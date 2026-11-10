@@ -582,6 +582,10 @@ msgid "%(seen)d/%(total)d seen (%(rate).0f%%)"
 msgstr "%(seen)d/%(total)d ορατά (%(rate).0f%%)"
 
 #, python-format
+msgid "%(state)s (%(stock)s)"
+msgstr "%(state)s (%(stock)s)"
+
+#, python-format
 msgid "%(store)s reached billing stage %(stage)s"
 msgstr "Το %(store)s έφτασε στο στάδιο χρέωσης %(stage)s"
 
@@ -1414,12 +1418,11 @@ msgstr "Ενεργές ετικέτες"
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 msgstr "Ενεργές μέθοδοι πληρωμής που μπορεί να εξοφλήσει αυτός ο συνδυασμός (provider, kind), με τους ίδιους κανόνες που εφαρμόζει η ολοκλήρωση αγοράς όταν τον επιλέγει ο αγοραστής. Δηλώνεται ως γεγονός ανά επιλογή και όχι ως 'αποκλειστικό σε αυτή τη γραμμή': το storefront συγχωνεύει πολλούς μεταφορείς σε μία κάρτα παράδοσης στο σπίτι, οπότε μόνο αυτό γνωρίζει ποιες γραμμές εμφανίζει πραγματικά και μπορεί να υπολογίσει τι ξεκλειδώνει αποκλειστικά μια συγκεκριμένη επιλογή. Επιτρέπει στο βήμα παράδοσης να προβάλλει ένα προϊόν αποκλειστικό του μεταφορέα — η BOX NOW Αντικαταβολή είναι διαθέσιμη ΜΟΝΟ μέσω locker BoxNow, και ένας αγοραστής που δεν επιλέγει ποτέ locker δεν έχει τρόπο να ανακαλύψει ότι υπάρχει."
 
+msgid "Active products still in stock but at or below their low-stock threshold"
+msgstr "Ενεργά προϊόντα που έχουν ακόμη απόθεμα, αλλά στο όριο χαμηλού αποθέματος ή κάτω από αυτό"
+
 msgid "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
 msgstr "Ενεργά προϊόντα με όλα τα χαρακτηριστικά και τις εικόνες τους, για τα feeds του καταλόγου. Φιλτράρονται, ταξινομούνται και σελιδοποιούνται όπως η λίστα προϊόντων."
-
-#, python-format
-msgid "Active products with fewer than %(count)s left"
-msgstr "Ενεργά προϊόντα με απόθεμα κάτω από %(count)s"
 
 msgid "Activity"
 msgstr "Δραστηριότητα"
@@ -3849,15 +3852,8 @@ msgstr "Πιστωμένη απόδειξη"
 msgid "Credits receipt %(number)s"
 msgstr "Πιστώνει την απόδειξη %(number)s"
 
-#, python-format
-msgid "Critical (%(stock)s)"
-msgstr "Κρίσιμο (%(stock)s)"
-
 msgid "Critical Priority"
 msgstr "Κρίσιμη προτεραιότητα"
-
-msgid "Critical Stock (1-5)"
-msgstr "Κρίσιμο απόθεμα (1-5)"
 
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr "Κρυπτογραφικά τυχαίος, με κεφαλαία· το μυστικό του κατόχου"
@@ -7188,9 +7184,6 @@ msgstr "Υψηλός συντελεστής"
 msgid "High Reservations (>50% stock)"
 msgstr "Υψηλές Δεσμεύσεις (>50% αποθέματος)"
 
-msgid "High Stock (>50)"
-msgstr "Υψηλό απόθεμα (>50)"
-
 msgid "High Usage (21-50)"
 msgstr "Υψηλή χρήση (21-50)"
 
@@ -7480,9 +7473,6 @@ msgstr "Εισαγωγή: {created} δημιουργήθηκαν, {updated} εν
 msgid "Impression"
 msgstr "Προβολή"
 
-msgid "In Stock (>0)"
-msgstr "Διαθέσιμα (>0)"
-
 #, python-format
 msgid "In case you forgot, your username is %(username)s."
 msgstr "Σε περίπτωση που το ξεχάσατε, το όνομα χρήστη σας είναι %(username)s."
@@ -7495,10 +7485,6 @@ msgstr "Σε αποθήκη"
 
 msgid "In stock"
 msgstr "Σε απόθεμα"
-
-#, python-format
-msgid "In stock (%(stock)s)"
-msgstr "Διαθέσιμο (%(stock)s)"
 
 #, python-format
 msgid "In the last %(days)s days"
@@ -8274,18 +8260,11 @@ msgstr "Αγαπημένα (πολλές επισημάνσεις)"
 msgid "Low"
 msgstr "Χαμηλό"
 
-#, python-format
-msgid "Low (%(stock)s)"
-msgstr "Χαμηλό (%(stock)s)"
-
 msgid "Low Priority"
 msgstr "Χαμηλή προτεραιότητα"
 
 msgid "Low Rate"
 msgstr "Χαμηλός συντελεστής"
-
-msgid "Low Stock (1-10)"
-msgstr "Χαμηλό απόθεμα (1-10)"
 
 msgid "Low Stock Alert"
 msgstr "Ειδοποίηση χαμηλού αποθέματος"
@@ -10080,9 +10059,6 @@ msgstr "Λοιπά έξοδα"
 
 msgid "Out for delivery"
 msgstr "Σε διανομή"
-
-msgid "Out of Stock (0)"
-msgstr "Εξαντλημένα (0)"
 
 msgid "Out of stock"
 msgstr "Εξαντλημένο"
@@ -17943,6 +17919,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Active Orders (Pending/Processing)"
 #~ msgstr "Ενεργές Παραγγελίες (Σε εκκρεμότητα/Σε επεξεργασία)"
 
+#, python-format
+#~ msgid "Active products with fewer than %(count)s left"
+#~ msgstr "Ενεργά προϊόντα με απόθεμα κάτω από %(count)s"
+
 #~ msgid "Additional gallery images"
 #~ msgstr "Επιπλέον εικόνες συλλογής"
 
@@ -18126,6 +18106,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Country Analytics"
 #~ msgstr "Αναλυτικά ανά χώρα"
+
+#~ msgid "Critical Stock (1-5)"
+#~ msgstr "Κρίσιμο απόθεμα (1-5)"
 
 #~ msgid "Crontab Schedules"
 #~ msgstr "Προγραμματισμοί Crontab"
@@ -18346,6 +18329,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Hero section image"
 #~ msgstr "Εικόνα ενότητας hero"
 
+#~ msgid "High Stock (>50)"
+#~ msgstr "Υψηλό απόθεμα (>50)"
+
 #~ msgid "High VAT (25% - 50%)"
 #~ msgstr "Υψηλός ΦΠΑ (25% - 50%)"
 
@@ -18372,6 +18358,13 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "In Fulfillment (Shipped/Delivered)"
 #~ msgstr "Σε Διεκπεραίωση (Απεσταλμένες/Παραδομένες)"
+
+#~ msgid "In Stock (>0)"
+#~ msgstr "Διαθέσιμα (>0)"
+
+#, python-format
+#~ msgid "In stock (%(stock)s)"
+#~ msgstr "Διαθέσιμο (%(stock)s)"
 
 #~ msgid "Inactive user notification"
 #~ msgstr "Ειδοποίηση ανενεργού χρήστη"
@@ -18468,6 +18461,13 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Location type, e.g. HOME or OFFICE (optional)"
 #~ msgstr "Τύπος τοποθεσίας, π.χ. HOME ή OFFICE (προαιρετικό)"
+
+#, python-format
+#~ msgid "Low (%(stock)s)"
+#~ msgstr "Χαμηλό (%(stock)s)"
+
+#~ msgid "Low Stock (1-10)"
+#~ msgstr "Χαμηλό απόθεμα (1-10)"
 
 #~ msgid "Low Stock — replenish soon"
 #~ msgstr "Χαμηλό Απόθεμα — επανεφοδιασμός σύντομα"
@@ -18707,6 +18707,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Orders this month"
 #~ msgstr "Παραγγελίες αυτόν τον μήνα"
+
+#~ msgid "Out of Stock (0)"
+#~ msgstr "Εξαντλημένα (0)"
 
 #~ msgid "Output file path (default: analytics_export.json)"
 #~ msgstr "Διαδρομή αρχείου εξόδου (προεπιλογή: analytics_export.json)"

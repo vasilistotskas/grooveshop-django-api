@@ -44,6 +44,7 @@ from admin.displays import ORDER_STATUS_VARIANT, label_cell, link_cell, money
 from admin.features import RETAIL_DOCUMENTS, store_features
 from admin.navigation import changelist_link
 from order.enum.status import OrderStatus
+from product.enum.stock import StockState
 
 PERIOD_LABELS = {
     "7d": (_("7 days"), _("Last 7 days")),
@@ -421,10 +422,14 @@ class StoreAttention(DashboardWidget):
                 "inventory_2",
                 "warning",
                 _("Running low on stock"),
-                _("Active products with fewer than %(count)s left")
-                % {"count": queries.LOW_STOCK_BELOW},
+                _(
+                    "Active products still in stock but at or below their "
+                    "low-stock threshold"
+                ),
                 "product.Product",
-                f"active__exact=1&stock__gt=0&stock__lt={queries.LOW_STOCK_BELOW}",
+                urlencode(
+                    {"active__exact": 1, "stock_status": StockState.LOW_STOCK}
+                ),
             ),
             (
                 features.live(RETAIL_DOCUMENTS),

@@ -57,6 +57,7 @@ from core.units import DistanceUnits, WeightUnits
 from order.models.order import Order
 from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
+from product.enum.stock import StockState
 from product.forms import ApplyDiscountForm
 from product.models.attribute import Attribute
 from product.models.attribute_value import AttributeValue
@@ -88,10 +89,9 @@ from user.models.account import UserAccount
 COMMENT_EXCERPT_CHARS = 80
 
 STOCK_STATUS_VARIANT: dict[str, str] = {
-    "out": "danger",
-    "critical": "warning",
-    "low": "warning",
-    "in_stock": "success",
+    StockState.OUT_OF_STOCK: "danger",
+    StockState.LOW_STOCK: "warning",
+    StockState.IN_STOCK: "success",
 }
 
 STOCK_RESERVATION_STATUS_VARIANT: dict[str, str] = {
@@ -118,32 +118,13 @@ class StockStatusFilter(DropdownFilter):
     parameter_name = "stock_status"
 
     def lookups(self, request, model_admin):
-        return [
-            ("in_stock", _("In Stock (>0)")),
-            ("low_stock", _("Low Stock (1-10)")),
-            ("out_of_stock", _("Out of Stock (0)")),
-            ("high_stock", _("High Stock (>50)")),
-            ("critical_stock", _("Critical Stock (1-5)")),
-        ]
+        return StockState.choices
 
     def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "in_stock":
-                filter_kwargs = {"stock__gt": 0}
-            case "low_stock":
-                filter_kwargs = {"stock__range": (1, 10)}
-            case "out_of_stock":
-                filter_kwargs = {"stock": 0}
-            case "high_stock":
-                filter_kwargs = {"stock__gt": 50}
-            case "critical_stock":
-                filter_kwargs = {"stock__range": (1, 5)}
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
+        value = self.value()
+        if value not in StockState.values:
+            return queryset
+        return queryset.by_stock_state(StockState(value))
 
 
 class PriceRangeFilter(DropdownFilter):
@@ -1214,6 +1195,7 @@ class ProductAdmin(
             "price_currency",
             "discount_percent",
             "stock",
+            "low_stock_threshold",
             "view_count",
             "created_at",
             "updated_at",
@@ -1290,14 +1272,11 @@ class ProductAdmin(
         description=_("Stock"), label=STOCK_STATUS_VARIANT, ordering="stock"
     )
     def stock_status(self, obj):
-        stock = obj.stock
-        if stock == 0:
-            return "out", _("Out of stock")
-        if stock <= 5:
-            return "critical", _("Critical (%(stock)s)") % {"stock": stock}
-        if stock <= 10:
-            return "low", _("Low (%(stock)s)") % {"stock": stock}
-        return "in_stock", _("In stock (%(stock)s)") % {"stock": stock}
+        state = obj.stock_state
+        return state, _("%(state)s (%(stock)s)") % {
+            "state": state.label,
+            "stock": obj.stock,
+        }
 
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
@@ -1693,12 +1672,7 @@ class ProductAdmin(
             for log in logs
         ]
 
-        if product.stock == 0:
-            stock_state = (_("Out of stock"), "danger")
-        elif 0 < product.stock <= product.low_stock_threshold:
-            stock_state = (_("Low stock"), "warning")
-        else:
-            stock_state = (_("In stock"), "success")
+        stock_state = product.stock_state
 
         context = {
             **self.admin_site.each_context(request),
@@ -1707,6 +1681,7 @@ class ProductAdmin(
             "original": product,
             "product": product,
             "stock_state": stock_state,
+            "stock_tone": STOCK_STATUS_VARIANT[stock_state],
             "window_days": window_days,
             "windows": windows,
             "has_activity": bool(totals),

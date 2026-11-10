@@ -3157,16 +3157,18 @@ class AcsService:
                 # portal rather than minted by the shop — and 30 days of
                 # logs contained not one unmatched-payout warning.
                 unmatched += 1
+                # The amounts as booked on the payout row (the raw ACS
+                # strings stay in its raw_payload).
                 logger.warning(
                     "reconcile_cod_payouts: payout matches no shipment — "
-                    "voucher=%r customer_code=%r amount=%r cash=%r card=%r "
+                    "voucher=%r customer_code=%r amount=%s cash=%s card=%s "
                     "delivered=%r picked_up=%r receiver=%r sender=%r "
                     "ref1=%r ref2=%r cod_payment_date=%r",
                     voucher_no,
                     row.get("Customer_Code"),
-                    row.get("Parcel_COD_Amount"),
-                    row.get("COD_Amount_Cach"),
-                    row.get("COD_Amount_CreditCard"),
+                    defaults["cod_amount_total"].amount,
+                    defaults["cod_amount_cash"].amount,
+                    defaults["cod_amount_card"].amount,
                     row.get("Parcel_Delivery_Date"),
                     row.get("Parcel_Pickup_Date"),
                     row.get("Parcel_Receiver"),

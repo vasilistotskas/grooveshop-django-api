@@ -39,6 +39,7 @@ from core.utils.generators import SlugifyConfig, unique_slugify
 from core.utils.html_text import visible_text
 from core.weight import zero_weight
 from meili.models import IndexMixin
+from product.enum.stock import StockState
 from product.managers.image import ORDERED_IMAGES
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
@@ -491,6 +492,16 @@ class Product(
         """Whether a shopper may add it to a cart and check it out: active
         and not soft-deleted (deleting leaves ``active`` alone)."""
         return self.active and not self.is_deleted
+
+    @property
+    def stock_state(self) -> StockState:
+        """This row's ``StockState``; ``ProductQuerySet.by_stock_state``
+        is the same rule as a filter."""
+        if self.stock == 0:
+            return StockState.OUT_OF_STOCK
+        if self.stock <= self.low_stock_threshold:
+            return StockState.LOW_STOCK
+        return StockState.IN_STOCK
 
     @property
     def _history_user(self):

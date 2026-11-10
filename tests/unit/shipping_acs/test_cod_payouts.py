@@ -143,10 +143,11 @@ def test_reconcile_falls_back_to_customer_ref_order_uuid():
     )
 
 
-def test_reconcile_creates_orphan_row_when_shipment_missing():
+def test_reconcile_creates_orphan_row_when_shipment_missing(caplog):
     """ACS reports parcels we don't have AcsShipment rows for —
     those still need to be persisted, just without a FK link."""
-    result = _reconcile([{**_BASE_ROW, "POD": "9999000111"}])
+    with caplog.at_level("WARNING", logger="shipping_acs.services"):
+        result = _reconcile([{**_BASE_ROW, "POD": "9999000111"}])
 
     assert result == {
         "upserted": 1,
@@ -159,6 +160,8 @@ def test_reconcile_creates_orphan_row_when_shipment_missing():
     }
     payout = AcsCodPayout.objects.get(voucher_no="9999000111")
     assert payout.shipment_id is None
+    # The operator's warning names the amounts it booked, card included.
+    assert "amount=120.3 cash=0 card=120.3 " in caplog.text
 
 
 def test_reconcile_is_idempotent_on_voucher_date_pair():

@@ -3,6 +3,59 @@
 
 
 
+## v3.242.16 (2026-11-10)
+
+### Bug fixes
+
+* fix(security): remove the basis of five CodeQL false positives (#623)
+
+core.client_ip.trusted_client_ip is renamed edge_client_ip, after the
+proof it rests on (request_came_through_edge). CodeQL's sensitive-data
+heuristics treat any function whose name matches "trusted" as a source
+of secrets, so every log line that carried an address resolved through
+it (idempotency budget owner and scope kind, the Viva webhook's
+observed source IP) was a clear-text-logging alert. Callers, tests,
+docs and the agent rules follow the new name; behaviour is unchanged.
+
+The ACS unmatched-payout warning logs the amounts booked on the payout
+row instead of re-reading the raw ACS fields: a lookup keyed by
+"COD_Amount_CreditCard" is a private-data source by its name. The raw
+strings stay in the row's raw_payload, and a test now pins the logged
+amounts. ([`fe78eb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe78eb14d0815d46574cec720bed98d5a55efbd3))
+
+## v3.242.15 (2026-11-10)
+
+### Bug fixes
+
+* fix(product): one stock state from each product's low-stock threshold (#621) ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): one stock state from each product's low-stock threshold
+
+The admin's stock filter and changelist badge used fixed bands (low 1-10,
+critical 1-5, high >50) and the dashboard counter used stock below 10,
+while the low-stock email and the stock-history page compared stock with
+the product's own low_stock_threshold. A product with threshold 20 and 15
+in stock was emailed as low but listed as in stock; one with threshold 0
+(alerts off) and 4 in stock showed "Critical".
+
+StockState is now the one rule: out of stock at 0, low above 0 and at or
+below the threshold (a threshold of 0 is never low), otherwise in stock.
+Product.stock_state decides it for a row and ProductQuerySet.by_stock_state
+(with low_stock() and out_of_stock()) for a queryset. The filter, badge,
+stock-history page, low-stock email task, dashboard counter and sidebar
+badge, and the staff agent's lowStock list all read it. The fixed bands
+and LOW_STOCK_BELOW are removed, and the unused in_stock() queryset
+method, whose meaning contradicted the new state, is deleted.
+
+Closes #589 ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): say the low-stock tile counts in-stock products only
+
+The dashboard tile counts StockState.LOW_STOCK (stock above 0), but its
+description read as if sold-out products at their threshold were counted
+too. The test of its link now follows the href the widget renders rather
+than a query string of its own. ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
 ## v3.242.14 (2026-11-10)
 
 ### Bug fixes

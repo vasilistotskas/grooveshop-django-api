@@ -29,7 +29,7 @@ and correct means the request came through our zone, so its Cloudflare
 IP header is Cloudflare's; absent or wrong means fall back.
 
 It fails SAFE: if the Transform Rule is missing, the secret is unset, or
-the two drift apart, ``trusted_client_ip`` returns ``None`` and callers
+the two drift apart, ``edge_client_ip`` returns ``None`` and callers
 key on the peer Traefik saw (``client_ip_or_peer``), which is coarse but
 cannot be chosen by the caller.
 """
@@ -63,7 +63,7 @@ def request_came_through_edge(request: HttpRequest) -> bool:
     return constant_time_compare(presented, secret)
 
 
-def trusted_client_ip(request: HttpRequest) -> str | None:
+def edge_client_ip(request: HttpRequest) -> str | None:
     """Return the real client IP, or ``None`` if it cannot be trusted.
 
     ``None`` is a deliberate, meaningful answer: it means "provenance not
@@ -100,7 +100,7 @@ def client_ip_or_peer(request: HttpRequest) -> str:
     from the visitor's own ``CF-Connecting-IP``, which a caller hitting a
     node IP can set to anything.
     """
-    edge_ip = trusted_client_ip(request)
+    edge_ip = edge_client_ip(request)
     if edge_ip:
         return edge_ip
     hops = [

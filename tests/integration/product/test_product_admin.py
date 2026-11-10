@@ -98,13 +98,11 @@ class TestStockStatusFilter:
             admin_request, ProductAdmin(Product, AdminSite())
         )
 
-        assert len(lookups) == 5
-        lookup_values = [lookup[0] for lookup in lookups]
-        assert "in_stock" in lookup_values
-        assert "low_stock" in lookup_values
-        assert "out_of_stock" in lookup_values
-        assert "high_stock" in lookup_values
-        assert "critical_stock" in lookup_values
+        assert [lookup[0] for lookup in lookups] == [
+            "in_stock",
+            "low_stock",
+            "out_of_stock",
+        ]
 
     def test_filter_queryset_in_stock(self, admin_request):
         ProductFactory(stock=10)
@@ -356,7 +354,7 @@ class TestProductAdmin:
 
         result = product_admin.stock_status(product)
 
-        assert result[0] == "out"
+        assert result[0] == "out_of_stock"
 
     def test_created_display(self, product_admin):
         from django.utils import timezone

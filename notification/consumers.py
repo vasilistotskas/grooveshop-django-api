@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+# The heartbeat, a contract with the storefront's notifications socket
+# (`app/plugins/websocket.client.ts`): it sends HEARTBEAT_PING every 30
+# seconds and closes the socket when no answer comes back within 5. While
+# nothing answered, every signed-in tab reconnected about every 36 seconds
+# (storefront #414).
+HEARTBEAT_PING = "ping"
+HEARTBEAT_PONG = "pong"
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     user: AbstractBaseUser | AnonymousUser | None = None
@@ -105,5 +113,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         await self.close(code=4003)
 
     async def receive(self, text_data=None, bytes_data=None):
-        # This is a server-push-only channel; client messages are ignored.
+        # Server-push only: the heartbeat is the one client message that is
+        # answered, so the socket stays open; anything else is discarded.
+        if text_data == HEARTBEAT_PING:
+            await self.send(text_data=HEARTBEAT_PONG)
+            return
         logger.debug("Client message received and discarded (server-push only)")

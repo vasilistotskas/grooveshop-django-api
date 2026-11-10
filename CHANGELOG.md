@@ -3,6 +3,36 @@
 
 
 
+## v3.242.21 (2026-11-10)
+
+### Bug fixes
+
+* fix(notification): answer the storefront's heartbeat ping with pong (#516)
+
+The storefront's notifications socket sends `ping` every 30 seconds and
+closes the socket when no answer comes back within 5. The consumer
+discarded every client message, so every signed-in tab reconnected about
+every 36 seconds: a ticket, a handshake and a channel-group add and
+discard each time (185 handshakes an hour on production), and a push
+sent while the socket was down was lost.
+
+`receive` now answers `ping` with `pong` and still discards everything
+else. The storefront takes `pong` as the heartbeat's answer since
+storefront #418, which must be live before this is: the client before it
+would read the answer as a notification and log a parse error every 30
+seconds.
+
+A real-stack test connects a signed-in socket the way the storefront
+does (a ticket minted for the store, spent by the ticket auth) and gets
+`pong` for `ping` and nothing for any other frame.
+
+Refs vasilistotskas/grooveshop-storefront-ui-node-nuxt#414
+
+
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`05d3ab0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05d3ab00123d90dc7c057a0b109b9f4811fcc04d))
+
 ## v3.242.20 (2026-11-10)
 
 ### Bug fixes

@@ -6373,6 +6373,9 @@ msgstr "Forgotten your password or username?"
 msgid "Format"
 msgstr "Format"
 
+msgid "Found by"
+msgstr "Found by"
+
 msgid "Found nothing"
 msgstr "Found nothing"
 
@@ -10049,6 +10052,9 @@ msgstr "Other Change"
 
 msgid "Other expenses"
 msgstr "Other expenses"
+
+msgid "Our own unused voucher that ACS would not delete"
+msgstr "Our own unused voucher that ACS would not delete"
 
 msgid "Out for delivery"
 msgstr "Out for delivery"
@@ -14712,9 +14718,6 @@ msgstr "The payment provider's result for the failed call."
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "The payment this share is refunded against; none for gift cards and points."
 
-msgid "The pickup list run that first named the voucher."
-msgstr "The pickup list run that first named the voucher."
-
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 
@@ -14908,6 +14911,9 @@ msgstr "The selected shipping provider is currently unavailable."
 msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
 msgstr "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
 
+msgid "The shipment whose voucher request returned this voucher after another one was saved or the check was resolved, when ACS would not delete it."
+msgstr "The shipment whose voucher request returned this voucher after another one was saved or the check was resolved, when ACS would not delete it."
+
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
 
@@ -15010,6 +15016,9 @@ msgstr "The voucher is already cancelled."
 
 msgid "The voucher number as the ACS portal shows it."
 msgstr "The voucher number as the ACS portal shows it."
+
+msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
+msgstr "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "The wholesale pricing tier this business gets"
@@ -15919,6 +15928,9 @@ msgstr "Untitled Product"
 
 msgid "Unused Tags"
 msgstr "Unused Tags"
+
+msgid "Unused answer for shipment"
+msgstr "Unused answer for shipment"
 
 #, python-format
 msgid "Update %(name)s information. Requires authentication."

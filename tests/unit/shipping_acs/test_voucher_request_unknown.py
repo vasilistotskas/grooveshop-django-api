@@ -943,13 +943,18 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         assert acs.deleted == []
         assert "orphan_vouchers" not in shipment.metadata
 
-    def test_an_orphan_acs_still_holds_is_raised_once_as_matching_no_order(
+    def test_a_voucher_acs_would_not_delete_is_in_the_staff_list_at_once(
         self, acs, sent, monkeypatch
     ):
-        """The orphan entry is a record, not a request to act: nothing
-        counts or alerts on it. If ACS still holds the voucher, the next
-        refused pickup list raises it once as a voucher matching no order,
-        the one record staff act on, and they may delete it there."""
+        """No pickup list needed: the refused delete itself records the
+        voucher where staff look (the list and its dashboard counter). A
+        later pickup-list naming finds the same row, and staff can delete
+        it from there."""
+        from shipping_acs.attention import unrecognised_vouchers
+        from shipping_acs.models.unrecognised_voucher import (
+            AcsUnrecognisedVoucherSource,
+        )
+
         acs.delete_error = AcsAPIError(
             alias="ACS_Delete_Voucher", error_message="temporarily refused"
         )
@@ -957,16 +962,19 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         shipment = self._late_answer(
             acs, monkeypatch, lambda s: self._request_again(s)
         )
+
         assert shipment.metadata["orphan_vouchers"] == [V1]
+        row = AcsUnrecognisedVoucher.objects.get(voucher_no=V1)
+        assert row.source == AcsUnrecognisedVoucherSource.REFUSED_DELETE
+        assert row.duplicate_of_id == shipment.pk
+        assert list(unrecognised_vouchers()) == [row]
+
         AcsShipment.objects.filter(pk=shipment.pk).update(
             metadata={"orphan_vouchers": [V1]}
         )
-
         AcsService._raise_unrecognised_vouchers([V1], timezone.localdate())
-        AcsService._raise_unrecognised_vouchers([V1], timezone.localdate())
+        assert AcsUnrecognisedVoucher.objects.filter(voucher_no=V1).count() == 1
 
-        row = AcsUnrecognisedVoucher.objects.get(voucher_no=V1)
-        assert _types(sent).count("ops.acs_unrecognised_vouchers") == 1
         acs.delete_error = None
         AcsService.delete_unrecognised_voucher(row, user=None, note="orphan")
         assert acs.deleted == [V1]
@@ -1045,7 +1053,7 @@ class TestAResetWhileAMintIsInFlight:
         assert acs.deleted == []
         assert len(acs.creates) == 1
 
-    def test_a_reset_turns_an_expired_claim_into_the_unknown_state(
+    def test_a_reset_records_an_expired_claim_as_unknown_and_refuses(
         self, acs, sent
     ):
         stale = timezone.now() - timedelta(
@@ -1056,16 +1064,57 @@ class TestAResetWhileAMintIsInFlight:
             shipment_state=AcsShipmentState.CANCELED
         )
 
-        AcsService.reset_shipment_for_remint(shipment)
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.reset_shipment_for_remint(shipment)
 
+        # The unknown state is true whatever happens to the reset: it is
+        # kept, alerted once, and the shipment is NOT reset.
         shipment.refresh_from_db()
-        assert shipment.shipment_state == AcsShipmentState.PENDING_CREATION
+        assert shipment.shipment_state == AcsShipmentState.CANCELED
         assert shipment.voucher_request_unknown_at is not None
         assert "mint_started_at" not in shipment.metadata
         assert _types(sent) == ["ops.acs_voucher_request_unknown"]
-        with pytest.raises(AcsVoucherRequestUnknownError):
-            AcsService.create_voucher_for_order(shipment.order)
         assert acs.creates == []
+
+    def test_issue_voucher_now_on_an_expired_claim_queues_nothing(
+        self, acs, sent
+    ):
+        """The admin used to flash "minting a fresh voucher" and queue a
+        task the mint then refused. It now shows the guard's guidance."""
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+
+        from shipping_acs.admin import AcsShipmentAdmin, voucher_check_message
+
+        stale = timezone.now() - timedelta(
+            seconds=AcsService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _shipment(metadata={"mint_started_at": stale.isoformat()})
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            shipment_state=AcsShipmentState.CANCELED
+        )
+        request = RequestFactory().get("/")
+        request.user = get_user_model()(id=1, username="staff")
+
+        with (
+            patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ) as dispatched,
+            patch("django.contrib.messages.error") as refused,
+            patch("django.contrib.messages.info") as told,
+        ):
+            AcsShipmentAdmin(AcsShipment, AdminSite()).issue_voucher_now(
+                request, shipment.pk
+            )
+
+        dispatched.assert_not_called()
+        told.assert_not_called()
+        shipment.refresh_from_db()
+        [call] = refused.call_args_list
+        assert str(call.args[1]) == str(voucher_check_message(shipment))
+        assert shipment.shipment_state == AcsShipmentState.CANCELED
+        assert _types(sent) == ["ops.acs_voucher_request_unknown"]
 
 
 class TestALateWorkerAndARequestAgain:

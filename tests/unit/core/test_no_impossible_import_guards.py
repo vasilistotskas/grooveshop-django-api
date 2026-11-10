@@ -224,3 +224,46 @@ def test_no_first_party_import_is_wrapped_in_a_catch_all():
         "the guard and let a real error surface:\n  "
         + "\n  ".join(sorted(offenders))
     )
+
+
+def _flagged(source: str) -> list[str]:
+    """Modules the detector flags in *source*, with `core` first-party."""
+    tree = ast.parse(source)
+    return [
+        module
+        for _lineno, module in _broadly_guarded_imports(
+            tree, frozenset({"core"})
+        )
+    ]
+
+
+def test_the_catch_all_detector_flags_a_seeded_offender():
+    """The guard proves itself: it must fail on the pattern it forbids."""
+    offenders = [
+        "try:\n    from core.models import X\nexcept Exception:\n    pass\n",
+        "try:\n    import core.cache\nexcept:\n    pass\n",
+        (
+            "try:\n    from core.models import X\n"
+            "except (OSError, BaseException):\n    pass\n"
+        ),
+    ]
+    for source in offenders:
+        assert _flagged(source) == ["core"], source
+
+
+def test_the_catch_all_detector_leaves_legitimate_code_alone():
+    clean = [
+        # Narrow except: a specific failure is the caller's business.
+        "try:\n    from core.models import X\nexcept ImportError:\n    pass\n",
+        # Third-party import: the other test owns it.
+        "try:\n    import requests\nexcept Exception:\n    pass\n",
+        # The try also does work, so the except may be catching that.
+        (
+            "try:\n    from core.models import X\n    X.objects.get()\n"
+            "except Exception:\n    pass\n"
+        ),
+        # No guard at all.
+        "from core.models import X\n",
+    ]
+    for source in clean:
+        assert _flagged(source) == [], source

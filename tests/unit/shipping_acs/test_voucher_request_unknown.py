@@ -853,7 +853,7 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         ]
 
     def test_after_request_again_the_late_voucher_is_not_saved(
-        self, acs, sent, monkeypatch
+        self, acs, sent, monkeypatch, caplog
     ):
         c_claim = {}
 
@@ -861,7 +861,19 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
             self._request_again(shipment)
             c_claim["stamp"] = self._mint_c_claims(shipment)
 
-        shipment = self._late_answer(acs, monkeypatch, request_again)
+        with caplog.at_level("WARNING", logger="shipping_acs.services"):
+            shipment = self._late_answer(acs, monkeypatch, request_again)
+
+        [record] = [
+            r
+            for r in caplog.records
+            if getattr(r, "phase", None) == "phase3_stale_answer"
+        ]
+        message = record.getMessage()
+        assert "after staff resolved the voucher check" in message
+        assert V1 in message
+        assert "None" not in message
+        assert record.voucher_no == V1
 
         assert shipment.voucher_no is None
         assert acs.deleted == [V1]
@@ -887,7 +899,7 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         assert shipment.metadata["mint_started_at"] == c_claim["stamp"]
 
     def test_after_request_again_saved_v2_first_the_late_v1_is_the_duplicate(
-        self, acs, sent, monkeypatch
+        self, acs, sent, monkeypatch, caplog
     ):
         """The other arrival order: C saved V2 before A's V1 came back,
         so V1 takes the duplicate path it always took."""
@@ -900,12 +912,16 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
                 metadata={},
             )
 
-        shipment = self._late_answer(
-            acs, monkeypatch, request_again_and_c_saves_v2
-        )
+        with caplog.at_level("WARNING", logger="shipping_acs.services"):
+            shipment = self._late_answer(
+                acs, monkeypatch, request_again_and_c_saves_v2
+            )
 
         assert shipment.voucher_no == V2
         assert acs.deleted == [V1]
+        phases = [getattr(r, "phase", None) for r in caplog.records]
+        assert "phase3_duplicate" in phases
+        assert "phase3_stale_answer" not in phases
 
     def test_after_adopting_the_same_number_the_late_answer_changes_nothing(
         self, acs, sent, monkeypatch

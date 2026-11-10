@@ -608,13 +608,31 @@ class AcsService:
             ):
                 # Another worker won the race, or staff resolved the
                 # check while this answer was out. Our voucher is unused.
-                logger.warning(
-                    "Unused voucher from a voucher request for order=%s: "
-                    "saved voucher %s, our answer %s — attempting cancel.",
-                    order.id,
-                    shipment.voucher_no,
-                    voucher_no,
-                )
+                extra = {
+                    "order_id": order.id,
+                    "shipment_pk": shipment.pk,
+                    "carrier": "acs",
+                    "voucher_no": voucher_no,
+                }
+                if shipment.voucher_no:
+                    logger.warning(
+                        "Concurrent voucher mint for order=%s: DB saved %s, "
+                        "we minted %s — attempting cancel.",
+                        order.id,
+                        shipment.voucher_no,
+                        voucher_no,
+                        extra={**extra, "phase": "phase3_duplicate"},
+                    )
+                else:
+                    logger.warning(
+                        "Late answer for order=%s after staff resolved the "
+                        "voucher check (requested again or closed): voucher "
+                        "%s is not saved — deleting it at ACS, or keeping "
+                        "it as an orphan if ACS refuses.",
+                        order.id,
+                        voucher_no,
+                        extra={**extra, "phase": "phase3_stale_answer"},
+                    )
                 try:
                     client.delete_voucher(voucher_no)
                     cls._settle_unrecognised_vouchers(

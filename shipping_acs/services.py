@@ -642,9 +642,11 @@ class AcsService:
             # IS the outcome, so it ends that state.
             late_answer = shipment.voucher_request_unknown_at is not None
             if late_answer:
+                # Within the 100-character history column for any
+                # 20-character voucher number.
                 shipment._change_reason = (
-                    f"A late answer from ACS (voucher {voucher_no}) resolved "
-                    "the voucher request of unknown outcome"
+                    f"A late answer saved voucher {voucher_no}; outcome no "
+                    "longer unknown"
                 )
             shipment.voucher_no = voucher_no
             shipment.shipment_state = AcsShipmentState.NEW
@@ -1689,10 +1691,10 @@ class AcsService:
                 fresh, order_needs_a_voucher=True
             )
             fresh.voucher_request_unknown_at = None
-            fresh._change_reason = (
-                "No voucher at ACS for the request of unknown outcome; "
-                f"requested again: {note}"
-            )
+            # The staff note goes on the order note only: the history
+            # column is short and the staging anonymiser keeps its text
+            # (``Kind.TEXT``), while a note's ``note`` key is replaced.
+            fresh._change_reason = "Voucher requested again by staff"
             fresh.save(update_fields=["voucher_request_unknown_at"])
             OrderHistory.log_note(
                 order=fresh.order,
@@ -1737,10 +1739,8 @@ class AcsService:
                 fresh, order_needs_a_voucher=False
             )
             fresh.voucher_request_unknown_at = None
-            fresh._change_reason = (
-                "Voucher request of unknown outcome closed, no voucher "
-                f"needed: {note.strip()}"
-            )
+            # The note goes on the order note only (see request_voucher_again).
+            fresh._change_reason = "Voucher check closed: no voucher needed"
             fresh.save(update_fields=["voucher_request_unknown_at"])
             OrderHistory.log_note(
                 order=fresh.order,

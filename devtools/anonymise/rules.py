@@ -311,7 +311,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
     # Staff describe the voucher in their own words, which can name the
     # recipient.
     "shipping_acs.AcsUnrecognisedVoucher": _scrub_all(
-        resolution_note=Kind.TEXT
+        resolution_note=Kind.FREE_TEXT
     ),
     "shipping_boxnow.BoxNowShipment": Scrub(
         order_fk="order", fields={"metadata": Kind.JSON}

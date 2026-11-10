@@ -940,6 +940,79 @@ class TestAnExpiredClaimSeenByADelete:
         assert _types(sent) == ["ops.acs_voucher_request_unknown"]
 
 
+class TestTypedNotesReachStagingReplaced:
+    """CodeRabbit on #626: a note staff type can name the recipient, so it
+    is stored only where the staging anonymiser replaces it whole
+    (``Kind.FREE_TEXT``, or a JSON key it reads as a note), never in a
+    ``Kind.TEXT`` column, which keeps everything but e-mails, phones and
+    the row's own known values."""
+
+    TYPED = "Spoke to Maria Papadopoulou, she has the parcel"
+
+    def test_the_resolution_note_of_a_voucher_matching_no_order(self):
+        from devtools.anonymise import rules
+
+        rule = rules.REGISTRY["shipping_acs.AcsUnrecognisedVoucher"]
+
+        assert rule.fields["resolution_note"] is rules.Kind.FREE_TEXT
+
+    @pytest.mark.parametrize("action", ["request_again", "close"])
+    def test_a_resolution_note_stays_out_of_the_shipment_history(
+        self, acs, sent, action
+    ):
+        from devtools.anonymise import rules
+        from devtools.anonymise.redaction import key_kind
+
+        shipment = _unknown_shipment(acs)
+        if action == "close":
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                shipment_state=AcsShipmentState.CANCELED
+            )
+            AcsService.close_voucher_request(
+                shipment, user=None, note=self.TYPED
+            )
+        else:
+            with patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ):
+                AcsService.request_voucher_again(
+                    shipment, user=None, note=self.TYPED
+                )
+
+        history = rules.REGISTRY["shipping_acs.HistoricalAcsShipment"]
+        assert history.fields["history_change_reason"] is rules.Kind.TEXT
+        assert not any(
+            self.TYPED in (row.history_change_reason or "")
+            for row in shipment.history.all()
+        )
+        [note] = [
+            h.new_value
+            for h in OrderHistory.objects.filter(
+                order_id=shipment.order_id, change_type="NOTE"
+            )
+            if self.TYPED in h.new_value.get("note", "")
+        ]
+        assert key_kind("note") is rules.Kind.FREE_TEXT
+        assert set(note) == {"note"}
+
+    def test_a_hand_confirmation_is_kept_only_in_the_order_note(
+        self, acs, sent
+    ):
+        shipment = _unknown_shipment(acs)
+        acs.summaries[V1] = {"voucher_no": V1, "recipient": "M. P."}
+
+        AcsService.adopt_voucher(
+            shipment, V1, user=None, confirmed_by_hand=self.TYPED
+        )
+
+        shipment.refresh_from_db()
+        assert self.TYPED not in str(shipment.metadata)
+        assert not any(
+            self.TYPED in (row.history_change_reason or "")
+            for row in shipment.history.all()
+        )
+
+
 class TestRequestAgain:
     def test_staff_who_found_no_voucher_get_exactly_one_new_request(
         self, acs, sent

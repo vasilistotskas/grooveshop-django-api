@@ -271,8 +271,10 @@ class TestWhileHeldNothingIsSent:
         assert waiting.voucher_request_unknown_at is None
         assert waiting.voucher_no is None
         assert waiting.shipment_state == AcsShipmentState.PENDING_CREATION
-        # No claim to expire into the unknown state, no error recorded.
+        # No claim to expire into the unknown state, no request an
+        # unknown state could belong to, no error recorded.
         assert "mint_started_at" not in (waiting.metadata or {})
+        assert "unknown_request" not in (waiting.metadata or {})
         assert "last_error" not in (waiting.metadata or {})
         # Nothing was sent, so it is not a request in flight for the
         # pickup-list run, a delete at ACS or a reset for a re-mint.

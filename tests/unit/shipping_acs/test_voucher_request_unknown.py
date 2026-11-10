@@ -1510,6 +1510,9 @@ class TestTwoLostAnswersWithTheHoldInForce:
         assert held["status"] == "voucher_request_held"
         assert second.voucher_request_unknown_at is None
         assert second.voucher_request_held_at is not None
+        # Held: it took no claim, so no unknown state can name it.
+        assert "mint_started_at" not in second.metadata
+        assert "unknown_request" not in second.metadata
         assert len(acs.creates) == 2
         assert AcsVoucherHold.objects.filter(ended_at__isnull=True).count() == 1
 

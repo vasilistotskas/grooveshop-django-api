@@ -52,31 +52,23 @@ class _Response:
 
 
 class TestConfiguration:
-    def test_not_configured_without_a_url(self, settings):
-        settings.AGENT_GATEWAY_INTERNAL_URL = ""
-        settings.AGENT_GATEWAY_INTERNAL_SECRET = "x"
+    @pytest.mark.parametrize(
+        ("url", "secret"),
+        [("", ""), ("", "x"), ("http://x", "")],
+        ids=["neither", "no-url", "no-secret"],
+    )
+    def test_unconfigured_is_a_no_op_not_an_error(self, settings, url, secret):
+        """A deployment without the gateway (or with half of its wiring)
+        must not have its cache purges fail, and sends nothing."""
+        settings.AGENT_GATEWAY_INTERNAL_URL = url
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = secret
 
-        assert not gateway.is_configured()
-
-    def test_not_configured_without_a_secret(self, settings):
-        settings.AGENT_GATEWAY_INTERNAL_URL = "http://x"
-        settings.AGENT_GATEWAY_INTERNAL_SECRET = ""
-
-        assert not gateway.is_configured()
-
-    def test_configured_with_both(self, configured):
-        assert gateway.is_configured()
-
-    def test_unconfigured_is_a_no_op_not_an_error(self, settings):
-        """A deployment without the gateway must not have its cache
-        purges fail."""
-        settings.AGENT_GATEWAY_INTERNAL_URL = ""
-        settings.AGENT_GATEWAY_INTERNAL_SECRET = ""
-
-        result = gateway.invalidate_feeds(schema_name="webside")
+        with patch("core.cache.gateway.requests.post") as post:
+            result = gateway.invalidate_feeds(schema_name="webside")
 
         assert result.removed == 0
         assert "not configured" in (result.error or "")
+        post.assert_not_called()
 
 
 class TestInvalidate:

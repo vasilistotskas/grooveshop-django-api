@@ -520,7 +520,6 @@ class CustomDjangoModelFactory(
 
 def custom_seeding(
     description: str | None = None,
-    settings_key: str | None = None,
     dependencies: list[str] | None = None,
 ):
     """
@@ -531,7 +530,6 @@ def custom_seeding(
     Usage:
         @custom_seeding(
             description="Seeds based on language settings",
-            settings_key="PARLER_LANGUAGES",
             dependencies=["Country"]
         )
         class MyFactory(CustomDjangoModelFactory):
@@ -546,9 +544,6 @@ def custom_seeding(
         if description:
             factory_class._seeding_description = description
 
-        if settings_key:
-            factory_class._settings_key = settings_key
-
         if dependencies:
             factory_class._dependencies = dependencies
 
@@ -559,11 +554,6 @@ def custom_seeding(
                     "_seeding_description",
                     f"Custom seeding for {cls.__name__}",
                 )
-            )
-
-        if not hasattr(factory_class, "get_settings_key"):
-            factory_class.get_settings_key = classmethod(
-                lambda cls: getattr(cls, "_settings_key", None)
             )
 
         if not hasattr(factory_class, "get_dependencies"):

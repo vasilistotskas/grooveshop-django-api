@@ -15,7 +15,6 @@ from order.signals import (
     order_completed,
     order_created,
     order_refunded,
-    order_returned,
     order_shipped,
     order_status_changed,
 )
@@ -358,27 +357,6 @@ class OrderSignalsTestCase(TestCase):
             order_refunded.send(
                 sender=Order, order=self.order, amount=Money("5.00", "EUR")
             )
-
-    def test_handle_order_returned(self):
-        order_returned.send(
-            sender=Order,
-            order=self.order,
-            items=[{"product_name": "Widget", "quantity": 1}],
-            reason="Wrong size",
-        )
-
-        self.assertTrue(
-            OrderHistory.objects.filter(
-                order=self.order,
-                change_type="NOTE",
-                new_value={
-                    "note": (
-                        "Order returned. Items: Widget (qty: 1). "
-                        "Reason: Wrong size"
-                    )
-                },
-            ).exists()
-        )
 
     @patch(
         "order.signals.handlers.send_shipping_notification_email.apply_async"

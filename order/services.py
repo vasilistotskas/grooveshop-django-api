@@ -233,9 +233,6 @@ class _ShareDeclined:
     declined: dict[str, Any]
 
 
-__all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
-
-
 def _violated_constraint(error: IntegrityError) -> str | None:
     """The constraint a database integrity error names, when the driver
     says (psycopg reports it as ``diag.constraint_name``, which for a
@@ -4674,8 +4671,9 @@ class OrderService:
         """Cancel an order whose shipment was canceled before it left.
 
         A carrier sync that finds the shipment CANCELED (ACS: the admin
-        retire action or a voucher cancel; BoxNow: a ``canceled`` parcel
-        event) is looking at a parcel that never shipped. Such an order
+        retire action or a voucher cancel; a BoxNow ``canceled`` parcel
+        leaves its order open, ``order.follow_up``) is looking at a
+        parcel that never shipped. Such an order
         is not "status CANCELED", it is a cancellation: stock goes back
         on the shelf, the reservation is released, the payment settled,
         the history and signals fired — everything :meth:`cancel_order`

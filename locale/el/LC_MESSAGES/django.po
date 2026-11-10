@@ -245,6 +245,10 @@ msgstr[0] "%(count)d αξιολόγηση απορρίφθηκε."
 msgstr[1] "%(count)d αξιολογήσεις απορρίφθηκαν."
 
 #, python-format
+msgid "%(count)d scheduled posts were left scheduled. Open a scheduled post and change its Published At date to publish it now."
+msgstr "%(count)d προγραμματισμένα άρθρα παρέμειναν προγραμματισμένα. Ανοίξτε ένα προγραμματισμένο άρθρο και αλλάξτε την ημερομηνία «Δημοσιεύθηκε στις» για να το δημοσιεύσετε τώρα."
+
+#, python-format
 msgid "%(count)d shipment(s) skipped — no parcel ID assigned yet."
 msgstr "%(count)d αποστολή/ές παραλείφθηκαν — δεν έχει ανατεθεί ακόμη parcel ID."
 
@@ -8739,6 +8743,9 @@ msgstr "Χρειάζεται παρακολούθηση"
 
 msgid "Needs follow-up since"
 msgstr "Χρειάζεται παρακολούθηση από"
+
+msgid "Needs follow-up: the parcel was canceled while the order is still open. Create a new parcel or cancel the order."
+msgstr "Χρειάζεται παρακολούθηση: το δέμα ακυρώθηκε ενώ η παραγγελία είναι ακόμη ανοιχτή. Δημιουργήστε νέο δέμα ή ακυρώστε την παραγγελία."
 
 msgid "Nested BoxNow locker details"
 msgstr "Ενσωματωμένα στοιχεία locker BoxNow"

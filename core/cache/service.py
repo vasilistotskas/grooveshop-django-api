@@ -254,11 +254,9 @@ class CacheService:
     def _log_audit(
         report: PurgeReport, *, actor: AbstractBaseUser | None
     ) -> None:
-        try:
-            from core.cache.models import CachePurgeLog
-        except Exception:  # pragma: no cover — model unavailable
-            return
         from django.db import connection
+
+        from core.cache.models import CachePurgeLog
 
         resolved_actor = actor if actor and actor.is_authenticated else None
         try:

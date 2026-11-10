@@ -609,6 +609,13 @@ class State:
             mydata_status=MyDataStatus.CANCELED
         )
 
+    def reserved_on(self, charge):
+        """What PENDING refund attempts hold back from one payment."""
+        return sum(
+            (a.amount.amount for a in charge.refund_attempts.live()),
+            Decimal(0),
+        )
+
     def live(self):
         return list(
             RefundAttempt.objects.live()
@@ -675,7 +682,7 @@ class State:
             self.resolve(live[int(a * len(live)) % len(live)], ev)
         elif ev == "dashboard":
             options = [
-                (c, PaymentLedger.left_on(c) - PaymentLedger.reserved_on(c))
+                (c, PaymentLedger.left_on(c) - self.reserved_on(c))
                 for c in self.charges()
             ]
             options = [(c, left) for c, left in options if left > 0]
@@ -731,7 +738,7 @@ class State:
             )
         elif ev == "chargeback":
             options = [
-                (c, PaymentLedger.left_on(c) - PaymentLedger.reserved_on(c))
+                (c, PaymentLedger.left_on(c) - self.reserved_on(c))
                 for c in self.charges()
             ]
             options = [(c, left) for c, left in options if left > 0]

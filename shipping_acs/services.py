@@ -1673,8 +1673,11 @@ class AcsService:
 
         First ACS must hold the voucher for the store: a row from
         ``ACS_Trackingsummary`` (manual, April 2026, p. 18-19), or an
-        open row ACS named on a refused pickup list (p. 14). Nothing
-        overrides that.
+        open row ACS named on a refused pickup list (p. 14). One
+        exception: a number recorded on THIS shipment as our own unused
+        voucher that ACS refused to delete. Our own record is then the
+        evidence, and a hand confirmation is still required. Nothing
+        else overrides it.
 
         Then it must be this order's, and the only automatic yes is the
         summary's ``recipient`` equal to the ``Recipient_Name`` the lost
@@ -1798,8 +1801,8 @@ class AcsService:
         """Give a shipment the voucher ACS made for its lost request.
 
         Staff found the voucher in the ACS portal. The number must belong
-        to no other shipment, and ACS must confirm it is this order's
-        (:meth:`_confirm_voucher_at_acs`). No second voucher request is
+        to no other shipment, and it must be confirmed as this order's
+        (:meth:`_confirm_voucher_at_acs`: by ACS, or by staff by hand). No second voucher request is
         sent. Every check is repeated under the shipment's row lock, and
         a concurrent adopt of the same number is answered with the same
         refusal, never an ``IntegrityError``.

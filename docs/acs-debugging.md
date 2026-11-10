@@ -133,7 +133,10 @@ shipment:
   number (its voucher, a multipart child, a previous or duplicate voucher).
   ACS must hold it for the store (an `ACS_Trackingsummary` row, p. 18-19,
   or an open "voucher matching no order" that ACS named on a refused
-  pickup list); nothing overrides that. Then it must be this order's: the
+  pickup list). One exception: a number recorded on this shipment as our
+  own unused voucher that ACS refused to delete. That record is the
+  evidence, and "Confirmed by hand" is still required. Nothing else
+  overrides it. Then it must be this order's: the
   summary's `recipient` must equal the `Recipient_Name` the lost request
   sent (from `metadata["last_error"]`, else the `AcsApiCall` row, else the
   order), compared without accents, case or extra spaces. The manual

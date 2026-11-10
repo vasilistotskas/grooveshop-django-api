@@ -109,7 +109,8 @@ ALLOWED_TAGS = {
 }
 
 ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
-    "a": {"href", "title", "target"},
+    # ``rel`` is kept only so ``_SET_ATTRIBUTES`` can overwrite it in place.
+    "a": {"href", "rel", "title", "target"},
     "col": {"span"},
     "iframe": {
         "src",
@@ -147,9 +148,15 @@ ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
     "*": {"class", "dir", "hidden", "id", "lang", "style", "title"},
 }
 
-# nh3 always sets ``rel`` on links itself, so ``rel`` is not in the
-# allowlist and the one an editor typed is replaced rather than kept.
-_LINK_REL = "noopener noreferrer"
+# Every link's ``rel``: the value an editor typed is replaced, never kept.
+# Set through ``set_tag_attribute_values`` rather than nh3's ``link_rel``,
+# so the output is a fixed point. ``link_rel`` drops any ``rel`` and
+# appends a new one, and ammonia removes an attribute the
+# ``attribute_filter`` drops with ``swap_remove``, which moves that last
+# attribute into the gap: ``<a class="MsoX" href>`` came out as
+# ``<a rel href>`` and, on the next pass, ``<a href rel>``. An allowed
+# ``rel`` is overwritten where it stands, so once placed it stays.
+_SET_ATTRIBUTES = {"a": {"rel": "noopener noreferrer"}}
 
 
 def is_allowed_embed_url(src: str) -> bool:
@@ -386,7 +393,8 @@ def sanitize_html(html: str) -> str:
         tags=ALLOWED_TAGS,
         attributes=ALLOWED_ATTRIBUTES,
         attribute_filter=_filter_attribute,
-        link_rel=_LINK_REL,
+        set_tag_attribute_values=_SET_ATTRIBUTES,
+        link_rel=None,
     )
 
 

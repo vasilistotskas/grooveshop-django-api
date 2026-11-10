@@ -6412,6 +6412,9 @@ msgstr "Ξεχάσατε τον κωδικό πρόσβασης ή το όνομ
 msgid "Format"
 msgstr "Μορφή"
 
+msgid "Found by"
+msgstr "Εντοπίστηκε από"
+
 msgid "Found nothing"
 msgstr "Χωρίς αποτελέσματα"
 
@@ -10117,6 +10120,9 @@ msgstr "Άλλη αλλαγή"
 
 msgid "Other expenses"
 msgstr "Λοιπά έξοδα"
+
+msgid "Our own unused voucher that ACS would not delete"
+msgstr "Δικό μας αχρησιμοποίητο voucher που η ACS δεν διέγραψε"
 
 msgid "Out for delivery"
 msgstr "Σε διανομή"
@@ -14791,9 +14797,6 @@ msgstr "Το αποτέλεσμα του παρόχου πληρωμών για 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο· καμία για δωροκάρτες και πόντους."
 
-msgid "The pickup list run that first named the voucher."
-msgstr "Η εκτέλεση λίστας παραλαβής που ανέφερε πρώτη το voucher."
-
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "Η πλατφόρμα πρόσθεσε το παρακάτω κείμενο στη δική της εκδοχή αυτού του εγγράφου. Η σελίδα σας δεν άλλαξε αυτόματα, επειδή το κείμενό της (ή μια μετάφρασή της) είναι δικό σας. Προσθέστε το κείμενο σε κάθε γλώσσα που εξυπηρετεί το κατάστημά σας, προσαρμόζοντάς το αν το κατάστημά σας λειτουργεί διαφορετικά, και μετά επιλέξτε τη σελίδα στη λίστα και εκτελέστε «Σήμανση ενημέρωσης νομικού κειμένου ως ελεγμένης»."
 
@@ -14987,6 +14990,9 @@ msgstr "Ο επιλεγμένος μεταφορέας δεν είναι δια�
 msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
 msgstr "Το κλειδί αποστολής της δικής σας ομάδας Resend, περιορισμένο στο επαληθευμένο domain. Μυστικό. Χρησιμοποιείται μόνο όσο το From Email είναι επαληθευμένο· ένα κατάστημα χωρίς δικό του domain στέλνει μέσω της ομάδας της πλατφόρμας. ΔΕΝ υπάρχει εναλλακτική από την πλατφόρμα για κατάστημα με επαληθευμένο domain: αν είναι κενό, τα email του δεν στέλνονται."
 
+msgid "The shipment whose voucher request returned this voucher after another one was saved or the check was resolved, when ACS would not delete it."
+msgstr "Η αποστολή της οποίας το αίτημα voucher επέστρεψε αυτό το voucher αφού είχε αποθηκευτεί άλλο ή είχε διευθετηθεί ο έλεγχος, όταν η ACS δεν το διέγραψε."
+
 msgid "The shipping of this order was already refunded."
 msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
 
@@ -15089,6 +15095,9 @@ msgstr "Το voucher έχει ήδη ακυρωθεί."
 
 msgid "The voucher number as the ACS portal shows it."
 msgstr "Ο αριθμός του voucher όπως τον δείχνει η πύλη της ACS."
+
+msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
+msgstr "Η ημερομηνία παραλαβής του voucher: η εκτέλεση λίστας παραλαβής που το ανέφερε πρώτη, ή η ημερομηνία που έφερε το αίτημα voucher του."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει αυτή η επιχείρηση"
@@ -16001,6 +16010,9 @@ msgstr "Προϊόν χωρίς τίτλο"
 
 msgid "Unused Tags"
 msgstr "Μη χρησιμοποιημένες ετικέτες"
+
+msgid "Unused answer for shipment"
+msgstr "Αχρησιμοποίητη απάντηση για την αποστολή"
 
 #, python-format
 msgid "Update %(name)s information. Requires authentication."

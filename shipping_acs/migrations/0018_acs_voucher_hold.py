@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('shipping_acs', '0016_acs_voucher_request_unknown'),
+        ('shipping_acs', '0017_acs_unrecognised_voucher_source'),
     ]
 
     operations = [

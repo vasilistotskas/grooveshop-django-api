@@ -15,6 +15,14 @@ class AcsUnrecognisedVoucherResolution(models.TextChoices):
     CHECKED = "checked", _("Checked by staff")
 
 
+class AcsUnrecognisedVoucherSource(models.TextChoices):
+    PICKUP_LIST = "pickup_list", _("Named by ACS on a refused pickup list")
+    REFUSED_DELETE = (
+        "refused_delete",
+        _("Our own unused voucher that ACS would not delete"),
+    )
+
+
 class AcsUnrecognisedVoucher(TimeStampMixinModel):
     """A voucher ACS holds for the store that matches no shipment.
 
@@ -31,7 +39,30 @@ class AcsUnrecognisedVoucher(TimeStampMixinModel):
     )
     pickup_date = models.DateField(
         _("Pickup date"),
-        help_text=_("The pickup list run that first named the voucher."),
+        help_text=_(
+            "The voucher's pickup date: the pickup list run that first named "
+            "it, or the date its voucher request carried."
+        ),
+    )
+    source = models.CharField(
+        _("Found by"),
+        max_length=24,
+        choices=AcsUnrecognisedVoucherSource.choices,
+        default=AcsUnrecognisedVoucherSource.PICKUP_LIST,
+        db_default=AcsUnrecognisedVoucherSource.PICKUP_LIST,
+    )
+    duplicate_of = models.ForeignKey(
+        "shipping_acs.AcsShipment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="unused_vouchers",
+        verbose_name=_("Unused answer for shipment"),
+        help_text=_(
+            "The shipment whose voucher request returned this voucher after "
+            "another one was saved or the check was resolved, when ACS "
+            "would not delete it."
+        ),
     )
     first_seen_at = models.DateTimeField(_("First named by ACS at"))
     last_seen_at = models.DateTimeField(_("Last named by ACS at"))

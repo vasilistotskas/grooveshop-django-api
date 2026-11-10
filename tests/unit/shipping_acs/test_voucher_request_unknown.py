@@ -822,6 +822,421 @@ class TestALateAnswerAfterStaffAdopted:
         assert shipment.metadata["orphan_vouchers"] == [V2]
 
 
+class TestALateAnswerAfterStaffResolvedTheCheck:
+    """Worker A's request outlives its claim; another worker records the
+    outcome as unknown; staff resolve the check (request again, or close
+    for a canceled order), possibly after deleting A's voucher in the ACS
+    portal; then A's answer arrives. The check is over, so the answer must
+    not become the shipment's voucher: it may be dead at ACS, and a
+    request-again mint is about to bring the voucher the order uses."""
+
+    def _late_answer(self, acs, monkeypatch, resolve):
+        acs.first_error = None
+        shipment = _shipment()
+
+        def answer_after_staff_resolved(self, params):
+            _Acs.creates.append(params)
+            # Worker B found A's claim expired: unknown outcome.
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_request_unknown_at=timezone.now(), metadata={}
+            )
+            resolve(shipment)
+            return {"Voucher_No": V1, "Error_Message": ""}
+
+        monkeypatch.setattr(_Acs, "create_voucher", answer_after_staff_resolved)
+        AcsService.create_voucher_for_order(shipment.order)
+        shipment.refresh_from_db()
+        return shipment
+
+    @staticmethod
+    def _request_again(shipment):
+        with patch(
+            "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+        ):
+            AcsService.request_voucher_again(
+                shipment, user=None, note="Nothing in the ACS portal."
+            )
+
+    @staticmethod
+    def _mint_c_claims(shipment) -> str:
+        """Mint C's Phase 1, through the code that stamps the claim."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            locked = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+            AcsService._claim_mint(locked.order, locked, locked.metadata or {})
+        return AcsShipment.objects.get(pk=shipment.pk).metadata[
+            "mint_started_at"
+        ]
+
+    def test_after_request_again_the_late_voucher_is_not_saved(
+        self, acs, sent, monkeypatch, caplog
+    ):
+        c_claim = {}
+
+        def request_again(shipment):
+            self._request_again(shipment)
+            c_claim["stamp"] = self._mint_c_claims(shipment)
+
+        with caplog.at_level("WARNING", logger="shipping_acs.services"):
+            shipment = self._late_answer(acs, monkeypatch, request_again)
+
+        [record] = [
+            r
+            for r in caplog.records
+            if getattr(r, "phase", None) == "phase3_stale_answer"
+        ]
+        message = record.getMessage()
+        assert "after staff resolved the voucher check" in message
+        assert V1 in message
+        assert "None" not in message
+        assert record.voucher_no == V1
+
+        assert shipment.voucher_no is None
+        assert acs.deleted == [V1]
+        # C's claim is C's: A's answer must not release it.
+        assert shipment.metadata["mint_started_at"] == c_claim["stamp"]
+
+    def test_after_request_again_a_voucher_acs_will_not_delete_is_an_orphan(
+        self, acs, sent, monkeypatch
+    ):
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="not found"
+        )
+        c_claim = {}
+
+        def request_again(shipment):
+            self._request_again(shipment)
+            c_claim["stamp"] = self._mint_c_claims(shipment)
+
+        shipment = self._late_answer(acs, monkeypatch, request_again)
+
+        assert shipment.voucher_no is None
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+        assert shipment.metadata["mint_started_at"] == c_claim["stamp"]
+
+    def test_after_request_again_saved_v2_first_the_late_v1_is_the_duplicate(
+        self, acs, sent, monkeypatch, caplog
+    ):
+        """The other arrival order: C saved V2 before A's V1 came back,
+        so V1 takes the duplicate path it always took."""
+
+        def request_again_and_c_saves_v2(shipment):
+            self._request_again(shipment)
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_no=V2,
+                shipment_state=AcsShipmentState.NEW,
+                metadata={},
+            )
+
+        with caplog.at_level("WARNING", logger="shipping_acs.services"):
+            shipment = self._late_answer(
+                acs, monkeypatch, request_again_and_c_saves_v2
+            )
+
+        assert shipment.voucher_no == V2
+        assert acs.deleted == [V1]
+        phases = [getattr(r, "phase", None) for r in caplog.records]
+        assert "phase3_duplicate" in phases
+        assert "phase3_stale_answer" not in phases
+
+    def test_after_adopting_the_same_number_the_late_answer_changes_nothing(
+        self, acs, sent, monkeypatch
+    ):
+        """Staff adopted V1, and the late answer IS V1: not a duplicate,
+        nothing to delete. (Adopting a different number:
+        TestALateAnswerAfterStaffAdopted.)"""
+
+        def adopt_v1(shipment):
+            _Acs.summaries[V1] = {
+                "voucher_no": V1,
+                "recipient": _as_acs_prints_it(shipment.order),
+            }
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment = self._late_answer(acs, monkeypatch, adopt_v1)
+
+        assert shipment.voucher_no == V1
+        assert acs.deleted == []
+        assert "orphan_vouchers" not in shipment.metadata
+
+    def test_a_voucher_acs_would_not_delete_is_in_the_staff_list_at_once(
+        self, acs, sent, monkeypatch
+    ):
+        """No pickup list needed: the refused delete itself records the
+        voucher where staff look (the list and its dashboard counter). A
+        later pickup-list naming finds the same row, and staff can delete
+        it from there."""
+        from shipping_acs.attention import unrecognised_vouchers
+        from shipping_acs.models.unrecognised_voucher import (
+            AcsUnrecognisedVoucherSource,
+        )
+
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="temporarily refused"
+        )
+
+        shipment = self._late_answer(
+            acs, monkeypatch, lambda s: self._request_again(s)
+        )
+
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+        row = AcsUnrecognisedVoucher.objects.get(voucher_no=V1)
+        assert row.source == AcsUnrecognisedVoucherSource.REFUSED_DELETE
+        assert row.duplicate_of_id == shipment.pk
+        assert list(unrecognised_vouchers()) == [row]
+
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            metadata={"orphan_vouchers": [V1]}
+        )
+        AcsService._raise_unrecognised_vouchers([V1], timezone.localdate())
+        assert AcsUnrecognisedVoucher.objects.filter(voucher_no=V1).count() == 1
+
+        acs.delete_error = None
+        AcsService.delete_unrecognised_voucher(row, user=None, note="orphan")
+        assert acs.deleted == [V1]
+
+    def test_after_close_a_voucher_acs_will_not_delete_is_an_orphan(
+        self, acs, sent, monkeypatch
+    ):
+        """Staff deleted V1 in the portal, then closed the check for the
+        canceled order: ACS refuses the delete of a dead voucher."""
+        from order.enum.status import OrderStatus
+        from order.models.order import Order
+
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="not found"
+        )
+
+        def close(shipment):
+            Order.objects.filter(pk=shipment.order_id).update(
+                status=OrderStatus.CANCELED
+            )
+            AcsService.close_voucher_request(
+                shipment, user=None, note="Deleted it in the ACS portal."
+            )
+
+        shipment = self._late_answer(acs, monkeypatch, close)
+
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is None
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+
+    def test_while_still_unknown_the_late_answer_resolves_it(
+        self, acs, sent, monkeypatch
+    ):
+        """Unchanged: nobody resolved the check, so the answer is the
+        outcome (TestALateAnswer)."""
+        shipment = self._late_answer(acs, monkeypatch, lambda shipment: None)
+
+        assert shipment.voucher_no == V1
+        assert shipment.voucher_request_unknown_at is None
+        assert acs.deleted == []
+
+
+class TestARefusedDeleteMeetsAnExistingRow:
+    """Migration review of #634: the refused-delete record and a
+    pickup-list record of the same voucher. The more specific fact (it is
+    our own unused voucher, from this shipment) always wins."""
+
+    def _refused_late_answer(self, acs, monkeypatch):
+        helper = TestALateAnswerAfterStaffResolvedTheCheck()
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="temporarily refused"
+        )
+        return helper._late_answer(
+            acs, monkeypatch, lambda s: helper._request_again(s)
+        )
+
+    def _named_first(self, **fields):
+        return AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+            **fields,
+        )
+
+    def test_a_row_the_pickup_list_made_first_learns_where_it_came_from(
+        self, acs, sent, monkeypatch
+    ):
+        from shipping_acs.models.unrecognised_voucher import (
+            AcsUnrecognisedVoucherSource,
+        )
+
+        row = self._named_first()
+
+        shipment = self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.source == AcsUnrecognisedVoucherSource.REFUSED_DELETE
+        assert row.duplicate_of_id == shipment.pk
+        assert AcsUnrecognisedVoucher.objects.count() == 1
+
+    def test_a_row_staff_marked_checked_is_reopened(
+        self, acs, sent, monkeypatch
+    ):
+        """Staff judged it without knowing it is our own voucher that ACS
+        will not delete: it may be live and billed, so it asks again."""
+        row = self._named_first(
+            resolved_at=timezone.now(),
+            resolution=AcsUnrecognisedVoucherResolution.CHECKED,
+            resolution_note="Not ours.",
+        )
+
+        self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.resolved_at is None
+        assert row.resolution == ""
+        assert row.resolution_note == "Not ours."
+
+    def test_a_row_deleted_at_acs_stays_resolved_with_the_link(
+        self, acs, sent, monkeypatch
+    ):
+        """Deleted at ACS: it is dead, which is also why ACS refuses our
+        delete now. Reopening would ask staff to delete it again."""
+        row = self._named_first(
+            resolved_at=timezone.now(),
+            resolution=AcsUnrecognisedVoucherResolution.DELETED,
+        )
+
+        shipment = self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.resolution == AcsUnrecognisedVoucherResolution.DELETED
+        assert row.duplicate_of_id == shipment.pk
+
+    def test_a_database_error_while_recording_never_fails_the_mint(
+        self, acs, sent, monkeypatch, caplog
+    ):
+        """Phase 3 has committed by then: the record is best effort, and
+        its failure is logged at ERROR with the voucher number."""
+        from django.db import DatabaseError
+
+        def broken(*args, **kwargs):
+            raise DatabaseError("connection lost")
+
+        monkeypatch.setattr(
+            AcsService, "_keep_unrecognised_vouchers", staticmethod(broken)
+        )
+
+        with caplog.at_level("ERROR", logger="shipping_acs.services"):
+            shipment = self._refused_late_answer(acs, monkeypatch)
+
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+        assert any(
+            r.levelname == "ERROR"
+            and V1 in r.getMessage()
+            and "could not be recorded" in r.getMessage()
+            for r in caplog.records
+        )
+
+
+class TestAResetWhileAMintIsInFlight:
+    """Cold review of #634: the shipment was canceled while a mint was out
+    (no voucher yet), then staff press "Issue ACS voucher now", which
+    resets it for a re-mint. Dropping the live claim would make the first
+    mint's good answer stale (deleted at ACS), and if ACS then refused the
+    re-mint the order would have no voucher. So the reset refuses while a
+    claim is live, and turns an expired one into the unknown state."""
+
+    def test_a_reset_is_refused_while_the_mint_is_in_flight(
+        self, acs, sent, monkeypatch
+    ):
+        acs.first_error = None
+        shipment = _shipment()
+        refused = []
+
+        def answer(self, params):
+            _Acs.creates.append(params)
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                shipment_state=AcsShipmentState.CANCELED
+            )
+            try:
+                AcsService.reset_shipment_for_remint(shipment)
+            except AcsAPIError as exc:
+                refused.append(exc)
+            return {"Voucher_No": V1, "Error_Message": ""}
+
+        monkeypatch.setattr(_Acs, "create_voucher", answer)
+
+        AcsService.create_voucher_for_order(shipment.order)
+
+        shipment.refresh_from_db()
+        assert len(refused) == 1
+        assert shipment.voucher_no == V1
+        assert acs.deleted == []
+        assert len(acs.creates) == 1
+
+    def test_a_reset_records_an_expired_claim_as_unknown_and_refuses(
+        self, acs, sent
+    ):
+        stale = timezone.now() - timedelta(
+            seconds=AcsService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _shipment(metadata={"mint_started_at": stale.isoformat()})
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            shipment_state=AcsShipmentState.CANCELED
+        )
+
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.reset_shipment_for_remint(shipment)
+
+        # The unknown state is true whatever happens to the reset: it is
+        # kept, alerted once, and the shipment is NOT reset.
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.CANCELED
+        assert shipment.voucher_request_unknown_at is not None
+        assert "mint_started_at" not in shipment.metadata
+        assert _types(sent) == ["ops.acs_voucher_request_unknown"]
+        assert acs.creates == []
+
+    def test_issue_voucher_now_on_an_expired_claim_queues_nothing(
+        self, acs, sent
+    ):
+        """The admin used to flash "minting a fresh voucher" and queue a
+        task the mint then refused. It now shows the guard's guidance."""
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+
+        from shipping_acs.admin import AcsShipmentAdmin, voucher_check_message
+
+        stale = timezone.now() - timedelta(
+            seconds=AcsService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _shipment(metadata={"mint_started_at": stale.isoformat()})
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            shipment_state=AcsShipmentState.CANCELED
+        )
+        request = RequestFactory().get("/")
+        request.user = get_user_model()(id=1, username="staff")
+
+        with (
+            patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ) as dispatched,
+            patch("django.contrib.messages.error") as refused,
+            patch("django.contrib.messages.info") as told,
+        ):
+            AcsShipmentAdmin(AcsShipment, AdminSite()).issue_voucher_now(
+                request, shipment.pk
+            )
+
+        dispatched.assert_not_called()
+        told.assert_not_called()
+        shipment.refresh_from_db()
+        [call] = refused.call_args_list
+        assert str(call.args[1]) == str(voucher_check_message(shipment))
+        assert shipment.shipment_state == AcsShipmentState.CANCELED
+        assert _types(sent) == ["ops.acs_voucher_request_unknown"]
+
+
 class TestALateWorkerAndARequestAgain:
     """Second review, finding 3: late worker A saves first and pops the
     claim of mint C (a "request again"); a pickup-list run then records

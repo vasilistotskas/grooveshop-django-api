@@ -51,6 +51,7 @@ from shipping_acs.attention import (
 )
 from shipping_acs.diagnostics import shipment_timeline
 from shipping_acs.enum.shipment_state import TERMINAL_STATES, AcsShipmentState
+from shipping_acs.exceptions import AcsVoucherRequestUnknownError
 from shipping_acs.models import (
     AcsApiCall,
     AcsCodPayout,
@@ -66,6 +67,26 @@ from shipping_acs.tasks import issue_held_acs_vouchers
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
+
+
+def voucher_check_message(shipment: AcsShipment) -> str:
+    """What staff do with a shipment whose voucher request has an unknown
+    outcome, by the shared rule (:func:`shipping_acs.attention.needs_no_voucher`): close it, or adopt / request again."""
+    if needs_no_voucher(shipment):
+        message = _(
+            "The last voucher request for order #%(order)s may have reached "
+            "ACS without an answer, and the order no longer needs a voucher. "
+            "If ACS holds one, delete it there, then use “No voucher needed: "
+            "close” on the shipment."
+        )
+    else:
+        message = _(
+            "The last voucher request for order #%(order)s may have reached "
+            "ACS without an answer, so ACS may already hold a voucher for it. "
+            "Check the ACS portal, then use “Adopt ACS voucher” or “No "
+            "voucher at ACS: request again” on the shipment."
+        )
+    return str(message % {"order": shipment.order_id})
 
 
 def _back_to_changelist(model_admin):
@@ -982,27 +1003,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         # The mint refuses it too (``AcsVoucherRequestUnknownError``), but
         # in a Celery task whose refusal never reaches this page.
         if voucher_request_unknown(shipment):
-            messages.error(
-                request,
-                (
-                    _(
-                        "The last voucher request for order #%(order)s may "
-                        "have reached ACS without an answer, and the order "
-                        "no longer needs a voucher. If ACS holds one, delete "
-                        "it there, then use “No voucher needed: close” on the "
-                        "shipment."
-                    )
-                    if needs_no_voucher(shipment)
-                    else _(
-                        "The last voucher request for order #%(order)s may "
-                        "have reached ACS without an answer, so ACS may "
-                        "already hold a voucher for it. Check the ACS portal, "
-                        "then use “Adopt ACS voucher” or “No voucher at ACS: "
-                        "request again” on the shipment."
-                    )
-                )
-                % {"order": shipment.order_id},
-            )
+            messages.error(request, voucher_check_message(shipment))
             return _back_to_changelist(self)
 
         # A CANCELED shipment keeps its (now-deleted) voucher_no, which
@@ -1012,6 +1013,12 @@ class AcsShipmentAdmin(BaseModelAdmin):
         if shipment.shipment_state == AcsShipmentState.CANCELED:
             try:
                 AcsService.reset_shipment_for_remint(shipment)
+            except AcsVoucherRequestUnknownError:
+                # The reset found the last request's outcome unknown,
+                # recorded it and reset nothing: nothing is queued.
+                shipment.refresh_from_db()
+                messages.error(request, voucher_check_message(shipment))
+                return _back_to_changelist(self)
             except Exception as exc:
                 messages.error(
                     request,
@@ -1172,16 +1179,19 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
     staff_actor_fields = ("resolved_by",)
     list_display = (
         "voucher_no",
+        "source",
         "pickup_date",
         "first_seen_at",
         "last_seen_at",
         "resolution",
         "resolved_at",
     )
-    list_filter = (UnrecognisedVoucherResolvedFilter, "resolution")
+    list_filter = (UnrecognisedVoucherResolvedFilter, "source", "resolution")
     search_fields = ("voucher_no",)
     readonly_fields = (
         "voucher_no",
+        "source",
+        "duplicate_of",
         "pickup_date",
         "first_seen_at",
         "last_seen_at",

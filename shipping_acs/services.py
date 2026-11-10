@@ -58,6 +58,7 @@ from shipping_acs.models import (
 from shipping_acs.models.pickup_list_run import AcsPickupListRunOutcome
 from shipping_acs.models.unrecognised_voucher import (
     AcsUnrecognisedVoucherResolution,
+    AcsUnrecognisedVoucherSource,
 )
 from tenant.celery import dispatch_on_commit
 from tenant.credentials import tenant_site_name
@@ -169,6 +170,15 @@ def _claim_age(started_raw: object) -> float | None:
     if started.tzinfo is None:
         started = timezone.make_aware(started)
     return (timezone.now() - started).total_seconds()
+
+
+def _voucher_pickup_date(params: dict[str, Any]) -> date:
+    """The ``Pickup_Date`` a voucher request carried (the voucher's own
+    pickup date at ACS), today when it is unreadable."""
+    try:
+        return date.fromisoformat(str(params.get("Pickup_Date")))
+    except ValueError:
+        return timezone.localdate()
 
 
 def _stale_claim_message(age: float) -> str:
@@ -634,28 +644,63 @@ class AcsService:
                 )
 
         # ----- Phase 3: persist (fresh atomic, race-checked) -----
+        # The claim this request was sent under (stamped in Phase 1).
+        our_claim = (shipment.metadata or {}).get("mint_started_at")
+        unused_answer = False
+        refused_delete = False
         with transaction.atomic():
             shipment = (
                 AcsShipment.objects.select_for_update()
                 .select_related("order")
                 .get(pk=shipment.pk)
             )
-            if shipment.voucher_no and shipment.voucher_no != voucher_no:
-                # Another worker won the race. Our voucher is the dupe.
-                logger.warning(
-                    "Concurrent voucher mint for order=%s: DB saved %s, "
-                    "we minted %s — attempting cancel.",
-                    order.id,
-                    shipment.voucher_no,
-                    voucher_no,
-                )
+            # Our claim was taken (expired, recorded as unknown) and staff
+            # have since resolved the check: requested again, so another
+            # mint brings the voucher the order uses, or closed it for an
+            # order that needs none. They may also have deleted this very
+            # voucher in the ACS portal. The answer is stale either way,
+            # so it is discarded like a duplicate; while the check is
+            # still open, it IS the outcome and is saved below.
+            resolved_meanwhile = (shipment.metadata or {}).get(
+                "mint_started_at"
+            ) != our_claim and shipment.voucher_request_unknown_at is None
+            if (shipment.voucher_no and shipment.voucher_no != voucher_no) or (
+                not shipment.voucher_no and resolved_meanwhile
+            ):
+                # Another worker won the race, or staff resolved the
+                # check while this answer was out. Our voucher is unused.
+                extra = {
+                    "order_id": order.id,
+                    "shipment_pk": shipment.pk,
+                    "carrier": "acs",
+                    "voucher_no": voucher_no,
+                }
+                if shipment.voucher_no:
+                    logger.warning(
+                        "Concurrent voucher mint for order=%s: DB saved %s, "
+                        "we minted %s — attempting cancel.",
+                        order.id,
+                        shipment.voucher_no,
+                        voucher_no,
+                        extra={**extra, "phase": "phase3_duplicate"},
+                    )
+                else:
+                    logger.warning(
+                        "Late answer for order=%s after staff resolved the "
+                        "voucher check (requested again or closed): voucher "
+                        "%s is not saved — deleting it at ACS, or keeping "
+                        "it as an orphan if ACS refuses.",
+                        order.id,
+                        voucher_no,
+                        extra={**extra, "phase": "phase3_stale_answer"},
+                    )
                 try:
                     client.delete_voucher(voucher_no)
                     cls._settle_unrecognised_vouchers(
                         [voucher_no],
                         AcsUnrecognisedVoucherResolution.DELETED,
-                        note="Deleted at ACS by the voucher mint as a "
-                        "duplicate of the saved voucher.",
+                        note="Deleted at ACS by the voucher mint: an "
+                        "answer no shipment uses.",
                     )
                 except AcsAPIError as exc:
                     logger.error(
@@ -672,50 +717,86 @@ class AcsService:
                     metadata["orphan_vouchers"] = orphans
                     shipment.metadata = metadata
                     shipment.save(update_fields=["metadata"])
-                return shipment
+                    refused_delete = True
+                unused_answer = True
 
-            metadata = shipment.metadata or {}
-            metadata.pop("mint_started_at", None)
-            # Clear any stale ``last_error`` from a prior failed
-            # attempt so ops looking at the row don't mistake an old
-            # error for the current state. Mirrors BoxNow's success
-            # path which already nulls ``last_error`` (see
-            # shipping_boxnow/services.py).
-            metadata.pop("last_error", None)
-            metadata["create_response"] = result
-            metadata["create_request"] = _audit_envelope(params)
-            metadata["multipart_vouchers"] = children
+            else:
+                metadata = shipment.metadata or {}
+                metadata.pop("mint_started_at", None)
+                # Clear any stale ``last_error`` from a prior failed
+                # attempt so ops looking at the row don't mistake an old
+                # error for the current state. Mirrors BoxNow's success
+                # path which already nulls ``last_error`` (see
+                # shipping_boxnow/services.py).
+                metadata.pop("last_error", None)
+                metadata["create_response"] = result
+                metadata["create_request"] = _audit_envelope(params)
+                metadata["multipart_vouchers"] = children
 
-            # The answer came after another worker found this claim
-            # expired and recorded the outcome as unknown: the answer
-            # IS the outcome, so it ends that state.
-            late_answer = shipment.voucher_request_unknown_at is not None
-            if late_answer:
-                # Within the 100-character history column for any
-                # 20-character voucher number.
-                shipment._change_reason = (
-                    f"A late answer saved voucher {voucher_no}; outcome no "
-                    "longer unknown"
+                # The answer came after another worker found this claim
+                # expired and recorded the outcome as unknown: the answer
+                # IS the outcome, so it ends that state.
+                late_answer = shipment.voucher_request_unknown_at is not None
+                if late_answer:
+                    # Within the 100-character history column for any
+                    # 20-character voucher number.
+                    shipment._change_reason = (
+                        f"A late answer saved voucher {voucher_no}; outcome no "
+                        "longer unknown"
+                    )
+                shipment.voucher_no = voucher_no
+                shipment.shipment_state = AcsShipmentState.NEW
+                shipment.voucher_request_unknown_at = None
+                shipment.voucher_request_held_at = None
+                shipment.metadata = metadata
+                shipment.save(
+                    update_fields=[
+                        "voucher_no",
+                        "shipment_state",
+                        "voucher_request_unknown_at",
+                        "voucher_request_held_at",
+                        "metadata",
+                    ]
                 )
-            shipment.voucher_no = voucher_no
-            shipment.shipment_state = AcsShipmentState.NEW
-            shipment.voucher_request_unknown_at = None
-            shipment.voucher_request_held_at = None
-            shipment.metadata = metadata
-            shipment.save(
-                update_fields=[
-                    "voucher_no",
-                    "shipment_state",
-                    "voucher_request_unknown_at",
-                    "voucher_request_held_at",
-                    "metadata",
-                ]
-            )
-            cls._settle_unrecognised_vouchers(
-                [voucher_no, *children],
-                AcsUnrecognisedVoucherResolution.ADOPTED,
-                shipment=shipment,
-            )
+                cls._settle_unrecognised_vouchers(
+                    [voucher_no, *children],
+                    AcsUnrecognisedVoucherResolution.ADOPTED,
+                    shipment=shipment,
+                )
+
+        if unused_answer:
+            if refused_delete:
+                # A live (maybe billed) voucher ACS would not delete is
+                # recorded where staff already look, at once, not only
+                # if a later refused pickup list happens to name it. Phase
+                # 3 has committed: this runs in its own transaction
+                # (``_keep_unrecognised_vouchers``), best effort like the
+                # pickup-list path, so a failure here never fails a mint
+                # whose outcome is already saved; the ERROR line keeps the
+                # number (it is also in ``metadata["orphan_vouchers"]``).
+                try:
+                    cls._keep_unrecognised_vouchers(
+                        [voucher_no],
+                        _voucher_pickup_date(params),
+                        source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
+                        duplicate_of=shipment,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Voucher %s that ACS would not delete (order=%s) "
+                        "could not be recorded as a voucher matching no "
+                        "order; delete it at ACS by hand.",
+                        voucher_no,
+                        order.id,
+                        extra={
+                            "order_id": order.id,
+                            "shipment_pk": shipment.pk,
+                            "carrier": "acs",
+                            "voucher_no": voucher_no,
+                            "phase": "phase3_unused_record_failed",
+                        },
+                    )
+            return shipment
 
         if late_answer:
             from order.models.history import OrderHistory
@@ -1350,6 +1431,18 @@ class AcsService:
 
         Refuses unless the shipment is CANCELED and not already in a
         pickup list (an issued manifest is immutable).
+
+        Also refuses while a voucher request is in flight (a mint claim
+        younger than its TTL: the shipment was canceled while the request
+        was out). Before #634 the reset dropped that claim, the request's
+        answer was saved and the re-mint stopped at it; after #634 such an
+        answer is stale and deleted at ACS, so if ACS then refused the
+        re-mint the order would be left with no voucher. Waiting for the
+        claim keeps the answer and never makes a second voucher. An
+        expired claim becomes the unknown state (alerted), as any later
+        mint would make it; that state is committed and the reset itself
+        is refused with :class:`AcsVoucherRequestUnknownError`, so no
+        re-mint is queued. Staff resolve it from the shipment.
         """
         with transaction.atomic():
             shipment = AcsShipment.objects.select_for_update().get(
@@ -1372,46 +1465,86 @@ class AcsService:
                         "pickup list."
                     ),
                 )
-
-            metadata = shipment.metadata or {}
-            if shipment.voucher_no:
-                metadata.setdefault("previous_vouchers", []).append(
-                    shipment.voucher_no
+            # A mint may be out for this shipment (it was canceled while
+            # the request was in flight). Dropping a live claim would make
+            # that request's good answer stale (deleted at ACS in Phase 3),
+            # and if ACS then refused the re-mint the order would have no
+            # voucher; keeping it and re-minting would make two. So: wait
+            # for a live claim to end, and an expired one is what any
+            # later mint would make of it, an unknown outcome.
+            claim_age = _claim_age(
+                (shipment.metadata or {}).get("mint_started_at")
+            )
+            if (
+                claim_age is not None
+                and claim_age < cls._MINT_CLAIM_TTL_SECONDS
+            ):
+                raise AcsAPIError(
+                    alias="reset_for_remint",
+                    error_message=(
+                        "A voucher request for this shipment is in progress; "
+                        "try again in a few minutes."
+                    ),
                 )
-            metadata.pop("mint_started_at", None)
-            metadata.pop("cancel_started_at", None)
+            # The claim expired with no voucher: the request may have
+            # reached ACS. Record that (it is true whatever the reset
+            # does), then refuse: resetting would let a re-mint be queued
+            # that the mint refuses at once, while staff are told one is
+            # under way.
+            became_unknown = claim_age is not None and not shipment.voucher_no
+            if became_unknown:
+                cls._set_voucher_request_unknown(shipment)
+            else:
+                cls._reset_locked(shipment)
+        # Outside the atomic block, so the refusal below cannot roll the
+        # recorded state back; alerted once, like every entry into it.
+        if became_unknown:
+            message = _stale_claim_message(claim_age or 0.0)
+            cls._alert_voucher_request_unknown(shipment.order_id, message)
+            raise AcsVoucherRequestUnknownError(message)
 
-            previous_voucher = shipment.voucher_no
-            # A real voucher ended any earlier request of unknown outcome,
-            # so a flag left beside it is stale and would refuse every
-            # mint. Without a voucher the flag stays: the shipment was
-            # canceled before staff resolved the lost request, ACS may
-            # still hold that voucher, and both resolutions (adopt,
-            # request again) remain open.
-            if previous_voucher:
-                shipment.voucher_request_unknown_at = None
-            shipment.voucher_no = None
-            shipment.shipment_state = AcsShipmentState.PENDING_CREATION
-            shipment.cancel_requested_at = None
-            shipment.metadata = metadata
-            shipment._change_reason = "Reset for re-mint via admin"
-            shipment.save(
-                update_fields=[
-                    "voucher_no",
-                    "voucher_request_unknown_at",
-                    "shipment_state",
-                    "cancel_requested_at",
-                    "metadata",
-                ]
+    @staticmethod
+    def _reset_locked(shipment: AcsShipment) -> None:
+        """The reset itself, on a row the caller holds locked."""
+        metadata = shipment.metadata or {}
+        if shipment.voucher_no:
+            metadata.setdefault("previous_vouchers", []).append(
+                shipment.voucher_no
             )
-            logger.info(
-                "reset_shipment_for_remint: shipment=%s (order=%s) reset "
-                "PENDING_CREATION; previous voucher %s archived to "
-                "metadata.previous_vouchers — ready to re-mint",
-                shipment.pk,
-                shipment.order_id,
-                previous_voucher,
-            )
+        metadata.pop("mint_started_at", None)
+        metadata.pop("cancel_started_at", None)
+
+        previous_voucher = shipment.voucher_no
+        # A real voucher ended any earlier request of unknown outcome,
+        # so a flag left beside it is stale and would refuse every
+        # mint. Without a voucher the flag stays: the shipment was
+        # canceled before staff resolved the lost request, ACS may
+        # still hold that voucher, and both resolutions (adopt,
+        # request again) remain open.
+        if previous_voucher:
+            shipment.voucher_request_unknown_at = None
+        shipment.voucher_no = None
+        shipment.shipment_state = AcsShipmentState.PENDING_CREATION
+        shipment.cancel_requested_at = None
+        shipment.metadata = metadata
+        shipment._change_reason = "Reset for re-mint via admin"
+        shipment.save(
+            update_fields=[
+                "voucher_no",
+                "voucher_request_unknown_at",
+                "shipment_state",
+                "cancel_requested_at",
+                "metadata",
+            ]
+        )
+        logger.info(
+            "reset_shipment_for_remint: shipment=%s (order=%s) reset "
+            "PENDING_CREATION; previous voucher %s archived to "
+            "metadata.previous_vouchers — ready to re-mint",
+            shipment.pk,
+            shipment.order_id,
+            previous_voucher,
+        )
 
     # ------------------------------------------------------------------
     # Vouchers to check: a lost voucher request, a voucher matching no
@@ -1929,25 +2062,11 @@ class AcsService:
             unrecognised = cls.vouchers_matching_no_shipment(named)
             if not unrecognised:
                 return
-            now = timezone.now()
-            first_time: list[str] = []
-            with transaction.atomic():
-                for voucher_no in unrecognised:
-                    _row, created = (
-                        AcsUnrecognisedVoucher.objects.get_or_create(
-                            voucher_no=voucher_no,
-                            defaults={
-                                "pickup_date": pickup_date,
-                                "first_seen_at": now,
-                                "last_seen_at": now,
-                            },
-                        )
-                    )
-                    if created:
-                        first_time.append(voucher_no)
-                AcsUnrecognisedVoucher.objects.filter(
-                    voucher_no__in=unrecognised
-                ).update(last_seen_at=now)
+            first_time = cls._keep_unrecognised_vouchers(
+                unrecognised,
+                pickup_date,
+                source=AcsUnrecognisedVoucherSource.PICKUP_LIST,
+            )
             logger.warning(
                 "ACS named voucher(s) matching no shipment on the pickup "
                 "list of %s: %s (first time: %s)",
@@ -1966,6 +2085,70 @@ class AcsService:
             logger.exception(
                 "Could not record the vouchers ACS named for %s", pickup_date
             )
+
+    @staticmethod
+    def _keep_unrecognised_vouchers(
+        numbers: list[str],
+        pickup_date: date,
+        *,
+        source: AcsUnrecognisedVoucherSource,
+        duplicate_of: AcsShipment | None = None,
+    ) -> list[str]:
+        """Record vouchers ACS holds that no shipment uses, one row per
+        number whoever finds it first (a refused pickup list, or our own
+        delete ACS refused), and return the numbers recorded now for the
+        first time. Counted by ``attention.unrecognised_vouchers``.
+
+        The more specific fact wins, never the other way round: when our
+        own refused delete meets a row a pickup list made, the row learns
+        that it is our unused voucher and which shipment it came from. A
+        row staff had marked CHECKED is reopened then: they judged it
+        without knowing it is ours and that ACS will not delete it, so it
+        may be a live, billed voucher nobody is acting on. A row resolved
+        as DELETED (dead at ACS, which is why our delete is refused now)
+        or ADOPTED (a shipment uses it) keeps its resolution and gains the
+        link only.
+        """
+        now = timezone.now()
+        first_time: list[str] = []
+        with transaction.atomic():
+            for voucher_no in numbers:
+                row, created = AcsUnrecognisedVoucher.objects.get_or_create(
+                    voucher_no=voucher_no,
+                    defaults={
+                        "pickup_date": pickup_date,
+                        "first_seen_at": now,
+                        "last_seen_at": now,
+                        "source": source,
+                        "duplicate_of": duplicate_of,
+                    },
+                )
+                if created:
+                    first_time.append(voucher_no)
+                elif source == AcsUnrecognisedVoucherSource.REFUSED_DELETE:
+                    row.source = source
+                    row.duplicate_of = duplicate_of
+                    if (
+                        row.resolution
+                        == AcsUnrecognisedVoucherResolution.CHECKED
+                    ):
+                        row.resolved_at = None
+                        row.resolution = ""
+                        row.resolved_by_id = None
+                    row.save(
+                        update_fields=[
+                            "source",
+                            "duplicate_of",
+                            "resolved_at",
+                            "resolution",
+                            "resolved_by_id",
+                            "updated_at",
+                        ]
+                    )
+            AcsUnrecognisedVoucher.objects.filter(
+                voucher_no__in=numbers
+            ).update(last_seen_at=now)
+        return first_time
 
     @staticmethod
     def _open_unrecognised_voucher(

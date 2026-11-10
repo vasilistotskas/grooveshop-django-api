@@ -1364,6 +1364,14 @@ accepting Cyprus orders at the Greek flat rate.
 
 - **REST + webhook** for tracking events.
 - Voucher mint: same 3-phase design as ACS.
+- **The HTTP layer never sends a POST or PUT a second time once it may
+  have reached BoxNow** (`_RETRY_CONFIG` in `shipping_boxnow/client.py`,
+  the same rule as ACS): only a request that never connected, or a GET
+  after a 5xx or a lost answer, is sent again. A 5xx or a timeout on a
+  write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
+  a second creation for one `orderNumber` with `P410` (manual v7.2, §3.4
+  and §5), so a re-sent creation could only turn a parcel that exists into
+  a reported refusal.
 - **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
   the tenant's keys are BoxNow production keys (on) or stage keys (off,
   the default). `BoxNowClient` maps it to the platform's

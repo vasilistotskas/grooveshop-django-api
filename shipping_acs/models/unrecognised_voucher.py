@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -71,7 +72,14 @@ class AcsUnrecognisedVoucher(TimeStampMixinModel):
         verbose_name = _("ACS voucher matching no order")
         verbose_name_plural = _("ACS vouchers matching no order")
         ordering = ["-last_seen_at"]
-        indexes = [*TimeStampMixinModel.Meta.indexes]
+        # Explicit short names: the mixin's ``%(class)s_created_at_ix``
+        # resolves to ``acsunrecognisedvoucher_created_at_ix`` (36 chars),
+        # which trips ``models.E034`` when the tenant migration runs its
+        # database checks.
+        indexes = [
+            BTreeIndex(fields=["created_at"], name="acs_unrec_created_at_ix"),
+            BTreeIndex(fields=["updated_at"], name="acs_unrec_updated_at_ix"),
+        ]
 
     def __str__(self) -> str:
         return self.voucher_no

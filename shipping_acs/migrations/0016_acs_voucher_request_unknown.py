@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 'verbose_name': 'ACS voucher matching no order',
                 'verbose_name_plural': 'ACS vouchers matching no order',
                 'ordering': ['-last_seen_at'],
-                'indexes': [django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='acsunrecognisedvoucher_created_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='acsunrecognisedvoucher_updated_at_ix')],
+                'indexes': [django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='acs_unrec_created_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='acs_unrec_updated_at_ix')],
             },
         ),
     ]

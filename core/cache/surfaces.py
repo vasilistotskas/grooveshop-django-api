@@ -694,14 +694,14 @@ def register_default_surfaces() -> None:
             label=_("Sitemap & SEO"),
             description=_(
                 "XML sitemap, RSS, llms.txt and the OG image cache."
-                " Cheap to regenerate; purge after publishing"
-                " content that should appear immediately."
+                " Purged when a post, product, category or content page"
+                " changes or goes live."
             ),
             django_patterns=(),
             # These are cached FUNCTIONS, not routes: the sitemap source
             # and the RSS feed build their data through
             # ``defineCachedFunction`` (``sitemap:blog-posts``,
-            # ``rss:products``, ``RssFeed``, ...), so the previous
+            # ``rss:feed``, ``rss:blog-posts``, ...), so the previous
             # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
             # matched no key in Redis and this surface's Nuxt half was a
             # no-op. Verified against the live keyspace.
@@ -710,9 +710,30 @@ def register_default_surfaces() -> None:
             # keyed per host): @nuxtjs/sitemap's own cache lived in each
             # pod's memory, where no purge reached it, so the storefront
             # turned it off and caches the response in Redis instead.
-            nuxt_patterns=_nuxt_functions("sitemap", "rss", "RssFeed")
+            #
+            # Every read the feeds make is a function named ``rss:<what>``
+            # (the storefront's ``server/utils/rssFeed.ts``), so ``rss``
+            # purges the feed and the posts and categories it was built
+            # from.
+            nuxt_patterns=_nuxt_functions("sitemap", "rss")
             + _nuxt_routes("/sitemap.xml")
             + _nuxt("nuxt-ai-ready"),
+            # What the sitemap and the feeds list. A row that goes live at
+            # its publish date is reported by ``core.publication``.
+            invalidated_by=(
+                "blog.BlogPost",
+                "blog.BlogPostTranslation",
+                "blog.BlogCategory",
+                "blog.BlogCategoryTranslation",
+                "product.Product",
+                "product.ProductTranslation",
+                "product.ProductCategory",
+                "product.ProductCategoryTranslation",
+                "page_config.ContentPage",
+                "page_config.ContentPageTranslation",
+            ),
+            # Each order's stock decrement, as on the products surface.
+            ignored_update_fields=frozenset({"stock", "updated_at"}),
             icon="map",
             group="content",
         )

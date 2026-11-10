@@ -39,6 +39,7 @@ from core.utils.generators import SlugifyConfig, unique_slugify
 from core.utils.html_text import visible_text
 from core.weight import zero_weight
 from meili.models import IndexMixin
+from product.enum.stock import StockState
 from product.managers.image import ORDERED_IMAGES
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
@@ -102,6 +103,21 @@ class Product(
     id = models.BigAutoField(primary_key=True)
     sku = models.CharField(
         _("SKU"), unique=True, max_length=100, default=uuid.uuid4
+    )
+    # The id another system gives this product (a catalogue import's
+    # "woo:123"), for rows that have no SKU of ours. Empty is stored as
+    # NULL so that any number of products can have none while a given
+    # value stays unique. Not part of the API.
+    external_reference = models.CharField(
+        _("External reference"),
+        max_length=255,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "The product's id in another system, used to match it when a "
+            "catalogue file is imported. Leave empty if it has none."
+        ),
     )
     # The manufacturer's identifiers, which Google Merchant Center asks
     # for. Never derived from ``sku``: that is the store's own code, and a
@@ -247,12 +263,12 @@ class Product(
             "is not reduced."
         ),
     )
+    # NOT NULL and protected from deletion: a product without a rate would be
+    # priced, snapshotted and invoiced at 0%.
     vat = models.ForeignKey(
         "vat.Vat",
         related_name="products",
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         verbose_name=_("VAT"),
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
@@ -394,6 +410,9 @@ class Product(
         if not self.sku:
             self.sku = self.generate_unique_sku()
 
+        # NULL, never "": a blank value would collide on the unique index.
+        self.external_reference = self.external_reference or None
+
         if not self.slug:
             config = SlugifyConfig(
                 instance=self,
@@ -473,6 +492,16 @@ class Product(
         """Whether a shopper may add it to a cart and check it out: active
         and not soft-deleted (deleting leaves ``active`` alone)."""
         return self.active and not self.is_deleted
+
+    @property
+    def stock_state(self) -> StockState:
+        """This row's ``StockState``; ``ProductQuerySet.by_stock_state``
+        is the same rule as a filter."""
+        if self.stock == 0:
+            return StockState.OUT_OF_STOCK
+        if self.stock <= self.low_stock_threshold:
+            return StockState.LOW_STOCK
+        return StockState.IN_STOCK
 
     @property
     def _history_user(self):
@@ -588,9 +617,7 @@ class Product(
 
     @property
     def vat_percent(self) -> Decimal:
-        if self.vat:
-            return self.vat.value
-        return Decimal(0)
+        return self.vat.value
 
     @property
     def vat_value(self) -> Money:
@@ -602,11 +629,9 @@ class Product(
         takes 10% off what the shopper pays. ``discount_value`` stays the
         markdown on the net price.
         """
-        if self.vat:
-            net = self.price.amount - self.discount_value.amount
-            value = (net * self.vat.value) / 100
-            return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
-        return Money(0, settings.DEFAULT_CURRENCY)
+        net = self.price.amount - self.discount_value.amount
+        value = (net * self.vat_percent) / 100
+        return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
     @property
     def final_price(self) -> Money:
@@ -727,9 +752,10 @@ class ProductTranslation(
 
         return (
             cls.objects.select_related(
-                "master", "master__category", "master__vat"
+                "master", "master__category", "master__vat", "master__brand"
             )
             .prefetch_related(
+                "master__category__translations",
                 "master__product_attributes__attribute_value__attribute__translations",
                 "master__product_attributes__attribute_value__translations",
             )
@@ -751,10 +777,8 @@ class ProductTranslation(
         prefetch its main image. Without this the enrichment loop runs ~4 DB
         queries per hit on the hottest public endpoint (G0336/G0351).
 
-        The category is prefetched, not joined, so every hit of one category
-        shares ONE category object: parler writes a translation it reads
-        from a prefetch to the cache once per object, and a join gave each
-        hit its own, one cache write per hit.
+        The category and its translations are prefetched: two queries for
+        the whole page of hits, however many hits share a category.
         """
         from django.db.models import Prefetch
 
@@ -814,15 +838,26 @@ class ProductTranslation(
         # built.
         facet_search = False
         # ``*_greeklish_variants`` bags exist only for the SHORT fields
-        # (name/attributes) — expanding every description word would
+        # (name/brand/category/attributes) — expanding every description word would
         # bloat the index and pollute ranking for no realistic recall
         # gain.
         searchable_fields = (
             "master_id",
+            "sku",
+            "gtin",
+            "mpn",
             "name",
             "name_greeklish",
             "name_greeklish_alt",
             "name_greeklish_variants",
+            "brand_name",
+            "brand_name_greeklish",
+            "brand_name_greeklish_alt",
+            "brand_name_greeklish_variants",
+            "category_name",
+            "category_name_greeklish",
+            "category_name_greeklish_alt",
+            "category_name_greeklish_variants",
             "description",
             "description_greeklish",
             "description_greeklish_alt",
@@ -903,7 +938,9 @@ class ProductTranslation(
             "enabled": True,
             "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 8},
             "disableOnWords": [],
-            "disableOnAttributes": [],
+            # A code matches exactly or not at all: with typos allowed a
+            # barcode one digit off finds a different product.
+            "disableOnAttributes": ["sku", "gtin", "mpn"],
         }
         # ``attribute_values`` is one facet holding every attribute's
         # value ids, returned in lexicographic order and cut at this cap:
@@ -961,12 +998,28 @@ class ProductTranslation(
             ),
             "category": lambda obj: obj.master.category_id,
             "brand": lambda obj: obj.master.brand_id,
-            "category_name": lambda obj: (
-                obj.master.category.safe_translation_getter(
-                    "name", language_code=obj.language_code, any_language=True
-                )
-                if obj.master.category
-                else None
+            "sku": lambda obj: obj.master.sku,
+            "gtin": lambda obj: obj.master.gtin,
+            "mpn": lambda obj: obj.master.mpn,
+            "brand_name": lambda obj: cls._brand_name(obj),
+            "brand_name_greeklish": lambda obj: greeklish_shadow(
+                cls._brand_name(obj)
+            ),
+            "brand_name_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                cls._brand_name(obj)
+            ),
+            "brand_name_greeklish_variants": lambda obj: greeklish_variants(
+                cls._brand_name(obj)
+            ),
+            "category_name": lambda obj: cls._category_name(obj),
+            "category_name_greeklish": lambda obj: greeklish_shadow(
+                cls._category_name(obj)
+            ),
+            "category_name_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                cls._category_name(obj)
+            ),
+            "category_name_greeklish_variants": lambda obj: greeklish_variants(
+                cls._category_name(obj)
             ),
             "stock": lambda obj: obj.master.stock,
             "in_stock": lambda obj: obj.master.stock > 0,
@@ -985,6 +1038,20 @@ class ProductTranslation(
             ),
             **cls._attribute_meili_fields(),
         }
+
+    @staticmethod
+    def _brand_name(obj) -> str | None:
+        brand = obj.master.brand
+        return brand.name if brand else None
+
+    @staticmethod
+    def _category_name(obj) -> str | None:
+        category = obj.master.category
+        if not category:
+            return None
+        return category.safe_translation_getter(
+            "name", language_code=obj.language_code, any_language=True
+        )
 
     def indexed_offer_kind(self) -> str | None:
         """``offer_kind`` from the bulk queryset's annotation, else resolved.

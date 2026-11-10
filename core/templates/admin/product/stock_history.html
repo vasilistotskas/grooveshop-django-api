@@ -33,7 +33,7 @@ header builds the breadcrumbs from `opts` and `original`.
         {% trans "Low-stock threshold" as threshold_label %}
         {% include "admin/dashboard/components/kpi.html" with icon="notifications" tone="info" value=product.low_stock_threshold label=threshold_label %}
         {% trans "State" as state_label %}
-        {% include "admin/dashboard/components/kpi.html" with icon="monitoring" tone=stock_state.1 value=stock_state.0 label=state_label %}
+        {% include "admin/dashboard/components/kpi.html" with icon="monitoring" tone=stock_tone value=stock_state.label label=state_label %}
     </div>
 
     {% trans "Daily movements" as chart_title %}

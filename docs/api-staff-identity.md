@@ -306,14 +306,93 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   sign-in, with no second login. The code that enrolled is spent. The
   recovery codes sit in the pending sign-in until confirmed, so a reload
   does not lose them.
-- **Guessing is bounded:** five wrong codes per user lock further tries for
-  fifteen minutes (cache), even a right one.
+- **Guessing is bounded:** five code attempts per user in fifteen minutes
+  (cache), then even a right one is refused. The attempt is counted BEFORE the
+  code is checked (`staff_mfa.register_attempt`), so parallel requests cannot
+  each get a guess; a right code clears the count. The count is shared by the
+  admin login and the token endpoint, and is kept under a `global:strict:`
+  key, so every host (the platform's and each store's) draws on one allowance
+  and a cache that cannot count stops the sign-in instead of lifting the lock.
 - **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa <email>`
   (run with cluster access) removes the authenticators and any
   lockout; the next login enrols a new one.
-- **Not covered:** platform staff API tokens (`PlatformStaffToken`) are issued
-  after a login and are a separate surface; a token already issued keeps
-  working. WebAuthn/passkeys are not offered for the admin login yet.
+- **The token endpoint asks the same factor.** `POST /api/v1/platform/auth/login`
+  takes `email`, `password` and, for every user `staff_mfa.requires_mfa` covers
+  (a superuser), a `code` (authenticator or recovery code), checked by
+  `staff_mfa.verify_second_factor`, the helper the admin form's `code` step
+  uses, with the same lockout and failure count. A superuser who has not set up
+  an authenticator gets `403 mfa_enrolment_required`: enrolment needs the QR
+  step, which stays in the admin login, so sign in there once first. Other
+  answers: `401 mfa_code_required` (none sent), `401 mfa_wrong_code`,
+  `429 mfa_locked`. A token already issued keeps working; WebAuthn/passkeys
+  are not offered for the admin login yet.
+
+## Sign-in attempts (admin login and token endpoint)
+
+allauth's limiter covers `/_allauth/` only, so attempts at the Django admin
+login and at the token endpoint are counted by
+`tenant/staff_login_limits.py`. Both reach the password check through
+`PlatformStaffBackend.authenticate_staff`, which does the counting, so there is
+no second copy.
+
+- **Counted first.** `register_attempt` increments (`cache.count_in_window`:
+  one Redis script that adds one and starts the window) before the password is looked at,
+  and raises `StaffLoginLocked` when the result is over a budget, without
+  checking the password. Parallel requests each get their own number, so the
+  budget is not "the limit plus the requests in flight".
+- **Account + proven address** (`MAX_FAILURES_PER_ACCOUNT_ADDRESS`, 5): the
+  strict budget. A lock here refuses only that address, so someone who knows a
+  staff email cannot lock the owner out from the owner's own address. A
+  success clears it; so do a password reset (`StaffSetPasswordForm.save`, which
+  clears BEFORE it saves, so a cache that cannot be written fails the reset
+  before anything changes) and `reset_staff_mfa`.
+- **Account-wide ceiling** (`MAX_FAILURES_PER_ACCOUNT`, 50): bounds a guessing
+  run spread over many addresses. Past it the account is locked for everyone
+  until the window ends. That is the remaining denial-of-service bound: a
+  caller who knows a staff email can lock it for everyone, but needs 50
+  attempts spread over addresses in the window to do so (a single address is
+  stopped after 5), and the owner is unlocked by a password reset or
+  `reset_staff_mfa`. It is the only account limit for a request without a
+  proven address.
+- **Per proven address** (`MAX_FAILURES_PER_IP`, 20): a run of guesses across
+  accounts. A success does not clear it, or one valid login of the attacker's
+  own would reset a guessing run. An address is `edge_client_ip` (the
+  request carried our edge's `X-Origin-Verify`); IPv6 counts on its /64, IPv4
+  on the full address. Without the proof (a domain outside our Cloudflare
+  zones, a missing or rotated secret, a direct call to a node) the only
+  address known is the proxy peer, a Cloudflare edge node or SNAT gateway
+  shared by everyone behind it, so no address counter applies: 20 wrong
+  passwords from one place would lock every staff member out.
+- **Existence-neutral.** The account key is the submitted identifier,
+  lower-cased and hashed whether or not it names an account, so a locked
+  unknown address answers like a locked known one.
+- **A lock refuses even the right password**: the admin form shows "Too many
+  failed sign-in attempts. Try again later." and the endpoint answers `429
+  login_locked`. Refused attempts do not extend it; it ends when the window
+  that began with the first attempt does.
+- **Keys** are `global:strict:` (see above), env-tunable as
+  `STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT_ADDRESS`,
+  `STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT`, `STAFF_LOGIN_MAX_FAILURES_PER_IP`,
+  `STAFF_LOGIN_WINDOW_SECONDS`. The endpoint's `staff_login` throttle (10 an
+  hour) still sits in front.
+
+### If the cache is down
+
+Staff sign-in is refused on purpose while the attempt counters cannot be read
+or written (`StaffLoginUnavailable`, raised for the cache's own
+`REDIS_UNAVAILABLE` errors on the `strict:` keys): the admin form shows "Sign-in
+is temporarily unavailable, try again shortly." and the token endpoint answers
+`503 staff_login_unavailable`, with one ERROR log line per attempt (no
+username) and the password never checked. Otherwise an attacker could lift the
+limits by overloading Redis. Customer sign-in behaves the same, because
+allauth's limiter keys are strict too.
+
+The way in during a Redis incident is the cluster, not the admin: run
+`manage.py` with `kubectl --context grooveshop exec` in a backend pod.
+`manage.py changepassword <email>` sets a staff password (it runs in the public
+schema, where staff identities live, and needs no cache). `manage.py
+reset_staff_mfa <email>` also clears the account's attempt counters, so it needs
+the cache; with Redis down, restore Redis first.
 
 ## Forgotten password (admin login)
 

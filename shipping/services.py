@@ -10,7 +10,9 @@ price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 from __future__ import annotations
 
 import logging
+import operator
 from collections.abc import Iterable, Iterator, Mapping
+from functools import reduce
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -27,6 +29,7 @@ from shipping.interfaces import (
     ShippingCarrierInterface,
     get_provider,
     is_registered,
+    registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
 
@@ -204,13 +207,32 @@ class ShippingService:
         return adapter.can_cancel_shipment(shipment)
 
     @classmethod
+    def canceled_shipment_q(cls) -> Q | None:
+        """Orders a carrier left open behind a canceled shipment, as a
+        ``Q`` on ``Order``: every carrier's answer
+        (:meth:`ShippingCarrierInterface.canceled_shipment_q`) OR-ed, or
+        ``None`` when no carrier leaves one."""
+        rules = [
+            rule
+            for adapter in registered_providers()
+            if (rule := adapter.canceled_shipment_q()) is not None
+        ]
+        return reduce(operator.or_, rules) if rules else None
+
+    @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:
-        """Return the label PDF for ``order`` or None when unavailable."""
+        """Return the label PDF for ``order``, or None when it has none.
+
+        None covers every "no label" case: no carrier, no shipment row,
+        or a shipment the carrier has not booked yet
+        (:meth:`ShippingCarrierInterface.has_label`). The carrier is
+        called only for a label that exists.
+        """
         adapter = cls.adapter_for_order(order)
         if adapter is None:
             return None
         shipment = adapter.shipment_for_order(order)
-        if shipment is None:
+        if shipment is None or not adapter.has_label(shipment):
             return None
         return adapter.fetch_label_bytes(shipment)
 

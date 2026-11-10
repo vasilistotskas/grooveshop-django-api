@@ -10,9 +10,11 @@ of the two Unfold configs raised ``NoReverseMatch`` and replaced the
 real error (2026-09-11: a missing migration column surfaced locally as
 "'platform_admin' is not a registered namespace").
 
-The links are pinned with ``reverse_lazy(..., urlconf=...)``; these
-tests cast them under BOTH urlconfs and run the debug page's own
-settings dump.
+The store admin's links are pinned with ``reverse_lazy(...,
+urlconf=...)``; these tests cast them under BOTH urlconfs and run the
+debug page's own settings dump. The control plane's sidebar is built per
+request (``admin.navigation.platform_sidebar``), so ``UNFOLD_PLATFORM``
+must hold no link to cast at all.
 """
 
 from __future__ import annotations
@@ -56,22 +58,23 @@ def active_urlconf(request):
     clear_url_caches()
 
 
-@pytest.mark.parametrize("config_name", ["UNFOLD", "UNFOLD_PLATFORM"])
-def test_every_unfold_link_casts_under_either_urlconf(
-    active_urlconf, config_name
-):
-    links = list(_links(getattr(settings, config_name)))
-    assert links, f"{config_name} declares no links"
+def test_every_unfold_link_casts_under_either_urlconf(active_urlconf):
+    links = list(_links(settings.UNFOLD))
+    assert links, "UNFOLD declares no links"
     for link in links:
         # Casting a lazy reverse is what the sidebar, the tabs and the
         # debug page all do; a NoReverseMatch here is the defect. The
         # env-gated dropdown entries (docs site, Flower, Mailpit, …) are
         # absolute URLs to other hosts and are legitimate as such.
         assert str(link).startswith(("/", "https://", "http://")), (
-            config_name,
             active_urlconf,
             link,
         )
+
+
+def test_the_platform_config_holds_no_link():
+    """Nothing in ``UNFOLD_PLATFORM`` for a store host to reverse."""
+    assert not list(_links(settings.UNFOLD_PLATFORM))
 
 
 def test_debug_page_settings_dump_never_reverses_against_the_host(

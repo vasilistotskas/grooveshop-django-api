@@ -30,9 +30,11 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def as_tenant_host(monkeypatch):
     """Fake being on a store's own host, not the platform host."""
-    from django.db import connection
+    from django.db import DEFAULT_DB_ALIAS, connections
 
-    monkeypatch.setattr(connection, "schema_name", "webside", raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "schema_name", "webside", raising=False
+    )
 
 
 def test_shippable_true_returns_only_countries_with_an_active_rate(

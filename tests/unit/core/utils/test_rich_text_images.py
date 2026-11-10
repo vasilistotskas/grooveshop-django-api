@@ -205,6 +205,42 @@ def test_backfill_updates_rows_saved_before_and_is_idempotent(media):
 
 
 @pytest.mark.django_db
+def test_backfill_applies_the_policy_a_save_does():
+    post = BlogPostFactory(slug="typography-backfill", body="<p>x</p>")
+    translation = post.translations.first()
+    old = (
+        '<p class="MsoNormal" style="font-family: arial; font-size: 14pt;'
+        ' color: #333">x</p>'
+    )
+    type(translation).objects.filter(pk=translation.pk).update(body=old)
+
+    normalise_current_schema(rich_text_fields())
+    translation.refresh_from_db()
+
+    assert translation.body == '<p style="color: #333;">x</p>'
+    translation.body = old
+    translation.save()
+    assert translation.body == '<p style="color: #333;">x</p>'
+
+
+@pytest.mark.django_db
+def test_backfill_leaves_a_row_a_save_would_refuse_and_counts_it():
+    post = BlogPostFactory(slug="refused-backfill", body="<p>x</p>")
+    translation = post.translations.first()
+    old = (
+        '<p style="font-size: 14pt">x</p>'
+        '<iframe src="https://example.com/embed"></iframe>'
+    )
+    type(translation).objects.filter(pk=translation.pk).update(body=old)
+
+    tallies = normalise_current_schema(rich_text_fields())
+    translation.refresh_from_db()
+
+    assert translation.body == old
+    assert tallies["blog.BlogPostTranslation.body"].skipped == 1
+
+
+@pytest.mark.django_db
 def test_a_save_and_the_backfill_both_drop_an_empty_heading():
     post = BlogPostFactory(
         slug="empty-heading", body='<h2 id="a"></h2><p>x</p>'

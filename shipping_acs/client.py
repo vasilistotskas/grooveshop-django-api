@@ -21,6 +21,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from requests.adapters import HTTPAdapter
+from urllib3.exceptions import MaxRetryError, NewConnectionError
 from urllib3.util.retry import Retry
 
 from shipping_acs.concurrency import acs_request_slot
@@ -28,6 +29,7 @@ from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
     AcsConfigError,
+    AcsOutcomeUnknownError,
     AcsRetryableError,
 )
 from shipping_acs.observability import Exchange, observe_call
@@ -45,17 +47,18 @@ TRACKING_ALIASES = (TRACKING_SUMMARY_ALIAS, TRACKING_DETAILS_ALIAS)
 # no risk of duplicate mutation on the ACS side). 5xx and read-timeout
 # responses are NOT retried at the HTTP layer because every ACS call
 # is a POST and write aliases like ``ACS_Create_Voucher`` are not
-# idempotent — re-POSTing a voucher request after a 502 has been
-# observed in stage to mint an orphan voucher (project memory:
-# ``project_acs_voucher_orphan_prevention.md``).  Celery's
-# ``autoretry_for=(AcsRetryableError,)`` plus the 3-phase claim/mint
-# /persist design in ``shipping_acs/services.py`` is the durable
-# retry path for everything that can have a server-side effect.
+# idempotent — a second voucher request for one order has minted a
+# second voucher in stage (order 682, 2026-04-29). The caller decides:
+# ``_exchange`` raises ``AcsOutcomeUnknownError`` for every failure
+# after the request may have left, and
+# ``AcsService.create_voucher_for_order`` records such a voucher
+# request as one of unknown outcome that nothing sends again.
 _RETRY_CONFIG = Retry(
     total=3,
     connect=3,
     read=0,
     status=0,
+    other=0,
     backoff_factor=0.5,
     raise_on_status=False,
 )
@@ -85,6 +88,28 @@ def worst_case_request_seconds(timeout: float) -> float:
         for errors in range(2, retries + 1)
     )
     return (retries + 1) * timeout + backoff + timeout
+
+
+def _never_connected(
+    exc: requests.ConnectionError | requests.Timeout,
+) -> bool:
+    """Whether the request failed before a connection to ACS existed.
+
+    ``requests`` raises ``ConnectTimeout`` when every connect attempt
+    timed out, and a ``ConnectionError`` wrapping urllib3's
+    ``MaxRetryError`` whose reason is a ``NewConnectionError`` (a refused
+    connection or a failed DNS lookup, ``NameResolutionError``) when
+    every attempt failed to connect (``requests/adapters.py``,
+    ``HTTPAdapter.send``). Those are the only failures in which no byte
+    of the request reached ACS; urllib3 itself retries only them
+    (``Retry._is_connection_error``).
+    """
+    if isinstance(exc, requests.ConnectTimeout):
+        return True
+    wrapped = exc.args[0] if exc.args else None
+    return isinstance(wrapped, MaxRetryError) and isinstance(
+        wrapped.reason, NewConnectionError
+    )
 
 
 class AcsClient:
@@ -240,20 +265,26 @@ class AcsClient:
                     },
                     timeout=self.timeout,
                 )
-        except requests.ConnectionError as exc:
-            raise AcsRetryableError(
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            # Only a connection that was never established proves the
+            # request never reached ACS. Everything else (a read timeout,
+            # a connection dropped after the body left, which requests
+            # re-raises from urllib3's ProtocolError as a plain
+            # ConnectionError) may have been executed, so it is an
+            # unknown outcome: ``create_voucher_for_order`` never sends
+            # such a voucher request again.
+            error = (
+                AcsRetryableError
+                if _never_connected(exc)
+                else AcsOutcomeUnknownError
+            )
+            raise error(
                 alias=alias,
-                error_message=f"ACS connection error: {exc}",
-            ) from exc
-        except requests.Timeout as exc:
-            # Read timeouts mean the request MAY have been processed —
-            # blind HTTP-layer re-POST is unsafe (see _RETRY_CONFIG),
-            # but the Celery path is: the 3-phase claim in
-            # ``AcsService.create_voucher_for_order`` dedupes a
-            # re-mint, so surfacing this as retryable is correct.
-            raise AcsRetryableError(
-                alias=alias,
-                error_message=f"ACS timeout after {self.timeout}s: {exc}",
+                error_message=(
+                    f"ACS timeout after {self.timeout}s: {exc}"
+                    if isinstance(exc, requests.Timeout)
+                    else f"ACS connection error: {exc}"
+                ),
             ) from exc
 
         exchange.http_status = response.status_code
@@ -280,13 +311,16 @@ class AcsClient:
             )
 
         if response.status_code >= 500:
+            # The manual documents 200, 403 and 406 only (p. 1-2), so a
+            # 5xx, whoever sent it, says nothing about whether ACS
+            # executed the call.
             logger.warning(
                 "ACS %s → HTTP %s: %s",
                 alias,
                 response.status_code,
                 response.text[:500],
             )
-            raise AcsRetryableError(
+            raise AcsOutcomeUnknownError(
                 alias=alias,
                 error_message=f"ACS server error {response.status_code}",
                 http_status=response.status_code,
@@ -302,7 +336,9 @@ class AcsClient:
         try:
             payload = response.json() or {}
         except ValueError as exc:
-            raise AcsAPIError(
+            # ACS answered, so it executed the call; what it did is
+            # unreadable.
+            raise AcsOutcomeUnknownError(
                 alias=alias,
                 error_message=f"ACS returned non-JSON body: {exc}",
                 http_status=response.status_code,

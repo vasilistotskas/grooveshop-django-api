@@ -1,6 +1,6 @@
 from html import unescape
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
@@ -94,9 +94,7 @@ class PublishStatusFilter(DropdownFilter):
         elif self.value() == "draft":
             return queryset.filter(is_published=False)
         elif self.value() == "scheduled":
-            return queryset.filter(
-                is_published=True, published_at__gt=timezone.now()
-            )
+            return queryset.scheduled()
         return queryset
 
 
@@ -147,15 +145,13 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         (
             _("Basic Information"),
             {
-                "fields": ("user", "website"),
-                "classes": ("wide",),
+                "fields": ("user", "website", "same_as"),
             },
         ),
         (
             _("Biography"),
             {
                 "fields": ("bio",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -233,14 +229,12 @@ class BlogTagAdmin(BaseTranslatableAdmin):
             _("Tag Information"),
             {
                 "fields": ("name", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Organization"),
             {
                 "fields": ("sort_order",),
-                "classes": ("wide",),
             },
         ),
     )
@@ -290,21 +284,18 @@ class BlogCategoryAdmin(BaseTranslatableAdmin):
             _("Category Information"),
             {
                 "fields": ("name", "description", "parent"),
-                "classes": ("wide",),
             },
         ),
         (
             _("URL"),
             {
                 "fields": ("slug",),
-                "classes": ("wide",),
             },
         ),
         (
             _("Media"),
             {
                 "fields": ("image",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -591,14 +582,31 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     )
     @transaction.atomic
     def publish_posts(self, request, queryset):
+        # Only drafts move: a scheduled post keeps its date (publishing it
+        # now would discard the schedule) and a live post keeps the date it
+        # went live on.
+        scheduled = queryset.scheduled().count()
         updated = update_each(
-            queryset, is_published=True, published_at=timezone.now()
+            queryset.filter(is_published=False),
+            is_published=True,
+            published_at=timezone.now(),
         )
         self.message_user(
             request,
             _("%(count)d posts were successfully published.")
             % {"count": updated},
         )
+        if scheduled:
+            self.message_user(
+                request,
+                _(
+                    "%(count)d scheduled posts were left scheduled. Open a "
+                    "scheduled post and change its Published At date to "
+                    "publish it now."
+                )
+                % {"count": scheduled},
+                messages.WARNING,
+            )
 
     @action(
         description=_("Unpublish selected posts"),
@@ -672,21 +680,18 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
             _("Comment Content"),
             {
                 "fields": ("content",),
-                "classes": ("wide",),
             },
         ),
         (
             _("Relations"),
             {
                 "fields": ("post", "user", "parent"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Moderation"),
             {
                 "fields": ("approved",),
-                "classes": ("wide",),
             },
         ),
         (

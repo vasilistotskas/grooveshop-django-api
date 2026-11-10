@@ -18,6 +18,7 @@ from order.factories import OrderFactory
 from order.models.item import OrderItem
 from order.models.order import Order
 from product.models import Product
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -36,6 +37,7 @@ def _order(shipping: str, lines=(), currency: str = "EUR", item_currency=None):
             sku=f"TOTAL-{order.id}-{index}",
             price=Money(Decimal("1.00"), currency),
             stock=1000,
+            vat=VatFactory(value=0),
         )
         OrderItem.objects.create(
             order=order,
@@ -123,6 +125,7 @@ def test_items_refuse_lines_in_different_currencies(read):
         sku=f"TOTAL-{order.id}-other",
         price=Money(Decimal("1.00"), settings.CURRENCIES[1]),
         stock=1000,
+        vat=VatFactory(value=0),
     )
     OrderItem.objects.create(
         order=order,

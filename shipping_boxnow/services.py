@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import logging
 import time
+import zipfile
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
@@ -16,7 +18,11 @@ from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
-from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowConfigError
+from shipping_boxnow.exceptions import (
+    BoxNowAPIError,
+    BoxNowConfigError,
+    BoxNowError,
+)
 from shipping_boxnow.models import (
     BoxNowLocker,
     BoxNowParcelEvent,
@@ -24,6 +30,8 @@ from shipping_boxnow.models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
@@ -689,8 +697,10 @@ class BoxNowService:
         ``NEW`` state (error P420 otherwise). We mirror that guard
         locally (:meth:`can_cancel_shipment`) so we never make an API
         call that BoxNow would reject, and so the caller gets a clear
-        error message. Cancelling a parcel that is already CANCELED is a
-        no-op, so a retry after a partly failed cancel goes through.
+        error message. Cancelling a shipment that is already CANCELED,
+        sent to BoxNow or not, is a no-op that changes nothing, as BoxNow
+        treats a canceled parcel, so a retry after a partly failed cancel
+        goes through.
 
         Three-phase design — same shape as ``create_shipment_for_order``
         — so the BoxNow API call doesn't happen with a row lock held.
@@ -721,6 +731,18 @@ class BoxNowService:
                 BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
             )
             parcel_id = locked.parcel_id
+
+            # Already canceled (a webhook, an earlier cancel that the
+            # caller then failed to finish, a retried order cancel):
+            # nothing left to do, with or without a parcel_id. BoxNow:
+            # "Canceling a canceled parcel has no effect" (API Manual
+            # v7.2, §3.7). Checked first, or a shipment BoxNow never
+            # received moved ``cancel_requested_at`` and logged one more
+            # cancellation on every repeat, and the state guard below
+            # read CANCELED as "past NEW" and refused a parcel that is
+            # exactly as canceled as asked.
+            if locked.parcel_state == BoxNowParcelState.CANCELED:
+                return
 
             # No parcel_id ⇒ nothing at BoxNow to cancel. This covers
             # the canonical ``pending_creation`` case (online order
@@ -774,13 +796,6 @@ class BoxNowService:
                         "updated_at",
                     ]
                 )
-                return
-
-            # Already canceled (a webhook, an earlier cancel that the
-            # caller then failed to finish): nothing left to do. Without
-            # this the state guard below read CANCELED as "past NEW" and
-            # refused a parcel that is exactly as canceled as asked.
-            if locked.parcel_state == BoxNowParcelState.CANCELED:
                 return
 
             # State guard: parcel_id is set, so a real BoxNow-side
@@ -1692,8 +1707,13 @@ class BoxNowService:
             Raw PDF bytes.
 
         Raises:
+            BoxNowError: The shipment has no parcel id yet.
             BoxNowAPIError: The BoxNow API returned an error.
         """
+        if not shipment.parcel_id:
+            raise BoxNowError(
+                "Cannot fetch a label before the parcel is created."
+            )
         cache_key = f"boxnow:label:{shipment.parcel_id}"
         cached: bytes | None = cache.get(cache_key)
         if cached is not None:
@@ -1710,6 +1730,59 @@ class BoxNowService:
         cache.set(cache_key, label_bytes, timeout=_LABEL_CACHE_TTL)
         return label_bytes
 
+    @staticmethod
+    def label_filename(shipment: BoxNowShipment) -> str:
+        """The file name a parcel's voucher PDF is downloaded under."""
+        return f"boxnow-voucher-{shipment.parcel_id}.pdf"
+
+    @classmethod
+    def fetch_labels_zip(
+        cls, shipments: Iterable[BoxNowShipment]
+    ) -> tuple[bytes, list[dict[str, Any]]]:
+        """Bundle the voucher PDFs for ``shipments`` into one zip archive.
+
+        One :meth:`fetch_label_bytes` call per parcel (each cached for an
+        hour), stored under :meth:`label_filename`. A shipment with no
+        ``parcel_id`` is left out: BoxNow has no voucher for it yet.
+
+        A label that fails is collected and reported, never raised, so
+        one bad parcel does not stop the others. Returns
+        ``(zip_bytes, failures)``; ``zip_bytes`` is empty when no label
+        was bundled.
+        """
+        buffer = io.BytesIO()
+        bundled = 0
+        failures: list[dict[str, Any]] = []
+
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for shipment in shipments:
+                if not shipment.parcel_id:
+                    continue
+                try:
+                    pdf = cls.fetch_label_bytes(shipment)
+                except Exception as exc:
+                    logger.exception(
+                        "fetch_labels_zip: parcel %s (order #%s) could not "
+                        "be fetched — continuing with the rest",
+                        shipment.parcel_id,
+                        shipment.order_id,
+                    )
+                    failures.append(
+                        {
+                            "shipment_id": shipment.pk,
+                            "order_id": shipment.order_id,
+                            "parcel_id": shipment.parcel_id,
+                            "error": str(exc),
+                        }
+                    )
+                    continue
+                archive.writestr(cls.label_filename(shipment), pdf)
+                bundled += 1
+
+        if not bundled:
+            return b"", failures
+        return buffer.getvalue(), failures
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -1723,18 +1796,27 @@ class BoxNowService:
         """
         Advance the Order's status based on the BoxNow parcel event.
 
-        Uses ``OrderService.update_order_status`` for all transitions so
-        signals and history logging fire correctly.  Swallows
-        ``InvalidStatusTransitionError`` with a warning so that an
-        out-of-order or duplicate webhook event cannot roll back the
-        already-recorded ``BoxNowParcelEvent``.
+        Uses ``OrderService.update_order_status`` so signals and history
+        logging fire correctly.  Swallows ``InvalidStatusTransitionError``
+        with a warning so that an out-of-order or duplicate webhook event
+        cannot roll back the already-recorded ``BoxNowParcelEvent``.
+
+        A ``canceled`` parcel moves no order. BoxNow defines it as
+        "Parcel has been canceled by the sender" (Webhook Tracking Guide
+        v1.4.6, p. 2; API Manual v7.2, §6.5.3), and the sender is the
+        store: a cancel of the order already ran ``cancel_order``, and a
+        parcel canceled while the order is open was canceled on purpose
+        (a wrong locker, a re-issue). The shipment is recorded CANCELED
+        by the caller, and the open order behind it needs follow-up
+        (``order.follow_up``) until staff re-issue the parcel or cancel
+        the order.
 
         Safety rules:
         - Never move a terminal order (DELIVERED, COMPLETED, CANCELED,
           RETURNED, REFUNDED) backwards.
         - Only advance to SHIPPED if the order is still PENDING or
           PROCESSING.
-        - Only advance to DELIVERED/CANCELED/RETURNED from non-terminal
+        - Only advance to DELIVERED/RETURNED from non-terminal
           states (or states before the target).
 
         Args:
@@ -1780,7 +1862,14 @@ class BoxNowService:
             new_status = "RETURNED"
 
         elif mapped_state == BoxNowParcelState.CANCELED:
-            new_status = "CANCELED"
+            # Never the order's status (see the docstring).
+            logger.info(
+                "BoxNow: parcel canceled for order=%s in status %r — the "
+                "order is left as it is",
+                order.id,
+                current_status,
+            )
+            return
 
         # new / in-depot / pending-creation events → no order status change.
 

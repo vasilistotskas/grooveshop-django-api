@@ -8,14 +8,13 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.order import OrderFactory
-from order.models.history import OrderHistory, OrderItemHistory
+from order.models.history import OrderHistory
 from order.models.order import Order
 from order.signals import (
     order_canceled,
     order_completed,
     order_created,
     order_refunded,
-    order_returned,
     order_shipped,
     order_status_changed,
 )
@@ -263,69 +262,6 @@ class OrderSignalsTestCase(TestCase):
 
             mock_signal.assert_called_once()
 
-    def test_handle_order_item_pre_save(self):
-        original_quantity = self.order_item.quantity
-        new_quantity = original_quantity + 2
-
-        self.order_item.quantity = new_quantity
-        self.order_item.save()
-
-        self.assertEqual(self.order_item._original_quantity, original_quantity)
-
-    def test_handle_order_item_saved_quantity_changed(self):
-        original_quantity = self.order_item.quantity
-        new_quantity = original_quantity + 2
-        self.order_item._original_quantity = original_quantity
-
-        self.order_item.quantity = new_quantity
-
-        self.order_item.save()
-
-        self.product.refresh_from_db()
-
-        self.assertEqual(self.product.stock, self.initial_stock - 2)
-
-        self.assertTrue(
-            OrderItemHistory.objects.filter(
-                order_item=self.order_item,
-                change_type="QUANTITY",
-                previous_value={"quantity": original_quantity},
-                new_value={"quantity": new_quantity},
-            ).exists()
-        )
-
-        self.assertTrue(
-            OrderHistory.objects.filter(
-                order=self.order,
-                change_type="NOTE",
-                new_value__note__endswith=(
-                    f"quantity updated from {original_quantity} "
-                    f"to {new_quantity}"
-                ),
-            ).exists()
-        )
-
-    def test_handle_order_item_saved_price_changed(self):
-        original_price = self.order_item.price
-        new_price = Money(
-            amount=Decimal("60.00"), currency=settings.DEFAULT_CURRENCY
-        )
-        self.order_item._original_price = original_price
-
-        self.order_item.price = new_price
-
-        self.order_item.save()
-
-        history = OrderItemHistory.objects.filter(
-            order_item=self.order_item, change_type="PRICE"
-        ).first()
-
-        self.assertIsNotNone(history)
-        self.assertEqual(
-            history.previous_value["price"], float(original_price.amount)
-        )
-        self.assertEqual(history.new_value["price"], float(new_price.amount))
-
     def test_handle_order_shipped(self):
         self.order.tracking_number = "TRACK123"
         self.order.shipping_carrier = "FedEx"
@@ -382,95 +318,6 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-    def test_handle_order_canceled(self):
-        order_canceled.send(
-            sender=Order, order=self.order, reason="Customer request"
-        )
-
-        self.assertTrue(
-            OrderHistory.objects.filter(
-                order=self.order,
-                change_type="NOTE",
-                new_value={"note": "Order canceled. Reason: Customer request"},
-            ).exists()
-        )
-
-    @patch("order.services.OrderService.cancel_attached_shipment")
-    def test_handle_order_canceled_cascades_when_not_yet_run(
-        self, mock_cascade
-    ):
-        """When ``OrderService.cancel_order`` hasn't already run the
-        cascade (admin-form-save path), the signal handler must do
-        it. Verified necessary on 2026-05-16 after prod order 60 was
-        cancelled via the admin form and the ACS voucher stayed
-        alive."""
-        order_canceled.send(
-            sender=Order, order=self.order, reason="Customer request"
-        )
-
-        mock_cascade.assert_called_once_with(self.order, "Customer request")
-
-    @patch("order.services.OrderService.cancel_attached_shipment")
-    def test_handle_order_canceled_admin_form_path_uses_default_reason(
-        self, mock_cascade
-    ):
-        """When the admin form save flips ``order.status`` to CANCELED
-        directly (no kwargs/reason), the cascade still runs with a
-        sensible default reason."""
-        order_canceled.send(sender=Order, order=self.order)
-
-        mock_cascade.assert_called_once_with(self.order, "admin status change")
-
-    @patch("order.services.OrderService.cancel_attached_shipment")
-    def test_handle_order_canceled_skips_cascade_when_already_run(
-        self, mock_cascade
-    ):
-        """``OrderService.cancel_order`` runs the cascade synchronously
-        and leaves a ``shipment_cancel`` breadcrumb on the metadata.
-        The signal handler must detect that and skip — otherwise the
-        programmatic cancel path would double-fire the carrier API."""
-        self.order.metadata = {
-            "cancellation": {
-                "shipment_cancel": {"attempted": True, "dispatched": True}
-            }
-        }
-        self.order.save(update_fields=["metadata"])
-
-        order_canceled.send(
-            sender=Order, order=self.order, reason="programmatic"
-        )
-
-        mock_cascade.assert_not_called()
-
-    def test_handle_order_canceled_initialises_metadata_cancellation(self):
-        """The admin-form-save path leaves ``metadata.cancellation``
-        absent. The signal handler must seed it so the cascade has a
-        parent dict to write its ``shipment_cancel`` outcome into.
-
-        Uses the real cascade — the test order has no shipping
-        provider attached, so ``ShippingService.cancel_shipment``
-        short-circuits to ``False``, but the metadata save still runs
-        end of cascade. That's what persists the seeded fields."""
-        # Baseline: ensure the test order has no cancellation dict.
-        self.order.metadata = {}
-        self.order.save(update_fields=["metadata"])
-
-        order_canceled.send(
-            sender=Order, order=self.order, previous_status="PROCESSING"
-        )
-
-        self.order.refresh_from_db()
-        cancellation = (self.order.metadata or {}).get("cancellation") or {}
-        assert cancellation.get("previous_status") == "PROCESSING"
-        assert cancellation.get("reason") == "admin status change"
-        assert cancellation.get("canceled_at")  # truthy ISO timestamp
-        # The cascade ran and wrote its outcome (no shipment attached
-        # → dispatched=False).
-        assert cancellation.get("shipment_cancel", {}).get("attempted") is True
-        assert (
-            cancellation.get("shipment_cancel", {}).get("dispatched") is False
-        )
-
     def test_handle_order_refunded(self):
         refunded = Money("50.00", "USD")
         order_refunded.send(
@@ -510,27 +357,6 @@ class OrderSignalsTestCase(TestCase):
             order_refunded.send(
                 sender=Order, order=self.order, amount=Money("5.00", "EUR")
             )
-
-    def test_handle_order_returned(self):
-        order_returned.send(
-            sender=Order,
-            order=self.order,
-            items=[{"product_name": "Widget", "quantity": 1}],
-            reason="Wrong size",
-        )
-
-        self.assertTrue(
-            OrderHistory.objects.filter(
-                order=self.order,
-                change_type="NOTE",
-                new_value={
-                    "note": (
-                        "Order returned. Items: Widget (qty: 1). "
-                        "Reason: Wrong size"
-                    )
-                },
-            ).exists()
-        )
 
     @patch(
         "order.signals.handlers.send_shipping_notification_email.apply_async"

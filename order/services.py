@@ -1,8 +1,10 @@
 import logging
-from collections.abc import Iterable, Mapping
+import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -15,12 +17,16 @@ from djmoney.money import Money
 
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
+from order import credit_allocation
 from order.attribution import (
     AttributionInput,
     ClassifiedAttribution,
     classify,
 )
-from order.discounts import add_line_discounts, spread_by_remaining_value
+from order.discounts import (
+    add_line_discounts,
+    spread_by_remaining_value,
+)
 from order.enum.attribution import OrderSourceType
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
@@ -40,6 +46,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    OrderNotCancelableError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
@@ -58,6 +65,7 @@ from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
     RefundAttemptStatus,
+    RefundReason,
 )
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
@@ -66,13 +74,19 @@ from order.payment import (
     provider_supports,
     registered_provider_codes,
 )
-from order.payment_binding import PaymentPurpose, binding_mismatch
+from order.payment_binding import (
+    SUBJECT_KEY,
+    PaymentPurpose,
+    binding_mismatch,
+)
 from order.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
+    PAYMENT_AMOUNT_TOLERANCE,
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
 )
+from order.refund_lines import plan_pieces
 from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
 from order.vat_snapshot import write_vat_lines
@@ -92,10 +106,6 @@ if TYPE_CHECKING:
     from promotion.services import CartDiscountResult
 
 logger = logging.getLogger(__name__)
-
-# What a provider may differ from the order's total by (rounding on its side)
-# before a confirmed charge is treated as not matching the order.
-PAYMENT_AMOUNT_TOLERANCE = Decimal("0.01")
 
 # Payment statuses that represent a financially settled (terminal) state.
 # A stale or out-of-order webhook event MUST NOT overwrite any of these.
@@ -223,9 +233,6 @@ class _ShareDeclined:
     declined: dict[str, Any]
 
 
-__all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
-
-
 def _violated_constraint(error: IntegrityError) -> str | None:
     """The constraint a database integrity error names, when the driver
     says (psycopg reports it as ``diag.constraint_name``, which for a
@@ -347,6 +354,14 @@ class LegalAcceptance:
     source: LegalAcceptanceSource
     documents: tuple[LegalDocumentVersion, ...]
 
+
+# ``metadata['cancellation']['shipment_cancel']`` of an order canceled
+# because its shipment already was: the courier was not asked, and the
+# shipment is canceled. The same shape ``cancel_attached_shipment`` writes.
+SHIPMENT_ALREADY_CANCELED: dict[str, Any] = {
+    "attempted": False,
+    "dispatched": True,
+}
 
 LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
     "The store's terms of use or privacy policy cannot be shown right "
@@ -2556,6 +2571,11 @@ class OrderService:
         transitions — e.g. the carrier bridge that walks PROCESSING →
         SHIPPED → RETURNED must not tell the customer "your order is on
         the way" moments before the return notification.
+
+        CANCELED is not a transition of this table: a cancel releases
+        stock, settles or refunds the payment and records why, and
+        :meth:`cancel_order` is the one path that does. Asking for it
+        here raises ``InvalidStatusTransitionError``.
         """
         if not new_status:
             raise ValueError("New status cannot be empty")
@@ -2577,14 +2597,8 @@ class OrderService:
             return order
 
         allowed_transitions = {
-            OrderStatus.PENDING: [
-                OrderStatus.PROCESSING,
-                OrderStatus.CANCELED,
-            ],
-            OrderStatus.PROCESSING: [
-                OrderStatus.SHIPPED,
-                OrderStatus.CANCELED,
-            ],
+            OrderStatus.PENDING: [OrderStatus.PROCESSING],
+            OrderStatus.PROCESSING: [OrderStatus.SHIPPED],
             OrderStatus.SHIPPED: [
                 OrderStatus.DELIVERED,
                 OrderStatus.RETURNED,
@@ -2620,7 +2634,7 @@ class OrderService:
         if new_status == OrderStatus.REFUNDED and PaymentLedger.refund_open(
             order
         ):
-            raise RefundOutstandingError(PaymentLedger.refundable(order))
+            raise RefundOutstandingError(PaymentLedger.outstanding(order))
 
         old_status = order.status
 
@@ -2857,8 +2871,14 @@ class OrderService:
         canceled_by: int | None = None,
         *,
         customer_initiated: bool = True,
+        shipment_already_canceled: bool = False,
     ) -> tuple[Order, dict[str, Any] | None]:
         """Cancel an order: stock back, status CANCELED, voucher, refund.
+
+        ``shipment_already_canceled`` is for a cancel that follows the
+        shipment's own (:meth:`cancel_for_dead_shipment`): the courier is
+        not asked at all, before or after, and the order records
+        :data:`SHIPMENT_ALREADY_CANCELED`.
 
         ``customer_initiated`` is the caller's call, taken from what it
         already knows (the cancel endpoint: the requester is not store
@@ -2879,11 +2899,15 @@ class OrderService:
         history note. The default is the strict one, so a caller that
         forgets to choose is held to the courier's answer.
         """
-        shipment_cancel = (
-            cls._ask_courier_to_cancel(order, reason)
-            if customer_initiated
-            else None
+        customer_asked_courier = (
+            customer_initiated and not shipment_already_canceled
         )
+        if shipment_already_canceled:
+            shipment_cancel = dict(SHIPMENT_ALREADY_CANCELED)
+        elif customer_asked_courier:
+            shipment_cancel = cls._ask_courier_to_cancel(order, reason)
+        else:
+            shipment_cancel = None
         try:
             canceled = cls._cancel_order_locked(
                 order,
@@ -2892,7 +2916,15 @@ class OrderService:
                 shipment_cancel=shipment_cancel,
             )
         except Exception:
-            if shipment_cancel is not None and shipment_cancel["dispatched"]:
+            # The note is for a cancel that asked the courier, got the
+            # voucher canceled and then failed: staff must issue a new
+            # one. A shipment that was dead before this ran has no such
+            # story to tell.
+            if (
+                customer_asked_courier
+                and shipment_cancel is not None
+                and shipment_cancel["dispatched"]
+            ):
                 cls._note_shipment_canceled_without_order(order)
             raise
         # The cancel is committed; the refund is its own claim, call and
@@ -3124,7 +3156,7 @@ class OrderService:
             logger.warning(
                 "Cannot cancel order %s: %s", order.id, error_message
             )
-            raise OrderCancellationError(
+            raise OrderNotCancelableError(
                 order_id=order.id, reason=error_message
             )
 
@@ -3269,8 +3301,7 @@ class OrderService:
             if shipment_cancel is not None:
                 # The courier already confirmed (a customer cancel asks it
                 # first). Recording the outcome here is also what stops
-                # the cascade below, and the ``order_canceled`` signal's
-                # safety net, from asking the carrier a second time.
+                # the cascade below from asking the carrier a second time.
                 order.metadata["cancellation"]["shipment_cancel"] = (
                     shipment_cancel
                 )
@@ -3289,14 +3320,9 @@ class OrderService:
                 old_status,
             )
 
-            # Cascade to the courier voucher synchronously here so the
-            # existing programmatic API contract (cancel-order callers
-            # see ``metadata.cancellation.shipment_cancel`` populated
-            # before this method returns) is preserved. The signal-side
-            # cascade in ``handle_order_canceled`` covers paths that
-            # bypass this method (admin form save) — it short-circuits
-            # when ``shipment_cancel`` is already on the metadata, so
-            # we don't double-fire from this entry point.
+            # Cascade to the courier voucher before returning, so every
+            # caller reads ``metadata.cancellation.shipment_cancel`` on
+            # the order it gets back.
             cls.cancel_attached_shipment(order, reason)
 
             return order
@@ -3370,9 +3396,30 @@ class OrderService:
         reason: str = "",
         *,
         repayment_reference: str = "",
+        lines: Sequence[tuple[OrderItem, int]] = (),
+        include_shipping: bool = False,
+        reason_code: str = "",
+        retry_request_id: UUID | None = None,
     ) -> RefundResult:
         """Refund ``amount`` of what *order* paid, or everything still
         refundable when ``amount`` is ``None``.
+
+        **By lines.** With ``lines`` (``(item, units)`` pairs) and/or
+        ``include_shipping`` the amount is derived from the order's frozen
+        figures (``order.refund_lines``: price, ``discount_allocation`` and
+        ``vat_rate`` of the units, the shipping split over the rates as the
+        receipt splits it) and ``amount`` must not be given. No line can be
+        refunded past what was sold less what earlier line refunds paid
+        back. Each share stores the lines it pays for as its own
+        ``CreditAllocation`` rows (``_allocate_lines_claim``), so its credit
+        document (myDATA 11.4) carries exactly their VAT rates. A bare ``amount`` is a goodwill
+        refund and is credited in proportion over the receipt's rates.
+        ``reason_code`` is a ``RefundReason`` and ``reason`` the note that
+        goes with it. A request by lines is always planned fresh; the only
+        way to resume one is ``retry_request_id``, the ``request_id`` of a
+        refund by lines with live PENDING shares (a provider call whose
+        outcome is unknown): those shares are called again under their own
+        idempotency keys, and nothing else is claimed.
 
         A payment a provider captured is refunded through that provider.
         Cash a courier collected on delivery (a ``COD_COLLECTION`` row) has
@@ -3416,7 +3463,17 @@ class OrderService:
         webhook or a retry settles it.
         """
         reference = repayment_reference.strip()
-        attempts, declined = cls._claim_refund(order, amount, reason, reference)
+        reason = cls._reason_text(reason_code, reason)
+        attempts, declined = cls._claim_refund(
+            order,
+            amount,
+            reason,
+            reference,
+            requested=cls._requested_units(lines),
+            include_shipping=include_shipping,
+            reason_code=reason_code,
+            retry_request_id=retry_request_id,
+        )
         if declined is not None:
             return RefundResult(
                 refunded=Money(0, order.amount_due.currency),
@@ -3454,6 +3511,26 @@ class OrderService:
             stored=stored,
         )
 
+    @staticmethod
+    def _reason_text(reason_code: str, note: str) -> str:
+        """The reason as it is written on the ledger and in the history:
+        the category's label, then the note."""
+        note = note.strip()
+        if not reason_code:
+            return note
+        label = str(RefundReason(reason_code).label)
+        return f"{label}: {note}" if note else label
+
+    @staticmethod
+    def _requested_units(
+        lines: Sequence[tuple[OrderItem, int]],
+    ) -> dict[int, int]:
+        """Order line pk to the units asked for (a line named twice adds)."""
+        requested: dict[int, int] = {}
+        for item, units in lines:
+            requested[item.pk] = requested.get(item.pk, 0) + units
+        return requested
+
     @classmethod
     @transaction.atomic
     def _claim_refund(
@@ -3462,6 +3539,11 @@ class OrderService:
         amount: Money | None,
         reason: str,
         reference: str,
+        *,
+        requested: Mapping[int, int],
+        include_shipping: bool,
+        reason_code: str,
+        retry_request_id: UUID | None,
     ) -> tuple[list[RefundAttempt], dict[str, Any] | None]:
         """Step 1 of :meth:`refund_order`: the attempts to make, or the
         provider-less refusal to report as declined."""
@@ -3477,7 +3559,18 @@ class OrderService:
             .get(pk=order.pk)
         )
         payment_status = locked["payment_status"]
+        # Every older source nobody allocated yet is decided before this
+        # claim takes its room (``order.credit_allocation``).
+        credit_allocation.allocate_order(order)
 
+        by_lines = bool(requested) or include_shipping
+        if by_lines and amount is not None:
+            raise PaymentError(
+                _(
+                    "A refund by lines is worth what its lines are worth: "
+                    "do not give an amount with them."
+                )
+            )
         if amount is not None and amount.amount <= 0:
             raise PaymentError(
                 _("The refund amount must be greater than zero.")
@@ -3525,22 +3618,34 @@ class OrderService:
                 )
             )
 
-        resumed = cls._attempts_to_resume(order, amount)
-        if resumed:
-            for attempt in resumed:
-                if attempt.charge is not None and not provider_supports(
-                    attempt.charge.provider, "idempotent_refunds"
-                ):
-                    raise PaymentError(
-                        _(
-                            "A refund of this amount was already sent to the "
-                            "payment provider and its result is not known "
-                            "yet. It is recorded when the provider confirms "
-                            "it; check the provider's dashboard before "
-                            "trying again."
-                        )
+        # A refund by lines is always planned fresh from what its lines
+        # have had back (``held_values``): a share that was declined holds
+        # nothing, so a new request covers what is left at the current
+        # charges. Only the retry of a named pending request resumes
+        # attempts, and only a bare amount is matched against live ones.
+        if retry_request_id is not None:
+            if by_lines or amount is not None:
+                raise PaymentError(
+                    _(
+                        "A retry repeats exactly what was asked: give no "
+                        "lines, shipping or amount with it."
                     )
+                )
+            return cls._pending_request_shares(order, retry_request_id), None
+        resumed = [] if by_lines else cls._attempts_to_resume(order, amount)
+        if resumed:
+            cls._require_resumable(resumed)
             return resumed, None
+
+        pieces: list[credit_allocation.Piece] = []
+        if by_lines:
+            pieces = plan_pieces(
+                order, requested, include_shipping=include_shipping, lock=True
+            )
+            amount = Money(
+                sum((piece.amount for piece in pieces), Decimal(0)),
+                order.amount_due.currency,
+            )
 
         # The value that can still be refunded: the provider's money, then
         # what the order paid with gift cards and points.
@@ -3601,12 +3706,20 @@ class OrderService:
                     )
                 )
 
+        if credit_allocation.undecided(order):
+            # An older refund still waits for a claim in flight to resolve
+            # (``credit_allocation.allocate_order``): this claim must not
+            # take the room it needs.
+            raise OrderService._waiting_error(order)
+        request_id = uuid.uuid4() if by_lines else None
         attempts = [
             RefundAttempt.objects.create(
                 order=order,
                 charge=charge,
                 amount=share,
                 reason=reason[:255],
+                reason_code=reason_code,
+                request_id=request_id,
             )
             for charge, share in plan
         ]
@@ -3618,24 +3731,222 @@ class OrderService:
                     charge=None,
                     amount=Money(stored_part, currency),
                     reason=reason[:255],
+                    reason_code=reason_code,
+                    request_id=request_id,
                 )
             )
+        cls._allocate_claim(order, attempts, pieces)
         return attempts, None
 
     @staticmethod
-    def _attempts_to_resume(
-        order: Order, amount: Money | None
-    ) -> list[RefundAttempt]:
-        """The live attempts a request is a repeat of: the one for the same
-        amount, or all of them when together they are the amount, or, for a
-        refund of everything, all of them once they hold everything that was
-        left. Cash shares are never resumed: their reference is their own
-        idempotency key."""
-        pending = list(
+    def _waiting_error(
+        order: Order, claims: Sequence[RefundAttempt] | None = None
+    ) -> PaymentError:
+        """The refusal of a refund that must wait for claims still PENDING
+        (*claims*, or those that keep a source of the order undecided)."""
+        return PaymentError(
+            _(
+                "Another refund of this order is waiting for "
+                "%(blockers)s to be settled, so nothing more can be "
+                "refunded until then."
+            )
+            % {"blockers": credit_allocation.describe_blockers(order, claims)}
+        )
+
+    @staticmethod
+    def _allocate_claim(
+        order: Order,
+        attempts: Sequence[RefundAttempt],
+        pieces: Sequence[credit_allocation.Piece] = (),
+    ) -> None:
+        """Fix, now and under the order lock, where the refund sits on the
+        receipt's VAT rates: its amount spread over the headroom left at
+        this moment (``order.credit_allocation``), laid over its shares in
+        order. A refund the headroom cannot hold is refused before any
+        provider is called: its credit document could never be issued.
+
+        A refund by lines (*pieces*) writes its own pieces instead
+        (:meth:`_allocate_lines_claim`)."""
+        if pieces:
+            OrderService._allocate_lines_claim(order, attempts, pieces)
+            return
+        if not credit_allocation.has_rates(order):
+            # Nothing taxable: nothing is owed, and each claim is marked
+            # allocated so the backfill never picks it up.
+            for attempt in attempts:
+                credit_allocation.store(
+                    order, [], nothing_owed=True, refund_attempt=attempt
+                )
+            return
+        # Points are a discount, not money returned: their share owes no
+        # credit document and takes no room on the receipt. A gift card is
+        # payment the receipt holds.
+        stored = PaymentLedger.stored_value(order)
+        owed = [
+            PaymentLedger.split_stored_value(stored, a.amount.amount)[0]
+            if a.kind == RefundAttemptKind.STORED_VALUE
+            else a.amount.amount
+            for a in attempts
+        ]
+        # A duplicate payment is paid back first, and giving it back is not
+        # reversing the sale: that part owes no credit and takes no room.
+        ids = [a.pk for a in attempts]
+        excess = PaymentLedger.refundable_excess(order, exclude=ids)
+        provider_amount = sum(
+            (
+                a.amount.amount
+                for a in attempts
+                if a.kind == RefundAttemptKind.PROVIDER
+            ),
+            Decimal(0),
+        )
+        if provider_amount > 0 and min(
+            PaymentLedger.refundable_excess(
+                order, exclude=ids, claims_hold=False
+            ),
+            provider_amount,
+        ) > min(excess, provider_amount):
+            # A claim still PENDING holds part of the duplicate payment
+            # this refund would take: what it owes depends on whether that
+            # claim is settled or declined, which nobody knows yet. Decide
+            # nothing on a guess: wait, as a refund booked without a claim
+            # does.
+            raise OrderService._waiting_error(
+                order,
+                credit_allocation.excess_holders(
+                    order, provider_amount, exclude=ids
+                ),
+            )
+        for i, attempt in enumerate(attempts):
+            if attempt.kind != RefundAttemptKind.PROVIDER or excess <= 0:
+                continue
+            taken = min(excess, owed[i])
+            owed[i] -= taken
+            excess -= taken
+        total = sum(owed, Decimal(0))
+        allocation = (
+            credit_allocation.allocate_pro_rata(order, total)
+            if total > 0
+            else {}
+        )
+        held = sum(allocation.values(), Decimal(0))
+        if held < total:
+            if blockers := credit_allocation.room_blockers(
+                order,
+                lambda **held_by: (
+                    sum(
+                        credit_allocation.allocate_pro_rata(
+                            order, total, **held_by
+                        ).values(),
+                        Decimal(0),
+                    )
+                    < total
+                ),
+                exclude=ids,
+            ):
+                raise OrderService._waiting_error(order, blockers)
+            raise PaymentError(
+                _(
+                    "The receipt of this order holds only %(left)s more "
+                    "across its VAT rates, less than the %(amount)s to "
+                    "refund, so its credit document could not be issued "
+                    "and nothing was refunded."
+                )
+                % {"left": held, "amount": total}
+            )
+        per_share = credit_allocation.split_over_shares(
+            credit_allocation.pieces_of(allocation), owed
+        )
+        for attempt, share_pieces in zip(attempts, per_share, strict=True):
+            credit_allocation.store(
+                order,
+                share_pieces,
+                nothing_owed=not share_pieces,
+                refund_attempt=attempt,
+            )
+
+    @staticmethod
+    def _allocate_lines_claim(
+        order: Order,
+        attempts: Sequence[RefundAttempt],
+        pieces: Sequence[credit_allocation.Piece],
+    ) -> None:
+        """Store a refund by lines as what it is: the lines' own pieces
+        (order line, kind, VAT rate, units, exact gross from the frozen
+        figures), laid over its shares in order (``split_over_shares``), so
+        its credit document carries exactly their rates and what a line has
+        had back is read from these rows (``order.refund_lines``).
+
+        The lines are goods the customer returned, owed as credit at their
+        own rates in full, so a duplicate payment (``refundable_excess``) is
+        never taken out of them: the share is all goods
+        (``goods_claimed`` equals its amount) and the duplicate payment
+        stays refundable as a bare amount. Points are a discount and owe no
+        credit: a stored-value share keeps only the gift card part of its
+        pieces, in proportion.
+
+        Each rate must fit its headroom now: a rate the receipt no longer
+        holds is refused before any provider is called, as a bare amount
+        the headroom cannot hold is."""
+        stored = PaymentLedger.stored_value(order)
+        per_share = credit_allocation.split_over_shares(
+            pieces, [a.amount.amount for a in attempts]
+        )
+        kept = [
+            credit_allocation.scale_pieces(
+                share_pieces,
+                PaymentLedger.split_stored_value(stored, a.amount.amount)[0],
+            )
+            if a.kind == RefundAttemptKind.STORED_VALUE
+            else share_pieces
+            for a, share_pieces in zip(attempts, per_share, strict=True)
+        ]
+        wanted = credit_allocation.by_rate(
+            piece for share_pieces in kept for piece in share_pieces
+        )
+        short = credit_allocation.first_short_rate(order, wanted)
+        if short is not None:
+            # A claim still PENDING may hold the room: the refusal is then
+            # "wait", never the final "the receipt holds only".
+            if blockers := credit_allocation.room_blockers(
+                order,
+                lambda **held: (
+                    credit_allocation.first_short_rate(order, wanted, **held)
+                    is not None
+                ),
+                exclude=[a.pk for a in attempts],
+            ):
+                raise OrderService._waiting_error(order, blockers)
+            rate, left = short
+            raise PaymentError(
+                _(
+                    "The receipt of this order holds only %(left)s more at "
+                    "%(rate)s%% VAT, less than these lines are worth "
+                    "(%(amount)s), so their credit document could not be "
+                    "issued and nothing was refunded. A goodwill refund of "
+                    "an amount can still be made."
+                )
+                % {"left": left, "rate": rate, "amount": wanted[rate]}
+            )
+        for attempt, share_pieces in zip(attempts, kept, strict=True):
+            credit_allocation.store(
+                order,
+                share_pieces,
+                nothing_owed=not share_pieces,
+                refund_attempt=attempt,
+            )
+
+    @staticmethod
+    def _resumable(order: Order):
+        """The live attempts of *order* a repeated request may resume, oldest
+        first. Cash shares are never resumed: their reference is their own
+        idempotency key, and the shares of a refund by lines (``request_id``
+        is set) are never matched by amount: only a named retry resumes
+        them."""
+        return (
             RefundAttempt.objects.live()
             .select_related("charge")
-            .select_for_update(of=("self",))
-            .filter(order=order)
+            .filter(order=order, request_id__isnull=True)
             .exclude(
                 charge__kind__in=(
                     PaymentTransactionKind.COD_COLLECTION,
@@ -3644,6 +3955,53 @@ class OrderService:
             )
             .order_by("created_at", "id")
         )
+
+    @classmethod
+    def resumes_a_refund(
+        cls,
+        order: Order,
+        amount: Money | None,
+        *,
+        retry_request_id: UUID | None = None,
+        by_lines: bool = False,
+    ) -> bool:
+        """Whether a refund would resume live attempts rather than make a
+        new refund (read without the lock, and answering as the locked path
+        does): the retry of a named request by lines resumes its live shares
+        (:meth:`_pending_request_shares`), a bare *amount* matches the
+        attempts of :meth:`_attempts_to_resume`, and a request *by_lines*
+        that is no retry is always planned fresh, never a resume. The refund
+        dialog asks nothing a resume does not need, such as how cash was
+        paid back."""
+        if retry_request_id is not None:
+            return (
+                RefundAttempt.objects.live()
+                .filter(order=order, request_id=retry_request_id)
+                .exists()
+            )
+        if by_lines:
+            return False
+        return bool(
+            cls._match_resumable(order, list(cls._resumable(order)), amount)
+        )
+
+    @classmethod
+    def _attempts_to_resume(
+        cls, order: Order, amount: Money | None
+    ) -> list[RefundAttempt]:
+        """The live attempts a request is a repeat of: the one for the same
+        amount, or all of them when together they are the amount, or, for a
+        refund of everything, all of them once they hold everything that was
+        left."""
+        pending = list(cls._resumable(order).select_for_update(of=("self",)))
+        return cls._match_resumable(order, pending, amount)
+
+    @staticmethod
+    def _match_resumable(
+        order: Order, pending: list[RefundAttempt], amount: Money | None
+    ) -> list[RefundAttempt]:
+        """Which of *pending* a request for *amount* repeats (see
+        :meth:`_attempts_to_resume`)."""
         if not pending:
             return []
         if amount is None:
@@ -3655,6 +4013,88 @@ class OrderService:
             return [match]
         together = sum((a.amount.amount for a in pending), Decimal(0))
         return pending if together == amount.amount else []
+
+    @classmethod
+    def _pending_request_shares(
+        cls, order: Order, request_id: UUID
+    ) -> list[RefundAttempt]:
+        """The live PENDING shares of one refund by lines, provider shares
+        first, for the retry the dialog names: nothing of any other request,
+        and no share that was declined or settled."""
+        shares = list(
+            RefundAttempt.objects.live()
+            .select_related("charge")
+            .select_for_update(of=("self",))
+            .filter(order=order, request_id=request_id)
+            .order_by("created_at", "id")
+        )
+        if not shares:
+            raise PaymentError(
+                _("There is no pending refund of this order to retry.")
+            )
+        cls._require_resumable(shares)
+        return sorted(
+            shares,
+            key=lambda a: (a.kind == RefundAttemptKind.STORED_VALUE, a.pk),
+        )
+
+    @staticmethod
+    def unresumable_reason(shares: Iterable[RefundAttempt]) -> str | None:
+        """Why *shares* may not be called again, or ``None`` when they may.
+        Shares the provider may already have made are only called again
+        under their own key, and only while that is safe: the provider must
+        remember keys, and the attempt must not be overdue (the provider may
+        have forgotten the key by then, and the refund is looked up by the
+        reconciliation or recorded by staff instead). A cash share has no
+        provider to ask: its reference is its own key, and staff record how
+        it was paid back. The one rule of the locked path
+        (:meth:`_require_resumable`) and of what the dialog offers. Only
+        shares still PENDING are judged: a settled or declined share of
+        the request is never called again, whatever its kind."""
+        for attempt in shares:
+            if attempt.status != RefundAttemptStatus.PENDING:
+                continue
+            charge = attempt.charge
+            if charge is not None and is_cash_collection(charge):
+                return str(
+                    _(
+                        "Part of this refund was paid back in cash and its "
+                        "outcome is not recorded yet. Cash is never "
+                        "repeated: record how it was paid back with Record "
+                        "refund outcome on the order."
+                    )
+                )
+            if charge is not None and not provider_supports(
+                charge.provider, "idempotent_refunds"
+            ):
+                return str(
+                    _(
+                        "A refund of this amount was already sent to the "
+                        "payment provider and its result is not known "
+                        "yet. It is recorded when the provider confirms "
+                        "it; check the provider's dashboard before "
+                        "trying again."
+                    )
+                )
+            if attempt.is_overdue:
+                return str(
+                    _(
+                        "A refund of this amount was sent to the "
+                        "payment provider a while ago and its result is "
+                        "still not known. It is looked up automatically; "
+                        "if it stays unknown, record its outcome with "
+                        "Record refund outcome on the order before "
+                        "trying again."
+                    )
+                )
+        return None
+
+    @classmethod
+    def _require_resumable(cls, shares: Sequence[RefundAttempt]) -> None:
+        """Refuse to call *shares* again when :meth:`unresumable_reason`
+        says so."""
+        if reason := cls.unresumable_reason(shares):
+            raise PaymentError(reason)
 
     @classmethod
     def _make_refund(
@@ -3698,7 +4138,7 @@ class OrderService:
             success, response = provider.refund_payment(
                 payment_id=charge.provider_reference,
                 amount=attempt.amount,
-                idempotency_key=f"refund-{attempt.idempotency_key}",
+                idempotency_key=attempt.provider_key,
             )
             if success and not response.get("refund_id"):
                 # Money may have moved but nothing identifies it, so it
@@ -3721,6 +4161,27 @@ class OrderService:
             )
             refund_id = response["refund_id"]
 
+        return cls.book_share(
+            order, attempt, paid_back, refund_id, reason, reference
+        )
+
+    @classmethod
+    def book_share(
+        cls,
+        order: Order,
+        attempt: RefundAttempt,
+        paid_back: Money,
+        refund_id: str | None,
+        reason: str,
+        reference: str = "",
+    ) -> _SharePaid:
+        """Step 3 of :meth:`refund_order` for one share, and the one place
+        a refund the provider made becomes a ledger row: under the order
+        lock, the refund is recorded (*refund_id* is the provider's id, or
+        ``None`` for cash paid back by the merchant under *reference*), the
+        attempt settles and ``order_refunded`` fires. Also what resolves an
+        attempt whose outcome was unknown (``order.refund_reconciliation``)."""
+        charge = attempt.charge
         with transaction.atomic():
             Order.objects.select_for_update().values_list("pk", flat=True).get(
                 pk=order.pk
@@ -3734,6 +4195,15 @@ class OrderService:
                 return _SharePaid(
                     attempt.pk, paid_back, settled.refund.provider_reference
                 )
+            # Only a PENDING attempt is a claim to fulfil. One declined
+            # while the provider was asked (staff marked it not made) is
+            # never revived: if the money moved anyway it is booked as a
+            # refund nobody claimed, which the allocation then decides.
+            claim = (
+                settled
+                if settled.status == RefundAttemptStatus.PENDING
+                else None
+            )
             if refund_id is None:
                 row, created = PaymentLedger.record_cod_refund(
                     order,
@@ -3741,7 +4211,7 @@ class OrderService:
                     amount=paid_back,
                     reference=reference,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
                 )
                 refund_id = row.provider_reference
             else:
@@ -3751,7 +4221,8 @@ class OrderService:
                     amount=paid_back,
                     reference=refund_id,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
+                    match_attempt=claim is not None,
                 )
             if created:
                 # One signal per refund the ledger took, so a failure on a
@@ -3797,25 +4268,9 @@ class OrderService:
                     attempt.pk, PaymentLedger.stored_returned_by(order, settled)
                 )
 
-            stored = PaymentLedger.stored_value(order)
-            left = stored.left
-            amount = min(attempt.amount.amount, left)
-            if amount >= left:
-                gift_card_part = stored.gift_card_left
-                points_part = stored.points_left
-            else:
-                gift_card_part = (
-                    amount * stored.gift_card_left / left
-                ).quantize(Decimal("0.01"), rounding="ROUND_DOWN")
-                points_part = (
-                    int(
-                        stored.points_left
-                        * (amount - gift_card_part)
-                        / stored.points_value_left
-                    )
-                    if stored.points_value_left
-                    else 0
-                )
+            gift_card_part, points_part = PaymentLedger.split_stored_value(
+                PaymentLedger.stored_value(order), attempt.amount.amount
+            )
             gift_card = (
                 GiftCardService.credit_refund(
                     order, gift_card_part, refund_attempt=settled
@@ -3833,6 +4288,13 @@ class OrderService:
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
             returned = PaymentLedger.stored_returned_by(order, settled)
+            # Only the gift cards are payment the receipt holds: points are
+            # a discount and owe no credit document.
+            credit_allocation.scale(gift_card, refund_attempt=settled)
+            credit_allocation.scale_points(
+                Decimal(returned.amount) - gift_card, refund_attempt=settled
+            )
+            credit_allocation.mark_moved(timezone.now(), refund_attempt=settled)
             order_stored_value_returned.send(
                 sender=cls,
                 order=order,
@@ -4203,17 +4665,59 @@ class OrderService:
         return out
 
     @classmethod
+    def cancel_for_dead_shipment(
+        cls, order: Order, *, carrier: str, silent_for_customer: bool
+    ) -> None:
+        """Cancel an order whose shipment was canceled before it left.
+
+        A carrier sync that finds the shipment CANCELED (ACS: the admin
+        retire action or a voucher cancel; a BoxNow ``canceled`` parcel
+        leaves its order open, ``order.follow_up``) is looking at a
+        parcel that never shipped. Such an order
+        is not "status CANCELED", it is a cancellation: stock goes back
+        on the shelf, the reservation is released, the payment settled,
+        the history and signals fired — everything :meth:`cancel_order`
+        owns. A bare status write flipped the label and stranded the
+        stock (prod order 248, retired 2026-09-13, still PROCESSING a
+        week later with its unit still counted as sold).
+
+        The refund is left to a human: nobody asked for this cancel, and
+        on a replay the event is historic — moving money without someone
+        looking is worse than one WARNING.
+
+        The courier is not asked to cancel: the shipment already is, and
+        the caller is a tracking sync holding the shipment's row lock, so
+        a call to the courier here would run inside its transaction.
+
+        Raises ``OrderNotCancelableError`` when the order's status no
+        longer allows a cancel, and ``OrderCancellationError`` when the
+        cancel failed on the way and is worth another attempt.
+        """
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.CANCELED.value
+            )
+        if order.is_paid:
+            logger.warning(
+                "%s shipment canceled for a PAID order=%s — canceling "
+                "without a refund; refund it by hand.",
+                carrier,
+                order.id,
+            )
+        cls.cancel_order(
+            order,
+            reason=f"{carrier} shipment canceled before dispatch",
+            refund_payment=False,
+            customer_initiated=False,
+            shipment_already_canceled=True,
+        )
+
+    @classmethod
     def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
         """Best-effort: cancel the courier voucher when the order is canceled.
 
-        Called from ``handle_order_canceled`` so the cascade fires for
-        every code path that produces ``order.status = CANCELED`` —
-        including admin form saves that go straight to ``Order.save()``
-        without touching :meth:`OrderService.cancel_order`. Verified
-        against prod order 60 on 2026-05-16: the admin status dropdown
-        was set to CANCELED via the change form, leaving voucher
-        9771614856 alive at ACS because the cascade lived only inside
-        ``cancel_order``.
+        Called by :meth:`cancel_order`, the only path that cancels an
+        order, so every cancel reaches the carrier.
 
         Routed through ``ShippingService.cancel_shipment`` so each
         carrier enforces its own cancellability rules. Common
@@ -4233,14 +4737,8 @@ class OrderService:
         """
         from shipping.services import ShippingService
 
-        # Idempotency: short-circuit when the cascade has already run for
-        # this order. The two entry points (programmatic ``cancel_order``
-        # explicit call AND the ``order_canceled`` signal-side safety
-        # net) can otherwise double-fire — with the test
-        # ``on_commit``-immediate fixture, the signal cascade lands
-        # synchronously during the first ``order.save()`` inside
-        # ``cancel_order``, then the explicit call inside the same
-        # method would run again.
+        # A customer cancel asked the courier before the order moved and
+        # recorded the answer: the courier is not asked a second time.
         existing_cancellation = (order.metadata or {}).get("cancellation") or {}
         if "shipment_cancel" in existing_cancellation:
             return
@@ -4276,15 +4774,8 @@ class OrderService:
         cancellation = order.metadata.setdefault("cancellation", {})
         cancellation["shipment_cancel"] = info
 
-        # ``.update(...)`` bypasses ``Order.save()`` and its post_save
-        # signal cascade — important because this method runs INSIDE
-        # the ``order_canceled`` signal handler, which itself fires
-        # from inside ``Order.save()``'s post_save chain. A nested
-        # ``order.save()`` would see a stale ``_original_status``
-        # (refreshed only AFTER the outer ``super().save()`` returns)
-        # and re-fire ``order_status_changed``, causing infinite
-        # recursion or duplicate-signal failures (verified in CI on
-        # 2026-05-16).
+        # ``.update(...)`` writes the one column that changed and runs no
+        # ``post_save`` receiver.
         Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
 
         if "error" in info:
@@ -4600,10 +5091,32 @@ class OrderService:
                 order.id,
             )
 
+    @staticmethod
+    def _bound_order_uuid(metadata: Mapping[str, str] | None) -> UUID | None:
+        """The order an intent was created for, when its own metadata (set
+        by the server, ``order.payment_binding``) binds it to an existing
+        order of this store; ``None`` for any other intent."""
+        subject = (metadata or {}).get(SUBJECT_KEY)
+        if not subject:
+            return None
+        try:
+            bound = UUID(subject)
+        except ValueError:
+            return None
+        if binding_mismatch(
+            metadata, purpose=PaymentPurpose.ORDER, subject=bound
+        ):
+            return None
+        return bound
+
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(
-        cls, payment_intent_id: str, *, captured: Money
+        cls,
+        payment_intent_id: str,
+        *,
+        captured: Money,
+        metadata: Mapping[str, str] | None = None,
     ) -> PaymentEventOutcome | None:
         """Book a succeeded Stripe PaymentIntent.
 
@@ -4611,6 +5124,14 @@ class OrderService:
         into the payment ledger whatever state the order is in, because
         the money has moved either way; the order's own status then
         follows the guards below.
+
+        The order is the one whose ``payment_id`` is the intent. An intent
+        the order no longer points at (the shopper paid in an older tab
+        after a retry opened a newer intent) is found by what the server
+        wrote on it, *metadata*: it must bind the intent to an existing
+        order (``PaymentPurpose.ORDER``) of this store, checked by
+        ``binding_mismatch``. A payment-first intent is bound to a cart,
+        its order may not exist yet, and "not found" stays the answer.
         """
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
@@ -4628,7 +5149,7 @@ class OrderService:
         # several of the FKs on Order are nullable (user, pay_way,
         # country, region, shipping_provider) and ``select_related``
         # joins them with LEFT OUTER JOIN.
-        order = (
+        orders = (
             Order.objects.select_for_update(of=("self",))
             .select_related(
                 "user",
@@ -4652,9 +5173,11 @@ class OrderService:
                 "acs_shipment__station_destination",
                 "invoice",
             )
-            .filter(payment_id=payment_intent_id)
-            .first()
         )
+        found = orders.filter(payment_id=payment_intent_id).first()
+        if found is None and (bound := cls._bound_order_uuid(metadata)):
+            found = orders.filter(uuid=bound).first()
+        order = found
         if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
@@ -4674,6 +5197,24 @@ class OrderService:
                 order, payment_id=payment_intent_id, payment_method="stripe"
             )
             publish_payment_status(order)
+            return PaymentEventOutcome(order, previous, applied=False)
+
+        # A second payment on an order another intent already paid: booked
+        # above (and flagged by ``PaymentLedger.sync_overcharge`` when it
+        # takes the order past what it is for). The order keeps its first
+        # ``payment_id`` and is not confirmed again.
+        if (
+            order.payment_status == PaymentStatus.COMPLETED
+            and order.payment_id
+            and order.payment_id != payment_intent_id
+        ):
+            logger.error(
+                "PaymentIntent %s is a second payment on order %s, already "
+                "paid by %s: recorded in the ledger, order left as it is",
+                payment_intent_id,
+                order.id,
+                order.payment_id,
+            )
             return PaymentEventOutcome(order, previous, applied=False)
 
         # Guard: a stale or out-of-order "payment succeeded" event must not

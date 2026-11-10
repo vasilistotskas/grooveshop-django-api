@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from order import credit_allocation
 from order.credit_documents import request_credit_documents
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.exceptions import OrderServiceError
@@ -103,6 +104,12 @@ def decide_chargebacks(
                 continue
             changed.append(decision)
 
+        # A decision that changed starts over; every returned one is then
+        # decided in one pass, oldest first (``allocate_order``).
+        credit_allocation.drop(
+            decision__in=[decision.pk for decision in changed]
+        )
+        credit_allocation.allocate_order(order)
         for decision in changed:
             template = (
                 gettext(
@@ -122,6 +129,8 @@ def decide_chargebacks(
                 note=template
                 % {"amount": decision.chargeback.amount, "who": user},
             )
-        if goods_returned and changed:
+        if changed:
+            # Whichever way it was decided, a settlement that waited for the
+            # decision is now due, and a goods-returned one owes its credit.
             request_credit_documents(order.id)
     return changed

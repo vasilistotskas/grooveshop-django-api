@@ -23,8 +23,11 @@ That invariant is tested by simulating an IntegrityError on Phase 3's
 TTL behaviour:
 * Fresh claim (age < 300 s): ``AcsRetryableError`` raised — another
   worker is in flight.
-* Stale claim (age >= 300 s): the service re-mints (logs a warning) and
-  proceeds as a new attempt.
+* Stale claim (age >= 300 s): a worker stopped after the request may
+  have reached ACS, so the voucher request has an unknown outcome
+  (``voucher_request_unknown_at``) and nothing is sent again (#622). Until
+  #622 the service re-minted here, which is how stage order 682 got a
+  second voucher.
 """
 
 from __future__ import annotations
@@ -38,7 +41,10 @@ from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsRetryableError
+from shipping_acs.exceptions import (
+    AcsRetryableError,
+    AcsVoucherRequestUnknownError,
+)
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsShipment
 from shipping_acs.services import AcsService
@@ -215,17 +221,16 @@ class TestCreateVoucherPersistsMetadataWhenDbSaveFails:
 
 
 # ---------------------------------------------------------------------------
-# Coverage 3-3: stale mint_started_at (expired TTL) is treated as new attempt
+# Coverage 3-3: stale mint_started_at (expired TTL) is an unknown outcome
 # ---------------------------------------------------------------------------
 
 
-class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
-    def test_stale_mint_started_at_does_not_block_new_attempt(
-        self, acs_client_mock
-    ):
+class TestCreateVoucherTreatsExpiredMintStartedAtAsUnknownOutcome:
+    def test_stale_mint_started_at_is_never_minted_again(self, acs_client_mock):
         """A ``mint_started_at`` older than ``_MINT_CLAIM_TTL_SECONDS``
-        (300 s) must NOT raise ``AcsRetryableError`` — the service should
-        log a warning and proceed as a fresh mint attempt.
+        (300 s) with no voucher means the worker stopped after the request
+        may have reached ACS: the request has an unknown outcome and no
+        second one is sent.
         """
         order = courier_cash_order(
             status=OrderStatus.PENDING,
@@ -238,13 +243,14 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
         shipment.metadata = {"mint_started_at": stale_time.isoformat()}
         shipment.save(update_fields=["metadata"])
 
-        # Must NOT raise — the expired claim is treated as a new attempt.
-        result = AcsService.create_voucher_for_order(order)
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.create_voucher_for_order(order)
 
-        assert result.voucher_no is not None
-        assert result.voucher_no != ""
-        # Voucher is set; the stale claim was cleared in Phase 3.
-        assert result.metadata.get("mint_started_at") is None
+        assert "create_voucher" not in acs_client_mock.calls
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is not None
+        assert shipment.metadata.get("mint_started_at") is None
 
     def test_fresh_mint_started_at_raises_retryable_error(
         self, acs_client_mock
@@ -275,7 +281,7 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
     ):
         """At exactly 300 s the claim is on the boundary of the TTL.  The
         check in the service is ``if age < cls._MINT_CLAIM_TTL_SECONDS``,
-        so age == 300 is NOT < 300 → treated as expired / re-mintable.
+        so age == 300 is NOT < 300 → treated as expired: unknown outcome.
         """
         order = courier_cash_order(
             status=OrderStatus.PENDING,
@@ -289,9 +295,9 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
         shipment.metadata = {"mint_started_at": boundary_time.isoformat()}
         shipment.save(update_fields=["metadata"])
 
-        # Should not raise.
-        result = AcsService.create_voucher_for_order(order)
-        assert result.voucher_no is not None
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.create_voucher_for_order(order)
+        assert "create_voucher" not in acs_client_mock.calls
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ from django.dispatch import receiver
 
 from blog.models import BlogComment
 from blog.models.post import BlogPost
+from core.publication import went_live
 from core.utils.tenant_urls import storefront_path
 from tenant.celery import dispatch_on_commit
 
@@ -27,6 +28,18 @@ def reindex_blog_post_translations(sender, instance, **kwargs):
     translations that still match ``meili_filter()`` and deletes those that no
     longer do. Mirrors ``product.signals.reindex_product_translations``.
     """
+    _reindex_translations(instance)
+
+
+@receiver(went_live, dispatch_uid="blog.index_post_gone_live")
+def index_post_gone_live(sender, instance, **kwargs):
+    """A post dated in the future whose date passed: nothing was saved,
+    so the post_save receiver above never indexed it."""
+    if sender is BlogPost:
+        _reindex_translations(instance)
+
+
+def _reindex_translations(post: BlogPost) -> None:
     if settings.MEILISEARCH.get("OFFLINE", False):
         return
 
@@ -37,10 +50,13 @@ def reindex_blog_post_translations(sender, instance, **kwargs):
     from blog.models.post import BlogPostTranslation
     from meili.tasks import index_document_task
 
+    # A plain query: ``get_meilisearch_queryset()`` carries the likes
+    # COUNT join, which every save would run just to collect the pks
+    # (the product receiver's G0307 lesson).
     translation_pks = list(
-        BlogPostTranslation.get_meilisearch_queryset()
-        .filter(master=instance)
-        .values_list("pk", flat=True)
+        BlogPostTranslation.objects.filter(master=post).values_list(
+            "pk", flat=True
+        )
     )
     if not translation_pks:
         return

@@ -48,14 +48,16 @@ def test_a_bulk_update_reindexes_every_affected_translation():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        patch("meili.tasks.index_document_task.apply_async") as dispatch,
+        patch("meili.tasks.index_documents_task.apply_async") as dispatch,
     ):
         Product.objects.filter(pk__in=ids).update(active=False)
         dispatched = reindex_products_by_pk(ids)
 
     assert dispatched == len(expected)
     assert {
-        call.kwargs["kwargs"]["pk"] for call in dispatch.call_args_list
+        pk
+        for call in dispatch.call_args_list
+        for pk in call.kwargs["kwargs"]["pks"]
     } == expected
 
 
@@ -64,7 +66,7 @@ def test_no_products_dispatches_nothing():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        patch("meili.tasks.index_document_task.apply_async") as dispatch,
+        patch("meili.tasks.index_documents_task.apply_async") as dispatch,
     ):
         assert reindex_products_by_pk([]) == 0
 
@@ -75,7 +77,7 @@ def test_no_products_dispatches_nothing():
 def test_offline_dispatches_nothing():
     product = ProductFactory(active=True, num_images=0, num_reviews=0)
 
-    with patch("meili.tasks.index_document_task.apply_async") as dispatch:
+    with patch("meili.tasks.index_documents_task.apply_async") as dispatch:
         assert reindex_products_by_pk([product.pk]) == 0
 
     dispatch.assert_not_called()

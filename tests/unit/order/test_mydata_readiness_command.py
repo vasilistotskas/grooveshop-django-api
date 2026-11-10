@@ -40,9 +40,7 @@ class TestMydataReadinessTenantScopeGuard:
 
 @pytest.mark.django_db
 class TestMydataReadinessReport:
-    def test_passes_when_every_rate_is_mapped_and_no_product_lacks_vat(
-        self, capsys
-    ):
+    def test_passes_when_every_rate_is_mapped(self, capsys):
         Vat.objects.all().delete()
         vat = VatFactory(value=Decimal("24.0"))
         ProductFactory(vat=vat)
@@ -60,16 +58,6 @@ class TestMydataReadinessReport:
         with (
             schema_context("mydata_readiness_scope_tenant"),
             pytest.raises(CommandError, match="1 unmapped VAT rate"),
-        ):
-            call_command("mydata_readiness")
-
-    def test_raises_when_a_product_has_no_vat(self):
-        Vat.objects.all().delete()
-        ProductFactory(vat=None)
-
-        with (
-            schema_context("mydata_readiness_scope_tenant"),
-            pytest.raises(CommandError, match="1 product\\(s\\) with vat=NULL"),
         ):
             call_command("mydata_readiness")
 

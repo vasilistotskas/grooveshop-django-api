@@ -18,9 +18,14 @@ by platform-wide settings carrying tenant #1's identity:
 
 from __future__ import annotations
 
+import re
+
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django_tenants.utils import get_public_schema_name
+
+#: The hidden field the login form posts ``next`` in.
+NEXT_FIELD = re.compile(r'<input type="hidden" name="next" value="([^"]*)">')
 
 
 class _Schema:
@@ -70,30 +75,40 @@ class TestPlatformBranding(TestCase):
         assert ctx["site_favicons"] == []
 
 
-class TestAdminLoginRedirect(TestCase):
-    """A staff login must land in the admin, never on the storefront."""
+class TestAdminLoginLandsInTheAdmin(TestCase):
+    """A staff login must land in the admin, never on the storefront.
 
-    def test_bare_login_url_gets_a_next_pointing_at_the_admin(self):
-        response = self.client.get("/admin/login/")
-        assert response.status_code == 302
-        assert f"{REDIRECT_FIELD_NAME}=" in response["Location"]
-        assert "/admin/" in response["Location"]
+    Without ``next``, Django falls back to ``LOGIN_REDIRECT_URL``, the
+    shopper account page: production sent an operator signing in at the
+    control plane to ``https://webside.gr/account`` on 2026-08-21. The
+    login form carries ``next`` itself (``core/templates/admin/login.html``),
+    and ``AdminSite.login`` fills it with the requested page or this
+    site's index.
+    """
 
-    def test_next_is_not_the_storefront(self):
+    def _next_field(self, path: str) -> str:
+        response = self.client.get(path)
+        assert response.status_code == 200
+        match = NEXT_FIELD.search(response.content.decode())
+        assert match, "the login form carries no next field"
+        return match.group(1)
+
+    def test_a_bare_login_page_sends_the_login_to_the_admin_index(self):
+        assert self._next_field("/admin/login/") == "/admin/"
+
+    def test_next_is_never_the_storefront(self):
         from django.conf import settings
 
-        response = self.client.get("/admin/login/")
-        assert settings.LOGIN_REDIRECT_URL not in response["Location"], (
-            "admin login still points at the storefront account page"
+        assert settings.LOGIN_REDIRECT_URL not in self._next_field(
+            "/admin/login/"
         )
 
-    def test_an_explicit_next_is_preserved(self):
+    def test_an_explicit_next_is_carried(self):
         target = "/admin/tenant/tenant/"
-        response = self.client.get(
-            f"/admin/login/?{REDIRECT_FIELD_NAME}={target}"
-        )
-        assert response.status_code == 200, (
-            "a login URL that already carries next must render, not redirect"
+
+        assert (
+            self._next_field(f"/admin/login/?{REDIRECT_FIELD_NAME}={target}")
+            == target
         )
 
 
@@ -165,9 +180,9 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             f"platform-only sections in the store sidebar: {stray}"
         )
 
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_the_platform_sidebar_links_every_model_of_them(self):
-        from django.conf import settings
-
+        from admin.navigation import platform_sidebar
         from admin.platform_site import platform_admin_site
 
         registered = {
@@ -175,7 +190,7 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             for model in platform_admin_site._registry
             if model._meta.app_label in self.INFRA_LABELS
         }
-        linked = self._linked(settings.UNFOLD_PLATFORM["SIDEBAR"]["navigation"])
+        linked = self._linked(platform_sidebar(RequestFactory().get("/admin/")))
         assert registered, "the platform site registers none of these apps"
         assert registered <= linked, (
             "registered on the control plane but reachable only by URL: "

@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from parler.utils import get_active_language_choices
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from order.enum.status import RETURN_HANDLING_STATUSES
@@ -18,6 +19,25 @@ from vat.models import validate_mydata_vat_rate
 # The restock reason is written to ``StockLog.reason`` (255) after a prefix of
 # about 45 characters, so it is capped well under that wherever it is typed.
 RESTOCK_REASON_MAX_LENGTH = 150
+
+
+def product_name_for(product, language_code: str) -> str:
+    """The name a line of an order placed in *language_code* is sold under:
+    the product's name in that language, else in the next language of its
+    parler fallback chain, else in any language it has one in, else empty
+    (never a made-up label). ``order.line_snapshot`` chooses the same way
+    for the lines that predate the snapshot."""
+    names = {
+        translation.language_code: translation.name
+        for translation in sorted(
+            product.translations.all(), key=lambda row: row.pk
+        )
+        if translation.name
+    }
+    for language in get_active_language_choices(language_code):
+        if language in names:
+            return names[language]
+    return next(iter(names.values()), "")
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
@@ -35,6 +55,36 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name=_("Product"),
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
+    # What the line was sold as, fixed when it is created, like ``vat_rate``
+    # and ``unit_cost``: the product's name in the ORDER's language and its
+    # SKU. The invoice, the order emails and the order API read these and
+    # never the product, so renaming or re-coding a product cannot rewrite
+    # a receipt already issued. ``db_default`` exists for the rolling deploy
+    # (the previous release still INSERTs without the columns; the
+    # ``backfill_line_snapshots`` command fills those rows in) and for the
+    # backfill of existing rows.
+    product_name = models.CharField(
+        _("Product name"),
+        max_length=255,
+        blank=True,
+        db_default="",
+        help_text=_(
+            "The product's name when the line was created, in the order's "
+            "language. Invoices and emails use it, never the product's "
+            "current name."
+        ),
+    )
+    sku = models.CharField(
+        _("SKU"),
+        max_length=100,
+        blank=True,
+        db_default="",
+        help_text=_(
+            "The product's SKU when the line was created. Invoices use it, "
+            "never the product's current SKU."
+        ),
+    )
+
     # The VAT percentage ``price`` was sold at (``price`` is VAT-inclusive),
     # fixed when the line is created. The invoice and the myDATA payload
     # split ``price`` at this rate and never read ``product.vat`` again, so
@@ -139,12 +189,9 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         ]
 
     def __str__(self):
-        product_name = self.product.safe_translation_getter(
-            "name", any_language=True
-        )
         return gettext("Order %(order)s - %(product)s × %(quantity)s") % {
             "order": self.order_id,
-            "product": product_name,
+            "product": self.product_name,
             "quantity": self.quantity,
         }
 
@@ -203,7 +250,19 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             self.vat_rate = self.product.vat_percent
         if self._state.adding and self.unit_cost is None:
             self.unit_cost = self.product.cost_price
+        if self._state.adding:
+            self._snapshot_product()
         super().save(*args, **kwargs)
+
+    def _snapshot_product(self) -> None:
+        """Fix the name and SKU the line is sold under (see the fields).
+        A caller that states either keeps what it stated."""
+        if isinstance(self.product_name, DatabaseDefault):
+            self.product_name = product_name_for(
+                self.product, self.order.language_code
+            )
+        if isinstance(self.sku, DatabaseDefault):
+            self.sku = self.product.sku
 
     def refund(self, quantity=None, *, performed_by=None, reason=""):
         """Put ``quantity`` returned units back in stock and record them as

@@ -22,7 +22,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory
 from djmoney.money import Money
 
-from order.admin import OrderAdmin, RefundOrderForm
+from order.admin import OrderAdmin, ReturnOrderForm
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
@@ -412,7 +412,7 @@ def _request(user, data):
 
 def _form(user, order, data):
     # ``_form_submitted`` is BaseDialogForm's required hidden field.
-    return RefundOrderForm(
+    return ReturnOrderForm(
         _request(user, data),
         order.pk,
         data={"_form_submitted": "true", **data},
@@ -442,7 +442,9 @@ class TestTheStaffAction:
     def test_a_refund_of_cash_without_a_reference_is_invalid(self, staff_user):
         order = _cod_order("50.00")
 
-        form = _form(staff_user, order, {"amount": "20.00", "reason": "Return"})
+        form = _form(
+            staff_user, order, {"amount": "20.00", "reason": "RETURNED"}
+        )
 
         assert not form.is_valid()
         assert form.errors["repayment_reference"] == [
@@ -460,12 +462,39 @@ class TestTheStaffAction:
             order,
             {
                 "amount": "20.00",
-                "reason": "Return",
+                "reason": "RETURNED",
                 "repayment_reference": "TRX-9",
             },
         )
 
         assert form.is_valid(), form.errors
+
+    def test_finishing_a_stalled_gift_card_share_needs_no_reference(
+        self, staff_user
+    ):
+        """A repeat that resumes a gift card and points share already
+        claimed pays no cash, so it is not asked how cash was paid back,
+        although cash is still refundable on the order."""
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _cod_order("50.00")
+        RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=_eur("15.00"),
+        )
+
+        resume = _form(
+            staff_user, order, {"amount": "15.00", "reason": "RETURNED"}
+        )
+        new = _form(
+            staff_user, order, {"amount": "20.00", "reason": "RETURNED"}
+        )
+
+        assert resume.is_valid(), resume.errors
+        assert not new.is_valid()
+        assert "repayment_reference" in new.errors
 
     def test_a_refund_inside_the_provider_payment_needs_no_reference(
         self, staff_user
@@ -487,8 +516,12 @@ class TestTheStaffAction:
             amount=_eur("40.00"),
         )
 
-        inside = _form(staff_user, order, {"amount": "60.00", "reason": "r"})
-        beyond = _form(staff_user, order, {"amount": "60.01", "reason": "r"})
+        inside = _form(
+            staff_user, order, {"amount": "60.00", "reason": "RETURNED"}
+        )
+        beyond = _form(
+            staff_user, order, {"amount": "60.01", "reason": "RETURNED"}
+        )
 
         assert inside.is_valid(), inside.errors
         assert not beyond.is_valid()
@@ -500,7 +533,8 @@ class TestTheStaffAction:
             staff_user,
             {
                 "amount": "50.00",
-                "reason": "Customer returned the parcel",
+                "reason": "RETURNED",
+                "note": "Customer returned the parcel",
                 "repayment_reference": "TRX-ADMIN",
             },
         )
@@ -517,7 +551,9 @@ class TestTheStaffAction:
         ]
         [refund] = _refund_rows(order)
         assert refund.provider == MANUAL_REFUND_PROVIDER
-        assert refund.description == "Customer returned the parcel"
+        assert refund.description == (
+            "Returned by the customer: Customer returned the parcel"
+        )
         assert _status(order) == PaymentStatus.REFUNDED
 
     def test_the_action_is_not_offered_when_the_cash_was_never_collected(
@@ -530,7 +566,9 @@ class TestTheStaffAction:
             payment_status=PaymentStatus.PENDING,
             payment_id="",
         )
-        request = _request(staff_user, {"amount": "10.00", "reason": "Return"})
+        request = _request(
+            staff_user, {"amount": "10.00", "reason": "RETURNED"}
+        )
         admin = OrderAdmin(Order, AdminSite())
 
         assert not admin.has_refund_permission(request, object_id=order.pk)

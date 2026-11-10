@@ -219,16 +219,20 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response1.status_code, status.HTTP_200_OK)
         reservation_ids_1 = response1.data["reservation_ids"]
 
-        # Reserve stock second time (should create new reservations)
+        # Reserve stock second time: the cart's holds are replaced
         response2 = self.client.post(self.reserve_url)
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
         reservation_ids_2 = response2.data["reservation_ids"]
 
-        # Verify different reservation IDs
         self.assertNotEqual(reservation_ids_1, reservation_ids_2)
 
-        # Verify both sets of reservations exist
+        # Only the second set is still held; the first was released
         all_reservations = StockReservation.objects.filter(
             session_id=str(self.cart.uuid)
         )
         self.assertEqual(all_reservations.count(), 2)
+        active = all_reservations.filter(consumed=False)
+        self.assertEqual(
+            [r.id for r in active],
+            reservation_ids_2,
+        )

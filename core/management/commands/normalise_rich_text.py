@@ -1,9 +1,14 @@
 """Bring stored rich text up to what a save writes today.
 
-``RichTextField`` normalises on every save (``normalise_rich_text``: no
-empty headings, every uploaded image's real size); this command brings
-the rows saved before each step existed up to date. Safe to run again: a
-row already normalised is left alone.
+``RichTextField`` stores ``stored_rich_text`` on every save (the policy
+of ``core.utils.sanitize``, no empty headings, every uploaded image's
+real size); this command brings the rows saved before each step existed
+up to date. Safe to run again: a row already in that form is left alone.
+
+A row holding content the policy would drop (``lost_content``: an embed
+from a host that is not allowed, say) is the one a save refuses. It is
+left as it is and counted as skipped, never stripped: someone has to
+decide what replaces that content.
 
 It writes the column directly rather than saving the row. A save
 re-validates the whole body and would refuse one the policy has since
@@ -25,15 +30,17 @@ from dataclasses import dataclass
 from django.core.management.base import BaseCommand
 from django.db import models
 
-from core.fields.rich_text import RichTextField, normalise_rich_text
+from core.fields.rich_text import RichTextField, stored_rich_text
 from core.management.commands.media_reference_audit import tenant_models
 from core.management.tenant_mixin import TenantCommandMixin
+from core.utils.sanitize import lost_content
 
 
 @dataclass
 class Tally:
     scanned: int = 0
     changed: int = 0
+    skipped: int = 0
 
 
 def rich_text_fields() -> list[tuple[type[models.Model], list]]:
@@ -69,7 +76,10 @@ def normalise_current_schema(
                 tally.scanned += 1
                 if not body:
                     continue
-                updated = normalise_rich_text(body)
+                if lost_content(body):
+                    tally.skipped += 1
+                    continue
+                updated = stored_rich_text(body)
                 if updated == body:
                     continue
                 tally.changed += 1
@@ -95,6 +105,7 @@ class Command(TenantCommandMixin, BaseCommand):
     def handle(self, *args, **options):
         pairs = rich_text_fields()
         total = 0
+        skipped = 0
         for context in self.iter_tenant_contexts(options):
             with context:
                 tallies = normalise_current_schema(
@@ -102,10 +113,19 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
             for label, tally in tallies.items():
                 total += tally.changed
+                skipped += tally.skipped
                 if tally.scanned:
                     self.stdout.write(
                         f"    {label}: {tally.changed} of "
-                        f"{tally.scanned} row(s) changed"
+                        f"{tally.scanned} row(s) changed, "
+                        f"{tally.skipped} skipped"
                     )
         verb = "would change" if options["dry_run"] else "changed"
         self.stdout.write(self.style.SUCCESS(f"{verb} {total} row(s)."))
+        if skipped:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"skipped {skipped} row(s) holding content a save "
+                    "refuses; edit them in the admin."
+                )
+            )

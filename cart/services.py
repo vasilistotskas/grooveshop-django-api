@@ -306,6 +306,17 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
+        # Lock both cart rows, in pk order, before anything moves. Checkout
+        # and ``StockManager.reserve_cart_stock`` take the cart row first
+        # too, so the rehoming of the holds below runs one at a time with
+        # them, and cart rows are always taken lowest pk first.
+        list(
+            Cart.objects.select_for_update()
+            .filter(pk__in=[source_cart.pk, target_cart.pk])
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+
         # Before any line moves: whether the target already holds lines
         # is what decides which source the merged cart keeps. A guest
         # cart that was emptied brings no lines, so its source brings

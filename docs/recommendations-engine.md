@@ -349,7 +349,7 @@ enabled for any tenant — with the `benchmark_embedder` command specified in
 
 ### 6.2 Where the model runs
 
-Verified against Meilisearch v1.53 (the cluster runs v1.53.1):
+Verified against Meilisearch v1.53 (the cluster ran v1.53.1 at the time):
 
 - `POST /indexes/{uid}/similar` takes `id`, `embedder`, `limit`,
   `offset`, `filter`, `rankingScoreThreshold` (0.0–1.0),

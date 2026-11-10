@@ -17,6 +17,7 @@ Exception Hierarchy:
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
+    │   └── OrderNotCancelableError
     │   └── ParcelWithCourierError
     └── PaymentError
         ├── PaymentNotFoundError
@@ -78,6 +79,27 @@ class InsufficientStockError(StockError):
         super().__init__(
             f"Product {product_id} has insufficient stock. "
             f"Available: {available}, Requested: {requested}"
+        )
+
+
+class CartStockUnavailableError(StockError):
+    """
+    Raised when a cart cannot hold stock for every one of its lines.
+
+    Carries one ``InsufficientStockError`` per short line, so the caller can
+    report all of them at once. Nothing was changed when it is raised: the
+    cart keeps the holds it had.
+
+    Attributes:
+        shortfalls (list[InsufficientStockError]): One entry per short line
+    """
+
+    def __init__(self, shortfalls: list[InsufficientStockError]):
+        """Keep the per-line shortfalls and name the products in the message."""
+        self.shortfalls = shortfalls
+        super().__init__(
+            "Insufficient stock for products: "
+            + ", ".join(str(e.product_id) for e in shortfalls)
         )
 
 
@@ -314,6 +336,18 @@ class OrderCancellationError(OrderServiceError):
         self.order_id = order_id
         self.reason = reason
         super().__init__(f"Cannot cancel order {order_id}: {reason}")
+
+
+class OrderNotCancelableError(OrderCancellationError):
+    """
+    Raised when the order's status no longer allows a cancel.
+
+    The order shipped, was delivered or is already canceled: asking again
+    gives the same answer. Every other ``OrderCancellationError`` is a
+    cancel that failed on the way (a lock that timed out, a write that
+    did not go through) and may succeed when it is tried again, so a
+    caller that drops refusals must catch this class, not its parent.
+    """
 
 
 class ParcelWithCourierError(OrderCancellationError):

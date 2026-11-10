@@ -208,6 +208,39 @@ class TestABlogPost:
             "template:blog",
         }
 
+    def test_a_post_going_live_reaches_the_lists_of_its_category(self, queued):
+        """A post dated in the future reaches its date with no save; the
+        publication sweep's ``went_live`` stands in for it."""
+        from blog.factories.category import BlogCategoryFactory
+        from blog.factories.post import BlogPostFactory
+        from blog.models.post import BlogPost
+        from core.publication import went_live
+
+        category = BlogCategoryFactory()
+        index(
+            ReferenceKind.QUERY_BLOG_POST,
+            f"category:{category.pk}",
+            "page:in-category",
+        )
+        post = BlogPostFactory(category=category)
+        queued.reset_mock()
+
+        went_live.send(sender=BlogPost, instance=post)
+
+        assert last(queued) == {"page:in-category"}
+
+    def test_another_model_going_live_queues_nothing(self, queued):
+        from blog.factories.post import BlogPostFactory
+        from core.publication import went_live
+        from page_config.models import ContentPage
+
+        post = BlogPostFactory()
+        queued.reset_mock()
+
+        went_live.send(sender=ContentPage, instance=post)
+
+        assert queued.call_count == 0
+
     def test_a_blog_category_reaches_the_lists_of_its_posts(self, queued):
         from blog.factories.category import BlogCategoryFactory
 

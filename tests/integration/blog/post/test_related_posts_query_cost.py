@@ -50,6 +50,32 @@ class BlogPostQueryCostTestCase(APITestCase):
 
         self.assertEqual(large, small)
 
+    def test_related_posts_query_count_does_not_depend_on_shared_words(self):
+        """The shared-words strategy finds every post here: a chain that
+        asked its strategies again to fill made the count follow what
+        each one returned (random factory titles failed it in CI)."""
+        from blog.models.post import BlogPostTranslation
+
+        def alike(count):
+            for post in BlogPostFactory.create_batch(
+                count, author=self.author, category=self.category
+            ):
+                BlogPostTranslation.objects.filter(master=post).update(
+                    title="Οπτική ίνα στο σπίτι"
+                )
+
+        BlogPostTranslation.objects.filter(master=self.post).update(
+            title="Οπτική ίνα στο σπίτι"
+        )
+        url = reverse("blog-post-related_posts", args=[self.post.pk])
+        alike(2)
+        small = self._queries(url)
+
+        alike(9)
+        large = self._queries(url)
+
+        self.assertEqual(large, small)
+
     def test_post_detail_query_count_does_not_grow_with_author_posts(self):
         url = reverse("blog-post-detail", args=[self.post.pk])
         self._posts(1)

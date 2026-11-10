@@ -6,6 +6,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
+from core.fields.url import WebURLField
 from core.history import ChangeOnlyHistoricalRecords
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping.querysets import ShipmentQuerySet
@@ -130,7 +131,7 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
     )
 
     # ── Tracking URLs / timestamps ─────────────────────────────────
-    label_url = models.URLField(
+    label_url = WebURLField(
         _("Label URL"),
         max_length=500,
         blank=True,

@@ -290,6 +290,17 @@ def _iter_declared_models():
             yield surface, label, model
 
 
+def surfaces_invalidated_by(model) -> list[str]:
+    """The codes of the surfaces that declare ``model`` in ``invalidated_by``:
+    what a write to it would have made stale."""
+
+    return [
+        surface.code
+        for surface, _label, declared in _iter_declared_models()
+        if declared is model
+    ]
+
+
 def connect_surface_invalidation(*, force: bool = False) -> None:
     """Wire ``post_save``/``post_delete`` for every declared model.
 

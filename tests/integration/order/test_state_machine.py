@@ -9,16 +9,11 @@ from order.exceptions import InvalidStatusTransitionError
 from order.factories import OrderFactory
 from order.services import OrderService
 
-# Define the allowed transitions from the OrderService
+# The transitions ``OrderService.update_order_status`` allows. CANCELED is
+# in none of them: a cancel is ``OrderService.cancel_order``.
 ALLOWED_TRANSITIONS = {
-    OrderStatus.PENDING: [
-        OrderStatus.PROCESSING,
-        OrderStatus.CANCELED,
-    ],
-    OrderStatus.PROCESSING: [
-        OrderStatus.SHIPPED,
-        OrderStatus.CANCELED,
-    ],
+    OrderStatus.PENDING: [OrderStatus.PROCESSING],
+    OrderStatus.PROCESSING: [OrderStatus.SHIPPED],
     OrderStatus.SHIPPED: [
         OrderStatus.DELIVERED,
         OrderStatus.RETURNED,

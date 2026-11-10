@@ -3,7 +3,6 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import models
 from django.utils import timezone
 
 from core import celery_app
@@ -16,6 +15,7 @@ from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 from emails.send import Status, send_email, was_sent
 from product.emails import ALERTS_GATE, LowStock, PriceDrop
+from product.enum.stock import RESTOCK_STATES, StockState
 
 if TYPE_CHECKING:
     from product.models.alert import ProductAlert
@@ -228,20 +228,18 @@ def check_low_stock_products() -> dict:
     - Triggers per product only once: flips `low_stock_alert_sent=True`
       atomically (row-locked) before sending, preventing duplicate
       sends from concurrent beat executions in HA setups.
-    - Automatically clears the flag when stock rises back above the
-      threshold.
+    - Alerts on a product whose ``StockState`` is low or out of stock;
+      clears the flag once it is back in stock.
     - Respects `low_stock_threshold=0` as "disabled for this product".
     """
     from django.db import transaction
 
     from product.models.product import Product
 
-    # Auto-clear the flag on products whose stock has recovered above
-    # the threshold. Runs on every invocation regardless of whether an
-    # alert will be sent this time.
-    Product.objects.filter(
-        low_stock_alert_sent=True,
-        stock__gt=models.F("low_stock_threshold"),
+    # Auto-clear the flag on products back in stock. Runs on every
+    # invocation regardless of whether an alert will be sent this time.
+    Product.objects.by_stock_state(StockState.IN_STOCK).filter(
+        low_stock_alert_sent=True
     ).update(low_stock_alert_sent=False)
 
     # Atomically claim the product rows we are about to alert on —
@@ -249,11 +247,11 @@ def check_low_stock_products() -> dict:
     with transaction.atomic():
         product_ids = list(
             Product.objects.select_for_update(skip_locked=True)
+            .by_stock_state(*RESTOCK_STATES)
             .filter(
                 active=True,
                 low_stock_alert_sent=False,
                 low_stock_threshold__gt=0,
-                stock__lte=models.F("low_stock_threshold"),
             )
             .values_list("id", flat=True)
         )
@@ -528,6 +526,35 @@ def sync_price_records(product_ids: list[int]) -> dict[str, int]:
     from promotion.offer_sync import refresh_products
 
     documents = refresh_products(product_ids)
+    return {"products": len(product_ids), "documents": documents}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def reindex_products_for_search_text(source: str, pk: int) -> dict[str, int]:
+    """Reindex the products whose search text includes the named row.
+
+    A brand, category, attribute or attribute value renamed in the admin
+    leaves its products' documents with the old text. A category can hold
+    thousands of products, so finding them and queueing a document each
+    happens here, never in the request that saved the rename.
+    """
+    from product.enum.search_text import SearchTextSource
+    from product.models.product import Product
+    from product.signals import reindex_products_by_pk
+
+    lookup = SearchTextSource(source).product_lookup
+    product_ids = list(
+        Product.objects.filter(**{lookup: pk})
+        .values_list("pk", flat=True)
+        .distinct()
+    )
+    documents = reindex_products_by_pk(product_ids)
     return {"products": len(product_ids), "documents": documents}
 
 

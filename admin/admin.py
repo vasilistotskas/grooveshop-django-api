@@ -17,7 +17,7 @@ from admin.forms import (
     PlatformAdminAuthenticationForm,
     PlatformPasswordChangeForm,
 )
-from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
+from admin.mixins import AdminFooterMixin
 from admin.password_reset import StaffPasswordResetMixin
 from admin.permissions import opens_changelist
 from admin.search import CommandSearchMixin
@@ -73,7 +73,6 @@ class MyAdminSite(
     StaffPasswordResetMixin,
     CommandSearchMixin,
     AdminFooterMixin,
-    AdminSiteLoginNextMixin,
     UnfoldAdminSite,
 ):
     index_title = _("Dashboard")

@@ -32,7 +32,6 @@ def _make_index(index_pks, *, page_size=1000):
 
     index = MagicMock()
     index.get_documents.side_effect = get_documents
-    index.delete_documents.return_value = SimpleNamespace(task_uid=7)
     return index
 
 
@@ -42,42 +41,43 @@ def _run_prune(index, synced_pks):
         "meili.management.commands.meilisearch_sync_all_indexes._client"
     ) as mock_client:
         mock_client.get_index.return_value = index
+        mock_client.delete_documents_by_primary_key.return_value = (
+            SimpleNamespace(task_uid=7)
+        )
         mock_client.wait_for_task.return_value = SimpleNamespace(
             status="succeeded", error=None
         )
         command._prune_stale_documents(_FakeModel, synced_pks)
-    return index
+    return mock_client.delete_documents_by_primary_key
 
 
 class TestConvergentPrune:
     def test_deletes_orphaned_documents(self):
         index = _make_index(["1", "2", "3"])
-        _run_prune(index, {"1", "2"})
+        delete = _run_prune(index, {"1", "2"})
 
-        index.delete_documents.assert_called_once()
-        deleted = set(index.delete_documents.call_args[0][0])
-        assert deleted == {"3"}
+        delete.assert_called_once_with("public__products", "pk", ["3"])
 
     def test_no_delete_when_index_matches_source(self):
         index = _make_index(["1", "2"])
-        _run_prune(index, {"1", "2"})
+        delete = _run_prune(index, {"1", "2"})
 
-        index.delete_documents.assert_not_called()
+        delete.assert_not_called()
 
     def test_empty_source_deletes_every_document(self):
         index = _make_index(["1", "2", "3"])
-        _run_prune(index, set())
+        delete = _run_prune(index, set())
 
-        index.delete_documents.assert_called_once()
-        deleted = set(index.delete_documents.call_args[0][0])
-        assert deleted == {"1", "2", "3"}
+        delete.assert_called_once_with(
+            "public__products", "pk", ["1", "2", "3"]
+        )
 
     def test_prunes_across_paginated_index(self):
         # 2500 docs force three get_documents pages at page_size 1000.
         index = _make_index([str(i) for i in range(2500)])
         synced = {str(i) for i in range(2500) if i % 2 == 0}
-        _run_prune(index, synced)
+        delete = _run_prune(index, synced)
 
         assert index.get_documents.call_count == 3
-        deleted = set(index.delete_documents.call_args[0][0])
+        deleted = set(delete.call_args.args[2])
         assert deleted == {str(i) for i in range(2500) if i % 2 == 1}

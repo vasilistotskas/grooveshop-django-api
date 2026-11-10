@@ -20,7 +20,7 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connection, connections
 from django_tenants.utils import get_public_schema_name
 
 ROUTER_PATH = "django_tenants.routers.TenantSyncRouter"
@@ -43,7 +43,12 @@ class TestRefusals:
 
     def test_it_refuses_off_the_public_schema(self, settings, monkeypatch):
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
-        monkeypatch.setattr(connection, "schema_name", "webside", raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            "webside",
+            raising=False,
+        )
 
         with pytest.raises(CommandError, match="only ever operates"):
             _run()
@@ -72,7 +77,10 @@ class TestDryRunIsTheDefault:
     def test_it_reports_without_dropping(self, settings, monkeypatch):
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
         monkeypatch.setattr(
-            connection, "schema_name", get_public_schema_name(), raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            get_public_schema_name(),
+            raising=False,
         )
         public = get_public_schema_name()
         table = "unit_lane_fake_tenant_table"
@@ -96,7 +104,10 @@ class TestDryRunIsTheDefault:
     def test_a_clean_schema_reports_nothing_to_do(self, settings, monkeypatch):
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
         monkeypatch.setattr(
-            connection, "schema_name", get_public_schema_name(), raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            get_public_schema_name(),
+            raising=False,
         )
         monkeypatch.setattr(
             "tenant.app_labels.tenant_only_table_names",
@@ -113,7 +124,10 @@ class TestExecution:
         routerless lane the real set names every table the suite needs."""
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
         monkeypatch.setattr(
-            connection, "schema_name", get_public_schema_name(), raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            get_public_schema_name(),
+            raising=False,
         )
         public = get_public_schema_name()
         residue = "unit_lane_fake_tenant_table"
@@ -147,7 +161,10 @@ class TestExecution:
         """The deploy record must name what was destroyed."""
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
         monkeypatch.setattr(
-            connection, "schema_name", get_public_schema_name(), raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            get_public_schema_name(),
+            raising=False,
         )
         public = get_public_schema_name()
         table = "unit_lane_fake_tenant_table"
@@ -183,7 +200,10 @@ class TestLegacyInboundForeignKeys:
     def _setup(monkeypatch, settings, *, not_null: bool):
         settings.DATABASE_ROUTERS = [ROUTER_PATH]
         monkeypatch.setattr(
-            connection, "schema_name", get_public_schema_name(), raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            get_public_schema_name(),
+            raising=False,
         )
         public = get_public_schema_name()
         residue = "unit_lane_fake_tenant_table"

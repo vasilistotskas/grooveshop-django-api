@@ -17,6 +17,8 @@ from django.core.cache import cache
 from django.utils import timezone
 from djmoney.money import Money
 
+from core.models import SweepCursor
+from core.sweeps import advance_sweep
 from product.factories import ProductFactory
 from product.factories.category import ProductCategoryFactory
 from promotion import offer_sync
@@ -274,11 +276,7 @@ class TestWindowSweep:
         now = timezone.now()
         opens = _promotion(starts_at=now - timedelta(minutes=2))
         opens.products.set([product])
-        cache.set(
-            "promotion-offer:window-cursor",
-            (now - timedelta(minutes=5)).isoformat(),
-            timeout=None,
-        )
+        advance_sweep(offer_sync.WINDOW_SWEEP_NAME, now - timedelta(minutes=5))
 
         reindex_offer_window_changes_task()
 
@@ -292,11 +290,7 @@ class TestWindowSweep:
             ends_at=now - timedelta(minutes=1),
         )
         closes.products.set([product])
-        cache.set(
-            "promotion-offer:window-cursor",
-            (now - timedelta(minutes=5)).isoformat(),
-            timeout=None,
-        )
+        advance_sweep(offer_sync.WINDOW_SWEEP_NAME, now - timedelta(minutes=5))
 
         reindex_offer_window_changes_task()
 
@@ -307,11 +301,7 @@ class TestWindowSweep:
         now = timezone.now()
         opens = _promotion(starts_at=now - timedelta(minutes=2))
         opens.products.set([product])
-        cache.set(
-            "promotion-offer:window-cursor",
-            (now - timedelta(minutes=5)).isoformat(),
-            timeout=None,
-        )
+        advance_sweep(offer_sync.WINDOW_SWEEP_NAME, now - timedelta(minutes=5))
 
         reindex_offer_window_changes_task()
         reindexed.reset_mock()
@@ -339,7 +329,7 @@ class TestWindowSweep:
 
         assert _ids(reindexed) == set()
 
-    def test_a_missing_cursor_falls_back_to_a_wide_window(self, reindexed):
+    def test_a_stores_first_sweep_looks_back_a_day(self, reindexed):
         product = ProductFactory(active=True)
         opens = _promotion(starts_at=timezone.now() - timedelta(hours=3))
         opens.products.set([product])
@@ -357,7 +347,9 @@ class TestWindowSweep:
         with pytest.raises(RuntimeError):
             offer_sync.refresh_window_changes()
 
-        assert cache.get("promotion-offer:window-cursor") is None
+        assert not SweepCursor.objects.filter(
+            name=offer_sync.WINDOW_SWEEP_NAME
+        ).exists()
 
 
 def test_the_beat_entry_fans_out_per_tenant():

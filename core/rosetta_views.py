@@ -48,10 +48,7 @@ class DBBackedTranslationFormView(TranslationFormView):
         if not language_code:
             return po
 
-        try:
-            from core.models import Translation
-        except Exception:
-            return po
+        from core.models import Translation
 
         # Fetch every DB row for the language in one query and index by
         # (msgid, plural_index) so the entry walk is O(N_entries).

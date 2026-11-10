@@ -20,6 +20,7 @@ from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +39,7 @@ def _order(user, *, metadata=None, status=OrderStatus.COMPLETED):
             product=ProductFactory(
                 price=Money(Decimal(price), "EUR"),
                 discount_percent=Decimal(0),
-                vat=None,
+                vat=VatFactory(value=0),
                 stock=10,
                 active=True,
             ),

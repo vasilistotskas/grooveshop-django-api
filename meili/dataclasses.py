@@ -29,6 +29,10 @@ class MeiliIndexSettings:
     faceting: dict[str, Any] | None = None
     pagination: dict[str, Any] | None = None
     search_cutoff_ms: int | None = None
+    #: The document attribute the engine's primary key is. Always
+    #: filterable (equality only, no facet search): a delete by filter
+    #: needs it, and the SDK deprecates deleting by ids.
+    primary_key: str | None = None
 
     def filterable_attributes_payload(self) -> list[dict[str, Any]]:
         """The granular ``filterableAttributes`` the engine is sent.
@@ -39,9 +43,13 @@ class MeiliIndexSettings:
         indexes for an operator nobody uses costs indexing time and disk,
         and the facet-search database costs the same again.
 
+        ``primary_key`` is added last as equality only with no facet
+        search, unless it is already listed: the cheapest way to make a
+        delete by filter possible.
+
         See https://www.meilisearch.com/docs/learn/filtering_and_sorting/configure_granular_filters
         """
-        filterable = self.filterable_fields or []
+        filterable = list(self.filterable_fields or [])
         range_fields = self.range_fields or []
         unknown = set(range_fields) - set(filterable)
         if unknown:
@@ -50,16 +58,24 @@ class MeiliIndexSettings:
             )
 
         payload = []
-        for names, comparison in (
-            (range_fields, True),
-            ([f for f in filterable if f not in range_fields], False),
+        plain = [f for f in filterable if f not in range_fields]
+        listed = {*range_fields, *plain}
+        pk_only = (
+            [self.primary_key]
+            if self.primary_key and self.primary_key not in listed
+            else []
+        )
+        for names, comparison, facet_search in (
+            (range_fields, True, self.facet_search),
+            (plain, False, self.facet_search),
+            (pk_only, False, False),
         ):
             if names:
                 payload.append(
                     {
                         "attributePatterns": names,
                         "features": {
-                            "facetSearch": self.facet_search,
+                            "facetSearch": facet_search,
                             "filter": {
                                 "equality": True,
                                 "comparison": comparison,

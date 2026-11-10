@@ -1,11 +1,14 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
+from order.enum.stock_log_reason import StockLogReason
 from order.exceptions import (
+    CartStockUnavailableError,
     InsufficientStockError,
     ProductNotFoundError,
     StockReservationError,
@@ -13,6 +16,9 @@ from order.exceptions import (
 from order.models import StockLog, StockReservation
 from product.models import Product
 from tenant.staff_actors import staff_id
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 
 def validate_reservation_ttl_minutes_setting(value: object) -> bool:
@@ -114,9 +120,13 @@ class StockManager:
         user_id: int | None = None,
     ) -> StockReservation:
         """
-        Reserve stock for checkout process.
+        Reserve stock for one product.
 
-        Creates a temporary stock reservation with a configurable TTL (default 15 minutes).
+        Counts EVERY active hold, the caller's own included. A cart reserves
+        through ``reserve_cart_stock``, which replaces its holds first.
+
+        Creates a temporary stock reservation that lasts the store's
+        ``STOCK_RESERVATION_TTL_MINUTES`` (:meth:`get_reservation_ttl_minutes`).
         Uses SELECT FOR UPDATE to prevent race conditions when multiple customers
         attempt to reserve the same product simultaneously.
 
@@ -217,6 +227,97 @@ class StockManager:
         )
 
         return reservation
+
+    @classmethod
+    @transaction.atomic
+    def reserve_cart_stock(
+        cls,
+        cart: Cart,
+        quantities: Mapping[int, int],
+    ) -> list[StockReservation]:
+        """
+        Make the cart's holds exactly ``quantities``, replacing its old ones.
+
+        A session (cart) owns one set of holds. In a single transaction this
+        locks every product the old or the new set touches (``lock_products``,
+        pk order), releases ALL of the session's unconsumed holds, expired
+        ones included, through ``release_reservation`` (so each leaves its
+        ``StockLog`` line), then reserves the new quantities. The cart's own
+        previous holds therefore never count against it, a retry is
+        idempotent, and a line that changed or left the cart is freed in the
+        same step. Holds of other sessions count as before, so two carts
+        still exclude each other for the last unit.
+
+        The first statement locks the ``Cart`` row (``select_for_update``),
+        the lock checkout takes first, so the order is cart, then products,
+        the same as checkout. This call, a checkout of the cart and the
+        login merge that rehomes its holds therefore run one at a time: the
+        holds read below cannot change under it, and a checkout never reads
+        a hold set this call is half way through replacing. Cart rows are
+        locked only here, in checkout and in the merge.
+
+        Order creation consumes the session's unconsumed holds
+        (``OrderService._consume_stock_for_order``), so after this call
+        those are exactly the ones returned.
+
+        Args:
+            cart: The cart whose holds are replaced (its UUID is the
+                session id of the holds, its user their owner)
+            quantities: product id -> units wanted, every one positive
+
+        Returns:
+            The new reservations, in ascending product id order.
+
+        Raises:
+            Cart.DoesNotExist: The cart was deleted meanwhile
+            ValueError: A quantity is not positive
+            ProductNotFoundError: A product does not exist
+            CartStockUnavailableError: One or more lines are short. Every
+                short line is reported and the transaction is rolled back,
+                so the cart keeps the holds it had.
+        """
+        if any(quantity <= 0 for quantity in quantities.values()):
+            raise ValueError("Quantity must be positive")
+
+        from cart.models import Cart
+
+        locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        session_id = str(locked_cart.uuid)
+        user_id = locked_cart.user_id
+
+        held_products = StockReservation.objects.filter(
+            session_id=session_id, consumed=False
+        ).values_list("product_id", flat=True)
+        cls.lock_products({*quantities, *held_products})
+
+        # Read again under the locks: a concurrent request of the same cart
+        # either finished before them (its holds are visible) or waits.
+        for reservation_id in list(
+            StockReservation.objects.filter(
+                session_id=session_id, consumed=False
+            )
+            .order_by("id")
+            .values_list("id", flat=True)
+        ):
+            cls.release_reservation(reservation_id)
+
+        reservations: list[StockReservation] = []
+        shortfalls: list[InsufficientStockError] = []
+        for product_id, quantity in sorted(quantities.items()):
+            try:
+                reservations.append(
+                    cls.reserve_stock(
+                        product_id=product_id,
+                        quantity=quantity,
+                        session_id=session_id,
+                        user_id=user_id,
+                    )
+                )
+            except InsufficientStockError as exc:
+                shortfalls.append(exc)
+        if shortfalls:
+            raise CartStockUnavailableError(shortfalls)
+        return reservations
 
     @classmethod
     @transaction.atomic
@@ -739,6 +840,67 @@ class StockManager:
         )
 
     @classmethod
+    @transaction.atomic
+    def set_stock(
+        cls,
+        product_id: int,
+        quantity: int,
+        *,
+        reason_code: StockLogReason,
+        reason: str = "",
+        performed_by=None,
+    ) -> bool:
+        """
+        Set a product's stock to an absolute ``quantity`` with one log row.
+
+        For a writer that knows the number it wants rather than a delta
+        (the catalogue import). The row is locked first, the new stock is
+        saved under a ``StockManager`` change reason so the stock-save
+        signal does not write its own ``MANUAL_ADJUSTMENT`` row, and
+        exactly one ``StockLog`` row records the move. A stock that
+        already equals ``quantity`` writes nothing: no save, no history,
+        no log, no reindex.
+
+        Returns whether the stock changed.
+
+        Raises:
+            ProductNotFoundError: If the product doesn't exist
+            ValueError: If ``quantity`` is negative
+        """
+        if quantity < 0:
+            raise ValueError("Quantity must not be negative")
+
+        try:
+            product = Product.objects.select_for_update().get(pk=product_id)
+        except Product.DoesNotExist:
+            raise ProductNotFoundError(product_id=product_id)
+
+        stock_before = product.stock
+        if stock_before == quantity:
+            return False
+
+        product.stock = quantity
+        product._change_reason = "StockManager: set_stock"
+        product.save(update_fields=["stock", "updated_at"])
+
+        delta = quantity - stock_before
+        StockLog.objects.create(
+            product=product,
+            operation_type=(
+                StockLog.OPERATION_INCREMENT
+                if delta > 0
+                else StockLog.OPERATION_DECREMENT
+            ),
+            quantity_delta=delta,
+            stock_before=stock_before,
+            stock_after=quantity,
+            reason_code=reason_code,
+            reason=reason,
+            performed_by_staff_id=staff_id(performed_by),
+        )
+        return True
+
+    @classmethod
     def get_available_stock(
         cls,
         product_id: int,
@@ -792,7 +954,8 @@ class StockManager:
         # Calculate sum of active reservation quantities
         # Active reservations are those that are:
         # 1. Not consumed (consumed=False) - not yet converted to actual sale
-        # 2. Not expired (expires_at > now) - still within 15-minute TTL
+        # 2. Not expired (expires_at > now) - still within the store's
+        #    STOCK_RESERVATION_TTL_MINUTES
         active_reservations = StockReservation.objects.filter(
             product=product, consumed=False, expires_at__gt=now
         )
@@ -824,8 +987,7 @@ class StockManager:
 
         This method is designed to be called by a Celery periodic task every
         5 minutes to clean up reservations that have exceeded their TTL
-        (Time To Live, configurable via STOCK_RESERVATION_TTL_MINUTES setting,
-        default 15 minutes).
+        (Time To Live, the store's STOCK_RESERVATION_TTL_MINUTES setting).
 
         The method finds all reservations where:
         - expires_at < current_time (reservation has expired)

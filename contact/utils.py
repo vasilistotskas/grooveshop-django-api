@@ -75,10 +75,9 @@ def validate_contact_content(
     if len(message) > 5000:
         errors["message"] = _("Message is too long (maximum 5000 characters)")
 
-    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    if not re.match(email_pattern, email):
-        errors["email"] = _("Please provide a valid email address")
-
+    # The address's format is the serializer's EmailField (Django's
+    # EmailValidator), which runs before this; a stricter regex here
+    # refused valid internationalised addresses.
     if detect_spam_patterns(message, email, name):
         errors["spam"] = _("Message appears to be spam")
 
@@ -107,15 +106,11 @@ def validate_feedback_content(
         errors["message"] = _("Message is too long (maximum 5000 characters)")
 
     if email.strip():
-        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-        if not re.match(email_pattern, email):
-            errors["email"] = _("Please provide a valid email address")
-        else:
-            email_domain = email.split("@")[-1]
-            if is_disposable_domain(email_domain):
-                errors["email"] = _(
-                    "Disposable / temporary email addresses are not allowed"
-                )
+        email_domain = email.split("@")[-1]
+        if is_disposable_domain(email_domain):
+            errors["email"] = _(
+                "Disposable / temporary email addresses are not allowed"
+            )
 
     if (
         not isinstance(rating, int)

@@ -36,7 +36,7 @@
 {% if items %}
 {% trans "Order Items" %}:
 {% for item in items %}
-- {{ item.product.name }} x {{ item.quantity }} @ {{ item.price }} = {{ item.total_price }}
+- {{ item.product_name }} x {{ item.quantity }} @ {{ item.price }} = {{ item.total_price }}
 {% endfor %}
 
 {% trans "Subtotal" %}: {{ order.total_price_items }}

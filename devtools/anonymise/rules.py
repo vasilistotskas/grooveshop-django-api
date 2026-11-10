@@ -308,6 +308,11 @@ REGISTRY: dict[str, Scrub | Delete] = {
         response=Kind.JSON,
         error_message=Kind.TEXT,
     ),
+    # Staff describe the voucher in their own words, which can name the
+    # recipient.
+    "shipping_acs.AcsUnrecognisedVoucher": _scrub_all(
+        resolution_note=Kind.FREE_TEXT
+    ),
     "shipping_boxnow.BoxNowShipment": Scrub(
         order_fk="order", fields={"metadata": Kind.JSON}
     ),
@@ -471,6 +476,10 @@ NOT_PERSONAL: dict[str, str] = {
         "scheduler.PeriodicTask",
     ),
     **_exempt(
+        "how far a periodic sweep has got: a store name and a date",
+        "core.SweepCursor",
+    ),
+    **_exempt(
         "catalogue and storefront content the merchant authored",
         "product.Attribute",
         "product.AttributeTranslation",
@@ -555,6 +564,7 @@ NOT_PERSONAL: dict[str, str] = {
         "order.OrderAttribution",
         "order.OrderLegalAcceptance",
         "order.OrderVatLine",
+        "order.CreditAllocation",
         "order.RefundNotification",
         "order.VivaWebhookEvent",
         "order.PendingPaymentFee",

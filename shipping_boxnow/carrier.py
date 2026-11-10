@@ -11,9 +11,12 @@ import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from django.db.models import Q
+
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
@@ -55,6 +58,14 @@ class BoxNowCarrier(ShippingCarrierInterface):
         from shipping_boxnow.services import BoxNowService
 
         return BoxNowService.can_cancel_shipment(shipment)
+
+    def canceled_shipment_q(self) -> Q:
+        # A canceled parcel leaves its order as it is
+        # (``BoxNowService._apply_order_status_transition``).
+        return Q(boxnow_shipment__parcel_state=BoxNowParcelState.CANCELED)
+
+    def has_label(self, shipment: Any) -> bool:
+        return bool(shipment.parcel_id)
 
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         from shipping_boxnow.services import BoxNowService

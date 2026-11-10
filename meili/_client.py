@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import UTC
 from typing import Self
 
@@ -8,6 +9,7 @@ from meilisearch.task import TaskInfo
 from meili._settings import _MeiliSettings
 from meili.dataclasses import MeiliIndexSettings
 from meili.exceptions import MeiliTaskFailed
+from meili.filters import primary_key_filter
 
 
 class Client:
@@ -197,6 +199,22 @@ class Client:
 
     def get_index(self, index_name: str):
         return self.client.index(index_name)
+
+    def delete_documents_by_primary_key(
+        self, index_name: str, primary_key: str, ids: Iterable[object]
+    ):
+        """Delete the documents whose ``primary_key`` is in ``ids``.
+
+        A delete by filter (``POST /documents/delete``), not by ids: the
+        SDK deprecates passing ids to ``delete_documents``. The engine rejects a
+        filter on an attribute that is not in ``filterableAttributes``;
+        ``MeiliIndexSettings`` always lists the primary key, and the
+        PreSync ``meilisearch_apply_settings`` applies it before a
+        release that deletes this way serves. Returns the ``TaskInfo``.
+        """
+        return self.client.index(index_name).delete_documents(
+            filter=primary_key_filter(primary_key, ids)
+        )
 
     def tenant_search_client(self) -> _Client:
         """The read-only client for the schema this request runs in.

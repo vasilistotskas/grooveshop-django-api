@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import base64
 import json
+from http.client import RemoteDisconnected
 from unittest.mock import MagicMock
 
 import pytest
 import requests
+from urllib3.exceptions import (
+    MaxRetryError,
+    NameResolutionError,
+    NewConnectionError,
+    ProtocolError,
+    SSLError,
+)
 
-from shipping_acs.client import AcsClient
+from shipping_acs.client import _RETRY_CONFIG, AcsClient
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
     AcsConfigError,
+    AcsOutcomeUnknownError,
     AcsRetryableError,
 )
 
@@ -87,6 +96,21 @@ class TestConfig:
 # ---------------------------------------------------------------------------
 
 
+class TestRetryPolicy:
+    def test_a_post_is_not_sent_again_after_an_error_of_unknown_timing(self):
+        # Neither a connect nor a read error: urllib3 retries it for any
+        # method unless ``other`` is 0, and the voucher may have been made.
+        with pytest.raises(MaxRetryError):
+            _RETRY_CONFIG.increment(method="POST", error=SSLError("tls"))
+
+    def test_a_post_is_sent_again_when_the_connection_was_refused(self):
+        after = _RETRY_CONFIG.increment(
+            method="POST", error=NewConnectionError(None, "refused")
+        )
+
+        assert after.total == 2
+
+
 class TestCall:
     def test_strips_misspelled_envelope(self):
         client = _make_client()
@@ -151,39 +175,98 @@ class TestCall:
         with pytest.raises(AcsRetryableError):
             client._call("ACS_Trackingsummary")
 
-    def test_500_raises_retryable_error(self):
-        client = _make_client()
-        client._session.post.return_value = _make_response(503)
-        with pytest.raises(AcsRetryableError):
-            client._call("ACS_Create_Voucher")
-
     def test_other_4xx_raises_api_error(self):
         client = _make_client()
         client._session.post.return_value = _make_response(404)
         with pytest.raises(AcsAPIError):
             client._call("ACS_Create_Voucher")
 
-    def test_connection_error_raises_retryable(self):
+
+class TestOutcomeOfAFailedCall:
+    """Whether a failed call may have been executed at ACS.
+
+    The manual (April 2026, p. 1-2) says the server always answers 200,
+    403 or 406; it says nothing of a 5xx, a lost answer or a timeout. So
+    only a connection that was never established proves the request
+    never reached ACS. Every other failure after the request may have
+    left is an unknown outcome: retryable for a read, never re-sent for
+    ``ACS_Create_Voucher`` (``AcsService.create_voucher_for_order``).
+    """
+
+    @staticmethod
+    def _raised(side_effect=None, response=None) -> AcsRetryableError:
         client = _make_client()
-        client._session.post.side_effect = requests.ConnectionError("boom")
-        with pytest.raises(AcsRetryableError):
+        if response is not None:
+            client._session.post.return_value = response
+        else:
+            client._session.post.side_effect = side_effect
+        with pytest.raises(AcsRetryableError) as exc_info:
             client._call("ACS_Create_Voucher")
+        return exc_info.value
 
-    def test_read_timeout_raises_retryable(self):
-        """ReadTimeout is not a ConnectionError subclass — it must be
-        wrapped explicitly or it escapes raw (prod 2026-07-04: 15s
-        ACS read timeout surfaced as an unhandled 500 on the
-        address-validation checkout endpoint)."""
-        client = _make_client()
-        client._session.post.side_effect = requests.ReadTimeout("slow ACS")
-        with pytest.raises(AcsRetryableError):
-            client._call("ACS_Address_Validation")
+    def test_a_read_timeout_is_an_unknown_outcome(self):
+        """Wrapped, never raw (prod 2026-07-04: a 15 s read timeout
+        surfaced as an unhandled 500 on address validation)."""
+        exc = self._raised(requests.ReadTimeout("slow ACS"))
 
-    def test_connect_timeout_raises_retryable(self):
-        client = _make_client()
-        client._session.post.side_effect = requests.ConnectTimeout("no route")
-        with pytest.raises(AcsRetryableError):
-            client._call("ACS_Address_Validation")
+        assert isinstance(exc, AcsOutcomeUnknownError)
+
+    def test_a_connection_dropped_after_the_request_is_an_unknown_outcome(
+        self,
+    ):
+        # requests re-raises urllib3's ProtocolError ("the server began
+        # processing it") as a plain ConnectionError.
+        exc = self._raised(
+            requests.ConnectionError(
+                ProtocolError("Connection aborted.", RemoteDisconnected())
+            )
+        )
+
+        assert isinstance(exc, AcsOutcomeUnknownError)
+
+    def test_a_connection_error_of_unknown_cause_is_an_unknown_outcome(self):
+        exc = self._raised(requests.ConnectionError("boom"))
+
+        assert isinstance(exc, AcsOutcomeUnknownError)
+
+    def test_a_server_error_is_an_unknown_outcome(self):
+        exc = self._raised(response=_make_response(503))
+
+        assert isinstance(exc, AcsOutcomeUnknownError)
+        assert exc.http_status == 503
+
+    def test_a_200_whose_body_is_not_json_is_an_unknown_outcome(self):
+        response = _make_response(200)
+        response.json.side_effect = ValueError("Expecting value")
+
+        exc = self._raised(response=response)
+
+        assert isinstance(exc, AcsOutcomeUnknownError)
+
+    def test_a_connect_timeout_never_reached_acs(self):
+        exc = self._raised(requests.ConnectTimeout("no route"))
+
+        assert not isinstance(exc, AcsOutcomeUnknownError)
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            NewConnectionError(None, "refused"),
+            NameResolutionError("acs.example", None, OSError("no DNS")),
+        ],
+    )
+    def test_a_connection_never_established_never_reached_acs(self, reason):
+        exc = self._raised(
+            requests.ConnectionError(MaxRetryError(None, "/", reason))
+        )
+
+        assert not isinstance(exc, AcsOutcomeUnknownError)
+
+    def test_an_auth_layer_rejection_is_retryable_not_unknown(self):
+        exc = self._raised(response=_make_response(406))
+
+        assert isinstance(exc, AcsAuthError)
+        assert not isinstance(exc, AcsOutcomeUnknownError)
 
     def test_payload_includes_creds_and_acs_alias(self):
         client = _make_client()

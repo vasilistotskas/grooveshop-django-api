@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar, cast
@@ -24,6 +25,24 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+#: The ``metadata`` key a Stripe refund carries the refund attempt's
+#: idempotency key under, so a refund whose answer was lost can be found
+#: again (:meth:`StripePaymentProvider.find_refunds`).
+REFUND_ATTEMPT_METADATA_KEY = "refund_attempt"
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderRefund:
+    """A refund as the provider reports it, found by
+    :meth:`PaymentProvider.find_refunds`.
+
+    ``made`` says whether the money went back (``True``) or the provider
+    reports the refund failed or was cancelled (``False``)."""
+
+    refund_id: str
+    amount: Money
+    made: bool
 
 
 class PaymentProvider(ABC):
@@ -80,6 +99,12 @@ class PaymentProvider(ABC):
     #: does not is never asked twice for one refund, because an answer that
     #: was lost cannot be told from a refund that was never made.
     idempotent_refunds: ClassVar[bool] = False
+
+    #: ``find_refunds`` identifies a refund by the attempt it was made for.
+    #: A provider that cannot (Viva sends no reference) can only say which
+    #: refunds of that amount exist on the payment, so a refund the ledger
+    #: already holds must not be handed to a second attempt.
+    refunds_carry_attempt: ClassVar[bool] = False
 
     @classmethod
     def is_configured_for_tenant(cls) -> bool:
@@ -160,6 +185,37 @@ class PaymentProvider(ABC):
         """
 
     @abstractmethod
+    def find_refunds(
+        self,
+        order: Order,
+        payment_id: str,
+        amount: Money,
+        *,
+        idempotency_key: str,
+    ) -> list[ProviderRefund] | None:
+        """The refunds of *amount* the provider holds on *payment_id* that
+        may be the one a refund attempt asked for, or ``None`` when the
+        provider could not be read (an error, never "no refund").
+
+        A provider whose refunds carry the attempt
+        (:attr:`refunds_carry_attempt`) returns only the refund made for
+        *idempotency_key*; one that does not returns every refund of that
+        amount on the payment.
+        """
+
+    @abstractmethod
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The refund the provider holds under *reference* when it is a
+        refund of exactly *amount* on *payment_id*, else ``None``: a
+        reference that does not exist, belongs to another payment or
+        amount, or a provider that could not be read. What staff typed is
+        never booked without this answer. The refund's ``refund_id`` is the
+        id as the provider writes it, the key its own webhook books under.
+        """
+
+    @abstractmethod
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
@@ -202,6 +258,7 @@ class StripePaymentProvider(PaymentProvider):
     supports_hosted_checkout: ClassVar[bool] = True
     supports_delegated_payment: ClassVar[bool] = True
     idempotent_refunds: ClassVar[bool] = True
+    refunds_carry_attempt: ClassVar[bool] = True
 
     @classmethod
     def is_configured_for_tenant(cls) -> bool:
@@ -688,6 +745,11 @@ class StripePaymentProvider(PaymentProvider):
     _ACCEPTED_REFUND_STATUSES: ClassVar[frozenset[str]] = frozenset(
         {"succeeded", "pending"}
     )
+    #: Refund statuses that returned nothing
+    #: (docs.stripe.com/api/refunds/object).
+    _FAILED_REFUND_STATUSES: ClassVar[frozenset[str]] = frozenset(
+        {"failed", "canceled"}
+    )
 
     def refund_payment(
         self, payment_id: str, amount: Money, *, idempotency_key: str
@@ -716,8 +778,13 @@ class StripePaymentProvider(PaymentProvider):
             stripe_refund = stripe.Refund.create(
                 payment_intent=payment_id,
                 amount=round(amount.amount * amount.currency.sub_unit),
-                # Echo the tenant back on the refund for finance reconciliation.
-                metadata={"tenant_schema": tenant_schema},
+                # Echo the tenant back on the refund for finance
+                # reconciliation, and the attempt, so a refund whose answer
+                # was lost is found by it (``find_refunds``).
+                metadata={
+                    "tenant_schema": tenant_schema,
+                    REFUND_ATTEMPT_METADATA_KEY: idempotency_key,
+                },
                 idempotency_key=idempotency_key,
                 api_key=self.api_key,
             )
@@ -782,6 +849,97 @@ class StripePaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id, "error": str(e)},
             )
             return False, {"error": str(e), "outcome_unknown": True}
+
+    def find_refunds(
+        self,
+        order: Order,
+        payment_id: str,
+        amount: Money,
+        *,
+        idempotency_key: str,
+    ) -> list[ProviderRefund] | None:
+        """The refund of the PaymentIntent *payment_id* that carries
+        *idempotency_key* in its metadata (``refund_payment`` puts it
+        there), read with the list-refunds call, which filters by
+        ``payment_intent`` but not by metadata. ``succeeded`` and
+        ``pending`` are a refund made, ``failed`` and ``canceled`` one that
+        was not; ``requires_action`` is no decision. ``None`` when Stripe
+        could not be read."""
+        found = []
+        try:
+            for refund in stripe.Refund.list(
+                payment_intent=payment_id, limit=100, api_key=self.api_key
+            ).auto_paging_iter():
+                if self.refund_attempt_key(refund) != idempotency_key:
+                    continue
+                if refund.status in self._ACCEPTED_REFUND_STATUSES:
+                    made = True
+                elif refund.status in self._FAILED_REFUND_STATUSES:
+                    made = False
+                else:
+                    continue
+                found.append(
+                    ProviderRefund(
+                        refund_id=refund.id,
+                        amount=money_from_minor_units(
+                            refund.amount, refund.currency
+                        ),
+                        made=made,
+                    )
+                )
+        except stripe.StripeError:
+            logger.exception(
+                "Stripe refund lookup failed",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        return found
+
+    @staticmethod
+    def refund_attempt_key(refund) -> str | None:
+        """The refund attempt's key a refund carries in its metadata
+        (``refund_payment`` puts it there), or ``None`` for a refund this app
+        did not make (a dashboard refund)."""
+        metadata = refund.metadata
+        if metadata is None or REFUND_ATTEMPT_METADATA_KEY not in metadata:
+            return None
+        return metadata[REFUND_ATTEMPT_METADATA_KEY]
+
+    def retrieve_refund(self, refund_id: str) -> stripe.Refund:
+        """The refund as Stripe holds it NOW (``re_...``). A refund event
+        is a snapshot of the moment it was raised and events are not
+        delivered in order, so what a refund is, and whether it counts, is
+        read here, never from an event's own status. Raises
+        ``stripe.StripeError``."""
+        return stripe.Refund.retrieve(refund_id, api_key=self.api_key)
+
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The Stripe refund *reference* (``re_...``), retrieved by id: it
+        must be a refund of this PaymentIntent for exactly *amount*, and
+        ``succeeded``/``pending`` (made) or ``failed``/``canceled`` (not
+        made); ``requires_action`` is no decision."""
+        try:
+            refund = self.retrieve_refund(reference)
+        except stripe.StripeError:
+            logger.exception(
+                "Stripe refund lookup failed",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        if refund.payment_intent != payment_id:
+            return None
+        moved = money_from_minor_units(refund.amount, refund.currency)
+        if moved != amount:
+            return None
+        if refund.status in self._ACCEPTED_REFUND_STATUSES:
+            made = True
+        elif refund.status in self._FAILED_REFUND_STATUSES:
+            made = False
+        else:
+            return None
+        return ProviderRefund(refund_id=refund.id, amount=moved, made=made)
 
     def get_payment_status(
         self, payment_id: str
@@ -878,6 +1036,10 @@ def money_from_minor_units(minor: int, currency: str) -> Money:
 #: refund is a transaction of its own and carries this status too; ``R``
 #: ("fully or partially refunded") belongs to the ORIGINAL payment.
 VIVA_STATUS_FINISHED = "F"
+
+#: ``StatusId`` of a transaction that ended in error: a refund Viva could
+#: not make.
+VIVA_STATUS_ERROR = "E"
 
 #: ``TransactionTypeId`` values that hand money back to the payer: every
 #: row of Viva's table named Refund or Void
@@ -1318,6 +1480,103 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
             return False, {"error": str(e), "outcome_unknown": True}
+
+    def find_refunds(
+        self,
+        order: Order,
+        payment_id: str,
+        amount: Money,
+        *,
+        idempotency_key: str,
+    ) -> list[ProviderRefund] | None:
+        """The refunds of *amount* Viva holds as children of *payment_id*.
+
+        Cancel Transaction carries no reference, so nothing ties a refund
+        to the attempt that asked for it: this lists every transaction of
+        the order's codes (``GET /api/transactions/?ordercode=``, Basic
+        auth, the same call Viva documents for the ISV API) and keeps those
+        whose ``ParentId`` is the payment, of a refund or void
+        ``TransactionType.TransactionTypeId`` (this listing nests the type:
+        ``{"Name": "CardRefund", "TransactionTypeId": 4}``, unlike Retrieve
+        Transaction's flat ``transactionTypeId``; seen on a demo refund
+        2026-11-08), for exactly *amount* (a refund's amount is
+        signed, so its absolute value is read). ``StatusId`` ``F`` is a
+        refund made, ``E`` one that failed; any other status is not a
+        decision. ``None`` when Viva could not be read.
+        """
+        import requests
+
+        from order.views.viva_webhook import order_viva_codes
+
+        found: dict[str, ProviderRefund] = {}
+        try:
+            for order_code in sorted(order_viva_codes(order)):
+                response = requests.get(
+                    f"{self.transactions_url}/api/transactions/",
+                    headers={"Authorization": self._get_basic_auth_header()},
+                    params={"ordercode": order_code},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                for row in response.json().get("Transactions") or []:
+                    refund = self._refund_child(row, payment_id, amount)
+                    if refund is not None:
+                        found[refund.refund_id] = refund
+        except Exception:
+            logger.exception(
+                "Viva Wallet refund lookup failed",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        return list(found.values())
+
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The Viva transaction *reference* among the refunds of *amount*
+        on *payment_id* (:meth:`find_refunds`): a child of the payment, a
+        refund or void, for exactly *amount*, finished or failed. Viva's
+        ids are compared without regard to case; the id returned is Viva's
+        own spelling, the one its webhook books under."""
+        refunds = self.find_refunds(
+            order, payment_id, amount, idempotency_key=""
+        )
+        return next(
+            (
+                r
+                for r in refunds or []
+                if r.refund_id.lower() == reference.lower()
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _refund_child(
+        row: dict[str, Any], payment_id: str, amount: Money
+    ) -> ProviderRefund | None:
+        """*row* as a refund of *amount* on *payment_id*, or ``None``."""
+        if str(row.get("ParentId") or "").lower() != payment_id.lower():
+            return None
+        transaction_type = row.get("TransactionType") or {}
+        if (
+            transaction_type.get("TransactionTypeId")
+            not in VIVA_REFUND_TRANSACTION_TYPE_IDS
+        ):
+            return None
+        status_id = row.get("StatusId")
+        if status_id not in {VIVA_STATUS_FINISHED, VIVA_STATUS_ERROR}:
+            return None
+        try:
+            moved = abs(Decimal(str(row.get("Amount"))))
+        except ArithmeticError:
+            return None
+        if moved != amount.amount or not row.get("TransactionId"):
+            return None
+        return ProviderRefund(
+            refund_id=str(row["TransactionId"]),
+            amount=Money(moved, amount.currency),
+            made=status_id == VIVA_STATUS_FINISHED,
+        )
 
     def get_payment_status(
         self, payment_id: str

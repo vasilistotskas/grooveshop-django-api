@@ -65,7 +65,11 @@ OPS_KEYS = {
     "ops.review_pending",
     "ops.gift_card_reversal",
     "ops.payment_mismatch",
+    "ops.overcharged",
     "ops.builder_schedule_failed",
+    # Not settings-era alerts: added with #622.
+    "ops.acs_voucher_request_unknown",
+    "ops.acs_unrecognised_vouchers",
 }
 
 

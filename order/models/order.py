@@ -247,6 +247,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             "never shipped has none."
         ),
     )
+    overcharged_at = models.DateTimeField(
+        _("Overcharged at"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Set while the payment ledger holds more money for the order "
+            "than it is for (a customer paid twice). Cleared when refunds "
+            "bring it back. Nothing is refunded automatically."
+        ),
+    )
     review_request_sent_at = models.DateTimeField(
         _("Review request sent at"),
         null=True,

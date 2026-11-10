@@ -133,6 +133,7 @@ class TestModelSettings:
                 ],
                 False,
             ),
+            _entry(["pk"], False),
         ]
         assert settings.facet_search is False
         assert settings.sortable_fields == [
@@ -149,7 +150,8 @@ class TestModelSettings:
         settings = BlogPostTranslation.get_meili_settings()
 
         assert settings.filterable_attributes_payload() == [
-            _entry(["language_code", "is_published"], False)
+            _entry(["language_code", "is_published"], False),
+            _entry(["pk"], False),
         ]
         assert settings.facet_search is False
         assert settings.pagination == {"maxTotalHits": 20_000}

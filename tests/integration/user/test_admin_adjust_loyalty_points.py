@@ -11,6 +11,7 @@ from django.test import RequestFactory
 
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
+from loyalty.services import LoyaltyService
 from tests.utils.staff import stamp_platform_identity
 from tests.utils.store_settings import switch_store_settings
 from user.admin import UserAdmin
@@ -58,6 +59,22 @@ def test_it_writes_one_ledger_row_and_redirects(user_admin, superuser):
     assert response["HX-Redirect"].endswith(
         f"/user/useraccount/{customer.pk}/change/"
     )
+
+
+def test_the_row_is_the_whole_adjustment(user_admin, superuser):
+    # The balance is the ledger's sum, and XP counts what orders earned
+    # (``LoyaltyService.award_order_points``): a hand adjustment moves the
+    # first and leaves the second, as the new-customer bonus does.
+    customer = UserAccountFactory()
+
+    user_admin.adjust_loyalty_points(
+        _post(superuser, points=50, reason="Goodwill"), object_id=customer.pk
+    )
+
+    customer.refresh_from_db()
+    assert LoyaltyService.get_user_balance(customer) == 50
+    assert customer.total_xp == 0
+    assert PointsTransaction.objects.get(user=customer).created_by == superuser
 
 
 def test_an_out_of_range_amount_writes_nothing(user_admin, superuser):

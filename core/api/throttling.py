@@ -41,7 +41,7 @@ from rest_framework.throttling import (
 
 from cart.agent_token import cart_token_from_request, hash_cart_token
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
-from core.client_ip import trusted_client_ip
+from core.client_ip import edge_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
         if user is not None and user.is_authenticated:
             ident = f"user:{user.pk}"
         else:
-            ident = trusted_client_ip(request) or self.get_ident(request)
+            ident = edge_client_ip(request) or self.get_ident(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
@@ -218,7 +218,7 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
             return None
-        ident = trusted_client_ip(request) or self.get_ident(request)
+        ident = edge_client_ip(request) or self.get_ident(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
@@ -259,6 +259,17 @@ class CartAgentTokenThrottle(ResilientThrottleMixin, UserRateThrottle):
 
     scope = "cart_agent_token"
     fail_closed = True
+
+
+class StaffAgentThrottle(UserOrIpRateThrottle):
+    """The store-admin agent surface (``agent/staff_views.py``).
+
+    Keyed by the staff member, and per store, since the cache key carries
+    the schema (``tenant.cache.make_tenant_key``): one AI app's burst of
+    tool calls spends that person's budget at that store, nobody else's.
+    """
+
+    scope = "agent_staff"
 
 
 class CartMutationAnonThrottle(AnonIpRateThrottle):

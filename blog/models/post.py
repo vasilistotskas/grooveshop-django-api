@@ -356,12 +356,14 @@ class BlogPostTranslation(
         """
         Determine if this translation should be indexed.
 
-        Only index translations for published articles.
+        Only index translations of live articles: a post dated in the
+        future is indexed when its date passes (``core.publication``), so
+        search never shows it early.
         """
         if not self.master_id:
             return False
         try:
-            return self.master and self.master.is_published
+            return self.master and self.master.is_live
         except BlogPost.DoesNotExist:
             return False
 

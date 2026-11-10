@@ -351,16 +351,17 @@ class TestSocialLoginProviderFilter:
 
     def _get_app(self, allowed, provider="google"):
         """Run ``get_app`` for a non-public tenant with the whitelist
-        pinned to *allowed*; returns (outcome, sentinel, tenant, fallback).
+        pinned to *allowed*; returns (outcome, tenant_app, tenant, fallback).
         The tenant's own lookup finds no app, so an admitted provider
-        falls through to allauth's ``get_app`` (patched to a sentinel)."""
+        falls through to allauth's ``get_app``, patched to return
+        *tenant_app*."""
         from unittest.mock import Mock, patch
 
         from tenant.allauth_adapter import TenantSocialAccountAdapter
 
         tenant = Mock(schema_name="shop")
         tenant.domains.filter.return_value.first.return_value = None
-        sentinel = object()
+        tenant_app = object()
         with (
             patch(
                 "tenant.allauth_adapter._resolve_tenant_from_request",
@@ -373,7 +374,7 @@ class TestSocialLoginProviderFilter:
             ),
             patch(
                 "user.adapter.SocialAccountAdapter.get_app",
-                return_value=sentinel,
+                return_value=tenant_app,
             ) as fallback,
         ):
             try:
@@ -382,7 +383,7 @@ class TestSocialLoginProviderFilter:
                 )
             except Exception as exc:  # the outcome under test
                 outcome = exc
-        return outcome, sentinel, tenant, fallback
+        return outcome, tenant_app, tenant, fallback
 
     def test_get_app_refuses_a_disabled_provider_before_the_tenant_lookup(self):
         """A tenant-specific ``SocialApp`` used to win before the
@@ -390,19 +391,19 @@ class TestSocialLoginProviderFilter:
         started OAuth when its URL was hit directly."""
         from allauth.socialaccount.models import SocialApp
 
-        outcome, _sentinel, tenant, fallback = self._get_app({"facebook"})
+        outcome, _tenant_app, tenant, fallback = self._get_app({"facebook"})
         assert isinstance(outcome, SocialApp.DoesNotExist)
         tenant.domains.filter.assert_not_called()
         fallback.assert_not_called()
 
     def test_get_app_admits_a_whitelisted_provider(self):
-        outcome, sentinel, tenant, _fallback = self._get_app({"google"})
-        assert outcome is sentinel
+        outcome, tenant_app, tenant, _fallback = self._get_app({"google"})
+        assert outcome is tenant_app
         tenant.domains.filter.assert_called_once_with(is_primary=True)
 
     def test_get_app_without_restriction_looks_up_the_tenant_app(self):
-        outcome, sentinel, tenant, _fallback = self._get_app(None)
-        assert outcome is sentinel
+        outcome, tenant_app, tenant, _fallback = self._get_app(None)
+        assert outcome is tenant_app
         tenant.domains.filter.assert_called_once_with(is_primary=True)
 
     def test_lookup_failure_fails_closed(self):

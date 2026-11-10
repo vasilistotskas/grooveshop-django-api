@@ -101,7 +101,6 @@ class VatAdmin(BaseModelAdmin):
             _("VAT Configuration"),
             {
                 "fields": ("value",),
-                "classes": ("wide",),
                 "description": _("Set the VAT percentage rate (0.0% - 100.0%)"),
             },
         ),

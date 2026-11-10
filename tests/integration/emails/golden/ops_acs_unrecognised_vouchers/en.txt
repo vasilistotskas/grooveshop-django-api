@@ -1,0 +1,12 @@
+ACS VOUCHERS MATCHING NO ORDER
+
+Refusing the pickup list of 2026-03-13, ACS named 2 unprinted vouchers that none of the store's shipments carries:
+
+- 7401573174
+- 7401573175
+
+Such a voucher can be the lost answer of a voucher request, a second voucher for an order that already has one, or a voucher made in the ACS portal. While it stays unprinted ACS refuses the pickup list. Open the admin list “ACS vouchers matching no order”: adopt it from the order's ACS shipment if it belongs to an order whose voucher request has an unknown outcome, delete it at ACS if it is not needed, or mark it as checked.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

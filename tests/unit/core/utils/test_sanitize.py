@@ -1,5 +1,8 @@
 import unittest
 
+from hypothesis import given
+from hypothesis import strategies as st
+
 from core.utils.sanitize import (
     drop_empty_headings,
     has_visible_content,
@@ -123,6 +126,180 @@ class TestSanitizeHtmlStyleResidue(unittest.TestCase):
         html = '<p style="text-align: center">x</p>'
 
         self.assertEqual(sanitize_html(html), html)
+
+
+class TestSanitizeHtmlTypography(unittest.TestCase):
+    """A store's typeface and type size are its theme's, not the text's."""
+
+    def test_drops_the_typeface_and_size_pasted_text_carries(self):
+        # Webside's post 82: Arial at 14pt drew the body at 18.7 px.
+        self.assertEqual(
+            sanitize_html(
+                '<p style="font-family: arial; font-size: 14pt;'
+                ' color: #333; text-align: justify">x</p>'
+            ),
+            '<p style="color: #333; text-align: justify;">x</p>',
+        )
+
+    def test_drops_the_font_shorthand_and_word_properties(self):
+        self.assertEqual(
+            sanitize_html(
+                '<span style="font: 12px/1.5 Roboto; mso-ansi-language: EL;'
+                " MSO-BIDI-FONT-FAMILY: 'Times'; margin-left: 4px\">x</span>"
+            ),
+            '<span style="margin-left: 4px;">x</span>',
+        )
+
+    def test_keeps_properties_that_only_start_like_a_dropped_one(self):
+        html = '<p style="font-weight: bold; font-style: italic">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_a_style_of_only_typography_is_dropped(self):
+        self.assertEqual(
+            sanitize_html('<summary style="font-size: 15pt;">Q</summary>'),
+            "<summary>Q</summary>",
+        )
+
+    def test_reads_a_semicolon_inside_a_url_or_a_string_as_part_of_it(self):
+        self.assertEqual(
+            sanitize_html(
+                "<p style=\"background: url('a;b.png'); font-size: 9pt;"
+                " content: ';'\">x</p>"
+            ),
+            "<p style=\"background: url('a;b.png'); content: ';';\">x</p>",
+        )
+
+    def test_drops_words_classes_and_keeps_the_authors(self):
+        self.assertEqual(
+            sanitize_html('<p class="MsoNormal intro">x</p>'),
+            '<p class="intro">x</p>',
+        )
+        self.assertEqual(
+            sanitize_html('<a class="msocomanchor" href="#c1">[1]</a>'),
+            '<a rel="noopener noreferrer" href="#c1">[1]</a>',
+        )
+
+    def test_keeps_a_class_that_only_starts_like_words(self):
+        html = '<p class="msonry-grid mso">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_reads_a_comment_the_way_a_browser_does(self):
+        # A browser skips a comment anywhere between tokens.
+        for style in (
+            "/**/font-size: 14pt; color: red",
+            "font-size/**/: 14pt; color: red",
+            "color: red; /* note */ font-family: arial",
+            "color: red /* it's */; font-size: 14pt",
+        ):
+            with self.subTest(style=style):
+                self.assertEqual(
+                    sanitize_html(f'<p style="{style}">x</p>'),
+                    '<p style="color: red;">x</p>',
+                )
+
+    def test_dropping_a_declaration_never_uncomments_another(self):
+        self.assertEqual(
+            sanitize_html(
+                '<p style="font: /*; position: fixed; */ 12px a;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
+    def test_keeps_a_comment_mark_inside_a_string(self):
+        html = "<p style=\"content: '/*'; color: red\">x</p>"
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_drops_a_property_name_spelled_with_an_escape(self):
+        self.assertEqual(
+            sanitize_html(
+                r'<p style="font-s\69ze: 14pt; \66ont-family: arial;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
+    def test_dropping_typography_is_not_content_the_save_refuses(self):
+        self.assertEqual(
+            lost_content(
+                '<p class="MsoNormal" style="font-family: arial">x</p>'
+            ),
+            [],
+        )
+
+
+# Values each attribute can take, chosen so every branch of the policy is
+# reached: kept as written, rewritten by the attribute filter, dropped by
+# the filter, dropped by the allowlist, and ``rel`` that nh3 sets itself.
+_ATTRIBUTE_VALUES = {
+    "class": ["MsoNormal", "msocomanchor", "intro", "MsoNormal intro"],
+    "style": [
+        "color: red",
+        "font-size: 14pt",
+        "font-family: arial; color: red",
+        "--darkreader-inline-color: #fff",
+        "/* c */ font: 12px a; margin: 0",
+    ],
+    "rel": ["nofollow", "noopener noreferrer"],
+    "href": ["#c1", "/p/1", "https://example.com/"],
+    "src": [
+        "https://www.youtube.com/embed/x",
+        "https://evil.example/x",
+        "/media/a.png",
+    ],
+    "id": ["_anchor_2"],
+    "title": ["t"],
+    "target": ["_blank"],
+    "data-x": ["1"],
+    "onclick": ["alert(1)"],
+}
+_TAGS = ["a", "p", "span", "img", "iframe", "div", "video"]
+
+
+@st.composite
+def _element(draw) -> str:
+    tag = draw(st.sampled_from(_TAGS))
+    names = draw(
+        st.lists(st.sampled_from(sorted(_ATTRIBUTE_VALUES)), unique=True)
+    )
+    attributes = "".join(
+        f' {name}="{draw(st.sampled_from(_ATTRIBUTE_VALUES[name]))}"'
+        for name in names
+    )
+    return f"<{tag}{attributes}>x</{tag}>"
+
+
+class TestSanitizeHtmlIsAFixedPoint(unittest.TestCase):
+    """A second pass changes nothing, so ``normalise_rich_text`` settles in
+    one run and a row is not rewritten on a save that edited nothing."""
+
+    def test_a_link_whose_filter_drops_an_attribute_is_stable(self):
+        for html in (
+            '<a class="msocomanchor" id="_anchor_2" href="#_msocom_2">[1]</a>',
+            '<a class="MsoX" rel="x" href="/a">b</a>',
+            '<a href="/a" class="MsoX" title="t">b</a>',
+            '<a style="font-size: 3px" href="/a" id="i">b</a>',
+        ):
+            with self.subTest(html=html):
+                once = sanitize_html(html)
+
+                self.assertEqual(sanitize_html(once), once)
+                self.assertIn('rel="noopener noreferrer"', once)
+
+    def test_replaces_the_rel_an_editor_typed(self):
+        self.assertEqual(
+            sanitize_html('<a href="/a" rel="nofollow">b</a>'),
+            '<a href="/a" rel="noopener noreferrer">b</a>',
+        )
+
+    @given(st.lists(_element(), min_size=1, max_size=4))
+    def test_any_markup_is_stable_after_one_pass(self, elements):
+        once = sanitize_html("".join(elements))
+
+        self.assertEqual(sanitize_html(once), once)
 
 
 class TestHasVisibleContent(unittest.TestCase):

@@ -15,6 +15,7 @@ from djmoney.money import Money
 
 from product.factories import ProductFactory
 from product.models.product import Product
+from vat.factories import VatFactory
 from vat.models import Vat
 
 
@@ -57,7 +58,9 @@ class TestFormula:
 
     def test_no_vat_rate_is_unchanged(self, db):
         product = ProductFactory(
-            price=Decimal("30.00"), discount_percent=Decimal(10), vat=None
+            price=Decimal("30.00"),
+            discount_percent=Decimal(10),
+            vat=VatFactory(value=0),
         )
 
         assert product.final_price == Money("27.00", "EUR")

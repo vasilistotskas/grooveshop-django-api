@@ -18,6 +18,7 @@ from tenant.auth_backends import (
     PLATFORM_STAFF_BACKEND_PATH,
     PlatformStaffBackend,
 )
+from tenant.staff_login_limits import StaffLoginLocked, StaffLoginUnavailable
 
 
 class PlatformAdminAuthenticationForm(AuthenticationForm):
@@ -203,9 +204,17 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
         password = self.cleaned_data.get("password")
         if username is None or not password:
             return
-        user = PlatformStaffBackend().authenticate_staff(
-            self.request, username=username, password=password
-        )
+        try:
+            user = PlatformStaffBackend().authenticate_staff(
+                self.request, username=username, password=password
+            )
+        except StaffLoginLocked:
+            raise forms.ValidationError(
+                _("Too many failed sign-in attempts. Try again later."),
+                code="login_locked",
+            ) from None
+        except StaffLoginUnavailable:
+            raise self._unavailable() from None
         if user is None:
             raise self.get_invalid_login_error()
         # Bind the session to PlatformStaffBackend explicitly —
@@ -222,20 +231,27 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
 
     def _code_step(self, user) -> None:
         code = self.cleaned_data["otp_code"]
-        if staff_mfa.is_locked(user):
+        try:
+            if self.step is Step.CODE:
+                staff_mfa.verify_second_factor(user, code)
+                self._finish(user)
+                return
+            staff_mfa.register_attempt(user)
+            codes = staff_mfa.complete_enrolment(self.request, user, code)
+            if codes is None:
+                raise staff_mfa.SecondFactorWrong
+            staff_mfa.clear_failures(user)
+        except StaffLoginUnavailable:
+            raise self._unavailable() from None
+        except staff_mfa.SecondFactorLocked:
             raise forms.ValidationError(
                 _("Too many wrong codes. Try again in a few minutes."),
                 code="mfa_locked",
-            )
-        if self.step is Step.CODE:
-            if not staff_mfa.verify_code(user, code):
-                self._wrong_code(user)
-            staff_mfa.clear_failures(user)
-            self._finish(user)
-            return
-        codes = staff_mfa.complete_enrolment(self.request, user, code)
-        if codes is None:
-            self._wrong_code(user)
+            ) from None
+        except staff_mfa.SecondFactorWrong:
+            raise forms.ValidationError(
+                _("That code is not correct."), code="mfa_wrong_code"
+            ) from None
         # Both factors are proven, but the recovery codes are shown once
         # before the sign-in completes.
         self.pending = staff_mfa.advance_pending(
@@ -243,10 +259,11 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
         )
         self.step = Step.RECOVERY
 
-    def _wrong_code(self, user) -> None:
-        staff_mfa.record_failure(user)
-        raise forms.ValidationError(
-            _("That code is not correct."), code="mfa_wrong_code"
+    @staticmethod
+    def _unavailable() -> forms.ValidationError:
+        return forms.ValidationError(
+            _("Sign-in is temporarily unavailable, try again shortly."),
+            code="login_unavailable",
         )
 
     def _finish(self, user) -> None:

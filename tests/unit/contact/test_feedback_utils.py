@@ -67,17 +67,6 @@ class TestValidateFeedbackContent:
         assert "message" in result["errors"]
         assert "too long" in str(result["errors"]["message"])
 
-    def test_invalid_email_when_provided(self):
-        result = validate_feedback_content(
-            name="John Doe",
-            email="invalid-email",
-            message="This is a valid piece of feedback for the store.",
-            rating=3,
-        )
-        assert result["valid"] is False
-        assert "email" in result["errors"]
-        assert "valid email" in str(result["errors"]["email"])
-
     def test_valid_email_when_provided(self):
         result = validate_feedback_content(
             name="John Doe",
@@ -146,9 +135,13 @@ class TestValidateFeedbackContent:
         assert "spam" in result["errors"]
         assert "appears to be spam" in str(result["errors"]["spam"])
 
-    def test_multiple_validation_errors(self):
+    @patch("contact.utils.is_disposable_domain", return_value=True)
+    def test_multiple_validation_errors(self, _disposable):
         result = validate_feedback_content(
-            name="J", email="invalid-email", message="Short", rating=10
+            name="J",
+            email="someone@tempmail.example",
+            message="Short",
+            rating=10,
         )
         assert result["valid"] is False
         assert "name" in result["errors"]

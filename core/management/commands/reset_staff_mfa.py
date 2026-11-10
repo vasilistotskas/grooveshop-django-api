@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from admin import staff_mfa
+from tenant import staff_login_limits
 from user.models import UserAccount
 
 
@@ -29,6 +30,8 @@ class Command(BaseCommand):
         if user is None:
             raise CommandError(f"No platform user with the email {email}.")
         removed = staff_mfa.reset(user)
+        # The operator is unlocking the account: wrong passwords too.
+        staff_login_limits.clear_account(user.email)
         self.stdout.write(
             f"Removed {removed} authenticator(s) of {user.email}; the next "
             "admin login sets up a new one."

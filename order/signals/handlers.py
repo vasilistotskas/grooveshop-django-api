@@ -5,7 +5,6 @@ from django.conf import settings
 from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.utils import timezone
 from django.utils.translation import gettext
 from django_tenants.utils import schema_context
 from djmoney.money import Money
@@ -23,10 +22,11 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.invoicing import receipt_issuable
-from order.models.history import OrderHistory, OrderItemHistory
+from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.models.refund_attempt import RefundAttempt
 from order.mydata.config import load_config as load_mydata_config
 from order.notifications import (
     notify_order_created_live,
@@ -40,8 +40,8 @@ from order.payment_fees import (
     record_stripe_charge_fee,
     record_stripe_fee_for_intent,
 )
-from order.payment_ledger import PaymentLedger
-from order.services import PAYMENT_AMOUNT_TOLERANCE, OrderService
+from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.services import OrderService
 from order.signals import (
     order_canceled,
     order_completed,
@@ -49,7 +49,6 @@ from order.signals import (
     order_delivered,
     order_paid,
     order_refunded,
-    order_returned,
     order_shipment_dispatched,
     order_shipped,
     order_status_changed,
@@ -434,24 +433,22 @@ def email_shipment_dispatched(
 def handle_order_item_pre_save(
     sender: Any, instance: Any, **kwargs: Any
 ) -> None:
-    """Store previous order item values before save."""
-    if instance.pk:
-        try:
-            original = sender.objects.get(pk=instance.pk)
+    """Remember whether the line was restocked before this save.
 
-            instance._original_quantity = original.quantity
-            instance._original_price = original.price
-            instance._original_is_refunded = original.is_refunded
-            instance._original_refunded_quantity = original.refunded_quantity
-
-        except sender.DoesNotExist:
-            instance._original_quantity = 0
-            instance._original_price = None
-        except Exception:
-            logger.exception("Error in handle_order_item_pre_save")
-    else:
-        instance._original_quantity = 0
-        instance._original_price = None
+    Nothing else about a placed line changes after checkout (its product,
+    quantity and price are a record, and no admin or API route edits them),
+    so the restock flag is all the post-save handler compares.
+    """
+    if not instance.pk:
+        return
+    try:
+        instance._original_is_refunded = sender.objects.values_list(
+            "is_refunded", flat=True
+        ).get(pk=instance.pk)
+    except sender.DoesNotExist:
+        return
+    except Exception:
+        logger.exception("Error in handle_order_item_pre_save")
 
 
 @receiver(
@@ -462,7 +459,7 @@ def handle_order_item_pre_save(
 def handle_order_item_post_save(
     sender: type[OrderItem], instance: OrderItem, created: bool, **kwargs: Any
 ) -> None:
-    """Handle order item changes and log history."""
+    """Log a line added to an order, and a line marked restocked."""
     if created:
         # Stock is managed by StockManager (either via convert_reservation_to_sale
         # or decrement_stock in OrderService.create_order_from_cart).
@@ -474,58 +471,13 @@ def handle_order_item_post_save(
 
             OrderHistory.log_note(
                 order=order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} added to order",
+                note=f"Item {instance.product_name or 'Unknown'} added to order",
             )
             logger.debug(
                 "Order item %s created for order %s", instance.id, order.id
             )
         except Exception:
             logger.exception("Error handling order item creation")
-    elif (
-        hasattr(instance, "_original_quantity")
-        and instance._original_quantity != instance.quantity
-    ):
-        from order.stock import StockManager
-
-        product = instance.product
-        stock_difference = instance._original_quantity - instance.quantity
-        StockManager.adjust_stock(
-            product=product,
-            delta=stock_difference,
-            reason="admin order item edit",
-            performed_by=None,
-            order_id=instance.order_id,
-        )
-
-        OrderItemHistory.log_quantity_change(
-            order_item=instance,
-            previous_quantity=instance._original_quantity,
-            new_quantity=instance.quantity,
-        )
-
-        try:
-            OrderHistory.log_note(
-                order=instance.order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
-            )
-        except Exception:
-            logger.exception(
-                "Error logging order history for quantity change",
-            )
-
-    # ``is not None`` rather than truthiness: ``Money(0, "EUR")`` is
-    # falsy, so correcting a line priced at zero — a free-gift line, or a
-    # data-entry fix — produced no history entry at all.
-    if (
-        hasattr(instance, "_original_price")
-        and instance._original_price is not None
-        and instance._original_price != instance.price
-    ):
-        OrderItemHistory.log_price_update(
-            order_item=instance,
-            previous_price=instance._original_price,
-            new_price=instance.price,
-        )
 
     if (
         hasattr(instance, "_original_is_refunded")
@@ -535,7 +487,7 @@ def handle_order_item_post_save(
             OrderHistory.log_note(
                 order=instance.order,
                 note=(
-                    f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} "
+                    f"Item {instance.product_name or 'Unknown'} "
                     f"marked as {'refunded' if instance.is_refunded else 'not refunded'}"
                 ),
             )
@@ -608,80 +560,6 @@ def handle_order_delivered(
     )
     # Email is sent by handle_order_status_changed via
     # send_order_status_update_email (uses the delivered template)
-
-
-@receiver(order_canceled, dispatch_uid="order.handle_order_canceled")
-def handle_order_canceled(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Handle order canceled signal.
-
-    Single source of truth for cancellation side-effects beyond the
-    status flip itself: history note, courier-voucher cascade, and
-    backfilling ``metadata['cancellation']`` for entry points (like
-    Django admin's form save) that bypass
-    :meth:`OrderService.cancel_order`. Verified necessary on
-    2026-05-16 after prod order 60 had ``status=CANCELED`` but
-    ``metadata.cancellation = null`` and voucher 9771614856 still
-    alive at ACS.
-    """
-    previous_status = kwargs.get("previous_status")
-    # ``order_canceled`` is dispatched by ``handle_order_status_changed``
-    # without forwarding the ``reason`` kwarg, so the programmatic path
-    # (``OrderService.cancel_order`` with a meaningful reason) needs us
-    # to recover it from the metadata that ``cancel_order`` writes
-    # BEFORE the save that triggers this signal chain. Falls back to
-    # "admin status change" for the admin-form-save path where neither
-    # the kwarg nor the metadata is populated.
-    metadata_reason = (
-        (order.metadata or {}).get("cancellation", {}).get("reason")
-    )
-    cancellation_reason = (
-        kwargs.get("reason") or metadata_reason or "admin status change"
-    )
-
-    try:
-        # Defensive: ``OrderService.cancel_order`` writes a rich
-        # ``metadata['cancellation']`` dict (reason / canceled_by /
-        # canceled_at / previous_status) BEFORE saving the row, so
-        # this block is a no-op on that path. For the admin form
-        # path we initialise it here so the carrier cascade has a
-        # parent dict to write its ``shipment_cancel`` outcome into.
-        if not order.metadata:
-            order.metadata = {}
-        cancellation = order.metadata.setdefault("cancellation", {})
-        cancellation.setdefault("canceled_at", timezone.now().isoformat())
-        cancellation.setdefault("previous_status", previous_status)
-        cancellation.setdefault("reason", cancellation_reason)
-
-        if kwargs.get("reason"):
-            OrderHistory.log_note(
-                order=order,
-                note=f"Order canceled. Reason: {kwargs['reason']}",
-            )
-        # Email is sent by handle_order_status_changed via
-        # send_order_status_update_email (uses the canceled template)
-
-        # Cascade to the courier voucher. Lives here as a safety net
-        # so every path that flips ``order.status`` to CANCELED —
-        # including admin form saves that go straight to Order.save()
-        # — reaches the carrier. ``OrderService.cancel_order`` runs
-        # the cascade synchronously itself; we detect that via the
-        # ``shipment_cancel`` outcome breadcrumb and skip, so the
-        # programmatic path doesn't double-fire and pre-existing
-        # tests that rely on synchronous cascade behaviour keep
-        # working.
-        if "shipment_cancel" not in cancellation:
-            OrderService.cancel_attached_shipment(order, cancellation_reason)
-
-        logger.info(
-            "Order %s canceled (previous status: %s)",
-            order.id,
-            previous_status,
-        )
-
-    except Exception:
-        logger.exception("Error handling order_canceled signal")
 
 
 @receiver(order_completed, dispatch_uid="order.handle_order_completed")
@@ -778,37 +656,6 @@ def handle_order_stored_value_returned(
         request_credit_documents(order.id)
     except Exception:
         logger.exception("Error handling order_stored_value_returned signal")
-
-
-@receiver(order_returned, dispatch_uid="order.handle_order_returned")
-def handle_order_returned(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Handle order returned signal."""
-    try:
-        return_reason = kwargs.get("reason", "")
-        return_items = kwargs.get("items", [])
-
-        items_text = ""
-        if return_items:
-            items_text = "Items: " + ", ".join(
-                f"{item.get('product_name', 'Unknown')} (qty: {item.get('quantity', 0)})"
-                for item in return_items
-            )
-
-        OrderHistory.log_note(
-            order=order,
-            note=(
-                f"Order returned. "
-                f"{items_text}. "
-                f"Reason: {return_reason or 'Not specified'}"
-            ),
-        )
-
-        logger.info("Order %s returned", order.id)
-
-    except Exception:
-        logger.exception("Error handling order_returned signal")
 
 
 @djstripe_receiver("payment_intent.succeeded")
@@ -910,7 +757,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     # propagate so dj-stripe's outer atomic rolls back the mark + Event
     # row and Stripe redelivers (G0231).
     outcome = OrderService.handle_payment_succeeded(
-        payment_intent_id, captured=captured
+        payment_intent_id,
+        captured=captured,
+        metadata=payment_intent.get("metadata"),
     )
 
     announce_stripe_payment_applied(outcome, payment_intent_id)
@@ -1140,6 +989,34 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
         )
 
 
+def _locked_order_for_stripe_intent(payment_intent_id: str) -> Order | None:
+    """The order a Stripe PaymentIntent was paid for, locked.
+
+    The ledger's CHARGE row (provider Stripe, reference the intent) names
+    its order whichever intent ``Order.payment_id`` points at: an order
+    paid twice keeps its FIRST intent there, so a refund, a failed refund or
+    a dispute on the second would find nothing by ``payment_id``. An order
+    whose payment has not been recorded yet (its ``payment_intent.succeeded``
+    still in flight; ``payment_id`` is set when the intent is created) has no
+    row, and is found by ``payment_id``, which is how the refund handler
+    tells "not recorded yet, redeliver" from "not ours". Call inside
+    ``transaction.atomic``.
+    """
+    order_id = (
+        PaymentTransaction.objects.filter(
+            kind=PaymentTransactionKind.CHARGE,
+            provider=StripePaymentProvider.code,
+            provider_reference=payment_intent_id,
+        )
+        .values_list("order_id", flat=True)
+        .first()
+    )
+    orders = Order.objects.select_for_update()
+    if order_id is not None:
+        return orders.filter(pk=order_id).first()
+    return orders.filter(payment_id=payment_intent_id).first()
+
+
 def _gift_card_purchase_for_intent(payment_intent_id: str):
     """The gift-card purchase paid by this PaymentIntent (locked), or
     ``None``. A purchase is not an order: a refund or dispute of its payment
@@ -1156,149 +1033,170 @@ def _gift_card_purchase_for_intent(payment_intent_id: str):
 @djstripe_receiver("charge.refunded")
 @with_tenant_schema_from_event
 def handle_stripe_charge_refunded(sender, **kwargs):
-    """Handle Stripe ``charge.refunded`` webhook (full + partial).
-
-    Stripe fires this after a refund issued from the dashboard, the
-    Stripe API, or our own ``OrderService.refund_order`` path. Without
-    a handler, refunds initiated outside our admin would never hit the
-    DB and the order would silently look paid.
+    """Handle Stripe ``charge.refunded`` for a gift card PURCHASE.
 
     The event carries the charge's CUMULATIVE ``amount_refunded`` and no
-    refund id (Stripe's own docs call fetching it an extra API call), so
-    the ledger is brought up to that figure: what it does not hold yet is
-    recorded as one REFUND row, keyed on the event id, and
-    ``PaymentLedger.record_refund`` derives ``payment_status`` from the
-    sums like every other refund path. A refund this app made is already in
-    the ledger under its own refund id, so its event adds nothing, and so
-    does a redelivered or out-of-order one (an older event reports less
-    than the ledger holds). Whatever the ledger records fires
-    ``order_refunded``, partial refunds included.
-
-    ``Order.status`` is intentionally NOT changed — the canonical
-    transition table only reaches ``REFUNDED`` from ``RETURNED``, and
-    deciding whether a refund means the goods were also returned is a
-    business call. Admin can drive that from the order page.
-
-    The event also proves the charge it refunds, so a charge the ledger
-    does not hold yet (the payment event was lost or came later) is
-    recorded from it first.
+    refund id: enough to void a purchased gift card once the refunds reach
+    the purchase amount, and not enough to book a refund on an order's
+    ledger, which is keyed on the refund id. An order's refunds are booked
+    from the refund events (:func:`handle_stripe_refund_made`), one row per
+    refund id, the key every other path books under.
     """
     logger.debug("Processing charge.refunded webhook")
 
     try:
         event: Event = kwargs["event"]
         charge = event.data["object"]
-        event_id = event.id
         payment_intent_id = charge.get("payment_intent") or ""
         currency = charge["currency"]
-        captured = money_from_minor_units(int(charge["amount"]), currency)
         refunded_to_date = money_from_minor_units(
             int(charge["amount_refunded"]), currency
         )
-
         if not payment_intent_id:
-            logger.warning(
-                "charge.refunded event %s has no payment_intent — skipping",
-                event_id,
-            )
             return
-
-        logger.info(
-            "Stripe charge refunded: payment_intent=%s refunded=%s of %s",
-            payment_intent_id,
-            refunded_to_date,
-            captured,
-        )
 
         with transaction.atomic():
             purchase = _gift_card_purchase_for_intent(payment_intent_id)
-            if purchase is not None:
-                # A gift card is the whole purchase: it is voided once the
-                # refunds reach the purchase amount (cumulative on the
-                # charge), exactly as for a Viva refund.
-                purchase.refunded_amount = max(
-                    purchase.refunded_amount, refunded_to_date.amount
-                )
-                purchase.save(update_fields=["refunded_amount"])
-                if purchase.refunded_amount >= purchase.amount.amount:
-                    from giftcard.services import GiftCardService
-
-                    GiftCardService.handle_purchase_reversal(purchase)
+            if purchase is None:
                 return
-
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
+            # A gift card is the whole purchase: it is voided once the
+            # refunds reach the purchase amount (cumulative on the
+            # charge), exactly as for a Viva refund.
+            purchase.refunded_amount = max(
+                purchase.refunded_amount, refunded_to_date.amount
             )
+            purchase.save(update_fields=["refunded_amount"])
+            if purchase.refunded_amount >= purchase.amount.amount:
+                from giftcard.services import GiftCardService
+
+                GiftCardService.handle_purchase_reversal(purchase)
+
+    except KeyError, TypeError:
+        # Malformed payload only. Everything else must PROPAGATE (G0231):
+        # this runs inside dj-stripe's webhook atomic, so swallowing
+        # commits the Event row and Stripe never redelivers.
+        logger.exception("Malformed charge.refunded payload")
+
+
+@djstripe_receiver("refund.created")
+@djstripe_receiver("refund.updated")
+@with_tenant_schema_from_event
+def handle_stripe_refund_made(sender, **kwargs):
+    """Book a Stripe refund of an order's payment on the ledger, keyed on
+    its refund id (``re_...``): the one key the in-app refund, the
+    reconciliation lookup and ``refund.failed`` use, so a refund is one
+    row however it arrives (docs.stripe.com/refunds: ``charge.refunded``
+    says to listen to ``refund.created`` for the refund itself).
+
+    ``succeeded`` and ``pending`` are a refund made; ``failed``,
+    ``canceled`` and ``requires_action`` are not (a failure is
+    :func:`handle_stripe_refund_failed`). Which it is comes from Stripe's
+    current state of the refund, never from the event, so the two handlers
+    cannot disagree. A refund this app made is already
+    in the ledger under the same id, so its event adds nothing, and so
+    does a redelivery. One nobody claimed settles the PENDING attempt that
+    matches it (``PaymentLedger.record_refund``).
+
+    ``Order.status`` is intentionally NOT changed: deciding whether a
+    refund means the goods came back is a business call.
+    """
+    logger.debug("Processing Stripe refund webhook")
+
+    try:
+        event: Event = kwargs["event"]
+        refund = event.data["object"]
+        refund_id = refund["id"]
+        # The refund's status NOW, not the event's snapshot of it: a
+        # ``pending`` created event processed after the failure must not
+        # book a refund that failed. A Stripe error propagates, so Stripe
+        # redelivers the event.
+        current = StripePaymentProvider().retrieve_refund(refund_id)
+        if (
+            current.status
+            not in StripePaymentProvider._ACCEPTED_REFUND_STATUSES
+        ):
+            return
+
+        payment_intent_id = refund.get("payment_intent") or ""
+        if not payment_intent_id:
+            logger.warning(
+                "Refund %s has no payment_intent: skipping", refund_id
+            )
+            return
+        refunded = money_from_minor_units(
+            int(refund["amount"]), refund["currency"]
+        )
+
+        with transaction.atomic():
+            if _gift_card_purchase_for_intent(payment_intent_id) is not None:
+                return
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
-                    "No order found for refunded payment_intent %s "
-                    "(charge event=%s)",
+                    "No order found for refunded payment_intent %s (refund %s)",
                     payment_intent_id,
-                    event_id,
+                    refund_id,
                 )
                 return
-
-            previous_payment_status = order.payment_status
-            paid, _created = PaymentLedger.record_charge(
-                order,
-                amount=captured,
+            charge = PaymentTransaction.objects.filter(
+                order=order,
+                kind=PaymentTransactionKind.CHARGE,
                 provider=StripePaymentProvider.code,
-                reference=payment_intent_id,
-            )
-            if PaymentLedger.reversed_after(
-                paid, getattr(event, "created", None)
-            ):
-                logger.info(
-                    "charge.refunded %s is older than a refund failure on "
-                    "order %s: its figure still counts the failed refund, "
-                    "so it adds nothing",
-                    event_id,
-                    order.id,
+                provider_reference=payment_intent_id,
+            ).first()
+            if charge is None:
+                # Raised, not logged: the payment's own event may still be
+                # on its way, and a 200 would make Stripe never redeliver
+                # this refund.
+                raise ValueError(
+                    f"Refund {refund_id} names payment {payment_intent_id} "
+                    f"of order {order.id}, which the ledger does not hold yet"
                 )
-                return
-            new_refund = refunded_to_date.amount - PaymentLedger.refunded_on(
-                paid
+            previous_payment_status = order.payment_status
+            # The attempt this refund was made for names itself in the
+            # refund's metadata (``refund_payment`` puts it there): link
+            # that one, never an older attempt of the same amount. A refund
+            # that carries the key is that attempt's or nobody's, so it is
+            # never matched by amount; one without it (a dashboard refund)
+            # is matched by amount.
+            key = StripePaymentProvider.refund_attempt_key(current)
+            attempt = (
+                RefundAttempt.objects.live()
+                .filter(charge=charge)
+                .with_provider_key(key)
+                .first()
+                if key
+                else None
             )
-            if new_refund <= 0:
-                logger.info(
-                    "charge.refunded %s adds nothing to order %s: the ledger "
-                    "already holds %s refunded",
-                    event_id,
-                    order.id,
-                    refunded_to_date,
-                )
-                return
-            refund = Money(new_refund, refunded_to_date.currency)
-            refund_row, _created = PaymentLedger.record_refund(
-                order, charge=paid, amount=refund, reference=event_id
+            refund_row, created = PaymentLedger.record_refund(
+                order,
+                charge=charge,
+                amount=refunded,
+                reference=refund_id,
+                attempt=attempt,
+                match_attempt=not key,
             )
+            if not created:
+                return
 
         OrderHistory.log_payment_update(
             order=order,
             previous_value={"payment_status": str(previous_payment_status)},
             new_value={
                 "payment_status": str(order.payment_status),
-                "amount_refunded": str(refunded_to_date.amount),
+                "amount_refunded": str(refunded.amount),
                 "is_full_refund": order.payment_status
                 == PaymentStatus.REFUNDED,
             },
         )
 
         order_refunded.send(
-            sender=Order, order=order, amount=refund, refund=refund_row
+            sender=Order, order=order, amount=refunded, refund=refund_row
         )
 
     except KeyError, TypeError:
-        # Malformed payload only. Everything else must PROPAGATE (G0231):
-        # this runs inside dj-stripe's webhook atomic, so swallowing
-        # commits the Event row and Stripe never redelivers. The history
-        # write and ``order_refunded`` above run AFTER the inner atomic
-        # has committed the refund, so losing them leaves an order that
-        # reads REFUNDED while the customer is never emailed about the
-        # money coming back.
-        logger.exception("Malformed charge.refunded payload")
+        # Malformed payload only: see charge.refunded above.
+        logger.exception("Malformed refund payload")
 
 
 @djstripe_receiver("refund.failed")
@@ -1330,10 +1228,15 @@ def handle_stripe_refund_failed(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         refund = event.data["object"]
-        if refund.get("status") != "failed":
+        refund_id = refund["id"]
+        # Stripe's current state of the refund, the same rule as
+        # ``handle_stripe_refund_made``; an error propagates for redelivery.
+        if (
+            StripePaymentProvider().retrieve_refund(refund_id).status
+            not in StripePaymentProvider._FAILED_REFUND_STATUSES
+        ):
             return
 
-        refund_id = refund["id"]
         payment_intent_id = refund.get("payment_intent") or ""
         if not payment_intent_id:
             logger.warning(
@@ -1346,11 +1249,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
         reason = refund.get("failure_reason") or "unknown"
 
         with transaction.atomic():
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             charge = (
                 PaymentTransaction.objects.filter(
                     order=order,
@@ -1484,11 +1383,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
                 GiftCardService.alert_purchase_disputed(purchase, dispute_id)
                 return
 
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
                     "No order found for disputed payment_intent %s "
@@ -1605,11 +1500,7 @@ def handle_stripe_dispute_closed(sender, **kwargs):
                     GiftCardService.handle_purchase_reversal(purchase)
                 return
 
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
                     "No order found for closed dispute payment_intent %s "
@@ -1808,6 +1699,26 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                     payment_method="stripe",
                 )
                 publish_payment_status(order)
+                return
+
+            # A second payment on an order another PaymentIntent already
+            # paid: booked above, and ``PaymentLedger.sync_overcharge``
+            # told staff when it took the order past what it is for. The
+            # order keeps its first ``payment_id``.
+            if (
+                order.payment_status == PaymentStatus.COMPLETED
+                and order.payment_id
+                and order.payment_id != payment_intent_id
+            ):
+                logger.error(
+                    "PaymentIntent %s is a second payment on order %s, "
+                    "already paid by %s: recorded in the ledger, order "
+                    "left as it is",
+                    payment_intent_id,
+                    order.id,
+                    order.payment_id,
+                )
+                order.save(update_fields=["metadata"])
                 return
 
             # Settled-state guard: Stripe does not guarantee event

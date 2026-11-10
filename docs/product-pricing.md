@@ -77,7 +77,7 @@ deployment settings.
 | Path | How it records | Source |
 |---|---|---|
 | `Product.save()` touching price, markdown or VAT | plans before the save so the derived columns ride the same UPDATE, writes the spells after it; takes no lock of its own (constraint-guarded) | `product/models/product.py`, `product/pricing/service.py: plan_for_save, record_spells` |
-| A `Vat` rate edit or deletion | task re-prices the rate's products in batches, then reindexes them | `product/signals.py`, `product/tasks.py: sync_price_records` |
+| A `Vat` rate edit | task re-prices the rate's products in batches, then reindexes them | `product/signals.py`, `product/tasks.py: sync_price_records` |
 | An unconditional automatic promotion starting, ending or being edited, or a usage limit reached | the offer queue's drain task re-records the products in its scope before reindexing them | `promotion/offer_sync.py: refresh_products`, `promotion/signals.py` |
 | A promotion window opening or closing | the 5-minute window sweep | `promotion/offer_sync.py: refresh_window_changes` |
 | The nightly reconciliation | recomputes every product, writes only what differs | `product/tasks.py: reevaluate_price_episodes` |
@@ -232,3 +232,50 @@ its reference within 60 days of the start; later it is a new reduction measured
 against the last 30 days). Products carrying a promotion are left to the nightly
 sweep, which re-prices them the same way. Spells written before the change keep
 the prices customers were actually charged.
+
+## A product always has a VAT rate
+
+A product without a rate is priced, indexed, snapshotted onto its order lines
+and invoiced at 0%: a wrong Greek invoice. So `Product.vat` is required on every
+write path and its rate cannot be deleted:
+
+- **Deleting a `Vat` row in use is refused** (`on_delete=PROTECT`): the model
+  raises `ProtectedError`, and the admin's delete page and its "delete
+  selected" action list the products and offer no confirm button. Move the
+  products to another rate first. There is no API that deletes a rate. This
+  replaced `SET_NULL` and the signal that re-priced the products it orphaned.
+- **Both product serializers require `vat`** (`ProductSerializer` and
+  `ProductWriteSerializer`; a PATCH may leave it out, never clear it) and the
+  admin form requires it (`blank=False`). The schema's `vat` is required on
+  write and no longer nullable on read.
+- **The standard rate** is `vat.constants.STANDARD_VAT_RATE` (24%, myDATA
+  category 1): a `Vat` row has only a `value`, so the value is what names the
+  standard row. The demo-store seed uses it and refuses to run without it;
+  `vat` 0007 seeds the row for every store.
+- **`product` 0068 backfills** every product without a rate to the standard
+  row, per store schema, and fails (naming the schema) when a store has such
+  products and no standard row. The products' gross price rises by the rate;
+  the rows are updated in place, so the price records and search documents
+  catch up in the nightly `reevaluate_price_episodes` sweep.
+
+Both releases have shipped. Release 1 (v3.234.0: `product` 0068 backfill,
+0069 `PROTECT` and required on every write path) ran in production before
+release 2 tightened the column, because a NOT NULL tightening is safe only once
+no pod of the previous release can INSERT without a rate.
+
+- **`Product.vat` is NOT NULL in the database** (`product` 0070, the contract
+  step of 0069: `contract_of = [("product", "0069_product_vat_required")]`). It
+  REFUSES to run while any product in the schema (soft-deleted ones included)
+  holds a NULL, with an error naming the schema and the count, before it
+  alters anything; it never fills or guesses a rate. So `Product.vat_percent`
+  is `self.vat.value`, `with_vat_value_annotation` has no NULL case, and
+  `mydata_readiness` no longer counts NULLs: no code path handles a product
+  without a rate, because none can exist.
+- **`Vat.value` is unique** (`vat` 0010, `vat_value_unique`). A store holding
+  two rows of one rate makes the migration abort with an `IntegrityError`
+  naming the duplicated values and the schema, before anything is built: which
+  row stays is a person's call (move the products of one to the other in the
+  admin, delete the empty row, migrate again). The Vat admin form shows a
+  repeated rate as a form error. This is what makes "the standard row" a
+  lookup (`Vat.objects.get(value=STANDARD_VAT_RATE)` in the demo-store seed)
+  instead of a guess.

@@ -88,21 +88,18 @@ class CountryAdmin(PublicReferenceDataDeletionMixin, BaseTranslatableAdmin):
             _("Country Information"),
             {
                 "fields": ("name",),
-                "classes": ("wide",),
             },
         ),
         (
             _("Country Codes"),
             {
                 "fields": ("alpha_2", "alpha_3", "iso_cc"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Postal Code Format"),
             {
                 "fields": ("postal_code_pattern", "postal_code_example"),
-                "classes": ("wide",),
                 "description": _(
                     "Checked on every checkout and saved address. Seeded "
                     "from Google's Address Data Service."
@@ -113,14 +110,12 @@ class CountryAdmin(PublicReferenceDataDeletionMixin, BaseTranslatableAdmin):
             _("Contact & Media"),
             {
                 "fields": ("phone_code", "image_flag"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Organization"),
             {
                 "fields": ("sort_order",),
-                "classes": ("wide",),
             },
         ),
         (

@@ -51,7 +51,11 @@ def order_item(order, product):
 
 class TestOrderItemModel:
     def test_str_representation(self, order_item, order):
-        assert str(order_item) == f"Order {order.id} - Test Product × 5"
+        # The line's own snapshot of the name, in the order's language.
+        assert order_item.product_name
+        assert str(order_item) == (
+            f"Order {order.id} - {order_item.product_name} × 5"
+        )
 
     def test_save_records_the_original_quantity(self, order, product):
         item = OrderItem(
@@ -61,18 +65,6 @@ class TestOrderItemModel:
 
         item.refresh_from_db()
         assert item.original_quantity == 2
-
-    def test_raising_quantity_takes_the_difference_from_stock(
-        self, order_item, product
-    ):
-        product.refresh_from_db()
-        initial_stock = product.stock
-
-        order_item.quantity = 7
-        order_item.save()
-
-        product.refresh_from_db()
-        assert product.stock == initial_stock - 2
 
     def test_money_properties(self, order_item):
         order_item.refunded_quantity = 2

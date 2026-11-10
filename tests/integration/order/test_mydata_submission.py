@@ -403,10 +403,14 @@ class SendInvoiceToMydataTestCase(TestCase):
         mock_email.assert_not_called()
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.mydata.client.MyDataClient.request_transmitted_docs",
+        return_value=b"<RequestedDoc><invoicesDoc/></RequestedDoc>",
+    )
     @patch("order.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_duplicate_uid_is_terminal_not_retried(
-        self, mock_email, mock_send, _mock_render
+        self, mock_email, mock_send, mock_lookup, _mock_render
     ):
         """Regression: AADE error 228 (duplicate uid) used to be
         caught in the retry branch alongside transport errors — that
@@ -434,6 +438,8 @@ class SendInvoiceToMydataTestCase(TestCase):
         # Must NOT retry — a single call is enough.
         self.assertFalse(result)
         self.assertEqual(mock_send.call_count, 1)
+        # The 228 recovery asks AADE once (nothing registered under our uid).
+        self.assertEqual(mock_lookup.call_count, 1)
         mock_email.assert_not_called()
         # Invoice ends up in REJECTED state so ops can reconcile.
         invoice.refresh_from_db()

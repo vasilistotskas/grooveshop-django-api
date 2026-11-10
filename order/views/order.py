@@ -219,7 +219,10 @@ serializers_config: SerializersConfig = {
         response=OrderDetailSerializer,
         operation_id="updateOrderStatus",
         summary=_("Update the status of an order"),
-        description=_("Update the status of an existing order"),
+        description=_(
+            "Update the status of an existing order. CANCELED is refused: "
+            "cancel an order through its cancel action."
+        ),
         tags=["Orders"],
     ),
     "create_payment_intent": ActionConfig(
@@ -2495,8 +2498,9 @@ class OrderViewSet(BaseModelViewSet):
         except RefundOutstandingError as e:
             raise RefundOutstanding(
                 _(
-                    "Refund this order's payment first: %(amount)s can still "
-                    "be refunded."
+                    "Refund this order's payment first: %(amount)s paid for "
+                    "it has not gone back yet, counting refunds still "
+                    "waiting for an answer."
                 )
                 % {"amount": e.refundable}
                 if e.refundable > 0
@@ -2504,6 +2508,17 @@ class OrderViewSet(BaseModelViewSet):
             ) from e
         except InvalidStatusTransitionError as e:
             logger.warning("Invalid status transition: %s", e)
+            if e.new_status == OrderStatus.CANCELED:
+                raise ValidationError(
+                    {
+                        "detail": _(
+                            "An order is canceled through its cancel "
+                            "action, which releases its stock and refunds "
+                            "its payment."
+                        )
+                    },
+                    code="cancel_through_cancel_action",
+                ) from e
             raise ValidationError(
                 {
                     "detail": _("Invalid status transition."),
@@ -2756,20 +2771,13 @@ class OrderViewSet(BaseModelViewSet):
 
         order = self.get_object()
 
-        adapter = ShippingService.adapter_for_order(order)
-        if adapter is None:
-            raise NotFound(
-                _("No carrier shipment found for this order."),
-                code="shipment_missing",
-            )
-        shipment = adapter.shipment_for_order(order)
-        if shipment is None:
+        label_bytes = ShippingService.fetch_label_bytes(order)
+        if label_bytes is None:
             raise NotFound(
                 _("No carrier shipment found for this order."),
                 code="shipment_missing",
             )
 
-        label_bytes: bytes = adapter.fetch_label_bytes(shipment)
         provider_code = order.shipping_provider.code
         return FileResponse(
             BytesIO(label_bytes),

@@ -9,7 +9,10 @@ answers "what may a STAFF do" from the same policy as the admin.
 from __future__ import annotations
 
 import pytest
+from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.test import RequestFactory
+from django_tenants.utils import get_public_schema_name, schema_context
 from rest_framework.test import APIClient
 
 from core.api.permissions import (
@@ -73,8 +76,12 @@ class TestStaffLogin:
         user = _staff(email="su-staffapi@example.com", username="sustaffapi")
         user.is_superuser = True
         user.save(update_fields=["is_superuser"])
+        with schema_context(get_public_schema_name()):
+            TOTP.activate(user, generate_totp_secret())
+            recovery_code = RecoveryCodes.activate(user).generate_codes()[0]
         response = APIClient().post(
-            LOGIN, {"email": user.email, "password": PASSWORD}
+            LOGIN,
+            {"email": user.email, "password": PASSWORD, "code": recovery_code},
         )
         assert response.status_code == 200
 

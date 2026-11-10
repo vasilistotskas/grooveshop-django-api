@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 from django.conf import settings
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 
 from meili.exceptions import MeiliSettingsError
 from meili.querysets import IndexQuerySet
@@ -26,14 +26,18 @@ from product.models.product import ProductTranslation
 
 class TestIndexName:
     def test_public_schema_uses_the_bare_base_name(self, monkeypatch):
-        monkeypatch.setattr(connection, "schema_name", "public")
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "schema_name", "public"
+        )
 
         assert ProductTranslation.get_meili_index_name() == (
             "ProductTranslation"
         )
 
     def test_tenant_schema_prefixes_the_base_name(self, monkeypatch):
-        monkeypatch.setattr(connection, "schema_name", "acme")
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "schema_name", "acme"
+        )
 
         assert ProductTranslation.get_meili_index_name() == (
             "acme__ProductTranslation"

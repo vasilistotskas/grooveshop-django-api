@@ -90,7 +90,7 @@ class TestHandleStripePaymentSucceeded:
 
         # Verify
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED
+            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
         )
 
     def test_successful_payment_enqueues_confirmation_email(
@@ -270,7 +270,7 @@ class TestHandleStripePaymentSucceeded:
 
         # Verify service was called but no error raised
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED
+            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
         )
 
     def test_service_exception_propagates(self, mock_djstripe_event):
@@ -303,7 +303,7 @@ class TestHandleStripePaymentSucceeded:
                 )
 
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED
+            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
         )
 
     def test_extracts_payment_intent_id_correctly(self, mock_djstripe_event):
@@ -331,7 +331,7 @@ class TestHandleStripePaymentSucceeded:
 
         # Verify correct payment_intent_id was used
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED
+            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
         )
 
     @pytest.mark.parametrize(
@@ -570,7 +570,9 @@ class TestWebhookHandlerErrorHandling:
             )
 
             # Verify service was called with None
-            mock_service.assert_called_once_with(None, captured=STRIPE_CAPTURED)
+            mock_service.assert_called_once_with(
+                None, captured=STRIPE_CAPTURED, metadata=None
+            )
 
 
 @pytest.mark.django_db

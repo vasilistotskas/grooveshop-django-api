@@ -36,6 +36,7 @@ from django.utils import timezone
 from django_tenants.utils import schema_context
 
 from core.cache.invalidation import mark_surface_stale
+from core.sweeps import advance_sweep, sweep_start
 from promotion.models import Promotion
 from promotion.offers import scope_product_ids
 from tenant.celery import dispatch_on_commit
@@ -45,15 +46,16 @@ logger = logging.getLogger(__name__)
 #: How long marks are gathered before the one reindex runs.
 REINDEX_DELAY_SECONDS = 15
 
-#: Where the window sweep resumes when its cursor is missing (cache
-#: flushed, first run). Reindexing is idempotent, so a generous fallback
-#: costs a few extra documents; a short one could miss an edge.
-WINDOW_FALLBACK = timedelta(days=1)
+#: How far back a store's very first window sweep looks. Reindexing is
+#: idempotent, so a generous window costs a few extra documents.
+FIRST_WINDOW = timedelta(days=1)
+
+#: The window sweep's name in ``core.models.SweepCursor``.
+WINDOW_SWEEP_NAME = "promotion-offer-window"
 
 _PENDING_PROMOTIONS_KEY = "promotion-offer:pending-promotions"
 _PENDING_PRODUCTS_KEY = "promotion-offer:pending-products"
 _SCHEDULED_KEY = "promotion-offer:scheduled"
-_WINDOW_CURSOR_KEY = "promotion-offer:window-cursor"
 
 # Outlive the delay many times over so a slow or restarting worker does
 # not lose the marks; the task deletes them when it drains.
@@ -153,12 +155,7 @@ def refresh_window_changes(now: datetime | None = None) -> set[int]:
     instead of skipping it.
     """
     now = now or timezone.now()
-    cursor_raw = cache.get(_WINDOW_CURSOR_KEY)
-    cursor = (
-        datetime.fromisoformat(cursor_raw)
-        if cursor_raw
-        else now - WINDOW_FALLBACK
-    )
+    cursor = sweep_start(WINDOW_SWEEP_NAME, now, FIRST_WINDOW)
     crossed = list(
         Promotion.objects.filter(is_active=True)
         .filter(
@@ -173,6 +170,5 @@ def refresh_window_changes(now: datetime | None = None) -> set[int]:
         # No save means no signal, so the cached offers listing would
         # keep advertising a promotion that ended, or hide one that began.
         mark_surface_stale("promotions")
-    # No expiry: losing the cursor only widens the next window.
-    cache.set(_WINDOW_CURSOR_KEY, now.isoformat(), timeout=None)
+    advance_sweep(WINDOW_SWEEP_NAME, now)
     return product_ids

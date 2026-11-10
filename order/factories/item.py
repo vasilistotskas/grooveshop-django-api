@@ -51,7 +51,10 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
     )
     quantity = factory.LazyFunction(lambda: random.randint(1, 5))
     original_quantity = factory.SelfAttribute("quantity")
-    is_refunded = factory.Faker("boolean", chance_of_getting_true=10)
+    # A line is not refunded unless a test asks for it (``create_with_refund``
+    # or ``is_refunded=True``): a random refunded line changes what an order
+    # owes and made refund tests flaky.
+    is_refunded = False
     refunded_quantity = factory.LazyAttribute(
         lambda o: random.randint(1, o.quantity) if o.is_refunded else 0
     )

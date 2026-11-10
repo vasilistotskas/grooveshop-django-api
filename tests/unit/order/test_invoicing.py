@@ -181,17 +181,6 @@ class VatBreakdownTestCase(TestCase):
         self.assertEqual(breakdown[0]["vat"], "2.40")
         self.assertEqual(breakdown[1]["vat"], "0.60")
 
-    def test_no_vat_bucketed_under_zero_rate(self) -> None:
-        product = ProductFactory(vat=None)
-        order = _goods_only_order()
-        self._make_item(order, product, amount="5.00", quantity=1)
-
-        breakdown = _compute_vat_breakdown(order)
-        self.assertEqual(len(breakdown), 1)
-        self.assertEqual(Decimal(breakdown[0]["rate"]), Decimal(0))
-        self.assertEqual(breakdown[0]["vat"], "0.00")
-        self.assertEqual(breakdown[0]["subtotal"], "5.00")
-
 
 class OrderTotalsTestCase(TestCase):
     def test_shipping_and_payment_fee_are_taxed_inside_the_totals(self) -> None:
@@ -672,22 +661,6 @@ class RenderItemsTestCase(TestCase):
         self.assertEqual(row["vat_rate"], Decimal(24))
         # 12.40 × 2 = 24.80
         self.assertEqual(row["line_total"], Decimal("24.80"))
-
-    def test_product_without_vat_is_sold_at_zero_percent(self) -> None:
-        """A product with no VAT row is sold at 0%, and the line says so:
-        the rate is the snapshot on the item, never an absent product
-        VAT the template has to guess at."""
-        product = ProductFactory(vat=None)
-        order = OrderFactory(num_order_items=0)
-        OrderItemFactory(
-            order=order,
-            product=product,
-            price=Money(Decimal("5.00"), "EUR"),
-            quantity=1,
-        )
-
-        rows = _render_items(order)
-        self.assertEqual(rows[0]["vat_rate"], Decimal(0))
 
 
 class QrSvgTestCase(TestCase):

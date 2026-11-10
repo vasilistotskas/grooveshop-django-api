@@ -18,7 +18,6 @@ from unittest import mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
-from django.core.cache import cache
 from django.test import RequestFactory
 from django.utils import timezone
 
@@ -175,10 +174,6 @@ class TestCouponCodes:
 
 
 class TestPromotionWindow:
-    @pytest.fixture(autouse=True)
-    def _fresh_cursor(self):
-        cache.delete(offer_sync._WINDOW_CURSOR_KEY)
-
     def test_a_window_closing_purges_the_offers(self, purged):
         now = timezone.now()
         PromotionFactory(
@@ -219,7 +214,8 @@ class TestVatRate:
         ProductFactory(vat=vat, num_images=0, num_reviews=0)
         purged.reset()
 
-        vat.value = 13
+        # ``Vat.value`` is unique: 9 is not a seeded rate.
+        vat.value = 9
         vat.save()
 
         assert "products" in purged()

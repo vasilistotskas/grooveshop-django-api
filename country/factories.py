@@ -7,6 +7,7 @@ from django.conf import settings
 from faker import Faker
 
 from country.models import Country
+from country.seed_data import LANGUAGE_COUNTRY_MAPPING
 from devtools.factories import (
     CustomDjangoModelFactory,
     SeedingResult,
@@ -43,8 +44,6 @@ available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
 
-LANGUAGE_COUNTRY_MAPPING = getattr(settings, "LANGUAGE_COUNTRY_MAPPING", {})
-
 
 class CountryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
@@ -60,7 +59,6 @@ class CountryTranslationFactory(factory.django.DjangoModelFactory):
 
 @custom_seeding(
     description="Creates countries based on PARLER_LANGUAGES settings (el→GR, en→GB)",
-    settings_key="PARLER_LANGUAGES",
 )
 class CountryFactory(CustomDjangoModelFactory):
     auto_translations = False

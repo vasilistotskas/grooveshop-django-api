@@ -105,6 +105,65 @@ class IsSuperuserOnlyModelAdmin:
         ) and self._is_superuser(request)
 
 
+class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
+    """dj-stripe's admin pages: a platform superuser's, nobody else's.
+
+    dj-stripe mirrors a store's Stripe account into its schema. The
+    store's payments run through its orders (``order.payment``); only the
+    platform reads or works the mirror (the sidebar's "Stripe" menu is a
+    superuser's). ``tenant.role_scopes`` grants no store role anything on
+    it, and this keeps the pages a superuser's whoever else holds a
+    permission.
+
+    It also closes the one URL no permission reached. dj-stripe serves its
+    own actions (resync, sync all, cancel a subscription) at
+    ``action/<action_name>/<model_name>/`` under each of its admins
+    (``djstripe.admin.actions.CustomActionMixin``), behind the admin login
+    and nothing else, and runs the action on whichever model the URL
+    names. Here that URL runs an action only where the changelist would:
+    the admin of the model it names must let the request open its
+    changelist and must offer it the action (``get_actions``, which
+    applies an action's ``allowed_permissions``).
+    """
+
+    def get_urls(self):
+        from django.urls import path
+
+        custom_action = path(
+            "action/<str:action_name>/<str:model_name>/",
+            self.admin_site.admin_view(self.custom_action_view),
+            name="djstripe_custom_action",
+        )
+        return [
+            custom_action,
+            *(
+                url
+                for url in super().get_urls()
+                if getattr(url, "name", None) != "djstripe_custom_action"
+            ),
+        ]
+
+    def custom_action_view(self, request, action_name: str, model_name: str):
+        from django.apps import apps
+        from django.core.exceptions import PermissionDenied
+        from djstripe.admin.views import ConfirmCustomAction
+
+        try:
+            model = apps.get_app_config("djstripe").get_model(model_name)
+        except LookupError:
+            raise PermissionDenied from None
+        target = self.admin_site._registry.get(model)
+        if (
+            target is None
+            or not target.has_view_or_change_permission(request)
+            or action_name not in target.get_actions(request)
+        ):
+            raise PermissionDenied
+        return ConfirmCustomAction.as_view()(
+            request, action_name=action_name, model_name=model_name
+        )
+
+
 class WithheldOnTenantHostModelAdmin:
     """Withhold a PLATFORM-owned model while serving a tenant host.
 

@@ -2041,6 +2041,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as processing"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="play_arrow",
     )
@@ -2054,6 +2055,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as shipped"),
+        permissions=["change"],
         variant=ActionVariant.INFO,
         icon="local_shipping",
     )
@@ -2067,6 +2069,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as delivered"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -2080,6 +2083,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as completed"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="task_alt",
     )
@@ -2093,13 +2097,14 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as returned"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="assignment_return",
     )
     def mark_as_returned(self, request, queryset):
         # Stock is deliberately untouched: the goods come back days later
         # and may be damaged, so restocking is a staff decision on the
-        # physical parcel (docs/order-system.md §5.1).
+        # physical parcel (docs/order/shipping-acs.md §5.1).
         self._bulk_update_status(
             request,
             queryset,
@@ -2109,6 +2114,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark selected orders as refunded"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="currency_exchange",
     )
@@ -2116,7 +2122,7 @@ class OrderAdmin(BaseModelAdmin):
         # The order status only; the money moves through the "Refund"
         # action below (``OrderService.refund_order``) or the provider's
         # refund webhook, neither of which changes ``status``
-        # (docs/order-system.md §4.2).
+        # (docs/order/payments.md §4.2).
         self._bulk_update_status(
             request,
             queryset,
@@ -2674,6 +2680,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Cancel selected orders and restore stock"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -3074,6 +3081,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Download shipping voucher (PDF)"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -3179,6 +3187,7 @@ class OrderAdmin(BaseModelAdmin):
 
     @action(
         description=_("Customer's orders"),
+        permissions=["view"],
         icon="person_search",
         variant=ActionVariant.INFO,
     )
@@ -3965,7 +3974,11 @@ class RetailCreditAdmin(BaseModelAdmin):
             label = f"{label} (#{obj.mydata_mark})"
         return obj.mydata_status, label
 
-    @admin.action(description=_("Cancel in myDATA (issued in error)"))
+    # Offered to nobody while this register refuses ``change`` (issue 653).
+    @admin.action(
+        description=_("Cancel in myDATA (issued in error)"),
+        permissions=["change"],
+    )
     def cancel_in_mydata(self, request, queryset):
         from order.tasks import cancel_mydata_credit
 

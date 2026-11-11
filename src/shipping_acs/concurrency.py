@@ -16,7 +16,8 @@ measurement. Over 10 days of production logs (2026-10-11 to 10-20), each
 tracking task was matched against the number of ACS tasks in flight when
 it started: 0.9% rejected at 1, 2.0% at 2, 3.6% at 3, 4.0% at 4, 6.9% at
 5, 7.9% at 6, 11% at 7, 17% at 8 and 19-50% at 9 or more. The full table
-and the dispatch-spacing arithmetic are in ``docs/order-system.md``.
+and the dispatch-spacing arithmetic are in
+``docs/order/shipping-acs.md``.
 
 The semaphore is ``ACS_MAX_CONCURRENT_REQUESTS`` redis-py ``Lock`` keys
 (``CustomCache.lock``), each non-blocking with a lease. A lock carries a

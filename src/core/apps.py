@@ -7,6 +7,12 @@ logger = logging.getLogger(__name__)
 
 
 class CoreConfig(AppConfig):
+    """Shared infrastructure: abstract models, the base viewset, permissions,
+    throttles, caches, middleware, the Celery app and the root URL conf.
+
+    Models and entry points: ``docs/app-map.md``.
+    """
+
     name = "core"
     verbose_name = _("System")
 

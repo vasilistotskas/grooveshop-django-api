@@ -75,30 +75,18 @@ docker compose up -d --build
 
 ### Settings
 
-Single `src/settings.py` (not inside any app). `SRC_DIR` is `src/`, for what Django loads from the source (`src/core/templates`, `src/locale`, `src/locale_vendor`, `src/static`); `BASE_DIR` is the repository root (`/home/app` in the image), for `.env`, `pyproject.toml` and what is written at run time (`logs`, `backups`, `mediafiles`, `staticfiles`). Uses `SYSTEM_ENV` env var (`dev`, `production`, `ci`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
+Single `src/settings.py` (not inside any app). `SRC_DIR` is `src/`, for what Django loads from the source (`src/core/templates`, `src/locale`, `src/locale_vendor`, `src/static`); `BASE_DIR` is the repository root (`/home/app` in the image), for `.env`, `pyproject.toml` and what is written at run time (`logs`, `backups`, `mediafiles`, `staticfiles`). Uses `SYSTEM_ENV` env var (`dev`, `ci`, `staging`, `production`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
 
 ### Django Apps
 
-Every app, the settings module (`src/settings.py`) and the `asgi` package live in `src/`, and `src/` is on the Python path, so an import names the app and never `src` (`from order.services import ...`, `DJANGO_SETTINGS_MODULE=settings`, `celery -A core`, `asgi:application`). A file is named by its path (`src/order/services.py`), a module by its dotted name (`order.services`). What puts `src/` on the path: `manage.py` and `gunicorn.conf.py` add it themselves, pytest reads `pythonpath` in `pyproject.toml`, and both images set `PYTHONPATH`. Any other command run on a checkout needs `PYTHONPATH=src` (`lint-imports`, `uvicorn`, `celery`). The repository root keeps the entry points, the tooling and its configuration, `tests/`, `tests_mt/`, `docs/`, and the folders written at run time. The apps:
+Every app, the settings module (`src/settings.py`) and the `asgi` package live in `src/`, and `src/` is on the Python path, so an import names the app and never `src` (`from order.services import ...`, `DJANGO_SETTINGS_MODULE=settings`, `celery -A core`, `asgi:application`). A file is named by its path (`src/order/services.py`), a module by its dotted name (`order.services`). What puts `src/` on the path: `manage.py` and `gunicorn.conf.py` add it themselves, pytest reads `pythonpath` in `pyproject.toml`, and both images set `PYTHONPATH`. Any other command run on a checkout needs `PYTHONPATH=src` (`lint-imports`, `uvicorn`, `celery`). The repository root keeps the entry points, the tooling and its configuration, `tests/`, `tests_mt/`, `docs/`, and the folders written at run time.
 
-- **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `src/core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
-- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain` (a domain is a bare lowercase host name: `tenant.validators.validate_store_hostname` runs in the form and in `save()`, because routing matches the text exactly), provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`src/tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`). Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row
-- **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
-- **promotion/**, **giftcard/**, **b2b/** — Rule-based promotions and coupons; stored-value gift cards with a ledger; wholesale program (business profiles, VIES, group pricing)
-- **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`src/shipping/interfaces.py`) and the two carrier integrations
-- **page_config/** — Content pages (policies, FAQ, info pages) and the legal documents: the platform's texts, their rollout, and the version each order accepted. Pages and menus are the page builder's (`src/builder/`)
-- **texts/** — Store-edited storefront wording (`TextOverride`), the store admin's text editor, and the public overrides read; the catalogue and the syntax check are the storefront's
-- **builder/** — The storefront page builder: versioned documents (theme, section groups, templates, pages), immutable releases, the staff API and the public read of the current release; the block catalogue is the storefront's
-- **meta_capi/** — Meta Conversions API event dispatch
-- **indexnow/** — IndexNow notifications: a published product or blog post that changes is queued and sent to search engines in one batched POST per store
-- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway: the shopper tools (`/mcp`, the store's own issuer and customers) and the store-admin tools (`/agent/staff/*` behind `/mcp/admin`, read only). Staff tokens come from the platform's staff issuer on `STAFF_CONNECT_HOST` (`src/agent/staff.py`, `src/agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc` is in SHARED_APPS too, so staff tokens live in `public` and customers' in each store's schema
-- **search/** — Meilisearch product and blog search, Greeklish transliteration, and analytics
-- **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
-- **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
-- **loyalty/** — Points, XP, tiers, and rewards system
-- **country/**, **region/**, **vat/**, **pay_way/**, **tag/**, **contact/** — Supporting domain apps
-- **admin/** — Custom admin app with django-unfold dashboard callback
-- **devtools/** — `CustomDjangoModelFactory`, the base class for the factories of translatable models
+**The apps are listed in [`docs/app-map.md`](docs/app-map.md)**: what each owns, its entry points, and the doc to read before changing it. Read the entry of the app you are about to touch. What to know before that:
+
+- **Two app lists** (`src/settings.py`): `SHARED_APPS` live in the `public` schema (`core`, `tenant`, `scheduler`, `country`, `region`, `devtools`), `TENANT_APPS` in every store's schema (the domain apps), and `user`, `emails` and `admin` are in both. The list decides which host can serve an app.
+- **`core/`** is shared infrastructure (base views, serializers, permissions, middleware, filters, caching, the Celery app); `src/core/urls.py` is the root URL conf that mounts every app under `api/v1/`.
+- **`tenant/`** is the control plane. Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row. Per-tenant credentials come from `src/tenant/credentials.py`, with no platform-wide fallback for money or secrets (`docs/secret-encryption.md`).
+- **Layout conventions**: a module becomes a package at about 500 lines; tasks live in the app's `tasks`, receivers in its `signals`, connected from `AppConfig.ready()`; imports between apps follow the contracts in `pyproject.toml` (`PYTHONPATH=src uv run lint-imports`).
 
 ### Core Base Classes and Patterns
 
@@ -144,6 +132,8 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Permissions** (`src/core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields; the staff bypass is `tenant.membership.is_store_staff` (a provenance-stamped platform identity with a staff role in the current tenant, or a superuser). `request.user.is_staff` is never an authorization signal on an API request — on a tenant-schema row it is customer residue (see `IsPlatformSuperuser`). Store-scoped write routes use `StoreStaffModelPermissions`. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
 
+**Admin actions** (`src/*/admin.py`): every action passes `permissions=[...]` in its decorator: `change` for an edit, `add` for a copy, `delete` for a deletion, `view` only for a named read-only one. Unfold serves list, row and detail actions at URLs of their own, behind the admin login and that argument alone; `tests/unit/admin/test_actions_declare_permissions.py` fails for an action without one. A detail action's `has_<perm>_permission` receives the object id (a string), never the object: look the row up by it (`OrderAdmin.has_confirm_payment_permission`). A package's admin on the store site belongs to an app in `tenant.role_scopes.PLATFORM_ONLY_APP_LABELS` and is named in that test's `THIRD_PARTY_ADMINS`; a URL it serves itself is named in `THIRD_PARTY_URLS` with its check (dj-stripe's: `admin.mixins.StripeMirrorModelAdmin`).
+
 ### API Conventions
 
 - All API endpoints are under `api/v1/` with DRF ViewSets
@@ -174,7 +164,7 @@ ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `src/core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `src/settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
+App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/tasks.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
 - `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications

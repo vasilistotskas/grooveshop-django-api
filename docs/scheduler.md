@@ -45,8 +45,8 @@ not in the settings, because Celery installs it while
 `tenant.tasks.fanout_reconcile_pending_refunds` (one run per store, suspended stores included: their PENDING refunds hold the customer's money too). It asks the
 payment provider what became of each refund attempt still `PENDING` after
 `REFUND_RECONCILE_AFTER_MINUTES`, and settles or declines only on an
-unambiguous answer (`src/order/refund_reconciliation.py`, `docs/order-system.md`
-§7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
+unambiguous answer (`src/order/refund_reconciliation.py`,
+`docs/order/refund-execution.md` §7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
 caught by the next hour. An attempt it cannot decide stays `PENDING`, holds its
 money and shows on the store dashboard until staff record its outcome.
 

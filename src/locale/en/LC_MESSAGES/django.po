@@ -136,6 +136,14 @@ msgstr[0] "%(count)d item"
 msgstr[1] "%(count)d items"
 
 #, python-format
+msgid "%(count)d items at quantity 1 were left as they are. Removing them needs a role that may delete cart items."
+msgstr "%(count)d items at quantity 1 were left as they are. Removing them needs a role that may delete cart items."
+
+#, python-format
+msgid "%(count)d items at quantity 1 were left as they are. Use \"Remove from cart\" to remove them."
+msgstr "%(count)d items at quantity 1 were left as they are. Use \"Remove from cart\" to remove them."
+
+#, python-format
 msgid "%(count)d items were removed from carts."
 msgstr "%(count)d items were removed from carts."
 

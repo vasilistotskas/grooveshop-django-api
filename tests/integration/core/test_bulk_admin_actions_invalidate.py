@@ -13,6 +13,7 @@ from unittest import mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
 from blog.admin import BlogPostAdmin
@@ -66,7 +67,7 @@ def purged():
 def _run(admin_class, model, action, queryset):
     admin = admin_class(model, AdminSite())
     request = RequestFactory().post("/admin/")
-    request.user = None
+    request.user = get_user_model()(is_superuser=True)
     with mock.patch.object(admin_class, "message_user"):
         getattr(admin, action)(request, queryset)
 

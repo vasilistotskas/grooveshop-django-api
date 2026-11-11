@@ -3,8 +3,8 @@
 `manage.py staging_anonymise` replaces every customer identity in a database
 restored from production, so staging keeps real orders, products, stock and
 amounts but no real person. It is step 4 of
-`grooveshop-infrastructure/scripts/staging-refresh.sh` (the infrastructure
-repo's `docs/staging.md` has the operator side).
+`grooveshop-infrastructure/scripts/staging-refresh.sh` (`grooveshop-infrastructure/docs/staging.md`
+has the operator side).
 
 It exists because the refresh used to copy production unchanged. Decision of
 2026-10-17: staging keeps more than identities alone, and **every** customer

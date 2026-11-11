@@ -78,7 +78,8 @@ one and retries. Checked on every use:
   coupons are judged against the owner, though the request is anonymous.
 - **Attribution is optional on the token path.** `POST /cart/item`
   takes the same `attribution` object as on the storefront and records
-  the cart's first touch from it (`docs/order-system.md` section 3.4).
+  the cart's first touch from it (`docs/order/creation-records.md`
+  section 3.4).
   The gateway sends none, so a cart it fills first records `direct`.
 - A new route that should accept the token must be added to the
   allowlist on purpose; reading `X-Cart-Token` anywhere but

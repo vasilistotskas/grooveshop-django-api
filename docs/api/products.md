@@ -2,11 +2,11 @@
 
 The two paginated product listings and who reads each.
 
-**Source of truth:** `product/views/product.py` (`ProductViewSet`:
-`list`, `feed`, `get_queryset`, `action_ordering`), `product/urls.py`,
-`product/serializers/product.py` (`ProductCardSerializer`,
-`ProductSerializer`), `product/managers/product.py` (`for_list`,
-`for_full_list`), `product/filters/product.py`, and the generated
+**Source of truth:** `src/product/views/product.py` (`ProductViewSet`:
+`list`, `feed`, `get_queryset`, `action_ordering`), `src/product/urls.py`,
+`src/product/serializers/product.py` (`ProductCardSerializer`,
+`ProductSerializer`), `src/product/managers/product.py` (`for_list`,
+`for_full_list`), `src/product/filters/product.py`, and the generated
 `schema.yml`. Where this page and the code disagree, the code wins.
 
 ## Endpoints
@@ -43,7 +43,7 @@ the net price and VAT fields, weight, counters and SEO copy are not in the
 list. The product page (`/product/{id}`) and the feed carry them.
 `ProductSerializer` is unchanged where it is nested (cart and order lines,
 reviews, images, recommendations), and `for_full_list()` is the queryset
-for a list rendered through it (the feed and `recommendation/hydrate.py`).
+for a list rendered through it (the feed and `src/recommendation/hydrate.py`).
 
 ## Ordering
 
@@ -52,7 +52,7 @@ default is `-availability_priority, id` (in stock first). Every ordering
 ends in the primary key, so products that tie keep one order across pages.
 
 An extra `@action` is unsorted unless it declares an ordering contract
-(`core/filters/camel_case_ordering.py`, `ordering_for`), so `feed` opts
+(`src/core/filters/camel_case_ordering.py`, `ordering_for`), so `feed` opts
 into the list's own through `action_ordering["feed"]`.
 
 ## Changing either shape

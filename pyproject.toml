@@ -122,16 +122,16 @@ parallel = true
 core = "sysmon"
 concurrency = ["multiprocessing", "thread"]
 omit = [
-    "*/tests/*",
-    "*/tests_mt/*",
     "*/migrations/*",
     "*/management/*",
     "*/factories/*",
-    "*/manage.py",
     "*/factories.py",
-    "gunicorn_worker.py",
 ]
-source = ["."]
+# ``src``, not ``.``: to list the files no test imported, coverage walks
+# into a sub-directory only when it holds an ``__init__.py``. ``src/`` holds
+# none, so from the repository root every unimported module would drop
+# out of the total without a word.
+source = ["src"]
 relative_files = true
 
 [tool.coverage.report]
@@ -161,7 +161,7 @@ directory = "htmlcov"
 # Coverage commands reference
 # ─────────────────────────────────────────────────────────
 # Run tests with coverage (sequential, recommended for coverage):
-#   uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml
+#   uv run pytest --cov=src --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
 #
 # Run tests in parallel (fast, no coverage):
 #   uv run pytest -n auto
@@ -231,6 +231,10 @@ python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# The apps, ``settings`` and ``asgi`` are imported by their bare names
+# from ``src/``. pytest-django puts the repository root (where
+# ``manage.py`` is) on the path, which is what ``tests.settings`` needs.
+pythonpath = ["src"]
 # The 600 s timeout guards a test BODY. ``timeout_func_only`` keeps
 # fixture setup out of it: pytest-timeout otherwise charges a
 # session fixture to whichever test triggers it, so the first test of
@@ -320,6 +324,9 @@ django_settings_module = "settings"
 target-version = "py315"
 line-length = 80
 exclude = ["**/migrations/**"]
+# Where a first-party import is looked up: the apps in ``src/``, and
+# ``tests``/``tests_mt`` at the root.
+src = ["src", "."]
 
 [tool.ruff.lint]
 # Ruff 0.16 turned on a much broader default set, which is what every
@@ -378,7 +385,7 @@ ignore = [
     # tuples — "# (slug, name, price)" heading a data table,
     # "#   SOCIALACCOUNT_EMAIL_AUTHENTICATION = True" recording a
     # setting. One hit is worse than noise: `# xgettext:no-python-format`
-    # in order/admin.py is a FUNCTIONAL directive, and ERA001's fix
+    # in src/order/admin.py is a FUNCTIONAL directive, and ERA001's fix
     # deletes it, which hard-fails msgfmt on the Greek catalogue.
     # A rule that is 1-in-13 right and can break the build on the
     # remainder is not worth its suppressions.
@@ -427,9 +434,9 @@ ignore = [
 # operator watching `seed_all` run. They are shared by the management
 # command and the test factories, so they have no `self.stdout` to write
 # to, and routing operator-facing progress into the log would hide it.
-"country/factories.py" = ["T201"]
-"region/factories.py" = ["T201"]
-"devtools/management/commands/seed_all.py" = ["T201"]
+"src/country/factories.py" = ["T201"]
+"src/region/factories.py" = ["T201"]
+"src/devtools/management/commands/seed_all.py" = ["T201"]
 # CI maintenance scripts run on a bare GitHub runner with no Django and
 # no logging config — stdout IS the interface, and the workflow log is
 # where an operator reads what a prune selected before it deletes it.
@@ -447,6 +454,9 @@ max-positional-args = 6
 # ─────────────────────────────────────────────────────────
 [tool.ty.environment]
 python-version = "3.15"
+# First-party modules: the apps in ``src/``, then ``tests``/``tests_mt``
+# at the root.
+root = ["./src", "."]
 
 [tool.ty.rules]
 # Django ORM metaclass: reverse relations, FK _id accessors,
@@ -503,14 +513,14 @@ invalid-assignment = "ignore"
 # django-money, factory_boy, meilisearch SDK
 [[tool.ty.overrides]]
 include = [
-    "core/fields/**",
-    "core/forms/**",
-    "core/filters/**",
-    "core/utils/**",
-    "asgi/**",
-    "admin/**",
-    "meili/**",
-    "devtools/**",
+    "src/core/fields/**",
+    "src/core/forms/**",
+    "src/core/filters/**",
+    "src/core/utils/**",
+    "src/asgi/**",
+    "src/admin/**",
+    "src/meili/**",
+    "src/devtools/**",
 ]
 
 [tool.ty.overrides.rules]
@@ -532,13 +542,13 @@ invalid-return-type = "ignore"
 # - celery-stubs declares Task.__call__ as an assignable Callable; the
 #   tenant task wraps the call in the tenant's schema context.
 [[tool.ty.overrides]]
-include = ["tenant/storage.py"]
+include = ["src/tenant/storage.py"]
 
 [tool.ty.overrides.rules]
 invalid-property-type-override = "ignore"
 
 [[tool.ty.overrides]]
-include = ["tenant/celery.py"]
+include = ["src/tenant/celery.py"]
 
 [tool.ty.overrides.rules]
 invalid-mutable-override = "ignore"
@@ -549,7 +559,7 @@ invalid-mutable-override = "ignore"
 # can't satisfy each TypedDict field individually. ty (since 0.0.33)
 # emits one diagnostic per field, producing ~75 errors per call site.
 [[tool.ty.overrides]]
-include = ["order/payment.py"]
+include = ["src/order/payment.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"

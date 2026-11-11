@@ -1,8 +1,8 @@
 # Celery task results
 
 What the result backend stores, where, and what to ask it. Source:
-`settings.py` (the `CELERY_*` result settings), `core/result_backend.py`
-(`TenantDatabaseBackend`), `core/admin.py` (`TaskResultAdmin`),
+`src/settings.py` (the `CELERY_*` result settings), `src/core/result_backend.py`
+(`TenantDatabaseBackend`), `src/core/admin.py` (`TaskResultAdmin`),
 `tests/settings.py`. The code wins over this page.
 
 **Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a

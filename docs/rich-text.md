@@ -9,7 +9,7 @@ admin, DRF, a shell, a command), in this order:
    element, link address or media address the policy would drop; the save
    raises instead of silently stripping it.
 2. **Sanitise.** `sanitize_html` reduces the markup to the allowlist in
-   `core/utils/sanitize.py`. Residue no reader sees (`data-*`, event
+   `src/core/utils/sanitize.py`. Residue no reader sees (`data-*`, event
    handlers, CSS custom properties such as Dark Reader's
    `--darkreader-inline-color` in a `style`) is dropped without refusing,
    and so is the text's own typography (next section).
@@ -51,7 +51,7 @@ a CSS escape is dropped: a browser reads `font-size/**/: 14pt` and
 `font-s9ze: 14pt` as a type size.
 
 The page builder's rich-text settings pass the same sanitiser when a draft is
-saved (`builder/validation.py`), so the rule holds for them from the next
+saved (`src/builder/validation.py`), so the rule holds for them from the next
 save. Builder documents are not backfilled: versions and releases are
 immutable, so a setting saved before keeps its typeface until it is edited.
 The storefront therefore keeps its own rule that ignores a typeface and a
@@ -126,6 +126,6 @@ uv run python manage.py meilisearch_sync_index product.ProductTranslation
 (`--tenant`/`--all-tenants` as that command accepts; the index settings do not
 change.)
 
-Source: `core/fields/rich_text.py`, `core/utils/sanitize.py`,
-`core/utils/rich_text_images.py`, `core/utils/html_text.py`,
-`core/management/commands/normalise_rich_text.py`.
+Source: `src/core/fields/rich_text.py`, `src/core/utils/sanitize.py`,
+`src/core/utils/rich_text_images.py`, `src/core/utils/html_text.py`,
+`src/core/management/commands/normalise_rich_text.py`.

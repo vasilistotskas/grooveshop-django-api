@@ -29,15 +29,15 @@ records follow the consumer price only.
 
 | What | Where | Source |
 |---|---|---|
-| `ProductPriceSpell`: one period during which a product's consumer **gross** unit price was constant (`valid_to` null = current). Append-only; the only mutation is closing the current spell. | table | `product/models/price_spell.py` |
-| `Product.effective_price`: the gross price a customer pays now. | stored column | `product/models/product.py` |
+| `ProductPriceSpell`: one period during which a product's consumer **gross** unit price was constant (`valid_to` null = current). Append-only; the only mutation is closing the current spell. | table | `src/product/models/price_spell.py` |
+| `Product.effective_price`: the gross price a customer pays now. | stored column | `src/product/models/product.py` |
 | `Product.prior_price`: the frozen reference, null when nothing may be announced. | stored column | same |
 | `Product.reduction_started_at`: when the reduction in force began. Set with `prior_price` null means "reduced, but nothing may be announced". | stored column | same |
 
 The tracked price is `Product.final_price` (price plus VAT minus the
 markdown) minus what the **unconditional automatic promotions** take off one
 unit. Those three columns are derived: `HistoricalRecords` excludes them, and
-nothing outside `product/pricing/service.py` writes them.
+nothing outside `src/product/pricing/service.py` writes them.
 
 A promotion counts as a price reduction only when it needs nothing from the
 basket: automatic, scoped to products or categories, a percentage or fixed
@@ -52,7 +52,7 @@ off one unit.
 
 ## How a reduction is decided
 
-`product/pricing/evaluation.py` holds the rule as one pure function,
+`src/product/pricing/evaluation.py` holds the rule as one pure function,
 `evaluate_reduction(spells, first_offered_at, is_reduction, episode, now)`.
 It returns the episode in force or `None`:
 
@@ -76,18 +76,18 @@ deployment settings.
 
 | Path | How it records | Source |
 |---|---|---|
-| `Product.save()` touching price, markdown or VAT | plans before the save so the derived columns ride the same UPDATE, writes the spells after it; takes no lock of its own (constraint-guarded) | `product/models/product.py`, `product/pricing/service.py: plan_for_save, record_spells` |
-| A `Vat` rate edit | task re-prices the rate's products in batches, then reindexes them | `product/signals.py`, `product/tasks.py: sync_price_records` |
-| An unconditional automatic promotion starting, ending or being edited, or a usage limit reached | the offer queue's drain task re-records the products in its scope before reindexing them | `promotion/offer_sync.py: refresh_products`, `promotion/signals.py` |
-| A promotion window opening or closing | the 5-minute window sweep | `promotion/offer_sync.py: refresh_window_changes` |
-| The nightly reconciliation | recomputes every product, writes only what differs | `product/tasks.py: reevaluate_price_episodes` |
+| `Product.save()` touching price, markdown or VAT | plans before the save so the derived columns ride the same UPDATE, writes the spells after it; takes no lock of its own (constraint-guarded) | `src/product/models/product.py`, `src/product/pricing/service.py: plan_for_save, record_spells` |
+| A `Vat` rate edit | task re-prices the rate's products in batches, then reindexes them | `src/product/signals.py`, `src/product/tasks.py: sync_price_records` |
+| An unconditional automatic promotion starting, ending or being edited, or a usage limit reached | the offer queue's drain task re-records the products in its scope before reindexing them | `src/promotion/offer_sync.py: refresh_products`, `src/promotion/signals.py` |
+| A promotion window opening or closing | the 5-minute window sweep | `src/promotion/offer_sync.py: refresh_window_changes` |
+| The nightly reconciliation | recomputes every product, writes only what differs | `src/product/tasks.py: reevaluate_price_episodes` |
 
 A price field must never be changed with `queryset.update()`: it skips all of
 the above (nothing in the code base does today). The nightly sweep exists for
 what no path can see: a promotion running when this shipped, a product saved
 by a release that predates the records. Switching promotions off or on (the
 store's `PROMOTIONS_ENABLED`, the plan's `promotions_enabled`) runs the same
-sweep for that store at once (`promotion/signals.py`). A promotion's start is recorded when the queue or sweep notices it
+sweep for that store at once (`src/promotion/signals.py`). A promotion's start is recorded when the queue or sweep notices it
 (seconds to five minutes), not at its `starts_at`.
 
 Those price columns move through `bulk_update`, which sends no `post_save`,
@@ -135,7 +135,7 @@ What it cannot know:
 | `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `ProductVariantSerializer` (`/api/v1/product/{id}/variants`) | each sibling's own three fields, the same `EffectivePriceFieldsSerializer`, so a variant swatch or an agent's variant list shows the price and announcement its product card shows |
 | `?minAnnouncedDiscountPercent=` / `?ordering=-announcedDiscountPercent` | `ProductFilter`, `ProductViewSet.ordering_fields` | list filter and sort on the same percent (`with_announced_discount_percent()`); the discounted rail uses both |
 | `?minEffectivePrice=` / `?maxEffectivePrice=` / `?ordering=effectivePrice` | `ProductFilter`, `ProductViewSet.ordering_fields` | list price filter and sort on `effective_price`, a stored column |
-| search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `search/views.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |
+| search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `src/search/views.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |
 
 Price filter and price sort follow what the customer pays, not the list
 price: a product under a 20% automatic category promotion is found by a price
@@ -193,7 +193,7 @@ needs only the settings step: the documents keep the field, so no reindex.
 The demo catalogue is seeded already marked down, so left alone its products
 have no full-price spell older than 30 days and the rule above announces
 nothing. The `price-history` step of `manage.py seed_demo_store`
-(`devtools/demo_price_history.py`) therefore records, for every marked-down
+(`src/devtools/demo_price_history.py`) therefore records, for every marked-down
 demo product, a full-price spell that began before the look-back window and
 ends where the reduction starts, a fixed point inside the 60-day progressive
 window. Only that full-price spell is written by the seed; the reduction's
@@ -203,7 +203,7 @@ deletes and back-dates spells, which the platform never does: it touches only
 the seed's own `demo-` products. Re-running changes nothing while a product's
 history is already what the seed writes.
 
-The nightly demo reset (`devtools/demo_account.py: reset_demo_account`) runs
+The nightly demo reset (`src/devtools/demo_account.py: reset_demo_account`) runs
 the same step, so a history that a price change broke, or one that was never
 seeded, is repaired by the next night, and the store's caches are purged when
 anything was rebuilt. Until 2026-10-16 the step ran only from
@@ -220,7 +220,7 @@ what the shopper pays (30.00 net at 24% VAT: 37.20 list, 33.48 with 10% off).
 `Product.discount_value` is the markdown on the net price, `Product.vat_value`
 is the VAT of the price actually charged, and
 `final_price == price - discount_value + vat_value`. The SQL twins in
-`product/managers/product.py` follow the same definition. Before migration
+`src/product/managers/product.py` follow the same definition. Before migration
 `0051` the VAT was taken on the undiscounted net, which made a 10% markdown
 worth about 8%.
 

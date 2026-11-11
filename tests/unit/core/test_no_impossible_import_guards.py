@@ -135,10 +135,11 @@ _BROAD_EXCEPTIONS = frozenset({"Exception", "BaseException"})
 
 
 def _first_party_modules() -> frozenset[str]:
-    """Top-level names this repository itself provides: its app packages
-    and its root modules (`settings`, `asgi`, ...)."""
+    """Top-level names this repository itself provides: the packages and
+    modules of `src/` (the apps, `settings`, `asgi`) and the modules at
+    the root (`manage`, `gunicorn_worker`)."""
     names = set()
-    for child in REPO_ROOT.iterdir():
+    for child in (*REPO_ROOT.iterdir(), *(REPO_ROOT / "src").iterdir()):
         if child.name.startswith(".") or child.name in _EXCLUDED_DIRS:
             continue
         if child.is_dir() and (child / "__init__.py").exists():

@@ -12,7 +12,7 @@ when it is shown.
 `contract/image-limits.json` in grooveshop-media-stream holds the per-format
 byte caps and the pixel limit it holds a source to (a spec there keeps the file
 equal to its constants; `docs/image-limits.md` there says what is refused).
-`core/data/image-limits.json` is a pinned COPY:
+`src/core/data/image-limits.json` is a pinned COPY:
 `.github/scripts/sync_upstream_sources.py` writes it and
 `tests/fixtures/upstream-sources.lock.json` pins it by git id,
 `tests/unit/core/test_upstream_sources_pin.py` fails on a hand edit and the
@@ -41,7 +41,7 @@ the upload fit (below), then judges what comes out with
 ### A big photo is shrunk, not refused
 
 A raster over its format's byte cap or over the pixel budget is re-encoded in
-the SAME format by `core/image_normalise.py`:
+the SAME format by `src/core/image_normalise.py`:
 
 - the EXIF orientation is applied, then the image is scaled down to
   `UPLOAD_IMAGE_MAX_EDGE` on its long side (default 4096, twice the widest
@@ -70,7 +70,7 @@ image stored before the rule can still be edited around it.
 | Those same fields through a DRF `ModelSerializer` | `CoreConfig.ready` maps the model field to `core.api.image_field.ServableImageField` |
 | Product images through the API | `ServableImageField(formats=PRODUCT_IMAGE_FORMATS)`: a product shows a still, no GIF or TIFF |
 | TinyMCE image upload (`core.views.upload_image`) | `ImageUploadForm` uses `ImageAndSvgField` |
-| The page builder's media library (`builder/media_services.py`) | `validate_servable_image(allow_svg=False)` and the import is cut off at the largest cap |
+| The page builder's media library (`src/builder/media_services.py`) | `validate_servable_image(allow_svg=False)` and the import is cut off at the largest cap |
 
 `FILE_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB) is Django's threshold for holding an
 upload in memory or spooling it to disk. It is not a policy and no rule reads

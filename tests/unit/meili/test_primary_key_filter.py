@@ -115,7 +115,13 @@ def test_no_code_deletes_by_ids():
     pattern = re.compile(r"delete_documents\(\s*+(?!filter=)\S")
     offenders = [
         str(path.relative_to(root))
-        for folder in ("meili", "product", "blog", "search", "tests/utils")
+        for folder in (
+            "src/meili",
+            "src/product",
+            "src/blog",
+            "src/search",
+            "tests/utils",
+        )
         for path in (root / folder).rglob("*.py")
         if pattern.search(path.read_text(encoding="utf-8"))
     ]

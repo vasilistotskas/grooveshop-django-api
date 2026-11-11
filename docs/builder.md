@@ -1,13 +1,13 @@
-# Storefront page builder (`builder/`)
+# Storefront page builder (`src/builder/`)
 
 A store's theme, section groups (header, footer, ...), templates and pages
 are **documents**: versioned JSON that the store's staff edit in the
-storefront's visual editor and publish together. Source: `builder/`
+storefront's visual editor and publish together. Source: `src/builder/`
 (`models.py`, `services.py`, `validation.py`, `storefront.py`,
 `references.py`, `published.py`, `views.py`, `rendering.py`,
 `media_services.py`, `media_api.py`), the
-`builder` cache surface in `core/cache/surfaces.py`,
-`tenant/role_scopes.py`. The code wins over this page.
+`builder` cache surface in `src/core/cache/surfaces.py`,
+`src/tenant/role_scopes.py`. The code wins over this page.
 
 `builder` is a tenant app: every table lives in the store's schema, with its
 backups, staging refresh and destroy. The editor and the block catalogue are
@@ -81,8 +81,8 @@ child exactly once.
 
 The storefront declares each block once and serves the result per store:
 `GET {NUXT_INTERNAL_BASE_URL}/api/builder/catalogue?schema=<schema>` answers
-`{hash, blocks: [...]}` with `ETag: "<hash>"` (`builder/storefront.py`; the
-base URL helper and `StorefrontUnavailable` are `core/storefront.py`, shared
+`{hash, blocks: [...]}` with `ETag: "<hash>"` (`src/builder/storefront.py`; the
+base URL helper and `StorefrontUnavailable` are `src/core/storefront.py`, shared
 with `texts`). A process keeps its copy and revalidates with `If-None-Match`
 every `BUILDER_CATALOGUE_REVALIDATE_SECONDS`. **When the storefront does not
 answer, nothing is saved** (`503 storefront_unavailable`): the same rule as
@@ -106,7 +106,7 @@ catalogue to this: each `linkRefs` is exactly the settings its schema marks
 
 ## What a save checks
 
-`builder/validation.py` collects every problem as `{path, code, message}`,
+`src/builder/validation.py` collects every problem as `{path, code, message}`,
 `path` being a JSON pointer into what was sent. On the wire a problem is
 always `{path, code, message, document, params}` (`Issue.as_dict`, held equal
 to `PublishProblemSerializer`): `document` and `params` are `null` when there
@@ -155,11 +155,11 @@ switched off does not count against a document here, as it does at a publish,
 but one the platform does not know does. An older storefront leaves out a node
 newer than it knows, so run it once the storefront release it follows has
 proved itself. It rewrites a `BuilderVersion` in place
-(`builder/document_rewrite.py`, [the way back](#a-rewrite-in-place-and-the-way-back)
+(`src/builder/document_rewrite.py`, [the way back](#a-rewrite-in-place-and-the-way-back)
 below): a version keeps its number and what it renders. A draft moves to a
 new revision and stays published if it was, so a store is not told it has
 unpublished changes.
-`builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
+`src/builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
 to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
 adds its step there too, or the command stops at it with `no upgrade from`.
 The overlay moves with the node: each language's settings are upgraded too, and
@@ -210,7 +210,7 @@ translatable: it resolves to the path of the viewer's language, so an overlay
 value on it is `untranslatable_setting`.
 
 
-### A theme keeps its contrast (`builder/contrast.py`)
+### A theme keeps its contrast (`src/builder/contrast.py`)
 
 The catalogue declares, for the theme document, the pairs of colours that must
 keep a WCAG 2.2 contrast (`documentKinds.theme.contrast`): `{id, foreground,
@@ -249,7 +249,7 @@ theme is.
   made (`seed_with_content` still applies).
 
 
-### Typed data props (`builder/data_sources.py`)
+### Typed data props (`src/builder/data_sources.py`)
 
 A block can declare a setting in the catalogue's `data` map, beside `refs`
 (both are read until the storefront stops serving `refs`):
@@ -287,7 +287,7 @@ for the current release, `BuilderReference`:
   existence-checked.
 
 
-### A changed record reaches the pages that show it (`builder/data_purge.py`)
+### A changed record reaches the pages that show it (`src/builder/data_purge.py`)
 
 The storefront caches a rendered page, so a product, category, post or
 promotion that changes must purge the pages that show it. The index above
@@ -308,7 +308,7 @@ under-purging is the bug, so a list is matched by ANY of its facets.
 
 ## Writes
 
-`builder/services.py` is the only writer (permission first, then the
+`src/builder/services.py` is the only writer (permission first, then the
 catalogue, then the write):
 
 | Function | What |
@@ -325,9 +325,9 @@ catalogue, then the write):
 ## What a release moves
 
 `BuilderRelease` is `invalidated_by` of the `builder` surface
-(`core/cache/surfaces.py`: the storefront's `builderPage` handler, every
+(`src/core/cache/surfaces.py`: the storefront's `builderPage` handler, every
 cached route, `invalidates_tenant_config=True`, so the Cloudflare edge purge
-follows) and `tenant/signals.py: bump_generation_on_builder_release` moves
+follows) and `src/tenant/signals.py: bump_generation_on_builder_release` moves
 `Tenant.cache_generation` in the release's own transaction. A draft save or
 a checkpoint purges nothing: no public read touches a draft.
 
@@ -336,7 +336,7 @@ a checkpoint purges nothing: no public read touches a draft.
 All under `/api/v1/builder/`. Bodies are camelCase, **except a document's
 own content** (`draft`, `i18n`, `data`, `theme`, `groups`, `page`,
 `versions`): its keys are the storefront's and travel untouched
-(`builder/rendering.py`).
+(`src/builder/rendering.py`).
 
 Staff (`StoreStaffModelPermissions`):
 
@@ -415,8 +415,8 @@ that a test reaches cannot go undeclared.
 
 ## The live preview
 
-`POST builder/preview/resolve` (`builder/services.py: preview`,
-`builder/published.py: preview`) answers what the public read would answer if
+`POST builder/preview/resolve` (`src/builder/services.py: preview`,
+`src/builder/published.py: preview`) answers what the public read would answer if
 the editor's **unsaved working copies** were released now, so the editor can
 render a page without saving or publishing it.
 
@@ -450,7 +450,7 @@ render a page without saving or publishing it.
 ## The editor's link pickers
 
 Staff routes (`StoreStaffModelPermissions`, so every role looks), in
-`builder/link_picker.py`. The existence rule is `references.VISIBLE`, the one
+`src/builder/link_picker.py`. The existence rule is `references.VISIBLE`, the one
 the publish check and `link-targets` use; the pickers add no second copy of
 it. No route is built here: the storefront composes the path from the slug.
 
@@ -482,7 +482,7 @@ per row.
 
 ## Share-preview links
 
-`builder/preview_links.py`, `BuilderPreviewLink`. A store shows unpublished work
+`src/builder/preview_links.py`, `BuilderPreviewLink`. A store shows unpublished work
 to someone without an account:
 
 - `POST preview-links {documents, note?}` (the change permission: ADMIN and
@@ -517,12 +517,12 @@ to someone without an account:
 - `builder.tasks.purge_expired_preview_links` (daily, per store, suspended
   stores included: `tenant.tasks.fanout_purge_expired_builder_preview_links`)
   deletes the expired links and the drafts they hold. The staging anonymiser
-  deletes the table (`devtools/anonymise/rules.py`): a link is a credential.
+  deletes the table (`src/devtools/anonymise/rules.py`): a link is a credential.
 
 ## Presence
 
 `POST builder/presence {documents: [key]}` is the editor's heartbeat and
-`DELETE builder/presence` its sign-out (`builder/presence.py`). The heartbeat
+`DELETE builder/presence` its sign-out (`src/builder/presence.py`). The heartbeat
 names the documents the editor has open (the full list: ones left out are let
 go of) and answers `{documents: {key: [{id, name, since}]}}`: who ELSE sent a
 heartbeat for each, oldest first, the caller left out. It is a hint, not a
@@ -543,9 +543,9 @@ lock: the draft's `If-Match` revision still decides a save.
 
 ## Which features are on, and where to turn one on
 
-`GET features` (`builder/features.py`, any store role) answers `{features:
+`GET features` (`src/builder/features.py`, any store role) answers `{features:
 {<name>: {on, turnOnUrl}}}` for every name of `TenantConfig.features`
-(`tenant/features.py: STORE_FEATURES`), so the editor can mark a block whose
+(`src/tenant/features.py: STORE_FEATURES`), so the editor can mark a block whose
 feature is off (`feature_disabled`) and offer "Turn on <feature>" without
 copying the plan/setting split or guessing admin addresses. It reads the table
 and the request-scoped state the admin uses (`admin.features.StoreFeatures`),
@@ -555,7 +555,7 @@ so it cannot disagree with the 404 gates or the sidebar.
 - `turnOnUrl`: the store admin's change page of the first setting that is off,
   on the store's own API host (`get_tenant_api_base_url`). Every declared
   setting has its row (`migrate` creates the missing ones, and the settings
-  admin refuses to delete a declared one: `core/admin.py: SettingAdmin`), so
+  admin refuses to delete a declared one: `src/core/admin.py: SettingAdmin`), so
   the page exists; a name with no row, which only an undeclared setting can
   be, has no link.
   `null` when the feature is on, when the plan keeps it off (only the platform
@@ -567,20 +567,20 @@ so it cannot disagree with the 404 gates or the sidebar.
 
 ## The media library
 
-`MediaAsset` (`builder/models.py`) is an image in the store's library; an
+`MediaAsset` (`src/builder/models.py`) is an image in the store's library; an
 image setting is a `media` reference to its id, never a URL. The storefront
 gets what it needs to render it well: the size a browser shows (EXIF
 orientation applied, so it can reserve space and size `srcset`), a focal
 point (`focalX`, `focalY`, 0 to 1) to crop around, the alt text per
 language, and `path` (`media/<schema>/uploads/builder/<name>`, what
 media-stream serves). The file is in the store's media directory
-(`tenant/storage.py`).
+(`src/tenant/storage.py`).
 
 `alt` is a parler translation, unlike a block's settings (a JSON overlay):
 the row stands alone and its text is one plain field, while a block's
 structure must not vary per language.
 
-`builder/media_services.py` is the only writer. Only raster images (an
+`src/builder/media_services.py` is the only writer. Only raster images (an
 SVG can carry script and has no size to reserve), held to the rule every
 image upload shares ([`docs/image-uploads.md`](image-uploads.md): the media
 service's per-format byte caps and a pixel budget) (`file_too_large`,
@@ -652,7 +652,7 @@ or expired token is `404 preview_link_expired`. Both are `private, no-store`.
 
 Before the media picker a block held an image as a string (`/img/x.jpg`,
 `/uploads/y.jpg`). `manage.py import_builder_media --tenant <schema>`
-(`builder/media_migration.py`) brings those into the library:
+(`src/builder/media_migration.py`) brings those into the library:
 
 - It reads every string of the drafts and of the published versions
   (`--all-versions` for every stored version), by value, never by field name:
@@ -684,9 +684,9 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
 `manage.py migrate_builder_media --tenant <schema>` does, once the storefront
 serves the blocks' new settings and the images are imported. The storefront
 declares each block's old image settings (`legacyImages`, vendored as
-`builder/legacy_image_fields.json`). Every draft and stored version gets the
+`src/builder/legacy_image_fields.json`). Every draft and stored version gets the
 asset in place of the URL and loses the URL and its alt, in the settings and in
-the overlay, through `builder/document_rewrite.py`: each document is validated
+the overlay, through `src/builder/document_rewrite.py`: each document is validated
 against the store's catalogue, and a version keeps its number. It ends with
 a new release of the same versions, because the public read is cached per
 release: that is what brings the rewrite to visitors.
@@ -848,7 +848,7 @@ release: that is what brings the rewrite to visitors.
 
 `persist_block_upgrades` and `migrate_builder_media` change every draft and
 every version of a store, which nothing else may edit, and neither model
-keeps history. `builder/document_rewrite.py` is the one place they do it.
+keeps history. `src/builder/document_rewrite.py` is the one place they do it.
 
 - **Every document**, a deleted page's too: its versions are still stored, so
   its draft is moved with them.
@@ -900,11 +900,11 @@ no store the command reaches holds, given to `--restore` or `--delete`, exits
   is refused unless `--in-every-store` is given too. The latest run of a
   store is kept unless `--latest-too` is given.
 - A backup is a copy of a draft or a version, so it is the same kind of data
-  as those (`devtools/anonymise/rules.py`), and Django deletes it with its
+  as those (`src/devtools/anonymise/rules.py`), and Django deletes it with its
   document or its version.
 
 **Rolling back to a release from before this table.** That release deletes
-versions (checkpoint pruning in `builder/services.py`) and pages without
+versions (checkpoint pruning in `src/builder/services.py`) and pages without
 knowing the backups exist. Django's cascade is Django's: the database would
 not delete a backup, it would refuse the delete of the version. A
 database-level cascade is not available here (`DB_CASCADE` is refused by the
@@ -919,10 +919,10 @@ next restore of its run.
 
 The editor runs on the store's own host, where nobody is signed in as staff
 (staff are public-schema identities; a storefront session is a customer's).
-`builder/staff_session.py`:
+`src/builder/staff_session.py`:
 
 1. Store admin, **Content -> Edit storefront** (`admin:edit-storefront`,
-   `builder/admin_views.py`; for a holder of `builder.view_builderdocument`,
+   `src/builder/admin_views.py`; for a holder of `builder.view_builderdocument`,
    so every role: ADMIN and OWNER edit in the editor, STAFF open it read only,
    and the session's `role` tells the editor which; `never_cache`).
    It stores the staff id in Redis under a random key for
@@ -938,7 +938,7 @@ The editor runs on the store's own host, where nobody is signed in as staff
 
 Security properties, each with a test:
 
-- **Single use.** The ticket is minted and spent by `core/tickets.py`, the
+- **Single use.** The ticket is minted and spent by `src/core/tickets.py`, the
   helper the WebSocket ticket uses too: Redis `GETDEL`, one round trip, so of
   two requests with the same ticket one wins. Tickets live under the `strict:`
   cache namespace, so an unreachable Redis raises instead of failing open.
@@ -960,7 +960,7 @@ Security properties, each with a test:
 - **Revocation.** The authenticator re-checks `is_staff` and the role in this
   store on every request, so removing the membership, clearing `is_staff` or
   deactivating the account ends a live session at once; a password reset
-  deletes the account's staff tokens (`admin/password_reset.py`); logout
+  deletes the account's staff tokens (`src/admin/password_reset.py`); logout
   deletes it.
 - **A ticket is in a URL**, so it can reach a log or a history entry; that is
   why it lives a minute and is single use. The storefront should trade it at
@@ -972,7 +972,7 @@ Security properties, each with a test:
 
 ## Scheduled publishing
 
-`builder/scheduling.py`, `builder/tasks.py`, `BuilderScheduledPublish`. A
+`src/builder/scheduling.py`, `src/builder/tasks.py`, `BuilderScheduledPublish`. A
 publish can wait for a time:
 
 - `POST schedules` `{documents, scheduledFor, note}` checks exactly what a
@@ -1003,7 +1003,7 @@ publish can wait for a time:
   cache generation and the `builder` surface move at that moment.
 - **A failure reaches a person.** When the sweep marks a schedule `failed`,
   after that commit it sends the store-staff email `ops.builder_schedule_failed`
-  (`builder/emails.py`, area `ops`, switchable on the store's Emails page like
+  (`src/builder/emails.py`, area `ops`, switchable on the store's Emails page like
   the other `ops.*` alerts; Greek and English) naming the pages, the scheduled
   time (store timezone) and the problems in plain words. The problem sentences
   are re-read from the stored code and params in the language of the email
@@ -1021,8 +1021,8 @@ files (the media service's image limits are copied the same way, see
 
 | Source | Copy | Used by |
 |---|---|---|
-| `test/fixtures/builder/catalogue.json` | `builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
-| `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
+| `test/fixtures/builder/catalogue.json` | `src/builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
+| `test/fixtures/builder/seeds/` | `src/builder/seeds/` | `builder.seeding`: application data |
 
 `tests/fixtures/upstream-sources.lock.json` names each owner's commit and
 the git id of each source (the tree id of a directory, the blob id of a file).
@@ -1034,7 +1034,7 @@ builder tests, commit.
 
 ## Default documents for a new store
 
-`builder/seeding.py` loads `builder/seeds/*.json` (each `{key, document,
+`src/builder/seeding.py` loads `src/builder/seeds/*.json` (each `{key, document,
 i18n}`). Provisioning (`tenant.provisioning`, step "page builder")
 stores each as a document whose draft equals its published content, one
 version, and ONE release (number 1) holding them all; today that is
@@ -1047,7 +1047,7 @@ references) equal what validation derives.
 
 ## The demo store's pages
 
-`devtools/demo_pages/*.json` are the demo store's pages and menus (home,
+`src/devtools/demo_pages/*.json` are the demo store's pages and menus (home,
 about, contact, feedback, the footer and the mobile menu) in the same
 `{key, document, i18n}` shape, exported from production's demo store. What
 differs per store is a placeholder: `{{asset:<key>}}` for an image (the

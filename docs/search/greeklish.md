@@ -1,12 +1,12 @@
 # Greeklish search
 
 How a Greek word typed in Latin letters finds its products and posts.
-Source: `search/transliteration.py`, the `MeiliMeta` blocks on
+Source: `src/search/transliteration.py`, the `MeiliMeta` blocks on
 `ProductTranslation` / `BlogPostTranslation`, and `_relaxed_query` in
-`search/views.py`. The code wins over this page. The API-facing summary is
+`src/search/views.py`. The code wins over this page. The API-facing summary is
 in [the search API reference](../api/search.md#greeklish).
 
-Handled at *index time* (`search/transliteration.py`), queries reach Meilisearch verbatim.
+Handled at *index time* (`src/search/transliteration.py`), queries reach Meilisearch verbatim.
 
 Three shadow layers:
 

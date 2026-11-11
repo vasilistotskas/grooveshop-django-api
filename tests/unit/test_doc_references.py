@@ -26,13 +26,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EXCEPTIONS_FILE = Path(__file__).with_name("doc_reference_exceptions.txt")
 
 _BACKTICKED = re.compile(r"`([^`\n]+)`")
+_EXTENSION = r"\.(?:py|md|txt|html|yml|yaml|toml|json|sh|mjs|po|j2)"
 # ``order/services.py``, ``order/services.py:120``, ``docs/x.md#anchor``
 _REPO_PATH = re.compile(
-    r"^(?P<path>[\w.-]+(?:/[\w.-]+)+\.(?:py|md|txt|html|yml|yaml|toml|json|sh|mjs|po|j2))"
-    r"(?:[:#][\w,:#-]*)?$"
+    r"^(?P<path>[\w.-]+(?:/[\w.-]+)+" + _EXTENSION + r")(?:[:#][\w,:#-]*)?$"
 )
+# A file named without a folder, alone or followed by what is said about
+# it: ``settings.py``, ``settings.py: REST_KNOX``, ``manage.py check``.
+# The name has to be a root or source-root entry to count (see
+# ``_first_party_roots``), which leaves ``models.py`` and ``conftest.py``
+# out. ``settings.py`` moved into ``src/`` and the docs went on citing
+# it by its bare name, unseen, because a path needed a slash.
+_ROOT_FILE = re.compile(r"^(?P<path>[\w.-]+" + _EXTENSION + r")(?=$|[\s:#,(])")
 # A template is named the way Django loads it, relative to this folder.
-_TEMPLATE_ROOT = "core/templates"
+_TEMPLATE_ROOT = "src/core/templates"
 # Directories whose entries are importable top-level packages.
 _SOURCE_ROOTS = ("src",)
 _MEMORY_NOTE = re.compile(r"\b(?:project|feedback|reference)_[a-z0-9_]+\.md\b")
@@ -87,7 +94,8 @@ def _missing_paths() -> set[str]:
     for doc in _doc_files():
         rel_doc = doc.relative_to(REPO_ROOT).as_posix()
         for token in _BACKTICKED.findall(doc.read_text(encoding="utf-8")):
-            match = _REPO_PATH.match(token.strip())
+            token = token.strip()
+            match = _REPO_PATH.match(token) or _ROOT_FILE.match(token)
             if match is None:
                 continue
             path = match["path"]
@@ -162,3 +170,20 @@ def test_a_package_moved_under_a_source_root_is_still_checked(
     monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
 
     assert _missing_paths() == {"CLAUDE.md: order/services.py"}
+
+
+def test_a_root_file_moved_under_a_source_root_is_still_checked(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "settings.py").touch()
+    (tmp_path / "manage.py").touch()
+    (tmp_path / "CLAUDE.md").write_text(
+        "Old `settings.py` and `settings.py: REST_KNOX`, new "
+        "`src/settings.py`. `manage.py check` is at the root, and "
+        "`models.py` names no root entry.",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
+
+    assert _missing_paths() == {"CLAUDE.md: settings.py"}

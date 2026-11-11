@@ -285,7 +285,12 @@ class TestNoDeadDjangoPatterns:
 
         root = Path(__file__).resolve().parents[4]
         names: set[str] = set()
-        for path in _project_python_files(root):
+        # ``src`` is not a package, so the walk from the root stops
+        # at it: the apps are walked from there.
+        for path in (
+            *_project_python_files(root),
+            *_project_python_files(root / "src"),
+        ):
             try:
                 text = path.read_text(encoding="utf-8")
             except OSError, UnicodeDecodeError:

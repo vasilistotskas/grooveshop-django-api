@@ -29,21 +29,21 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 
 ### 3. Stock & Payment Atomicity
 - `StockManager.reserve_stock()` / `release_reservation()` / `convert_reservation_to_sale()` / `decrement_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
-- `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `settings.py`, validated by `order.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
+- `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `src/settings.py`, validated by `order.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
-- Viva Wallet webhooks (`order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
+- Viva Wallet webhooks (`src/order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
 - Order status transitions: verify they follow the expected lifecycle (no skipping states)
 
 ### 4. Celery Task Security
 - Tasks accepting model IDs must re-fetch from DB (never trust serialized model instances)
 - `MonitoredTask` base class: verify error handling doesn't leak stack traces to external services
-- Tasks with `autoretry_for` and `retry_backoff`: `max_retries` is set explicitly and bounded (2 to 5 in the codebase); `autoretry_for` names a transient-error tuple from `core/retry.py` (or one specific domain exception), never `Exception`
+- Tasks with `autoretry_for` and `retry_backoff`: `max_retries` is set explicitly and bounded (2 to 5 in the codebase); `autoretry_for` names a transient-error tuple from `src/core/retry.py` (or one specific domain exception), never `Exception`
 - Verify task arguments are serializable primitives (no user objects, no request objects)
 
 ### 5. File Upload & Image Processing
 - `ImageAndSvgField`: verify SVG uploads are sanitized (no `<script>`, no `javascript:` URLs)
 - File upload size limits: check `DATA_UPLOAD_MAX_MEMORY_SIZE` and model-level validators
-- Uploaded files must be stored in `mediafiles/`, never in `static/` or project root
+- Uploaded files must be stored in `mediafiles/`, never in `src/static/` or project root
 - Check `MEDIA_URL` and `MEDIA_ROOT` configuration for path traversal
 
 ### 6. Serializer & Input Validation
@@ -59,18 +59,18 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Admin-only endpoints use `StoreStaffModelPermissions` (or `tenant.membership.is_store_staff`), or `IsPlatformSuperuser` for platform routes; flag any DRF `IsAdminUser` or `request.user.is_staff` check (`docs/api-staff-identity.md`)
 
 ### 8. Information Disclosure
-- Error responses: verify the production deploy does not set the `DEBUG` env var to `True` (`settings.py`: `DEBUG = getenv("DEBUG", "False") == "True"`)
+- Error responses: verify the production deploy does not set the `DEBUG` env var to `True` (`src/settings.py`: `DEBUG = getenv("DEBUG", "False") == "True"`)
 - Serializer fields: verify `private_metadata` is excluded from non-admin serializers
 - User serializers: verify sensitive fields (password hash, tokens, internal IDs) are excluded
 - Health check at `/api/v1/health`: verify it doesn't expose internal service versions or connection strings
 
 ### 9. WebSocket Security
 - Verify `ws/notifications/` enforces authentication via `TokenAuthMiddleware`
-- Check that group assignment (`tenant_{schema}_user_{id}`, `notification/groups.py`) cannot be spoofed across users or tenants; the socket authenticates only by a single-use `?ticket=`
+- Check that group assignment (`tenant_{schema}_user_{id}`, `src/notification/groups.py`) cannot be spoofed across users or tenants; the socket authenticates only by a single-use `?ticket=`
 - Verify message content is not user-controlled HTML
 
 ### 10. Rate Limiting
-- Throttling is app-level DRF: `AnonRateThrottle`/`UserRateThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in `core/api/throttling.py` with rates in `DEFAULT_THROTTLE_RATES`
+- Throttling is app-level DRF: `AnonRateThrottle`/`UserRateThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in `src/core/api/throttling.py` with rates in `DEFAULT_THROTTLE_RATES`
 - Flag a throttle keyed on `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` read directly; the ident is `edge_client_ip(request) or self.get_ident(request)` (CLAUDE.md, "Client IP and throttle identity")
 - A new throttle uses `ResilientThrottleMixin` and sets `fail_closed` by the rule in that module's docstring (secret or existence oracle, money or stock, email to a caller-chosen address, uploads, third-party budgets deny while Redis is down)
 
@@ -87,8 +87,8 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 ## Review Process
 
 1. Read the changed files completely
-2. Cross-reference against `core/api/permissions.py` for permission patterns
-3. Check if changes affect `core/middleware/` for request processing
+2. Cross-reference against `src/core/api/permissions.py` for permission patterns
+3. Check if changes affect `src/core/middleware/` for request processing
 4. Verify model changes don't weaken `SoftDeleteModel` or `PublishableModel` protections
 5. Flag only HIGH-CONFIDENCE issues with specific file:line references
 6. Rate each finding: CRITICAL / HIGH / MEDIUM with clear exploit scenario
@@ -96,5 +96,5 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 ## What NOT to Flag
 - `DEBUG=True` in a developer's local `.env`
 - A browsing or read endpoint with no per-scope throttle (the default anon/user throttles already apply)
-- Generic Django security settings already configured in `settings.py`
+- Generic Django security settings already configured in `src/settings.py`
 - `force_authenticate()` in test files (expected pattern)

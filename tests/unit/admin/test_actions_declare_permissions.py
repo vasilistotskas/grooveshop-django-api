@@ -94,7 +94,7 @@ def test_every_first_party_admin_extends_the_base():
 
     first_party = {
         path.name
-        for path in Path(settings.BASE_DIR).iterdir()
+        for path in Path(settings.SRC_DIR).iterdir()
         if (path / "__init__.py").exists()
     }
     bare = sorted(

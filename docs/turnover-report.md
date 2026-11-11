@@ -4,13 +4,13 @@ A store's turnover for any range of days: the goods **and** the shipping and
 payment-method fee it invoices, net of VAT, an order counted when it left the
 store, less what went back. One definition serves the turnover page, its CSV and
 XLSX, and the store dashboard's revenue and best sellers. Source:
-`order/turnover.py` (the definition and every query), `order/vat_snapshot.py`
-(what it reads and how existing orders are filled in), `order/models/vat_line.py`
-(`OrderVatLine`), `order/models/order.py` (`Order.shipped_at`, stamped in
-`Order.save`), `admin/turnover.py` (the page and the two exports),
-`core/templates/admin/turnover.html`, `admin/dashboard/store/queries.py` (the
-dashboard reads `figures_between`), `admin/admin.py: MyAdminSite.get_urls` (the
-three routes), `admin/navigation.py: store_sidebar` (the entry). The code wins
+`src/order/turnover.py` (the definition and every query), `src/order/vat_snapshot.py`
+(what it reads and how existing orders are filled in), `src/order/models/vat_line.py`
+(`OrderVatLine`), `src/order/models/order.py` (`Order.shipped_at`, stamped in
+`Order.save`), `src/admin/turnover.py` (the page and the two exports),
+`src/core/templates/admin/turnover.html`, `src/admin/dashboard/store/queries.py` (the
+dashboard reads `figures_between`), `src/admin/admin.py: MyAdminSite.get_urls` (the
+three routes), `src/admin/navigation.py: store_sidebar` (the entry). The code wins
 over this page.
 
 ## The definition
@@ -195,7 +195,7 @@ own schema.
 
 ## The dashboard
 
-`admin/dashboard/store/queries.py` reads the same module: `overview` (revenue
+`src/admin/dashboard/store/queries.py` reads the same module: `overview` (revenue
 and its prior period, orders sold) and `sales_series` (revenue per bucket) call
 `figures_between`; `best_sellers` counts units of orders with `shipped_at` in the
 period. Revenue there is net turnover. The cached queries depend on
@@ -213,9 +213,9 @@ its creation). An order whose receipt cannot be derived is named and skipped,
 never guessed. Orders the previous release creates or ships while it still
 serves the rollout are not covered, because the migration already ran: run
 `manage.py backfill_turnover_snapshots --all-tenants` after the rollout. It is
-idempotent. The seeded demo orders (`devtools/demo_orders.py`) write both
+idempotent. The seeded demo orders (`src/devtools/demo_orders.py`) write both
 snapshots, and a `REFUNDED` demo order gets its charge and refund ledger rows
-(`devtools/demo_account.py: _seed_refund`).
+(`src/devtools/demo_account.py: _seed_refund`).
 
 ## Performance
 

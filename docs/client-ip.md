@@ -1,7 +1,7 @@
 # Client IP and throttle identity
 
 How the API identifies the caller behind a request, for throttles, audit
-rows and anything else keyed on an address. Source: `core/client_ip.py`
+rows and anything else keyed on an address. Source: `src/core/client_ip.py`
 (`edge_client_ip`, `client_ip_or_peer`). The code wins over this page.
 
 Never read

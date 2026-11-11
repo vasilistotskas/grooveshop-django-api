@@ -4,7 +4,7 @@ description: >
   Review Django migrations for backwards-compatibility under the Argo CD
   PreSync hook deploy model — schema lands BEFORE new code rolls out.
   Use after generating any migration, when reviewing PRs that touch
-  `*/migrations/*.py`, or whenever model changes are about to ship.
+  `src/*/migrations/*.py`, or whenever model changes are about to ship.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -21,7 +21,7 @@ This means any migration that breaks the old code's queries will produce
 removes the old shape after no code reads it. The full rule, with the
 `contract_of` / `accepted_downtime` attributes, is `docs/migrations.md`.
 
-`manage.py migration_preflight` (`core/db/migration_safety.py`) is the
+`manage.py migration_preflight` (`src/core/db/migration_safety.py`) is the
 automated gate for the mechanical cases — it runs in CI and as PreSync
 step 0. This review covers what it cannot see: `RunPython` data
 changes, column type changes, unique constraints on dirty data, lock
@@ -37,7 +37,7 @@ git diff --name-only --diff-filter=AM | grep migrations/
 ```
 
 Read every changed migration file in full. Cross-reference against the
-corresponding `<app>/models.py` to understand the model shape before and
+corresponding `src/<app>/models.py` to understand the model shape before and
 after.
 
 ### 2. Classify each operation
@@ -149,7 +149,7 @@ possible.
 Migration safety review
 
 UNSAFE
-  product/migrations/0042_remove_legacy_sku.py:14
+  src/product/migrations/0042_remove_legacy_sku.py:14
     RemoveField(Product, "legacy_sku")
     Old pods break: ProductSerializer reads legacy_sku → KeyError on response
     Fix: split into two releases
@@ -157,13 +157,13 @@ UNSAFE
       Release 2: this migration
 
 CONDITIONAL
-  order/migrations/0089_add_status_index.py:8
+  src/order/migrations/0089_add_status_index.py:8
     AddIndex(Order, fields=["status"])
     Order has ~5M rows in prod; CREATE INDEX may exceed the PreSync hook's 1800s activeDeadlineSeconds
     Fix: use AddIndexAdaptively with atomic = False
 
 SAFE
-  product/migrations/0043_add_view_count.py:12
+  src/product/migrations/0043_add_view_count.py:12
     AddField(Product, "view_count", IntegerField(db_default=0))
     NOT NULL with db_default; old INSERTs that omit it still succeed
 

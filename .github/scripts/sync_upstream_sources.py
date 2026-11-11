@@ -101,21 +101,21 @@ SOURCES: tuple[Source, ...] = (
         "catalogue",
         STOREFRONT,
         "test/fixtures/builder/catalogue.json",
-        "builder/seed_catalogue.json",
+        "src/builder/seed_catalogue.json",
         "blob",
     ),
     Source(
         "legacy-image-fields",
         STOREFRONT,
         "test/fixtures/builder/legacy-image-fields.json",
-        "builder/legacy_image_fields.json",
+        "src/builder/legacy_image_fields.json",
         "blob",
     ),
     Source(
         "seeds",
         STOREFRONT,
         "test/fixtures/builder/seeds",
-        "builder/seeds",
+        "src/builder/seeds",
         "tree",
     ),
     Source(
@@ -150,7 +150,7 @@ SOURCES: tuple[Source, ...] = (
         "image-limits",
         MEDIA_STREAM,
         "contract/image-limits.json",
-        "core/data/image-limits.json",
+        "src/core/data/image-limits.json",
         "blob",
     ),
 )

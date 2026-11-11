@@ -1,7 +1,7 @@
 # The scheduler
 
 `celery beat` runs the periodic tasks, with our own scheduler
-(`scheduler/beat.py: CodeOwnedScheduler`, a `celery.beat.Scheduler` subclass)
+(`src/scheduler/beat.py: CodeOwnedScheduler`, a `celery.beat.Scheduler` subclass)
 in place of django-celery-beat, which we removed because its `Django<x` cap
 blocked every Django upgrade until it published a release.
 
@@ -9,7 +9,7 @@ blocked every Django upgrade until it published a release.
 
 | What | Where |
 |---|---|
-| What runs and when | `CELERY_BEAT_SCHEDULE` (`settings.py: get_celery_beat_schedule()`) |
+| What runs and when | `CELERY_BEAT_SCHEDULE` (`src/settings.py: get_celery_beat_schedule()`) |
 | Whether a slot is due | Celery's `crontab` |
 | Switched on or off, last run, run count | `scheduler.PeriodicTask`, one row per entry, in `public` |
 
@@ -45,14 +45,14 @@ not in the settings, because Celery installs it while
 `tenant.tasks.fanout_reconcile_pending_refunds` (one run per store, suspended stores included: their PENDING refunds hold the customer's money too). It asks the
 payment provider what became of each refund attempt still `PENDING` after
 `REFUND_RECONCILE_AFTER_MINUTES`, and settles or declines only on an
-unambiguous answer (`order/refund_reconciliation.py`, `docs/order-system.md`
+unambiguous answer (`src/order/refund_reconciliation.py`, `docs/order-system.md`
 §7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
 caught by the next hour. An attempt it cannot decide stays `PENDING`, holds its
 money and shows on the store dashboard until staff record its outcome.
 
 `allocate-credit-sources` runs every five minutes through
 `tenant.tasks.fanout_allocate_credit_sources` (one run per store, suspended
-stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`order/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
+stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`src/order/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
 
 ## Time zones
 
@@ -87,8 +87,8 @@ that way locally too.
 
 | File | Role |
 |---|---|
-| `scheduler/beat.py` | The scheduler |
-| `scheduler/models.py` | `PeriodicTask`, `switch_on`, `switch_off` |
-| `scheduler/admin.py` | The console screen and its actions |
-| `settings.py` | `CELERY_BEAT_SCHEDULE`, `CELERY_BEAT_SCHEDULER` |
+| `src/scheduler/beat.py` | The scheduler |
+| `src/scheduler/models.py` | `PeriodicTask`, `switch_on`, `switch_off` |
+| `src/scheduler/admin.py` | The console screen and its actions |
+| `src/settings.py` | `CELERY_BEAT_SCHEDULE`, `CELERY_BEAT_SCHEDULER` |
 | `tests/integration/scheduler/` | Tick-by-tick behaviour on a clock the test owns |

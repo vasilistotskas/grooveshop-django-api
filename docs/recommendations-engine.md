@@ -44,7 +44,7 @@ strip is on screen, so a cart read or an add does not pay for them.
 
 `ProductRelation(from_product, to_product, relation_type, sort_order)`
 with `RelationType` = `similar`, `complementary`, `accessory`,
-`replacement`, `bundle` (`product/enum/relation.py`). Directional,
+`replacement`, `bundle` (`src/product/enum/relation.py`). Directional,
 because "accessory of" is not symmetric. A single `related_products`
 list is too weak for a multi-vertical platform; the type is what lets
 a nursery and a phone shop share one engine — and it is the whole
@@ -52,7 +52,7 @@ Free tier on its own.
 
 ### 2.2 Strategies are a registry with capability advertising
 
-Mirrors the adapter registry in `shipping/interfaces.py`: an ABC, a `@register_strategy`
+Mirrors the adapter registry in `src/shipping/interfaces.py`: an ABC, a `@register_strategy`
 class decorator, a module-level `_REGISTRY` populated in
 `AppConfig.ready()`. Every strategy answers `is_available(tenant_ctx)`
 **before** it is asked to suggest — `co_purchase` declines until the
@@ -70,7 +70,7 @@ design listed were therefore **removed** (migration
 unbuilt:
 
 - `semantic` (embedding similarity) has no embedder to query: no index
-  has one configured, and `meili/` has no `embedders` settings path. It
+  has one configured, and `src/meili/` has no `embedders` settings path. It
   is a **follow-up, not impossible**: Meilisearch's own `huggingFace`
   embedder source runs in-process with no API key, so no new service is
   needed (the TEI sidecar of §6 is the alternative). What that takes:
@@ -120,7 +120,7 @@ answered without them: `compute_candidates` writes nothing for a product
 nobody bought anything with, so "no rows" is far more often "nothing to
 say" than "not computed yet", and computing on a miss would put the
 expensive path on every view of every such product. A product's own
-save rebuilds its rows within seconds (`recommendation/signals.py`),
+save rebuilds its rows within seconds (`src/recommendation/signals.py`),
 and the nightly pass rebuilds the rest:
 
 | Writer | When | What |
@@ -157,15 +157,15 @@ Dispatch is **always** `tenant.celery.dispatch_on_commit(task, kwargs={...})`,
 never a raw `transaction.on_commit`: it captures `connection.schema_name`
 at registration and stamps the `_schema_name` header, because by the
 time a commit hook fires the connection has usually snapped back to
-`public` (the `@receiver` in `product/signals.py` is the canonical call site).
+`public` (the `@receiver` in `src/product/signals.py` is the canonical call site).
 PKs only, kwargs only, primitives only. Receivers connected in
 `ready()` use explicit `dispatch_uid` and **`weak=False`** — closures
 are otherwise garbage-collected and the signal silently stops firing
-(the trap documented in `meili/apps.py` and `core/celery.py`).
+(the trap documented in `src/meili/apps.py` and `src/core/celery.py`).
 
 ## 4. Strategies
 
-Six strategies, every one registered (`recommendation/strategies/`).
+Six strategies, every one registered (`src/recommendation/strategies/`).
 The tier is the strategy's `min_plan`; a strategy below the store's plan
 is skipped, so a preset can name it and it starts contributing the day
 the store upgrades.
@@ -189,7 +189,7 @@ all features are used.
 
 Chain order, weights, `limit`, `min_fill` and `price_band_ratio` are
 **data per tenant per surface** — a `RecommendationSlot` row — seeded
-from the store's vertical preset (`recommendation/presets.py`, keyed by
+from the store's vertical preset (`src/recommendation/presets.py`, keyed by
 `Tenant.vertical`, a `StoreVertical` the platform sets at onboarding) at
 provisioning and on every deploy, and editable in admin. Seeding never
 overwrites an edited row; the slot admin's **Reset to preset** actions
@@ -218,7 +218,7 @@ today only `popular` — through `RecommendationStrategy.store_wide`, and
 other strategy in a seedless slot's chain, because it would save and then
 say nothing.
 
-`order_email` (`recommendation/order_email.py`) is answered by the same
+`order_email` (`src/recommendation/order_email.py`) is answered by the same
 `suggest()` when `send_order_confirmation_email` renders, seeded with the
 order's products, and rendered by `emails/base/_suggestions.html` /
 `.txt` as names linked to their product pages — no prices, because the
@@ -256,7 +256,7 @@ cart), merge candidates from each enabled strategy, then:
    page, which IS the category.
 4. **Cut** to `limit`; return `[]` under `min_fill`.
 
-**Weights are learned nightly** (`recommendation/learning.py`, task
+**Weights are learned nightly** (`src/recommendation/learning.py`, task
 `learn_slot_weights`, beat `learn-recommendation-weights` at 05:00, fanned
 out per store) for every enabled slot with **`learn_weights`** on — the
 default, and part of the preset, so "Reset to preset" turns it back on.
@@ -284,8 +284,8 @@ Since `curated` is a tier above the blended score, its weight orders it
 only against other curated candidates. A changed slot is saved through
 the ORM, so the `recommendations` cache surface purges the cached strips.
 
-**Attach attribution** (`recommendation/events.py:record_attach_events`,
-dispatched from `order_created` by `recommendation/signals.py`): an order
+**Attach attribution** (`src/recommendation/events.py:record_attach_events`,
+dispatched from `order_created` by `src/recommendation/signals.py`): an order
 line attaches to an impression of its product by three identities, in
 precedence order and all labelled (`matched_by`):
 
@@ -365,7 +365,7 @@ Verified against Meilisearch v1.53 (the cluster ran v1.53.1 at the time):
   (`ghcr.io/huggingface/text-embeddings-inference:cpu-1.9`) runs every
   candidate above including the MoE one.
 - Indexes are per tenant (`{schema}__product`, scoped API keys via
-  `Client.search_client_for_schema` in `meili/_client.py`), so an
+  `Client.search_client_for_schema` in `src/meili/_client.py`), so an
   embedder is per tenant by construction.
 - **The index is on `ProductTranslation`, one document per language**
   (the `MeiliMeta` block on `ProductTranslation`). Embedding cost is ×3 per product;
@@ -388,10 +388,10 @@ switching is one settings PATCH per index (§9.4).
 — the prefix only for nomic; `description` is a `RichTextField` (an `HTMLField`) passed
 through verbatim by `meili_serialize`, hence the strip.
 
-Settings path (four files, in order): `meili/dataclasses.py`
-(`MeiliIndexSettings.embedders`), `meili/models.py` (`MeiliMeta`
+Settings path (four files, in order): `src/meili/dataclasses.py`
+(`MeiliIndexSettings.embedders`), `src/meili/models.py` (`MeiliMeta`
 default **and** the explicit `getattr` in `get_meili_settings()` — it is
-not generic), `meili/_client.py::with_settings()` (conditional key, the
+not generic), `src/meili/_client.py::with_settings()` (conditional key, the
 `searchCutoffMs` precedent — omit when `None` so indexes without an
 embedder are never reset), `ProductTranslation.MeiliMeta`. The PreSync
 hook's `meilisearch_apply_settings --all-tenants` then carries it on
@@ -410,7 +410,7 @@ every deploy. Enable `vectorStore` with the existing
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`
 (plan flag, declared beside `promotions_enabled` on `Tenant`;
-`IsRecommendationsEnabled` in `tenant/permissions.py`) **and** the
+`IsRecommendationsEnabled` in `src/tenant/permissions.py`) **and** the
 per-schema `PRODUCT_SUGGESTIONS_ENABLED` extra-setting
 (`EXTRA_SETTINGS_DEFAULTS`; clients read the two combined as the
 `product_suggestions` feature in `TenantConfig.features`), which `IsRecommendationsRuntimeEnabled` enforces on
@@ -424,10 +424,10 @@ the weight learning — read the same two tiers through
 Cache **candidates** (product-level, shared by every viewer), never
 **results** (viewer-level). Keys are schema-scoped by
 `KEY_FUNCTION = tenant.cache.make_tenant_key`. The engine registers a
-`recommendations` surface in `core/cache/surfaces.py` with
+`recommendations` surface in `src/core/cache/surfaces.py` with
 `invalidated_by = (Product, ProductCategory, ProductRelation,
 RecommendationSlot)` — the auto-invalidation in
-`core/cache/invalidation.py` — so a merchant curating a relation sees
+`src/core/cache/invalidation.py` — so a merchant curating a relation sees
 it on the next request rather than behind a 7200 s TTL.
 `RecommendationCandidate` is deliberately **not** listed: the nightly
 pass rewrites it per product, and per-row signals would purge the
@@ -435,7 +435,7 @@ surface once per product; `recompute_all_candidates` purges once at
 the end instead.
 
 The one thing the engine caches itself is the per-tenant
-`TenantContext` (`recommendation/context.py`: plan, product count,
+`TenantContext` (`src/recommendation/context.py`: plan, product count,
 whether brands/tags/attributes exist, order counts) under
 `recs:tenant_context:<field names>` for 300 s — the facts `is_available`
 consults. The field names are part of the key because the value is
@@ -478,7 +478,7 @@ in client-side by `useB2BPricing`, never cached.
 
 ### 9.1 Adding a strategy
 
-1. `recommendation/strategies/<code>.py`: subclass
+1. `src/recommendation/strategies/<code>.py`: subclass
    `RecommendationStrategy`, set `code`, `label`, `min_plan` and
    `precompute`; implement `is_available` (decline honestly — call
    `super()` first) and `candidates`. Override `candidates_for` to
@@ -486,10 +486,10 @@ in client-side by `useB2BPricing`, never cached.
    for a live strategy, and what `compute_candidates` batches a
    precomputed one through. A strategy that can answer the empty cart
    sets `seedless = True` and implements `store_wide`.
-2. Add the code to `StrategyCode` (`recommendation/enum.py`) **in the
+2. Add the code to `StrategyCode` (`src/recommendation/enum.py`) **in the
    same change** — `test_registry.py` fails for a member with no
    strategy — and to the presets that should use it.
-3. Import the module in `recommendation/strategies/__init__.py` —
+3. Import the module in `src/recommendation/strategies/__init__.py` —
    `RecommendationConfig.ready()` imports that package, which is what
    runs `@register_strategy`.
 4. Tests in `tests/unit/recommendation/test_strategies.py` — one test
@@ -513,7 +513,7 @@ admin offers must render somewhere.
 ### 9.3 Adding a vertical preset
 
 Add the member to `tenant.models.StoreVertical` and its entry to
-`recommendation/presets.py:PRESETS` — the two are pinned to be the same
+`src/recommendation/presets.py:PRESETS` — the two are pinned to be the same
 set, and every preset must cover every `Surface` and pass
 `RecommendationSlot.clean()` (`tests/unit/recommendation/test_presets.py`).
 A store's vertical is set on the Tenant row in the platform admin; the

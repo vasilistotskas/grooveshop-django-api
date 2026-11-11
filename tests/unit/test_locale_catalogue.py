@@ -20,7 +20,7 @@ from core.utils.po_catalogue import canonical_text
 
 MESSAGES = Path("el") / "LC_MESSAGES" / "django.po"
 CATALOGUES = {
-    "project": Path(settings.BASE_DIR) / "locale" / MESSAGES,
+    "project": Path(settings.SRC_DIR) / "locale" / MESSAGES,
     "unfold": Path(settings.UNFOLD_LOCALE_PATH) / MESSAGES,
 }
 
@@ -74,7 +74,7 @@ def test_the_unfold_catalogue_covers_the_installed_unfold(tmp_path):
 
 @pytest.mark.parametrize(
     "catalogue",
-    sorted((Path(settings.BASE_DIR) / "locale").glob("*/LC_MESSAGES/*.po")),
+    sorted((Path(settings.SRC_DIR) / "locale").glob("*/LC_MESSAGES/*.po")),
     ids=lambda path: path.parent.parent.name,
 )
 def test_the_catalogue_is_in_canonical_form(catalogue):

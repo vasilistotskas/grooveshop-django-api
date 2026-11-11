@@ -91,7 +91,7 @@ ProductTranslation.meilisearch.filter(name__contains="Laptop")
 
 ## Supported Field Types
 
-`_add_contains_filter` (`meili/querysets.py`) validates the **value**
+`_add_contains_filter` (`src/meili/querysets.py`) validates the **value**
 you pass, not the field it's applied to — any string value is accepted
 regardless of which field it's filtered against. Only a non-string value
 (e.g. an `int`, `bool`, or `None`) raises `TypeError` client-side.
@@ -426,7 +426,7 @@ ProductTranslation.meilisearch.filter(
 
 - [Meilisearch CONTAINS Documentation](https://docs.meilisearch.com/learn/filtering_and_sorting/filter_expression_reference.html#contains)
 - [Experimental Features](https://docs.meilisearch.com/learn/experimental/overview.html)
-- `meili/querysets.py` — the `IndexQuerySet` implementation
+- `src/meili/querysets.py` — the `IndexQuerySet` implementation
 - [Search API Documentation](../api/search.md)
 
 - [Meilisearch Discord](https://discord.gg/meilisearch) for engine-side questions

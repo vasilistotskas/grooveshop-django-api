@@ -52,7 +52,7 @@ RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
 
 COPY . .
 # Copy pre-built Tailwind CSS from tailwind-builder stage
-COPY --from=tailwind-builder ${APP_PATH}/static/css/styles.css ./static/css/styles.css
+COPY --from=tailwind-builder ${APP_PATH}/src/static/css/styles.css ./src/static/css/styles.css
 RUN uv sync --frozen --no-editable --no-dev
 
 # Compile gettext .mo files from the committed .po sources. Kept in the
@@ -95,6 +95,13 @@ RUN apk add --no-cache \
 # management command's output) reached the logs only when the process exited,
 # and never if it was killed. Logging flushes every record.
 ENV PYTHONUNBUFFERED=1
+
+# The apps, ``settings`` and ``asgi`` live in ``src/`` and are imported by
+# their bare names. The cluster starts ``.venv/bin/celery -A core ...``
+# and ``.venv/bin/python manage.py ...`` from ${APP_PATH}; this is what
+# lets Celery, which adds only the working directory to the path, find
+# ``core``.
+ENV PYTHONPATH=${APP_PATH}/src
 
 USER app
 WORKDIR ${APP_PATH}

@@ -1,8 +1,8 @@
 # API error contract
 
 What an API error looks like on the wire, and how to raise one. Source:
-`core/api/exception_handler.py` (the handler),
-`REST_FRAMEWORK["EXCEPTION_HANDLER"]` in `settings.py`, and the guards in
+`src/core/api/exception_handler.py` (the handler),
+`REST_FRAMEWORK["EXCEPTION_HANDLER"]` in `src/settings.py`, and the guards in
 `tests/unit/core/api/test_error_code_guards.py`. The code wins over this
 page.
 
@@ -69,7 +69,7 @@ raise ValidationError(
 
 - **A code is an identifier, never a message.** Pass it as `code=`, never
   through `_()`. The sentence goes through `_()`, with the English sentence
-  as the msgid and the Greek in `locale/el`. `must_have_purchased` used to
+  as the msgid and the Greek in `src/locale/el`. `must_have_purchased` used to
   be a msgid: the wire carried the Greek translation, and the storefront,
   comparing text, failed in Greek. `test_no_error_code_goes_through_gettext`
   fails on any `_("snake_case")` inside an API exception.
@@ -78,7 +78,7 @@ raise ValidationError(
   (`insufficient_stock`, `quantity_not_positive`).
 - A `dict` given with one `code=` gives that code to every value in it. A
   rule that yields several kinds of error builds each message as an
-  `ErrorDetail(message, code)` (see `core/validators/address.py`).
+  `ErrorDetail(message, code)` (see `src/core/validators/address.py`).
 - `NotFound`, `PermissionDenied` and `NotAuthenticated` already carry
   `not_found`, `permission_denied`, `not_authenticated`; give a specific
   code when a client tells the cases apart.
@@ -89,7 +89,7 @@ Every DRF `ValidationError` carries a `code=` (`test_every_drf_validation_error_
 scans the whole project; Django's own `ValidationError` of models and admin
 forms is staff-facing and not judged). A raise of a bare name, an error dict
 a helper built, is trusted to code its own messages (see
-`core/validators/address.py`).
+`src/core/validators/address.py`).
 
 Not coded, on purpose: `NotFound`, `PermissionDenied`, `NotAuthenticated`
 keep their DRF code unless a client tells the cases apart, and the feature
@@ -121,12 +121,12 @@ adds `code` and `fields`.
 
 ## Which codes are returned (monitoring)
 
-Every request writes one access line (`core/middleware/access_log.py`), and
+Every request writes one access line (`src/core/middleware/access_log.py`), and
 an error response's line names its `code`. It is read from the response,
 not in the handler, because the handler sees only raised errors and the
 order, cart and payment views build most of theirs themselves; the access
 line sees both, once each. In production it is one JSON object (the
-`JsonFormatter` in `core/logging.py`), which VictoriaLogs stores under
+`JsonFormatter` in `src/core/logging.py`), which VictoriaLogs stores under
 `log.*`:
 
 ```json
@@ -150,7 +150,7 @@ line sees both, once each. In production it is one JSON object (the
   read back (never as a key, a path or a template).
 - `db_queries` and `db_ms` are what the request cost the database: the number of
   queries it ran on any configured alias and the time spent in them, measured
-  by `core/db_cost.py` (a `connection.execute_wrapper` per alias, about 1
+  by `src/core/db_cost.py` (a `connection.execute_wrapper` per alias, about 1
   microsecond per query). `duration_ms` minus `db_ms` is Python, Redis and
   outbound calls. A `MonitoredTask` completion or failure line carries the same
   two fields and its own `duration_ms`. Queries a view hands to a thread other

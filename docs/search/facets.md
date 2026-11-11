@@ -1,6 +1,6 @@
 # Product search facets: counts and ranges
 
-`GET /api/v1/search/product` (`search/views.py: product_meili_search`) can
+`GET /api/v1/search/product` (`src/search/views.py: product_meili_search`) can
 answer a whole filter sidebar in one request. The `facets` parameter lists
 the facet fields to return (`category`, `brand`, `attribute_values`,
 `effective_price`, `likes_count`, `view_count`, `price_range`,
@@ -20,7 +20,7 @@ every other filter still narrows them. Meilisearch has no single-request
 option for it; its documented recipe is a `multi-search` with the main
 query plus one count-only query per filter, that filter's clause left out.
 
-`meili/querysets.py` does this for a `FacetGroup`:
+`src/meili/querysets.py` does this for a `FacetGroup`:
 
 - `IndexQuerySet.filter_facet_group(facet, selected, members)` adds an
   `facet IN [...]` clause and records the group. When the facet is also in
@@ -37,7 +37,7 @@ query plus one count-only query per filter, that filter's clause left out.
   are groups of this kind.
 
 `attribute_values` always uses groups, one per attribute
-(`product/attribute_selection.py`). `category` and `brand` do so only with
+(`src/product/attribute_selection.py`). `category` and `brand` do so only with
 `sidebarFacets=true`; without it a request keeps today's narrowed counts.
 
 ## `sidebarFacets`
@@ -76,7 +76,7 @@ make is pinned by `tests/integration/search/test_product_search_sidebar_facets.p
 ## Facet reads are not searches
 
 A request that asks for facets and for at most one product
-(`_COUNT_ONLY_MAX_LIMIT` in `search/views.py`) is a facet read: the
+(`_COUNT_ONLY_MAX_LIMIT` in `src/search/views.py`) is a facet read: the
 shopper sees nothing to click. `_mark_count_only` flags it on the request
 and `SearchAnalyticsMiddleware` does not record a `SearchQuery` for it. A
 request for results, with or without facets, is a search.

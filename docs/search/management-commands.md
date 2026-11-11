@@ -1,10 +1,10 @@
 # Meilisearch Management Commands
 
-Reference for the commands under `meili/management/commands/`. Every command below
+Reference for the commands under `src/meili/management/commands/`. Every command below
 also accepts `--tenant <schema>` or `--all-tenants` (from `core.management.tenant_mixin`)
 unless stated otherwise; without either it runs against the schema bound to the current
 connection. Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
-classmethod in `meili/models.py`.
+classmethod in `src/meili/models.py`.
 
 Run `uv run python manage.py <command> --help` for the authoritative option list.
 

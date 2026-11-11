@@ -22,7 +22,7 @@ uv run pytest tests/unit/path/to/test_file.py
 uv run pytest tests/unit/path/to/test_file.py::test_function_name
 
 # Run tests with coverage (must disable parallel with -n0)
-uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
+uv run pytest --cov=src --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
 
 # Lint and format
 uv run ruff check --fix
@@ -33,7 +33,8 @@ uv run ty check
 
 # Import contracts between apps ([tool.importlinter] in pyproject.toml).
 # A contract's ignore_imports only shrinks: fix the import, delete its line.
-uv run lint-imports
+# lint-imports puts only the working directory on the path, hence PYTHONPATH.
+PYTHONPATH=src uv run lint-imports
 
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
@@ -41,7 +42,7 @@ uv run pre-commit run --all-files
 # Django management
 uv run python manage.py makemigrations
 uv run python manage.py migrate
-uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
+PYTHONPATH=src uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
 # `manage.py runserver` is not the dev server: it serves plain HTTP through
 # Django's default WSGI handler but no WebSocket (ws/notifications/)
 uv run python manage.py seed_all
@@ -74,23 +75,23 @@ docker compose up -d --build
 
 ### Settings
 
-Single `settings.py` at the project root (not inside any app). Uses `SYSTEM_ENV` env var (`dev`, `production`, `ci`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
+Single `src/settings.py` (not inside any app). `SRC_DIR` is `src/`, for what Django loads from the source (`src/core/templates`, `src/locale`, `src/locale_vendor`, `src/static`); `BASE_DIR` is the repository root (`/home/app` in the image), for `.env`, `pyproject.toml` and what is written at run time (`logs`, `backups`, `mediafiles`, `staticfiles`). Uses `SYSTEM_ENV` env var (`dev`, `production`, `ci`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
 
 ### Django Apps
 
-All apps live at the project root (flat structure, no `src/` directory):
+Every app, the settings module (`src/settings.py`) and the `asgi` package live in `src/`, and `src/` is on the Python path, so an import names the app and never `src` (`from order.services import ...`, `DJANGO_SETTINGS_MODULE=settings`, `celery -A core`, `asgi:application`). A file is named by its path (`src/order/services.py`), a module by its dotted name (`order.services`). What puts `src/` on the path: `manage.py` and `gunicorn.conf.py` add it themselves, pytest reads `pythonpath` in `pyproject.toml`, and both images set `PYTHONPATH`. Any other command run on a checkout needs `PYTHONPATH=src` (`lint-imports`, `uvicorn`, `celery`). The repository root keeps the entry points, the tooling and its configuration, `tests/`, `tests_mt/`, `docs/`, and the folders written at run time. The apps:
 
-- **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
-- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain` (a domain is a bare lowercase host name: `tenant.validators.validate_store_hostname` runs in the form and in `save()`, because routing matches the text exactly), provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`). Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row
+- **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `src/core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
+- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain` (a domain is a bare lowercase host name: `tenant.validators.validate_store_hostname` runs in the form and in `save()`, because routing matches the text exactly), provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`src/tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`). Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
 - **promotion/**, **giftcard/**, **b2b/** — Rule-based promotions and coupons; stored-value gift cards with a ledger; wholesale program (business profiles, VIES, group pricing)
-- **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`shipping/interfaces.py`) and the two carrier integrations
-- **page_config/** — Content pages (policies, FAQ, info pages) and the legal documents: the platform's texts, their rollout, and the version each order accepted. Pages and menus are the page builder's (`builder/`)
+- **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`src/shipping/interfaces.py`) and the two carrier integrations
+- **page_config/** — Content pages (policies, FAQ, info pages) and the legal documents: the platform's texts, their rollout, and the version each order accepted. Pages and menus are the page builder's (`src/builder/`)
 - **texts/** — Store-edited storefront wording (`TextOverride`), the store admin's text editor, and the public overrides read; the catalogue and the syntax check are the storefront's
 - **builder/** — The storefront page builder: versioned documents (theme, section groups, templates, pages), immutable releases, the staff API and the public read of the current release; the block catalogue is the storefront's
 - **meta_capi/** — Meta Conversions API event dispatch
 - **indexnow/** — IndexNow notifications: a published product or blog post that changes is queued and sent to search engines in one batched POST per store
-- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway: the shopper tools (`/mcp`, the store's own issuer and customers) and the store-admin tools (`/agent/staff/*` behind `/mcp/admin`, read only). Staff tokens come from the platform's staff issuer on `STAFF_CONNECT_HOST` (`agent/staff.py`, `agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc` is in SHARED_APPS too, so staff tokens live in `public` and customers' in each store's schema
+- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway: the shopper tools (`/mcp`, the store's own issuer and customers) and the store-admin tools (`/agent/staff/*` behind `/mcp/admin`, read only). Staff tokens come from the platform's staff issuer on `STAFF_CONNECT_HOST` (`src/agent/staff.py`, `src/agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc` is in SHARED_APPS too, so staff tokens live in `public` and customers' in each store's schema
 - **search/** — Meilisearch product and blog search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
@@ -101,7 +102,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 
 ### Core Base Classes and Patterns
 
-**Abstract models** (all in `core/models.py`):
+**Abstract models** (all in `src/core/models.py`):
 - `TimeStampMixinModel` — `created_at`/`updated_at` with indexes
 - `UUIDModel` — UUID4 field for external/guest access
 - `SeoTranslationModel` — `seo_title`, `seo_description`, `seo_keywords`, for a model's parler **translations** model (never the shared row): inherit it on an explicit `TranslatedFieldsModel`, or spread `**SeoTranslationModel.translated_fields()` into `TranslatedFields(...)`
@@ -112,7 +113,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 
 Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, UUIDModel, MetaDataModel, TaggedModel)` with `ProductTranslation(TranslatedFieldsModel, SeoTranslationModel, IndexMixin)`.
 
-**Base ViewSet** (`core/api/views.py: BaseModelViewSet`):
+**Base ViewSet** (`src/core/api/views.py: BaseModelViewSet`):
 - Combines `RequestResponseSerializerMixin`, `TranslationsModelViewSet`, `PaginationModelViewSet`
 - Uses `serializers_config` dict mapping actions to `ActionConfig` objects (separate request/response serializers per action)
 - Supports three pagination strategies via `?pagination_type=` query param: `pageNumber` (default), `cursor`, `limitOffset`
@@ -120,28 +121,28 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - Atomic transactions on create/update
 - URL confs wire actions by hand (`ViewSet.as_view({"post": "retry_payment"})`), not through a router; `RouterActionOverridesMixin` (in `BaseModelViewSet`) applies each extra action's `@action(...)` arguments — `throttle_classes`, `permission_classes`, `pagination_class`, `queryset` — the way DRF's router would. A viewset not built on `BaseModelViewSet` must include it; `tests/unit/core/test_routes_apply_action_overrides.py` fails for any route that drops an override
 
-**Optimized Managers** (`core/managers/`):
+**Optimized Managers** (`src/core/managers/`):
 - `OptimizedManager`/`OptimizedQuerySet` — Override `for_list()` and `for_detail()` for select_related/prefetch_related
 - `TranslatableOptimizedManager`/`TranslatableOptimizedQuerySet` — Adds `with_translations()` for parler
 - `TreeTranslatableManager`/`TreeTranslatableQuerySet` — For MPTT + Parler models (categories)
 - ViewSets call `Model.objects.for_list()` or `.for_detail()` based on action
 
-**Composable FilterSets** (`core/filters/`):
-- Mixin-based (`core/filters/core.py`): `TimeStampFilterMixin`, `UUIDFilterMixin`, `SortableFilterMixin`, `MetaDataFilterMixin` — each a real `FilterSet` subclass, because plain-class mixins were silently dropped by django-filter (see the module docstring)
-- CamelCase variants (`core/filters/camel_case_filters.py`): `CamelCaseFilterMixin` auto-converts query param names; bases `CamelCaseTimeStampFilterSet` and `CamelCasePublishableTimeStampFilterSet`
+**Composable FilterSets** (`src/core/filters/`):
+- Mixin-based (`src/core/filters/core.py`): `TimeStampFilterMixin`, `UUIDFilterMixin`, `SortableFilterMixin`, `MetaDataFilterMixin` — each a real `FilterSet` subclass, because plain-class mixins were silently dropped by django-filter (see the module docstring)
+- CamelCase variants (`src/core/filters/camel_case_filters.py`): `CamelCaseFilterMixin` auto-converts query param names; bases `CamelCaseTimeStampFilterSet` and `CamelCasePublishableTimeStampFilterSet`
 
-**Pagination** (`core/pagination/`): `PageNumberPaginator`, `CursorPaginator`, `LimitOffsetPaginator` — all return consistent envelope: `{links, count, total_pages, page_size, page_total_results, page, results}`
+**Pagination** (`src/core/pagination/`): `PageNumberPaginator`, `CursorPaginator`, `LimitOffsetPaginator` — all return consistent envelope: `{links, count, total_pages, page_size, page_total_results, page, results}`
 
-**Serializer utilities** (`core/utils/serializers.py`):
+**Serializer utilities** (`src/core/utils/serializers.py`):
 - `ActionConfig` dataclass — per-action request/response serializer + OpenAPI metadata
 - `crud_config()` — shorthand for standard CRUD serializer mapping
 - `create_schema_view_config()` — auto-generates `@extend_schema` decorators from model verbose names
 
-**Translation validation** (`core/api/serializers.py`): `RequiredDefaultTranslationMixin` — mix into a `TranslatableModelSerializer` and set `required_translation_field` to require the `settings.PARLER_DEFAULT_LANGUAGE_CODE` translation (with that field non-empty); other locales stay optional. Never hardcode a language code (e.g. `if "en" in value`) — the default is `el` and the locale set can change.
+**Translation validation** (`src/core/api/serializers.py`): `RequiredDefaultTranslationMixin` — mix into a `TranslatableModelSerializer` and set `required_translation_field` to require the `settings.PARLER_DEFAULT_LANGUAGE_CODE` translation (with that field non-empty); other locales stay optional. Never hardcode a language code (e.g. `if "en" in value`) — the default is `el` and the locale set can change.
 
 **Custom fields**: `ImageAndSvgField` (images + SVG), `MeasurementField` (physical measurements with unit conversion)
 
-**Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields; the staff bypass is `tenant.membership.is_store_staff` (a provenance-stamped platform identity with a staff role in the current tenant, or a superuser). `request.user.is_staff` is never an authorization signal on an API request — on a tenant-schema row it is customer residue (see `IsPlatformSuperuser`). Store-scoped write routes use `StoreStaffModelPermissions`. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
+**Permissions** (`src/core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields; the staff bypass is `tenant.membership.is_store_staff` (a provenance-stamped platform identity with a staff role in the current tenant, or a superuser). `request.user.is_staff` is never an authorization signal on an API request — on a tenant-schema row it is customer residue (see `IsPlatformSuperuser`). Store-scoped write routes use `StoreStaffModelPermissions`. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
 
 ### API Conventions
 
@@ -149,7 +150,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - Request/response bodies use **camelCase** (auto-converted from snake_case via `djangorestframework-camel-case`)
 - Authentication: Knox token auth (`Bearer` prefix, 7-day TTL, auto-refresh after 1 day) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
 - `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticatedOrReadOnly`. Any endpoint that requires anonymous POST access (e.g. guest checkout) must explicitly set `permission_classes = [AllowAny]`.
-- Payments: Viva Wallet (primary) and Stripe via dj-stripe (secondary), plus cash on delivery; per-tenant credentials via `tenant/credentials.py`
+- Payments: Viva Wallet (primary) and Stripe via dj-stripe (secondary), plus cash on delivery; per-tenant credentials via `src/tenant/credentials.py`
 - Default pagination: 12 items per page, max 100
 - OpenAPI docs at `/api/v1/schema/swagger-ui` and `/api/v1/schema/redoc`
 - Health check at `/api/v1/health` (checks DB, Redis, Celery)
@@ -165,29 +166,29 @@ files.
 
 ### WebSocket / Real-time
 
-ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
+ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 - HTTP: Django ASGI. CORS is django-cors-headers only: the static `CORS_ALLOWED_ORIGINS` holds the platform origins and `tenant.signals.allow_tenant_origin` admits the current tenant's own domains (the same rule as `TenantCsrfMiddleware`); never set `CORS_ALLOW_ALL_ORIGINS`
 - WebSocket: `ws/notifications/` → `NotificationConsumer`
-- Auth via `TokenAuthMiddleware` — a single-use `?ticket=<token>` minted by the API and consumed atomically from Redis (`core/tickets.py`, spent in `core/middleware/channels.py`); Knox tokens and session cookies are not accepted on the socket
-- Groups: `tenant_{schema}_user_{id}` per user (`notification/groups.py`); WebSocket identities are tenant-schema customers, so there is no staff group on the socket
+- Auth via `TokenAuthMiddleware` — a single-use `?ticket=<token>` minted by the API and consumed atomically from Redis (`src/core/tickets.py`, spent in `src/core/middleware/channels.py`); Knox tokens and session cookies are not accepted on the socket
+- Groups: `tenant_{schema}_user_{id}` per user (`src/notification/groups.py`); WebSocket identities are tenant-schema customers, so there is no staff group on the socket
 
 ### Celery
 
-App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
+App configured in `src/core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `src/settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
-- `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
-- `product/tasks.py` — price drop notifications, price-record reconciliation (`reevaluate_price_episodes`)
-- `search/tasks.py` — search analytics
-- `blog/tasks.py` — comment liked notifications
-- `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
-- `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
+- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
+- `src/product/tasks.py` — price drop notifications, price-record reconciliation (`reevaluate_price_episodes`)
+- `src/search/tasks.py` — search analytics
+- `src/blog/tasks.py` — comment liked notifications
+- `src/loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
+- `src/contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
 **Queueing after a commit.** Queue a task that follows a change with `tenant.celery.dispatch_on_commit` (schema pinned at the call). A publish that fails because the broker is unreachable never reaches the caller: it is logged at ERROR and kept as a `tenant.DeferredDispatch` that `redispatch_deferred_tasks` publishes again; a task whose work is the state of a row also gets a sweep over that state (`contact.tasks.rescan_pending_attachments`). See [`docs/deferred-dispatch.md`](docs/deferred-dispatch.md).
 
 **Data retention.** Every sweep deletes through `core.retention.delete_in_batches` (batch size `RETENTION_PURGE_BATCH_SIZE`) and per-store tables fan out through `tenant.tasks.fanout_purge_*` with `include_suspended=True`. A model whose `HistoricalRecords` sets `excluded_fields` and is saved by a bookkeeping task uses `core.history.ChangeOnlyHistoricalRecords`, or every poll tick writes a history row. The full table (what, how long, which setting) is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
-**The schedule is code (`scheduler/`).** See [`docs/scheduler.md`](docs/scheduler.md). `CELERY_BEAT_SCHEDULE` is the whole schedule, and `scheduler.beat.CodeOwnedScheduler`, a `celery.beat.Scheduler` subclass, reads it. A `scheduler.PeriodicTask` row holds only state (enabled, last run, run count), and beat deletes any row the settings do not declare when it starts, so removing an entry needs no migration. The platform admin reads the schedule, switches an entry off or on and runs one by hand; to change when a job runs, change the settings and deploy.
+**The schedule is code (`src/scheduler/`).** See [`docs/scheduler.md`](docs/scheduler.md). `CELERY_BEAT_SCHEDULE` is the whole schedule, and `scheduler.beat.CodeOwnedScheduler`, a `celery.beat.Scheduler` subclass, reads it. A `scheduler.PeriodicTask` row holds only state (enabled, last run, run count), and beat deletes any row the settings do not declare when it starts, so removing an entry needs no migration. The platform admin reads the schedule, switches an entry off or on and runs one by hand; to change when a job runs, change the settings and deploy.
 
 **Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps
 `scheduled-database-backup` and `cleanup-old-backups` in the beat schedule;
@@ -197,12 +198,12 @@ staging sets it `False`. See `docs/staging-anonymise.md`.
 
 ### Factory / Test Data Pattern
 
-Factories of translatable models extend `CustomDjangoModelFactory` from `devtools/factories.py`; the rest use plain `factory.django.DjangoModelFactory`. Key features:
+Factories of translatable models extend `CustomDjangoModelFactory` from `src/devtools/factories.py`; the rest use plain `factory.django.DjangoModelFactory`. Key features:
 - `auto_translations` flag for parler models
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
-- `get_or_create_instance()` helper in `core/helpers/factory.py` for dynamic model/factory resolution
-- `UserNameGenerator` in `core/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
+- `get_or_create_instance()` helper in `src/core/helpers/factory.py` for dynamic model/factory resolution
+- `UserNameGenerator` in `src/core/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration
 

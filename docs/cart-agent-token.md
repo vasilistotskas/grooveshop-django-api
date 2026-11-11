@@ -1,8 +1,8 @@
 # Cart agent token
 
 How the storefront's shopping assistant acts on a **signed-in** shopper's
-cart. Source: `cart/agent_token.py`, `cart/services.py` (`CartService`),
-`cart/views/cart.py` (`agent_token`), `core/api/tokens.py`
+cart. Source: `src/cart/agent_token.py`, `src/cart/services.py` (`CartService`),
+`src/cart/views/cart.py` (`agent_token`), `src/core/api/tokens.py`
 (`is_auth_token_live`). The code wins over this page.
 
 ## Why it exists

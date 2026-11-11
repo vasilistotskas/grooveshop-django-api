@@ -114,7 +114,7 @@ ships in two releases:
 
 ### Enforcement: `migration_preflight`
 
-`manage.py migration_preflight` (`core/db/migration_safety.py`) checks
+`manage.py migration_preflight` (`src/core/db/migration_safety.py`) checks
 every schema `migrate_schemas` would touch — `public` and every tenant
 row — against the migrations already applied to it. `makemigrations
 --check` keeps each release's models equal to its migration state, so

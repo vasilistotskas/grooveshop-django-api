@@ -51,7 +51,7 @@ for how the services fit together. The developer docs are behind basic auth.
   Django Channels for WebSockets
 - PostgreSQL 18 with django-tenants (schema per store)
 - Redis (cache, Channels layer, WebSocket tickets)
-- Celery with a RabbitMQ broker; `scheduler/` for schedules
+- Celery with a RabbitMQ broker; `src/scheduler/` for schedules
 - Meilisearch
 - drf-spectacular for the OpenAPI schema
 - Django Unfold for the admin
@@ -84,13 +84,14 @@ Run the API (HTTP and WebSocket on port 8000), and the Celery worker and beat
 when you need background jobs:
 
 ```bash
+export PYTHONPATH=src   # the apps are imported from src/ by their bare names
 uv run uvicorn asgi:application --reload
 uv run celery --app core worker --queues celery,meilisearch --loglevel=info
 uv run celery --app core beat --loglevel=info
 ```
 
 `manage.py runserver` is not the dev server: it serves no WebSocket; use
-`uv run uvicorn asgi:application --reload`.
+`PYTHONPATH=src uv run uvicorn asgi:application --reload`.
 `docker compose up -d --build` runs the whole stack in containers instead
 (`docker-compose.yml` includes `infra.compose.yml` and `app.compose.yml`).
 
@@ -125,9 +126,12 @@ settings, seeds or the cache.
 
 ## Project layout
 
-Every Django app sits at the repository root; there is no `src/` directory.
-`settings.py`, `asgi/` and `manage.py` are at the root too, and `core/urls.py`
-mounts every app under `api/v1/`.
+Every Django app, the settings module (`src/settings.py`) and the `asgi`
+package are in `src/`, which is on the Python path: an import names the app,
+never `src`
+(`from order.services import ...`). `manage.py`, the Dockerfiles, the tooling
+configuration, `tests/` and `docs/` stay at the repository root, and
+`src/core/urls.py` mounts every app under `api/v1/`.
 
 | Area | Apps |
 |---|---|

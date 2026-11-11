@@ -13,13 +13,13 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 
 ## App-to-Test Mapping
 
-A modified app `<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>/`
+A modified app `src/<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>/`
 (not every app has both): `uv run pytest tests/unit/<app>/ tests/integration/<app>/`.
 Exceptions:
 
-- `user/` social login (`user/adapter.py`, `user/signals.py`) is also covered by `tests/unit/authentication/` and `tests/integration/authentication/`
-- `core/celery.py` and `core/urls.py` are also covered by `tests/unit/app/`
-- `settings.py` is covered by `tests/unit/config/` and the `tests/unit/test_*.py` files at the root of `tests/unit/`
+- `src/user/` social login (`src/user/adapter.py`, `src/user/signals.py`) is also covered by `tests/unit/authentication/` and `tests/integration/authentication/`
+- `src/core/celery.py` and `src/core/urls.py` are also covered by `tests/unit/app/`
+- `src/settings.py` is covered by `tests/unit/config/` and the `tests/unit/test_*.py` files at the root of `tests/unit/`
 - Cross-app changes: `uv run pytest`
 
 ## Process
@@ -51,7 +51,7 @@ Exceptions:
 - **Show local variables on failure**: add `-l` flag
 - **Run tests matching a pattern**: `uv run pytest -k "test_list" tests/unit/product/`
 - **Skip Meilisearch tests**: they auto-skip when offline (via `requires_meilisearch` marker)
-- **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=product --cov-report=term -n0`
+- **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=src/product --cov-report=term -n0`
 
 ## Two concurrent pytest runs need different `DB_NAME`s
 

@@ -34,8 +34,8 @@ If the model doesn't exist yet, scaffold the model + manager first, then the end
 5. **URLs**
 6. **Admin registration**
 7. **Factory** (for test data)
-8. Register app in `settings.py` (if new app)
-9. Register URLs in `core/urls.py` (if new app)
+8. Register app in `src/settings.py` (if new app)
+9. Register URLs in `src/core/urls.py` (if new app)
 
 For detailed patterns for each step, read `references/patterns.md`.
 
@@ -70,7 +70,7 @@ After scaffolding, verify:
 - [ ] `@extend_schema_view(**create_schema_view_config(...))` decorator is on ViewSet
 - [ ] URLs use manual `path()` with `ViewSet.as_view({...})` mapping
 - [ ] FilterSet composes appropriate core mixins
-- [ ] Admin subclasses `BaseModelAdmin` / `BaseTranslatableAdmin` (`admin/base.py`)
+- [ ] Admin subclasses `BaseModelAdmin` / `BaseTranslatableAdmin` (`src/admin/base.py`)
 - [ ] Factory extends `CustomDjangoModelFactory` for a parler model (or `factory.django.DjangoModelFactory` with a translations post_generation)
-- [ ] App is in `TENANT_APPS` (store data) or `SHARED_APPS` (public schema) in `settings.py`
-- [ ] URLs are included in `core/urls.py` under `api/v1/`
+- [ ] App is in `TENANT_APPS` (store data) or `SHARED_APPS` (public schema) in `src/settings.py`
+- [ ] URLs are included in `src/core/urls.py` under `api/v1/`

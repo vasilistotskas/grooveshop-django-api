@@ -151,7 +151,11 @@ jobs:
       # lists the imports that broke it on the day it was written; a
       # new one fails here.
       - name: Import contracts (import-linter)
+        # lint-imports puts only the working directory on the path,
+        # and the packages it reads are in src/.
         run: uv run lint-imports
+        env:
+          PYTHONPATH: src
 
       - name: Compile translations
         # The schema depends on the compiled catalogue: without the .mo
@@ -474,7 +478,7 @@ jobs:
         run: |
           workers="$(nproc)"
           echo "XDIST_WORKERS=$workers" >> "$GITHUB_ENV"
-          uv run pytest -n 0 --cov=. --cov-report= --cov-fail-under=0 \
+          uv run pytest -n 0 --cov=src --cov-report= --cov-fail-under=0 \
             --cov-config=pyproject.toml \
             "tests/unit/test_migration_seed.py::TestRestore::test_a_restore_puts_back_exactly_the_migrated_rows"
           for worker in $(seq 0 $((workers - 1))); do
@@ -556,7 +560,7 @@ jobs:
         # pytest --durations=25.
         run: >
           cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
-          uv run pytest --cov=. --cov-append --cov-report= --cov-fail-under=0
+          uv run pytest --cov=src --cov-append --cov-report= --cov-fail-under=0
           --cov-config=pyproject.toml -n "$XDIST_WORKERS" --dist loadfile
           --no-loadscope-reorder
           --splits 4 --group ${{ matrix.group }}

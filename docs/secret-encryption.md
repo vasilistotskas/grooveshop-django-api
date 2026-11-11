@@ -4,7 +4,7 @@ A store's third-party credentials live on its `tenant.Tenant` row, in the
 public schema. They are stored as Fernet tokens (`cryptography`:
 AES-128-CBC with an HMAC-SHA256 tag), so a database dump, replica or backup
 that leaves the cluster carries ciphertext only. The application reads and
-writes plain strings: `EncryptedCharField` (`core/db/encrypted_fields.py`)
+writes plain strings: `EncryptedCharField` (`src/core/db/encrypted_fields.py`)
 encrypts on write and decrypts when a row is loaded.
 
 ## What is encrypted
@@ -27,7 +27,7 @@ them either.
 ## The key
 
 `FIELD_ENCRYPTION_KEYS` is a comma-separated list of Fernet keys, read in
-`settings.py`. The first key encrypts; every key decrypts. It is never
+`src/settings.py`. The first key encrypts; every key decrypts. It is never
 derived from `SECRET_KEY`, so rotating one does not touch the other.
 
 - Production and staging refuse to start without it, and refuse an entry
@@ -51,7 +51,7 @@ derived from `SECRET_KEY`, so rotating one does not touch the other.
 - Fernet is randomised: one plaintext gives a different token each time.
   A lookup, index or `unique` constraint on a non-empty value can never
   match. Filter on a plain column and compare in Python (the edge purge in
-  `core/cache/edge.py` does).
+  `src/core/cache/edge.py` does).
 - A token no configured key opens raises `DecryptionError` when the row is
   loaded. That is deliberate: a store never silently runs with a
   ciphertext as its credential. If the key was lost or replaced, the

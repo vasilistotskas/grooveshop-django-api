@@ -11,7 +11,7 @@ import polib
 from django.conf import settings
 
 CATALOGUE = (
-    Path(settings.BASE_DIR) / "locale" / "en" / "LC_MESSAGES" / "django.po"
+    Path(settings.SRC_DIR) / "locale" / "en" / "LC_MESSAGES" / "django.po"
 )
 
 

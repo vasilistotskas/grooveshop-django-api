@@ -3,8 +3,8 @@
 Meilisearch-backed search over products and blog posts, plus click
 attribution, trending queries and per-store analytics.
 
-**Source of truth:** `search/views.py`, `search/serializers.py`,
-`search/middleware.py`, `meili/querysets.py`, and the generated
+**Source of truth:** `src/search/views.py`, `src/search/serializers.py`,
+`src/search/middleware.py`, `src/meili/querysets.py`, and the generated
 `schema.yml`. Where this page and the code disagree, the code wins.
 
 ## Conventions
@@ -60,7 +60,7 @@ tenant-schema row (see `is_platform_superuser`).
 | `facets` | comma-separated strings | No | — |
 
 The three id lists (`categories`, `attributeValues`, `brands`) take at most
-100 distinct ids each (`MAX_INT_CSV_ITEMS` in `core/api/query_params.py`; a
+100 distinct ids each (`MAX_INT_CSV_ITEMS` in `src/core/api/query_params.py`; a
 repeated id counts once, so a mangled link does not empty the listing); more
 is a 400 with code `too_many_values`, so a request can never drive an
 unbounded filter into Meilisearch.
@@ -83,7 +83,7 @@ Hits, the product feed (`/product/feed`) and the product page carry
 
 ### On offer
 
-One definition, `promotion/offers.py`, answers "is this product on offer"
+One definition, `src/promotion/offers.py`, answers "is this product on offer"
 for the search index, the product feed/detail API and the search cards, so the
 `onOffer` filter and the badge cannot disagree. `offerKind` is
 `"MARKDOWN" | "PROMOTION" | null` (optional in the schema):
@@ -109,10 +109,10 @@ favourite lines carry `offerKind: null`: those payloads are not badge surfaces
 and their querysets do not annotate.
 
 **Keeping `on_offer` fresh.** A promotion can change a product's status without
-the product being saved, so `promotion/offer_sync.py` reindexes the affected
+the product being saved, so `src/promotion/offer_sync.py` reindexes the affected
 products:
 
-- `promotion/signals.py` marks a promotion saved or deleted, its
+- `src/promotion/signals.py` marks a promotion saved or deleted, its
   `products` / `categories` / exclusion sets changed, or its total usage limit
   reached (or freed). Marks are coalesced in the cache per tenant; one
   `reindex_offer_products_task` runs 15 seconds after the first, whatever the
@@ -121,13 +121,13 @@ products:
 - `reindex_offer_window_changes_task` (beat, every 5 minutes, fanned out per
   tenant by `fanout_reindex_offer_window_changes`) reindexes the products of
   promotions whose `starts_at` / `ends_at` passed since the last run. The
-  cursor is a `core.SweepCursor` row (`core/sweeps.py`, durable, unlike the
+  cursor is a `core.SweepCursor` row (`src/core/sweeps.py`, durable, unlike the
   cache, which fails open) and only moves after the reindex was dispatched; a
   store's very first run looks back one day.
 
 Flipping promotions off or on (the store's `PROMOTIONS_ENABLED` or the plan's
 `promotions_enabled`) queues the store's whole price sweep at once
-(`promotion/signals.py`), which reindexes every product it changes. Not
+(`src/promotion/signals.py`), which reindexes every product it changes. Not
 signalled: the reverse side of the M2M (`product.promotions.add(...)`); the
 nightly `sync_meilisearch_indexes` repairs it.
 
@@ -137,7 +137,7 @@ Response is `ProductMeiliSearchResponse`: the common envelope above plus
 ### Attribute filters and facet counts
 
 `attributeValues` is one flat list of attribute value ids, as the storefront's
-filter sidebar sends it. `AttributeSelection` (`product/attribute_selection.py`)
+filter sidebar sends it. `AttributeSelection` (`src/product/attribute_selection.py`)
 groups the ids by the attribute each value belongs to, and that grouping is the
 rule: the values of **one attribute are alternatives (OR)**, and **every
 attribute with a selection narrows the result (AND)**. With Colour values 10
@@ -147,7 +147,7 @@ and 11 and a Length value 20, `attributeValues=10,11,20` means
 The same class reads the ids for every surface that filters by attribute
 value, so they cannot drift: this search (one `attribute_values IN [...]`
 clause per attribute; a Meilisearch filter list ANDs its elements) and the
-product list's `attributeValue_In` filter (`product/filters/product.py`, one
+product list's `attributeValue_In` filter (`src/product/filters/product.py`, one
 subquery per attribute). The agent gateway's catalogue calls reach this
 endpoint without one.
 
@@ -180,7 +180,7 @@ sibling that a product holds together with a selected value is replaced by the
 count query's wider number.
 
 **The facet value cap.** Every facet returns at most `maxValuesPerFacet` values
-(500, `MeiliMeta.faceting` in `product/models/product.py`), taken in ascending
+(500, `MeiliMeta.faceting` in `src/product/models/product.py`), taken in ascending
 alphanumeric order of the key unless `sortFacetValuesBy` says otherwise.
 `attribute_values` lists the values of every attribute side by side, so a
 catalogue with more than 500 distinct attribute values loses the rest from
@@ -292,15 +292,15 @@ Transliteration happens at **index time**, not query time — queries reach
 Meilisearch verbatim. Each searchable Greek field carries shadow fields
 (`*_greeklish`, `*_greeklish_alt`, and `*_greeklish_variants` on short
 fields only), so a Latin-typed Greek word matches the indexed variants
-directly. See `search/transliteration.py` and the `MeiliMeta` blocks on
+directly. See `src/search/transliteration.py` and the `MeiliMeta` blocks on
 `ProductTranslation` / `BlogPostTranslation`. Do not "expand" queries
 client-side: Meilisearch's default `last` matching strategy makes the first
 word effectively mandatory and only considers the first 10 words.
 
 ### Search cutoff
 
-Both indexes set `search_cutoff_ms = 1500` (`product/models/product.py`,
-`blog/models/post.py`). Meilisearch returns whatever it found within the
+Both indexes set `search_cutoff_ms = 1500` (`src/product/models/product.py`,
+`src/blog/models/post.py`). Meilisearch returns whatever it found within the
 budget; the response carries no timeout flag, so a cut-off search is
 indistinguishable from a complete one at the API level.
 
@@ -322,7 +322,7 @@ The search, product, blog and trending endpoints carry
 `SearchThrottle` (scope `search`); `/search/click` carries
 `SearchClickThrottle` (scope `search_click`), a budget of its own so clicks
 cannot starve searches. Both are per user or IP
-(`core/api/throttling.py`), and the global `anon` / `user` daily throttles
+(`src/core/api/throttling.py`), and the global `anon` / `user` daily throttles
 apply on top. `/search/analytics` has only the global DRF defaults. Rates
 live in `settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, all disabled
 when `DEBUG`. DRF returns

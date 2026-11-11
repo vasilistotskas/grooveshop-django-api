@@ -28,8 +28,8 @@ OUT_OF_RANGE = "https://example.com:65536/x"
 FINE = "https://example.com:8443/x"
 #: The two modules that define the fields.
 DEFINITIONS = {
-    ROOT / "core" / "fields" / "url.py",
-    ROOT / "core" / "api" / "url_field.py",
+    ROOT / "src" / "core" / "fields" / "url.py",
+    ROOT / "src" / "core" / "api" / "url_field.py",
 }
 EXCLUDED_PARTS = {".venv", "migrations", "tests", "tests_mt", "node_modules"}
 

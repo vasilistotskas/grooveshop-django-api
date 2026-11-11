@@ -55,7 +55,7 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
 
         if not os.path.exists(image_path):
             image_path = os.path.join(
-                settings.BASE_DIR, "static", "images", "default.png"
+                settings.SRC_DIR, "static", "images", "default.png"
             )
 
         try:

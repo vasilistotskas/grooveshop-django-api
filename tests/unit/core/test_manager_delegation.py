@@ -16,6 +16,9 @@ from core.managers import (
     TranslatableOptimizedQuerySet,
 )
 
+# The models these tests declare must not reach the project's registry.
+pytestmark = pytest.mark.usefixtures("isolated_core_models")
+
 
 class TestOptimizedManagerDelegation:
     """Tests for OptimizedManager __getattr__ delegation."""

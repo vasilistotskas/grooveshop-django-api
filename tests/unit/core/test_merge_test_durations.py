@@ -10,6 +10,7 @@ incomplete or inconsistent set of shards instead of writing one.
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -97,3 +98,19 @@ def test_no_successful_pull_request_run_is_an_error_not_a_guess():
         merge_test_durations.latest_successful_run(
             [_run(1, conclusion="failure")]
         )
+
+
+def test_downloaded_shard_artifacts_are_read_by_their_directory(tmp_path):
+    # ``actions/download-artifact`` and ``gh run download`` both give
+    # each artifact a directory of its own, named after it.
+    for group, tests in ((1, {"tests/a.py::t": 1.0}), (2, {})):
+        directory = tmp_path / f"test-durations-shard-{group}"
+        directory.mkdir()
+        (directory / f"test-durations-shard-{group}.json").write_text(
+            json.dumps(tests), encoding="utf-8"
+        )
+
+    assert merge_test_durations.read_shards(tmp_path) == {
+        1: {"tests/a.py::t": 1.0},
+        2: {},
+    }

@@ -69,7 +69,7 @@ def acs_client_mock(monkeypatch):
         last_multipart_call: str | None = None
         last_delete_call: str | None = None
 
-        def create_voucher(self, params):
+        def create_voucher(self, params, *, request_id):
             _DummyClient.last_create_payload = params
             return {"Voucher_No": "7227891234", "Error_Message": ""}
 
@@ -183,7 +183,7 @@ class TestCreateVoucherForOrder:
         class _BadClient:
             billing_code = "X"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 return {"Voucher_No": "", "Error_Message": "Invalid address."}
 
         monkeypatch.setattr(services, "AcsClient", _BadClient)
@@ -1676,7 +1676,7 @@ class TestLastErrorPersisted:
         class _BadClient:
             billing_code = "X"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 return {
                     "Voucher_No": "",
                     "Error_Message": "ACS:Error fill data error",
@@ -1713,7 +1713,7 @@ class TestLastErrorPersisted:
         class _UnreachableClient:
             billing_code = "X"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 raise AcsRetryableError(
                     alias="ACS_Create_Voucher",
                     error_message="ACS connection error: host unreachable",
@@ -1750,7 +1750,7 @@ class TestLastErrorPersisted:
         class _ExplodingClient:
             billing_code = "X"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 raise ConnectionError("ACS host unreachable")
 
         monkeypatch.setattr(services, "AcsClient", _ExplodingClient)

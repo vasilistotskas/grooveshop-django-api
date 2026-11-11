@@ -3,6 +3,207 @@
 
 
 
+## v3.243.0 (2026-11-11)
+
+### Bug fixes
+
+* fix(shipping_acs): end a voucher hold only on a voucher, and keep a held order held until ACS answers it
+
+Review of the voucher hold found four ways it gave up too early or said
+too much.
+
+What ends a hold is now decided by what each answer proves. Only a voucher
+ends it. A refusal in ACS's own envelope leaves it at "one request first"
+and frees the turn, so the next held order goes next. An HTTP 4xx that is
+not ACS's envelope (a proxy's 429, a gateway's 404) says nothing about
+ACS: it closes the hold again and doubles the wait, and begins none. A
+refused or rejected order leaves the held requests, so it is never sent
+first twice. The table is in shipping_acs/voucher_hold.py.
+
+voucher_request_held_at is no longer cleared when a request is let
+through, only when ACS answers it or its outcome becomes unknown. A
+request that never reached ACS keeps the stamp, so the sweep still sends
+the order after the task's retries are spent.
+
+A request stopped at its slot (held, or the hold could not be read) is not
+a call to ACS and no longer leaves an AcsApiCall row or a call log line.
+
+A hold that allowed one request first and has nothing left to send stays
+in force for the next order, but is no longer a dashboard row.
+
+acs_answers_a_read records what production answered on 2026-11-10 for a
+day with no pickup list: OK with an empty list. ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+* fix(shipping_acs): the request sent first owns its turn of a voucher hold
+
+Five findings of the second review of the voucher hold (#631).
+
+1. The turn records the request that took it
+   (AcsVoucherHold.trial_request: the shipment and that request's mint
+   claim) and only that request settles it. A request still out from
+   before the hold, or one whose lease ended and whose turn was taken
+   over, no longer frees the turn with its refusal, closes the hold
+   again with its 4xx or lost answer, or ends it with its voucher. Its
+   lost answer is recorded as the last failure, without doubling the
+   wait. AcsClient.create_voucher takes the request's identity.
+2. A first request that never reached ACS (a connection never made,
+   403/406) gives the turn back at once instead of keeping it for its
+   lease. The lease (78 s) stays shorter than the sweep's tick (300 s);
+   a test pins it.
+3. The staff action acts on allow_trial()'s answer: a second press logs
+   nothing, dispatches nothing and says one request was already allowed.
+4. The sweep sends the held order it tried longest ago
+   (AcsShipment.voucher_request_retried_at, written before it
+   dispatches), so one order that cannot be sent does not keep the rest
+   waiting. An order the mint refuses because it awaits payment again
+   loses its held stamp: the payment dispatches its mint.
+5. An HTTP 4xx that is not ACS's envelope is AcsUndocumentedHttpError.
+   It says nothing about the order: a held order stays held and nobody
+   is told to fix an address; an order that was not held is still
+   reported to staff, to send again.
+
+Migration 0018_acs_voucher_hold is regenerated in place with the two
+new columns; it was never released. ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+* fix(shipping_acs): a held order's request is an ordinary one once no hold is in force
+
+An HTTP 4xx that is not ACS's envelope left a held order held whatever
+the state of the hold. With no hold in force (the hold ended and the
+sweep is sending what waited) nothing bounded that: an order whose
+request got the same 4xx every time was sent again on every tick, with
+nobody told, until the stale digest a day later.
+
+The order now stays held only while a hold is in force, which is also
+what staff see. With none, the 4xx is handled as for any order: the
+order leaves the sweep and staff are alerted once, to send the request
+again. voucher_hold.record_no_answer returns whether a hold is in
+force; a hold that cannot be read counts as in force, so a failure of
+ours keeps the order for the next tick.
+
+A refusal by ACS for such an order already cleared the stamp and
+alerted; a test now pins it. ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+* fix(shipping_acs): "Issue ACS voucher now" says the request waits only when the mint holds it
+
+The action read voucher_hold.in_force(), which is also true for a hold
+that lets one request go and has the turn free. The request it
+dispatches then takes the turn and is sent, while staff were told it
+waits until ACS answers again. It now reads voucher_hold.holding(), the
+rule the mint applies, before it dispatches, so the message is about
+the state at the press and the task cannot change it first. ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+### Features
+
+* feat(shipping_acs): hold voucher requests while ACS is failing (#645) ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+* feat(shipping_acs): hold voucher requests while ACS is failing
+
+After #626 a voucher request whose answer is lost is never sent again and
+staff check that order at the ACS portal. In an outage that answers 5xx or
+hangs, every order placed while it lasts ended that way, one check and one
+email each, although nothing stopped us from not sending.
+
+The unknown outcome of an ACS_Create_Voucher the store sent now begins an
+AcsVoucherHold, one row per span in the store's schema and at most one in
+force. While it is in force create_voucher_for_order sends nothing and
+raises AcsVoucherRequestHeldError: the shipment is stamped
+voucher_request_held_at, keeps no claim, gets no alert and never becomes
+a request of unknown outcome. The hold is checked before the claim and
+again inside the request slot, right before the POST, so a request that
+waited for its slot behind the one that failed is held too.
+
+issue_held_acs_vouchers (every 5 minutes, per store) is the one retry of
+a held request. Once the wait after the last lost answer is over it asks
+ACS a read (ACS_Get_Pickup_Lists); an answer, or staff pressing "ACS
+answers again: send one request", lets one request go first. An answered
+create ends the hold and the rest follow; an unknown outcome closes it
+again and doubles the wait; a request that never reached ACS changes
+nothing.
+
+Staff see one dashboard row with the time the hold began, the list of
+holds with its action (change permission, admin log), and a shipment
+filter for the held requests.
+
+Closes #631 ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+### Testing
+
+* test(shipping_acs): a held voucher request names no request of unknown outcome ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+* test(shipping_acs): the hold beside the request that owns an unknown state ([`404edcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404edcd76aad957f7c239747ef678b180e652ce2))
+
+## v3.242.22 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): the unknown state of a voucher request belongs to that request (#647) ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): the unknown state of a voucher request belongs to that request
+
+The unknown state was a bare timestamp, so when a request sent again was
+lost too, the first request's late answer was saved over the later
+request's state and cleared it: that request's possible voucher was never
+checked, and the order could hold a voucher staff had deleted. The state
+now records the claim it was set for (metadata unknown_request); a late
+answer is saved only for its own request's state and is otherwise deleted
+at ACS or recorded as our unused voucher. Adopt counts only vouchers ACS
+itself named as evidence that ACS holds them. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): a request releases or loses only its own claim; adopt our undeletable voucher by hand
+
+A stale request's Phase 2 failure released the next request's claim (its
+on-time answer then looked stale and its voucher was deleted at ACS) or
+marked that request unknown. Release and the unknown conversion now act
+only on the request's own claim. A voucher recorded on this shipment as
+our own that ACS would not delete is adopted with a hand confirmation
+instead of being refused as unknown to ACS. Pins the request identity
+recorded by every path into the unknown state. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): tell staff once when a stale request is lost after its check was resolved
+
+Staff looked in the ACS portal before that request landed there, so a
+voucher it may have made is known to nobody. The row's mint state is left
+alone; an order note and the unknown-request alert, worded for this case,
+are sent once per request (metadata late_unknown_alerted). ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+### Documentation
+
+* docs(shipping_acs): state the one exception to "ACS must hold the voucher" for adopt
+
+A number recorded on this shipment as our own unused voucher ACS refused
+to delete is adopted on our record plus a hand confirmation; the adopt
+docstrings and both docs said nothing overrides the ACS evidence. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+## v3.242.21 (2026-11-10)
+
+### Bug fixes
+
+* fix(notification): answer the storefront's heartbeat ping with pong (#516)
+
+The storefront's notifications socket sends `ping` every 30 seconds and
+closes the socket when no answer comes back within 5. The consumer
+discarded every client message, so every signed-in tab reconnected about
+every 36 seconds: a ticket, a handshake and a channel-group add and
+discard each time (185 handshakes an hour on production), and a push
+sent while the socket was down was lost.
+
+`receive` now answers `ping` with `pong` and still discards everything
+else. The storefront takes `pong` as the heartbeat's answer since
+storefront #418, which must be live before this is: the client before it
+would read the answer as a notification and log a parse error every 30
+seconds.
+
+A real-stack test connects a signed-in socket the way the storefront
+does (a ticket minted for the store, spent by the ticket auth) and gets
+`pong` for `ping` and nothing for any other frame.
+
+Refs vasilistotskas/grooveshop-storefront-ui-node-nuxt#414
+
+
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`05d3ab0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05d3ab00123d90dc7c057a0b109b9f4811fcc04d))
+
 ## v3.242.20 (2026-11-10)
 
 ### Bug fixes

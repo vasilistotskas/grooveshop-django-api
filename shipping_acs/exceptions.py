@@ -15,7 +15,9 @@ ACS error semantics (per PDF):
 * HTTP 5xx, a lost answer, a non-JSON 200       → outcome unknown
   (:class:`AcsOutcomeUnknownError`): a read is retried, a voucher
   request is never sent again.
-* Other 4xx                                     → permanent; surface to admin.
+* Other 4xx                                     → not ACS's documented
+  answer (:class:`AcsUndocumentedHttpError`): nothing was made, and
+  nothing was said about the request; surface to admin.
 """
 
 from __future__ import annotations
@@ -64,6 +66,19 @@ class AcsAPIError(AcsError):
         return f"ACS [{self.alias}]: {self.error_message}"
 
 
+class AcsUndocumentedHttpError(AcsAPIError):
+    """An HTTP 4xx that is not in ACS's envelope and is not 403/406.
+
+    The manual has the server answer 200, 403 or 406 (April 2026 edition,
+    p. 1-2), so a 400, 401, 404 or 429 is a proxy's or a gateway's, or an
+    answer ACS does not document. A known outcome, like every 4xx: no
+    voucher was made (#626). But it says nothing about what was asked,
+    so it is not ACS refusing the order: staff are not told to fix an
+    address, and while a voucher hold is in force an order whose request
+    was held stays held (``shipping_acs.voucher_hold``).
+    """
+
+
 class AcsRetryableError(AcsAPIError, CarrierUnavailableError):
     """Raised when a retry may succeed: a connection never established,
     a full request cap, an auth-layer rejection, and (as the subclass
@@ -88,6 +103,29 @@ class AcsOutcomeUnknownError(AcsRetryableError):
     not idempotent must not be re-sent: ``ACS_Create_Voucher`` has no
     idempotency key, and ``AcsService.create_voucher_for_order`` turns
     this error into a voucher request of unknown outcome instead.
+    """
+
+
+class AcsVoucherRequestNotSentError(AcsRetryableError):
+    """The voucher request was stopped at its request slot, before the
+    POST: nothing reached ACS.
+
+    Raised as itself when the store's voucher hold could not be read
+    (Celery retries), and as :class:`AcsVoucherRequestHeldError` when a
+    hold is in force. Not a call to ACS, so ``AcsClient._call`` writes no
+    ``AcsApiCall`` row and no call log line for it.
+    """
+
+
+class AcsVoucherRequestHeldError(AcsVoucherRequestNotSentError):
+    """The voucher request was not sent: an ``AcsVoucherHold`` is in force.
+
+    ACS just left a voucher request of this store with an unknown outcome,
+    so no further one is sent until ACS answers again
+    (``shipping_acs.voucher_hold``). Nothing reached ACS, so this is a
+    known outcome and the request is sent later, by
+    ``shipping_acs.tasks.issue_held_acs_vouchers``; it never becomes a
+    voucher request of unknown outcome.
     """
 
 

@@ -308,6 +308,14 @@ BUILDERS: dict[str, Callable[[], object]] = {
             "django.utils.timezone", fromlist=["now"]
         ).now(),
     ),
+    # Ended holds: the database allows one in force at a time.
+    "shipping_acs.AcsVoucherHold": lambda: __import__(
+        "shipping_acs.models", fromlist=["AcsVoucherHold"]
+    ).AcsVoucherHold.objects.create(
+        started_at=timezone.now(),
+        last_failure_at=timezone.now(),
+        ended_at=timezone.now(),
+    ),
     "shipping_acs.AcsPickupListRun": lambda: __import__(
         "shipping_acs.models", fromlist=["AcsPickupListRun"]
     ).AcsPickupListRun.objects.create(

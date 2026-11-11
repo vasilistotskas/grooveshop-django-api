@@ -1754,6 +1754,17 @@ def get_celery_beat_schedule():
             "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
         },
+        # Send the voucher requests that waited while ACS was failing
+        # (``shipping_acs.voucher_hold``). While a hold is in force the
+        # task first asks ACS a read, and then sends one request before
+        # the rest. It is the only retry of a held request, so it runs
+        # often; with nothing held it is two small queries per store.
+        "issue-held-acs-vouchers": {
+            # Fanout: AcsShipment and AcsVoucherHold are per-tenant.
+            "task": "tenant.tasks.fanout_issue_held_acs_vouchers",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
+            "options": {"queue": "celery", "expires": 240},
+        },
         # Surface non-terminal ACS shipments with no tracking movement
         # for ACS_STALE_SHIPMENT_DAYS days (stuck parcels, dead
         # vouchers) to the owning store's operators (the
@@ -4526,6 +4537,17 @@ ACS_POLL_DISPATCH_SPACING_SECONDS = (
 # reported by check_stale_acs_shipments to the store's operators
 # (platform ADMINS only as a fallback).
 ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
+# A voucher request that ends with an unknown outcome holds the store's
+# further voucher requests (``shipping_acs.voucher_hold``): ACS is failing
+# and each request sent would be one more order to check at its portal.
+# Seconds after the last lost answer before ACS is asked whether it answers
+# again; every first request that fails too doubles the wait, up to the cap.
+ACS_VOUCHER_HOLD_RETRY_SECONDS = int(
+    getenv("ACS_VOUCHER_HOLD_RETRY_SECONDS", "300")
+)
+ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS = int(
+    getenv("ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS", "3600")
+)
 # Days an ``AcsApiCall`` history row is kept (request/response of every
 # ACS call, recipient details included) before the retention sweep
 # deletes it.

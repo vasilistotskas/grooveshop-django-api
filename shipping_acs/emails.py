@@ -63,6 +63,9 @@ class VoucherRequestUnknown:
 
     order_id: int
     error: str
+    #: A request sent before its check was resolved, whose answer is lost
+    #: now: ACS may hold one more voucher that nothing records.
+    after_resolution: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +136,7 @@ def _voucher_request_unknown(
         "site": tenant_site_name(),
         "order_id": alert.order_id,
         "error": alert.error,
+        "after_resolution": alert.after_resolution,
     }
 
 

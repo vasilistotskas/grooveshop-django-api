@@ -26,6 +26,10 @@ from shipping_acs.exceptions import (
     AcsRetryableError,
 )
 
+# A voucher request asks the store's voucher hold, a row, whether it may
+# be sent (``AcsClient._admit_voucher_request``, #631).
+pytestmark = pytest.mark.django_db
+
 
 def _make_response(status_code: int, body=None):
     resp = MagicMock(spec=requests.Response)
@@ -312,7 +316,8 @@ class TestVoucher:
         )
 
         result = client.create_voucher(
-            {"Recipient_Name": "TEST", "Weight": "1.0"}
+            {"Recipient_Name": "TEST", "Weight": "1.0"},
+            request_id="1:2026-11-11T10:00:00+00:00",
         )
         assert result["Voucher_No"] == "7227891234"
 

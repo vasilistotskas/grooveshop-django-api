@@ -45,6 +45,14 @@ unnoticed, unless an earlier run of this store applied that very decision and
 recorded it: then it is said and stops nothing. So when one store of several
 stops, the file is fixed for that store and given again as it is.
 
+A version is stored as it validates against the storefront's catalogue of
+today. One in no release that did not validate before the run either (a block
+the storefront has since dropped) cannot be rewritten, edited or decided
+valid: it stops the store until it is named under ``"left"``, and is then
+left as it is, said each run, and kept with the run. A version a release
+holds, or a publish is waiting to release, has to be moved and always stops
+the store.
+
 A deleted page is moved with the rest, and its lines are marked: nobody can
 open it, so what it holds is settled by a decision. Its draft is never read
 again (a page brought back starts empty), so where no decision can settle it,
@@ -72,7 +80,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 from builder import media_migration, media_services, services, storefront
-from builder.document_rewrite import DELETED_PAGE, Run, rewrite_store
+from builder.document_rewrite import (
+    DELETED_PAGE,
+    LEAVABLE,
+    Leave,
+    Run,
+    record_run,
+    rewrite_store,
+)
 from builder.errors import BuilderError
 from builder.models import MediaAsset
 from core.management.tenant_mixin import TenantCommandMixin
@@ -152,6 +167,17 @@ class Command(TenantCommandMixin, BaseCommand):
                     "brought back starts empty: what it holds is settled in "
                     "--decisions."
                 )
+            if any(LEAVABLE in line for line in failed):
+                failed.append(
+                    "Nobody can change a version, and no decision makes one "
+                    "valid. A block left at an older version is moved by "
+                    "persist_block_upgrades: run that first. To go on "
+                    'without such a version, name it under "left" in '
+                    "--decisions, as this report names it. It is then left "
+                    "as it is, and a release rolled back to it will show no "
+                    "image where it names one by URL, once the storefront "
+                    "stops reading the old settings."
+                )
             raise CommandError(
                 "Nothing of these stores was written. Settle each line "
                 "(docs/builder.md says how) and run it again:\n"
@@ -169,7 +195,7 @@ class Command(TenantCommandMixin, BaseCommand):
         catalogue = storefront.fetch_catalogue(connection.schema_name)
         recorded = media_migration.recorded_decisions(COMMAND)
 
-        def unused(*, alts=(), slots=()) -> list[str]:
+        def unused(*, alts=(), slots=(), left=()) -> list[str]:
             """The decisions nothing used that stop the store; those an
             earlier run applied are printed."""
             applied, stale = media_migration.unused_decisions(
@@ -178,6 +204,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 urls=resolution.unused,
                 alts=list(alts),
                 slots=list(slots),
+                left=list(left),
             )
             for line in applied:
                 self.stdout.write(line)
@@ -198,6 +225,8 @@ class Command(TenantCommandMixin, BaseCommand):
             return alts.conflicts + unused(alts=alts.unused)
 
         slots = media_migration.SlotDecisions(decisions.slots)
+        leave = Leave(decisions.left)
+        record = Run(run, COMMAND, decisions.as_stated())
         with transaction.atomic():
             problems = self._fill_alts(alts.fill)
             result = rewrite_store(
@@ -205,16 +234,30 @@ class Command(TenantCommandMixin, BaseCommand):
                     data, i18n, where, resolution.assets, slots
                 ),
                 catalogue=catalogue,
-                run=Run(run, COMMAND, decisions.as_stated()),
+                run=record,
+                leave=leave,
             )
             problems += result.problems
-            problems += unused(alts=alts.unused, slots=slots.unused)
+            problems += unused(
+                alts=alts.unused,
+                slots=slots.unused,
+                left=sorted(decisions.left - set(leave.used)),
+            )
+            # What was left is kept with a run even when nothing was moved,
+            # once: a rerun that leaves the same versions records nothing.
+            only_left = (
+                not problems
+                and not result.changed
+                and bool(set(leave.used) - recorded.left)
+            )
+            if only_left:
+                record_run(record)
             if not problems and result.changed:
                 services.release_again(RELEASE_NOTE)
             if problems or dry_run:
                 transaction.set_rollback(True)
 
-        for line in [*slots.used.values(), *result.left]:
+        for line in [*slots.used.values(), *leave.used.values(), *result.left]:
             self.stdout.write(line)
         rolled_back = dry_run or bool(problems)
         self.stdout.write(
@@ -224,6 +267,10 @@ class Command(TenantCommandMixin, BaseCommand):
         )
         if result.changed and not rolled_back:
             self.stdout.write(f"backup run {run}")
+        elif only_left and not rolled_back:
+            self.stdout.write(
+                f"run {run}: nothing was moved, what was left is recorded"
+            )
         return problems
 
     def _fill_alts(self, fill: dict[int, dict[str, str]]) -> list[str]:

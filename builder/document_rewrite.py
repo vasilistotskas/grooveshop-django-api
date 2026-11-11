@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -50,7 +50,7 @@ from builder.models import (
     BuilderVersion,
     ScheduleStatus,
 )
-from builder.services import _lock_release_sequence
+from builder.services import _lock_release_sequence, published_versions
 from tenant.features import STORE_FEATURES
 
 #: A document, its overlay and how a report names it (``template:home version
@@ -115,6 +115,48 @@ class Rewritten:
         return bool(self.drafts or self.versions)
 
 
+@dataclass(slots=True)
+class Leave:
+    """The old versions a person said to leave as they are (by the name a
+    report gives them, ``template:home version 3``), and which of them a run
+    did leave."""
+
+    decided: Collection[str] = frozenset()
+    #: ``{version: what was said of it}``, to print.
+    used: dict[str, str] = field(default_factory=dict)
+
+
+#: Marks, in a report, a version that can only be left as it is.
+LEAVABLE = "it is in no release, and did not validate before this run either"
+
+
+def _validates(
+    key: str, data: Any, i18n: Any, catalogue: storefront.Catalogue
+) -> bool:
+    _issues, validated = validation.validate_document(
+        key=key,
+        data=data,
+        i18n=i18n,
+        catalogue=catalogue,
+        feature_on=known_feature_on,
+    )
+    return validated is not None
+
+
+def _block_at(data: Any, path: str) -> str:
+    """`` (<type@version>)`` of the node an issue's *path* is in, if any."""
+    parts = path.strip("/").split("/")
+    node, found = data, ""
+    while len(parts) >= 2 and parts[0] in {"sections", "blocks"}:
+        holder = node.get(parts[0]) if isinstance(node, dict) else None
+        node = holder.get(parts[1]) if isinstance(holder, dict) else None
+        if not isinstance(node, dict):
+            break
+        found = str(node.get("type") or found)
+        parts = parts[2:]
+    return f" ({found})" if found else ""
+
+
 def _rewritten(
     *,
     key: str,
@@ -125,15 +167,36 @@ def _rewritten(
     catalogue: storefront.Catalogue,
     result: Rewritten,
     dead: bool = False,
+    leave: Leave | None = None,
+    bound: str = "",
 ) -> validation.Validated | None:
     """The document to store, or ``None`` with nothing to do or with the reason
     it cannot be rewritten added to the problems.
 
-    *dead* is the draft of a deleted page. Nothing reads it again: a page
-    that is brought back starts with an empty draft
-    (``services._create_document``). So where no decision can settle why it
-    cannot be rewritten, it is left as it is and said, and does not stop the
-    store, which nobody could then get moving again.
+    What is stored is what ``validate_document`` returns against the
+    catalogue of TODAY, which is where its references and its hash come
+    from. A version was valid when it was made and nothing validates it
+    again (``services.publish_version``, ``services.rollback``), so one can
+    fail today for a reason this run did not cause: a block the storefront
+    has since dropped or changed. Nobody can edit a version, and no decision
+    can make it valid. What happens then depends on who reads it:
+
+    * *bound* says a release holds the version, or a publish is waiting to
+      release it. Visitors read it, so it has to be moved, and it stops the
+      store.
+    * *leave* is given for a version in no release, read again only if
+      someone rolls back to it. Where it did not validate before the run
+      either, it can only be left as it is, which a person has to say
+      (``Leave.decided``): until then it stops the store. One that
+      validated before the run and does not after it is this run's doing,
+      and always stops the store.
+    * *dead* is the draft of a deleted page. Nothing reads it again: a page
+      that is brought back starts with an empty draft
+      (``services._create_document``). It is left as it is and said, and
+      stops nothing.
+
+    A reason a person can settle for the command (``DocumentRefused
+    .decidable``) stops the store in every case, until it is settled.
     """
 
     def refuse(reasons: list[str], *, decidable: bool) -> None:
@@ -141,8 +204,26 @@ def _rewritten(
             result.left.extend(
                 f"{label}: left as it is ({reason})" for reason in reasons
             )
+        elif (
+            leave is not None
+            and not decidable
+            and not _validates(key, data, i18n, catalogue)
+        ):
+            if label in leave.decided:
+                why = "; ".join(reasons)
+                leave.used[label] = (
+                    f"decision: {label} is left as it is ({why})"
+                )
+            else:
+                result.problems.extend(
+                    f"{label}: {reason}; {LEAVABLE}" for reason in reasons
+                )
         else:
-            result.problems.extend(f"{label}: {reason}" for reason in reasons)
+            held = f"; {bound}, so it has to be moved" if bound else ""
+            result.problems.extend(
+                f"{label}: {reason}{'' if decidable else held}"
+                for reason in reasons
+            )
 
     try:
         new_data, new_i18n, moved = transform(data, i18n, label)
@@ -160,12 +241,24 @@ def _rewritten(
     )
     if validated is None:
         refuse(
-            [f"{issue.code} at {issue.path}" for issue in issues],
+            [
+                f"{issue.code} at {issue.path}{_block_at(new_data, issue.path)}"
+                for issue in issues
+            ],
             decidable=False,
         )
         return None
     result.moved.update(moved)
     return validated
+
+
+def record_run(run: Run) -> BuilderRewriteRun:
+    """The row of *run* in this store, made if it is not there yet."""
+    record, _made = BuilderRewriteRun.objects.get_or_create(
+        run=run.id,
+        defaults={"command": run.command, "decisions": dict(run.decisions)},
+    )
+    return record
 
 
 def _move_revision(document: BuilderDocument) -> None:
@@ -213,26 +306,34 @@ def _replace(
 
 
 def rewrite_store(
-    transform: Transform, *, catalogue: storefront.Catalogue, run: Run
+    transform: Transform,
+    *,
+    catalogue: storefront.Catalogue,
+    run: Run,
+    leave: Leave,
 ) -> Rewritten:
     """Every draft and version of the current store through *transform*, what
     each held before kept as a backup of *run*. Call it in a transaction: the
     release sequence and then the documents are locked, and the caller rolls
-    back on ``problems`` and for a dry run."""
+    back on ``problems`` and for a dry run. *leave* names the old versions to
+    leave as they are where they cannot be rewritten (:func:`_rewritten`)."""
     _lock_release_sequence()
     result = Rewritten()
+    released = set(published_versions().values())
+    waiting = {
+        version
+        for versions in BuilderScheduledPublish.objects.filter(
+            status=ScheduleStatus.PENDING
+        ).values_list("versions", flat=True)
+        for version in versions.values()
+    }
+
     records: list[BuilderRewriteRun] = []
 
     def record() -> BuilderRewriteRun:
         """The row of *run*, made with the first row it replaces."""
         if not records:
-            records.append(
-                BuilderRewriteRun.objects.create(
-                    run=run.id,
-                    command=run.command,
-                    decisions=dict(run.decisions),
-                )
-            )
+            records.append(record_run(run))
         return records[0]
 
     documents = BuilderDocument.objects.all_with_deleted()
@@ -273,6 +374,14 @@ def rewrite_store(
             transform=transform,
             catalogue=catalogue,
             result=result,
+            leave=None if version.pk in released | waiting else leave,
+            bound=(
+                "it is published"
+                if version.pk in released
+                else "a publish is waiting to release it"
+                if version.pk in waiting
+                else ""
+            ),
         )
         if validated is None:
             continue

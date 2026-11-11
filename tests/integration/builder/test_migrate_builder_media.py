@@ -491,7 +491,7 @@ class TestWhatStopsAStore:
 def decide(tenant, tmp_path):
     """Writes a decisions file for this store and answers its argument."""
 
-    def write(images=None, alt=None, slots=None, schema=None):
+    def write(images=None, alt=None, slots=None, left=None, schema=None):
         path = tmp_path / "decisions.json"
         path.write_text(
             json.dumps(
@@ -500,6 +500,7 @@ def decide(tenant, tmp_path):
                         "images": images or {},
                         "alt": alt or {},
                         "slots": slots or {},
+                        "left": left or [],
                     }
                 },
                 ensure_ascii=False,
@@ -1955,3 +1956,237 @@ class TestABackupWhoseRowIsGone:
         assert "2 backup(s)" in listed
         assert "2 backup(s) of rows that no longer exist removed" in restored
         assert not BuilderRewriteRun.objects.exists()
+
+
+def promo_block() -> dict:
+    """A block a store once used and the storefront has since dropped."""
+    return {
+        "type": "promo_strip",
+        "version": 1,
+        "accepts": [1],
+        "schema": _schema(text=dict(TEXT)),
+        "translatable": [],
+        "refs": {},
+        "linkRefs": [],
+        "data": {},
+        "limits": {},
+        "children": {"allowed": []},
+        "kinds": ["section"],
+    }
+
+
+class TestAVersionThatNoLongerValidates:
+    """A rewritten version is validated against the storefront's catalogue of
+    TODAY, as every document is before it is stored. A version was valid when
+    it was made and nothing validates it again, so an old one can fail today
+    for a reason that has nothing to do with images, and nobody can edit it."""
+
+    OLD = f"{HOME} version 1"
+
+    @pytest.fixture
+    def history(self, admin, catalogue, stored_image):
+        """A store whose first version holds a block that is gone today, and
+        whose current version and draft do not: ``(document, url, asset)``."""
+        promo = promo_block()
+        catalogue.blocks = [*catalogue.blocks, promo]
+        clear_catalogue_cache()
+        asset = imported(url := stored_image(200))
+        doc = save_and_publish(
+            admin,
+            document(
+                ("a", banner(imageUrl=url)),
+                ("p", section("promo_strip@1", {"text": "Προσφορά"})),
+            ),
+        )
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(imageUrl=url))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        services.publish(admin, keys=[HOME])
+        catalogue.blocks = [b for b in catalogue.blocks if b is not promo]
+        clear_catalogue_cache()
+        return BuilderDocument.objects.get(pk=doc.pk), url, asset
+
+    @staticmethod
+    def version(doc: BuilderDocument, number: int) -> BuilderVersion:
+        return BuilderVersion.objects.get(document=doc, number=number)
+
+    def test_an_old_one_stops_the_store_until_someone_says_to_leave_it(
+        self, history, run
+    ):
+        doc, url, _asset = history
+        old = self.version(doc, 1).data
+
+        with pytest.raises(CommandError) as raised:
+            run()
+
+        message = str(raised.value)
+        assert f"{self.OLD}: unknown_block_type at /sections/p" in message
+        assert "(promo_strip@1)" in message
+        assert 'name it under "left"' in message
+        assert self.version(doc, 1).data == old
+        assert settings_of(doc) == {"imageUrl": url}
+
+    def test_left_as_it_is_it_keeps_its_content_and_gets_no_backup(
+        self, history, decide, run
+    ):
+        doc, _url, asset = history
+        old = self.version(doc, 1)
+
+        output = run(*decide(left=[self.OLD]))
+
+        after = self.version(doc, 1)
+        assert (after.data, after.content_hash) == (old.data, old.content_hash)
+        assert settings_of(doc) == {"image": asset.pk}
+        assert self.version(doc, 2).data["sections"]["a"]["settings"] == {
+            "image": asset.pk
+        }
+        assert f"decision: {self.OLD} is left as it is" in output
+        assert "moved 1 draft(s), 1 version(s)" in output
+        assert not BuilderRewriteBackup.objects.filter(version=old).exists()
+
+    def test_what_was_left_is_kept_with_the_run_and_listed(
+        self, history, decide, run
+    ):
+        run(*decide(left=[self.OLD]))
+
+        listed = run(command="builder_rewrite_backups")
+
+        assert BuilderRewriteRun.objects.get().decisions == {"left": [self.OLD]}
+        assert f'"left": ["{self.OLD}"]' in listed
+
+    def test_a_rerun_reports_it_again_and_stops_nothing(
+        self, history, decide, run
+    ):
+        run(*decide(left=[self.OLD]))
+
+        output = run(*decide(left=[self.OLD]))
+
+        assert f"decision: {self.OLD} is left as it is" in output
+        assert "moved 0 draft(s), 0 version(s)" in output
+        assert BuilderRewriteRun.objects.count() == 1
+
+    def test_a_store_with_nothing_else_to_move_still_records_it(
+        self, admin, catalogue, stored_image, decide, run
+    ):
+        promo = promo_block()
+        catalogue.blocks = [*catalogue.blocks, promo]
+        clear_catalogue_cache()
+        imported(url := stored_image(203))
+        doc = save_and_publish(
+            admin,
+            document(
+                ("a", banner(imageUrl=url)),
+                ("p", section("promo_strip@1", {"text": "Προσφορά"})),
+            ),
+        )
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(heading="Χωρίς εικόνα"))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        services.publish(admin, keys=[HOME])
+        catalogue.blocks = [b for b in catalogue.blocks if b is not promo]
+        clear_catalogue_cache()
+
+        output = run(*decide(left=[self.OLD]))
+        again = run(*decide(left=[self.OLD]))
+
+        kept = BuilderRewriteRun.objects.get()
+        assert kept.decisions == {"left": [self.OLD]}
+        assert not kept.backups.exists()
+        assert f"run {kept.run}: nothing was moved" in output
+        assert "nothing was moved" not in again
+        assert f"decision: {self.OLD} is left as it is" in again
+
+    def test_the_published_one_cannot_be_left(
+        self, history, admin, decide, run
+    ):
+        """The version a release holds is what visitors read."""
+        doc, url, _asset = history
+        services.publish_version(admin, key=HOME, number=1)
+
+        with pytest.raises(CommandError) as raised:
+            run(*decide(left=[self.OLD]))
+
+        message = str(raised.value)
+        assert f"{self.OLD}: unknown_block_type at /sections/p" in message
+        assert "it is published" in message
+        assert f"decision not used: {self.OLD}" in message
+        assert settings_of(doc) == {"imageUrl": url}
+
+    def test_one_a_publish_is_waiting_to_release_cannot_be_left(
+        self, history, admin, catalogue, decide, run
+    ):
+        doc, url, _asset = history
+        promo = promo_block()
+        catalogue.blocks = [*catalogue.blocks, promo]
+        clear_catalogue_cache()
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(
+                ("a", banner(imageUrl=url)),
+                ("p", section("promo_strip@1", {"text": "Αύριο"})),
+            ),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        scheduling.schedule_publish(
+            admin, keys=[HOME], when=timezone.now() + timedelta(days=1)
+        )
+        catalogue.blocks = [b for b in catalogue.blocks if b is not promo]
+        clear_catalogue_cache()
+        waiting = f"{HOME} version 3"
+
+        with pytest.raises(CommandError) as raised:
+            run(*decide(left=[self.OLD, waiting]))
+
+        assert f"{waiting}: unknown_block_type" in str(raised.value)
+        assert "a publish is waiting to release it" in str(raised.value)
+
+    def test_one_the_move_itself_breaks_cannot_be_left(
+        self, admin, catalogue, stored_image, decide, run
+    ):
+        """It validated before the run: what stops it is this command's, and
+        leaving it would hide that."""
+        imported(url := stored_image(201))
+        doc = save_and_publish(
+            admin, document(("a", banner(mobileImageUrl=url)))
+        )
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(heading="Νέο"))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        services.publish(admin, keys=[HOME])
+        block = next(b for b in catalogue.blocks if b["type"] == "hero_banner")
+        block["schema"]["properties"]["mobileImage"] = {"type": "string"}
+        clear_catalogue_cache()
+
+        with pytest.raises(CommandError) as raised:
+            run(*decide(left=[self.OLD]))
+
+        assert f"{self.OLD}: " in str(raised.value)
+        assert 'name it under "left"' not in str(raised.value)
+        assert f"decision not used: {self.OLD}" in str(raised.value)
+
+    def test_leaving_a_version_that_needs_no_leaving_stops_the_store(
+        self, admin, stored_image, decide, run
+    ):
+        imported(url := stored_image(202))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        with pytest.raises(
+            CommandError, match=f"decision not used: {self.OLD}"
+        ):
+            run(*decide(left=[self.OLD]))
+
+        assert settings_of(doc) == {"imageUrl": url}

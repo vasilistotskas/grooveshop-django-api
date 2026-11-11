@@ -36,7 +36,7 @@ from django.db import connection, transaction
 
 from builder import references, storefront
 from builder.block_upgrades import upgrade_document
-from builder.document_rewrite import Run, rewrite_store
+from builder.document_rewrite import Leave, Run, rewrite_store
 from builder.services import published_versions
 from core.management.tenant_mixin import TenantCommandMixin
 
@@ -79,6 +79,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 ),
                 catalogue=catalogue,
                 run=Run(run, "persist_block_upgrades"),
+                leave=Leave(),
             )
             if result.problems:
                 rolled_back = True

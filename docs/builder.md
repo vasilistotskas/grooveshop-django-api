@@ -720,7 +720,8 @@ release: that is what brings the rewrite to visitors.
     "slots": {
       "template:home draft: /sections/hero/settings/mobileImages/1": 31,
       "template:home version 3: /sections/hero/settings/mobileImages/1": "remove"
-    }}}
+    },
+    "left": ["template:home version 2"]}}
   ```
 
   A store is named by its schema. Under `images`, a value exactly as the
@@ -728,7 +729,8 @@ release: that is what brings the rewrite to visitors.
   (`"empty"`: the setting is left unset and its alt goes with it). Under
   `alt`, an image whose uses disagree gets the text stated, per language; an
   empty text leaves it without one. Under `slots`, an empty entry of a list
-  (next point) gets a library image, or is taken out with its position. There
+  (next point) gets a library image, or is taken out with its position. Under
+  `left`, an old version that cannot be rewritten is left as it is (below). There
   is no switch that ignores problems and no default: what has no decision
   still stops the store. Each decision used is printed, and what was decided
   for a store is kept with its run (`BuilderRewriteRun.decisions`), which
@@ -751,6 +753,33 @@ release: that is what brings the rewrite to visitors.
   now nor recorded, or that the file now states differently, stops the store.
   A run that was put back recorded nothing any more. With `--tenant`, the
   sections of other stores are skipped and said.
+- **A version that no longer validates.** What is stored is what
+  `validate_document` returns against the storefront's catalogue of *today*:
+  that is where a rewritten document's references and hash come from. A
+  version was valid when it was made and nothing validates it again
+  (`publish_version` and `rollback` say so), so an old one can fail today for
+  a reason that has nothing to do with images: a block the storefront has
+  since dropped or changed. Nobody can edit a version and no decision makes
+  one valid, so what happens depends on who reads it.
+  - A version **a release holds, or a publish is waiting to release**, is what
+    visitors read. It has to be moved, and it stops the store. The line names
+    the issue, its place and the block (`unknown_block_type at
+    /sections/p/type (promo_strip@1); it is published, so it has to be
+    moved`). A block left at an older version is moved by
+    `persist_block_upgrades`, to be run first; anything else is fixed by
+    publishing a page that validates.
+  - A version **in no release** is read again only if someone rolls back to
+    it. Where it did not validate before the run either, it can only be left
+    as it is: not rewritten, no backup. That has a consequence, so it is not a
+    default: the store stops until the version is named under `left` in the
+    decisions file, as the report names it. From then on each run prints
+    `decision: <version> is left as it is (<why>)` and exits 0, and the run
+    keeps it (`BuilderRewriteRun.decisions`), also when nothing else was
+    moved, so `builder_rewrite_backups` shows it later. The consequence: a
+    release rolled back to that version shows no image where it names one by
+    URL, once the storefront stops reading the old settings.
+  - A version in no release that validated before the run and does not after
+    it is the run's own doing. It always stops the store and cannot be left.
 - **A deleted page.** Nobody can open it in the editor, and one brought back
   starts with an empty draft (`services._create_document`), so what it holds
   cannot be fixed by hand. Its lines are marked `(deleted page)`, and a value

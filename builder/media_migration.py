@@ -501,6 +501,10 @@ class Decisions:
     #: ``{"<document> <draft | version N>: <pointer>" of an empty list entry:
     #: the library image to put there, None to remove its position}``.
     slots: Mapping[str, int | None] = field(default_factory=dict)
+    #: The old versions to leave as they are, as a report names them
+    #: (``template:home version 3``): ones in no release that did not
+    #: validate before the run and so cannot be rewritten.
+    left: frozenset[str] = frozenset()
 
     def as_stated(self) -> dict[str, Any]:
         """These decisions as a decisions file states them, for the record of
@@ -518,6 +522,7 @@ class Decisions:
                 slot: REMOVE_POSITION if asset is None else asset
                 for slot, asset in self.slots.items()
             },
+            "left": sorted(self.left),
         }
         return {part: decided for part, decided in stated.items() if decided}
 
@@ -527,8 +532,15 @@ def _decisions_of(schema: str, stated: Any) -> Decisions:
         return DecisionsInvalid(f"{schema}: {what}")
 
     keys = ("images", "alt", "slots")
-    if not isinstance(stated, dict) or set(stated) - set(keys):
-        raise bad('a store holds "images", "alt" and "slots", nothing else')
+    if not isinstance(stated, dict) or set(stated) - {*keys, "left"}:
+        raise bad(
+            'a store holds "images", "alt", "slots" and "left", nothing else'
+        )
+    stated_left = stated.get("left", [])
+    if not isinstance(stated_left, list) or not all(
+        isinstance(version, str) for version in stated_left
+    ):
+        raise bad('"left" is a list of versions, as the report names them')
     stated_images, stated_alts, stated_slots = (
         stated.get(key, {}) for key in keys
     )
@@ -562,7 +574,9 @@ def _decisions_of(schema: str, stated: Any) -> Decisions:
             if not isinstance(alt, str):
                 raise bad(f"alt[{asset!r}][{locale!r}] is a text")
             alts[int(asset), locale] = alt.strip()
-    return Decisions(images, alts, slots)
+    return Decisions(
+        images, alts, slots, frozenset(v.strip() for v in stated_left)
+    )
 
 
 def read_decisions(path: Path) -> dict[str, Decisions]:
@@ -759,6 +773,7 @@ def recorded_decisions(command: str) -> Decisions:
     images: dict[str, int | None] = {}
     alts: dict[tuple[int, str], str] = {}
     slots: dict[str, int | None] = {}
+    left: set[str] = set()
     for stated in BuilderRewriteRun.objects.filter(command=command).values_list(
         "decisions", flat=True
     ):
@@ -766,7 +781,8 @@ def recorded_decisions(command: str) -> Decisions:
         images.update(earlier.images)
         alts.update(earlier.alts)
         slots.update(earlier.slots)
-    return Decisions(images, alts, slots)
+        left |= earlier.left
+    return Decisions(images, alts, slots, frozenset(left))
 
 
 def unused_decisions(
@@ -776,6 +792,7 @@ def unused_decisions(
     urls: list[str],
     alts: list[tuple[int, str]],
     slots: list[str],
+    left: list[str],
 ) -> tuple[list[str], list[str]]:
     """The decisions that settled nothing in this run, apart: ``(those an
     earlier run of this store applied as they stand, the rest)``.
@@ -817,6 +834,13 @@ def unused_decisions(
             and recorded.slots[slot] == decisions.slots[slot],
             slot,
             "is no empty entry beside an image",
+        )
+    for version in left:
+        sort(
+            version in recorded.left,
+            version,
+            "is no version that can only be left: it is in a release, or "
+            "validates, or is not there",
         )
     return applied, problems
 

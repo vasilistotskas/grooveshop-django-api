@@ -15,6 +15,10 @@ artifacts from one CI run and merges them into ``.test_durations``::
     python .github/scripts/merge_test_durations.py --run-id 123456789
 
 Without ``--run-id`` it takes the latest successful pull_request CI run.
+CI runs the same merge itself (``--from-dir``, in the Coverage Gate job)
+and uploads the result as the ``test-durations`` artifact, so a refresh
+can also be one download: ``gh run download <run> --name test-durations``
+gives ``test-durations.json``, the new content of ``.test_durations``.
 Every PR run runs the four shards; a push to ``main`` skips them when the
 PR already tested its tree (``tested_in_pr.sh``), so a main run may hold
 no durations at all.
@@ -109,6 +113,11 @@ def _download(run_id: str, into: Path) -> dict[int, dict[str, float]]:
         "--dir",
         str(into),
     )
+    return read_shards(into)
+
+
+def read_shards(into: Path) -> dict[int, dict[str, float]]:
+    """The shard files under ``into``, one directory per artifact."""
     shards: dict[int, dict[str, float]] = {}
     for directory in into.glob(f"{ARTIFACT_PREFIX}*"):
         group = int(directory.name.removeprefix(ARTIFACT_PREFIX))
@@ -120,17 +129,27 @@ def _download(run_id: str, into: Path) -> dict[int, dict[str, float]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--run-id", help="CI run to take durations from")
+    parser.add_argument(
+        "--from-dir",
+        type=Path,
+        help="read shard artifacts already downloaded here (what CI does)",
+    )
     parser.add_argument("--shards", type=int, default=4)
     parser.add_argument("--output", type=Path, default=Path(".test_durations"))
     args = parser.parse_args()
 
-    run_id = args.run_id or latest_successful_run(_recent_runs())
-    with tempfile.TemporaryDirectory() as tmp:
-        shards = _download(run_id, Path(tmp))
+    if args.from_dir:
+        source = str(args.from_dir)
+        shards = read_shards(args.from_dir)
+    else:
+        run_id = args.run_id or latest_successful_run(_recent_runs())
+        source = f"run {run_id}"
+        with tempfile.TemporaryDirectory() as tmp:
+            shards = _download(run_id, Path(tmp))
     try:
         merged = merge(shards, args.shards)
     except ValueError as exc:
-        print(f"run {run_id}: {exc}", file=sys.stderr)
+        print(f"{source}: {exc}", file=sys.stderr)
         return 1
 
     # Same layout pytest-split writes, so a refresh diffs cleanly.
@@ -142,7 +161,7 @@ def main() -> int:
     for group in sorted(shards):
         total = sum(shards[group].values()) / 60
         print(f"shard {group}: {len(shards[group])} tests, {total:.1f} min")
-    print(f"run {run_id}: wrote {len(merged)} tests to {args.output}")
+    print(f"{source}: wrote {len(merged)} tests to {args.output}")
     return 0
 
 

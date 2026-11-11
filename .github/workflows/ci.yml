@@ -17,9 +17,16 @@ on:
       - '.editorconfig'
   workflow_dispatch:
 
+# A new push to a pull request cancels the run it supersedes: those runs
+# share a group named after the pull request's number (not its branch:
+# two forks may both send a branch called ``main``). Every other run (a push to main,
+# a dispatch) is a group of its own, so it is never cancelled and never
+# waits: a cancelled run on main could be in the middle of a release (a
+# version commit pushed, its tag not yet). Releases still happen one at
+# a time (``concurrency: release`` on that job).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -452,6 +459,32 @@ jobs:
         # a missing one.
         run: uv run python manage.py compilemessages --ignore=.venv
 
+      - name: Build the test database once, copy it for each worker
+        # Every xdist worker used to build its own database by replaying
+        # the whole migration history: 3.5 minutes with two workers side
+        # by side, 4.5 to 5 with four (runs 42867810779 and 42872796937,
+        # 2026-11-10). One serial pytest run builds ``test_postgres``
+        # through the same conftest, and PostgreSQL copies it to
+        # ``test_postgres_gw<N>``. The shard run below finds each
+        # worker's database in place (``--reuse-db`` in ``addopts``),
+        # applies no migration and restores the seed snapshot the copy
+        # carries. The history is still replayed in full, once per
+        # shard. The one test named here reads the rows the build left,
+        # and a missing node id fails the step.
+        run: |
+          workers="$(nproc)"
+          echo "XDIST_WORKERS=$workers" >> "$GITHUB_ENV"
+          uv run pytest -n 0 --cov=. --cov-report= --cov-fail-under=0 \
+            --cov-config=pyproject.toml \
+            "tests/unit/test_migration_seed.py::TestRestore::test_a_restore_puts_back_exactly_the_migrated_rows"
+          for worker in $(seq 0 $((workers - 1))); do
+            docker exec ci-postgres psql -U postgres -v ON_ERROR_STOP=1 \
+              -c "CREATE DATABASE test_postgres_gw${worker} TEMPLATE test_postgres"
+          done
+        timeout-minutes: 10
+        env:
+          HYPOTHESIS_PROFILE: ci
+
       - name: Run Tests (shard)
         # ``--dist loadfile`` is mandatory for stability per
         # ``project_test_suite_stability.md`` — interleaving tests
@@ -488,25 +521,48 @@ jobs:
         # within 0.7% of each other and they ran 9-16 minutes on CI.
         # Tests missing from the file are assumed average, so drift
         # costs balance, never correctness. Four shards, not more:
-        # each shard pays a fixed ~3 min creating its xdist worker
-        # test-databases (validated locally with ``--create-db -n 4``),
-        # so extra shards mostly buy overhead.
+        # each shard pays about 5 minutes before its tests (setup, the
+        # migration replay above, collection), and a shard cannot be
+        # shorter than its longest file, which ``loadfile`` keeps on one
+        # worker: tests/unit/devtools/test_demo_store.py took 267 s on
+        # 2026-11-10 (run 42883125945), so its shard stays near 9.5
+        # minutes however many shards there are, and four balanced
+        # shards are already there. ``--durations`` prints the slowest
+        # setups, tests and teardowns of the shard, for the day one of
+        # them becomes the bound.
+        # ``--no-loadscope-reorder``: by default xdist hands out files
+        # by their number of tests, largest first
+        # (``xdist/scheduler/loadscope.py``), so a file with few tests
+        # and a long class setup starts last and the shard waits for it
+        # with three workers idle. tests/integration/core/
+        # test_migration_seo_into_translations.py (5 tests, 160 to 214 s
+        # of setup) held shard 1 that way for 3.5 minutes in run
+        # 42885630670. Without the reorder files start in collection
+        # order.
+        # One worker per vCPU (``XDIST_WORKERS``), not the ``-n auto``
+        # of ``addopts``: with psutil installed ``auto`` counts PHYSICAL
+        # cores, and a standard runner has 4 vCPUs on 2 cores, so
+        # ``auto`` started 2 workers ("created: 2/2 workers" in the logs
+        # of that day's runs).
         # Coverage: shards upload raw data files; the ``coverage`` job
         # combines them and enforces ``fail_under`` for the whole suite.
         # A single shard's percentage is meaningless, so the per-shard
         # run must not gate (``--cov-fail-under=0``) and prints no
-        # report (``--cov-report=``). Note the coverage CORE is not a
+        # report (``--cov-report=``). ``--cov-append`` keeps what the
+        # database build above measured. Note the coverage CORE is not a
         # lever here: an A/B of CI runs (2026-08-25, ctrace 31:44 vs
         # sysmon 34:27) showed the suite is DB/fixture-bound. If a shard
         # creeps toward its timeout, profile first:
         # pytest --durations=25.
         run: >
           cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
-          uv run pytest --cov=. --cov-report= --cov-fail-under=0
-          --cov-config=pyproject.toml -n auto --dist loadfile
+          uv run pytest --cov=. --cov-append --cov-report= --cov-fail-under=0
+          --cov-config=pyproject.toml -n "$XDIST_WORKERS" --dist loadfile
+          --no-loadscope-reorder
           --splits 4 --group ${{ matrix.group }}
           --durations-path test-durations-shard-${{ matrix.group }}.json
           --store-durations --clean-durations
+          --durations=15 --durations-min=10
         timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci
@@ -540,15 +596,16 @@ jobs:
     needs: tested-in-pr
     if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
-    # Nearly all of the lane is building its two store schemas through
-    # the full migration history: locally on 2026-10-22, 244 s for the
-    # first and 89 s for the second, against under a minute for the 150
-    # tests. That cost grows with every migration, and splitting the lane
-    # would not cut it, since each shard would build the schemas again.
-    # Its green CI runs took 8-14 minutes on 2026-10-21/22, and one was
-    # cancelled at the old 15-minute limit right after "150 passed". 25
-    # leaves room for slower runners; raise it again only with a fresh
-    # measurement. (Creating the second schema by cloning the first,
+    # Nearly all of the lane is the migration replays that build its
+    # schemas: public, then the stores ``webside``, ``mt_smoke`` and
+    # ``mt_smoke_b``, about 160 s each on a runner, against one minute
+    # for the 251 tests (three pull_request runs of 2026-11-10: 10 to 13
+    # minutes in pytest, 8 of them before the first test). That cost
+    # grows with every migration, and splitting the lane into jobs would
+    # not cut it, since each job would build the schemas again. So
+    # ``tests_mt/conftest.py`` builds the three store schemas at the
+    # same time, one process each. 25 leaves room for slower runners.
+    # (Creating a store schema by cloning another,
     # TENANT_CREATION_FAKES_MIGRATIONS, is not the way out: django-tenants
     # warns it can be slower, and it would copy the first store's test
     # rows into the store the isolation tests compare it with.)
@@ -633,9 +690,8 @@ jobs:
         run: uv run python manage.py compilemessages --ignore=.venv
 
       - name: Run MT lane
-        # Serial (-n 0): the lane is small (~10 tests) and schema
-        # switching is process-global via ``connection`` — xdist would
-        # need per-worker schemas for no real benefit here.
+        # Serial (-n 0): the tests take a minute, and every xdist worker
+        # would build its own database with all four schemas again.
         run: uv run pytest tests_mt -n 0
 
   coverage:
@@ -681,6 +737,45 @@ jobs:
           uv run coverage combine coverage-shard-*
           uv run coverage report
 
+      - name: Download shard durations
+        id: durations-download
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-durations-shard-*
+          path: shard-durations
+
+      - name: Merge shard durations
+        # What ``.test_durations`` would be if it were refreshed from
+        # this run: every test's time on a runner, under this run's
+        # coverage and xdist load. Nothing reads it here. To refresh,
+        # download this artifact from a green pull_request run and
+        # commit it (docs/testing.md says when). The artifact is optional
+        # and the release needs this job, so these three steps never fail
+        # it: a merge the script refuses (a missing shard, a test two
+        # shards claim) leaves a warning and no artifact.
+        id: durations
+        if: steps.durations-download.outcome == 'success'
+        continue-on-error: true
+        run: >
+          python .github/scripts/merge_test_durations.py
+          --from-dir shard-durations --shards 4
+          --output test-durations.json
+
+      - name: Warn when the durations were not merged
+        if: steps.durations.outcome != 'success'
+        run: echo "::warning::The shard durations were not merged, so this run has no test-durations artifact. See the two steps above."
+
+      - name: Upload merged durations
+        if: steps.durations.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations
+          path: test-durations.json
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     needs:
       [tested-in-pr, quality, migrations, testing, test-mt, coverage, security-scan]
@@ -699,12 +794,19 @@ jobs:
           || !contains(needs.*.result, 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # One release job at a time; a second waits. GitHub keeps one waiting
+    # job per group, so a third cancels the second, whose run then shows
+    # as cancelled. release_target.sh covers that: the job that takes its
+    # place releases from the tip, or fails when the cancelled run was
+    # the one that had to release.
     concurrency: release
     environment: release
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      # release_target.sh reads the run of a newer commit.
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -731,7 +833,31 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
+      - name: Decide what to release
+        # Runs on main are not cancelled, so this one may have tested a
+        # commit that is no longer the tip, and semantic-release can only
+        # push a version commit onto the tip. The script holds the rule
+        # and its table of cases. In short: at the tip, release; behind
+        # commits that start no run (docs, the bot's version commit),
+        # release from the tip; behind a code commit, leave the release
+        # to that commit's run, with a warning while that run is alive
+        # and a failed job when it is not. A release that does not
+        # happen is never a quiet green job.
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/release_target.sh "$GITHUB_SHA"
+
+      - name: Move to the tip of main
+        # Only over commits the script found to start no run, so the tree
+        # differs from the tested one in ignored files and the bot's own.
+        if: steps.target.outputs.release == 'true' && steps.target.outputs.ref != github.sha
+        env:
+          TIP: ${{ steps.target.outputs.ref }}
+        run: git merge --ff-only "$TIP"
+
       - name: Python Semantic Release
+        if: steps.target.outputs.release == 'true'
         # Inline instead of the python-semantic-release ACTION: its
         # Docker image pip-installs dependencies UNPINNED at workflow
         # runtime, so a transitive release can break every run at once

@@ -5,6 +5,7 @@ These tests verify that the OptimizedQuerySet, OptimizedManager, and related
 mixin classes work correctly and provide the expected optimization patterns.
 """
 
+import pytest
 from django.db import models
 
 from core.managers import (
@@ -16,6 +17,9 @@ from core.managers import (
 from core.mixins import (
     SoftDeleteQuerySetMixin,
 )
+
+# The models these tests declare must not reach the project's registry.
+pytestmark = pytest.mark.usefixtures("isolated_core_models")
 
 
 class TestOptimizedQuerySet:

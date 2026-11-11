@@ -2034,7 +2034,7 @@ if SYSTEM_ENV == "ci":
     DATABASES = {
         "default": {
             "ENGINE": "django_tenants.postgresql_backend",
-            "NAME": "postgres",
+            "NAME": getenv("DB_NAME", "postgres"),
             "USER": getenv("DB_USER", "postgres"),
             "PASSWORD": DB_PASSWORD,
             "HOST": "127.0.0.1",

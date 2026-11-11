@@ -1,7 +1,7 @@
 """Unit tests for the ``ShippingRate`` model.
 
 Single source of truth for a store's shipping price, availability and
-weight cap — see ``docs/order-system.md``. ``ShippingRateFactory``
+weight cap — see ``docs/order/shipping.md`` (5.0). ``ShippingRateFactory``
 requires an explicit ``country`` (see its docstring); these tests use
 ``CountryFactory`` for a country that has nothing to do with the GR
 row the shipping migrations seed.

@@ -30,7 +30,8 @@ it.
 
 Why dispatch and not payment or placement. The platform's retail receipt is
 issued when the parcel ships (`order.invoicing.receipt_issuable`,
-`docs/order-system.md` section 7.4), and a Greek store keeps accrual books
+`docs/order/fiscal-mydata.md` section 7.4), and a Greek store keeps accrual
+books
 (ν.4308/2014): a sale belongs to the period of its receipt, not to the day a
 courier pays a cash-on-delivery order out, nor to the day an online payment
 cleared before the parcel left. The earlier rule (placed, and collected)
@@ -99,7 +100,7 @@ order never shipped is not counted (the sale it would reverse was never earned).
 **Only the goods part of a provider refund is a return.** A refund pays a
 duplicate payment back first, and that part is no return of the sale: it gets no
 credit document and takes no room on the receipt (`order.credit_allocation`,
-`docs/order-system.md` section 7). Turnover reads each refund's goods from
+`docs/order/fiscal-credit-vat-split.md`). Turnover reads each refund's goods from
 `CreditAllocation.goods_claimed`, which is written once when the money is claimed
 or booked and never scaled afterwards, capped to what the refund really moved
 (`order.turnover._ledger_goods`). A refund with no allocation at all (not decided

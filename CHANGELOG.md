@@ -3,6 +3,48 @@
 
 
 
+## v3.242.22 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): the unknown state of a voucher request belongs to that request (#647) ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): the unknown state of a voucher request belongs to that request
+
+The unknown state was a bare timestamp, so when a request sent again was
+lost too, the first request's late answer was saved over the later
+request's state and cleared it: that request's possible voucher was never
+checked, and the order could hold a voucher staff had deleted. The state
+now records the claim it was set for (metadata unknown_request); a late
+answer is saved only for its own request's state and is otherwise deleted
+at ACS or recorded as our unused voucher. Adopt counts only vouchers ACS
+itself named as evidence that ACS holds them. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): a request releases or loses only its own claim; adopt our undeletable voucher by hand
+
+A stale request's Phase 2 failure released the next request's claim (its
+on-time answer then looked stale and its voucher was deleted at ACS) or
+marked that request unknown. Release and the unknown conversion now act
+only on the request's own claim. A voucher recorded on this shipment as
+our own that ACS would not delete is adopted with a hand confirmation
+instead of being refused as unknown to ACS. Pins the request identity
+recorded by every path into the unknown state. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+* fix(shipping_acs): tell staff once when a stale request is lost after its check was resolved
+
+Staff looked in the ACS portal before that request landed there, so a
+voucher it may have made is known to nobody. The row's mint state is left
+alone; an order note and the unknown-request alert, worded for this case,
+are sent once per request (metadata late_unknown_alerted). ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
+### Documentation
+
+* docs(shipping_acs): state the one exception to "ACS must hold the voucher" for adopt
+
+A number recorded on this shipment as our own unused voucher ACS refused
+to delete is adopted on our record plus a hand confirmation; the adopt
+docstrings and both docs said nothing overrides the ACS evidence. ([`f4c3b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4c3b3a0f64c4553cc9f4e445f3d741a0ad0aba1))
+
 ## v3.242.21 (2026-11-10)
 
 ### Bug fixes

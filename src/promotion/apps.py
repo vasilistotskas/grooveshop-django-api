@@ -3,6 +3,11 @@ from django.utils.translation import gettext_lazy as _
 
 
 class PromotionConfig(AppConfig):
+    """Rule-based promotions and coupon codes, and their redemptions.
+
+    Models and entry points: ``docs/app-map.md``.
+    """
+
     default_auto_field = "django.db.models.BigAutoField"
     name = "promotion"
     verbose_name = _("Promotions")

@@ -6,8 +6,8 @@ class TenantConfig(AppConfig):
     """The multi-tenancy control plane: stores, their domains, staff
     memberships, credentials, provisioning, billing and lifecycle.
 
-    Models and entry points: ``docs/app-map.md``. Read ``docs/api-staff-
-    identity.md`` and ``docs/secret-encryption.md``.
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/api-staff-identity.md`` and ``docs/secret-encryption.md``.
     """
 
     default_auto_field = "django.db.models.BigAutoField"

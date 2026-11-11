@@ -14,6 +14,13 @@ in the docs and in every source file of ``_SOURCE_SUFFIXES``: a workflow
 comment cited one unseen while only Python was read.
 
 Neither rule has an allowlist: #561 fixed the last known failures.
+
+Python is read for one more thing: a ``docs/`` path named in a docstring
+or a comment must exist and stand on one line, since a pointer to a doc is
+what a docstring is for. Other repo paths in Python are not checked yet:
+about 240 comments still name a module by its path before ``src/``.
+
+The last rule keeps a doc small enough to read whole.
 """
 
 from __future__ import annotations
@@ -45,7 +52,12 @@ _MEMORY_NOTE = re.compile(r"\b(?:project|feedback|reference)_[a-z0-9_]+\.md\b")
 _SOURCE_DIRS_SKIPPED = frozenset(
     {".venv", "node_modules", ".git", "migrations", "__pycache__", "htmlcov"}
 )
-_ORDER_DOC_MAX_CHARACTERS = 40_000
+# ``docs/product-`` at the end of a line: a path cut in two by a wrap.
+_SPLIT_DOC_PATH = re.compile(r"`(docs/[\w./-]*)$", re.MULTILINE)
+_DOC_MAX_CHARACTERS = 40_000
+# Over the limit on the day the rule was written; #656 splits them. Delete
+# a name when its file fits, never add one.
+_DOCS_OVER_THE_LIMIT = frozenset({"docs/builder.md", "docs/emails.md"})
 _ORDER_DOC_MAX_LINE = 200
 # Code, workflows, hooks and config: where a comment gives a reason.
 _SOURCE_SUFFIXES = frozenset({".py", ".yml", ".yaml", ".toml", ".sh", ".mjs"})
@@ -119,6 +131,43 @@ def _source_files() -> list[Path]:
     return files
 
 
+def _python_files() -> list[Path]:
+    """Python sources, without this file: its fixtures name absent paths."""
+    return [
+        path
+        for path in _source_files()
+        if path.suffix == ".py" and path != Path(__file__).resolve()
+    ]
+
+
+def _missing_docs_named_in_python() -> set[str]:
+    """``<file>: <path>`` for every absent ``docs/`` path Python names."""
+    missing = set()
+    for source in _python_files():
+        rel = source.relative_to(REPO_ROOT).as_posix()
+        for token in _BACKTICKED.findall(source.read_text(encoding="utf-8")):
+            match = _REPO_PATH.match(token.strip())
+            if match is None or not match["path"].startswith("docs/"):
+                continue
+            if not (REPO_ROOT / match["path"]).exists():
+                missing.add(f"{rel}: {match['path']}")
+    return missing
+
+
+def _split_doc_paths() -> set[str]:
+    """``<file>: <start of the path>`` for a ``docs/`` path cut by a wrap."""
+    found = set()
+    for path in _doc_files() + _python_files():
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        found.update(
+            f"{rel}: {start}"
+            for start in _SPLIT_DOC_PATH.findall(
+                path.read_text(encoding="utf-8")
+            )
+        )
+    return found
+
+
 def _memory_note_citations() -> set[str]:
     """``<file>: <note>`` for every memory note named in a tracked text."""
     files = _doc_files() + [
@@ -187,24 +236,72 @@ def test_the_app_map_names_every_app():
     )
 
 
-def test_an_order_reference_file_fits_in_one_read():
-    """``docs/order-system.md`` grew to 273,000 characters in one file,
-    with paragraphs of up to 17,000 on one line, and could no longer be
-    read whole. Split a file on a subject before it reaches the limit
-    (``docs/order/index.md`` lists the files), and wrap prose: a table
-    row is the only line that may be long."""
-    too_big, too_long = [], []
-    for path in sorted((REPO_ROOT / "docs" / "order").glob("*.md")):
-        text = path.read_text(encoding="utf-8")
-        if len(text) > _ORDER_DOC_MAX_CHARACTERS:
-            too_big.append(f"{path.name}: {len(text)} characters")
-        too_long += [
-            f"{path.name}:{number}: {len(line)} characters"
-            for number, line in enumerate(text.splitlines(), 1)
-            if len(line) > _ORDER_DOC_MAX_LINE
-            and not line.lstrip().startswith("|")
-        ]
-    assert not too_big, "\n  ".join(too_big)
+def test_a_doc_named_in_python_exists():
+    missing = sorted(_missing_docs_named_in_python())
+    assert not missing, (
+        "These docstrings or comments name a doc that does not exist. A "
+        "sibling repository's doc is written with its repository "
+        "(grooveshop-infrastructure/docs/...):\n  " + "\n  ".join(missing)
+    )
+
+
+def test_no_doc_path_is_split_across_lines():
+    split = sorted(_split_doc_paths())
+    assert not split, (
+        "A docs/ path wrapped over two lines cannot be copied or found "
+        "with grep. Keep it on one line:\n  " + "\n  ".join(split)
+    )
+
+
+def test_a_split_or_absent_doc_path_in_python_is_reported(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "product-pricing.md").touch()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "apps.py").write_text(
+        '"""Read ``docs/product-pricing.md``, ``docs/gone.md`` and\n'
+        "``docs/product-\n"
+        'pricing.md``; the code is ``order/services.py``."""\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
+
+    assert _missing_docs_named_in_python() == {"src/apps.py: docs/gone.md"}
+    assert _split_doc_paths() == {"src/apps.py: docs/product-"}
+
+
+def test_a_doc_fits_in_one_read():
+    """``docs/order-system.md`` grew to 273,000 characters in one file and
+    could no longer be read whole. Split a doc on a subject before it
+    reaches the limit, into a folder with an ``index.md`` that says which
+    file to read (``docs/order/index.md``)."""
+    sizes = {
+        path.relative_to(REPO_ROOT).as_posix(): len(
+            path.read_text(encoding="utf-8")
+        )
+        for path in (REPO_ROOT / "docs").rglob("*.md")
+    }
+    over = {name for name, size in sizes.items() if size > _DOC_MAX_CHARACTERS}
+    new = sorted(over - _DOCS_OVER_THE_LIMIT)
+    assert not new, "\n  ".join(f"{name}: {sizes[name]}" for name in new)
+    fits = sorted(_DOCS_OVER_THE_LIMIT - over)
+    assert not fits, f"These fit now, delete them from the list: {fits}"
+
+
+def test_the_order_reference_has_no_paragraph_on_one_line():
+    """It had paragraphs of up to 17,000 characters on one line, which no
+    diff or partial read can show. Wrap prose; a table row is the only
+    line that may be long. The other docs are not held to this yet: many
+    of their paragraphs are still one line each."""
+    too_long = [
+        f"{path.relative_to(REPO_ROOT).as_posix()}:{number}: {len(line)}"
+        for path in sorted((REPO_ROOT / "docs" / "order").rglob("*.md"))
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), 1
+        )
+        if len(line) > _ORDER_DOC_MAX_LINE and not line.lstrip().startswith("|")
+    ]
     assert not too_long, "\n  ".join(too_long)
 
 

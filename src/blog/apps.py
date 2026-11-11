@@ -5,8 +5,8 @@ from django.utils.translation import gettext_lazy as _
 class BlogConfig(AppConfig):
     """Blog posts, categories, authors, comments and tags.
 
-    Models and entry points: ``docs/app-map.md``. Read ``docs/blog-related-
-    posts.md``.
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/blog-related-posts.md``.
     """
 
     name = "blog"

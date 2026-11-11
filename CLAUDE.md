@@ -86,7 +86,7 @@ Every app, the settings module (`src/settings.py`) and the `asgi` package live i
 - **Two app lists** (`src/settings.py`): `SHARED_APPS` live in the `public` schema (`core`, `tenant`, `scheduler`, `country`, `region`, `devtools`), `TENANT_APPS` in every store's schema (the domain apps), and `user`, `emails` and `admin` are in both. The list decides which host can serve an app.
 - **`core/`** is shared infrastructure (base views, serializers, permissions, middleware, filters, caching, the Celery app); `src/core/urls.py` is the root URL conf that mounts every app under `api/v1/`.
 - **`tenant/`** is the control plane. Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row. Per-tenant credentials come from `src/tenant/credentials.py`, with no platform-wide fallback for money or secrets (`docs/secret-encryption.md`).
-- **Layout conventions**: a module becomes a package at about 500 lines; tasks live in the app's `tasks`, receivers in its `signals`, connected from `AppConfig.ready()`; imports between apps follow the contracts in `pyproject.toml` (`uv run lint-imports`).
+- **Layout conventions**: a module becomes a package at about 500 lines; tasks live in the app's `tasks`, receivers in its `signals`, connected from `AppConfig.ready()`; imports between apps follow the contracts in `pyproject.toml` (`PYTHONPATH=src uv run lint-imports`).
 
 ### Core Base Classes and Patterns
 

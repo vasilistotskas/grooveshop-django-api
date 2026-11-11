@@ -151,9 +151,12 @@ both settled statuses a late `payment_intent.succeeded` cannot write over.
 nothing: none is recorded, the order stays COMPLETED, and staff find Stripe's
 refund id and status in a NOTE on the order. The provider no longer reports a
 payment status at all (`refund_payment` returns `refund_id`, `amount`,
-`payment_id`). A refund Stripe accepted and later fails (`refund.failed`) is
-not reversed on the ledger: it has no kind for that, and nothing handles the
-event yet.
+`payment_id`). A refund Stripe accepted and later fails (`refund.failed`,
+`refund.updated`, `charge.refund.updated`) is reversed on the ledger:
+`handle_stripe_refund_failed` writes one `REFUND_REVERSAL` row keyed on the
+refund id, so the money counts as held and refundable again, `payment_status`
+is derived again and staff are told. What the refund had released is not
+taken back. [§4.2.0](payments.md) has the whole rule.
 
 **The `order_refunded` contract** (`src/order/signals/__init__.py`). It carries
 `amount`, a `Money`: what THIS refund paid back, and `refund`, the REFUND
@@ -170,10 +173,13 @@ more (`giftcard.signals.handle_order_refunded_giftcard` is gone): `refund_order`
 credits the cards itself, with the value of a refund beyond the provider's
 money (`GiftCardService.credit_refund`, [§7.2](refunds.md)), and a cancel
 returns the whole redemption (`giftcard.signals.handle_order_canceled_giftcard`
-→ `giftcard.tasks.credit_refund_to_gift_cards`). A partial refund is paid back by the provider first, so a
-slice of the redemption on top would hand back more than that refund was worth
-(a EUR 5 refund once put EUR 60 back on a gift card), and the
-one-credit-per-card ledger could not top the card up when the rest is refunded.
+→ `giftcard.tasks.credit_refund_to_gift_cards`). A refund is paid back by the
+provider first, and releasing the whole redemption on top handed back more
+than the refund was worth (a EUR 5 refund once put EUR 60 back on a gift
+card). The cards now get the value in parts, as each refund reaches past the
+provider's money: a card can be credited more than once for one order, never
+for more than it is still owed, which `credit_refund` reads under the card's
+row lock.
 The email, the toast, the history row and the Meta `Refund` event fire on every
 refund, partial Stripe dashboard refunds included (they used to be silent).
 

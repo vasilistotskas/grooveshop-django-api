@@ -6,8 +6,8 @@ class ProductConfig(AppConfig):
     """The catalogue: products, categories, brands, attributes, reviews,
     favourites, alerts and pricing.
 
-    Models and entry points: ``docs/app-map.md``. Read ``docs/product-
-    pricing.md``.
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/product-pricing.md``.
     """
 
     name = "product"

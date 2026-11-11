@@ -1,7 +1,8 @@
 # App map
 
 Every Django app in this repository: what it owns, where its entry points
-are, and the doc to read before changing it. The code wins over this
+are, and the doc to read before changing it (an entry says so when
+there is none). The code wins over this
 page: when they differ, fix the page in the same change.
 `tests/unit/test_doc_references.py` fails when an app under `src/` is not
 named here, and when a path named here does not exist.
@@ -31,7 +32,9 @@ named here, and when a path named here does not exist.
   importing that module from the app's `AppConfig.ready()`. A task that
   changes module keeps its registered name (`name="<its old dotted path>"`).
 - **Imports between apps are contracts.** `[tool.importlinter]` in
-  `pyproject.toml` lists what may import what; run `uv run lint-imports`.
+  `pyproject.toml` lists what may import what; run
+  `PYTHONPATH=src uv run lint-imports` (it puts only the working directory
+  on the path).
 
 ## Settings, URLs and ASGI
 
@@ -124,7 +127,9 @@ not declare. Read `docs/scheduler.md`.
 ### `country/`, `region/`
 
 `Country` and `Region`: reference rows shared by every store, seeded from
-`src/country/seed_data.py` and `src/region/seed_data.py`.
+`src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
+of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+rules that read them.
 
 ### `devtools/`
 
@@ -206,8 +211,10 @@ cancel, refund), `src/order/stock.py` (`StockManager`),
 
 `Cart`, `CartItem` and `CartAttribution` (`src/cart/models/`),
 `src/cart/services.py`, the guest and customer cart API under
-`src/cart/views/`, and the agent's cart token
-(`src/cart/agent_token.py`, `docs/cart-agent-token.md`).
+`src/cart/views/`, and the agent's cart token (`src/cart/agent_token.py`).
+Read `docs/cart-agent-token.md` for the token, and
+`docs/order/creation-records.md` (section 3.4) for the first touch a cart
+records.
 
 ### `blog/`
 
@@ -227,8 +234,8 @@ cancel, refund), `src/order/stock.py` (`StockManager`),
 - `b2b/`: `BusinessProfile`, `CustomerGroup` and `PriceListItem`; VIES
   validation in `src/b2b/vies.py`, the rest in `src/b2b/services.py`.
 
-Each is behind a store feature (`docs/store-features.md`). Cross-service
-views: `grooveshop-docs/src/dev/flows/promotions-and-gift-cards.md` and
+Each is behind a store feature: read `docs/store-features.md`. The
+cross-service views are `grooveshop-docs/src/dev/flows/promotions-and-gift-cards.md` and
 `grooveshop-docs/src/dev/flows/b2b.md`.
 
 ### `loyalty/`
@@ -236,7 +243,8 @@ views: `grooveshop-docs/src/dev/flows/promotions-and-gift-cards.md` and
 `LoyaltyTier` (translatable), `PointsTransaction` and `LoyaltyPause`.
 `src/loyalty/services.py` awards and reverses points,
 `src/loyalty/signals.py` reacts to order events and
-`src/loyalty/tasks.py` expires points. Cross-service view:
+`src/loyalty/tasks.py` expires points. It has no doc in this repository;
+the cross-service view is
 `grooveshop-docs/src/dev/flows/loyalty.md`.
 
 ### `shipping/`, `shipping_acs/`, `shipping_boxnow/`
@@ -265,11 +273,19 @@ lists the imports that still break that rule.
 
 ### `pay_way/`, `vat/`, `tag/`, `contact/`
 
-`PayWay` (a store's payment methods, with `PayWayShippingExclusion`;
-`src/pay_way/services.py`; read `docs/order/payments.md`), `Vat`,
-`Tag` and `TaggedItem` (generic tagging through `TaggedModel`), and
-`contact/` (`Contact`, `ContactAttachment`, `Feedback`, with the
-attachment scan and the retention sweeps in `src/contact/tasks.py`).
+- `pay_way/`: `PayWay` (a store's payment methods, with
+  `PayWayShippingExclusion`) and `src/pay_way/services.py`. Read
+  `docs/order/payments.md`.
+- `vat/`: `Vat`, the VAT rates. A rate edit re-prices the rate's products
+  and an order keeps the rate of each of its lines, so read
+  `docs/product-pricing.md` before touching VAT rates, and
+  `docs/order/creation-records.md` (section 3.5) for VAT on an order.
+- `tag/`: `Tag` and `TaggedItem` (generic tagging through `TaggedModel`).
+  It has no doc of its own.
+- `contact/`: `Contact`, `ContactAttachment` and `Feedback`, with the
+  attachment scan and the retention sweeps in `src/contact/tasks.py`. Read
+  `CLAUDE.md` ("Celery": the tasks and data retention); the retention
+  table is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
 ### `page_config/`
 
@@ -277,7 +293,9 @@ Translatable `ContentPage` (policies, FAQ, information pages) and the
 legal documents: the platform's texts and their rollout
 (`src/page_config/legal_documents.py`, `src/page_config/legal_guard.py`)
 and the version each order accepted (`LegalDocumentVersion`). Pages and
-menus are the page builder's.
+menus are the page builder's. Read `docs/order/creation-records.md`
+(section 3.6) for the acceptance an order records; the content pages have
+no doc of their own.
 
 ### `texts/`
 
@@ -308,7 +326,10 @@ the engine (`src/recommendation/engine.py`) and its strategies
 `Notification` and `NotificationUser`, the Channels consumer
 (`src/notification/consumers.py`), the per-user group names
 (`src/notification/groups.py`) and the single-use WebSocket ticket
-endpoint (`src/notification/views/websocket.py`).
+endpoint (`src/notification/views/websocket.py`). Read `CLAUDE.md`
+("WebSocket / Real-time"), and
+`docs/order/emails-and-notifications.md` (section 6.4) for the order
+toasts.
 
 ### `agent/`
 
@@ -321,7 +342,8 @@ authorization server through `allauth.idp`. Staff tokens come from the
 platform's staff issuer on `STAFF_CONNECT_HOST` (`src/agent/staff.py`,
 `src/agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc`
 is in `SHARED_APPS` too, so staff tokens live in `public` and customers'
-tokens in each store's schema. Cross-service views:
+tokens in each store's schema. It has no doc in this repository; the
+cross-service views are
 `grooveshop-docs/src/dev/flows/agentic-commerce.md` and
 `grooveshop-docs/src/dev/flows/staff-mcp.md`.
 
@@ -339,7 +361,9 @@ analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 
 Meta Conversions API: `MetaCapiEventLog`, the receivers on order and
 registration events (`src/meta_capi/signals.py`) and the tasks that post
-the events (`src/meta_capi/tasks.py`).
+the events (`src/meta_capi/tasks.py`). It has no doc in this repository;
+the cross-service view is
+`grooveshop-docs/src/dev/flows/analytics-and-consent.md`.
 
 ### `indexnow/`
 

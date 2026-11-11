@@ -121,10 +121,15 @@ unchanged.
 BEFORE it.** A retail receipt (11.1) documents the sale at shipment; a credit
 document (11.4) only corrects a receipt that exists (it relates to its MARK).
 So money returned before the receipt is issued reduces the receipt and gets NO
-credit document: `order.invoicing.refunded_before_receipt` = the REFUND rows on
-the payment ledger (less REFUND_REVERSAL, a refund the provider reported
-failed) plus the value returned onto gift cards and points
-(`PaymentLedger.stored_value(...).returned`). `_compute_vat_breakdown` takes
+credit document: `order.invoicing.refunded_before_receipt` adds up the
+allocations (`CreditAllocation`) that moved before the receipt: the REFUND
+rows on the payment ledger (less REFUND_REVERSAL, a refund the provider
+reported failed), the value returned onto gift cards, and a chargeback staff
+decided came with the goods back. Restored loyalty points are NOT in it:
+points are a discount that already lowered the lines' gross, so the receipt
+never held their value and a refund's points share is never allocated
+("Points owe no credit" in [`fiscal-credit-vat-split.md`](fiscal-credit-vat-split.md)).
+`_compute_vat_breakdown` takes
 that gross off the rates exactly as a credit would
 (`credit_documents.credit_breakdown`: the stored allocation's own rates, capped
 per rate at what each holds, to the cent, the net derived cumulatively), so the
@@ -138,13 +143,15 @@ no receipt: `generate_invoice` refuses with `ReceiptNotIssuable` ("refunded in
 full before its receipt was issued"; the shipment task logs it and issues
 nothing; an existing receipt is never affected).
 
-**Value returned onto gift cards and points is credited like a refund.** After
+**Value returned onto gift cards is credited like a refund; restored points
+are not.** After
 the receipt exists, a settled `STORED_VALUE` `RefundAttempt` (value-based
 refunds, section 7.2) reverses the sale just as a provider REFUND row does, so
 `create_pending_credits` is the ONE path for both: it credits each such attempt
-for what its rows actually returned (`PaymentLedger.stored_returned_by`: the
-gift-card credits plus the restored points at what they were worth, not the
-amount claimed), as a `RetailCredit` of reason REFUND linked by
+for what its rows actually returned onto gift cards
+(`PaymentLedger.stored_gift_card_returned_by`, not the amount claimed; the
+points it restored are a discount and owe no credit), as a `RetailCredit` of
+reason REFUND linked by
 `refund_attempt` (one document per attempt, exactly one of `refund` /
 `refund_attempt`, enforced by the `credit_refund_iff_reason_refund` check), VAT
 split by `credit_breakdown`, capped at what the receipt still holds. Its moment
@@ -166,8 +173,9 @@ returned so far. A row that already exists (a retry after a failed render, or
 `create_pending_credits` and never also subtracted. The full-refund guard
 (`_refuse_if_fully_refunded`) applies to every receipt without a MARK, on the
 normal and the `force` path, and for an existing row counts only what was
-returned before the row was created (`PaymentLedger.refunded(before=...)`,
-`stored_value(before=...)`); a receipt with a MARK is frozen.
+returned before the row was created (`fully_refunded_before_receipt` passes the
+row's creation to `refunded_before_receipt` as `before`); a receipt with a
+MARK is frozen.
 
 **A chargeback owes a credit document only when the goods came back, and staff
 say so (decision M6, refined).** A lost dispute is the card network taking

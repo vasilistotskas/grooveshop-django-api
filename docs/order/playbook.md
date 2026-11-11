@@ -55,14 +55,48 @@ and says which file holds each § number used here.
 
 ### 9.4 Reconciling state after a manual prod fix
 
-If you ever touch order metadata or status directly via shell
-(`order.save(update_fields=[...])`), you've bypassed signals.
-Recover by:
-1. Note exactly which fields you changed.
-2. If status was changed: roll it back to `PENDING` and call
-   `OrderService.cancel_order(...)` so the canonical path fires.
-3. For voucher mint mishaps, follow the order-47 recovery script
+A status written by hand skips the service that owns the transition.
+`order.save()` still stamps `status_updated_at`, settles an unpaid payment
+on CANCELED / RETURNED and sends `order_status_changed`, so the customer's
+status email and toast can go out; `Order.objects.filter(...).update(...)`
+does none of that. Neither checks the transition table
+(`OrderService.update_order_status`), and a hand-written CANCELED releases
+no stock, refunds nothing, cancels no voucher and records no
+cancellation ([§7.1](cancel.md)).
+
+There is no one recipe. Recovery depends on what the order was before the
+edit and on what really happened to the parcel, the stock and the money:
+
+1. Note exactly which fields you changed and what they held before.
+2. Read what the status does not say: the shipment's state (whether the
+   courier has the parcel), the stock the order holds (its `StockLog` rows)
+   and the money (`payment_status` and its `PaymentTransaction` rows).
+3. Then, by the status the order had BEFORE the edit:
+   - **PENDING or PROCESSING, and the order is to be canceled.** Put the
+     old status back and call
+     `OrderService.cancel_order(order, reason, customer_initiated=False)`.
+     It accepts only PENDING and PROCESSING, releases what the order still
+     holds, records the cancel, asks the courier afterwards and refunds a
+     paid order. This is the only case in which to call it.
+   - **PENDING or PROCESSING, and the order goes on.** Put the old status
+     back, and the old `payment_status` with it when the edit was a save
+     to CANCELED or RETURNED: that save closes an unpaid payment
+     ([§2.2](state-machines.md)).
+   - **SHIPPED, DELIVERED or COMPLETED.** Never set it to PENDING in order
+     to cancel it: the customer has the goods or is about to, and a cancel
+     would put their stock back on sale and refund the payment. Put the
+     true status back, by hand as the edit was made (the transition table
+     has no step backwards). If the goods do come back, the order is
+     RETURNED ("Mark selected orders as returned", or
+     `update_order_status`), and the money and the stock go back through
+     the "Return and refund" and "Restock returned items" actions, each
+     decided on the parcel in hand ([§7.2](refunds.md)).
+4. For voucher mint mishaps, follow the order-47 recovery script
    in `commit 05208050`.
+
+This section used to tell every case to roll the status back to PENDING
+and cancel, which is right for the first case only. `update_order_status`
+refuses CANCELED, so `cancel_order` is the one way to cancel.
 
 ### 9.5 A customer email carries the wrong subject or wording
 

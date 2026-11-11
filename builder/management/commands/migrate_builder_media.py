@@ -34,18 +34,25 @@ without); an empty entry of a list beside an image of the block's other list
 gets a library image, or goes with its position from every list of the block
 (``"remove"``). A decision about a value holds for every draft and every
 version that has it, published and older ones included; a slot is decided
-per draft and per version. Each decision used is printed, and each one
-nothing used.
+per draft and per version. Each decision used is printed and kept with the run.
+
+The file is held to its word. A store it names that this invocation does not
+reach stops the command before anything is read. A decision that nothing used
+(a value no document holds, an alt that needed none, a slot that is no empty
+entry beside an image) stops its store like any other problem, so a file
+written for another day cannot pass unnoticed.
 
 ``--dry-run`` takes every step of the real run, the alt text and the release
 included, in a transaction it rolls back. A second run finds nothing to do. A
-version keeps its number and a draft its revision. The command ends with a new
-release of the same versions, so the rewrite reaches visitors through the cache
-like any release.
+version keeps its number. A draft moves to a new revision, so an editor that
+has it open is answered the revision conflict on its next save and cannot
+write the old settings back; it stays published if it was. The command ends
+with a new release of the same versions, so the rewrite reaches visitors
+through the cache like any release.
 
 What each draft and version held is kept as a backup of the run, whose id is
-printed: ``builder_rewrite_backups`` puts a run back, and deletes its backups
-once they are no longer wanted.
+printed: ``builder_rewrite_backups`` lists the runs, puts one back, and deletes
+one once it is no longer wanted.
 """
 
 from __future__ import annotations
@@ -57,11 +64,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 from builder import media_migration, media_services, services, storefront
-from builder.document_rewrite import rewrite_store
+from builder.document_rewrite import Run, rewrite_store
 from builder.errors import BuilderError
 from builder.models import MediaAsset
 from core.management.tenant_mixin import TenantCommandMixin
 
+COMMAND = "migrate_builder_media"
 RELEASE_NOTE = "Images moved to the media library"
 
 
@@ -96,6 +104,17 @@ class Command(TenantCommandMixin, BaseCommand):
                 decisions = media_migration.read_decisions(options["decisions"])
             except media_migration.DecisionsInvalid as exc:
                 raise CommandError(f"--decisions: {exc}") from exc
+        reached = {
+            connection.schema_name if tenant is None else tenant.schema_name
+            for tenant in self.get_target_tenants(options)
+        }
+        if strangers := sorted(set(decisions) - reached):
+            raise CommandError(
+                "--decisions: "
+                + ", ".join(repr(schema) for schema in strangers)
+                + " is no store this run reaches. Nothing was read or "
+                "written."
+            )
         run = uuid.uuid4()
         failed: list[str] = []
         for context in self.iter_tenant_contexts(options):
@@ -120,20 +139,22 @@ class Command(TenantCommandMixin, BaseCommand):
         decisions: media_migration.Decisions,
         dry_run: bool,
     ) -> list[str]:
+        """One store, in one transaction: what stands in its way, and with
+        any of it nothing written."""
         catalogue = storefront.fetch_catalogue(connection.schema_name)
         current, older = media_migration.stored_uses()
         resolution = media_migration.resolve(current + older, decisions)
         for line in resolution.decided:
             self.stdout.write(line)
         if resolution.problems:
-            return resolution.problems
+            return resolution.problems + resolution.unused
         alts = media_migration.decide_alts(
             current, resolution.assets, decisions.alts
         )
         for line in alts.gives_way + alts.decided:
             self.stdout.write(line)
         if alts.conflicts:
-            return alts.conflicts
+            return alts.conflicts + resolution.unused + alts.unused
 
         slots = media_migration.SlotDecisions(decisions.slots)
         with transaction.atomic():
@@ -143,9 +164,10 @@ class Command(TenantCommandMixin, BaseCommand):
                     data, i18n, where, resolution.assets, slots
                 ),
                 catalogue=catalogue,
-                run=run,
+                run=Run(run, COMMAND, decisions.as_stated()),
             )
             problems += result.problems
+            problems += resolution.unused + alts.unused + slots.unused
             if not problems and result.changed:
                 services.release_again(RELEASE_NOTE)
             if problems or dry_run:
@@ -153,8 +175,6 @@ class Command(TenantCommandMixin, BaseCommand):
 
         for line in slots.used.values():
             self.stdout.write(line)
-        for slot in slots.unused:
-            self.stdout.write(f"decision not used: {slot}")
         rolled_back = dry_run or bool(problems)
         self.stdout.write(
             f"{'would move' if rolled_back else 'moved'} {result.drafts} "

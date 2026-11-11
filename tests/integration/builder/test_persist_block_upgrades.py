@@ -125,7 +125,9 @@ def run(tenant):
     return go
 
 
-def test_the_draft_and_the_version_move_and_keep_their_identity(published, run):
+def test_the_draft_and_the_version_move_and_the_version_keeps_its_number(
+    published, run
+):
     version = published.versions.get()
     revision = published.draft_revision
 
@@ -140,7 +142,7 @@ def test_the_draft_and_the_version_move_and_keep_their_identity(published, run):
     assert published.draft["sections"]["a"] == expected
     assert after.data["sections"]["a"] == expected
     assert after.number == version.number
-    assert published.draft_revision == revision
+    assert published.draft_revision == revision + 1
     assert "upgraded 1 draft(s), 1 version(s)" in report
 
 
@@ -159,12 +161,12 @@ def test_a_run_is_kept_and_can_be_put_back(published, run):
     version = published.versions.get()
 
     run_id = run().rsplit("backup run ", 1)[1].split()[0]
-    kept = BuilderRewriteBackup.objects.filter(run=run_id).count()
+    kept = BuilderRewriteBackup.objects.filter(run__run=run_id).count()
     report = run("--restore", run_id, command="builder_rewrite_backups")
 
     after = BuilderVersion.objects.get(pk=version.pk)
     assert kept == 2
-    assert "restored 1 draft(s), 1 version(s); 0 left" in report
+    assert "restored 1 draft(s), 1 version(s)" in report
     assert BuilderDocument.objects.get(key=HOME).draft == published.draft
     assert (after.data, after.block_types) == (
         version.data,
@@ -185,12 +187,14 @@ def test_a_dry_run_keeps_nothing(published, run):
 
 
 def test_a_store_is_not_told_it_has_unpublished_changes(published, run):
-    before = published.published_revision
+    before = published.draft_revision
 
     run()
 
     published.refresh_from_db()
-    assert published.published_revision == before == published.draft_revision
+    assert (
+        published.published_revision == published.draft_revision == before + 1
+    )
 
 
 def test_a_published_page_gets_the_dependency_rows_of_its_data(published, run):

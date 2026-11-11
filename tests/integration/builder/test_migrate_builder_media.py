@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import uuid
+from datetime import timedelta
 from io import StringIO
 from unittest import mock
 
@@ -13,13 +15,24 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
-from builder import media_migration, media_services, preview_links, services
+from builder import (
+    media_migration,
+    media_services,
+    preview_links,
+    scheduling,
+    services,
+)
+from builder.errors import RevisionConflict
 from builder.models import (
     BuilderDocument,
     BuilderReference,
     BuilderRelease,
     BuilderRewriteBackup,
+    BuilderRewriteRun,
     BuilderVersion,
     MediaAsset,
 )
@@ -214,16 +227,6 @@ class TestAMove:
         after = BuilderDocument.objects.get(pk=doc.pk)
         assert after.draft_i18n == {"en": {"a": {"/heading": "Hello"}}}
         assert after.versions.get().i18n == {"en": {"a": {"/heading": "Hello"}}}
-
-    def test_a_document_keeps_its_identity(self, stored, run):
-        doc, _, _ = stored
-        version = doc.versions.get()
-
-        run()
-
-        after = BuilderDocument.objects.get(pk=doc.pk)
-        assert after.draft_revision == doc.draft_revision
-        assert after.versions.get().number == version.number
 
     def test_it_ends_with_a_release_of_the_same_versions_and_their_references(
         self, stored, run
@@ -690,16 +693,20 @@ class TestListsThatPairByPosition:
 
         assert self.stored(doc) == before
 
-    def test_a_decision_for_a_slot_that_is_no_hole_is_said(
+    def test_a_decision_for_a_slot_that_is_no_hole_stops_the_store(
         self, carousel, decide, run
     ):
         make, assets, _urls = carousel
-        make([0, 1], [3, 4])
+        doc = make([0, 1], [3, 4])
+        before = self.stored(doc)
         unused = self.slot("draft", "images", 0)
 
-        output = run(*decide(slots={unused: assets[5]}))
+        with pytest.raises(
+            CommandError, match=f"decision not used: {re.escape(unused)}"
+        ):
+            run(*decide(slots={unused: assets[5]}))
 
-        assert f"decision not used: {unused}" in output
+        assert self.stored(doc) == before
 
     def test_a_decided_run_is_put_back_as_it_was(self, carousel, decide, run):
         make, _assets, _urls = carousel
@@ -989,29 +996,6 @@ class TestDecisions:
         with pytest.raises(CommandError, match="which is not in the library"):
             run(*decide(images={url: asset.pk + 1000}))
 
-    def test_another_stores_decision_is_not_this_stores(
-        self, outside, decide, run
-    ):
-        _doc, url, asset = outside
-
-        with pytest.raises(CommandError, match="outside this store"):
-            run(*decide(images={url: asset.pk}, schema="another_store"))
-
-    def test_a_decision_nothing_used_is_said(self, outside, decide, run):
-        _doc, url, asset = outside
-        other = "https://example.org/typo.png"
-
-        output = run(
-            *decide(
-                images={url: asset.pk, other: "empty"},
-                alt={str(asset.pk): {"el": "Δεν χρειάστηκε"}},
-            )
-        )
-
-        assert f"decision not used: {other!r}" in output
-        assert f"decision not used: image {asset.pk} [el]" in output
-        assert alt_of(asset, "el") == "Βιτρίνα"
-
     def test_a_dry_run_takes_the_decisions(self, outside, decide, run):
         doc, url, asset = outside
         draft = doc.draft
@@ -1218,10 +1202,15 @@ class TestTheWayBack:
         run_id = output.rsplit("backup run ", 1)[1].split()[0]
         return doc, versions, asset, run_id
 
+    @pytest.fixture
+    def asset_settings(self, moved):
+        _doc, _versions, asset, _run_id = moved
+        return {"image": asset.pk}
+
     def test_a_run_keeps_what_each_draft_and_version_held(self, moved):
         doc, versions, _asset, run_id = moved
 
-        backups = BuilderRewriteBackup.objects.filter(run=run_id)
+        backups = BuilderRewriteBackup.objects.filter(run__run=run_id)
         assert backups.count() == 3
         draft = backups.get(version=None)
         assert draft.document == doc
@@ -1244,13 +1233,13 @@ class TestTheWayBack:
         after = BuilderDocument.objects.get(pk=doc.pk)
         assert (after.draft, after.draft_i18n) == (doc.draft, doc.draft_i18n)
         assert after.draft_catalogue_hash == doc.draft_catalogue_hash
-        assert after.draft_revision == doc.draft_revision
         for row in BuilderVersion.objects.filter(document=doc).values(
             "pk", *COLUMNS
         ):
             assert row == versions[row["pk"]]
         assert not BuilderRewriteBackup.objects.exists()
-        assert "restored 1 draft(s), 2 version(s); 0 left" in output
+        assert not BuilderRewriteRun.objects.exists()
+        assert "restored 1 draft(s), 2 version(s)" in output
         again = BuilderRelease.objects.order_by("-number").first()
         assert again.number == release.number + 1
         assert again.versions == release.versions
@@ -1272,13 +1261,13 @@ class TestTheWayBack:
 
         assert "moved 1 draft(s), 2 version(s)" in output
         assert settings_of(doc) == {"image": asset.pk}
-        runs = set(BuilderRewriteBackup.objects.values_list("run", flat=True))
-        assert len(runs) == 1
-        assert str(runs.pop()) != run_id
+        kept = BuilderRewriteRun.objects.get()
+        assert str(kept.run) != run_id
+        assert kept.backups.count() == 3
 
-    def test_a_draft_saved_since_is_left_and_its_backup_kept(
-        self, moved, admin, run
-    ):
+    @pytest.fixture
+    def saved_since(self, moved, admin):
+        """The run's store with its draft saved by someone afterwards."""
         doc, versions, asset, run_id = moved
         saved = document(("a", banner(heading="Νέα δουλειά", image=asset.pk)))
         services.save_draft(
@@ -1286,34 +1275,69 @@ class TestTheWayBack:
             key=HOME,
             draft=saved,
             i18n={},
-            expected_revision=doc.draft_revision,
+            expected_revision=BuilderDocument.objects.get(
+                pk=doc.pk
+            ).draft_revision,
         )
+        return doc, versions, saved, run_id
 
-        output = run("--restore", run_id, command="builder_rewrite_backups")
+    def test_one_row_changed_since_and_nothing_is_restored(
+        self, saved_since, asset_settings, run
+    ):
+        doc, _versions, saved, run_id = saved_since
+        releases = BuilderRelease.objects.count()
+
+        with pytest.raises(
+            CommandError,
+            match=f"{HOME} draft: saved since the run; nothing of this store",
+        ):
+            run("--restore", run_id, command="builder_rewrite_backups")
 
         assert BuilderDocument.objects.get(pk=doc.pk).draft == saved
-        assert f"{HOME} draft: changed since the run, left as it is" in output
-        assert "restored 0 draft(s), 2 version(s); 1 left" in output
-        kept = BuilderRewriteBackup.objects.get()
-        assert kept.version is None
+        for version in BuilderVersion.objects.filter(document=doc):
+            assert version.data["sections"]["a"]["settings"] == asset_settings
+        assert BuilderRewriteBackup.objects.count() == 3
+        assert BuilderRelease.objects.count() == releases
+
+    def test_the_rest_is_restored_only_when_asked_and_still_fails(
+        self, saved_since, run
+    ):
+        doc, versions, saved, run_id = saved_since
+        releases = BuilderRelease.objects.count()
+
+        with pytest.raises(
+            CommandError,
+            match=f"{HOME} draft: saved since the run; left as it is",
+        ):
+            run(
+                "--restore",
+                run_id,
+                "--leave-changed-rows",
+                command="builder_rewrite_backups",
+            )
+
+        assert BuilderDocument.objects.get(pk=doc.pk).draft == saved
         for row in BuilderVersion.objects.filter(document=doc).values(
             "pk", *COLUMNS
         ):
             assert row == versions[row["pk"]]
+        assert BuilderRewriteBackup.objects.get().version is None
+        assert BuilderRelease.objects.count() == releases + 1
 
-    def test_a_version_rewritten_since_is_left(self, moved, run):
-        doc, versions, _asset, run_id = moved
+    def test_a_version_rewritten_since_stops_the_restore_too(self, moved, run):
+        doc, _versions, _asset, run_id = moved
         later = BuilderVersion.objects.filter(document=doc).first()
         BuilderVersion.objects.filter(pk=later.pk).update(content_hash="later")
+        draft = BuilderDocument.objects.get(pk=doc.pk).draft
 
-        output = run("--restore", run_id, command="builder_rewrite_backups")
+        with pytest.raises(
+            CommandError,
+            match=f"{HOME} version {later.number}: rewritten since the run",
+        ):
+            run("--restore", run_id, command="builder_rewrite_backups")
 
-        assert f"{HOME} version {later.number}: changed since the run" in output
-        assert (
-            BuilderVersion.objects.get(pk=later.pk).data
-            != versions[later.pk]["data"]
-        )
-        assert BuilderRewriteBackup.objects.get().version == later
+        assert BuilderDocument.objects.get(pk=doc.pk).draft == draft
+        assert BuilderRewriteBackup.objects.count() == 3
 
     def test_a_dry_run_of_a_restore_changes_nothing(self, moved, run):
         doc, _versions, asset, run_id = moved
@@ -1328,22 +1352,13 @@ class TestTheWayBack:
         assert BuilderRewriteBackup.objects.count() == 3
         assert BuilderRelease.objects.count() == releases
 
-    def test_the_runs_are_listed_and_one_is_deleted(self, moved, run):
-        doc, _versions, asset, run_id = moved
+    def test_the_runs_of_a_store_are_listed(self, moved, run):
+        _doc, _versions, _asset, run_id = moved
 
         listed = run(command="builder_rewrite_backups")
-        other = run(
-            "--delete", str(uuid.uuid4()), command="builder_rewrite_backups"
-        )
-        deleted = run("--delete", run_id, command="builder_rewrite_backups")
 
         assert f"{run_id}  " in listed
-        assert "3 backup(s)" in listed
-        assert "deleted 0 backup(s)" in other
-        assert "deleted 3 backup(s)" in deleted
-        assert not BuilderRewriteBackup.objects.exists()
-        assert settings_of(doc) == {"image": asset.pk}
-        assert "no backups" in run(command="builder_rewrite_backups")
+        assert "migrate_builder_media  3 backup(s)" in listed
 
     def test_a_run_the_store_does_not_hold_restores_nothing(self, moved, run):
         doc, _versions, asset, _run_id = moved
@@ -1367,3 +1382,337 @@ def test_a_preview_link_keeps_the_copy_it_froze(admin, stored_image, run):
 
     page = preview_links.open_link(token, "home", "el")
     assert page["page"]["sections"]["a"]["settings"] == {"imageUrl": url}
+
+
+def lock_order(queries) -> list[str]:
+    """Which lock each locking statement of *queries* took, in order."""
+    order = []
+    for query in queries:
+        sql = query["sql"]
+        if "pg_advisory_xact_lock" in sql:
+            order.append("release sequence")
+        elif "FOR UPDATE" in sql and '"builder_builderdocument"' in sql:
+            order.append("documents")
+    return order
+
+
+class TestWhatARunMeetsInAStore:
+    """A store in use: a deleted page, staff publishing, an editor open."""
+
+    @pytest.fixture
+    def stored(self, admin, stored_image):
+        asset = imported(url := stored_image(140))
+        doc = save_and_publish(
+            admin, document(("a", banner(imageUrl=url, imageAlt="Βιτρίνα")))
+        )
+        return doc, url, asset
+
+    def test_a_deleted_pages_draft_is_moved_with_its_versions(
+        self, admin, stored_image, run
+    ):
+        asset = imported(url := stored_image(141))
+        page = save_and_publish(
+            admin, document(("a", banner(imageUrl=url))), key="page:about"
+        )
+        services.delete_page(
+            admin, key="page:about", expected_revision=page.draft_revision
+        )
+
+        run()
+
+        deleted = BuilderDocument.objects.deleted_only().get(pk=page.pk)
+        assert deleted.draft["sections"]["a"]["settings"] == {"image": asset.pk}
+        assert deleted.versions.get().data["sections"]["a"]["settings"] == {
+            "image": asset.pk
+        }
+
+    def test_a_deleted_pages_draft_is_reported_like_any_other(self, admin, run):
+        page = save_and_publish(
+            admin,
+            document(("a", banner(imageUrl="https://example.org/a.png"))),
+            key="page:about",
+        )
+        services.delete_page(
+            admin, key="page:about", expected_revision=page.draft_revision
+        )
+
+        with pytest.raises(CommandError, match="page:about draft: /sections/a"):
+            run()
+
+    def test_the_release_sequence_is_locked_before_any_document(
+        self, stored, run
+    ):
+        """The order of every writer of a release (``services.publish``): a
+        run that locked documents first could deadlock with a publish. Read
+        from the statements a run sends, with no second connection."""
+        with CaptureQueriesContext(connection) as moved:
+            output = run()
+        run_id = output.rsplit("backup run ", 1)[1].split()[0]
+        with CaptureQueriesContext(connection) as restored:
+            run("--restore", run_id, command="builder_rewrite_backups")
+
+        for queries in (moved, restored):
+            order = lock_order(queries.captured_queries)
+            assert order[0] == "release sequence"
+            assert "documents" in order
+
+    def test_the_draft_moves_to_a_new_revision_and_stays_published(
+        self, stored, run
+    ):
+        doc, _url, _asset = stored
+        version = doc.versions.get()
+
+        run()
+
+        after = BuilderDocument.objects.get(pk=doc.pk)
+        assert after.draft_revision == doc.draft_revision + 1
+        assert after.published_revision == after.draft_revision
+        assert after.versions.get().number == version.number
+
+    def test_an_editor_open_since_before_gets_the_conflict(
+        self, stored, admin, run
+    ):
+        """The copy an editor holds still has the URL. Its save names the
+        revision it loaded, which the run has moved on."""
+        doc, _url, asset = stored
+
+        run()
+
+        with pytest.raises(RevisionConflict):
+            services.save_draft(
+                admin,
+                key=HOME,
+                draft=doc.draft,
+                i18n=doc.draft_i18n,
+                expected_revision=doc.draft_revision,
+            )
+        assert settings_of(doc) == {"image": asset.pk}
+
+    def test_a_draft_with_unpublished_changes_still_has_them(
+        self, stored, admin, run
+    ):
+        doc, url, _asset = stored
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(imageUrl=url, heading="Νέο"))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        before = BuilderDocument.objects.get(pk=doc.pk)
+
+        run()
+
+        after = BuilderDocument.objects.get(pk=doc.pk)
+        assert after.draft_revision == before.draft_revision + 1
+        assert after.published_revision == before.published_revision
+
+    def test_a_waiting_publish_follows_the_draft_it_froze(
+        self, stored, admin, run
+    ):
+        doc, url, _asset = stored
+        saved = services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(imageUrl=url, heading="Αύριο"))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        schedule = scheduling.schedule_publish(
+            admin, keys=[HOME], when=timezone.now() + timedelta(days=1)
+        )
+        assert schedule.revisions == {HOME: saved.draft_revision}
+
+        run()
+
+        schedule.refresh_from_db()
+        assert schedule.revisions == {HOME: saved.draft_revision + 1}
+
+    def test_a_restore_moves_the_revision_on_again(self, stored, admin, run):
+        doc, _url, _asset = stored
+        output = run()
+        run_id = output.rsplit("backup run ", 1)[1].split()[0]
+        moved = BuilderDocument.objects.get(pk=doc.pk)
+
+        run("--restore", run_id, command="builder_rewrite_backups")
+
+        after = BuilderDocument.objects.get(pk=doc.pk)
+        assert after.draft == doc.draft
+        assert after.draft_revision == moved.draft_revision + 1
+        assert after.published_revision == after.draft_revision
+        with pytest.raises(RevisionConflict):
+            services.save_draft(
+                admin,
+                key=HOME,
+                draft=moved.draft,
+                i18n=moved.draft_i18n,
+                expected_revision=moved.draft_revision,
+            )
+
+    def test_a_version_deleted_without_django_takes_no_backup_down(
+        self, stored, admin, run
+    ):
+        """A release from before this table deletes versions (checkpoint
+        pruning) knowing nothing of the backups. No constraint of the
+        database stands in its way, and a restore puts back the rest."""
+        doc, url, _asset = stored
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(imageUrl=url, heading="Νέο"))),
+            i18n={},
+            expected_revision=doc.draft_revision,
+        )
+        old = services.create_checkpoint(admin, key=HOME)
+        before = BuilderDocument.objects.get(pk=doc.pk).draft
+        output = run()
+        run_id = output.rsplit("backup run ", 1)[1].split()[0]
+
+        BuilderVersion.objects.filter(pk=old.pk)._raw_delete(connection.alias)
+        connection.check_constraints()
+        output = run("--restore", run_id, command="builder_rewrite_backups")
+
+        assert "restored 1 draft(s), 1 version(s)" in output
+        assert BuilderDocument.objects.get(pk=doc.pk).draft == before
+        assert not BuilderRewriteBackup.objects.exists()
+
+
+class TestTheDecisionsFileIsHeldToItsWord:
+    def test_a_store_the_run_does_not_reach_is_refused(
+        self, admin, stored_image, decide, run
+    ):
+        imported(url := stored_image(150))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        with pytest.raises(CommandError, match="'builder_stor'"):
+            run(*decide(schema="builder_stor"))
+
+        assert settings_of(doc) == {"imageUrl": url}
+
+    @pytest.mark.parametrize(
+        "decided",
+        [
+            {"images": {"https://example.org/typo.png": "empty"}},
+            {"alt": {"1": {"el": "Δεν χρειάστηκε"}}},
+            {
+                "slots": {
+                    f"{HOME} draft: /sections/a/settings/images/0": "remove"
+                }
+            },
+        ],
+        ids=["value", "alt", "slot"],
+    )
+    def test_a_decision_nothing_used_stops_the_store(
+        self, admin, stored_image, decide, run, decided
+    ):
+        imported(url := stored_image(151))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        with pytest.raises(CommandError, match="decision not used: "):
+            run(*decide(**decided))
+
+        assert settings_of(doc) == {"imageUrl": url}
+
+    def test_what_was_decided_is_kept_with_the_run(
+        self, admin, tenant, stored_image, decide, run
+    ):
+        asset = imported(stored_image(152))
+        url = "https://example.org/a.png"
+        save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        output = run(*decide(images={url: asset.pk}))
+        run_id = output.rsplit("backup run ", 1)[1].split()[0]
+        listed = run(command="builder_rewrite_backups")
+
+        kept = BuilderRewriteRun.objects.get(run=run_id)
+        assert kept.command == "migrate_builder_media"
+        assert kept.decisions == {"images": {url: asset.pk}}
+        assert f'"{url}": {asset.pk}' in listed
+        assert "migrate_builder_media" in listed
+
+    def test_a_dry_run_keeps_no_run(self, admin, stored_image, run):
+        imported(url := stored_image(153))
+        save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        run("--dry-run")
+
+        assert not BuilderRewriteRun.objects.exists()
+
+
+class TestDeletingBackups:
+    @pytest.fixture
+    def two_runs(self, admin, stored_image, run):
+        """A store with an older run and the latest one: their ids."""
+        imported(url := stored_image(160))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+        first = run().rsplit("backup run ", 1)[1].split()[0]
+        moved = BuilderDocument.objects.get(pk=doc.pk)
+        services.save_draft(
+            admin,
+            key=HOME,
+            draft=document(("a", banner(imageUrl=url, heading="Ξανά"))),
+            i18n={},
+            expected_revision=moved.draft_revision,
+        )
+        second = run().rsplit("backup run ", 1)[1].split()[0]
+        return first, second
+
+    def delete(self, run, *args):
+        return run("--delete", *args, command="builder_rewrite_backups")
+
+    def test_it_says_what_it_would_delete_and_waits_for_yes(
+        self, two_runs, run
+    ):
+        first, _second = two_runs
+
+        with pytest.raises(CommandError, match="--yes") as raised:
+            self.delete(run, first)
+
+        assert "2 backup(s)" in str(raised.value)
+        assert BuilderRewriteRun.objects.filter(run=first).exists()
+
+    def test_yes_deletes_the_run_and_its_backups(self, two_runs, run):
+        first, second = two_runs
+
+        output = self.delete(run, first, "--yes")
+
+        assert "deleted 2 backup(s)" in output
+        assert [
+            str(kept)
+            for kept in BuilderRewriteRun.objects.values_list("run", flat=True)
+        ] == [second]
+        assert not BuilderRewriteBackup.objects.filter(run__run=first).exists()
+
+    def test_the_latest_run_of_a_store_is_kept_unless_asked_for(
+        self, two_runs, run
+    ):
+        _first, second = two_runs
+
+        with pytest.raises(CommandError, match="--latest-too"):
+            self.delete(run, second, "--yes")
+        assert BuilderRewriteRun.objects.filter(run=second).exists()
+
+        self.delete(run, second, "--yes", "--latest-too")
+
+        assert not BuilderRewriteRun.objects.filter(run=second).exists()
+
+    def test_every_store_at_once_has_to_be_said(self, two_runs, tenant):
+        first, _second = two_runs
+
+        with pytest.raises(CommandError, match="--in-every-store"):
+            call_command(
+                "builder_rewrite_backups",
+                "--all-tenants",
+                "--delete",
+                first,
+                "--yes",
+                stdout=StringIO(),
+            )
+
+        assert BuilderRewriteRun.objects.filter(run=first).exists()
+
+    def test_a_run_the_store_does_not_hold_deletes_nothing(self, two_runs, run):
+        output = self.delete(run, str(uuid.uuid4()), "--yes")
+
+        assert "no backup of run" in output
+        assert BuilderRewriteRun.objects.count() == 2

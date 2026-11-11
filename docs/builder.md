@@ -156,8 +156,9 @@ but one the platform does not know does. An older storefront leaves out a node
 newer than it knows, so run it once the storefront release it follows has
 proved itself. It rewrites a `BuilderVersion` in place
 (`builder/document_rewrite.py`, [the way back](#a-rewrite-in-place-and-the-way-back)
-below): a version keeps its number and what it renders, and a draft
-keeps its revision, so a store is not told it has unpublished changes.
+below): a version keeps its number and what it renders. A draft moves to a
+new revision and stays published if it was, so a store is not told it has
+unpublished changes.
 `builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
 to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
 adds its step there too, or the command stops at it with `no upgrade from`.
@@ -686,9 +687,9 @@ declares each block's old image settings (`legacyImages`, vendored as
 `builder/legacy_image_fields.json`). Every draft and stored version gets the
 asset in place of the URL and loses the URL and its alt, in the settings and in
 the overlay, through `builder/document_rewrite.py`: each document is validated
-against the store's catalogue, a version keeps its number and a draft its
-revision. It ends with a new release of the same versions, because the public
-read is cached per release: that is what brings the rewrite to visitors.
+against the store's catalogue, and a version keeps its number. It ends with
+a new release of the same versions, because the public read is cached per
+release: that is what brings the rewrite to visitors.
 
 - **Alt text belongs to the image.** A use's alt goes onto the asset, per
   language, only where the asset has none. Only the drafts and the current
@@ -729,10 +730,16 @@ read is cached per release: that is what brings the rewrite to visitors.
   empty text leaves it without one. Under `slots`, an empty entry of a list
   (next point) gets a library image, or is taken out with its position. There
   is no switch that ignores problems and no default: what has no decision
-  still stops the store. Each decision used is printed, and so is each one
-  nothing used (a value no document holds, an alt for an image that has its
-  own or whose uses agree, a slot that is no empty entry beside an image). The
-  file is the record of what was decided: keep it with the run's output.
+  still stops the store. Each decision used is printed, and what was decided
+  for a store is kept with its run (`BuilderRewriteRun.decisions`), which
+  `builder_rewrite_backups` lists.
+- **The file is held to its word.** A store it names that the invocation does
+  not reach (`--tenant webside` with a `websid` in the file) stops the command
+  before anything is read. A decision nothing used stops its store like any
+  other problem: a value no document holds, an alt for an image that has its
+  own or whose uses agree, a slot that is no empty entry beside an image. So a
+  file with a typo, or one written for another day, cannot pass unnoticed.
+  After a run, check with a second run without `--decisions`.
 - **A decision reaches every version.** A version is immutable to the editor,
   so a value only an old version holds can be settled nowhere else. Like the
   rest of this command, a decision changes the content of every draft and
@@ -762,6 +769,10 @@ read is cached per release: that is what brings the rewrite to visitors.
 - A new setting already chosen stays and the URL beside it goes.
 - `--dry-run` takes every step of the real run, the alt text and the release
   included, in a transaction it rolls back. A second run finds nothing.
+- **Editors need not be idle.** A rewritten draft is a new revision, so an
+  editor that had the page open is answered the usual revision conflict on its
+  next save (the editor's "this page changed" notice) and reloads the new
+  content. It cannot write the old settings back.
 - **Share-preview links are not rewritten.** A link's snapshot is outside the
   version history and lives at most `BUILDER_PREVIEW_LINK_TTL_SECONDS`. It keeps
   the URL it froze, which the storefront's read adapter still draws, so a link
@@ -770,32 +781,68 @@ read is cached per release: that is what brings the rewrite to visitors.
 
 ### A rewrite in place, and the way back
 
-`persist_block_upgrades` and `migrate_builder_media` change a draft without a
-new revision and a version that nothing else may edit, and neither model keeps
-history. So `builder/document_rewrite.py` first copies the columns it is about
-to replace into a `BuilderRewriteBackup` row, one per draft and per version, in
-the same transaction, under the id of the run. Each command prints
-`backup run <id>` for a store it wrote. A draft's old content is not kept as a
-version instead: a version is the store's own history (its numbers, its
-restore list), and one in the old shape would be the next thing to rewrite.
+`persist_block_upgrades` and `migrate_builder_media` change every draft and
+every version of a store, which nothing else may edit, and neither model
+keeps history. `builder/document_rewrite.py` is the one place they do it.
+
+- **Every document**, a deleted page's too: its versions are still stored, so
+  its draft is moved with them.
+- **A draft moves to a new revision.** Its content changed under whoever has
+  it open, so a save that names the old revision is refused like any other
+  late save. What a revision means is otherwise kept: a draft that was at its
+  published revision stays there, and a publish waiting for its time names
+  the new revision of the draft it froze.
+- **Lock order.** The store's release sequence first, then the documents:
+  the order of `publish`, `rollback`, `delete_page` and a scheduled publish.
+  A rewrite and a restore end with a release, and documents locked first
+  would deadlock with a publish arriving in between.
+- **What is replaced is kept.** Before a row is rewritten, the columns about
+  to be replaced are copied into a `BuilderRewriteBackup`, one per draft and
+  per version, in the same transaction, under the run (`BuilderRewriteRun`:
+  its id, the command, the time, what was decided). Each command prints
+  `backup run <id>` for a store it wrote. A draft's old content is not kept as
+  a version instead: a version is the store's own history (its numbers, its
+  restore list), and one in the old shape would be the next thing to rewrite.
 
 `manage.py builder_rewrite_backups --tenant <schema>` lists the runs a store
-holds.
+holds: id, time, command, number of backups, and the decisions.
 
-- `--restore <run>` (with `--dry-run` to try it) puts a run back in that store:
-  each draft and version that still holds what the run stored gets its columns
-  exactly as they were, with no validation, and its backup is deleted. A draft
-  saved since is someone's work and a version rewritten since belongs to a later
-  run (restore that one first): both are left as they are and named, and their
-  backups stay. It ends with a new release of the same versions, like the
-  rewrite did. The command that made the run can then be run again.
+- `--restore <run>` (with `--dry-run` to try it) puts a run back in that
+  store, **whole or not at all**. Each draft and version gets its columns
+  exactly as they were, with no validation, and its backup is deleted; a
+  restored draft moves to a new revision again. A row that no longer holds
+  what the run stored cannot be put back: a draft saved since is someone's
+  work, a version rewritten since belongs to a later run (restore that one
+  first). One such row and nothing of the store is restored, the rows are
+  named, and the command exits 1.
+- `--leave-changed-rows` restores the rest of the run all the same and leaves
+  those rows as they are, their backups kept. The store then holds both
+  shapes, which the storefront reads, and the command still exits 1.
+- A restore ends with a new release of the same versions, like the rewrite
+  did. The command that made the run can then be run again.
 - Alt text `migrate_builder_media` wrote onto an image stays after a restore.
   An image's alt is edited in the library, and the next run finds it there.
-- `--delete <run>` removes a run's backups. Nothing else does: there is no
-  sweep, so a run can be put back until someone decides it never will be. A
-  backup is a copy of a draft or a version, so it is the same kind of data as
-  those (`devtools/anonymise/rules.py`), and it is deleted with its document
-  or its version.
+- `--delete <run>` removes a run and its backups, and with them the way back.
+  Nothing else does: there is no sweep. It prints what it would delete (the
+  run's time, command and number of backups, per store) and deletes only with
+  `--yes`. One run id spans every store of its invocation, so `--all-tenants`
+  is refused unless `--in-every-store` is given too. The latest run of a
+  store is kept unless `--latest-too` is given.
+- A backup is a copy of a draft or a version, so it is the same kind of data
+  as those (`devtools/anonymise/rules.py`), and Django deletes it with its
+  document or its version.
+
+**Rolling back to a release from before this table.** That release deletes
+versions (checkpoint pruning in `builder/services.py`) and pages without
+knowing the backups exist. Django's cascade is Django's: the database would
+not delete a backup, it would refuse the delete of the version. A
+database-level cascade is not available here (`DB_CASCADE` is refused by the
+system check `fields.E323`, because `BuilderVersion` reaches its document
+with a Python-level one). So the two references from a backup carry no
+database constraint (`db_constraint=False`): the older release deletes what
+it deletes, a store can be rolled back with its backups in place, and a
+backup left without its version has nothing to restore and is removed at the
+next restore of its run.
 
 ## Signing in to the editor
 

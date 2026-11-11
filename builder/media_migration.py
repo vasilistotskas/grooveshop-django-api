@@ -243,6 +243,21 @@ def _strings(data: Any) -> Iterator[tuple[str, str]]:
     yield from walk(data, ())
 
 
+#: Documents read at a time: a version carries its whole content, and a store
+#: holds hundreds of them.
+READ_CHUNK = 50
+
+
+def _drafts() -> Iterator[BuilderDocument]:
+    """Every document of this store, a deleted page too: its versions are
+    still stored, and are moved with the rest."""
+    return (
+        BuilderDocument.objects.all_with_deleted()
+        .order_by("key")
+        .iterator(chunk_size=READ_CHUNK)
+    )
+
+
 def scan(*, all_versions: bool = False) -> Plan:
     """Every image string in the drafts and the published versions of this
     store (every version with ``all_versions``)."""
@@ -265,7 +280,7 @@ def scan(*, all_versions: bool = False) -> Plan:
                     )
                 )
 
-    for doc in BuilderDocument.objects.order_by("key"):
+    for doc in _drafts():
         collect(doc.key, "draft", doc.draft, "")
         collect(doc.key, "draft", doc.draft_i18n, "/i18n")
     versions = BuilderVersion.objects.select_related("document").order_by(
@@ -273,7 +288,7 @@ def scan(*, all_versions: bool = False) -> Plan:
     )
     if not all_versions:
         versions = versions.filter(pk__in=published_versions().values())
-    for version in versions:
+    for version in versions.iterator(chunk_size=READ_CHUNK):
         source = f"version {version.number}"
         collect(version.document.key, source, version.data, "")
         collect(version.document.key, source, version.i18n, "/i18n")
@@ -431,16 +446,17 @@ def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
     image's alt: an older version's text is what the store has since replaced."""
     current: list[LegacyUse] = []
     older: list[LegacyUse] = []
-    for document in BuilderDocument.objects.order_by("key"):
+    for document in _drafts():
         current.extend(
             legacy_uses(
                 document.key, "draft", document.draft, document.draft_i18n
             )
         )
     live = set(published_versions().values())
-    for version in BuilderVersion.objects.select_related("document").order_by(
+    versions = BuilderVersion.objects.select_related("document").order_by(
         "document__key", "number"
-    ):
+    )
+    for version in versions.iterator(chunk_size=READ_CHUNK):
         (current if version.pk in live else older).extend(
             legacy_uses(
                 version.document.key,
@@ -476,6 +492,25 @@ class Decisions:
     #: ``{"<document> <draft | version N>: <pointer>" of an empty list entry:
     #: the library image to put there, None to remove its position}``.
     slots: Mapping[str, int | None] = field(default_factory=dict)
+
+    def as_stated(self) -> dict[str, Any]:
+        """These decisions as a decisions file states them, for the record of
+        a run."""
+        alt: dict[str, dict[str, str]] = defaultdict(dict)
+        for (asset, locale), text in self.alts.items():
+            alt[str(asset)][locale] = text
+        stated = {
+            "images": {
+                url: NO_IMAGE if asset is None else asset
+                for url, asset in self.images.items()
+            },
+            "alt": dict(alt),
+            "slots": {
+                slot: REMOVE_POSITION if asset is None else asset
+                for slot, asset in self.slots.items()
+            },
+        }
+        return {part: decided for part, decided in stated.items() if decided}
 
 
 def _decisions_of(schema: str, stated: Any) -> Decisions:
@@ -549,6 +584,8 @@ class Resolution:
     assets: dict[str, int | None] = field(default_factory=dict)
     #: Each decision that settled a value, to print.
     decided: list[str] = field(default_factory=list)
+    #: Each decision about a value no document holds.
+    unused: list[str] = field(default_factory=list)
     #: Each value with no asset and no decision, then where it is used.
     problems: list[str] = field(default_factory=list)
 
@@ -603,7 +640,7 @@ def resolve(uses: list[LegacyUse], decisions: Decisions) -> Resolution:
                 _found(use.document, use.source, use.path, url, kind, hosts)
                 for use in where
             )
-    resolution.decided.extend(
+    resolution.unused.extend(
         f"decision not used: {url!r} is in no document"
         for url in sorted(set(decided) - set(by_url))
     )
@@ -638,6 +675,8 @@ class AltDecisions:
     gives_way: list[str] = field(default_factory=list)
     #: Each decision that settled uses that disagree, to print.
     decided: list[str] = field(default_factory=list)
+    #: Each decision about an alt that needed none.
+    unused: list[str] = field(default_factory=list)
     #: Uses that disagree, of an asset with nothing written to decide by.
     conflicts: list[str] = field(default_factory=list)
 
@@ -695,7 +734,7 @@ def decide_alts(
                 f"image {asset} [{locale}]: its uses disagree and it has no alt "
                 f"of its own, so decide it or write one on the image: {versions}"
             )
-    decisions.decided.extend(
+    decisions.unused.extend(
         f"decision not used: image {asset} [{locale}] has an alt of its own, "
         "or no uses that disagree"
         for asset, locale in sorted(set(decided) - settled)
@@ -735,7 +774,10 @@ class SlotDecisions:
 
     @property
     def unused(self) -> list[str]:
-        return sorted(set(self.decided) - set(self.used))
+        return [
+            f"decision not used: {slot} is no empty entry beside an image"
+            for slot in sorted(set(self.decided) - set(self.used))
+        ]
 
 
 def _entry_shown(asset: int | None, written: Any) -> str:

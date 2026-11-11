@@ -3354,6 +3354,9 @@ msgstr "Comma-separated ranking rules. Example: words,typo,proximity,attribute,s
 msgid "Comma-separated values"
 msgstr "Comma-separated values"
 
+msgid "Command"
+msgstr "Command"
+
 msgid "Comment"
 msgstr "Comment"
 
@@ -4088,6 +4091,9 @@ msgstr "Decided at"
 
 msgid "Decided by"
 msgstr "Decided by"
+
+msgid "Decisions"
+msgstr "Decisions"
 
 msgid "Declined"
 msgstr "Declined"
@@ -12523,6 +12529,9 @@ msgstr "Rewrite backups"
 msgid "Rewrite run"
 msgstr "Rewrite run"
 
+msgid "Rewrite runs"
+msgstr "Rewrite runs"
+
 msgid "Rewritten content hash"
 msgstr "Rewritten content hash"
 
@@ -12540,6 +12549,9 @@ msgstr "Run"
 
 msgid "Run COD reconciliation now"
 msgstr "Run COD reconciliation now"
+
+msgid "Run id"
+msgstr "Run id"
 
 msgid "Run now"
 msgstr "Run now"
@@ -16741,6 +16753,9 @@ msgstr "What This Means"
 
 msgid "What You'll Receive"
 msgstr "What You'll Receive"
+
+msgid "What a person decided for this store in this run, as the decisions file stated it."
+msgstr "What a person decided for this store in this run, as the decisions file stated it."
 
 msgid "What became of the goods?"
 msgstr "What became of the goods?"

@@ -3361,6 +3361,9 @@ msgstr "Κανόνες κατάταξης διαχωρισμένοι με κόμ
 msgid "Comma-separated values"
 msgstr "Τιμές διαχωρισμένες με κόμμα"
 
+msgid "Command"
+msgstr "Εντολή"
+
 msgid "Comment"
 msgstr "Σχόλιο"
 
@@ -4093,6 +4096,9 @@ msgstr "Ημερομηνία απόφασης"
 
 msgid "Decided by"
 msgstr "Απόφαση από"
+
+msgid "Decisions"
+msgstr "Αποφάσεις"
 
 msgid "Declined"
 msgstr "Απορρίφθηκε"
@@ -12529,6 +12535,9 @@ msgstr "Αντίγραφα πριν από επανεγγραφή"
 msgid "Rewrite run"
 msgstr "Εκτέλεση επανεγγραφής"
 
+msgid "Rewrite runs"
+msgstr "Εκτελέσεις επανεγγραφής"
+
 msgid "Rewritten content hash"
 msgstr "Αποτύπωμα του νέου περιεχομένου"
 
@@ -12546,6 +12555,9 @@ msgstr "Εκτελέστε"
 
 msgid "Run COD reconciliation now"
 msgstr "Εκτέλεση συμφωνίας αντικαταβολής τώρα"
+
+msgid "Run id"
+msgstr "Αναγνωριστικό εκτέλεσης"
 
 msgid "Run now"
 msgstr "Εκτέλεση τώρα"
@@ -16743,6 +16755,9 @@ msgstr "Τι Σημαίνει Αυτό"
 
 msgid "What You'll Receive"
 msgstr "Τι θα λαμβάνετε"
+
+msgid "What a person decided for this store in this run, as the decisions file stated it."
+msgstr "Τι αποφάσισε ένας άνθρωπος για αυτό το κατάστημα σε αυτή την εκτέλεση, όπως το έγραφε το αρχείο αποφάσεων."
 
 msgid "What became of the goods?"
 msgstr "Τι απέγιναν τα προϊόντα;"

@@ -20,8 +20,9 @@ puts a run back, and deletes its backups once they are no longer wanted.
 
 This rewrites a ``BuilderVersion`` (``builder.document_rewrite``), which is
 otherwise immutable: a version keeps its number and what it renders, the storefront
-having upgraded the same node on read until now. A draft keeps its revision for
-the same reason, so a store is not told it has unpublished changes. The
+having upgraded the same node on read until now. A draft moves to a new
+revision, so an editor that has it open is told it changed, and stays
+published if it was, so a store is not told it has unpublished changes. The
 current release's reference index is rebuilt afterwards, which is what records
 the dependency rows of a page published before its blocks took data settings.
 """
@@ -35,7 +36,7 @@ from django.db import connection, transaction
 
 from builder import references, storefront
 from builder.block_upgrades import upgrade_document
-from builder.document_rewrite import rewrite_store
+from builder.document_rewrite import Run, rewrite_store
 from builder.services import published_versions
 from core.management.tenant_mixin import TenantCommandMixin
 
@@ -77,7 +78,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     data, i18n, catalogue
                 ),
                 catalogue=catalogue,
-                run=run,
+                run=Run(run, "persist_block_upgrades"),
             )
             if result.problems:
                 rolled_back = True

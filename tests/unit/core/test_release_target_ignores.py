@@ -10,6 +10,7 @@ tree no run tested.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -108,14 +109,30 @@ def test_the_gate_keeps_its_name():
     assert _JOBS["gate"]["name"] == "CI Gate"
 
 
-def test_every_job_that_tests_code_waits_for_the_change_detection():
-    # ``coverage`` needs ``testing``, so it is skipped with it.
-    for name in set(_JOBS) - _GATE_EXEMPT - {"coverage"}:
-        job = _JOBS[name]
-        needs = job["needs"]
-        needs = [needs] if isinstance(needs, str) else needs
-        assert "changes" in needs, name
-        assert "needs.changes.outputs.code == 'true'" in job["if"], name
+def _needs(name: str) -> list[str]:
+    needs = _JOBS[name].get("needs", [])
+    return [needs] if isinstance(needs, str) else needs
+
+
+def _skipped_with_the_change_detection(name: str) -> bool:
+    """Carries the ``changes`` condition itself, or only needs such jobs."""
+    if "needs.changes.outputs.code == 'true'" in _JOBS[name].get("if", ""):
+        return "changes" in _needs(name)
+    needs = _needs(name)
+    return bool(needs) and all(
+        _skipped_with_the_change_detection(need) for need in needs
+    )
+
+
+def test_every_job_that_tests_code_is_skipped_on_a_docs_only_change():
+    """A new job runs on docs-only pull requests unless it is named here.
+
+    The named jobs are the cheap ones that must always run: the detection,
+    the push-only check, the gate, and the release (``main`` only).
+    ``coverage`` is skipped with ``testing``, which it needs.
+    """
+    for name in set(_JOBS) - _GATE_EXEMPT:
+        assert _skipped_with_the_change_detection(name), name
 
 
 def test_the_change_detection_runs_the_pinned_script():
@@ -225,4 +242,114 @@ def test_code_changed_then_reverted_leaves_only_docs(tmp_path):
     _git(repo, "checkout", "-q", "--detach", "pr~2")
     _git(repo, "merge", "-q", "--no-ff", "-m", "merge", "pr")
 
+    assert _detect(repo).stdout.strip() == "code=false"
+
+
+_TESTED = (_SCRIPTS / "tested_in_pr.sh").read_text(encoding="utf-8")
+
+
+def _required_jobs() -> list[str]:
+    declared = re.search(r"^REQUIRED_JOBS=\((.*)\)$", _TESTED, re.MULTILINE)
+    assert declared is not None
+    return re.findall(r"'([^']+)'", declared.group(1))
+
+
+def test_tested_in_pr_requires_the_jobs_the_gate_waits_for():
+    """One list, two files: a job added to the gate is added there too.
+
+    ``Coverage Gate`` stands for the ``Testing`` shards: it needs them, so
+    it is skipped unless they all ran.
+    """
+    tested = set(_JOBS) - {"changes", "tested-in-pr", "gate", "release"}
+    names = {_JOBS[job]["name"] for job in tested} - {"Testing"}
+
+    assert set(_required_jobs()) == names
+    assert _JOBS["coverage"]["needs"] == "testing"
+
+
+_STUB_GH = r"""#!/usr/bin/env bash
+case "$*" in
+  *"/pulls"*) echo "$HEAD" ;;
+  *"/compare/"*) echo ahead ;;
+  *"/jobs?"*)
+    [[ $* == *filter=latest* ]] || exit 3
+    [[ -n ${JOBS_API_ERROR:-} ]] && exit 1
+    cat "$JOBS_FILE" ;;
+  *"/actions/runs?"*) echo "123 https://example.test/runs/123" ;;
+  *) echo "tree-of-both" ;;
+esac
+"""
+
+_SHA = "a" * 40
+_BEFORE = "b" * 40
+_HEAD = "c" * 40
+_TESTS_RAN = {job: "success" for job in _required_jobs()}
+
+
+def _certify(tmp_path: Path, jobs: dict[str, str], **env: str) -> str:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    gh = bin_dir / "gh"
+    gh.write_text(_STUB_GH, encoding="utf-8", newline="\n")
+    gh.chmod(0o755)
+    jobs_file = tmp_path / "jobs.tsv"
+    jobs_file.write_text(
+        "".join(f"{name}\t{result}\n" for name, result in jobs.items()),
+        encoding="utf-8",
+        newline="\n",
+    )
+    result = subprocess.run(
+        [
+            shutil.which("bash") or "bash",
+            str(_SCRIPTS / "tested_in_pr.sh"),
+            _SHA,
+            _BEFORE,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "GITHUB_WORKFLOW_REF": "owner/repo/.github/workflows/ci.yml@x",
+            "HEAD": _HEAD,
+            "JOBS_FILE": str(jobs_file),
+            **env,
+        },
+    )
+    return result.stdout
+
+
+def test_a_full_green_run_is_a_certificate(tmp_path):
+    assert _certify(tmp_path, _TESTS_RAN).strip() == "tested=true"
+
+
+def test_a_green_run_with_skipped_tests_is_no_certificate(tmp_path):
+    """A docs-only pull request runs green with every test job skipped."""
+    skipped = dict.fromkeys(_required_jobs(), "skipped")
+    assert _certify(tmp_path, skipped).strip() == "tested=false"
+
+
+def test_one_skipped_or_cancelled_test_job_is_no_certificate(tmp_path):
+    for result in ("skipped", "cancelled", "failure"):
+        jobs = {**_TESTS_RAN, "Migration Check": result}
+        assert _certify(tmp_path / result, jobs).strip() == "tested=false"
+
+
+def test_a_job_cancelled_and_re_run_counts_by_its_re_run(tmp_path):
+    """The script asks for the latest attempt, whose jobs are all green."""
+    # The stub refuses (exit 3) a jobs request without ``filter=latest``.
+    assert _certify(tmp_path, _TESTS_RAN).strip() == "tested=true"
+
+
+def test_an_api_error_certifies_nothing(tmp_path):
+    out = _certify(tmp_path, _TESTS_RAN, JOBS_API_ERROR="1")
+    assert "tested=true" not in out
+
+
+def test_a_non_ascii_docs_path_is_docs(tmp_path):
+    """git quotes such a path without ``-z``, which would read as code."""
+    repo = _repo_with_change(
+        tmp_path, lambda r: (r / "docs" / "\u00e9.md").write_text("x\n")
+    )
     assert _detect(repo).stdout.strip() == "code=false"

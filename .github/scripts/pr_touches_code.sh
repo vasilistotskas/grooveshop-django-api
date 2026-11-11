@@ -14,19 +14,21 @@ set -euo pipefail
 # shellcheck source=ignored_paths.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ignored_paths.sh"
 
-# Captured first, so a failing ``git diff`` fails the script (the exit
-# status of a process substitution is lost): an unreadable diff must never
-# read as "nothing but docs changed".
-changed=$(git diff --no-renames --name-only HEAD^1 HEAD)
+# Written to a file first, so a failing ``git diff`` fails the script (the
+# exit status of a process substitution is lost): an unreadable diff must
+# never read as "nothing but docs changed". ``-z`` keeps a non-ASCII path
+# (which git would quote) and a path with a newline in one piece.
+changed=$(mktemp)
+trap 'rm -f "$changed"' EXIT
+git diff --no-renames --name-only -z HEAD^1 HEAD >"$changed"
 
-while IFS= read -r file; do
-  [[ -z $file ]] && continue
+while IFS= read -r -d '' file; do
   if ! ignored_path "$file"; then
     echo "code changed: $file" >&2
     echo "code=true"
     exit 0
   fi
-done <<<"$changed"
+done <"$changed"
 
 echo "only ignored paths changed" >&2
 echo "code=false"

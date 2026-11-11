@@ -715,8 +715,9 @@ read is cached per release: that is what brings the rewrite to visitors.
   `alt`, an image whose uses disagree gets the text stated, per language; an
   empty text leaves it without one. There is no switch that ignores problems:
   a value with no decision still stops the store. Each decision used is
-  printed, and the file is the record of what was decided: keep it with the
-  run's output.
+  printed, and so is each one nothing used (a value no document holds, an alt
+  for an image that has its own or whose uses agree). The file is the record
+  of what was decided: keep it with the run's output.
 - **A decision reaches every version.** A version is immutable to the editor,
   so a value only an old version holds can be settled nowhere else. Like the
   rest of this command, a decision changes the content of every draft and

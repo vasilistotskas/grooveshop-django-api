@@ -719,6 +719,21 @@ class TestDecisions:
         with pytest.raises(CommandError, match="outside this store"):
             run(*decide(images={url: asset.pk}, schema="another_store"))
 
+    def test_a_decision_nothing_used_is_said(self, outside, decide, run):
+        _doc, url, asset = outside
+        other = "https://example.org/typo.png"
+
+        output = run(
+            *decide(
+                images={url: asset.pk, other: "empty"},
+                alt={str(asset.pk): {"el": "Δεν χρειάστηκε"}},
+            )
+        )
+
+        assert f"decision not used: {other!r}" in output
+        assert f"decision not used: image {asset.pk} [el]" in output
+        assert alt_of(asset, "el") == "Βιτρίνα"
+
     def test_a_dry_run_takes_the_decisions(self, outside, decide, run):
         doc, url, asset = outside
         draft = doc.draft

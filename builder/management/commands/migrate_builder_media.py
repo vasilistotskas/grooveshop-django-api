@@ -104,8 +104,8 @@ class Command(TenantCommandMixin, BaseCommand):
                 failed += [f"{schema}: {line}" for line in problems]
         if failed:
             raise CommandError(
-                "Nothing of these stores was written. Settle each line, by "
-                "import_builder_media or in --decisions, and run it again:\n"
+                "Nothing of these stores was written. Settle each line "
+                "(docs/builder.md says how) and run it again:\n"
                 + "\n".join(failed)
             )
 

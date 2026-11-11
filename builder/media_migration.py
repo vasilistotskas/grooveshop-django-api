@@ -491,6 +491,10 @@ def resolve(
                 Found(use.document, use.source, use.path, url, kind)
                 for use in where
             )
+    resolution.decided.extend(
+        f"decision not used: {url!r} is in no document"
+        for url in sorted(set(decided) - set(by_url))
+    )
     outcomes = run(plan, dry_run=True)
     for import_url, items in plan.internal.items():
         outcome = outcomes[import_url]
@@ -553,6 +557,7 @@ def decide_alts(
         if text
     }
     decisions = AltDecisions()
+    settled: set[tuple[int, str]] = set()
     for (asset, locale), texts in sorted(said.items()):
         if (kept := held.get((asset, locale))) is not None:
             decisions.gives_way.extend(
@@ -563,6 +568,7 @@ def decide_alts(
         elif len(texts) == 1:
             decisions.fill.setdefault(asset, {})[locale] = next(iter(texts))
         elif (stated := decided.get((asset, locale))) is not None:
+            settled.add((asset, locale))
             if stated:
                 decisions.fill.setdefault(asset, {})[locale] = stated
             decisions.decided.append(
@@ -577,14 +583,25 @@ def decide_alts(
                 f"image {asset} [{locale}]: its uses disagree and it has no alt "
                 f"of its own, so decide it or write one on the image: {versions}"
             )
+    decisions.decided.extend(
+        f"decision not used: image {asset} [{locale}] has an alt of its own, "
+        "or no uses that disagree"
+        for asset, locale in sorted(set(decided) - settled)
+    )
     return decisions
 
 
 def _asset_of(value: Any, assets: Mapping[str, int | None]) -> int | None:
     """The asset the entry *value* becomes: none for an empty entry and for a
-    value decided to be no image. A URL the store's read did not find was
-    saved since: the documents are locked only after it."""
-    if not isinstance(value, str) or not value.strip():
+    value decided to be no image. A value that is no text is refused: its
+    setting leaves the document, so it would go without a word. A URL the
+    store's read did not find was saved since: the documents are locked only
+    after it."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise DocumentRefused(f"{value!r} is no image path")
+    if not value.strip():
         return None
     try:
         return assets[value.strip()]
@@ -680,10 +697,12 @@ def migrate_document(
             if node_settings.get(legacy.target):
                 continue
             if legacy.is_list:
-                slots[legacy] = [
-                    _asset_of(url, assets)
-                    for url in (value if isinstance(value, list) else [])
-                ]
+                if value is not None and not isinstance(value, list):
+                    raise DocumentRefused(
+                        f"{node['type']} {node_id!r}: /{legacy.source} is "
+                        "no list"
+                    )
+                slots[legacy] = [_asset_of(url, assets) for url in value or []]
             elif (asset := _asset_of(value, assets)) is not None:
                 node_settings[legacy.target] = asset
         if slots:

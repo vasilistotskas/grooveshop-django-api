@@ -24,8 +24,16 @@ run does.
 (``services._lock_release_sequence``) and then its documents: ``publish``,
 ``rollback``, ``delete_page``, a scheduled publish. A rewrite and a restore
 end with a release, so they take the release sequence first as well, before
-any document. Locking documents first would deadlock with a publish that
-arrives in between.
+any document (:func:`lock_store`). Locking documents first would deadlock
+with a publish that arrives in between. Library assets come last, in the
+order of their ids (``media_services.lock_assets``): whoever edits or
+deletes an asset holds its row and takes no other lock after it, so nothing
+waits in the other direction. In full: release sequence, documents by key,
+assets by id.
+
+What a rewrite writes has to be planned from rows it holds. A command that
+reads the store to decide what to write does so after :func:`lock_store`,
+in the same transaction: what it read before can have been saved over.
 
 Nothing else keeps what a rewrite replaces, so each row is first copied to a
 ``BuilderRewriteBackup`` of the run (``BuilderRewriteRun``), in the same
@@ -252,6 +260,22 @@ def _rewritten(
     return validated
 
 
+def lock_store() -> None:
+    """Take the locks of a rewrite of the current store, for the rest of the
+    transaction: its release sequence, then every document, a deleted page
+    too, in the order a publish locks them. No draft is saved, no version is
+    made or pruned and no release is cut while they are held, so what is read
+    after this call is what is there when the rewrite writes. A page created
+    meanwhile is the one thing that can still appear."""
+    _lock_release_sequence()
+    list(
+        BuilderDocument.objects.all_with_deleted()
+        .select_for_update()
+        .order_by("key")
+        .values_list("pk", flat=True)
+    )
+
+
 def record_run(run: Run) -> BuilderRewriteRun:
     """The row of *run* in this store, made if it is not there yet."""
     record, _made = BuilderRewriteRun.objects.get_or_create(
@@ -317,7 +341,7 @@ def rewrite_store(
     release sequence and then the documents are locked, and the caller rolls
     back on ``problems`` and for a dry run. *leave* names the old versions to
     leave as they are where they cannot be rewritten (:func:`_rewritten`)."""
-    _lock_release_sequence()
+    lock_store()
     result = Rewritten()
     released = set(published_versions().values())
     waiting = {

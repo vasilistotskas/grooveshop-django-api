@@ -83,8 +83,11 @@ from builder import media_migration, media_services, services, storefront
 from builder.document_rewrite import (
     DELETED_PAGE,
     LEAVABLE,
+    DocumentRefused,
     Leave,
+    Rewritten,
     Run,
+    lock_store,
     record_run,
     rewrite_store,
 )
@@ -190,18 +193,24 @@ class Command(TenantCommandMixin, BaseCommand):
         decisions: media_migration.Decisions,
         dry_run: bool,
     ) -> list[str]:
-        """One store, in one transaction: what stands in its way, and with
-        any of it nothing written."""
+        """One store: what stands in its way, and with any of it nothing
+        written. Which asset each URL becomes is found first, with no lock
+        held. Everything that is written is then planned and written in one
+        transaction, from rows locked for the whole of it
+        (``document_rewrite`` states the order): the documents, so no alt or
+        URL saved meanwhile is missed or overwritten, and the images, so one
+        deleted meanwhile is not released and an alt written on one
+        meanwhile is not replaced."""
         catalogue = storefront.fetch_catalogue(connection.schema_name)
         recorded = media_migration.recorded_decisions(COMMAND)
 
-        def unused(*, alts=(), slots=(), left=()) -> list[str]:
+        def unused(*, urls=(), alts=(), slots=(), left=()) -> list[str]:
             """The decisions nothing used that stop the store; those an
             earlier run applied are printed."""
             applied, stale = media_migration.unused_decisions(
                 decisions,
                 recorded,
-                urls=resolution.unused,
+                urls=list(urls),
                 alts=list(alts),
                 slots=list(slots),
                 left=list(left),
@@ -210,46 +219,67 @@ class Command(TenantCommandMixin, BaseCommand):
                 self.stdout.write(line)
             return stale
 
-        current, older = media_migration.stored_uses()
-        resolution = media_migration.resolve(current + older, decisions)
+        # Before any lock: which asset each URL becomes. This reads every
+        # image, too long to hold a store's documents for.
+        resolution = media_migration.resolve(
+            media_migration.stored_uses().uses, decisions
+        )
         for line in resolution.decided:
             self.stdout.write(line)
         if resolution.problems:
-            return resolution.problems + unused()
-        alts = media_migration.decide_alts(
-            current, resolution.assets, decisions.alts
-        )
-        for line in alts.gives_way + alts.decided:
-            self.stdout.write(line)
-        if alts.conflicts:
-            return alts.conflicts + unused(alts=alts.unused)
+            return resolution.problems + unused(urls=resolution.unused)
 
         slots = media_migration.SlotDecisions(decisions.slots)
         leave = Leave(decisions.left)
         record = Run(run, COMMAND, decisions.as_stated())
+        alts = media_migration.AltDecisions()
+        result = Rewritten()
+        only_left = False
         with transaction.atomic():
-            problems = self._fill_alts(alts.fill)
-            result = rewrite_store(
-                lambda data, i18n, where: media_migration.migrate_document(
-                    data, i18n, where, resolution.assets, slots
-                ),
-                catalogue=catalogue,
-                run=record,
-                leave=leave,
+            # Under the locks: what is written is planned from what is read
+            # here, and from nothing read earlier.
+            lock_store()
+            stored = media_migration.stored_uses()
+            problems = media_migration.changed_since(
+                stored, resolution, decisions
             )
-            problems += result.problems
-            problems += unused(
-                alts=alts.unused,
-                slots=slots.unused,
-                left=sorted(decisions.left - set(leave.used)),
-            )
-            # What was left is kept with a run even when nothing was moved,
-            # once: a rerun that leaves the same versions records nothing.
-            only_left = (
-                not problems
-                and not result.changed
-                and bool(set(leave.used) - recorded.left)
-            )
+            if not problems:
+                alts = media_migration.decide_alts(
+                    stored.current, resolution.assets, decisions.alts
+                )
+                for line in alts.gives_way + alts.decided:
+                    self.stdout.write(line)
+                problems = alts.conflicts + unused(
+                    urls=resolution.unused, alts=alts.unused
+                )
+            if not problems:
+
+                def planned(data, i18n, where):
+                    if where not in stored.read:
+                        raise DocumentRefused(
+                            "was made after the store was read, run it again"
+                        )
+                    return media_migration.migrate_document(
+                        data, i18n, where, resolution.assets, slots
+                    )
+
+                problems = self._fill_alts(alts.fill)
+                result = rewrite_store(
+                    planned, catalogue=catalogue, run=record, leave=leave
+                )
+                problems += result.problems
+                problems += unused(
+                    slots=slots.unused,
+                    left=sorted(decisions.left - set(leave.used)),
+                )
+                # What was left is kept with a run even when nothing was
+                # moved, once: a rerun that leaves the same versions records
+                # nothing.
+                only_left = (
+                    not problems
+                    and not result.changed
+                    and bool(set(leave.used) - recorded.left)
+                )
             if only_left:
                 record_run(record)
             if not problems and result.changed:

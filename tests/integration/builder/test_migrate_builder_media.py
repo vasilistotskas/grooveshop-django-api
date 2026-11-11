@@ -2190,3 +2190,183 @@ class TestAVersionThatNoLongerValidates:
             run(*decide(left=[self.OLD]))
 
         assert settings_of(doc) == {"imageUrl": url}
+
+
+class TestWhatChangesWhileTheStoreIsRead:
+    """Which asset a URL becomes is found before any lock is taken, because
+    it reads every image. What is written is planned afterwards, from rows
+    locked for the rest of the store's transaction. So whatever staff change
+    in between is either seen or stops the store, never overwritten."""
+
+    @pytest.fixture
+    def stored(self, admin, stored_image):
+        asset = imported(url := stored_image(210))
+        doc = save_and_publish(
+            admin, document(("a", banner(imageUrl=url, imageAlt="Πριν")))
+        )
+        return doc, url, asset
+
+    @staticmethod
+    def after_the_first(function, then):
+        """*function*, with *then* run once after its first call returns: what
+        someone does between the unlocked read and the locks."""
+        calls = []
+
+        def wrapped(*args, **kwargs):
+            answer = function(*args, **kwargs)
+            if not calls:
+                then()
+            calls.append(1)
+            return answer
+
+        return wrapped
+
+    def test_an_alt_saved_for_a_known_url_is_the_one_that_moves(
+        self, stored, admin, run
+    ):
+        doc, url, asset = stored
+
+        def an_editor_saves():
+            services.save_draft(
+                admin,
+                key=HOME,
+                draft=document(("a", banner(imageUrl=url, imageAlt="Μετά"))),
+                i18n={},
+                expected_revision=doc.draft_revision,
+            )
+            services.publish(admin, keys=[HOME])
+
+        with mock.patch.object(
+            media_migration,
+            "stored_uses",
+            self.after_the_first(media_migration.stored_uses, an_editor_saves),
+        ):
+            run()
+
+        assert alt_of(asset, "el") == "Μετά"
+        assert settings_of(doc) == {"image": asset.pk}
+
+    def test_an_alt_staff_wrote_on_the_image_meanwhile_wins(
+        self, stored, admin, run
+    ):
+        doc, _url, asset = stored
+
+        def staff_write_it():
+            media_services.update_asset(
+                admin, asset, alt={"el": "Του προσωπικού"}
+            )
+
+        with mock.patch.object(
+            media_migration,
+            "stored_uses",
+            self.after_the_first(media_migration.stored_uses, staff_write_it),
+        ):
+            output = run()
+
+        assert alt_of(asset, "el") == "Του προσωπικού"
+        assert "keeps 'Του προσωπικού'" in output
+        assert settings_of(doc) == {"image": asset.pk}
+
+    def test_an_image_deleted_meanwhile_stops_the_store(self, stored, run):
+        doc, url, asset = stored
+        gone = asset.pk
+
+        def staff_delete_it():
+            MediaAsset.objects.filter(pk=gone).delete()
+
+        with (
+            mock.patch.object(
+                media_migration,
+                "resolve",
+                self.after_the_first(media_migration.resolve, staff_delete_it),
+            ),
+            pytest.raises(
+                CommandError,
+                match=f"image {gone} was deleted from the library",
+            ),
+        ):
+            run()
+
+        assert settings_of(doc) == {"imageUrl": url, "imageAlt": "Πριν"}
+        assert not BuilderRewriteRun.objects.exists()
+
+    def test_a_page_made_after_the_locks_stops_the_store(
+        self, stored, admin, run
+    ):
+        """Every document there is gets locked, so only a new one can appear:
+        it was in no plan, and is refused rather than moved unplanned."""
+        doc, url, _asset = stored
+        calls = []
+        read = media_migration.stored_uses
+
+        def read_then_a_page_is_made():
+            answer = read()
+            calls.append(1)
+            if len(calls) == 2:
+                services.save_draft(
+                    admin,
+                    key="page:new",
+                    draft=document(("a", banner(imageUrl=url, imageAlt="Νέα"))),
+                    i18n={},
+                    expected_revision=0,
+                )
+            return answer
+
+        with (
+            mock.patch.object(
+                media_migration, "stored_uses", read_then_a_page_is_made
+            ),
+            pytest.raises(
+                CommandError,
+                match="page:new draft: was made after the store was read",
+            ),
+        ):
+            run()
+
+        assert settings_of(doc) == {"imageUrl": url, "imageAlt": "Πριν"}
+
+    def test_the_plan_is_read_under_the_locks_and_the_images_locked_last(
+        self, stored, run
+    ):
+        with CaptureQueriesContext(connection) as queries:
+            run()
+
+        sql = [query["sql"] for query in queries.captured_queries]
+
+        def first(*needles: str, after: int = 0) -> int:
+            return next(
+                index
+                for index, statement in enumerate(sql)
+                if index >= after and all(n in statement for n in needles)
+            )
+
+        sequence = first("pg_advisory_xact_lock")
+        documents = first("FOR UPDATE", '"builder_builderdocument"')
+        planned = first('"builder_builderversion"."data"', after=documents)
+        images = first("FOR UPDATE", '"builder_mediaasset"')
+        alts = first('"builder_mediaasset_translation"')
+        written = first('UPDATE "builder_builderversion"')
+        assert sequence < documents < planned < images < alts < written
+
+    def test_deleting_an_image_locks_it_before_asking_who_uses_it(
+        self, stored, admin
+    ):
+        """So a delete that meets a run waits for it, and then sees the
+        release the run made."""
+        _doc, _url, asset = stored
+
+        with CaptureQueriesContext(connection) as queries:
+            media_services.delete_asset(admin, asset)
+
+        sql = [query["sql"] for query in queries.captured_queries]
+        locked = next(
+            index
+            for index, statement in enumerate(sql)
+            if "FOR UPDATE" in statement and '"builder_mediaasset"' in statement
+        )
+        asked = next(
+            index
+            for index, statement in enumerate(sql)
+            if '"builder_builderreference"' in statement
+        )
+        assert locked < asked

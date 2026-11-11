@@ -445,20 +445,36 @@ def legacy_uses(
                     )
 
 
-def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
-    """Every old image setting of this store: ``(what the drafts and the current
-    release hold, what only older versions and deleted pages hold)``. Only
-    the first decide an image's alt: an older version's text is what the store
-    has since replaced, and a deleted page says nothing any more."""
-    current: list[LegacyUse] = []
-    older: list[LegacyUse] = []
+@dataclass(slots=True)
+class Stored:
+    """Every old image setting of a store, as one read of it found them."""
+
+    #: What the drafts and the current release hold. Only these decide an
+    #: image's alt: an older version's text is what the store has since
+    #: replaced, and a deleted page says nothing any more.
+    current: list[LegacyUse] = field(default_factory=list)
+    #: What only older versions and deleted pages hold.
+    older: list[LegacyUse] = field(default_factory=list)
+    #: Every draft and version that was read, as a report names it, with or
+    #: without an old setting.
+    read: set[str] = field(default_factory=set)
+
+    @property
+    def uses(self) -> list[LegacyUse]:
+        return self.current + self.older
+
+
+def stored_uses() -> Stored:
+    """Every old image setting of this store, now. A caller that writes by
+    what this answers holds the store's locks
+    (``document_rewrite.lock_store``) from before the call."""
+    stored = Stored()
     for document in _drafts():
-        (older if document.is_deleted else current).extend(
+        source = source_of(document)
+        stored.read.add(f"{document.key} {source}")
+        (stored.older if document.is_deleted else stored.current).extend(
             legacy_uses(
-                document.key,
-                source_of(document),
-                document.draft,
-                document.draft_i18n,
+                document.key, source, document.draft, document.draft_i18n
             )
         )
     live = set(published_versions().values())
@@ -466,15 +482,49 @@ def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
         "document__key", "number"
     )
     for version in versions.iterator(chunk_size=READ_CHUNK):
-        (current if version.pk in live else older).extend(
+        source = source_of(version.document, version.number)
+        stored.read.add(f"{version.document.key} {source}")
+        (stored.current if version.pk in live else stored.older).extend(
             legacy_uses(
-                version.document.key,
-                source_of(version.document, version.number),
-                version.data,
-                version.i18n,
+                version.document.key, source, version.data, version.i18n
             )
         )
-    return current, older
+    return stored
+
+
+def changed_since(
+    stored: Stored, resolution: Resolution, decisions: Decisions
+) -> list[str]:
+    """What stands in the way of writing *stored*, which was read under the
+    store's locks, by a *resolution* found before them (it reads every image,
+    too long to hold a store for).
+
+    A URL the resolution does not know was saved in between. An image it
+    chose, or a decision named, may have been deleted in between: the images
+    are locked here, for the rest of the transaction, so that the ones still
+    there stay, and their alt text is read and written with nobody else
+    writing it. Each line says to run the command again; nothing is guessed.
+    """
+    problems = sorted(
+        {
+            f"{use.url!r} was saved after the store's images were read, "
+            "run it again"
+            for use in stored.uses
+            if use.url not in resolution.assets
+        }
+    )
+    chosen = [
+        *(resolution.assets.get(use.url) for use in stored.uses),
+        *decisions.slots.values(),
+    ]
+    wanted = {asset for asset in chosen if asset is not None}
+    there = media_services.lock_assets(wanted)
+    problems += [
+        f"image {asset} was deleted from the library after the store's "
+        "images were read, run it again"
+        for asset in sorted(wanted - there)
+    ]
+    return problems
 
 
 #: What a decision writes for a value that is to become no image.

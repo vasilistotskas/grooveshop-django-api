@@ -705,10 +705,26 @@ release: that is what brings the rewrite to visitors.
   an SVG, a path with a query string, or a file that is gone.
 - **What stops a store.** A value with no library image, alt texts that
   disagree, an empty list entry that cannot keep its place (below), a document
-  that does not validate, and a draft saved while the command read the store
-  (run it again). Each is printed with every document, version, block and
-  setting that holds it, and the command ends with exit 1. One store is one
-  transaction: nothing of a stopped store is written, the other stores are.
+  that does not validate, and something that changed while the command read
+  the store (next point). Each is printed with every document, version, block
+  and setting that holds it, and the command ends with exit 1. One store is
+  one transaction: nothing of a stopped store is written, the other stores are.
+- **What is written is planned from locked rows.** Finding the asset of each
+  URL reads every image, too long to hold a store's documents for, so that is
+  done first with no lock. Then, in one transaction, the store is locked
+  (below: release sequence, documents, images), read again, and everything
+  that is written comes from that second read: which settings there are, what
+  alt each use gives, what alt each image already has. So a staff change
+  between the two reads is seen, or stops the store, and is never overwritten:
+  an alt an editor saved for the same URL is the one that moves; an alt staff
+  wrote on the library image wins, as any existing alt does; a URL saved in
+  between, an image deleted in between and a page created in between each stop
+  the store with `run it again`.
+- **An image a release names is not deleted under it.** Deleting an asset
+  locks its row and then reads who uses it (`media_services.delete_asset`),
+  so a delete that meets a run waits for it and is then refused with
+  `media_in_use`, like any delete of an image a published page shows: the
+  release the run made rebuilt the reference index it reads.
 - **A person decides what the import cannot fix**, one by one, in a
   JSON file passed as `--decisions`
   (`builder.media_migration.read_decisions`):
@@ -841,10 +857,14 @@ keeps history. `builder/document_rewrite.py` is the one place they do it.
   late save. What a revision means is otherwise kept: a draft that was at its
   published revision stays there, and a publish waiting for its time names
   the new revision of the draft it froze.
-- **Lock order.** The store's release sequence first, then the documents:
-  the order of `publish`, `rollback`, `delete_page` and a scheduled publish.
-  A rewrite and a restore end with a release, and documents locked first
-  would deadlock with a publish arriving in between.
+- **Lock order.** The store's release sequence first, then the documents by
+  key: the order of `publish`, `rollback`, `delete_page` and a scheduled
+  publish. A rewrite and a restore end with a release, and documents locked
+  first would deadlock with a publish arriving in between. Library images
+  come last, by id (`media_services.lock_assets`): an edit or a delete of an
+  image holds its row and takes no other lock after it, so nothing waits the
+  other way round. A command reads the store to plan what it writes only
+  after `document_rewrite.lock_store`.
 - **What is replaced is kept.** Before a row is rewritten, the columns about
   to be replaced are copied into a `BuilderRewriteBackup`, one per draft and
   per version, in the same transaction, under the run (`BuilderRewriteRun`:

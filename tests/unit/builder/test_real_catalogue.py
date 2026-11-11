@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from builder.media_migration import legacy_fields
 from builder.seeding import SEED_CATALOGUE
 from builder.storefront import parse_catalogue
 
@@ -75,3 +76,25 @@ def test_the_blocks_that_carry_a_link_say_so():
         "/ctaLink",
         "/prompt/ctaLink",
     }
+
+
+def test_a_list_of_images_takes_an_asset_id_and_nothing_else():
+    """Why ``media_migration._place_lists`` cannot keep an empty entry of an
+    old list in its place: the list it becomes has no value for "no image".
+    If this fails, the storefront has given such a list an empty slot, and the
+    migration can keep one instead of stopping the store."""
+    schemas = {raw["type"]: raw["schema"] for raw in PAYLOAD["blocks"]}
+    lists = [
+        (block, legacy.target)
+        for block, fields in legacy_fields().items()
+        for legacy in fields
+        if legacy.is_list
+    ]
+
+    assert lists == [
+        ("hero_carousel", "artworks"),
+        ("hero_carousel", "mobileArtworks"),
+    ]
+    for block, target in lists:
+        items = schemas[block]["properties"][target]["items"]
+        assert (items["type"], items["minimum"]) == ("integer", 1)

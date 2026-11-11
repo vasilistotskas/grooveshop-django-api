@@ -12,7 +12,12 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from builder import services
-from builder.models import BuilderDocument, BuilderReference, BuilderVersion
+from builder.models import (
+    BuilderDocument,
+    BuilderReference,
+    BuilderRewriteBackup,
+    BuilderVersion,
+)
 from builder.storefront import clear_catalogue_cache
 from tests.utils.builder import TEXT, _schema, document, section
 
@@ -102,14 +107,14 @@ def published(admin, catalogue, upgraded_catalogue, features_on):
 
 @pytest.fixture
 def run(tenant):
-    def go(*args):
+    def go(*args, command="persist_block_upgrades"):
         out = StringIO()
         with mock.patch(
             "django_tenants.utils.tenant_context",
             lambda _tenant: contextlib.nullcontext(),
         ):
             call_command(
-                "persist_block_upgrades",
+                command,
                 "--tenant",
                 tenant.schema_name,
                 *args,
@@ -120,7 +125,9 @@ def run(tenant):
     return go
 
 
-def test_the_draft_and_the_version_move_and_keep_their_identity(published, run):
+def test_the_draft_and_the_version_move_and_the_version_keeps_its_number(
+    published, run
+):
     version = published.versions.get()
     revision = published.draft_revision
 
@@ -135,7 +142,7 @@ def test_the_draft_and_the_version_move_and_keep_their_identity(published, run):
     assert published.draft["sections"]["a"] == expected
     assert after.data["sections"]["a"] == expected
     assert after.number == version.number
-    assert published.draft_revision == revision
+    assert published.draft_revision == revision + 1
     assert "upgraded 1 draft(s), 1 version(s)" in report
 
 
@@ -150,13 +157,44 @@ def test_a_version_states_what_it_now_holds(published, run):
     assert after.catalogue_hash == "catalogue-hash-2"
 
 
+def test_a_run_is_kept_and_can_be_put_back(published, run):
+    version = published.versions.get()
+
+    run_id = run().rsplit("backup run ", 1)[1].split()[0]
+    kept = BuilderRewriteBackup.objects.filter(run__run=run_id).count()
+    report = run("--restore", run_id, command="builder_rewrite_backups")
+
+    after = BuilderVersion.objects.get(pk=version.pk)
+    assert kept == 2
+    assert "restored 1 draft(s), 1 version(s)" in report
+    assert BuilderDocument.objects.get(key=HOME).draft == published.draft
+    assert (after.data, after.block_types) == (
+        version.data,
+        ["offers_preview@1"],
+    )
+    assert after.content_hash == version.content_hash
+    assert after.catalogue_hash == version.catalogue_hash
+    assert not BuilderRewriteBackup.objects.exists()
+    assert "upgraded 1 draft(s), 1 version(s)" in run()
+
+
+def test_a_dry_run_keeps_nothing(published, run):
+    report = run("--dry-run")
+
+    assert "would upgrade 1 draft(s), 1 version(s)" in report
+    assert "backup run" not in report
+    assert not BuilderRewriteBackup.objects.exists()
+
+
 def test_a_store_is_not_told_it_has_unpublished_changes(published, run):
-    before = published.published_revision
+    before = published.draft_revision
 
     run()
 
     published.refresh_from_db()
-    assert published.published_revision == before == published.draft_revision
+    assert (
+        published.published_revision == published.draft_revision == before + 1
+    )
 
 
 def test_a_published_page_gets_the_dependency_rows_of_its_data(published, run):

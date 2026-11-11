@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -349,6 +349,14 @@ def store_import(
     )
 
 
+def fill_alt(asset: MediaAsset, alt: Mapping[str, Any]) -> None:
+    """Write the alt text of some languages onto *asset*, for the command that
+    moves it there from the documents, with the checks of an edit and no
+    permission check. Saved in the caller's transaction."""
+    _set_alt(asset, _checked_alt(alt))
+    asset.save()
+
+
 def _reaches_the_storefront(asset: MediaAsset) -> None:
     """A used asset changed: the storefront resolves it at render, so its
     cached copies go, in the commit of the change."""
@@ -384,9 +392,34 @@ def update_asset(
     return asset
 
 
+def lock_assets(ids: Iterable[int]) -> set[int]:
+    """Lock these assets for the rest of the transaction, in the order of
+    their ids, and answer which of them exist.
+
+    An asset's row is the one lock of everything about it, its alt text
+    included: an edit saves the row before its translations
+    (``update_asset``) and a delete locks it before anything else
+    (``delete_asset``), so both wait for whoever holds it. Neither takes
+    another lock afterwards, so a caller that holds documents may take
+    assets, and never the other way round
+    (``builder.document_rewrite`` states the whole order).
+    """
+    return set(
+        MediaAsset.objects.select_for_update()
+        .filter(pk__in=set(ids))
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
 def delete_asset(user: Any, asset: MediaAsset) -> None:
+    """Delete an asset no document of the current release uses. Its row is
+    locked before the uses are read: a delete that meets a command which is
+    about to release documents naming the asset (it holds the row,
+    :func:`lock_assets`) waits for it, and then reads the release it made."""
     require_permission(user, DELETE_PERMISSION)
     with transaction.atomic():
+        lock_assets([asset.pk])
         used = references.used_by(ReferenceKind.MEDIA, asset.pk)
         if used:
             raise MediaInUse(used_by=used)

@@ -3354,6 +3354,9 @@ msgstr "Comma-separated ranking rules. Example: words,typo,proximity,attribute,s
 msgid "Comma-separated values"
 msgstr "Comma-separated values"
 
+msgid "Command"
+msgstr "Command"
+
 msgid "Comment"
 msgstr "Comment"
 
@@ -4089,6 +4092,9 @@ msgstr "Decided at"
 msgid "Decided by"
 msgstr "Decided by"
 
+msgid "Decisions"
+msgstr "Decisions"
+
 msgid "Declined"
 msgstr "Declined"
 
@@ -4675,6 +4681,9 @@ msgstr "Empty cart"
 
 msgid "Empty for singular entries. Set for ngettext / msgid_plural entries; in that case each plural form has its own row identified by plural_index."
 msgstr "Empty for singular entries. Set for ngettext / msgid_plural entries; in that case each plural form has its own row identified by plural_index."
+
+msgid "Empty for the document's draft."
+msgstr "Empty for the document's draft."
 
 msgid "Empty for unlimited; 1 for single-use codes"
 msgstr "Empty for unlimited; 1 for single-use codes"
@@ -12511,6 +12520,21 @@ msgstr "Revisions"
 msgid "Reward Products"
 msgstr "Reward Products"
 
+msgid "Rewrite backup"
+msgstr "Rewrite backup"
+
+msgid "Rewrite backups"
+msgstr "Rewrite backups"
+
+msgid "Rewrite run"
+msgstr "Rewrite run"
+
+msgid "Rewrite runs"
+msgstr "Rewrite runs"
+
+msgid "Rewritten content hash"
+msgstr "Rewritten content hash"
+
 msgid "Role"
 msgstr "Role"
 
@@ -12525,6 +12549,9 @@ msgstr "Run"
 
 msgid "Run COD reconciliation now"
 msgstr "Run COD reconciliation now"
+
+msgid "Run id"
+msgstr "Run id"
 
 msgid "Run now"
 msgstr "Run now"
@@ -16727,6 +16754,9 @@ msgstr "What This Means"
 msgid "What You'll Receive"
 msgstr "What You'll Receive"
 
+msgid "What a person decided for this store in this run, as the decisions file stated it."
+msgstr "What a person decided for this store in this run, as the decisions file stated it."
+
 msgid "What became of the goods?"
 msgstr "What became of the goods?"
 
@@ -17802,6 +17832,9 @@ msgstr "payment provider"
 msgid "sha256 of data+i18n"
 msgstr "sha256 of data+i18n"
 
+msgid "sha256 of the content the run stored. A restore puts back only a row that still holds it."
+msgstr "sha256 of the content the run stored. A restore puts back only a row that still holds it."
+
 msgid "shipping_provider_code is required for pickup_point."
 msgstr "shipping_provider_code is required for pickup_point."
 
@@ -17858,6 +17891,9 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+msgid "{column: value} of the row as it was before the run."
+msgstr "{column: value} of the row as it was before the run."
 
 msgid "{document key: draft revision it was taken from}"
 msgstr "{document key: draft revision it was taken from}"

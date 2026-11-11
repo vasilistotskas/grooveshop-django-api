@@ -3361,6 +3361,9 @@ msgstr "Κανόνες κατάταξης διαχωρισμένοι με κόμ
 msgid "Comma-separated values"
 msgstr "Τιμές διαχωρισμένες με κόμμα"
 
+msgid "Command"
+msgstr "Εντολή"
+
 msgid "Comment"
 msgstr "Σχόλιο"
 
@@ -4094,6 +4097,9 @@ msgstr "Ημερομηνία απόφασης"
 msgid "Decided by"
 msgstr "Απόφαση από"
 
+msgid "Decisions"
+msgstr "Αποφάσεις"
+
 msgid "Declined"
 msgstr "Απορρίφθηκε"
 
@@ -4680,6 +4686,9 @@ msgstr "Άδειο καλάθι"
 
 msgid "Empty for singular entries. Set for ngettext / msgid_plural entries; in that case each plural form has its own row identified by plural_index."
 msgstr "Κενό για μεμονωμένες (ενικού) καταχωρήσεις. Συμπληρώνεται για καταχωρήσεις ngettext / msgid_plural· σε αυτή την περίπτωση κάθε πληθυντικός τύπος έχει τη δική του γραμμή που προσδιορίζεται από το plural_index."
+
+msgid "Empty for the document's draft."
+msgstr "Κενό για το πρόχειρο του εγγράφου."
 
 msgid "Empty for unlimited; 1 for single-use codes"
 msgstr "Κενό για απεριόριστη χρήση· 1 για κωδικούς μίας χρήσης"
@@ -12517,6 +12526,21 @@ msgstr "Αναθεωρήσεις"
 msgid "Reward Products"
 msgstr "Προϊόντα ανταμοιβής"
 
+msgid "Rewrite backup"
+msgstr "Αντίγραφο πριν από επανεγγραφή"
+
+msgid "Rewrite backups"
+msgstr "Αντίγραφα πριν από επανεγγραφή"
+
+msgid "Rewrite run"
+msgstr "Εκτέλεση επανεγγραφής"
+
+msgid "Rewrite runs"
+msgstr "Εκτελέσεις επανεγγραφής"
+
+msgid "Rewritten content hash"
+msgstr "Αποτύπωμα του νέου περιεχομένου"
+
 msgid "Role"
 msgstr "Ρόλος"
 
@@ -12531,6 +12555,9 @@ msgstr "Εκτελέστε"
 
 msgid "Run COD reconciliation now"
 msgstr "Εκτέλεση συμφωνίας αντικαταβολής τώρα"
+
+msgid "Run id"
+msgstr "Αναγνωριστικό εκτέλεσης"
 
 msgid "Run now"
 msgstr "Εκτέλεση τώρα"
@@ -16729,6 +16756,9 @@ msgstr "Τι Σημαίνει Αυτό"
 msgid "What You'll Receive"
 msgstr "Τι θα λαμβάνετε"
 
+msgid "What a person decided for this store in this run, as the decisions file stated it."
+msgstr "Τι αποφάσισε ένας άνθρωπος για αυτό το κατάστημα σε αυτή την εκτέλεση, όπως το έγραφε το αρχείο αποφάσεων."
+
 msgid "What became of the goods?"
 msgstr "Τι απέγιναν τα προϊόντα;"
 
@@ -17804,6 +17834,9 @@ msgstr "πάροχος πληρωμών"
 msgid "sha256 of data+i18n"
 msgstr "sha256 των data+i18n"
 
+msgid "sha256 of the content the run stored. A restore puts back only a row that still holds it."
+msgstr "Το sha256 του περιεχομένου που αποθήκευσε η εκτέλεση. Η επαναφορά αφορά μόνο γραμμή που το έχει ακόμη."
+
 msgid "shipping_provider_code is required for pickup_point."
 msgstr "Το shipping_provider_code είναι υποχρεωτικό για το pickup_point."
 
@@ -17860,6 +17893,9 @@ msgstr "εβδομάδα"
 
 msgid "without voucher"
 msgstr "χωρίς voucher"
+
+msgid "{column: value} of the row as it was before the run."
+msgstr "{στήλη: τιμή} της γραμμής όπως ήταν πριν από την εκτέλεση."
 
 msgid "{document key: draft revision it was taken from}"
 msgstr "{κλειδί εγγράφου: αναθεώρηση του πρόχειρου από την οποία ελήφθη}"

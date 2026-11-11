@@ -407,6 +407,111 @@ class BuilderPreviewLink(TimeStampMixinModel):
         return f"{self.pk} ({self.expires_at:%Y-%m-%d %H:%M})"
 
 
+class BuilderRewriteRun(_Immutable):
+    """One run, in this store, of a command that rewrites stored documents in
+    place (``builder.document_rewrite``): which command, when, and what a
+    person decided for it. One invocation uses one id in every store it
+    reaches. ``manage.py builder_rewrite_backups`` lists the runs a store
+    holds, puts one back, and deletes one; nothing deletes a run on a
+    schedule.
+    """
+
+    run = models.UUIDField(_("Run id"), unique=True, editable=False)
+    command = models.CharField(_("Command"), max_length=64, editable=False)
+    decisions = models.JSONField(
+        _("Decisions"),
+        default=dict,
+        db_default={},
+        editable=False,
+        help_text=_(
+            "What a person decided for this store in this run, as the "
+            "decisions file stated it."
+        ),
+    )
+    created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Rewrite run")
+        verbose_name_plural = _("Rewrite runs")
+        ordering = ["created_at", "pk"]
+
+    def __str__(self) -> str:
+        return f"{self.run} {self.command}"
+
+
+class BuilderRewriteBackup(_Immutable):
+    """What a rewrite in place replaced, so that it can be put back.
+
+    The commands that move stored documents to a new shape change a draft
+    and a version that is otherwise immutable, and keep no history. Before
+    each row is rewritten, the columns about to be replaced are copied here,
+    in the same transaction, under the run that replaces them.
+
+    The database holds no constraint from a backup to its document or its
+    version (``db_constraint=False``). A release from before this table
+    deletes versions and pages knowing nothing of it, and a constraint would
+    make those deletes fail for as long as a backup exists, so a store could
+    not be rolled back to that release without first giving up its way back.
+    Django still deletes a backup with its document or version; one left
+    behind by other code has nothing to restore and goes at the next restore
+    of its run.
+    """
+
+    run = models.ForeignKey(
+        BuilderRewriteRun,
+        on_delete=models.CASCADE,
+        related_name="backups",
+        verbose_name=_("Rewrite run"),
+    )
+    document = models.ForeignKey(
+        BuilderDocument,
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="rewrite_backups",
+        verbose_name=_("Document"),
+    )
+    version = models.ForeignKey(
+        BuilderVersion,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="rewrite_backups",
+        verbose_name=_("Version"),
+        help_text=_("Empty for the document's draft."),
+    )
+    original = models.JSONField(
+        _("Original"),
+        editable=False,
+        help_text=_("{column: value} of the row as it was before the run."),
+    )
+    rewritten_hash = models.CharField(
+        _("Rewritten content hash"),
+        max_length=64,
+        editable=False,
+        help_text=_(
+            "sha256 of the content the run stored. A restore puts back only "
+            "a row that still holds it."
+        ),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Rewrite backup")
+        verbose_name_plural = _("Rewrite backups")
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "document", "version"],
+                nulls_distinct=False,
+                name="builder_backup_run_row_uniq",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        source = f"version {self.version_id}" if self.version_id else "draft"
+        return f"{self.run_id} document {self.document_id} {source}"
+
+
 def document_label(key: str) -> str:
     """``Template: home`` for ``template:home``: what a person reads."""
     kind = kind_of_key(key)

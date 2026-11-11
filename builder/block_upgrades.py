@@ -25,6 +25,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 from builder import pointers
+from builder.document_rewrite import DocumentRefused
 from builder.published import localised
 from builder.storefront import BlockDefinition, Catalogue
 from builder.validation import VERSIONED_TYPE
@@ -42,7 +43,7 @@ LEGACY_PRODUCT_ORDERING = {
 }
 
 
-class NoUpgradePath(Exception):
+class NoUpgradePath(DocumentRefused):
     """A node is older than its block and nothing here brings it up."""
 
 
@@ -234,11 +235,12 @@ def upgrade_translations(
     return moved
 
 
-def _nodes(holder: dict[str, Any], key: str) -> Iterator[tuple[dict, str]]:
+def nodes_of(holder: dict[str, Any], key: str) -> Iterator[tuple[dict, str]]:
+    """``(the mapping that holds it, its id)`` of every node under *key*."""
     for node_id, node in (holder.get(key) or {}).items():
         yield holder[key], node_id
         if isinstance(node, dict):
-            yield from _nodes(node, "blocks")
+            yield from nodes_of(node, "blocks")
 
 
 def upgrade_document(
@@ -252,7 +254,7 @@ def upgrade_document(
     upgraded = copy.deepcopy(data)
     before: dict[str, tuple[dict[str, Any], BlockDefinition]] = {}
     moved: Counter[str] = Counter()
-    for parent, node_id in list(_nodes(upgraded, "sections")):
+    for parent, node_id in list(nodes_of(upgraded, "sections")):
         node = parent[node_id]
         versioned = node.get("type") if isinstance(node, dict) else None
         if not isinstance(versioned, str):

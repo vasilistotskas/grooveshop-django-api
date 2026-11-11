@@ -522,6 +522,11 @@ NOT_PERSONAL: dict[str, str] = {
         "builder.MediaAsset",
         "builder.MediaAssetTranslation",
         "builder.BuilderScheduledPublish",
+        # A copy of a draft or a version above, as it was before a rewrite,
+        # and its run: the decisions kept there are library image ids and alt
+        # text for them, which is what ``MediaAssetTranslation`` holds.
+        "builder.BuilderRewriteBackup",
+        "builder.BuilderRewriteRun",
         "page_config.ContentPageTranslation",
         "page_config.LegalDocumentVersion",
         "user.SubscriptionTopic",

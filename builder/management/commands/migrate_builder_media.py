@@ -25,12 +25,17 @@ bring in is for a person to decide, one value at a time, in the file
 
     {"webside": {"images": {"https://example.org/a.png": 12,
                             "/img/old-logo.svg": "empty"},
-                 "alt": {"12": {"el": "Ο πάγκος"}}}}
+                 "alt": {"12": {"el": "Ο πάγκος"}},
+                 "slots": {"template:home draft: /sections/c/settings/images/1": "remove"}}}
 
 An image value becomes the library image named, or no image (``"empty"``); an
 image whose uses disagree gets the alt stated (an empty text leaves it
-without). A decision holds for every draft and every version that has the
-value, published and older ones included. Each decision used is printed.
+without); an empty entry of a list beside an image of the block's other list
+gets a library image, or goes with its position from every list of the block
+(``"remove"``). A decision about a value holds for every draft and every
+version that has it, published and older ones included; a slot is decided
+per draft and per version. Each decision used is printed, and each one
+nothing used.
 
 ``--dry-run`` takes every step of the real run, the alt text and the release
 included, in a transaction it rolls back. A second run finds nothing to do. A
@@ -117,7 +122,7 @@ class Command(TenantCommandMixin, BaseCommand):
     ) -> list[str]:
         catalogue = storefront.fetch_catalogue(connection.schema_name)
         current, older = media_migration.stored_uses()
-        resolution = media_migration.resolve(current + older, decisions.images)
+        resolution = media_migration.resolve(current + older, decisions)
         for line in resolution.decided:
             self.stdout.write(line)
         if resolution.problems:
@@ -130,11 +135,12 @@ class Command(TenantCommandMixin, BaseCommand):
         if alts.conflicts:
             return alts.conflicts
 
+        slots = media_migration.SlotDecisions(decisions.slots)
         with transaction.atomic():
             problems = self._fill_alts(alts.fill)
             result = rewrite_store(
-                lambda data, i18n: media_migration.migrate_document(
-                    data, i18n, resolution.assets
+                lambda data, i18n, where: media_migration.migrate_document(
+                    data, i18n, where, resolution.assets, slots
                 ),
                 catalogue=catalogue,
                 run=run,
@@ -145,6 +151,10 @@ class Command(TenantCommandMixin, BaseCommand):
             if problems or dry_run:
                 transaction.set_rollback(True)
 
+        for line in slots.used.values():
+            self.stdout.write(line)
+        for slot in slots.unused:
+            self.stdout.write(f"decision not used: {slot}")
         rolled_back = dry_run or bool(problems)
         self.stdout.write(
             f"{'would move' if rolled_back else 'moved'} {result.drafts} "

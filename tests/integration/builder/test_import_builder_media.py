@@ -29,6 +29,8 @@ from tests.integration.builder.test_media_import import (
 
 pytestmark = pytest.mark.django_db
 
+NO_HOSTS = media_migration.OwnHosts()
+
 HOME = "template:home"
 ABOUT = "page:about"
 
@@ -183,7 +185,34 @@ class TestScan:
         ],
     )
     def test_what_counts_as_an_image_path(self, value, kind):
-        assert media_migration.classify(value, "s") == kind
+        assert media_migration.classify(value, "s", NO_HOSTS) == kind
+
+    @pytest.mark.parametrize(
+        ("value", "kind"),
+        [
+            ("https://shop.example/img/x.png", "static"),
+            ("https://shop.example/uploads/x.png", "store"),
+            ("HTTPS://Shop.Example/media/s/uploads/x.png", "store"),
+            ("//shop.example/img/x.png", "static"),
+            ("http://shop.example:8443/img/x.png", "static"),
+            ("https://shop.example/media/other/uploads/x.png", "external"),
+            ("https://shop.example/products/x.png", "external"),
+            ("https://media.platform/media/s/uploads/x.png", "store"),
+            ("https://media.platform/media/other/uploads/x.png", "external"),
+            ("https://media.platform/img/x.png", "external"),
+            ("https://media.platform/uploads/x.png", "external"),
+            ("https://shop.example.evil.test/img/x.png", "external"),
+            ("https://evil.test/shop.example/img/x.png", "external"),
+            ("https://shop.example@evil.test/img/x.png", "external"),
+        ],
+    )
+    def test_an_address_on_the_stores_own_hosts_is_its_path(self, value, kind):
+        hosts = media_migration.OwnHosts(
+            store=frozenset({"shop.example"}),
+            platform=frozenset({"media.platform"}),
+        )
+
+        assert media_migration.classify(value, "s", hosts) == kind
 
     def test_an_older_unpublished_version_is_only_read_on_request(
         self, documents

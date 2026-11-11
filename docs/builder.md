@@ -659,14 +659,23 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
   `/img/...`, `/uploads/...` or `/media/<store>/uploads/...`, the last also as
   Django writes it with no leading slash, ending in an image extension;
   `/uploads/x` is read as `/media/<store>/uploads/x`.
+- An absolute address on one of the store's own hosts is the path it names
+  (`media_migration.own_hosts`), which is what a stored URL looks like after
+  a store changed its domain or wrote its media host in full. The hosts are
+  read, never written down: the store's `TenantDomain` rows, where any of the
+  paths above is the store's; and the hosts of `MEDIA_STREAM_BASE_URL` and
+  `STATIC_BASE_URL`, which every store shares and where only
+  `/media/<store>/uploads/...` is this store's. The file is then read by its
+  path from where the store keeps it; the address itself is never fetched. A
+  domain the store no longer has is not its host any more.
 - Each distinct path goes through the same import as `media/import`
   (`media_services.store_import`: the upload checks, the shrinking of an
   oversize photo, de-duplication by content), so running it again finds the
   assets it made. It prints, per image, where it is used (document, source,
   JSON pointer) and the asset it became, and `--mapping-file` writes the
   `{url: asset id}` map (a real run, one tenant).
-- An absolute `http(s)` address or another store's file is listed as EXTERNAL
-  and never fetched. An SVG is refused by the library (a raster only) and a
+- Any other absolute `http(s)` address, and another store's file, is listed
+  as EXTERNAL and never fetched. An SVG is refused by the library (a raster only) and a
   file that cannot be read is reported `FAILED (<code>)`; the rest carry on.
 - `--dry-run` reads the same files and writes nothing: no asset, no file.
 - It never rewrites a document.
@@ -699,25 +708,31 @@ read is cached per release: that is what brings the rewrite to visitors.
   (run it again). Each is printed with every document, version, block and
   setting that holds it, and the command ends with exit 1. One store is one
   transaction: nothing of a stopped store is written, the other stores are.
-- **A person decides what the import cannot fix**, one value at a time, in a
+- **A person decides what the import cannot fix**, one by one, in a
   JSON file passed as `--decisions`
   (`builder.media_migration.read_decisions`):
 
   ```json
-  {"webside": {"images": {"https://example.org/a.png": 12,
-                          "/img/old-logo.svg": "empty"},
-               "alt": {"12": {"el": "Ο πάγκος", "en": ""}}}}
+  {"webside": {
+    "images": {"https://example.org/a.png": 12, "/img/old-logo.svg": "empty"},
+    "alt": {"12": {"el": "Ο πάγκος", "en": ""}},
+    "slots": {
+      "template:home draft: /sections/hero/settings/mobileImages/1": 31,
+      "template:home version 3: /sections/hero/settings/mobileImages/1": "remove"
+    }}}
   ```
 
   A store is named by its schema. Under `images`, a value exactly as the
   report prints it becomes the library image of that id, or no image
   (`"empty"`: the setting is left unset and its alt goes with it). Under
   `alt`, an image whose uses disagree gets the text stated, per language; an
-  empty text leaves it without one. There is no switch that ignores problems:
-  a value with no decision still stops the store. Each decision used is
-  printed, and so is each one nothing used (a value no document holds, an alt
-  for an image that has its own or whose uses agree). The file is the record
-  of what was decided: keep it with the run's output.
+  empty text leaves it without one. Under `slots`, an empty entry of a list
+  (next point) gets a library image, or is taken out with its position. There
+  is no switch that ignores problems and no default: what has no decision
+  still stops the store. Each decision used is printed, and so is each one
+  nothing used (a value no document holds, an alt for an image that has its
+  own or whose uses agree, a slot that is no empty entry beside an image). The
+  file is the record of what was decided: keep it with the run's output.
 - **A decision reaches every version.** A version is immutable to the editor,
   so a value only an old version holds can be settled nowhere else. Like the
   rest of this command, a decision changes the content of every draft and
@@ -727,11 +742,23 @@ read is cached per release: that is what brings the rewrite to visitors.
   design draws the phone image at the position of the desk one. A list of
   references has no empty slot (the storefront's schema takes an asset id from
   1 up, and a release refuses an id that names no asset), so an empty entry, as
-  written or by a decision, is handled by position: a position that is empty in
-  every list of the block goes from each, which moves no pair; an empty entry
-  beside an image of another list stops the store, because dropping it would
-  put every later image against the wrong partner. No decision settles that
-  one yet: it needs the storefront to accept an empty slot.
+  written or by an `images` decision, is handled by position. A position that
+  is empty in every list of the block goes from each, which moves no pair. An
+  empty entry beside an image of the other list stops the store, because
+  dropping it alone would put every later image against the wrong partner. The
+  report names it as `<document> <draft | version N>: <pointer> (<block>)` and
+  shows the entry of each list at that position, so what a removal would drop
+  is in front of the person deciding. Under `slots`, with exactly that name up
+  to the pointer, they state one of two things: the id of a library image to
+  put there, or `"remove"`, which takes that position out of every list of the
+  block, its partner included. A draft and each version are decided
+  separately, because each may hold something else at that position.
+- **The rule does not look at the store's design.** Which component draws a
+  block is the storefront's choice by store (`componentRegistry`,
+  `<block>@<schema>`), and Django does not know it: webside's carousel does
+  not pair the two lists at all, the default one does. A stored document is
+  also not tied to the design that draws it today. So an empty entry beside an
+  image stops every store and asks, whatever would draw it.
 - A new setting already chosen stays and the URL beside it goes.
 - `--dry-run` takes every step of the real run, the alt text and the release
   included, in a transaction it rolls back. A second run finds nothing.

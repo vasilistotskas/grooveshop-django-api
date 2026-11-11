@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from builder.document_rewrite import DocumentRefused
-from builder.media_migration import migrate_document
+from builder.media_migration import SlotDecisions, migrate_document
 
 IMAGE = "/img/a.png"
 ASSETS = {IMAGE: 7}
@@ -21,7 +21,9 @@ def one(block: str, **settings) -> dict:
 
 
 def settings_after(document: dict) -> dict:
-    migrated, _overlay, _moved = migrate_document(document, {}, ASSETS)
+    migrated, _overlay, _moved = migrate_document(
+        document, {}, "page:a draft", ASSETS, SlotDecisions()
+    )
     return migrated["sections"]["a"]["settings"]
 
 

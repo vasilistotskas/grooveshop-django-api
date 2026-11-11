@@ -24,6 +24,7 @@ from builder.models import (
     MediaAsset,
 )
 from builder.storefront import clear_catalogue_cache
+from tenant.models import TenantDomain
 from tests.integration.builder.test_media import image_bytes
 from tests.utils.builder import TEXT, _schema, document, section
 
@@ -115,7 +116,9 @@ def stored_image(tenant):
 
 
 def imported(url: str) -> MediaAsset:
-    return media_services.store_import(media_migration.import_url_of(url)).asset
+    return media_services.store_import(
+        media_migration.import_url_of(url, media_migration.own_hosts())
+    ).asset
 
 
 def alt_of(asset: MediaAsset, locale: str) -> str:
@@ -476,6 +479,41 @@ class TestWhatStopsAStore:
         assert not BuilderRelease.objects.filter(number=2).exists()
 
 
+@pytest.fixture
+def decide(tenant, tmp_path):
+    """Writes a decisions file for this store and answers its argument."""
+
+    def write(images=None, alt=None, slots=None, schema=None):
+        path = tmp_path / "decisions.json"
+        path.write_text(
+            json.dumps(
+                {
+                    schema or tenant.schema_name: {
+                        "images": images or {},
+                        "alt": alt or {},
+                        "slots": slots or {},
+                    }
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        return ("--decisions", str(path))
+
+    return write
+
+
+def settings_of(doc: BuilderDocument, node: str = "a") -> dict:
+    return BuilderDocument.objects.get(pk=doc.pk).draft["sections"][node][
+        "settings"
+    ]
+
+
+#: ``(images, mobileImages)`` as positions of the fixture's six pictures.
+DESK_HOLE = ([0, "", 2], [3, 4, 5])
+PHONE_HOLE = ([0, 1, 2], [3, "", 5])
+
+
 class TestListsThatPairByPosition:
     """``hero_carousel`` draws ``mobileArtworks[i]`` as the phone's crop of
     ``artworks[i]``, and a list of references has no empty slot."""
@@ -503,41 +541,192 @@ class TestListsThatPairByPosition:
             )
             return save_and_publish(admin, draft)
 
-        return make, assets
+        return make, assets, urls
 
-    def test_a_hole_in_the_desk_list_beside_a_phone_image_stops_the_store(
-        self, carousel, run
+    @staticmethod
+    def slot(source: str, setting: str, position: int = 1) -> str:
+        return f"{HOME} {source}: /sections/c/settings/{setting}/{position}"
+
+    @staticmethod
+    def stored(doc: BuilderDocument) -> list[dict]:
+        """The carousel's settings in the draft, then in each version."""
+        after = BuilderDocument.objects.get(pk=doc.pk)
+        return [
+            after.draft["sections"]["c"]["settings"],
+            *(
+                version.data["sections"]["c"]["settings"]
+                for version in after.versions.all()
+            ),
+        ]
+
+    @pytest.mark.parametrize(
+        ("lists", "setting", "beside"),
+        [(DESK_HOLE, "images", 4), (PHONE_HOLE, "mobileImages", 1)],
+        ids=["desk", "phone"],
+    )
+    def test_a_hole_beside_an_image_stops_the_store_and_shows_both_entries(
+        self, carousel, tenant, run, lists, setting, beside
     ):
-        make, _ = carousel
-        doc = make([0, "", 2], [3, 4, 5])
-        draft = doc.draft
+        make, assets, urls = carousel
+        doc = make(*lists)
+        before = self.stored(doc)
+        other = "mobileImages" if setting == "images" else "images"
 
-        with pytest.raises(CommandError, match=r"/images/1 is empty"):
+        with pytest.raises(CommandError) as raised:
             run()
 
-        assert BuilderDocument.objects.get(pk=doc.pk).draft == draft
+        lines = str(raised.value).splitlines()[1:]
+        assert lines == [
+            f"{tenant.schema_name}: {self.slot(source, setting)} "
+            f"(hero_carousel@1) is empty: /{setting}/1 = '', /{other}/1 = "
+            f"{urls[beside]!r} (image {assets[beside]}). Decide an image for "
+            'it, or "remove" to take position 1 out of every list of the block'
+            for source in ("draft", "version 1")
+        ]
+        assert self.stored(doc) == before
 
-    def test_a_hole_in_the_phone_list_beside_a_desk_image_stops_the_store(
-        self, carousel, run
+    @pytest.mark.parametrize(
+        ("lists", "setting", "filled"),
+        [
+            (DESK_HOLE, "images", ([0, 1, 2], [3, 4, 5])),
+            (PHONE_HOLE, "mobileImages", ([0, 1, 2], [3, 4, 5])),
+        ],
+        ids=["desk", "phone"],
+    )
+    def test_an_image_decided_for_a_hole_fills_it_in_draft_and_version(
+        self, carousel, decide, run, lists, setting, filled
     ):
-        make, _ = carousel
-        doc = make([0, 1, 2], [3, "", 5])
-        draft = doc.draft
+        make, assets, _urls = carousel
+        doc = make(*lists)
+        image = assets[1] if setting == "images" else assets[4]
 
-        with pytest.raises(CommandError, match=r"/mobileImages/1 is empty"):
-            run()
+        output = run(
+            *decide(
+                slots={
+                    self.slot("draft", setting): image,
+                    self.slot("version 1", setting): image,
+                }
+            )
+        )
 
-        assert BuilderDocument.objects.get(pk=doc.pk).draft == draft
+        assert (
+            self.stored(doc)
+            == [
+                {
+                    "artworks": [assets[n] for n in filled[0]],
+                    "mobileArtworks": [assets[n] for n in filled[1]],
+                }
+            ]
+            * 2
+        )
+        assert (
+            f"decision: {self.slot('version 1', setting)} is image {image}"
+            in output
+        )
+
+    @pytest.mark.parametrize(
+        ("lists", "setting"),
+        [(DESK_HOLE, "images"), (PHONE_HOLE, "mobileImages")],
+        ids=["desk", "phone"],
+    )
+    def test_a_position_decided_removed_goes_from_both_lists(
+        self, carousel, decide, run, lists, setting
+    ):
+        make, assets, _urls = carousel
+        doc = make(*lists)
+
+        output = run(
+            *decide(
+                slots={
+                    self.slot("draft", setting): "remove",
+                    self.slot("version 1", setting): "remove",
+                }
+            )
+        )
+
+        assert (
+            self.stored(doc)
+            == [
+                {
+                    "artworks": [assets[0], assets[2]],
+                    "mobileArtworks": [assets[3], assets[5]],
+                }
+            ]
+            * 2
+        )
+        assert (
+            f"decision: {self.slot('draft', setting)} is removed with its "
+            "position"
+        ) in output
+
+    def test_each_document_is_decided_for_itself(self, carousel, decide, run):
+        make, _assets, _urls = carousel
+        doc = make(*DESK_HOLE)
+        before = self.stored(doc)
+
+        with pytest.raises(CommandError) as raised:
+            run(*decide(slots={self.slot("draft", "images"): "remove"}))
+
+        assert self.slot("version 1", "images") in str(raised.value)
+        assert self.slot("draft", "images") not in str(raised.value)
+        assert self.stored(doc) == before
+
+    def test_an_image_the_library_does_not_hold_stops_the_store(
+        self, carousel, decide, run
+    ):
+        make, assets, _urls = carousel
+        doc = make(*DESK_HOLE)
+        before = self.stored(doc)
+
+        with pytest.raises(CommandError, match="which is not in the library"):
+            run(
+                *decide(
+                    slots={
+                        self.slot("draft", "images"): max(assets) + 1000,
+                        self.slot("version 1", "images"): "remove",
+                    }
+                )
+            )
+
+        assert self.stored(doc) == before
+
+    def test_a_decision_for_a_slot_that_is_no_hole_is_said(
+        self, carousel, decide, run
+    ):
+        make, assets, _urls = carousel
+        make([0, 1], [3, 4])
+        unused = self.slot("draft", "images", 0)
+
+        output = run(*decide(slots={unused: assets[5]}))
+
+        assert f"decision not used: {unused}" in output
+
+    def test_a_decided_run_is_put_back_as_it_was(self, carousel, decide, run):
+        make, _assets, _urls = carousel
+        doc = make(*PHONE_HOLE)
+        before = self.stored(doc)
+        output = run(
+            *decide(
+                slots={
+                    self.slot("draft", "mobileImages"): "remove",
+                    self.slot("version 1", "mobileImages"): "remove",
+                }
+            )
+        )
+        run_id = output.rsplit("backup run ", 1)[1].split()[0]
+        assert self.stored(doc) != before
+
+        run("--restore", run_id, command="builder_rewrite_backups")
+
+        assert self.stored(doc) == before
 
     def test_a_slot_empty_in_both_lists_goes_from_both(self, carousel, run):
-        make, assets = carousel
+        make, assets, _urls = carousel
         doc = make([0, "", 2], [3, "", 5])
 
         run()
 
-        assert BuilderDocument.objects.get(pk=doc.pk).draft["sections"]["c"][
-            "settings"
-        ] == {
+        assert settings_of(doc, "c") == {
             "artworks": [assets[0], assets[2]],
             "mobileArtworks": [assets[3], assets[5]],
         }
@@ -545,23 +734,132 @@ class TestListsThatPairByPosition:
     def test_a_desk_slot_the_phone_list_does_not_reach_goes(
         self, carousel, run
     ):
-        make, assets = carousel
+        make, assets, _urls = carousel
         doc = make([0, "", 2], [3])
 
         run()
 
-        assert BuilderDocument.objects.get(pk=doc.pk).draft["sections"]["c"][
-            "settings"
-        ] == {
+        assert settings_of(doc, "c") == {
             "artworks": [assets[0], assets[2]],
             "mobileArtworks": [assets[3]],
         }
 
+    def test_a_removed_position_leaves_a_chosen_list_too(
+        self, admin, carousel, decide, run
+    ):
+        """One list already holds references, the other still URLs: the
+        position goes from both, whichever shape each has."""
+        _make, assets, urls = carousel
+        doc = save_and_publish(
+            admin,
+            document(
+                (
+                    "c",
+                    section(
+                        "hero_carousel@1",
+                        {
+                            "artworks": assets[:3],
+                            "mobileImages": [urls[3], "", urls[5]],
+                        },
+                    ),
+                )
+            ),
+        )
 
-def settings_of(doc: BuilderDocument, node: str = "a") -> dict:
-    return BuilderDocument.objects.get(pk=doc.pk).draft["sections"][node][
-        "settings"
-    ]
+        run(
+            *decide(
+                slots={
+                    self.slot("draft", "mobileImages"): "remove",
+                    self.slot("version 1", "mobileImages"): "remove",
+                }
+            )
+        )
+
+        assert settings_of(doc, "c") == {
+            "artworks": [assets[0], assets[2]],
+            "mobileArtworks": [assets[3], assets[5]],
+        }
+
+
+class TestTheStoresOwnHosts:
+    """An absolute address on one of the store's own hosts names the store's
+    own file, by its path: it is found in the library like the bare path, and
+    is never fetched."""
+
+    @pytest.fixture
+    def hosts(self, tenant, settings):
+        TenantDomain.objects.create(
+            tenant=tenant, domain="shop.example", is_primary=True
+        )
+        TenantDomain.objects.create(
+            tenant=tenant, domain="assets.shop.example", is_primary=False
+        )
+        settings.MEDIA_STREAM_BASE_URL = "https://assets.platform.example"
+        settings.STATIC_BASE_URL = "https://static.platform.example"
+
+    def test_they_are_the_tenants_domains_and_the_platforms_media_hosts(
+        self, hosts
+    ):
+        own = media_migration.own_hosts()
+
+        assert own.store == {"shop.example", "assets.shop.example"}
+        assert own.platform == {
+            "assets.platform.example",
+            "static.platform.example",
+        }
+
+    @pytest.mark.parametrize(
+        "address",
+        [
+            "https://shop.example{path}",
+            "https://assets.shop.example/media/{schema}{path}",
+            "//SHOP.example{path}",
+            "https://assets.platform.example/media/{schema}{path}",
+            "https://static.platform.example/media/{schema}{path}",
+        ],
+    )
+    def test_an_address_on_one_of_them_becomes_the_stores_image(
+        self, hosts, admin, tenant, stored_image, run, address
+    ):
+        path = stored_image(130)
+        asset = imported(path)
+        url = address.format(path=path, schema=tenant.schema_name)
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        run()
+
+        assert settings_of(doc) == {"image": asset.pk}
+
+    @pytest.mark.parametrize(
+        "address",
+        [
+            "https://elsewhere.example{path}",
+            "https://assets.platform.example{path}",
+            "https://assets.platform.example/media/another_store{path}",
+        ],
+    )
+    def test_an_address_that_is_not_the_stores_still_stops_it(
+        self, hosts, admin, stored_image, run, address
+    ):
+        path = stored_image(131)
+        imported(path)
+        url = address.format(path=path)
+        save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        with pytest.raises(CommandError, match="outside this store"):
+            run()
+
+    def test_the_import_takes_it_too(self, hosts, admin, stored_image):
+        path = stored_image(132)
+        url = f"https://shop.example{path}"
+        save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        plan = media_migration.scan()
+        outcomes = media_migration.run(plan, dry_run=False)
+
+        asset = MediaAsset.objects.get()
+        assert not plan.external
+        assert media_migration.mapping(plan, outcomes) == {url: asset.pk}
 
 
 class TestWhatIsReported:
@@ -591,8 +889,8 @@ class TestWhatIsReported:
         )
         setting = "settings/imageUrl (hero_banner@2)"
         assert lines[2:] == [
-            f"{schema}:     {HOME} draft /sections/b/{setting}",
-            f"{schema}:     {HOME} version 1 /sections/a/{setting}",
+            f"{schema}:     {HOME} draft: /sections/b/{setting}",
+            f"{schema}:     {HOME} version 1: /sections/a/{setting}",
         ]
 
     def test_a_file_that_is_gone(self, admin, run):
@@ -624,26 +922,6 @@ class TestWhatIsReported:
 
 class TestDecisions:
     """What the library cannot take is decided by a person, value by value."""
-
-    @pytest.fixture
-    def decide(self, tenant, tmp_path):
-        def write(images=None, alt=None, schema=None):
-            path = tmp_path / "decisions.json"
-            path.write_text(
-                json.dumps(
-                    {
-                        schema or tenant.schema_name: {
-                            "images": images or {},
-                            "alt": alt or {},
-                        }
-                    },
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
-            return ("--decisions", str(path))
-
-        return write
 
     @pytest.fixture
     def outside(self, admin, stored_image):
@@ -754,6 +1032,8 @@ class TestDecisions:
             '{"builder_store": {"images": []}}',
             '{"builder_store": {"alt": {"twelve": {"el": "x"}}}}',
             '{"builder_store": {"alt": {"12": {"el": 3}}}}',
+            '{"builder_store": {"slots": {"page:a draft: /x/0": "empty"}}}',
+            '{"builder_store": {"slots": []}}',
         ],
     )
     def test_a_file_that_does_not_say_what_it_must_is_refused(
@@ -846,7 +1126,11 @@ class TestDecisions:
 
         with pytest.raises(
             CommandError,
-            match=rf"{HOME} version 1: hero_carousel@1 'c': /images/1 is empty",
+            match=(
+                rf"{HOME} version 1: /sections/c/settings/images/1 "
+                r"\(hero_carousel@1\) is empty: /images/1 = "
+                r"'/uploads/gone.png' \(no image\)"
+            ),
         ):
             run(*decide(images={gone: "empty"}))
 

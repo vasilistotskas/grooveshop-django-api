@@ -73,7 +73,9 @@ class Command(TenantCommandMixin, BaseCommand):
         rolled_back = dry_run
         with transaction.atomic():
             result = rewrite_store(
-                lambda data, i18n: upgrade_document(data, i18n, catalogue),
+                lambda data, i18n, _where: upgrade_document(
+                    data, i18n, catalogue
+                ),
                 catalogue=catalogue,
                 run=run,
             )

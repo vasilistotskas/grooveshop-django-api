@@ -38,12 +38,14 @@ from builder.models import (
 )
 from tenant.features import STORE_FEATURES
 
-#: A document and its overlay, to copies of both and what moved, by a label.
-Transform = Callable[[Any, Any], tuple[Any, Any, Counter[str]]]
+#: A document, its overlay and how a report names it (``template:home version
+#: 3``), to copies of both and what moved, by a label.
+Transform = Callable[[Any, Any, str], tuple[Any, Any, Counter[str]]]
 
 
 class DocumentRefused(Exception):
-    """A transform cannot bring this document to the new shape."""
+    """A transform cannot bring this document to the new shape. Each argument
+    is one reason, reported on a line of its own."""
 
 
 def known_feature_on(name: str) -> bool:
@@ -82,9 +84,9 @@ def _rewritten(
     """The document to store, or ``None`` with nothing to do or with the reason
     it cannot be rewritten added to the problems."""
     try:
-        new_data, new_i18n, moved = transform(data, i18n)
+        new_data, new_i18n, moved = transform(data, i18n, label)
     except DocumentRefused as exc:
-        result.problems.append(f"{label}: {exc}")
+        result.problems.extend(f"{label}: {reason}" for reason in exc.args)
         return None
     if not moved:
         return None

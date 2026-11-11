@@ -135,3 +135,31 @@ for _root in (MEDIA_ROOT, MEDIA_ROOT + "_private"):
 # ciphertext written by one test run is readable by the next. Tests that
 # need a second key (rotation) override this setting themselves.
 FIELD_ENCRYPTION_KEYS = ["VkyGsNMhjr7YocC7DKYmx9PeHvgKAXcLZXaOQDJQTqA="]
+
+# Never talk to a real Redis channel layer in tests.
+#
+# Any code path that emits a websocket notification sends to the
+# channel layer (``notification.groups.send_to_user_group``) — e.g.
+# ``notification.tasks.send_notification_task``, reached indirectly by
+# order/loyalty flows. With the production RedisChannelLayer that is a
+# live async Redis round-trip per test, and under ``-n auto`` every
+# worker hammers the same local instance at once. Connections get reset
+# mid-command and the test dies with
+# ``ConnectionResetError: [WinError 10054]`` wrapped in
+# ``redis.exceptions.ConnectionError`` — a failure with nothing to do
+# with the behaviour under test, in a DIFFERENT test on each run.
+#
+# Observed on
+# ``test_idempotency_guard_prevents_double_award``: 2 failures in 3
+# full-suite runs, always green in isolation. InMemoryChannelLayer keeps
+# group_send working (so the calls are still exercised) without leaving
+# the process.
+#
+# Here rather than in ``tests/conftest.py`` so that ``tests_mt/``,
+# which shares this module but not that conftest, gets it too: that
+# lane ran any notification push against a real Redis.
+# ``InMemoryChannelLayer.group_send`` never waits on anything (it
+# puts with ``put_nowait`` and drops a message for a full channel).
+CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+}

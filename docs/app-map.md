@@ -324,8 +324,9 @@ the engine (`src/recommendation/engine.py`) and its strategies
 ### `notification/`
 
 `Notification` and `NotificationUser`, the Channels consumer
-(`src/notification/consumers.py`), the per-user group names
-(`src/notification/groups.py`) and the single-use WebSocket ticket
+(`src/notification/consumers.py`), the per-user group names and the
+send to them, bounded by `NOTIFICATION_PUSH_TIMEOUT_SECONDS`
+(`src/notification/groups.py`), and the single-use WebSocket ticket
 endpoint (`src/notification/views/websocket.py`). Read `CLAUDE.md`
 ("WebSocket / Real-time"), and
 `docs/order/emails-and-notifications.md` (section 6.4) for the order

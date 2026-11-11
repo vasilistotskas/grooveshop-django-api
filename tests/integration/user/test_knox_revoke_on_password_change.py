@@ -139,27 +139,22 @@ class TestRevokeKnoxTokensOnPasswordChange:
     def test_force_logout_broadcast_is_attempted_after_token_revocation(self):
         """_broadcast_force_logout is called even when the channel layer is
         available; here we verify it is invoked with the correct user group."""
+        from asgiref.sync import async_to_sync
+        from channels.layers import InMemoryChannelLayer
+
+        from notification.groups import user_group
+
         user = UserAccountFactory()
         _create_tokens(user, 1)
 
-        group_sends: list[tuple] = []
+        # A socket of the user's, joined to their tenant-scoped personal
+        # group. Tests run in the public schema (DATABASE_ROUTERS disabled
+        # in conftest), so the group prefix is "tenant_public".
+        layer = InMemoryChannelLayer()
+        channel = async_to_sync(layer.new_channel)()
+        async_to_sync(layer.group_add)(user_group("public", user.pk), channel)
 
-        def fake_group_send(group, message):
-            group_sends.append((group, message))
-
-        fake_layer = type(
-            "_FakeLayer",
-            (),
-            {"group_send": staticmethod(fake_group_send)},
-        )()
-
-        with (
-            patch("channels.layers.get_channel_layer", return_value=fake_layer),
-            patch(
-                "asgiref.sync.async_to_sync",
-                side_effect=lambda fn: fn,
-            ),
-        ):
+        with patch("channels.layers.get_channel_layer", return_value=layer):
             password_changed.send(
                 sender=User,
                 request=None,
@@ -168,15 +163,8 @@ class TestRevokeKnoxTokensOnPasswordChange:
 
         # Tokens revoked.
         assert AuthToken.objects.filter(user=user).count() == 0
-        # WS broadcast called with the user's tenant-scoped personal group.
-        # Tests run in the public schema (DATABASE_ROUTERS disabled in
-        # conftest), so the group prefix is "tenant_public".
-        from notification.groups import user_group
-
-        expected_group = user_group("public", user.pk)
-        assert any(group == expected_group for group, _ in group_sends), (
-            f"Expected group_send to target {expected_group}, got {group_sends}"
-        )
+        # The socket received the force logout.
+        assert async_to_sync(layer.receive)(channel) == {"type": "force.logout"}
 
 
 class TestRevocationSignalHandlerRegistration:

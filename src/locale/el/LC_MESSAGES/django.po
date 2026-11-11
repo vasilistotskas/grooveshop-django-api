@@ -141,6 +141,10 @@ msgstr[0] "%(count)d είδος"
 msgstr[1] "%(count)d είδη"
 
 #, python-format
+msgid "%(count)d items at quantity 1 were left as they are. Use \"Remove from cart\" to remove them."
+msgstr "%(count)d είδη με ποσότητα 1 έμειναν ως είχαν. Για να αφαιρεθούν, χρησιμοποιήστε την «Αφαίρεση από καλάθι»."
+
+#, python-format
 msgid "%(count)d items were removed from carts."
 msgstr "%(count)d είδη αφαιρέθηκαν από τα καλάθια."
 

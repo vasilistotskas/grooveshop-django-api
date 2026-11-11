@@ -296,9 +296,11 @@ def test_a_rest_framework_action_is_not_an_admin_action():
     assert _actions(source) == {}
 
 
-def _slot_entries(model_admin) -> set[str]:
+def _slot_entries(model_admin, third_party: bool = False) -> set[str]:
     names = set()
     for slot in ACTION_SLOTS:
+        if third_party and slot == "actions":
+            continue
         for entry in getattr(model_admin, slot, None) or []:
             if isinstance(entry, dict):
                 names.update(entry.get("items", ()))
@@ -308,10 +310,13 @@ def _slot_entries(model_admin) -> set[str]:
 
 
 def _registered_actions():
+    """Every action an admin lists, on every admin of the store site. A
+    third-party admin's ``actions`` are the package's and run from its
+    changelist, which no store role opens (``THIRD_PARTY_ADMINS``); its
+    Unfold slots are URLs of their own and must declare like ours."""
     for model_admin in django_admin.site._registry.values():
-        if not isinstance(model_admin, BaseModelAdmin):
-            continue
-        for name in sorted(_slot_entries(model_admin)):
+        third_party = not isinstance(model_admin, BaseModelAdmin)
+        for name in sorted(_slot_entries(model_admin, third_party)):
             method = getattr(type(model_admin), name, None)
             if method is not None:
                 yield f"{type(model_admin).__name__}.{name}", method
@@ -361,8 +366,8 @@ def test_every_first_party_admin_extends_the_base():
 
     A first-party admin on bare ``unfold.admin.ModelAdmin`` skipped
     them; seven did (tenant, contact, core). Third-party admins
-    re-wrapped in ``core/admin.py`` are out of scope - their actions are
-    the package's, not ours.
+    re-wrapped in ``core/admin.py`` are covered by the three guards
+    below.
     """
     first_party = {
         path.name
@@ -377,3 +382,104 @@ def test_every_first_party_admin_extends_the_base():
         and not type(model_admin).__name__.endswith("AdminOverride")
     )
     assert not bare, f"first-party admins not on BaseModelAdmin: {bare}"
+
+
+# The packages whose admins the store site registers, by app label, with
+# why no store role reaches them. Their actions are the package's and
+# declare nothing in our sense, so what keeps them shut is that the app is
+# in ``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``: no role holds any of
+# its permissions, so its changelist, forms and bulk actions answer 403.
+# A URL a package serves itself is the one thing that bypasses that, so
+# each is named in ``THIRD_PARTY_URLS`` with the check in front of it.
+THIRD_PARTY_ADMINS: dict[str, str] = {
+    "account": "allauth's email addresses: a customer's sign-in identity",
+    "allauth_idp_oidc": "the store's OIDC clients and tokens, the platform's "
+    "to manage",
+    "djstripe": "the store's Stripe mirror, which only the platform works; "
+    "a superuser's (admin.mixins.StripeMirrorModelAdmin)",
+    "knox": "customers' API tokens: the add form mints a working one",
+    "mfa": "customers' second factors",
+    "sites": "the platform's domains (withheld on a store host too)",
+    "socialaccount": "customers' linked social accounts",
+    "usersessions": "customers' browser sessions",
+}
+
+# Each URL a third-party admin serves beyond Django's own, with the check
+# in front of it.
+THIRD_PARTY_URLS: dict[str, str] = {
+    "djstripe_custom_action": (
+        "admin.mixins.StripeMirrorModelAdmin.custom_action_view: the admin "
+        "of the model it names must open its changelist to the request and "
+        "offer it the action"
+    ),
+}
+
+_MODEL_ADMIN_URLS = {"changelist", "add", "history", "delete", "change"}
+
+
+def _third_party_admins():
+    return [
+        model_admin
+        for model_admin in django_admin.site._registry.values()
+        if not isinstance(model_admin, BaseModelAdmin)
+    ]
+
+
+def test_every_third_party_admin_is_named():
+    registered = {
+        model_admin.model._meta.app_label
+        for model_admin in _third_party_admins()
+    }
+
+    assert sorted(registered - set(THIRD_PARTY_ADMINS)) == [], (
+        "A package registers these on the store admin. Make the app "
+        "platform-only (tenant.role_scopes) and name it in "
+        "THIRD_PARTY_ADMINS with why, or give its admin our base class."
+    )
+    assert sorted(set(THIRD_PARTY_ADMINS) - registered) == [], (
+        "Remove from THIRD_PARTY_ADMINS: no longer registered."
+    )
+
+
+def test_no_store_role_is_granted_a_third_party_app():
+    from tenant.role_scopes import PLATFORM_ONLY_APP_LABELS
+
+    assert sorted(set(THIRD_PARTY_ADMINS) - PLATFORM_ONLY_APP_LABELS) == []
+
+
+def test_every_url_a_third_party_admin_serves_is_guarded():
+    """Django's own five URLs ask the admin's permissions; Unfold's action
+    URLs are the slots the registry guard covers. Anything else is the
+    package's own view, which asks what the package chose: dj-stripe's
+    asked nothing."""
+    served = set()
+    for model_admin in _third_party_admins():
+        opts = model_admin.model._meta
+        prefix = f"{opts.app_label}_{opts.model_name}_"
+        unfold_actions = (
+            {
+                action.action_name
+                for action in (
+                    *model_admin._get_base_actions_list(),
+                    *model_admin._get_base_actions_row(),
+                    *model_admin._get_base_actions_detail(),
+                )
+            }
+            if hasattr(model_admin, "_get_base_actions_list")
+            else set()
+        )
+        for url in model_admin.get_urls():
+            name = getattr(url, "name", None)
+            if name is None or name in unfold_actions:
+                continue
+            if name.startswith(prefix) and (
+                name.removeprefix(prefix) in _MODEL_ADMIN_URLS
+            ):
+                continue
+            served.add(name)
+
+    assert sorted(served - set(THIRD_PARTY_URLS)) == [], (
+        "A third-party admin serves these URLs of its own. Put a check in "
+        "front of each and name it in THIRD_PARTY_URLS."
+    )
+    assert sorted(set(THIRD_PARTY_URLS) - served) == []

@@ -17,6 +17,7 @@ from unfold.decorators import display
 from admin.base import BaseModelAdmin
 from admin.mixins import (
     IsSuperuserOnlyModelAdmin,
+    StripeMirrorModelAdmin,
     WithheldOnTenantHostModelAdmin,
 )
 from core.result_backend import ran_in_store, ran_on_platform, store_of
@@ -90,12 +91,17 @@ def override_third_party_admins():
 
         admin.site.unregister(model)
 
-        # The mixin goes FIRST so its permission overrides win the
+        # The mixins go FIRST so their permission overrides win the
         # MRO: these are third-party admins (sites.Site, ...) that never
         # reach BaseModelAdmin.
+        guards = (
+            (StripeMirrorModelAdmin, WithheldOnTenantHostModelAdmin)
+            if model._meta.app_label == "djstripe"
+            else (WithheldOnTenantHostModelAdmin,)
+        )
         new_admin_class = type(
             f"{model.__name__}AdminOverride",
-            (WithheldOnTenantHostModelAdmin, model_admin.__class__, ModelAdmin),
+            (*guards, model_admin.__class__, ModelAdmin),
             {},
         )
 

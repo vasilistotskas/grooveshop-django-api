@@ -344,10 +344,6 @@ REACHED_FROM_THEIR_PARENT = frozenset(
         "order.OrderItem",
     }
 )
-# dj-stripe registers its whole mirror of the Stripe API; the sidebar
-# lists the six an operator reconciles with, the rest are Stripe's own
-# dashboard's job.
-UNLISTED_APPS = frozenset({"djstripe"})
 
 
 def test_every_store_page_is_reachable(settings_values, carriers):
@@ -377,7 +373,6 @@ def test_every_store_page_is_reachable(settings_values, carriers):
         model._meta.label
         for model in django_admin.site._registry
         if model._meta.app_label in store_labels
-        and model._meta.app_label not in UNLISTED_APPS
         and model._meta.label not in REACHED_FROM_THEIR_PARENT
         and not {
             f"{model._meta.app_label}_{model._meta.model_name}_changelist",

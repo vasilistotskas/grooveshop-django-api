@@ -96,7 +96,9 @@ class FakeBoxNowHttp:
     """The ``requests`` session under ``BoxNowClient``.
 
     Each ``(method, path)`` answers from its own queue, in order; an entry
-    that is an exception is raised instead. Every request is recorded.
+    that is an exception is raised instead, and a callable is called and
+    its result answered (something that happens while BoxNow answers).
+    Every request is recorded.
     """
 
     def __init__(self, **_: Any) -> None:
@@ -116,6 +118,8 @@ class FakeBoxNowHttp:
         answer = queue.pop(0)
         if isinstance(answer, BaseException):
             raise answer
+        if callable(answer) and not isinstance(answer, MagicMock):
+            return answer()
         return answer
 
     def routes(self) -> list[tuple[str, str]]:
@@ -434,6 +438,95 @@ class TestCancellingAShipmentWithNoParcelNumber:
         http.post.assert_not_called()
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+
+def _canceled_while_boxnow_answers(shipment, answer: Any):
+    """BoxNow's answer, delivered after the row was cancelled locally.
+
+    What a cancel made once the claim's TTL ran out looks like to phase 3
+    of a slow creation.
+    """
+
+    def deliver() -> Any:
+        type(shipment).objects.filter(pk=shipment.pk).update(
+            parcel_state=BoxNowParcelState.CANCELED,
+            cancel_requested_at=timezone.now(),
+        )
+        return answer
+
+    return deliver
+
+
+class TestAParcelCreatedForAShipmentCanceledMeanwhile:
+    _CREATED = {"id": "42224", "parcels": [{"id": "9219709201"}]}
+
+    def _assert_stays_canceled(self, shipment, order):
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+        assert shipment.delivery_request_id is None
+        assert shipment.metadata["mint_started_at"] is None
+        order.refresh_from_db()
+        assert not order.tracking_number
+
+    def test_the_cancel_is_kept_and_the_parcel_canceled_at_boxnow(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            _canceled_while_boxnow_answers(
+                shipment, _response(200, self._CREATED)
+            ),
+        )
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, _cancel("9219709201")]
+        self._assert_stays_canceled(shipment, order)
+        [minted] = shipment.metadata["minted_after_cancel"]
+        assert minted["parcel_id"] == "9219709201"
+        assert minted["delivery_request_id"] == "42224"
+        assert minted["canceled_at_boxnow"]
+        assert "orphan_delivery_requests" not in shipment.metadata
+
+    def test_a_parcel_boxnow_will_not_cancel_is_recorded_for_ops(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            _canceled_while_boxnow_answers(
+                shipment, _response(200, self._CREATED)
+            ),
+        )
+        http.answer(_cancel("9219709201"), _response(503, text="busy"))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        self._assert_stays_canceled(shipment, order)
+        [minted] = shipment.metadata["minted_after_cancel"]
+        assert "503" in minted["cancel_error"]
+        [orphan] = shipment.metadata["orphan_delivery_requests"]
+        assert orphan["parcel_id"] == "9219709201"
+        assert orphan["delivery_request_id"] == "42224"
+        assert "503" in orphan["cancel_error"]
+
+    def test_a_parcel_taken_over_after_p410_is_canceled_too(self, http):
+        order = _paid_order()
+        shipment = _after_a_lost_answer(order)
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(
+            _LOOKUP,
+            _canceled_while_boxnow_answers(
+                shipment, _lookup(_parcel("9219709201", "new"))
+            ),
+        )
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, _LOOKUP, _cancel("9219709201")]
+        self._assert_stays_canceled(shipment, order)
 
 
 class TestStaffAreToldWhenBoxNowCannotBeAsked:

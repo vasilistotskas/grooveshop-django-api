@@ -41,6 +41,17 @@ and says which file holds each § number used here.
   answer with no parcel list alerts. A row's `state` is read through
   `BoxNowParcelState.from_webhook_event`, which takes both spellings the
   sources give (the OpenAPI file's `canceled`, the manual's `cancelled`).
+- **A parcel created for a shipment cancelled meanwhile is cancelled at
+  BoxNow** (`BoxNowService._persist_parcel`). A cancel made once the
+  claim's TTL ran out can land while BoxNow is still answering the
+  creation. Phase 3 then keeps the row CANCELED (no `parcel_id`, no
+  tracking number), records the parcel under
+  `metadata["minted_after_cancel"]`, releases the lock and cancels it at
+  BoxNow by id (`_cancel_parcel_minted_after_cancel`). The entry gets
+  `canceled_at_boxnow`, or `cancel_error` when BoxNow refuses or does not
+  answer; in that case the parcel is also recorded under
+  `metadata["orphan_delivery_requests"]` and an ERROR is logged, for ops
+  to reconcile. The same holds for a parcel taken over after `P410`.
 - **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
   the tenant's keys are BoxNow production keys (on) or stage keys (off,
   the default). `BoxNowClient` maps it to the platform's

@@ -686,6 +686,11 @@ class BoxNowService:
         different parcel (another worker raced past the claim TTL) keeps
         it and records ours under ``orphan_delivery_requests`` for manual
         reconciliation.
+
+        A row cancelled while BoxNow answered (a cancel once the claim's
+        TTL ran out) stays CANCELED: the parcel is recorded under
+        ``metadata['minted_after_cancel']`` and, with the lock released,
+        cancelled at BoxNow (:meth:`_cancel_parcel_minted_after_cancel`).
         """
         with transaction.atomic():
             shipment = (
@@ -696,7 +701,33 @@ class BoxNowService:
             if shipment.parcel_id == parcel_id:
                 return shipment
 
-            if shipment.parcel_id:
+            canceled_meanwhile = (
+                shipment.parcel_state == BoxNowParcelState.CANCELED
+            )
+            if canceled_meanwhile:
+                logger.warning(
+                    "create_shipment_for_order: shipment=%s (order=%s) was "
+                    "canceled while BoxNow created parcel_id=%s — keeping "
+                    "the cancel and cancelling the parcel at BoxNow.",
+                    shipment.pk,
+                    order.id,
+                    parcel_id,
+                )
+                shipment.metadata = {
+                    **shipment.metadata,
+                    "minted_after_cancel": [
+                        *shipment.metadata.get("minted_after_cancel", []),
+                        {
+                            "delivery_request_id": delivery_request_id,
+                            "parcel_id": parcel_id,
+                            "minted_at": timezone.now().isoformat(),
+                        },
+                    ],
+                    "mint_started_at": None,
+                }
+                shipment.save(update_fields=["metadata", "updated_at"])
+
+            elif shipment.parcel_id:
                 logger.error(
                     "create_shipment_for_order: race detected for order=%s "
                     "— another worker persisted parcel_id=%s while we "
@@ -721,33 +752,102 @@ class BoxNowService:
                 shipment.save(update_fields=["metadata", "updated_at"])
                 return shipment
 
-            shipment.delivery_request_id = delivery_request_id
-            shipment.parcel_id = parcel_id
-            shipment.parcel_state = BoxNowParcelState.NEW
-            shipment.last_event_at = timezone.now()
-            shipment.metadata = {
-                **shipment.metadata,
-                **record,
-                "last_error": None,
-                "mint_started_at": None,
-            }
-            shipment.save(
-                update_fields=[
-                    "delivery_request_id",
-                    "parcel_id",
-                    "parcel_state",
-                    "last_event_at",
-                    "metadata",
-                    "updated_at",
-                ]
+            else:
+                shipment.delivery_request_id = delivery_request_id
+                shipment.parcel_id = parcel_id
+                shipment.parcel_state = BoxNowParcelState.NEW
+                shipment.last_event_at = timezone.now()
+                shipment.metadata = {
+                    **shipment.metadata,
+                    **record,
+                    "last_error": None,
+                    "mint_started_at": None,
+                }
+                shipment.save(
+                    update_fields=[
+                        "delivery_request_id",
+                        "parcel_id",
+                        "parcel_state",
+                        "last_event_at",
+                        "metadata",
+                        "updated_at",
+                    ]
+                )
+
+                # ``add_tracking_info`` issues its own save inside this txn.
+                order.add_tracking_info(
+                    tracking_number=parcel_id,
+                    shipping_carrier="boxnow",
+                )
+                cls._advance_pending_order_to_processing(order)
+
+        if canceled_meanwhile:
+            return cls._cancel_parcel_minted_after_cancel(
+                shipment_pk,
+                delivery_request_id=delivery_request_id,
+                parcel_id=parcel_id,
+            )
+        return shipment
+
+    @classmethod
+    def _cancel_parcel_minted_after_cancel(
+        cls,
+        shipment_pk: int,
+        *,
+        delivery_request_id: str | None,
+        parcel_id: str,
+    ) -> BoxNowShipment:
+        """Cancel at BoxNow a parcel created for a shipment cancelled meanwhile.
+
+        Runs with no lock held, then records the outcome on the
+        ``minted_after_cancel`` entry :meth:`_persist_parcel` wrote:
+        ``canceled_at_boxnow`` when BoxNow accepted the cancel, otherwise
+        ``cancel_error``, and the parcel is also recorded under
+        ``orphan_delivery_requests`` for ops to reconcile. The row stays
+        CANCELED either way.
+        """
+        error = ""
+        try:
+            BoxNowClient().cancel_parcel(parcel_id)
+        except BoxNowError as exc:
+            error = str(exc)
+            logger.error(
+                "create_shipment_for_order: BoxNow parcel_id=%s was created "
+                "for canceled shipment=%s and could not be canceled at "
+                "BoxNow: %s. Recorded as an orphan for ops review.",
+                parcel_id,
+                shipment_pk,
+                exc,
             )
 
-            # ``add_tracking_info`` issues its own save inside this txn.
-            order.add_tracking_info(
-                tracking_number=parcel_id,
-                shipping_carrier="boxnow",
+        with transaction.atomic():
+            shipment = BoxNowShipment.objects.select_for_update().get(
+                pk=shipment_pk
             )
-            cls._advance_pending_order_to_processing(order)
+            outcome = (
+                {"cancel_error": error}
+                if error
+                else {"canceled_at_boxnow": timezone.now().isoformat()}
+            )
+            minted = [
+                {**entry, **outcome}
+                if entry.get("parcel_id") == parcel_id
+                else entry
+                for entry in shipment.metadata.get("minted_after_cancel", [])
+            ]
+            metadata = {**shipment.metadata, "minted_after_cancel": minted}
+            if error:
+                metadata["orphan_delivery_requests"] = [
+                    *shipment.metadata.get("orphan_delivery_requests", []),
+                    {
+                        "delivery_request_id": delivery_request_id,
+                        "parcel_id": parcel_id,
+                        "minted_at": timezone.now().isoformat(),
+                        "cancel_error": error,
+                    },
+                ]
+            shipment.metadata = metadata
+            shipment.save(update_fields=["metadata", "updated_at"])
         return shipment
 
     @classmethod

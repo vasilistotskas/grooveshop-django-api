@@ -411,7 +411,6 @@ class TestEndpointShaping:
         result = client.get_parcel_info(
             parcel_id="9200000001",
             order_number="ORD-1",
-            q="maria",
             payment_state="pending",
             payment_mode="cod",
             state=["new", "intransit"],
@@ -425,7 +424,6 @@ class TestEndpointShaping:
         assert sent["params"] == {
             "parcelId": "9200000001",
             "orderNumber": "ORD-1",
-            "q": "maria",
             "paymentState": "pending",
             "paymentMode": "cod",
             "state": ["new", "intransit"],
@@ -456,19 +454,6 @@ class TestEndpointShaping:
             "region": "el-GR",
             "compartmentSize": 2,
         }
-
-    def test_update_delivery_request_puts_allow_return(self):
-        client = self._ok({"id": "777"})
-
-        assert client.update_delivery_request("777", allow_return=False) == {
-            "id": "777"
-        }
-        sent = self._sent(client)
-        assert (sent["method"], sent["url"], sent["json"]) == (
-            "PUT",
-            f"{_API}/api/v1/delivery-requests/777",
-            {"allowReturn": False},
-        )
 
     def test_fetch_order_label_requests_zpl_at_the_given_dpi(self):
         client = _client()

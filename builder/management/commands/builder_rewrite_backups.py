@@ -126,6 +126,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 "--tenant, or say --in-every-store as well."
             )
         stopped: list[str] = []
+        self._held = False
         for context in self.iter_tenant_contexts(options):
             with context:
                 if restore is not None:
@@ -147,6 +148,11 @@ class Command(TenantCommandMixin, BaseCommand):
                 ]
         if stopped:
             raise CommandError("\n".join(stopped))
+        if (run := restore or delete) and not self._held:
+            raise CommandError(
+                f"No store this command reached holds run {run}. Nothing "
+                "was changed."
+            )
 
     def _list(self) -> list[str]:
         runs = BuilderRewriteRun.objects.annotate(rows=Count("backups"))
@@ -168,6 +174,7 @@ class Command(TenantCommandMixin, BaseCommand):
         if not BuilderRewriteRun.objects.filter(run=run).exists():
             self.stdout.write(f"no backup of run {run}")
             return []
+        self._held = True
         with transaction.atomic():
             result = restore_run(run, leave_changed=leave_changed)
             if result.changed:
@@ -204,6 +211,7 @@ class Command(TenantCommandMixin, BaseCommand):
         if record is None:
             self.stdout.write(f"no backup of run {run}")
             return []
+        self._held = True
         what = _described(record, record.rows)
         latest = BuilderRewriteRun.objects.order_by(
             "-created_at", "-pk"

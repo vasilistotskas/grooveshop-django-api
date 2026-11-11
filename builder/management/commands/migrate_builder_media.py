@@ -36,11 +36,19 @@ gets a library image, or goes with its position from every list of the block
 version that has it, published and older ones included; a slot is decided
 per draft and per version. Each decision used is printed and kept with the run.
 
-The file is held to its word. A store it names that this invocation does not
-reach stops the command before anything is read. A decision that nothing used
-(a value no document holds, an alt that needed none, a slot that is no empty
-entry beside an image) stops its store like any other problem, so a file
-written for another day cannot pass unnoticed.
+The file is held to its word. A name in it that is no store stops the command
+before anything is read; a store this invocation does not reach is skipped and
+said. A decision that nothing used (a value no document holds, an alt that
+needed none, a slot that is no empty entry beside an image) stops its store
+like any other problem, so a file written for another day cannot pass
+unnoticed, unless an earlier run of this store applied that very decision and
+recorded it: then it is said and stops nothing. So when one store of several
+stops, the file is fixed for that store and given again as it is.
+
+A deleted page is moved with the rest, and its lines are marked: nobody can
+open it, so what it holds is settled by a decision. Its draft is never read
+again (a page brought back starts empty), so where no decision can settle it,
+it is left as it is and said.
 
 ``--dry-run`` takes every step of the real run, the alt text and the release
 included, in a transaction it rolls back. A second run finds nothing to do. A
@@ -64,10 +72,11 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 from builder import media_migration, media_services, services, storefront
-from builder.document_rewrite import Run, rewrite_store
+from builder.document_rewrite import DELETED_PAGE, Run, rewrite_store
 from builder.errors import BuilderError
 from builder.models import MediaAsset
 from core.management.tenant_mixin import TenantCommandMixin
+from tenant.models import Tenant
 
 COMMAND = "migrate_builder_media"
 RELEASE_NOTE = "Images moved to the media library"
@@ -108,12 +117,22 @@ class Command(TenantCommandMixin, BaseCommand):
             connection.schema_name if tenant is None else tenant.schema_name
             for tenant in self.get_target_tenants(options)
         }
-        if strangers := sorted(set(decisions) - reached):
+        elsewhere = set(decisions) - reached
+        stores = set(
+            Tenant.objects.filter(schema_name__in=elsewhere).values_list(
+                "schema_name", flat=True
+            )
+        )
+        if strangers := sorted(elsewhere - stores):
             raise CommandError(
                 "--decisions: "
                 + ", ".join(repr(schema) for schema in strangers)
-                + " is no store this run reaches. Nothing was read or "
-                "written."
+                + " is no store. Nothing was read or written."
+            )
+        for schema in sorted(stores):
+            self.stdout.write(
+                f"decisions for {schema} skipped: this run does not reach "
+                "that store"
             )
         run = uuid.uuid4()
         failed: list[str] = []
@@ -127,6 +146,12 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
                 failed += [f"{schema}: {line}" for line in problems]
         if failed:
+            if any(DELETED_PAGE in line for line in failed):
+                failed.append(
+                    "A deleted page cannot be opened in the editor, and one "
+                    "brought back starts empty: what it holds is settled in "
+                    "--decisions."
+                )
             raise CommandError(
                 "Nothing of these stores was written. Settle each line "
                 "(docs/builder.md says how) and run it again:\n"
@@ -142,19 +167,35 @@ class Command(TenantCommandMixin, BaseCommand):
         """One store, in one transaction: what stands in its way, and with
         any of it nothing written."""
         catalogue = storefront.fetch_catalogue(connection.schema_name)
+        recorded = media_migration.recorded_decisions(COMMAND)
+
+        def unused(*, alts=(), slots=()) -> list[str]:
+            """The decisions nothing used that stop the store; those an
+            earlier run applied are printed."""
+            applied, stale = media_migration.unused_decisions(
+                decisions,
+                recorded,
+                urls=resolution.unused,
+                alts=list(alts),
+                slots=list(slots),
+            )
+            for line in applied:
+                self.stdout.write(line)
+            return stale
+
         current, older = media_migration.stored_uses()
         resolution = media_migration.resolve(current + older, decisions)
         for line in resolution.decided:
             self.stdout.write(line)
         if resolution.problems:
-            return resolution.problems + resolution.unused
+            return resolution.problems + unused()
         alts = media_migration.decide_alts(
             current, resolution.assets, decisions.alts
         )
         for line in alts.gives_way + alts.decided:
             self.stdout.write(line)
         if alts.conflicts:
-            return alts.conflicts + resolution.unused + alts.unused
+            return alts.conflicts + unused(alts=alts.unused)
 
         slots = media_migration.SlotDecisions(decisions.slots)
         with transaction.atomic():
@@ -167,13 +208,13 @@ class Command(TenantCommandMixin, BaseCommand):
                 run=Run(run, COMMAND, decisions.as_stated()),
             )
             problems += result.problems
-            problems += resolution.unused + alts.unused + slots.unused
+            problems += unused(alts=alts.unused, slots=slots.unused)
             if not problems and result.changed:
                 services.release_again(RELEASE_NOTE)
             if problems or dry_run:
                 transaction.set_rollback(True)
 
-        for line in slots.used.values():
+        for line in [*slots.used.values(), *result.left]:
             self.stdout.write(line)
         rolled_back = dry_run or bool(problems)
         self.stdout.write(

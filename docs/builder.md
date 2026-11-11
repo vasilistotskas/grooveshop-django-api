@@ -733,13 +733,33 @@ release: that is what brings the rewrite to visitors.
   still stops the store. Each decision used is printed, and what was decided
   for a store is kept with its run (`BuilderRewriteRun.decisions`), which
   `builder_rewrite_backups` lists.
-- **The file is held to its word.** A store it names that the invocation does
-  not reach (`--tenant webside` with a `websid` in the file) stops the command
-  before anything is read. A decision nothing used stops its store like any
-  other problem: a value no document holds, an alt for an image that has its
-  own or whose uses agree, a slot that is no empty entry beside an image. So a
-  file with a typo, or one written for another day, cannot pass unnoticed.
-  After a run, check with a second run without `--decisions`.
+- **The file is held to its word.** A name in it that is no store (`websid`)
+  stops the command before anything is read. A decision nothing used stops its
+  store like any other problem: a value no document holds, an alt for an image
+  that has its own or whose uses agree, a slot that is no empty entry beside
+  an image. So a file with a typo, or one written for another day, cannot pass
+  unnoticed.
+- **One file, several stores, given again as it is.** Each store is its own
+  transaction, so with `--all-tenants` one store can be moved and committed
+  while another stops. Fix the stopped store's section and give the same file
+  again: nothing has to be taken out. A decision that settles nothing now but
+  that an earlier run of that store applied, exactly as the file states it,
+  is printed as `decision already applied by an earlier run` and is no
+  problem; the evidence is what that run recorded
+  (`BuilderRewriteRun.decisions`). An alt decision whose text the image
+  already has is `already in place`. Only a decision that is neither usable
+  now nor recorded, or that the file now states differently, stops the store.
+  A run that was put back recorded nothing any more. With `--tenant`, the
+  sections of other stores are skipped and said.
+- **A deleted page.** Nobody can open it in the editor, and one brought back
+  starts with an empty draft (`services._create_document`), so what it holds
+  cannot be fixed by hand. Its lines are marked `(deleted page)`, and a value
+  or an empty list entry there is settled in the decisions file like any
+  other. Its draft is never read again, so where no decision can settle why
+  it cannot be rewritten (it no longer validates, a value has a shape the
+  walk refuses), the draft is left as it is and said, and the store goes on;
+  its versions are moved as usual. What a deleted page's draft says about an
+  image's alt decides nothing.
 - **A decision reaches every version.** A version is immutable to the editor,
   so a value only an old version holds can be settled nowhere else. Like the
   rest of this command, a decision changes the content of every draft and
@@ -805,7 +825,9 @@ keeps history. `builder/document_rewrite.py` is the one place they do it.
   restore list), and one in the old shape would be the next thing to rewrite.
 
 `manage.py builder_rewrite_backups --tenant <schema>` lists the runs a store
-holds: id, time, command, number of backups, and the decisions.
+holds: id, time, command, number of backups, and the decisions. A run id that
+no store the command reaches holds, given to `--restore` or `--delete`, exits
+1: it is a mistyped id.
 
 - `--restore <run>` (with `--dry-run` to try it) puts a run back in that
   store, **whole or not at all**. Each draft and version gets its columns

@@ -87,6 +87,8 @@ class Command(TenantCommandMixin, BaseCommand):
             if rolled_back:
                 transaction.set_rollback(True)
 
+        for line in result.left:
+            self.stdout.write(line)
         verb = "would upgrade" if rolled_back else "upgraded"
         self.stdout.write(
             f"{verb} {result.drafts} draft(s), {result.versions} version(s): "

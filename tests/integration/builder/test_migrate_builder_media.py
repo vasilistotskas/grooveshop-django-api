@@ -40,6 +40,11 @@ from builder.storefront import clear_catalogue_cache
 from tenant.models import TenantDomain
 from tests.integration.builder.test_media import image_bytes
 from tests.utils.builder import TEXT, _schema, document, section
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -1360,13 +1365,13 @@ class TestTheWayBack:
         assert f"{run_id}  " in listed
         assert "migrate_builder_media  3 backup(s)" in listed
 
-    def test_a_run_the_store_does_not_hold_restores_nothing(self, moved, run):
+    def test_a_run_no_store_holds_restores_nothing_and_fails(self, moved, run):
         doc, _versions, asset, _run_id = moved
         unknown = str(uuid.uuid4())
 
-        output = run("--restore", unknown, command="builder_rewrite_backups")
+        with pytest.raises(CommandError, match=f"holds run {unknown}"):
+            run("--restore", unknown, command="builder_rewrite_backups")
 
-        assert f"no backup of run {unknown}" in output
         assert settings_of(doc) == {"image": asset.pk}
 
 
@@ -1425,19 +1430,6 @@ class TestWhatARunMeetsInAStore:
         assert deleted.versions.get().data["sections"]["a"]["settings"] == {
             "image": asset.pk
         }
-
-    def test_a_deleted_pages_draft_is_reported_like_any_other(self, admin, run):
-        page = save_and_publish(
-            admin,
-            document(("a", banner(imageUrl="https://example.org/a.png"))),
-            key="page:about",
-        )
-        services.delete_page(
-            admin, key="page:about", expected_revision=page.draft_revision
-        )
-
-        with pytest.raises(CommandError, match="page:about draft: /sections/a"):
-            run()
 
     def test_the_release_sequence_is_locked_before_any_document(
         self, stored, run
@@ -1711,8 +1703,255 @@ class TestDeletingBackups:
 
         assert BuilderRewriteRun.objects.filter(run=first).exists()
 
-    def test_a_run_the_store_does_not_hold_deletes_nothing(self, two_runs, run):
-        output = self.delete(run, str(uuid.uuid4()), "--yes")
+    def test_a_run_no_store_holds_deletes_nothing_and_fails(
+        self, two_runs, run
+    ):
+        unknown = str(uuid.uuid4())
 
-        assert "no backup of run" in output
+        with pytest.raises(CommandError, match=f"holds run {unknown}"):
+            self.delete(run, unknown, "--yes")
+
         assert BuilderRewriteRun.objects.count() == 2
+
+
+class TestTheSameFileAgain:
+    """A file whose decisions an earlier run applied to this store is not a
+    stale file: the run recorded them, and a rerun says so and goes on."""
+
+    @pytest.fixture
+    def applied(self, admin, tenant, stored_image, tmp_path, run):
+        """A store moved by a run that used a decision of each kind: the
+        file's content, to write again, and the run's output."""
+        shared, desk, phone = (
+            stored_image(170 + n, f"s-{n}.png") for n in range(3)
+        )
+        asset, _desk, _phone = (imported(url) for url in (shared, desk, phone))
+        outside = "https://example.org/a.png"
+        save_and_publish(
+            admin,
+            document(
+                ("a", banner(imageUrl=outside)),
+                ("b", banner(imageUrl=shared, imageAlt="Ο πάγκος")),
+                ("c", banner(imageUrl=shared, imageAlt="Το δέντρο")),
+                (
+                    "d",
+                    section(
+                        "hero_carousel@1",
+                        {"images": [desk, desk], "mobileImages": ["", phone]},
+                    ),
+                ),
+            ),
+        )
+        hole = "/sections/d/settings/mobileImages/0"
+        stated = {
+            "images": {outside: asset.pk},
+            "alt": {str(asset.pk): {"el": "Το εργαστήριο"}},
+            "slots": {
+                f"{HOME} draft: {hole}": "remove",
+                f"{HOME} version 1: {hole}": "remove",
+            },
+        }
+
+        def write(**changed):
+            path = tmp_path / "decisions.json"
+            path.write_text(
+                json.dumps(
+                    {tenant.schema_name: {**stated, **changed}},
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            return ("--decisions", str(path))
+
+        return write, stated, run(*write())
+
+    def test_what_an_earlier_run_applied_is_said_and_stops_nothing(
+        self, applied, run
+    ):
+        write, stated, first = applied
+        releases = BuilderRelease.objects.count()
+
+        output = run(*write())
+
+        assert "moved 1 draft(s), 1 version(s)" in first
+        assert "moved 0 draft(s), 0 version(s)" in output
+        assert output.count("decision already applied by an earlier run: ") == 3
+        assert "decision already in place: image" in output
+        assert "decision not used" not in output
+        assert BuilderRewriteRun.objects.count() == 1
+        assert BuilderRelease.objects.count() == releases
+        assert BuilderRewriteRun.objects.get().decisions == stated
+
+    def test_a_decision_no_run_applied_still_stops_the_store(
+        self, applied, run
+    ):
+        write, stated, _first = applied
+        typo = "https://example.org/typo.png"
+
+        with pytest.raises(CommandError) as raised:
+            run(*write(images={**stated["images"], typo: "empty"}))
+
+        assert f"decision not used: {typo!r} is in no document" in str(
+            raised.value
+        )
+        assert "example.org/a.png" not in str(raised.value)
+
+    def test_a_decision_changed_since_it_was_applied_stops_the_store(
+        self, applied, run
+    ):
+        write, _stated, _first = applied
+        outside = "https://example.org/a.png"
+
+        with pytest.raises(
+            CommandError, match=f"decision not used: {outside!r}"
+        ):
+            run(*write(images={outside: "empty"}))
+
+    def test_a_restored_run_applied_nothing_any_more(self, applied, run):
+        write, _stated, first = applied
+        run_id = first.rsplit("backup run ", 1)[1].split()[0]
+        run("--restore", run_id, command="builder_rewrite_backups")
+
+        output = run(*write())
+
+        assert "moved 1 draft(s), 1 version(s)" in output
+        assert "decision already applied" not in output
+
+
+class TestAFileForSeveralStores:
+    @pytest.fixture
+    def another_store(self, tenant):
+        """A second store, which the run of this one does not reach."""
+        bound = bind_store_tenant(None)
+        store_tenant("another_store")
+        unbind_store_tenant(bound)
+
+    def file(self, tmp_path, **stores):
+        path = tmp_path / "decisions.json"
+        path.write_text(json.dumps(stores), encoding="utf-8")
+        return ("--decisions", str(path))
+
+    def test_a_store_this_run_does_not_reach_is_skipped_and_said(
+        self, admin, tenant, another_store, stored_image, tmp_path, run
+    ):
+        asset = imported(stored_image(180))
+        url = "https://example.org/a.png"
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        output = run(
+            *self.file(
+                tmp_path,
+                another_store={"images": {"/img/theirs.png": "empty"}},
+                **{tenant.schema_name: {"images": {url: asset.pk}}},
+            )
+        )
+
+        assert "decisions for another_store skipped" in output
+        assert settings_of(doc) == {"image": asset.pk}
+
+    def test_a_name_that_is_no_store_stops_the_command(
+        self, admin, tenant, another_store, stored_image, tmp_path, run
+    ):
+        imported(url := stored_image(181))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+
+        with pytest.raises(CommandError, match="'another_stor' is no store"):
+            run(*self.file(tmp_path, another_stor={}))
+
+        assert settings_of(doc) == {"imageUrl": url}
+
+
+class TestADeletedPage:
+    """Nobody can open a deleted page, so what it holds is settled in the
+    decisions file or not at all."""
+
+    @pytest.fixture
+    def deleted(self, admin):
+        def make(**settings):
+            page = save_and_publish(
+                admin, document(("a", banner(**settings))), key="page:about"
+            )
+            services.delete_page(
+                admin, key="page:about", expected_revision=page.draft_revision
+            )
+            return page
+
+        return make
+
+    def test_its_lines_say_so_and_what_can_be_done(self, deleted, run):
+        deleted(imageUrl="https://example.org/a.png")
+
+        with pytest.raises(CommandError) as raised:
+            run()
+
+        message = str(raised.value)
+        setting = "/sections/a/settings/imageUrl (hero_banner@2)"
+        assert f"page:about draft (deleted page): {setting}" in message
+        assert f"page:about version 1 (deleted page): {setting}" in message
+        assert "A deleted page cannot be opened in the editor" in message
+
+    def test_a_decision_settles_it(
+        self, deleted, admin, stored_image, decide, run
+    ):
+        asset = imported(stored_image(190))
+        page = deleted(imageUrl="https://example.org/a.png")
+
+        run(*decide(images={"https://example.org/a.png": asset.pk}))
+
+        after = BuilderDocument.objects.deleted_only().get(pk=page.pk)
+        assert after.draft["sections"]["a"]["settings"] == {"image": asset.pk}
+
+    def test_a_draft_no_decision_can_settle_is_left_and_stops_nothing(
+        self, deleted, stored_image, run
+    ):
+        """It does not validate any more, which no decision changes, and it
+        is never read again: a page brought back starts empty."""
+        asset = imported(url := stored_image(191))
+        page = deleted(imageUrl=url)
+        stale = document(("a", banner(imageUrl=url, nonsense=True)))
+        BuilderDocument.objects.all_with_deleted().filter(pk=page.pk).update(
+            draft=stale
+        )
+
+        output = run()
+
+        after = BuilderDocument.objects.deleted_only().get(pk=page.pk)
+        assert after.draft == stale
+        assert after.versions.get().data["sections"]["a"]["settings"] == {
+            "image": asset.pk
+        }
+        assert "page:about draft (deleted page): left as it is" in output
+        assert "moved 0 draft(s), 1 version(s)" in output
+
+
+class TestABackupWhoseRowIsGone:
+    """A version or a page deleted by code that does not know the backups
+    (no constraint of the database ties them): the run is still listed."""
+
+    @pytest.fixture
+    def moved(self, admin, stored_image, run):
+        imported(url := stored_image(195))
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+        run_id = run().rsplit("backup run ", 1)[1].split()[0]
+        return doc, run_id
+
+    def test_a_version_gone(self, moved, run):
+        doc, run_id = moved
+        doc.versions.all()._raw_delete(connection.alias)
+
+        listed = run(command="builder_rewrite_backups")
+
+        assert f"{run_id}  " in listed
+        assert "2 backup(s)" in listed
+
+    def test_a_page_gone(self, moved, run):
+        doc, run_id = moved
+        doc.versions.all()._raw_delete(connection.alias)
+        BuilderDocument.objects.filter(pk=doc.pk)._raw_delete(connection.alias)
+
+        listed = run(command="builder_rewrite_backups")
+        restored = run("--restore", run_id, command="builder_rewrite_backups")
+
+        assert "2 backup(s)" in listed
+        assert "2 backup(s) of rows that no longer exist removed" in restored
+        assert not BuilderRewriteRun.objects.exists()

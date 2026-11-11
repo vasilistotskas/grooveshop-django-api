@@ -62,6 +62,22 @@ class DocumentRefused(Exception):
     """A transform cannot bring this document to the new shape. Each argument
     is one reason, reported on a line of its own."""
 
+    #: Whether a person can settle the reasons for the command (a decisions
+    #: file), without the document being edited.
+    decidable = False
+
+
+#: How a report marks what belongs to a deleted page.
+DELETED_PAGE = "(deleted page)"
+
+
+def source_of(document: BuilderDocument, version: int | None = None) -> str:
+    """Which copy of *document* a report line is about: ``draft`` or
+    ``version <number>``, marked when the page is deleted, since nobody can
+    open that page to change it."""
+    source = "draft" if version is None else f"version {version}"
+    return f"{source} {DELETED_PAGE}" if document.is_deleted else source
+
 
 def known_feature_on(name: str) -> bool:
     """What the validation asks of a feature during a rewrite. A store may
@@ -91,6 +107,8 @@ class Rewritten:
     versions: int = 0
     moved: Counter[str] = field(default_factory=Counter)
     problems: list[str] = field(default_factory=list)
+    #: A deleted page's draft that cannot be rewritten, left as it is.
+    left: list[str] = field(default_factory=list)
 
     @property
     def changed(self) -> bool:
@@ -106,17 +124,33 @@ def _rewritten(
     transform: Transform,
     catalogue: storefront.Catalogue,
     result: Rewritten,
+    dead: bool = False,
 ) -> validation.Validated | None:
     """The document to store, or ``None`` with nothing to do or with the reason
-    it cannot be rewritten added to the problems."""
+    it cannot be rewritten added to the problems.
+
+    *dead* is the draft of a deleted page. Nothing reads it again: a page
+    that is brought back starts with an empty draft
+    (``services._create_document``). So where no decision can settle why it
+    cannot be rewritten, it is left as it is and said, and does not stop the
+    store, which nobody could then get moving again.
+    """
+
+    def refuse(reasons: list[str], *, decidable: bool) -> None:
+        if dead and not decidable:
+            result.left.extend(
+                f"{label}: left as it is ({reason})" for reason in reasons
+            )
+        else:
+            result.problems.extend(f"{label}: {reason}" for reason in reasons)
+
     try:
         new_data, new_i18n, moved = transform(data, i18n, label)
     except DocumentRefused as exc:
-        result.problems.extend(f"{label}: {reason}" for reason in exc.args)
+        refuse([str(reason) for reason in exc.args], decidable=exc.decidable)
         return None
     if not moved:
         return None
-    result.moved.update(moved)
     issues, validated = validation.validate_document(
         key=key,
         data=new_data,
@@ -125,9 +159,12 @@ def _rewritten(
         feature_on=known_feature_on,
     )
     if validated is None:
-        result.problems.extend(
-            f"{label}: {issue.code} at {issue.path}" for issue in issues
+        refuse(
+            [f"{issue.code} at {issue.path}" for issue in issues],
+            decidable=False,
         )
+        return None
+    result.moved.update(moved)
     return validated
 
 
@@ -204,10 +241,11 @@ def rewrite_store(
             key=document.key,
             data=document.draft,
             i18n=document.draft_i18n,
-            label=f"{document.key} draft",
+            label=f"{document.key} {source_of(document)}",
             transform=transform,
             catalogue=catalogue,
             result=result,
+            dead=document.is_deleted,
         )
         if validated is None:
             continue
@@ -228,7 +266,10 @@ def rewrite_store(
             key=version.document.key,
             data=version.data,
             i18n=version.i18n,
-            label=f"{version.document.key} version {version.number}",
+            label=(
+                f"{version.document.key} "
+                f"{source_of(version.document, version.number)}"
+            ),
             transform=transform,
             catalogue=catalogue,
             result=result,
@@ -325,13 +366,15 @@ def restore_run(run: UUID, *, leave_changed: bool) -> Restored:
             if _draft_hash(document) == backup.rewritten_hash:
                 ready.append((backup, document))
             else:
-                result.left.append(f"{document.key} draft: saved since the run")
+                result.left.append(
+                    f"{document.key} {source_of(document)}: saved since the run"
+                )
         elif version.content_hash == backup.rewritten_hash:
             ready.append((backup, version))
         else:
             result.left.append(
-                f"{document.key} version {version.number}: rewritten since "
-                "the run"
+                f"{document.key} {source_of(document, version.number)}: "
+                "rewritten since the run"
             )
     if result.left and not leave_changed:
         return result

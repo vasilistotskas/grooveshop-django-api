@@ -43,9 +43,14 @@ from django.db import connection
 
 from builder import media_services, pointers
 from builder.block_upgrades import nodes_of
-from builder.document_rewrite import DocumentRefused
+from builder.document_rewrite import DocumentRefused, source_of
 from builder.errors import BuilderError
-from builder.models import BuilderDocument, BuilderVersion, MediaAsset
+from builder.models import (
+    BuilderDocument,
+    BuilderRewriteRun,
+    BuilderVersion,
+    MediaAsset,
+)
 from builder.services import published_versions
 from builder.validation import VERSIONED_TYPE
 from tenant.membership import bound_tenant
@@ -281,15 +286,15 @@ def scan(*, all_versions: bool = False) -> Plan:
                 )
 
     for doc in _drafts():
-        collect(doc.key, "draft", doc.draft, "")
-        collect(doc.key, "draft", doc.draft_i18n, "/i18n")
+        collect(doc.key, source_of(doc), doc.draft, "")
+        collect(doc.key, source_of(doc), doc.draft_i18n, "/i18n")
     versions = BuilderVersion.objects.select_related("document").order_by(
         "document__key", "number"
     )
     if not all_versions:
         versions = versions.filter(pk__in=published_versions().values())
     for version in versions.iterator(chunk_size=READ_CHUNK):
-        source = f"version {version.number}"
+        source = source_of(version.document, version.number)
         collect(version.document.key, source, version.data, "")
         collect(version.document.key, source, version.i18n, "/i18n")
     return plan
@@ -442,14 +447,18 @@ def legacy_uses(
 
 def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
     """Every old image setting of this store: ``(what the drafts and the current
-    release hold, what only older versions hold)``. Only the first decide an
-    image's alt: an older version's text is what the store has since replaced."""
+    release hold, what only older versions and deleted pages hold)``. Only
+    the first decide an image's alt: an older version's text is what the store
+    has since replaced, and a deleted page says nothing any more."""
     current: list[LegacyUse] = []
     older: list[LegacyUse] = []
     for document in _drafts():
-        current.extend(
+        (older if document.is_deleted else current).extend(
             legacy_uses(
-                document.key, "draft", document.draft, document.draft_i18n
+                document.key,
+                source_of(document),
+                document.draft,
+                document.draft_i18n,
             )
         )
     live = set(published_versions().values())
@@ -460,7 +469,7 @@ def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
         (current if version.pk in live else older).extend(
             legacy_uses(
                 version.document.key,
-                f"version {version.number}",
+                source_of(version.document, version.number),
                 version.data,
                 version.i18n,
             )
@@ -584,7 +593,7 @@ class Resolution:
     assets: dict[str, int | None] = field(default_factory=dict)
     #: Each decision that settled a value, to print.
     decided: list[str] = field(default_factory=list)
-    #: Each decision about a value no document holds.
+    #: Each decided value that no document holds.
     unused: list[str] = field(default_factory=list)
     #: Each value with no asset and no decision, then where it is used.
     problems: list[str] = field(default_factory=list)
@@ -640,10 +649,7 @@ def resolve(uses: list[LegacyUse], decisions: Decisions) -> Resolution:
                 _found(use.document, use.source, use.path, url, kind, hosts)
                 for use in where
             )
-    resolution.unused.extend(
-        f"decision not used: {url!r} is in no document"
-        for url in sorted(set(decided) - set(by_url))
-    )
+    resolution.unused.extend(sorted(set(decided) - set(by_url)))
     outcomes = run(plan, dry_run=True)
     for import_url, items in plan.internal.items():
         outcome = outcomes[import_url]
@@ -675,8 +681,8 @@ class AltDecisions:
     gives_way: list[str] = field(default_factory=list)
     #: Each decision that settled uses that disagree, to print.
     decided: list[str] = field(default_factory=list)
-    #: Each decision about an alt that needed none.
-    unused: list[str] = field(default_factory=list)
+    #: Each ``(asset id, language)`` decided that needed no decision.
+    unused: list[tuple[int, str]] = field(default_factory=list)
     #: Uses that disagree, of an asset with nothing written to decide by.
     conflicts: list[str] = field(default_factory=list)
 
@@ -703,7 +709,7 @@ def decide_alts(
     held = {
         (asset, locale): text
         for asset, locale, text in MediaAsset.translations.field.model.objects.filter(
-            master__in={asset for asset, _locale in said}
+            master__in={asset for asset, _locale in {*said, *decided}}
         ).values_list("master", "language_code", "alt")
         if text
     }
@@ -734,12 +740,85 @@ def decide_alts(
                 f"image {asset} [{locale}]: its uses disagree and it has no alt "
                 f"of its own, so decide it or write one on the image: {versions}"
             )
-    decisions.unused.extend(
-        f"decision not used: image {asset} [{locale}] has an alt of its own, "
-        "or no uses that disagree"
-        for asset, locale in sorted(set(decided) - settled)
-    )
+    for asset, locale in sorted(set(decided) - settled):
+        stated = decided[asset, locale]
+        if stated and held.get((asset, locale)) == stated:
+            decisions.decided.append(
+                f"decision already in place: image {asset} [{locale}] says "
+                f"{stated!r}"
+            )
+        else:
+            decisions.unused.append((asset, locale))
     return decisions
+
+
+def recorded_decisions(command: str) -> Decisions:
+    """What earlier runs of *command* recorded as decided for this store
+    (``BuilderRewriteRun.decisions``), a later run over an earlier one. A run
+    that was put back is gone, and so is what it recorded."""
+    images: dict[str, int | None] = {}
+    alts: dict[tuple[int, str], str] = {}
+    slots: dict[str, int | None] = {}
+    for stated in BuilderRewriteRun.objects.filter(command=command).values_list(
+        "decisions", flat=True
+    ):
+        earlier = _decisions_of(connection.schema_name, stated)
+        images.update(earlier.images)
+        alts.update(earlier.alts)
+        slots.update(earlier.slots)
+    return Decisions(images, alts, slots)
+
+
+def unused_decisions(
+    decisions: Decisions,
+    recorded: Decisions,
+    *,
+    urls: list[str],
+    alts: list[tuple[int, str]],
+    slots: list[str],
+) -> tuple[list[str], list[str]]:
+    """The decisions that settled nothing in this run, apart: ``(those an
+    earlier run of this store applied as they stand, the rest)``.
+
+    One file serves a run over several stores, and a store that was moved
+    and committed while another stopped meets the same file again. Its
+    decisions settle nothing the second time, because they are done: the run
+    that applied them recorded them. Those are said and are no problem. A
+    decision nothing used and no run recorded, or one the file now states
+    differently, is a typo or a file for another day, and stops the store.
+    """
+    applied: list[str] = []
+    problems: list[str] = []
+
+    def sort(done: bool, what: str, why: str) -> None:
+        if done:
+            applied.append(
+                f"decision already applied by an earlier run: {what}"
+            )
+        else:
+            problems.append(f"decision not used: {what} {why}")
+
+    for url in urls:
+        sort(
+            url in recorded.images
+            and recorded.images[url] == decisions.images[url],
+            repr(url),
+            "is in no document",
+        )
+    for key in alts:
+        sort(
+            key in recorded.alts and recorded.alts[key] == decisions.alts[key],
+            f"image {key[0]} [{key[1]}]",
+            "has an alt of its own, or no uses that disagree",
+        )
+    for slot in slots:
+        sort(
+            slot in recorded.slots
+            and recorded.slots[slot] == decisions.slots[slot],
+            slot,
+            "is no empty entry beside an image",
+        )
+    return applied, problems
 
 
 def _asset_of(value: Any, assets: Mapping[str, int | None]) -> int | None:
@@ -763,6 +842,12 @@ def _asset_of(value: Any, assets: Mapping[str, int | None]) -> int | None:
         ) from None
 
 
+class SlotsUndecided(DocumentRefused):
+    """Empty list entries of this document wait for a decision."""
+
+    decidable = True
+
+
 @dataclass(slots=True)
 class SlotDecisions:
     """What was decided for the empty entries of lists (``Decisions.slots``),
@@ -774,10 +859,7 @@ class SlotDecisions:
 
     @property
     def unused(self) -> list[str]:
-        return [
-            f"decision not used: {slot} is no empty entry beside an image"
-            for slot in sorted(set(self.decided) - set(self.used))
-        ]
+        return sorted(set(self.decided) - set(self.used))
 
 
 def _entry_shown(asset: int | None, written: Any) -> str:
@@ -943,7 +1025,7 @@ def migrate_document(
                 node, node_id, node_settings, old, where, slots
             )
     if undecided:
-        raise DocumentRefused(*undecided)
+        raise SlotsUndecided(*undecided)
     return migrated, _without_empties(overlay), moved
 
 

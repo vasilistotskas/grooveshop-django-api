@@ -28,6 +28,7 @@ from typing import Any
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from core.retention import delete_in_batches
@@ -44,10 +45,12 @@ from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
     AcsRetryableError,
+    AcsUndocumentedHttpError,
     AcsUnprintedVouchersError,
     AcsVoucherRequestHeldError,
     AcsVoucherRequestUnknownError,
 )
+from shipping_acs.models import AcsShipment
 from shipping_acs.services import AcsService
 from tenant.celery import TenantTask
 
@@ -199,6 +202,50 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
         # business error. A lost answer never gets here: the service
         # turns it into AcsVoucherRequestUnknownError.
         raise
+    except AcsUndocumentedHttpError as exc:
+        # An HTTP 4xx that is not ACS's own answer (a proxy's, a
+        # gateway's): no voucher was made, and nothing was said about
+        # the order. An order whose request was held still waits for
+        # ACS, and ``issue_held_acs_vouchers`` sends it again.
+        if voucher_requests_held().filter(order_id=order_id).exists():
+            logger.warning(
+                "ACS voucher request for order %s was answered by "
+                "something that is not ACS; it stays held: %s",
+                order_id,
+                exc,
+                extra={"order_id": order_id, "http_status": exc.http_status},
+            )
+            return {
+                "status": "voucher_request_held",
+                "order_id": order_id,
+                "message": str(exc),
+            }
+        # Nothing sends any other order again by itself, so staff are
+        # told, and not to fix an address that nobody refused.
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
+        logger.error(
+            "ACS voucher request for order %s was answered by something "
+            "that is not ACS: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id, "http_status": exc.http_status},
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id,
+            carrier="ACS",
+            error=str(exc),
+            remedy=(
+                "The answer did not come from ACS itself, so ACS refused "
+                "nothing about the order. Press “Issue ACS voucher now” on "
+                "the order's ACS shipment to send the request again."
+            ),
+        )
+        return {
+            "status": "acs_api_error",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except AcsAPIError as exc:
         # Business error (bad address, unacceptable destination
         # station, …) — permanent, no retry. Tell a human immediately:
@@ -256,14 +303,21 @@ def issue_held_acs_vouchers(*, max_per_run: int = 100) -> dict[str, Any]:
     * **closed**: once ``AcsVoucherHold.retry_after`` has passed, ask ACS
       one read. No answer, nothing else is sent. An answer allows one
       request first.
-    * **one request first**: dispatch the oldest held request, unless one
-      is already in flight. Its answer ends the hold; a lost answer
-      closes it again and doubles the wait.
-    * **no hold**: dispatch every held request, oldest first, at most
-      ``max_per_run`` a run and spaced like the tracking polls
+    * **one request first**: dispatch one held request, unless one is
+      already in flight. Its voucher ends the hold; a lost answer closes
+      it again and doubles the wait.
+    * **no hold**: dispatch every held request, at most ``max_per_run`` a
+      run and spaced like the tracking polls
       (``ACS_POLL_DISPATCH_SPACING_SECONDS``: 100 take 200 s at the
       defaults, inside the 5-minute tick), so they do not queue for a
       request slot and exhaust their retries on it.
+
+    **Which request goes first**: the one this sweep tried longest ago,
+    never tried before all others, then the one held longest. The sweep
+    records its choice (``voucher_request_retried_at``) before it
+    dispatches, so whatever becomes of that request, even one that never
+    runs or is refused before its claim on every attempt, the next tick
+    chooses another and no order keeps the rest waiting behind it.
 
     No retry policy: the next tick is the retry.
     """
@@ -288,11 +342,19 @@ def issue_held_acs_vouchers(*, max_per_run: int = 100) -> dict[str, Any]:
     else:
         status, limit = "one_request_first", 1
 
-    order_ids = list(
+    chosen = list(
         voucher_requests_held()
-        .order_by("voucher_request_held_at", "pk")
-        .values_list("order_id", flat=True)[:limit]
+        .order_by(
+            F("voucher_request_retried_at").asc(nulls_first=True),
+            "voucher_request_held_at",
+            "pk",
+        )
+        .values_list("pk", "order_id")[:limit]
     )
+    AcsShipment.objects.filter(pk__in=[pk for pk, _order_id in chosen]).update(
+        voucher_request_retried_at=timezone.now()
+    )
+    order_ids = [order_id for _pk, order_id in chosen]
     spacing = settings.ACS_POLL_DISPATCH_SPACING_SECONDS
     for index, order_id in enumerate(order_ids):
         create_acs_voucher_for_order.apply_async(

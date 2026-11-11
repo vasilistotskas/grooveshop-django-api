@@ -41,6 +41,7 @@ from shipping_acs.exceptions import (
     AcsError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
+    AcsUndocumentedHttpError,
     AcsUnprintedVouchersError,
     AcsVoucherRequestHeldError,
     AcsVoucherRequestNotSentError,
@@ -450,10 +451,13 @@ class AcsService:
         from the slot itself with the claim released.
         ``issue_held_acs_vouchers`` sends it once ACS answers again. The
         stamp goes only when ACS answers the request (a voucher, a
-        refusal, an HTTP 4xx) or its outcome becomes unknown; a request
-        that never reached ACS keeps it, so the sweep still owns it when
-        the task's retries are spent. What each outcome does to the hold
-        is the table in ``shipping_acs.voucher_hold``.
+        refusal), its outcome becomes unknown, or the order can no longer
+        be sent (it awaits payment again, its request cannot be built). A
+        request that never reached ACS, or that something other than ACS
+        answered (an HTTP 4xx outside ACS's envelope), keeps it, so the
+        sweep still owns it when the task's retries are spent. What each
+        outcome does to the hold is the table in
+        ``shipping_acs.voucher_hold``.
         """
         client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
@@ -483,59 +487,71 @@ class AcsService:
             # voucher would carry Cod_Ammount 0 and hand the parcel over
             # for free. ``shipment.order`` was loaded under this lock, so
             # a payment that landed a moment ago is seen.
-            if shipment.order.awaits_online_payment:
-                raise ShipmentAwaitingPaymentError(order.id)
-
-            # A voucher request whose answer was lost: ACS may hold a
-            # voucher for this order, and ``ACS_Create_Voucher`` has no
-            # idempotency key, so nothing sends another one until staff
-            # resolve it (``adopt_voucher`` / ``request_voucher_again``).
-            from shipping_acs.attention import voucher_request_unknown
-
-            if voucher_request_unknown(shipment):
-                raise AcsVoucherRequestUnknownError(
-                    f"The voucher request for order {order.id} has an "
-                    "unknown outcome since "
-                    f"{shipment.voucher_request_unknown_at.isoformat()}: "
-                    "check ACS before requesting again."
+            #
+            # Such an order no longer waits for ACS either. It waits for
+            # the shopper, and the payment that settles it dispatches the
+            # mint again (``OrderService.handle_payment_succeeded``), held
+            # like any other while a hold is in force. Left stamped, the
+            # sweep would send it tick after tick to be refused here.
+            awaits_payment = shipment.order.awaits_online_payment
+            if awaits_payment:
+                stale_claim, hold = "", None
+                cls._voucher_request_no_longer_held(
+                    shipment, "Held voucher request: order awaits payment"
                 )
-
-            metadata = shipment.metadata or {}
-            claim_age = cls._expired_claim_age(order, metadata)
-            if claim_age is not None:
-                # TTL expired and no voucher_no was persisted. Every
-                # failure before the request releases the claim, so the
-                # worker stopped after the request may have left (stage
-                # order 682, 2026-04-29, leaked a voucher this way). Same
-                # state as a lost answer, never a second request.
-                logger.warning(
-                    "create_voucher_for_order: stale mint_started_at "
-                    "for order=%s (age=%.1fs > TTL=%ds) without a "
-                    "voucher_no — outcome unknown, not re-minting.",
-                    order.id,
-                    claim_age,
-                    cls._MINT_CLAIM_TTL_SECONDS,
-                    extra={
-                        "order_id": order.id,
-                        "shipment_pk": shipment.pk,
-                        "carrier": "acs",
-                        "phase": "phase1_stale_claim",
-                        "claim_age_seconds": claim_age,
-                    },
-                )
-                stale_claim = _stale_claim_message(claim_age)
-                hold = None
-                cls._set_voucher_request_unknown(shipment)
             else:
-                stale_claim = ""
-                # ACS is failing: this request waits, with no claim to
-                # expire into the unknown state.
-                hold = voucher_hold.holding()
-                if hold is None:
-                    cls._claim_mint(order, shipment, metadata)
-                else:
-                    cls._mark_voucher_request_held(shipment)
+                # A voucher request whose answer was lost: ACS may hold a
+                # voucher for this order, and ``ACS_Create_Voucher`` has no
+                # idempotency key, so nothing sends another one until staff
+                # resolve it (``adopt_voucher`` / ``request_voucher_again``).
+                from shipping_acs.attention import voucher_request_unknown
 
+                if voucher_request_unknown(shipment):
+                    raise AcsVoucherRequestUnknownError(
+                        f"The voucher request for order {order.id} has an "
+                        "unknown outcome since "
+                        f"{shipment.voucher_request_unknown_at.isoformat()}: "
+                        "check ACS before requesting again."
+                    )
+
+                metadata = shipment.metadata or {}
+                claim_age = cls._expired_claim_age(order, metadata)
+                if claim_age is not None:
+                    # TTL expired and no voucher_no was persisted. Every
+                    # failure before the request releases the claim, so the
+                    # worker stopped after the request may have left (stage
+                    # order 682, 2026-04-29, leaked a voucher this way). Same
+                    # state as a lost answer, never a second request.
+                    logger.warning(
+                        "create_voucher_for_order: stale mint_started_at "
+                        "for order=%s (age=%.1fs > TTL=%ds) without a "
+                        "voucher_no — outcome unknown, not re-minting.",
+                        order.id,
+                        claim_age,
+                        cls._MINT_CLAIM_TTL_SECONDS,
+                        extra={
+                            "order_id": order.id,
+                            "shipment_pk": shipment.pk,
+                            "carrier": "acs",
+                            "phase": "phase1_stale_claim",
+                            "claim_age_seconds": claim_age,
+                        },
+                    )
+                    stale_claim = _stale_claim_message(claim_age)
+                    hold = None
+                    cls._set_voucher_request_unknown(shipment)
+                else:
+                    stale_claim = ""
+                    # ACS is failing: this request waits, with no claim to
+                    # expire into the unknown state.
+                    hold = voucher_hold.holding()
+                    if hold is None:
+                        cls._claim_mint(order, shipment, metadata)
+                    else:
+                        cls._mark_voucher_request_held(shipment)
+
+        if awaits_payment:
+            raise ShipmentAwaitingPaymentError(order.id)
         if stale_claim:
             cls._alert_voucher_request_unknown(order.id, stale_claim)
             raise AcsVoucherRequestUnknownError(stale_claim)
@@ -558,6 +574,7 @@ class AcsService:
         # The claim this request was sent under (stamped in Phase 1): what
         # it may release, turn into an unknown state, or save under.
         our_claim = (shipment.metadata or {}).get("mint_started_at")
+        request_id = cls._request_id(shipment, our_claim)
 
         # ----- Phase 2: API call (no DB lock held) -----
         try:
@@ -573,7 +590,7 @@ class AcsService:
             cls._release_mint_claim(shipment, our_claim, held=False)
             raise
         try:
-            result = client.create_voucher(params)
+            result = client.create_voucher(params, request_id=request_id)
         except AcsVoucherRequestNotSentError as exc:
             # Stopped at its slot: the hold began while this request
             # waited for it (stamp it as held), or the hold could not be
@@ -591,19 +608,26 @@ class AcsService:
             cls._record_last_error(shipment, params, exc)
             if not cls._outcome_is_known(exc):
                 cls._voucher_request_lost(order, shipment, exc, our_claim)
-            # Known outcome: the request never reached ACS (a connection
-            # never made, the request cap) or it was answered with an
-            # error. Release the claim so the retry, or staff, can send it
-            # again. Only an answer ends its wait for ACS: a request that
-            # never got there keeps its stamp and the sweep sends it.
-            answered = isinstance(exc, AcsAPIError) and not isinstance(
-                exc, AcsRetryableError
-            )
-            if answered:
-                cls._report_error_answer(exc)
-            cls._release_mint_claim(
-                shipment, our_claim, held=False if answered else None
-            )
+            # A known outcome, one of three (the table in
+            # ``shipping_acs.voucher_hold``). The claim is released so the
+            # retry, the sweep or staff can send the request again.
+            if isinstance(exc, AcsRetryableError):
+                # Never reached ACS (a connection never made, 403/406,
+                # the request cap): an order that was waiting still is,
+                # and the turn, if this request had it, is free at once.
+                voucher_hold.record_not_sent(request_id)
+                held = None
+            elif isinstance(exc, AcsUndocumentedHttpError):
+                # Not ACS's answer, so nothing was said about the order:
+                # an order that was waiting still is. Only ACS's own
+                # refusal below takes it out of the sweep.
+                voucher_hold.record_no_answer(str(exc), request_id)
+                held = None
+            else:
+                # ACS refused it in its own envelope: staff's to fix.
+                voucher_hold.record_refusal(request_id)
+                held = False
+            cls._release_mint_claim(shipment, our_claim, held=held)
             logger.warning(
                 "create_voucher_for_order: API call failed for order=%s "
                 "shipment=%s — released mint claim. Error: %s",
@@ -634,10 +658,10 @@ class AcsService:
                 # A success envelope without a number or a reason: ACS
                 # executed the call and nothing says it made no voucher.
                 cls._voucher_request_lost(order, shipment, api_error, our_claim)
-            cls._report_error_answer(api_error)
+            voucher_hold.record_refusal(request_id)
             cls._release_mint_claim(shipment, our_claim, held=False)
             raise api_error
-        voucher_hold.record_voucher()
+        voucher_hold.record_voucher(request_id)
 
         children: list[str] = []
         if shipment.item_quantity > 1:
@@ -920,6 +944,16 @@ class AcsService:
             )
 
     @staticmethod
+    def _request_id(shipment: AcsShipment, claim: str | None) -> str:
+        """A voucher request's identity for the store's voucher hold.
+
+        Its mint claim is what tells one request for a shipment from the
+        next; the claim is a timestamp, unique per shipment only, so the
+        shipment goes with it.
+        """
+        return f"{shipment.pk}:{claim}"
+
+    @staticmethod
     def _mark_voucher_request_held(shipment: AcsShipment) -> None:
         """Stamp a request the voucher hold kept from ACS, on a row the
         caller holds locked. The first stamp stays: it is how long the
@@ -930,22 +964,15 @@ class AcsService:
             shipment.save(update_fields=["voucher_request_held_at"])
 
     @staticmethod
-    def _report_error_answer(exc: AcsAPIError) -> None:
-        """Tell the store's voucher hold which error answered a create.
-
-        ``raw`` is set only for an answer in ACS's own envelope
-        (``ACSExecution_HasError``, or the value row this service read an
-        ``Error_Message`` from): ACS executed the create and refused it.
-        Without it the answer is a bare HTTP 4xx, which the manual does
-        not list for ACS (200, 403 and 406 only, p. 1-2): a proxy's or a
-        gateway's, saying nothing about ACS. The same line
-        ``observability._classify`` draws between a business error and an
-        unexpected one.
-        """
-        if exc.raw:
-            voucher_hold.record_refusal()
-        else:
-            voucher_hold.record_no_answer(str(exc))
+    def _voucher_request_no_longer_held(
+        shipment: AcsShipment, reason: str
+    ) -> None:
+        """Take a request out of the ones the sweep sends, on a row the
+        caller holds locked: it no longer waits for ACS to answer again."""
+        if shipment.voucher_request_held_at is not None:
+            shipment.voucher_request_held_at = None
+            shipment._change_reason = reason
+            shipment.save(update_fields=["voucher_request_held_at"])
 
     @classmethod
     def _release_mint_claim(
@@ -964,9 +991,10 @@ class AcsService:
 
         ``held`` settles the voucher hold's stamp in the same
         transaction: True for a request the hold kept from ACS, False
-        for one that was answered or refused (it no longer waits for
-        ACS). None leaves the stamp as it is: the request never reached
-        ACS, so an order that was waiting still is. Like the claim, the
+        for one ACS refused or that could not be built (it no longer
+        waits for ACS). None leaves the stamp as it is: the request never
+        reached ACS, or was answered by something that is not ACS, so an
+        order that was waiting still is. Like the claim, the
         stamp is this request's to settle only while the row holds its
         claim: once the claim was taken, a stamp on the row is a later
         request's (staff requested again and that one is held), and a
@@ -994,10 +1022,10 @@ class AcsService:
                     fresh.save(update_fields=["metadata"])
                     if held:
                         cls._mark_voucher_request_held(fresh)
-                    elif held is False and fresh.voucher_request_held_at:
-                        fresh.voucher_request_held_at = None
-                        fresh._change_reason = "Held voucher request answered"
-                        fresh.save(update_fields=["voucher_request_held_at"])
+                    elif held is False:
+                        cls._voucher_request_no_longer_held(
+                            fresh, "Held voucher request answered"
+                        )
                 elif metadata.get("mint_started_at") is not None:
                     logger.info(
                         "Not releasing another request's mint claim on "
@@ -1188,7 +1216,9 @@ class AcsService:
                     fresh.save(update_fields=["metadata"])
         # ACS just lost an answer, whichever request's it was: the
         # store's further requests wait.
-        voucher_hold.record_unknown_outcome(str(exc))
+        voucher_hold.record_unknown_outcome(
+            str(exc), cls._request_id(shipment, claim)
+        )
         if late_after_resolution:
             cls._alert_voucher_request_unknown(
                 order.id, str(exc), after_resolution=True

@@ -28,9 +28,11 @@ class AcsVoucherHold(models.Model):
 
     * **closed** (``trial_allowed_at`` empty): nothing is sent.
     * **one request first** (``trial_allowed_at`` set, by a read ACS
-      answered or by staff): one voucher request at a time is sent, each
-      for ``trial_until``. An answer from ACS ends the hold; an unknown
-      outcome closes it again and doubles the wait.
+      answered or by staff): one voucher request at a time is sent. The
+      request that goes takes the turn (``trial_request``) until
+      ``trial_until``, and only it settles the turn: its voucher ends the
+      hold, its unknown outcome closes the hold again and doubles the
+      wait. No turn is taken while both are empty.
     """
 
     started_at = models.DateTimeField(_("Held since"))
@@ -65,6 +67,17 @@ class AcsVoucherHold(models.Model):
     )
     trial_until = models.DateTimeField(
         _("First request in flight until"), null=True, blank=True
+    )
+    trial_request = models.CharField(
+        _("First request"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "The voucher request that has the turn: the shipment and the "
+            "request's own mint claim. Only this request's answer ends "
+            "the hold or closes it again."
+        ),
     )
 
     class Meta(TypedModelMeta):

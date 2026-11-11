@@ -6337,6 +6337,9 @@ msgstr "First name"
 msgid "First named by ACS at"
 msgstr "First named by ACS at"
 
+msgid "First request"
+msgstr "First request"
+
 msgid "First request in flight until"
 msgstr "First request in flight until"
 
@@ -7173,6 +7176,9 @@ msgstr "Height"
 
 msgid "Held since"
 msgstr "Held since"
+
+msgid "Held voucher request last retried at"
+msgstr "Held voucher request last retried at"
 
 msgid "Held: nothing is sent"
 msgstr "Held: nothing is sent"
@@ -9531,6 +9537,9 @@ msgstr "One request allowed since"
 
 msgid "One request first"
 msgstr "One request first"
+
+msgid "One voucher request was already allowed to go first. Nothing more was sent."
+msgstr "One voucher request was already allowed to go first. Nothing more was sent."
 
 msgid "One-click unsubscribe"
 msgstr "One-click unsubscribe"
@@ -15102,6 +15111,9 @@ msgstr "The voucher is already cancelled."
 msgid "The voucher number as the ACS portal shows it."
 msgstr "The voucher number as the ACS portal shows it."
 
+msgid "The voucher request that has the turn: the shipment and the request's own mint claim. Only this request's answer ends the hold or closes it again."
+msgstr "The voucher request that has the turn: the shipment and the request's own mint claim. Only this request's answer ends the hold or closes it again."
+
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 
@@ -16780,6 +16792,9 @@ msgstr "When enabled, customers can subscribe to a one-time email when this prod
 
 msgid "When enabled, this attribute is rendered as a variant selector (e.g. Colour, Memory) across a product's variant group instead of as a plain read-only specification."
 msgstr "When enabled, this attribute is rendered as a variant selector (e.g. Colour, Memory) across a product's variant group instead of as a plain read-only specification."
+
+msgid "When issue_held_acs_vouchers last sent this held request. It sends the one it tried longest ago first, so a request that cannot be sent never keeps the others waiting."
+msgstr "When issue_held_acs_vouchers last sent this held request. It sends the one it tried longest ago first, so a request that cannot be sent never keeps the others waiting."
 
 msgid "When set, only checkouts with this email can redeem the code — covers guests without an account"
 msgstr "When set, only checkouts with this email can redeem the code — covers guests without an account"

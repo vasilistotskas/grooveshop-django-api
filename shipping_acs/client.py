@@ -32,6 +32,7 @@ from shipping_acs.exceptions import (
     AcsConfigError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
+    AcsUndocumentedHttpError,
     AcsVoucherRequestHeldError,
     AcsVoucherRequestNotSentError,
 )
@@ -203,11 +204,14 @@ class AcsClient:
         params: dict[str, Any] | None = None,
         *,
         background: bool = False,
+        request_id: str = "",
     ) -> dict[str, Any]:
         """Perform an ACS RPC call and record what happened.
 
         ``background`` marks the tracking polls, which may not take the
         slots reserved for interactive calls (``acs_request_slot``).
+        ``request_id`` is given for a voucher request only: its identity
+        for the store's voucher hold (``_admit_voucher_request``).
 
         Returns the unwrapped ``ACSOutputResponce`` payload (note the
         misspelling — keep it on the wire side).  Raises typed
@@ -224,7 +228,9 @@ class AcsClient:
         started = time.monotonic()
         exchange = Exchange()
         try:
-            envelope = self._exchange(alias, params, background, exchange)
+            envelope = self._exchange(
+                alias, params, background, exchange, request_id
+            )
         except AcsVoucherRequestNotSentError:
             raise
         except Exception as exc:
@@ -247,6 +253,7 @@ class AcsClient:
         params: dict[str, Any] | None,
         background: bool,
         exchange: Exchange,
+        request_id: str,
     ) -> dict[str, Any]:
         """The wire exchange; ``exchange`` collects status and body."""
         body = {
@@ -265,7 +272,7 @@ class AcsClient:
                 background=background,
             ):
                 if alias == voucher_hold.HELD_ALIAS:
-                    self._admit_voucher_request(lease_seconds)
+                    self._admit_voucher_request(lease_seconds, request_id)
                 response = self._session.post(
                     self.api_base_url,
                     json=body,
@@ -338,7 +345,7 @@ class AcsClient:
             )
 
         if response.status_code >= 400:
-            raise AcsAPIError(
+            raise AcsUndocumentedHttpError(
                 alias=alias,
                 error_message=response.text[:500] or "ACS HTTP error",
                 http_status=response.status_code,
@@ -377,18 +384,23 @@ class AcsClient:
         )
 
     @staticmethod
-    def _admit_voucher_request(lease_seconds: float) -> None:
+    def _admit_voucher_request(lease_seconds: float, request_id: str) -> None:
         """Ask the store's voucher hold whether this request may be sent.
 
         Asked inside the slot, as the last thing before the POST: a
         request that waited for its slot behind one that failed is then
         held, so a failing ACS costs the requests in flight and not the
-        ones queued behind them. Nothing was sent when this raises, and
-        that includes a hold that could not be read: it must never look
-        like a request of unknown outcome.
+        ones queued behind them. ``request_id`` is the request's
+        identity (``AcsService._request_id``): the one let through first
+        takes the turn under it, and only its outcome settles the turn.
+        Nothing was sent when this raises, and that includes a hold that
+        could not be read: it must never look like a request of unknown
+        outcome.
         """
         try:
-            voucher_hold.admit(lease_seconds=lease_seconds)
+            voucher_hold.admit(
+                lease_seconds=lease_seconds, request_id=request_id
+            )
         except AcsVoucherRequestHeldError:
             raise
         except Exception as exc:
@@ -418,7 +430,9 @@ class AcsClient:
     # Voucher creation / management
     # ------------------------------------------------------------------
 
-    def create_voucher(self, params: dict[str, Any]) -> dict[str, Any]:
+    def create_voucher(
+        self, params: dict[str, Any], *, request_id: str
+    ) -> dict[str, Any]:
         """Call ``ACS_Create_Voucher``.
 
         ``params`` must include billing_code, recipient address fields,
@@ -426,11 +440,16 @@ class AcsClient:
         ``Acs_Station_Destination`` / ``Acs_Station_Branch_Destination``
         for Smartpoint pickups.
 
+        ``request_id`` names this request to the store's voucher hold
+        (``shipping_acs.voucher_hold.admit``).
+
         Returns the first ``ACSValueOutput`` row, which on success
         contains ``Voucher_No`` (and ``Voucher_No_Return`` when
         ``With_Return_Voucher`` was requested).
         """
-        envelope = self._call(voucher_hold.HELD_ALIAS, params)
+        envelope = self._call(
+            voucher_hold.HELD_ALIAS, params, request_id=request_id
+        )
         return self._value_output(envelope)
 
     def get_multipart_vouchers(self, main_voucher_no: str) -> list[str]:

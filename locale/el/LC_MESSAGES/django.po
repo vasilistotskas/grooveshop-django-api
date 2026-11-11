@@ -6342,6 +6342,9 @@ msgstr "Όνομα"
 msgid "First named by ACS at"
 msgstr "Πρώτη αναφορά από την ACS"
 
+msgid "First request"
+msgstr "Πρώτο αίτημα"
+
 msgid "First request in flight until"
 msgstr "Το πρώτο αίτημα εκκρεμεί έως"
 
@@ -7180,6 +7183,9 @@ msgstr "Ύψος"
 
 msgid "Held since"
 msgstr "Σε αναμονή από"
+
+msgid "Held voucher request last retried at"
+msgstr "Τελευταία νέα προσπάθεια του αιτήματος voucher σε αναμονή"
 
 msgid "Held: nothing is sent"
 msgstr "Σε αναμονή: δεν στέλνεται τίποτα"
@@ -9537,6 +9543,9 @@ msgstr "Ένα αίτημα επιτρέπεται από"
 
 msgid "One request first"
 msgstr "Πρώτα ένα αίτημα"
+
+msgid "One voucher request was already allowed to go first. Nothing more was sent."
+msgstr "Έχει ήδη επιτραπεί να σταλεί πρώτα ένα αίτημα voucher. Δεν στάλθηκε τίποτα άλλο."
 
 msgid "One-click unsubscribe"
 msgstr "Απεγγραφή με ένα κλικ"
@@ -15104,6 +15113,9 @@ msgstr "Το voucher έχει ήδη ακυρωθεί."
 msgid "The voucher number as the ACS portal shows it."
 msgstr "Ο αριθμός του voucher όπως τον δείχνει η πύλη της ACS."
 
+msgid "The voucher request that has the turn: the shipment and the request's own mint claim. Only this request's answer ends the hold or closes it again."
+msgstr "Το αίτημα voucher που έχει σειρά: η αποστολή και το αναγνωριστικό της δικής του έκδοσης. Μόνο η απάντηση σε αυτό το αίτημα τερματίζει την αναμονή ή την κλείνει ξανά."
+
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "Η ημερομηνία παραλαβής του voucher: η εκτέλεση λίστας παραλαβής που το ανέφερε πρώτη, ή η ημερομηνία που έφερε το αίτημα voucher του."
 
@@ -16782,6 +16794,9 @@ msgstr "Όταν είναι ενεργοποιημένο, οι πελάτες μ
 
 msgid "When enabled, this attribute is rendered as a variant selector (e.g. Colour, Memory) across a product's variant group instead of as a plain read-only specification."
 msgstr "Όταν είναι ενεργοποιημένο, αυτό το χαρακτηριστικό εμφανίζεται ως επιλογέας παραλλαγής (π.χ. Χρώμα, Μνήμη) σε όλη την ομάδα παραλλαγών ενός προϊόντος αντί ως απλή προδιαγραφή μόνο για ανάγνωση."
+
+msgid "When issue_held_acs_vouchers last sent this held request. It sends the one it tried longest ago first, so a request that cannot be sent never keeps the others waiting."
+msgstr "Πότε το issue_held_acs_vouchers έστειλε τελευταία φορά αυτό το αίτημα που ήταν σε αναμονή. Στέλνει πρώτα εκείνο που δοκίμασε πιο παλιά, ώστε ένα αίτημα που δεν μπορεί να σταλεί να μην κρατά ποτέ τα υπόλοιπα σε αναμονή."
 
 msgid "When set, only checkouts with this email can redeem the code — covers guests without an account"
 msgstr "Όταν ορίζεται, μόνο αγορές με αυτό το email μπορούν να εξαργυρώσουν τον κωδικό — καλύπτει επισκέπτες χωρίς λογαριασμό"

@@ -316,7 +316,8 @@ class TestVoucher:
         )
 
         result = client.create_voucher(
-            {"Recipient_Name": "TEST", "Weight": "1.0"}
+            {"Recipient_Name": "TEST", "Weight": "1.0"},
+            request_id="1:2026-11-11T10:00:00+00:00",
         )
         assert result["Voucher_No"] == "7227891234"
 

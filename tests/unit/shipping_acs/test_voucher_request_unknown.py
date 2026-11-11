@@ -70,7 +70,7 @@ class _Acs:
     deleted: list[str] = []
     delete_error: Exception | None = None
 
-    def create_voucher(self, params):
+    def create_voucher(self, params, *, request_id):
         _Acs.creates.append(params)
         if len(_Acs.creates) == 1 and _Acs.first_error is not None:
             raise _Acs.first_error
@@ -237,7 +237,9 @@ class TestTheTracedSequence:
         with patch.object(
             _Acs,
             "create_voucher",
-            lambda self, params: _Acs.creates.append(params) or {},
+            lambda self, params, *, request_id: (
+                _Acs.creates.append(params) or {}
+            ),
         ):
             with pytest.raises(AcsVoucherRequestUnknownError):
                 AcsService.create_voucher_for_order(shipment.order)
@@ -528,7 +530,7 @@ class TestALateAnswer:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_worker_b_gave_up(self, params):
+        def answer_after_worker_b_gave_up(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             return {"Voucher_No": V1, "Error_Message": ""}
@@ -794,7 +796,7 @@ class TestALateAnswerAfterStaffAdopted:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_staff_adopted(self, params):
+        def answer_after_staff_adopted(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             _Acs.summaries[V1] = {
@@ -840,7 +842,7 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_staff_resolved(self, params):
+        def answer_after_staff_resolved(self, params, *, request_id):
             _Acs.creates.append(params)
             # Worker B found A's claim expired: unknown outcome.
             _worker_b_finds_the_claim_expired(shipment)
@@ -1163,7 +1165,7 @@ class TestEveryWayIntoTheUnknownStateRecordsTheRequest:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_the_claim_expired(self, params):
+        def answer_after_the_claim_expired(self, params, *, request_id):
             _Acs.creates.append(params)
             # The request outlived its claim's TTL.
             with patch.object(AcsService, "_MINT_CLAIM_TTL_SECONDS", 0):
@@ -1224,7 +1226,7 @@ class TestAStaleRequestsFailureLeavesTheNextRequestAlone:
         shipment = _shipment()
         stamps = {}
 
-        def r1_fails(self, params):
+        def r1_fails(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             helper._request_again(shipment)
@@ -1311,7 +1313,7 @@ class TestAStaleRequestLostAfterTheCheckWasResolved:
         TestALateAnswerAfterStaffResolvedTheCheck._request_again(shipment)
         acs.first_error = None
 
-        def r2_answers_after_r1_was_lost(self, params):
+        def r2_answers_after_r1_was_lost(self, params, *, request_id):
             _Acs.creates.append(params)
             TestAStaleRequestLostAfterTheCheckWasResolved()._r1_lost(shipment)
             return {"Voucher_No": V2, "Error_Message": ""}
@@ -1526,7 +1528,7 @@ class TestAResetWhileAMintIsInFlight:
         shipment = _shipment()
         refused = []
 
-        def answer(self, params):
+        def answer(self, params, *, request_id):
             _Acs.creates.append(params)
             AcsShipment.objects.filter(pk=shipment.pk).update(
                 shipment_state=AcsShipmentState.CANCELED
@@ -1623,7 +1625,7 @@ class TestALateWorkerAndARequestAgain:
         acs.first_error = None
         shipment = _shipment()
 
-        def c_answers_after_a_saved(self, params):
+        def c_answers_after_a_saved(self, params, *, request_id):
             _Acs.creates.append(params)
             AcsShipment.objects.filter(pk=shipment.pk).update(
                 voucher_no=V1,
@@ -1833,7 +1835,7 @@ class TestTwoLostAnswersWithTheHoldInForce:
     ):
         first, second = _shipment(), _shipment()
 
-        def lose_both(self, params):
+        def lose_both(self, params, *, request_id):
             _Acs.creates.append(params)
             if len(_Acs.creates) == 1:
                 # The second request is out as well when this one's

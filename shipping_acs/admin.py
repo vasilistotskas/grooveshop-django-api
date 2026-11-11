@@ -1398,8 +1398,21 @@ class AcsVoucherHoldAdmin(BaseModelAdmin):
                 _("This hold is no longer in force."),
                 messages.WARNING,
             )
+        elif not voucher_hold.allow_trial():
+            # Nothing changed, so nothing is logged or dispatched: one
+            # request was already allowed (it is out, or goes on the
+            # next tick), or the hold ended a moment ago.
+            self.message_user(
+                request,
+                _("This hold is no longer in force.")
+                if voucher_hold.in_force() is None
+                else _(
+                    "One voucher request was already allowed to go first. "
+                    "Nothing more was sent."
+                ),
+                messages.WARNING,
+            )
         else:
-            voucher_hold.allow_trial()
             self.log_change(
                 request,
                 hold,

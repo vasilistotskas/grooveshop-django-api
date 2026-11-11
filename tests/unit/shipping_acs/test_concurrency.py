@@ -184,7 +184,7 @@ class TestClientUsesTheCap:
     @pytest.mark.parametrize(
         ("method", "kwargs"),
         [
-            ("create_voucher", {"params": {}}),
+            ("create_voucher", {"params": {}, "request_id": "1:claim"}),
             ("delete_voucher", {"voucher_no": "V1"}),
             ("print_voucher", {"voucher_no": "V1"}),
             ("issue_pickup_list", {"pickup_date": "2026-10-21"}),

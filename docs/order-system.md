@@ -1258,10 +1258,15 @@ accepting Cyprus orders at the Greek flat rate.
     row and no call log line, so the history of an outage shows only the
     creates that left.
   - **The stamp.** `voucher_request_held_at` goes only when ACS answers
-    the request (a voucher, a refusal, an HTTP 4xx) or its outcome becomes
-    unknown. A request that was let through and never reached ACS (a
-    connection never made, the request cap, 403/406) keeps it, so the
-    sweep still sends the order after the task's retries are spent. Like
+    the request (a voucher, a refusal), its outcome becomes unknown, or
+    the order can no longer be sent: its request cannot be built, or the
+    mint refuses it because the shopper owes the money online again
+    (`ShipmentAwaitingPaymentError`; the payment that settles it
+    dispatches the mint again). A request that was let through and never
+    reached ACS (a connection never made, the request cap, 403/406), or
+    that something other than ACS answered (an HTTP 4xx outside ACS's
+    envelope, `AcsUndocumentedHttpError`), keeps it, so the sweep still
+    sends the order after the task's retries are spent. Like
     the claim (#647), the stamp is a request's to settle only while the
     row holds that request's claim: a stale answer (its claim expired,
     staff requested again, and that later request is held) is deleted at
@@ -1277,23 +1282,37 @@ accepting Cyprus orders at the Greek flat rate.
     writes nothing). No answer: nothing else is sent. An answer, or staff
     pressing **ACS answers again: send one request** on the hold (admin:
     ACS voucher holds; change permission; recorded in the admin log),
-    allows **one request first**: the oldest held order, one at a time
-    (a row lock on the hold picks it across workers; it holds the turn
-    for `client.worst_case_request_seconds`, so a dead worker does not
-    block the next).
+    allows **one request first**, one at a time: a row lock on the hold
+    picks it across workers, and the request that goes takes the turn
+    (`AcsVoucherHold.trial_request`: the shipment and that request's
+    mint claim) for `client.worst_case_request_seconds` (78 s at the
+    default `ACS_HTTP_TIMEOUT`, shorter than the 5-minute tick, so a turn
+    a dead worker never gave back is over before the next tick).
+  - **Which held order goes first.** The one the sweep tried longest ago:
+    never tried before all others, then the one held longest
+    (`voucher_request_retried_at`, written by the sweep before it
+    dispatches). So an order whose request cannot be sent, whatever the
+    reason, is not chosen on every tick while the rest wait behind it.
   - **What ends it, by what each answer proves** (the table in
     `shipping_acs/voucher_hold.py` is the rule):
 
-    | Outcome of the one request | The order | The hold |
+    | Outcome of the request that has the turn | The order | The hold |
     |---|---|---|
-    | ACS returns a voucher | saved | **ends**: creating a voucher works. The rest follow on the next tick, oldest first, spaced by `ACS_POLL_DISPATCH_SPACING_SECONDS` |
-    | ACS refuses in its own envelope (`ACSExecution_HasError`, a value-row `Error_Message`) | rejected as before (`ops.shipment_rejected`), no longer held | stays "one request first", the turn free at once: ACS executed a create, nothing shows one succeeds. The next held order goes next |
-    | an HTTP 4xx that is not ACS's envelope (the manual has 200, 403, 406 only: a proxy's 429, a gateway's 404) | rejected as before, no longer held | **closes again, wait doubled**: it says nothing about ACS. Without a hold it begins none |
+    | ACS returns a voucher | saved | **ends**: creating a voucher works. The rest follow on the next tick, spaced by `ACS_POLL_DISPATCH_SPACING_SECONDS` |
+    | ACS refuses in its own envelope (`ACSExecution_HasError`, a value-row `Error_Message`) | rejected as before (`ops.shipment_rejected`, "fix the address"), no longer held | stays "one request first", the turn free at once: ACS executed a create, nothing shows one succeeds. The next held order goes next |
+    | an HTTP 4xx that is not ACS's envelope (the manual has 200, 403, 406 only: a proxy's 429, a gateway's 404) | as it was: a held order **stays held**, with no alert; one that was not held is rejected as before and staff are told to send it again (not to fix an address) | **closes again, wait doubled**: it says nothing about ACS, and nothing about the order. Without a hold it begins none |
     | unknown outcome | #626's state, no longer held | closes again, wait doubled (`AcsVoucherHold.retry_after`, capped by `ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS`, 3600) |
-    | never reached ACS | still held | unchanged; the turn ends with its lease |
+    | never reached ACS (a connection never made, 403/406) | still held | stays "one request first", **the turn free at once**: ACS processed nothing, and that is known now |
+    | stopped before its turn (the request cap, a hold that could not be read) | still held | unchanged: it never had the turn |
 
-    A refused or rejected order leaves the held requests, so it is never
-    the one request sent first twice.
+    **Only the request that has the turn settles it.** Another request of
+    the store can still be out: it left before the hold began, or its
+    turn ended with its lease and the next request took it. Its outcome
+    is its own order's and leaves the hold as it is: its voucher does not
+    end the hold (it shows nothing newer than the lost answer, the reason
+    a voucher changes nothing while the hold is closed), its refusal or
+    4xx frees and doubles nothing, and its unknown outcome is recorded as
+    the last failure without counting as a failed first request.
   - **Staff see one state.** The dashboard row "ACS voucher requests are
     held" (since when; `in_force=yes` on the hold list) and the shipment
     filter `attention=voucher_held`; there is no email and no order note

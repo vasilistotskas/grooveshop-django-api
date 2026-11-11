@@ -140,7 +140,9 @@ def test_the_sweep_of_one_store_sends_only_its_own_held_requests(two_stores):
     remote = _Acs(failing_company="nobody")
     for tenant in two_stores:
         with tenant_context(tenant):
-            voucher_hold.record_unknown_outcome("ACS server error 502")
+            voucher_hold.record_unknown_outcome(
+                "ACS server error 502", "0:2026-11-11T10:00:00+00:00"
+            )
         assert _request_a_voucher(tenant, remote)["status"] == (
             "voucher_request_held"
         )

@@ -172,6 +172,7 @@ class TagAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Activate selected tags"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -190,6 +191,7 @@ class TagAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Deactivate selected tags"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )

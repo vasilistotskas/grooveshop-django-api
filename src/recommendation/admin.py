@@ -125,6 +125,7 @@ class RecommendationSlotAdmin(BaseModelAdmin):
 
     @action(
         description=_("Reset all slots to the store's preset"),
+        permissions=["change"],
         icon="restart_alt",
         dialog=ActionDialog(
             title=_("Reset every slot to the preset?"),
@@ -156,6 +157,7 @@ class RecommendationSlotAdmin(BaseModelAdmin):
 
     @action(
         description=_("Reset to the store's preset"),
+        permissions=["change"],
         icon="restart_alt",
         dialog=ActionDialog(
             title=_("Reset this slot to the preset?"),

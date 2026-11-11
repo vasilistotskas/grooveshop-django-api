@@ -43,7 +43,7 @@ URL_BACKED = {"actions_row", "actions_list", "actions_detail"}
 
 def _request():
     request = RequestFactory().get("/")
-    request.user = get_user_model()(id=1, username="staff")
+    request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     return request
 
 

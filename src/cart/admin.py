@@ -566,6 +566,7 @@ class CartItemAdmin(BaseModelAdmin):
 
     @action(
         description=_("Increase quantity by 1"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="add",
     )
@@ -580,6 +581,7 @@ class CartItemAdmin(BaseModelAdmin):
 
     @action(
         description=_("Decrease quantity by 1"),
+        permissions=["change", "delete"],
         variant=ActionVariant.WARNING,
         icon="remove",
     )
@@ -597,6 +599,7 @@ class CartItemAdmin(BaseModelAdmin):
 
     @action(
         description=_("Remove from cart"),
+        permissions=["delete"],
         variant=ActionVariant.DANGER,
         icon="delete",
     )

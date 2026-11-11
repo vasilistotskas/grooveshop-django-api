@@ -549,6 +549,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
 
     @action(
         description=_("Mark selected posts as featured"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
@@ -563,6 +564,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
 
     @action(
         description=_("Remove featured mark from selected posts"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
@@ -577,6 +579,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
 
     @action(
         description=_("Publish selected posts"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
@@ -610,6 +613,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
 
     @action(
         description=_("Unpublish selected posts"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
@@ -624,6 +628,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
 
     @action(
         description=_("Reset view count to zero"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="visibility_off",
     )
@@ -754,6 +759,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Approve selected comments"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -768,6 +774,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Unapprove selected comments"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -782,6 +789,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Mark as spam and delete"),
+        permissions=["delete"],
         variant=ActionVariant.DANGER,
         icon="report",
     )

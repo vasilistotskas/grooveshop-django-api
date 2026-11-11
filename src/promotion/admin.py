@@ -306,7 +306,9 @@ class PromotionAdmin(BaseTranslatableAdmin):
     def redemptions_count(self, obj):
         return obj.redemptions_total
 
-    @action(description=_("Activate selected promotions"))
+    @action(
+        description=_("Activate selected promotions"), permissions=["change"]
+    )
     def activate_promotions(self, request, queryset):
         updated = update_each(queryset, is_active=True)
         self.message_user(
@@ -315,7 +317,9 @@ class PromotionAdmin(BaseTranslatableAdmin):
             messages.SUCCESS,
         )
 
-    @action(description=_("Deactivate selected promotions"))
+    @action(
+        description=_("Deactivate selected promotions"), permissions=["change"]
+    )
     def deactivate_promotions(self, request, queryset):
         updated = update_each(queryset, is_active=False)
         self.message_user(
@@ -326,6 +330,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Generate codes"),
+        permissions=["change"],
         icon="confirmation_number",
         dialog=ActionDialog(
             title=_("Bulk-generate coupon codes"),
@@ -365,7 +370,11 @@ class PromotionAdmin(BaseTranslatableAdmin):
             }
         )
 
-    @action(description=_("Duplicate"), icon="content_copy")
+    @action(
+        description=_("Duplicate"),
+        icon="content_copy",
+        permissions=["duplicate"],
+    )
     def duplicate_promotion(
         self, request: HttpRequest, object_id: int
     ) -> HttpResponse:
@@ -415,6 +424,13 @@ class PromotionAdmin(BaseTranslatableAdmin):
         return redirect(
             reverse("admin:promotion_promotion_change", args=[clone.pk])
         )
+
+    def has_duplicate_permission(self, request, object_id=None) -> bool:
+        """A copy is a new promotion, so it asks what adding one asks.
+        Not ``permissions=["add"]``: Unfold hands a detail action's
+        permission the object id, which ``has_add_permission`` does not
+        take."""
+        return self.has_add_permission(request)
 
 
 @admin.register(PromotionCode)

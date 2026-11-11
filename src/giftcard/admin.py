@@ -278,6 +278,7 @@ class GiftCardAdmin(BaseModelAdmin):
 
     @action(
         description=_("Adjust balance"),
+        permissions=["change"],
         icon="tune",
         dialog=ActionDialog(
             title=_("Adjust gift card balance"),
@@ -348,7 +349,7 @@ class GiftCardAdmin(BaseModelAdmin):
             }
         )
 
-    @action(description=_("Disable card"), icon="block")
+    @action(description=_("Disable card"), icon="block", permissions=["change"])
     def disable_card(
         self, request: HttpRequest, object_id: int
     ) -> HttpResponse:
@@ -362,7 +363,11 @@ class GiftCardAdmin(BaseModelAdmin):
             reverse("admin:giftcard_giftcard_change", args=[object_id])
         )
 
-    @action(description=_("Resend delivery email"), icon="forward_to_inbox")
+    @action(
+        description=_("Resend delivery email"),
+        icon="forward_to_inbox",
+        permissions=["change"],
+    )
     def resend_delivery(
         self, request: HttpRequest, object_id: int
     ) -> HttpResponse:

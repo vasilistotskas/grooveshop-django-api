@@ -539,6 +539,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Print labels for selected shipments"),
+        permissions=["change"],
         icon="print",
         variant=ActionVariant.PRIMARY,
     )
@@ -605,6 +606,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Re-poll tracking for selected shipments"),
+        permissions=["change"],
         icon="refresh",
         variant=ActionVariant.INFO,
     )
@@ -633,6 +635,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         description=str(
             _("Retire selected shipments (mark CANCELED, stop polling)")
         ),
+        permissions=["change"],
         icon="block",
         variant=ActionVariant.DANGER,
     )
@@ -690,6 +693,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Issue ACS pickup list now"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
     )
     def issue_pickup_list_now(self, request):
@@ -742,6 +746,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Re-poll ACS tracking"),
+        permissions=["change"],
         variant=ActionVariant.INFO,
     )
     def repoll_tracking(self, request, object_id):
@@ -753,6 +758,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Record COD received outside ACS"),
+        permissions=["change"],
         icon="payments",
         dialog=ActionDialog(
             title=_("Record COD received outside ACS"),
@@ -800,6 +806,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Cancel ACS voucher"),
+        permissions=["change"],
         icon="cancel",
         variant=ActionVariant.DANGER,
         dialog=ActionDialog(
@@ -863,6 +870,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Adopt ACS voucher"),
+        permissions=["change"],
         icon="link",
         dialog=ActionDialog(
             title=_("Adopt the voucher ACS holds for this order"),
@@ -901,6 +909,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("No voucher at ACS: request again"),
+        permissions=["change"],
         icon="refresh",
         variant=ActionVariant.WARNING,
         dialog=ActionDialog(
@@ -937,6 +946,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("No voucher needed: close"),
+        permissions=["change"],
         icon="block",
         dialog=ActionDialog(
             title=_("Close the voucher check"),
@@ -969,6 +979,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Issue ACS voucher now"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
     )
     def issue_voucher_now(self, request, object_id):
@@ -1231,6 +1242,7 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
 
     @action(
         description=_("Delete at ACS"),
+        permissions=["change"],
         icon="delete",
         variant=ActionVariant.DANGER,
         dialog=ActionDialog(
@@ -1268,6 +1280,7 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
 
     @action(
         description=_("Mark as checked"),
+        permissions=["change"],
         icon="task_alt",
         dialog=ActionDialog(
             title=_("Mark this voucher as checked"),
@@ -1556,6 +1569,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @action(
         description=_("Mark as reconciled"),
+        permissions=["change"],
         icon="task_alt",
         dialog=ActionDialog(
             title=_("Mark payout as reconciled"),
@@ -1597,6 +1611,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @action(
         description=_("Run COD reconciliation now"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
     )
     def run_reconciliation(self, request):

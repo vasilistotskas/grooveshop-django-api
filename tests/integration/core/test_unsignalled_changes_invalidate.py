@@ -18,6 +18,7 @@ from unittest import mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.utils import timezone
 
@@ -76,7 +77,7 @@ def purged():
 def _admin_call(admin_class, model, name, *args):
     admin = admin_class(model, AdminSite())
     request = RequestFactory().post("/admin/")
-    request.user = None
+    request.user = get_user_model()(is_superuser=True)
     with (
         mock.patch.object(admin_class, "message_user"),
         mock.patch.object(admin_class, "_back_to", create=True),

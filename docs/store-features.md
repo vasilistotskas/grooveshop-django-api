@@ -246,6 +246,12 @@ How it is wired:
   from `has_module_permission`) and a typed URL follow the same predicate.
   `MyAdminSite.get_tabs_list` keeps a tab of `UNFOLD["TABS"]` only while its
   page opens, through Unfold's own per-tab `has_permission`.
+- An admin action follows the same predicate only because its decorator names
+  the permission (`permissions=["change"]`): Unfold serves `actions_list`,
+  `actions_row` and `actions_detail` at URLs of their own and checks nothing
+  but what the decorator was given. An action with none ran for every
+  signed-in member of the store's staff, on a read-only page too (#646);
+  `tests/unit/admin/test_actions_declare_permissions.py` fails for one.
 - `feature_gates` on an admin lists `Gate(feature, fields=…, filters=…,
   kind=…, data=Q(...))`: the fields (an emptied fieldset goes with them) and the
   list filters hidden while the feature is not shown. `data` is the filter that

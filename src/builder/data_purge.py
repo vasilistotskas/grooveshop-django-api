@@ -212,22 +212,34 @@ def _promotion_documents() -> set[str]:
 # --- the receivers --------------------------------------------------------
 
 
-def _remember(attribute: str, model, field: str):
-    """A ``pre_save`` that keeps the stored value of ``field`` on the
-    instance, so the receiver after the save knows where the record WAS."""
+def _remember(model, **attributes: str):
+    """A ``pre_save`` that keeps on the instance the stored value of each
+    field (``attribute=field``), read in ONE query, so the receiver after the
+    save knows where the record WAS."""
+    fields = tuple(attributes.values())
 
     def receiver(sender, instance, **kwargs):
         if kwargs.get("raw") or instance.pk is None:
             return
-        setattr(
-            instance,
-            attribute,
+        row = (
             model._base_manager.filter(pk=instance.pk)
-            .values_list(field, flat=True)
-            .first(),
+            .values_list(*fields)
+            .first()
         )
+        for attribute, value in zip(
+            attributes, row or (None,) * len(fields), strict=True
+        ):
+            setattr(instance, attribute, value)
 
     return receiver
+
+
+def _availability_flipped(instance) -> bool:
+    """Whether the save moved the product between available (stock above
+    zero, the storefront's own test) and sold out. Needs the stock read
+    before the save; without it nothing is known and nothing flips."""
+    before = getattr(instance, "_builder_old_stock", None)
+    return before is not None and (before > 0) != (instance.stock > 0)
 
 
 def _later(compute) -> None:
@@ -270,7 +282,15 @@ def connect(*, force: bool = False) -> None:
     promotion_tr = apps.get_model("promotion.PromotionTranslation")
 
     def saved_product(sender, instance, **kwargs):
-        if _skip(kwargs):
+        # A save of ``stock`` alone changes no page, except when it sells the
+        # product out or brings it back: a list that puts products in stock
+        # first or leaves sold-out ones out then shows something else. The
+        # index records a list's facets (``*``, ``category:<id>``), not its
+        # ``stock`` rule, so the flip reaches every list a product edit
+        # reaches; over-purging is the safe direction and the flip is rare.
+        if kwargs.get("raw") or (
+            _skip(kwargs) and not _availability_flipped(instance)
+        ):
             return
         before = getattr(instance, "_builder_old_category", None)
         _later(
@@ -359,19 +379,23 @@ def connect(*, force: bool = False) -> None:
 
     _connect(
         pre_save,
-        _remember("_builder_old_category", product, "category_id"),
+        _remember(
+            product,
+            _builder_old_category="category_id",
+            _builder_old_stock="stock",
+        ),
         product,
         "builder-data:pre:product",
     )
     _connect(
         pre_save,
-        _remember("_builder_old_parent", category, "parent_id"),
+        _remember(category, _builder_old_parent="parent_id"),
         category,
         "builder-data:pre:category",
     )
     _connect(
         pre_save,
-        _remember("_builder_old_category", post, "category_id"),
+        _remember(post, _builder_old_category="category_id"),
         post,
         "builder-data:pre:post",
     )

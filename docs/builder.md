@@ -311,9 +311,12 @@ transaction commits and queue them in a per-store Redis set; the batched purge
 (`core.cache.invalidation`) then sends the storefront `builderDocuments`
 (document keys, at most 64 per call, `patterns` empty) through the
 `builder_documents` surface, and the storefront maps a key to its own routes.
-A save of `stock` or `updated_at` alone queues nothing, so a list that
-orders or filters by `stock` is not purged when only stock moved. A promotion
-reaches the offer lists and every page that shows a product. Over-purging is safe;
+A save of `stock` or `updated_at` alone queues nothing, unless it sells the
+product out or brings it back (stock crossing zero): a list that puts products
+in stock first or leaves sold-out ones out then shows something else, so the
+save reaches the same pages a product edit does. The index records a list's
+facets, not its `stock` rule, so every list is reached. A promotion reaches
+the offer lists and every page that shows a product. Over-purging is safe;
 under-purging is the bug, so a list is matched by ANY of its facets.
 
 ## Writes

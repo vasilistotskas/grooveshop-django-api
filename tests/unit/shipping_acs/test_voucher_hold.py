@@ -810,6 +810,74 @@ class TestWhatEndsAHold:
 
         assert "Fix the address" in alerted.call_args.kwargs["remedy"]
 
+    def _held_order_sent_after_the_hold_ended(self, acs, answer):
+        """The hold ended with the first order's voucher; the second held
+        order is sent on the next tick, with no hold in force, and gets
+        ``answer``."""
+        first, second = self._one_request_first(acs)
+        issue_held_acs_vouchers.run()
+        first.refresh_from_db()
+        assert first.voucher_no
+        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
+        acs.create.append(answer)
+
+        with patch(ALERT) as alerted:
+            result = issue_held_acs_vouchers.run()
+            # And nothing sends it again on the ticks after.
+            later = [issue_held_acs_vouchers.run() for _tick in range(2)]
+
+        assert result == {"status": "open", "dispatched": 1}
+        assert later == [{"status": "open", "dispatched": 0}] * 2
+        assert acs.orders_requested().count(str(second.order_id)) == 1
+        second.refresh_from_db()
+        assert second.voucher_no is None
+        assert second.voucher_request_held_at is None
+        assert second.voucher_request_unknown_at is None
+        assert "mint_started_at" not in second.metadata
+        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
+        alerted.assert_called_once()
+        return alerted.call_args.kwargs
+
+    @pytest.mark.parametrize("status", [400, 429])
+    def test_an_http_error_for_a_held_order_with_no_hold_in_force_is_staffs(
+        self, acs, sent, status
+    ):
+        """With no hold in force a held order's request is an ordinary
+        request again. Its 4xx from something that is not ACS is handled
+        like any order's: it leaves the sweep and staff are told once,
+        or the same request would be repeated every tick with nobody
+        told."""
+        alert = self._held_order_sent_after_the_hold_ended(
+            acs, _response(status, text="<html>proxy</html>")
+        )
+
+        assert str(status) in alert["error"]
+        assert "address" not in alert["remedy"]
+        assert "Issue ACS voucher now" in alert["remedy"]
+
+    def test_a_refusal_for_a_held_order_with_no_hold_in_force_is_staffs(
+        self, acs, sent
+    ):
+        alert = self._held_order_sent_after_the_hold_ended(
+            acs, _answer({"Voucher_No": None, "Error_Message": "Λάθος ΤΚ"})
+        )
+
+        assert "Fix the address" in alert["remedy"]
+
+    def test_the_hold_says_whether_a_held_order_stays_held(self, acs, sent):
+        assert voucher_hold.record_no_answer("ACS HTTP 429", OTHER) is False
+
+        _lose_one_answer(acs)
+
+        assert voucher_hold.record_no_answer("ACS HTTP 429", OTHER) is True
+        # A hold that cannot be read: the order is kept for the next
+        # tick, not dropped from the sweep on a failure of ours.
+        with patch(
+            "shipping_acs.voucher_hold._locked",
+            side_effect=RuntimeError("no database"),
+        ):
+            assert voucher_hold.record_no_answer("ACS HTTP 429", OTHER) is True
+
     def test_an_http_error_without_a_hold_begins_none(self, acs, sent):
         acs.create.append(_response(429, text="<html>proxy</html>"))
         shipment = _shipment()

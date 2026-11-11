@@ -1264,9 +1264,13 @@ accepting Cyprus orders at the Greek flat rate.
     (`ShipmentAwaitingPaymentError`; the payment that settles it
     dispatches the mint again). A request that was let through and never
     reached ACS (a connection never made, the request cap, 403/406), or
-    that something other than ACS answered (an HTTP 4xx outside ACS's
-    envelope, `AcsUndocumentedHttpError`), keeps it, so the sweep still
-    sends the order after the task's retries are spent. Like
+    that something other than ACS answered while a hold is in force (an
+    HTTP 4xx outside ACS's envelope, `AcsUndocumentedHttpError`), keeps
+    it, so the sweep still sends the order after the task's retries are
+    spent. With no hold in force (the hold ended and the sweep is sending
+    what waited) a held order's request is an ordinary request again:
+    that 4xx, like a refusal, takes it out of the sweep and alerts staff
+    once, so nothing is repeated every tick with nobody told. Like
     the claim (#647), the stamp is a request's to settle only while the
     row holds that request's claim: a stale answer (its claim expired,
     staff requested again, and that later request is held) is deleted at
@@ -1300,7 +1304,7 @@ accepting Cyprus orders at the Greek flat rate.
     |---|---|---|
     | ACS returns a voucher | saved | **ends**: creating a voucher works. The rest follow on the next tick, spaced by `ACS_POLL_DISPATCH_SPACING_SECONDS` |
     | ACS refuses in its own envelope (`ACSExecution_HasError`, a value-row `Error_Message`) | rejected as before (`ops.shipment_rejected`, "fix the address"), no longer held | stays "one request first", the turn free at once: ACS executed a create, nothing shows one succeeds. The next held order goes next |
-    | an HTTP 4xx that is not ACS's envelope (the manual has 200, 403, 406 only: a proxy's 429, a gateway's 404) | as it was: a held order **stays held**, with no alert; one that was not held is rejected as before and staff are told to send it again (not to fix an address) | **closes again, wait doubled**: it says nothing about ACS, and nothing about the order. Without a hold it begins none |
+    | an HTTP 4xx that is not ACS's envelope (the manual has 200, 403, 406 only: a proxy's 429, a gateway's 404) | a held order **stays held** while a hold is in force (always so for the request that has the turn: the hold closes again), with no alert; with no hold in force, or for an order that was not held, it is rejected as before and staff are told once to send it again (not to fix an address) | **closes again, wait doubled**: it says nothing about ACS, and nothing about the order. Without a hold it begins none |
     | unknown outcome | #626's state, no longer held | closes again, wait doubled (`AcsVoucherHold.retry_after`, capped by `ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS`, 3600) |
     | never reached ACS (a connection never made, 403/406) | still held | stays "one request first", **the turn free at once**: ACS processed nothing, and that is known now |
     | stopped before its turn (the request cap, a hold that could not be read) | still held | unchanged: it never had the turn |

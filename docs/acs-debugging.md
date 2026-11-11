@@ -105,7 +105,7 @@ the request may have reached ACS (`AcsClient._exchange`):
 | 403 / 406 | `AcsAuthError` | the manual's rejections (p. 1-2): claim released, Celery retries |
 | an ACS voucher hold in force (`Not sent: ...`) | `AcsVoucherRequestHeldError` | never sent: no claim kept, `voucher_request_held_at` stamped, sent later by `issue_held_acs_vouchers` (below) |
 | `ACSExecution_HasError`, a value row `Error_Message` | `AcsAPIError` | ACS refused: claim released, `ops.shipment_rejected` ("fix the address") |
-| any other 4xx (not ACS's envelope: a proxy's, a gateway's) | `AcsUndocumentedHttpError` | nothing was made and nothing was said about the order: claim released; a held order stays held, any other gets `ops.shipment_rejected` with "send the request again" |
+| any other 4xx (not ACS's envelope: a proxy's, a gateway's) | `AcsUndocumentedHttpError` | nothing was made and nothing was said about the order: claim released; a held order stays held while a voucher hold is in force, any other (not held, or held with no hold in force) gets `ops.shipment_rejected` with "send the request again" |
 | `ReadTimeout`, any other `ConnectionError` (urllib3's `ProtocolError`, a connection dropped after the body left, arrives as a plain `ConnectionError`), any 5xx, a non-JSON 200 | `AcsOutcomeUnknownError` | **unknown** |
 | an exception the client does not classify; a 200 with neither `Voucher_No` nor `Error_Message`; a claim older than `_MINT_CLAIM_TTL_SECONDS` (a worker stopped between the request and the save) | | **unknown** |
 

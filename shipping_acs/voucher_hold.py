@@ -37,11 +37,13 @@ ACS refuses in its own envelope             rejected, staff's to   stays "one re
 (``ACSExecution_HasError``, a value-row     fix (#626); no longer  the turn is free at once.
 ``Error_Message``; :func:`record_refusal`)  held                   ACS executed a create, but
                                                                    nothing shows one succeeds.
-An HTTP 4xx that is not ACS's envelope      as it was: a held      closes again, the wait
-(the manual has 200, 403 and 406 only, so   order stays held; one  doubled. It says nothing
-a 400/401/404/429 is a proxy's or a         that was not is        about ACS, and nothing
-gateway's; :func:`record_no_answer`)        rejected (#626) and    about the order. Begins no
-                                            staff send it again    hold.
+An HTTP 4xx that is not ACS's envelope      a held order stays     closes again, the wait
+(the manual has 200, 403 and 406 only, so   held while a hold is   doubled. It says nothing
+a 400/401/404/429 is a proxy's or a         in force. With none,   about ACS, and nothing
+gateway's; :func:`record_no_answer`)        or if it was not       about the order. Begins no
+                                            held: rejected (#626)  hold.
+                                            and staff send it
+                                            again
 Unknown (a lost answer;                     unknown outcome        closes again, the wait
 :func:`record_unknown_outcome`)             (#626); no longer      doubled.
                                             held
@@ -80,6 +82,14 @@ nobody gave back is over before the next tick and costs at most the tick
 it was taken in. Every outcome that is known gives the turn back at once.
 A request whose lease ran out still has the turn until another request
 takes it, so its late answer still decides.
+
+**With no hold in force a held order's request is an ordinary request
+again** (the hold ended and the sweep is sending what waited). Whatever
+answers it is handled as for any order, so nothing is repeated tick after
+tick with nobody told: ACS's refusal and an HTTP 4xx that is not ACS's
+both take the order out of the sweep and alert staff once (to fix the
+address, or to send the request again). Only a hold in force keeps an
+order held after such a 4xx, and the hold is then what staff see.
 
 A refused order leaves the held requests, and the sweep sends the held
 order it tried longest ago, so no order is the one request sent first on
@@ -244,21 +254,29 @@ def record_not_sent(request_id: str) -> None:
     _give_the_turn_back(request_id)
 
 
-def record_no_answer(error: str, request_id: str) -> None:
+def record_no_answer(error: str, request_id: str) -> bool:
     """``request_id`` got an HTTP 4xx that is not ACS's envelope: when
     that request has the turn, the hold closes again.
 
     Without a hold it begins none, and from any other request it changes
     nothing: the 4xx is a known outcome and says nothing new about ACS.
-    Never raises.
+
+    Returns whether a hold is in force, which is whether an order that
+    was held stays held: with none, its request was an ordinary one and
+    the 4xx is staff's to act on. Never raises; a hold that could not be
+    read counts as in force, so the order is kept for the next tick
+    rather than dropped on a failure here.
     """
     try:
         with transaction.atomic():
             hold = _locked()
-            if hold is not None and _has_the_turn(hold, request_id):
+            if hold is None:
+                return False
+            if _has_the_turn(hold, request_id):
                 _record_failure(hold, error, of_the_first_request=True)
     except Exception:
         logger.exception("Could not close the ACS voucher hold again")
+    return True
 
 
 def record_unknown_outcome(error: str, request_id: str) -> None:

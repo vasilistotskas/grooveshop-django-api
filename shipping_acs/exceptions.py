@@ -74,8 +74,8 @@ class AcsUndocumentedHttpError(AcsAPIError):
     answer ACS does not document. A known outcome, like every 4xx: no
     voucher was made (#626). But it says nothing about what was asked,
     so it is not ACS refusing the order: staff are not told to fix an
-    address, and an order whose request was held stays held
-    (``shipping_acs.voucher_hold``).
+    address, and while a voucher hold is in force an order whose request
+    was held stays held (``shipping_acs.voucher_hold``).
     """
 
 

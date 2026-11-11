@@ -454,8 +454,10 @@ class AcsService:
         refusal), its outcome becomes unknown, or the order can no longer
         be sent (it awaits payment again, its request cannot be built). A
         request that never reached ACS, or that something other than ACS
-        answered (an HTTP 4xx outside ACS's envelope), keeps it, so the
-        sweep still owns it when the task's retries are spent. What each
+        answered (an HTTP 4xx outside ACS's envelope) while a hold is in
+        force, keeps it, so the sweep still owns it when the task's
+        retries are spent. With no hold in force that 4xx is staff's, as
+        for any order. What each
         outcome does to the hold is the table in
         ``shipping_acs.voucher_hold``.
         """
@@ -618,11 +620,13 @@ class AcsService:
                 voucher_hold.record_not_sent(request_id)
                 held = None
             elif isinstance(exc, AcsUndocumentedHttpError):
-                # Not ACS's answer, so nothing was said about the order:
-                # an order that was waiting still is. Only ACS's own
-                # refusal below takes it out of the sweep.
-                voucher_hold.record_no_answer(str(exc), request_id)
-                held = None
+                # Not ACS's answer, so nothing was said about the order.
+                # While a hold is in force an order that was waiting
+                # still is. With none in force its request was an
+                # ordinary one: it leaves the sweep, and the task tells
+                # staff, instead of being sent again on every tick.
+                in_force = voucher_hold.record_no_answer(str(exc), request_id)
+                held = None if in_force else False
             else:
                 # ACS refused it in its own envelope: staff's to fix.
                 voucher_hold.record_refusal(request_id)
@@ -991,10 +995,12 @@ class AcsService:
 
         ``held`` settles the voucher hold's stamp in the same
         transaction: True for a request the hold kept from ACS, False
-        for one ACS refused or that could not be built (it no longer
+        for one ACS refused, that could not be built, or that something
+        other than ACS answered while no hold is in force (it no longer
         waits for ACS). None leaves the stamp as it is: the request never
-        reached ACS, or was answered by something that is not ACS, so an
-        order that was waiting still is. Like the claim, the
+        reached ACS, or was answered by something that is not ACS while a
+        hold is in force, so an order that was waiting still is. Like the
+        claim, the
         stamp is this request's to settle only while the row holds its
         claim: once the claim was taken, a stamp on the row is a later
         request's (staff requested again and that one is held), and a

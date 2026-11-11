@@ -205,8 +205,8 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
     except AcsUndocumentedHttpError as exc:
         # An HTTP 4xx that is not ACS's own answer (a proxy's, a
         # gateway's): no voucher was made, and nothing was said about
-        # the order. An order whose request was held still waits for
-        # ACS, and ``issue_held_acs_vouchers`` sends it again.
+        # the order. While a hold is in force the service left a held
+        # order held, and ``issue_held_acs_vouchers`` sends it again.
         if voucher_requests_held().filter(order_id=order_id).exists():
             logger.warning(
                 "ACS voucher request for order %s was answered by "
@@ -220,8 +220,9 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
                 "order_id": order_id,
                 "message": str(exc),
             }
-        # Nothing sends any other order again by itself, so staff are
-        # told, and not to fix an address that nobody refused.
+        # Nothing sends any other order again by itself (one that was
+        # not held, or was held with no hold in force any more), so
+        # staff are told, and not to fix an address that nobody refused.
         from shipping.alerts import alert_admins_shipment_creation_failed
 
         logger.error(

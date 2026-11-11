@@ -232,7 +232,9 @@ the parcel, so a customer cancel is only accepted once the courier agrees:
    is not asked), then calls `ShippingService.cancel_shipment` — the same
    carrier path a staff cancel uses (`AcsService.cancel_voucher`,
    `BoxNowService.cancel_shipment`). An order with no voucher has nothing to
-   ask, and goes on.
+   ask, and goes on; a BoxNow shipment with no parcel number whose creation
+   was sent is first looked up at BoxNow by `orderNumber`, and a parcel
+   found there is cancelled like any other ([§5.2](shipping-boxnow.md)).
 2. If the courier confirms, the order cancels and refunds as usual, and
    `metadata['cancellation']['shipment_cancel']` is
    `{"attempted": true, "dispatched": <bool>}`.

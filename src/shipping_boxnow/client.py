@@ -31,8 +31,8 @@ logger = logging.getLogger("shipping_boxnow.client")
 #   on ``BoxNowRetryableError``, and ``create_shipment_for_order``
 #   releases its mint claim on any error, so the re-run sends the same
 #   ``orderNumber`` again. If the first request did create the parcel,
-#   BoxNow answers P410 and the task reports a business error; finding
-#   the parcel in that case is issue #606.
+#   BoxNow answers P410 and ``BoxNowService._take_over_existing_parcel``
+#   finds it by ``orderNumber`` and saves it.
 #
 # Why, from the BoxNow API Manual v7.2 (Partner API 1.65):
 #

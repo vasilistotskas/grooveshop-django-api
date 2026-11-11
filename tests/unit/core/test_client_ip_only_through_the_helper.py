@@ -55,31 +55,6 @@ ALLOWED: dict[str, tuple[str, Counter[tuple[str, str]]]] = {
             }
         ),
     ),
-    # Believes X-Real-IP without the edge proof, which the helper refuses.
-    # A potential defect, not a decision: issue #638.
-    "src/meta_capi/signals.py": (
-        "believes X-Real-IP; issue #638",
-        Counter(
-            {
-                ("_on_user_signed_up", "X_REAL_IP"): 1,
-                ("_on_user_signed_up", "REMOTE_ADDR"): 1,
-            }
-        ),
-    ),
-    # Its own copy of the peer rule, storing an unchecked forwarded hop in
-    # a GenericIPAddressField: issue #639.
-    "src/search/middleware.py": (
-        "own copy of the peer rule; issue #639",
-        Counter(
-            {
-                ("SearchAnalyticsMiddleware._get_client_ip", "REMOTE_ADDR"): 1,
-                (
-                    "SearchAnalyticsMiddleware._get_client_ip",
-                    "X_FORWARDED_FOR",
-                ): 1,
-            }
-        ),
-    ),
 }
 SKIP_DIRS = {
     "tests",

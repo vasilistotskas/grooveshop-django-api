@@ -16,7 +16,6 @@ to a schema with no ``search_query`` table (2026-10-13).
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import logging
 from collections.abc import Callable
@@ -26,7 +25,7 @@ from uuid import uuid4
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
-from core.client_ip import edge_client_ip
+from core.client_ip import client_ip_or_peer
 from core.sessions import persisted_session_key
 
 logger = logging.getLogger(__name__)
@@ -180,7 +179,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             # cookie the client sent. No session is spelled "", like
             # every other absent string on the row.
             session_key = persisted_session_key(request)
-            ip_address = self._get_client_ip(request)
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
             # Fire and forget: no transaction.on_commit() wrapper needed
@@ -219,48 +218,3 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     "query": request.GET.get("query", ""),
                 },
             )
-
-    def _get_client_ip(self, request: HttpRequest) -> str | None:
-        """
-        Extract client IP address from request.
-
-        Prefers ``edge_client_ip`` (the visitor Cloudflare vouched
-        for). Otherwise: the app runs behind a single trusted reverse
-        proxy (Traefik in K8s). REMOTE_ADDR is the proxy address (a
-        private/loopback IP), so we use the *rightmost* entry in
-        X-Forwarded-For — the one appended by our trusted proxy — rather
-        than the leftmost, which an attacker can spoof. If REMOTE_ADDR is
-        not a private IP we trust it directly.
-
-        Args:
-            request: The HTTP request
-
-        Returns:
-            Client IP address or None if not available
-        """
-        # Preferred: the visitor Cloudflare reported, accepted only when
-        # the request provably came through our edge. Without this the
-        # value below is Traefik's TCP peer — the Cloudflare edge node, or
-        # (before externalTrafficPolicy: Local) the internal 10.42.x.x SNAT
-        # address — so rows share it and the field says little about who
-        # searched.
-        edge_ip = edge_client_ip(request)
-        if edge_ip:
-            return edge_ip
-
-        remote_addr = request.META.get("REMOTE_ADDR", "")
-
-        try:
-            addr = ipaddress.ip_address(remote_addr)
-            behind_proxy = (
-                addr.is_loopback or addr.is_private or addr.is_link_local
-            )
-        except ValueError:
-            behind_proxy = False
-
-        if behind_proxy:
-            xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-            entries = [e.strip() for e in xff.split(",") if e.strip()]
-            return entries[-1] if entries else remote_addr or None
-
-        return remote_addr or None

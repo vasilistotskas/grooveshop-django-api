@@ -118,3 +118,67 @@ class TestCompleteRegistrationConsent:
         ) as mock_delay:
             _on_user_signed_up(sender=None, request=None, user=user)
         mock_delay.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestCompleteRegistrationClientIp:
+    """The IP sent to Meta is the visitor our edge vouched for, or none.
+
+    ``X-Real-IP`` on the SSR path is the caller's own ``CF-Connecting-IP``
+    relayed by Nuxt, so without ``X-Origin-Verify`` it is caller-chosen
+    (#638). The peer is not sent either: it is a proxy, not the browser
+    Meta asks for.
+    """
+
+    SECRET = "s3cret-edge-token"
+    VISITOR = "203.0.113.9"
+    FORGED = "198.51.100.66"
+
+    def _sent_ip(self, **meta):
+        req = RequestFactory().post("/signup", REMOTE_ADDR="10.42.1.0", **meta)
+        req.COOKIES = {"ad_storage": "granted"}
+        with patch(
+            "meta_capi.signals.dispatch_complete_registration_event.apply_async"
+        ) as mock_dispatch:
+            _on_user_signed_up(
+                sender=None, request=req, user=UserAccountFactory()
+            )
+        mock_dispatch.assert_called_once()
+        return mock_dispatch.call_args.kwargs["kwargs"]["client_ip_address"]
+
+    def test_forged_x_real_ip_without_the_edge_proof_is_not_sent(
+        self, settings
+    ):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert (
+            self._sent_ip(
+                HTTP_X_REAL_IP=self.FORGED,
+                HTTP_CF_CONNECTING_IP=self.FORGED,
+                HTTP_X_FORWARDED_FOR=f"{self.FORGED}, 162.158.1.1",
+            )
+            is None
+        )
+
+    def test_forged_x_real_ip_with_a_wrong_proof_is_not_sent(self, settings):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert (
+            self._sent_ip(
+                HTTP_X_ORIGIN_VERIFY="not-the-secret",
+                HTTP_X_REAL_IP=self.FORGED,
+            )
+            is None
+        )
+
+    def test_the_proxy_peer_is_not_sent_as_the_visitor(self, settings):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert self._sent_ip(HTTP_X_FORWARDED_FOR="162.158.1.1") is None
+
+    def test_the_edge_proven_visitor_is_sent(self, settings):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert (
+            self._sent_ip(
+                HTTP_X_ORIGIN_VERIFY=self.SECRET,
+                HTTP_X_REAL_IP=self.VISITOR,
+            )
+            == self.VISITOR
+        )

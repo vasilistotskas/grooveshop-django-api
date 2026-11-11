@@ -266,8 +266,9 @@ def derive_api_domain(primary_domain: str) -> str:
     ``api-<label>.<zone>``. The zone's free Universal SSL certificate
     covers ``*.<zone>``, one label deep: ``api.demo.grooveshop.space``
     would be a second-level name Cloudflare cannot proxy, so it stays
-    DNS-only and bypasses the edge (grooveshop-infrastructure
-    ``docs/edge-trust-boundary.md``). A store on its own domain is the
+    DNS-only and bypasses the edge
+    (``grooveshop-infrastructure/docs/edge-trust-boundary.md``). A store
+    on its own domain is the
     apex of its own zone, where ``api.<primary>`` is one label deep.
     """
     primary = primary_domain or ""

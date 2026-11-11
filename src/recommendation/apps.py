@@ -3,6 +3,13 @@ from django.utils.translation import gettext_lazy as _
 
 
 class RecommendationConfig(AppConfig):
+    """Product recommendations: slots, candidates, events and the strategy
+    engine.
+
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/recommendations-engine.md``.
+    """
+
     name = "recommendation"
     verbose_name = _("Recommendations")
 

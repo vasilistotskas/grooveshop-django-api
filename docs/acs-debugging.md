@@ -186,7 +186,8 @@ LogsQL: `phase:phase2_outcome_unknown` or `phase:phase1_stale_claim`.
 ## Voucher requests held while ACS is failing
 
 An unknown outcome of a create the store sent begins an `AcsVoucherHold`
-(admin: ACS voucher holds; `docs/order-system.md` §5.1 has the states).
+(admin: ACS voucher holds; `docs/order/shipping-acs.md` §5.1 has the
+states).
 While it is in force no `ACS_Create_Voucher` is sent for the store: the
 task returns `{"status": "voucher_request_held"}`, the shipment carries
 `voucher_request_held_at` (shipment list, `attention=voucher_held`) and
@@ -303,4 +304,4 @@ reported by `alert_unremitted_cod_payouts`.
 
 LogsQL: `acs_alias:ACS_COD_Beneficiary_Info | sort by (_time) desc | limit 20`
 
-See also `docs/order-system.md` (the ACS pickup-list section).
+See also `docs/order/shipping-acs.md` (the ACS pickup-list part).

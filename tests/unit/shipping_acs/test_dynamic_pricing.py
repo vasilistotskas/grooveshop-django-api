@@ -137,8 +137,8 @@ def test_quote_is_cached_per_country_region(
     * ``transaction.on_commit`` handlers (BoxNow signal cascades
       sometimes clear cache keys eagerly under the test fixture that
       runs ``on_commit`` synchronously);
-    * the project's known ``-n auto`` parallelism flakes documented
-      in ``project_test_suite_stability.md``.
+    * the cross-test interference of a ``-n auto`` run, which the
+      ``--dist loadfile`` comment in ``pyproject.toml`` describes.
 
     Patches ``django.core.cache.cache`` directly because
     ``shipping_acs.carrier`` lazy-imports it inside ``_fetch_live_quote``;

@@ -11,7 +11,8 @@ when it is shown.
 
 `contract/image-limits.json` in grooveshop-media-stream holds the per-format
 byte caps and the pixel limit it holds a source to (a spec there keeps the file
-equal to its constants; `docs/image-limits.md` there says what is refused).
+equal to its constants; `grooveshop-media-stream/docs/image-limits.md` says
+what is refused).
 `src/core/data/image-limits.json` is a pinned COPY:
 `.github/scripts/sync_upstream_sources.py` writes it and
 `tests/fixtures/upstream-sources.lock.json` pins it by git id,

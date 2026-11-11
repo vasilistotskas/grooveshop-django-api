@@ -82,7 +82,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 ### 12. Meilisearch & Search
 - `meili_filter()`: verify it prevents indexing of unpublished/deleted content
 - Search queries: verify `IndexMixin` sanitizes indexed content (no HTML/scripts in search index)
-- API keys: verify `MEILISEARCH_MASTER_KEY` is not exposed in any response
+- API keys: verify `MEILI_MASTER_KEY` (`MEILISEARCH["MASTER_KEY"]` in `src/settings.py`) is not exposed in any response
 
 ## Review Process
 

@@ -3,6 +3,11 @@ from django.utils.translation import gettext_lazy as _
 
 
 class GiftcardConfig(AppConfig):
+    """Stored-value gift cards: purchases, cards and their ledger.
+
+    Models and entry points: ``docs/app-map.md``.
+    """
+
     default_auto_field = "django.db.models.BigAutoField"
     name = "giftcard"
     verbose_name = _("Gift cards")

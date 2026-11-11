@@ -40,9 +40,9 @@ class MeasurementField(FloatField):
         # types we deliberately don't drag into our public API
         # (mirrors ``core.cache.registry.LazyStr = Any``). The
         # lazy form is the correct way to avoid baking a locale-
-        # resolved value into ``makemigrations`` output (see
-        # ``project_settings_update_or_create_flake.md``-adjacent
-        # migration loop the previous fix unwound).
+        # resolved value into ``makemigrations`` output: a plain
+        # string is translated at import time, so the migration
+        # would hold whichever language was active (bd625c434).
         verbose_name: Any = None,
         name: str | None = None,
         measurement: type[MeasureBase | BidimensionalMeasure] | None = None,

@@ -2199,8 +2199,7 @@ class OrderViewSet(BaseModelViewSet):
         # Use ``.values(...)`` rather than ``.only(...)`` because the
         # Order model's ``__init__`` lazy-loads ``_original_tracking_number``
         # from any deferred attribute access and recurses indefinitely
-        # under DRF's serialization path (see project memory:
-        # ``project_order_state_machine_invariants.md``).
+        # under DRF's serialization path (``docs/order/invariants.md``).
         value_fields = (
             "id",
             "uuid",

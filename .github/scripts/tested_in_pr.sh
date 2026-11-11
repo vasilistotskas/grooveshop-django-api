@@ -63,9 +63,13 @@ tree() { gh api "repos/$GITHUB_REPOSITORY/commits/$1" --jq .commit.tree.sha; }
 # is green only when they all were.
 REQUIRED_JOBS=('Security Scan (Trivy)' 'Code Quality' 'Migration Check' 'Testing (multi-tenant lane)' 'Coverage Gate')
 
-read -r run_id run_url < <(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head&event=pull_request&status=success&per_page=100" \
-  --jq "[.workflow_runs[] | select((.path | split(\"@\")[0]) == \"$workflow_path\")][0] | select(. != null) | \"\(.id) \(.html_url)\"")
-[[ -n ${run_id:-} ]] || untested "no successful $workflow_path run for PR head $head"
+# The latest successful run of this workflow for the head, picked by its
+# creation time rather than by the order the API lists runs in. An empty
+# answer is "no such run"; an API error aborts (``set -e``).
+run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head&event=pull_request&status=success&per_page=100" \
+  --jq "[.workflow_runs[] | select((.path | split(\"@\")[0]) == \"$workflow_path\")] | sort_by(.created_at) | last | select(. != null) | \"\(.id) \(.html_url)\"")
+[[ -n $run ]] || untested "no successful $workflow_path run for PR head $head"
+read -r run_id run_url <<<"$run"
 
 # One ``name<TAB>conclusion`` line per job of the latest attempt.
 jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \

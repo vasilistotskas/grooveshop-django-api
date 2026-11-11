@@ -103,7 +103,9 @@ the request may have reached ACS (`AcsClient._exchange`):
 |---|---|---|
 | `ConnectTimeout`; `ConnectionError` wrapping a `MaxRetryError` whose reason is `NewConnectionError` / `NameResolutionError`; the request cap (`ACS request cap: ...`) | `AcsRetryableError` | never reached ACS: claim released, Celery retries |
 | 403 / 406 | `AcsAuthError` | the manual's rejections (p. 1-2): claim released, Celery retries |
-| `ACSExecution_HasError`, a value row `Error_Message`, any other 4xx | `AcsAPIError` | ACS refused: claim released, `ops.shipment_rejected` |
+| an ACS voucher hold in force (`Not sent: ...`) | `AcsVoucherRequestHeldError` | never sent: no claim kept, `voucher_request_held_at` stamped, sent later by `issue_held_acs_vouchers` (below) |
+| `ACSExecution_HasError`, a value row `Error_Message` | `AcsAPIError` | ACS refused: claim released, `ops.shipment_rejected` ("fix the address") |
+| any other 4xx (not ACS's envelope: a proxy's, a gateway's) | `AcsUndocumentedHttpError` | nothing was made and nothing was said about the order: claim released; a held order stays held while a voucher hold is in force, any other (not held, or held with no hold in force) gets `ops.shipment_rejected` with "send the request again" |
 | `ReadTimeout`, any other `ConnectionError` (urllib3's `ProtocolError`, a connection dropped after the body left, arrives as a plain `ConnectionError`), any 5xx, a non-JSON 200 | `AcsOutcomeUnknownError` | **unknown** |
 | an exception the client does not classify; a 200 with neither `Voucher_No` nor `Error_Message`; a claim older than `_MINT_CLAIM_TTL_SECONDS` (a worker stopped between the request and the save) | | **unknown** |
 
@@ -180,6 +182,38 @@ and keeps one on a shipment with no voucher (it was canceled before the
 lost request was resolved; both resolutions still work).
 
 LogsQL: `phase:phase2_outcome_unknown` or `phase:phase1_stale_claim`.
+
+## Voucher requests held while ACS is failing
+
+An unknown outcome of a create the store sent begins an `AcsVoucherHold`
+(admin: ACS voucher holds; `docs/order-system.md` §5.1 has the states).
+While it is in force no `ACS_Create_Voucher` is sent for the store: the
+task returns `{"status": "voucher_request_held"}`, the shipment carries
+`voucher_request_held_at` (shipment list, `attention=voucher_held`) and
+ACS API Calls shows no create for it: a request that was not sent is not
+a call, so the creates listed during an outage are the ones that left. A
+held order needs nothing from
+staff. Only the orders whose request was really sent and lost are "ACS
+voucher requests to check".
+
+To see why a hold has not ended, read its row: `reason` is the last
+failure (a lost answer, or an HTTP 4xx that was not ACS's own answer),
+`failed_trials` how many times the one request sent first failed that
+way, and "ACS is asked again after" the next time
+`issue_held_acs_vouchers` asks ACS a read (`ACS_Get_Pickup_Lists` in ACS
+API Calls, every tick after that time until one is answered). If ACS is
+known to answer, press **ACS answers again: send one request** on the
+hold; a second press while one request is already allowed sends nothing
+and says so. Only the voucher of the request that has the turn ends a
+hold: a refusal by ACS sends the next held order next, and a request
+that never reached ACS gives its turn back at once. The sweep sends the
+held order it tried longest ago (`voucher_request_retried_at` on the
+shipment), so one order that cannot be sent does not keep the rest
+waiting. A hold whose state reads "No request waits: the next one goes
+alone" is waiting for an order, not for staff, and is not on the
+dashboard.
+
+LogsQL: `"ACS voucher hold"` or `"ACS voucher requests are held"`.
 
 ## A voucher ACS names that matches no order
 

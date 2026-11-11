@@ -21,16 +21,22 @@ import pytest
 from django.utils import timezone
 
 from order.models.history import OrderHistory
+from shipping_acs import voucher_hold
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
+    AcsVoucherRequestHeldError,
     AcsVoucherRequestUnknownError,
     AcsVoucherResolutionError,
 )
 from shipping_acs.factories import AcsShipmentFactory
-from shipping_acs.models import AcsShipment, AcsUnrecognisedVoucher
+from shipping_acs.models import (
+    AcsShipment,
+    AcsUnrecognisedVoucher,
+    AcsVoucherHold,
+)
 from shipping_acs.models.unrecognised_voucher import (
     AcsUnrecognisedVoucherResolution,
 )
@@ -64,7 +70,7 @@ class _Acs:
     deleted: list[str] = []
     delete_error: Exception | None = None
 
-    def create_voucher(self, params):
+    def create_voucher(self, params, *, request_id):
         _Acs.creates.append(params)
         if len(_Acs.creates) == 1 and _Acs.first_error is not None:
             raise _Acs.first_error
@@ -231,7 +237,9 @@ class TestTheTracedSequence:
         with patch.object(
             _Acs,
             "create_voucher",
-            lambda self, params: _Acs.creates.append(params) or {},
+            lambda self, params, *, request_id: (
+                _Acs.creates.append(params) or {}
+            ),
         ):
             with pytest.raises(AcsVoucherRequestUnknownError):
                 AcsService.create_voucher_for_order(shipment.order)
@@ -343,6 +351,19 @@ def _unknown_shipment(acs):
         AcsService.create_voucher_for_order(shipment.order)
     shipment.refresh_from_db()
     return shipment
+
+
+def _another_request_was_in_flight() -> None:
+    """Let the next request be sent although an answer was just lost.
+
+    A lost answer holds the store's further voucher requests (#631), so
+    two orders are both of unknown outcome only when both requests were
+    in flight when ACS failed. These tests are about what staff do with
+    two such orders, not about the hold.
+    """
+    AcsVoucherHold.objects.filter(ended_at__isnull=True).update(
+        ended_at=timezone.now()
+    )
 
 
 class TestAdoptTheVoucherAcsHolds:
@@ -475,6 +496,7 @@ class TestAdoptConfirmsTheVoucherIsThisOrders:
         """The other adopt commits between our pre-check and our lock."""
         rival = _unknown_shipment(acs)
         acs.creates.clear()  # the next create loses its answer as well
+        _another_request_was_in_flight()
         shipment = _unknown_shipment(acs)
 
         def summary_while_the_rival_saves(self, voucher_no):
@@ -508,7 +530,7 @@ class TestALateAnswer:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_worker_b_gave_up(self, params):
+        def answer_after_worker_b_gave_up(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             return {"Voucher_No": V1, "Error_Message": ""}
@@ -693,6 +715,7 @@ class TestOnlyAnExactNameIsAnAutomaticYes:
         tell which one the voucher is for."""
         shipment = _unknown_shipment(acs)
         acs.creates.clear()
+        _another_request_was_in_flight()
         twin = _unknown_shipment(acs)
         for order in (shipment.order, twin.order):
             order.first_name, order.last_name = "Maria", "Papadopoulou"
@@ -773,7 +796,7 @@ class TestALateAnswerAfterStaffAdopted:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_staff_adopted(self, params):
+        def answer_after_staff_adopted(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             _Acs.summaries[V1] = {
@@ -819,7 +842,7 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_staff_resolved(self, params):
+        def answer_after_staff_resolved(self, params, *, request_id):
             _Acs.creates.append(params)
             # Worker B found A's claim expired: unknown outcome.
             _worker_b_finds_the_claim_expired(shipment)
@@ -1142,7 +1165,7 @@ class TestEveryWayIntoTheUnknownStateRecordsTheRequest:
         acs.first_error = None
         shipment = _shipment()
 
-        def answer_after_the_claim_expired(self, params):
+        def answer_after_the_claim_expired(self, params, *, request_id):
             _Acs.creates.append(params)
             # The request outlived its claim's TTL.
             with patch.object(AcsService, "_MINT_CLAIM_TTL_SECONDS", 0):
@@ -1203,7 +1226,7 @@ class TestAStaleRequestsFailureLeavesTheNextRequestAlone:
         shipment = _shipment()
         stamps = {}
 
-        def r1_fails(self, params):
+        def r1_fails(self, params, *, request_id):
             _Acs.creates.append(params)
             _worker_b_finds_the_claim_expired(shipment)
             helper._request_again(shipment)
@@ -1290,7 +1313,7 @@ class TestAStaleRequestLostAfterTheCheckWasResolved:
         TestALateAnswerAfterStaffResolvedTheCheck._request_again(shipment)
         acs.first_error = None
 
-        def r2_answers_after_r1_was_lost(self, params):
+        def r2_answers_after_r1_was_lost(self, params, *, request_id):
             _Acs.creates.append(params)
             TestAStaleRequestLostAfterTheCheckWasResolved()._r1_lost(shipment)
             return {"Voucher_No": V2, "Error_Message": ""}
@@ -1505,7 +1528,7 @@ class TestAResetWhileAMintIsInFlight:
         shipment = _shipment()
         refused = []
 
-        def answer(self, params):
+        def answer(self, params, *, request_id):
             _Acs.creates.append(params)
             AcsShipment.objects.filter(pk=shipment.pk).update(
                 shipment_state=AcsShipmentState.CANCELED
@@ -1602,7 +1625,7 @@ class TestALateWorkerAndARequestAgain:
         acs.first_error = None
         shipment = _shipment()
 
-        def c_answers_after_a_saved(self, params):
+        def c_answers_after_a_saved(self, params, *, request_id):
             _Acs.creates.append(params)
             AcsShipment.objects.filter(pk=shipment.pk).update(
                 voucher_no=V1,
@@ -1802,6 +1825,80 @@ class TestTypedNotesReachStagingReplaced:
         )
 
 
+class TestTwoLostAnswersWithTheHoldInForce:
+    """Two requests were in flight when ACS failed, so both are of unknown
+    outcome and the voucher hold (#631) the first one began is in force
+    while staff resolve them: nothing here ends it by hand."""
+
+    def test_both_are_checked_by_staff_while_everything_else_waits(
+        self, acs, sent, monkeypatch
+    ):
+        first, second = _shipment(), _shipment()
+
+        def lose_both(self, params, *, request_id):
+            _Acs.creates.append(params)
+            if len(_Acs.creates) == 1:
+                # The second request is out as well when this one's
+                # answer is lost; its own answer is lost first.
+                with pytest.raises(AcsVoucherRequestUnknownError):
+                    AcsService.create_voucher_for_order(second.order)
+            raise _lost_answer()
+
+        monkeypatch.setattr(_Acs, "create_voucher", lose_both)
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.create_voucher_for_order(first.order)
+
+        hold = AcsVoucherHold.objects.get()
+        assert hold.ended_at is None
+        assert hold.trial_allowed_at is None
+        # Two lost answers of one failure, not a failed first request.
+        assert hold.failed_trials == 0
+        for shipment in (first, second):
+            shipment.refresh_from_db()
+            assert shipment.voucher_request_unknown_at is not None
+            assert shipment.voucher_request_held_at is None
+            # Each unknown state is its own request's: the claim that
+            # request took, kept as its identity.
+            assert shipment.metadata["unknown_request"]
+            assert "mint_started_at" not in shipment.metadata
+        assert _types(sent).count("ops.acs_voucher_request_unknown") == 2
+
+        # A third order waits: nothing is sent for it.
+        third = _shipment()
+        with pytest.raises(AcsVoucherRequestHeldError):
+            AcsService.create_voucher_for_order(third.order)
+        assert len(acs.creates) == 2
+
+        # Staff resolve both checks with the hold in force. An adopt
+        # sends no create; a request-again waits like every request.
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(first.order),
+        }
+        AcsService.adopt_voucher(first, V1, user=None)
+        with patch(
+            "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+        ):
+            AcsService.request_voucher_again(
+                second, user=None, note="Checked the ACS portal: none."
+            )
+        held = create_acs_voucher_for_order.run(second.order_id)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.voucher_no == V1
+        # Both checks are resolved, so neither state names a request.
+        assert "unknown_request" not in first.metadata
+        assert held["status"] == "voucher_request_held"
+        assert second.voucher_request_unknown_at is None
+        assert second.voucher_request_held_at is not None
+        # Held: it took no claim, so no unknown state can name it.
+        assert "mint_started_at" not in second.metadata
+        assert "unknown_request" not in second.metadata
+        assert len(acs.creates) == 2
+        assert AcsVoucherHold.objects.filter(ended_at__isnull=True).count() == 1
+
+
 class TestRequestAgain:
     def test_staff_who_found_no_voucher_get_exactly_one_new_request(
         self, acs, sent
@@ -1814,6 +1911,12 @@ class TestRequestAgain:
             AcsService.request_voucher_again(
                 shipment, user=None, note="Checked the ACS portal: none."
             )
+        # The lost answer began a voucher hold (#631): the new request
+        # waits until ACS answers again, and is then the one sent first.
+        held = create_acs_voucher_for_order.run(shipment.order_id)
+        assert held["status"] == "voucher_request_held"
+        assert len(acs.creates) == 1
+        assert voucher_hold.allow_trial()
         create_acs_voucher_for_order.run(shipment.order_id)
 
         dispatched.assert_called_once()

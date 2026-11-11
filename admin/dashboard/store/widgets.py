@@ -303,6 +303,11 @@ class StoreAttention(DashboardWidget):
         from order.models.invoice import MyDataStatus
 
         features = store_features(self.request)
+        held_since = (
+            queries.acs_voucher_hold_since.get()
+            if data["acs_voucher_holds"]
+            else None
+        )
         candidates = [
             (
                 True,
@@ -385,6 +390,26 @@ class StoreAttention(DashboardWidget):
                 _("ACS may hold a voucher: adopt it or request again"),
                 "shipping_acs.AcsShipment",
                 urlencode({"attention": "voucher_unknown"}),
+            ),
+            (
+                held_since is not None,
+                "acs_voucher_holds",
+                "pause_circle",
+                "danger",
+                _("ACS voucher requests are held"),
+                _(
+                    "Since %(since)s, because ACS is failing. They are sent "
+                    "when it answers again"
+                )
+                % {
+                    "since": formats.date_format(
+                        timezone.localtime(held_since), "SHORT_DATETIME_FORMAT"
+                    )
+                    if held_since
+                    else ""
+                },
+                "shipping_acs.AcsVoucherHold",
+                urlencode({"in_force": "yes"}),
             ),
             (
                 True,

@@ -6,6 +6,7 @@ from shipping_acs.models.shipment import AcsShipment
 from shipping_acs.models.station import AcsStation
 from shipping_acs.models.tracking_event import AcsTrackingEvent
 from shipping_acs.models.unrecognised_voucher import AcsUnrecognisedVoucher
+from shipping_acs.models.voucher_hold import AcsVoucherHold
 
 __all__ = [
     "AcsApiCall",
@@ -16,4 +17,5 @@ __all__ = [
     "AcsStation",
     "AcsTrackingEvent",
     "AcsUnrecognisedVoucher",
+    "AcsVoucherHold",
 ]

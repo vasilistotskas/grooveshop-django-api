@@ -68,7 +68,7 @@ def acs_client_mock(monkeypatch):
         # Tracking which calls were made
         calls: list[str] = []
 
-        def create_voucher(self, params):
+        def create_voucher(self, params, *, request_id):
             _StubClient.calls.append("create_voucher")
             return {"Voucher_No": "9001230001", "Error_Message": ""}
 
@@ -112,7 +112,7 @@ class TestCreateVoucherSetsMintStartedAtBeforeApiCall:
         class _TrackingClient:
             billing_code = "TEST_BILLING"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 # At the moment this runs (Phase 2), Phase 1 must be done.
                 # Read directly from the DB (no ORM cache).
                 row = AcsShipment.objects.values("metadata").get(pk=shipment_pk)
@@ -179,7 +179,7 @@ class TestCreateVoucherPersistsMetadataWhenDbSaveFails:
         class _SuccessClient:
             billing_code = "TEST_BILLING"
 
-            def create_voucher(self, params):
+            def create_voucher(self, params, *, request_id):
                 return {"Voucher_No": minted_voucher, "Error_Message": ""}
 
             def get_multipart_vouchers(self, voucher_no):

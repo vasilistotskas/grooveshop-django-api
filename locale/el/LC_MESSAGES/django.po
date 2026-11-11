@@ -1121,6 +1121,9 @@ msgstr "Alias ACS"
 msgid "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr "Η ACS έχει ήδη αναφέρει απόδοση για αυτό το voucher· δεν υπάρχει κάτι να εκκαθαριστεί."
 
+msgid "ACS answers again: send one request"
+msgstr "Η ACS απαντά ξανά: αποστολή ενός αιτήματος"
+
 msgid "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty disables ACS."
 msgstr "Κωδικός χρέωσης ACS (π.χ. 'ΑΚ12345678'). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
@@ -1154,9 +1157,15 @@ msgstr "Η ACS δεν αναφέρει το voucher %(voucher)s για αυτό 
 msgid "ACS error message"
 msgstr "Μήνυμα σφάλματος ACS"
 
+msgid "ACS failure"
+msgstr "Σφάλμα της ACS"
+
 #, python-format
 msgid "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
 msgstr "Η ACS δεν δίνει παραλήπτη για το voucher %(voucher)s, οπότε τίποτα δεν το συνδέει με αυτή την παραγγελία. Αν επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα αυτής της παραγγελίας, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
+
+msgid "ACS is asked again after"
+msgstr "Νέος έλεγχος της ACS μετά τις"
 
 msgid "ACS may hold a voucher: adopt it or request again"
 msgstr "Η ACS ίσως έχει voucher: υιοθετήστε το ή ζητήστε νέο"
@@ -1224,6 +1233,12 @@ msgstr "Συμβάν παρακολούθησης ACS"
 msgid "ACS tracking events"
 msgstr "Συμβάντα παρακολούθησης ACS"
 
+msgid "ACS voucher hold"
+msgstr "Αναμονή αιτημάτων voucher ACS"
+
+msgid "ACS voucher holds"
+msgstr "Αναμονές αιτημάτων voucher ACS"
+
 msgid "ACS voucher matching no order"
 msgstr "Voucher ACS χωρίς αντίστοιχη παραγγελία"
 
@@ -1232,6 +1247,13 @@ msgstr "Αριθμός voucher ACS — συνδέεται με το AcsShipment.
 
 msgid "ACS voucher request with an unknown outcome"
 msgstr "Αίτημα voucher ACS με άγνωστη έκβαση"
+
+msgid "ACS voucher requests are held"
+msgstr "Τα αιτήματα voucher ACS είναι σε αναμονή"
+
+#, python-format
+msgid "ACS voucher requests are held since %(since)s because ACS is failing. This one is sent automatically once ACS answers again."
+msgstr "Τα αιτήματα voucher ACS είναι σε αναμονή από %(since)s, επειδή η ACS παρουσιάζει πρόβλημα. Αυτό το αίτημα θα σταλεί αυτόματα μόλις η ACS απαντήσει ξανά."
 
 msgid "ACS voucher requests to check"
 msgstr "Αιτήματα voucher ACS για έλεγχο"
@@ -4695,6 +4717,12 @@ msgstr "Έληξε"
 msgid "Ended At"
 msgstr "Έληξε στις"
 
+msgid "Ended at"
+msgstr "Έληξε στις"
+
+msgid "Ended: ACS answered"
+msgstr "Έληξε: η ACS απάντησε"
+
 msgid "Ends At"
 msgstr "Λήξη"
 
@@ -5018,6 +5046,9 @@ msgstr "Απέτυχε"
 
 msgid "Failed background tasks (24h)"
 msgstr "Αποτυχημένες εργασίες παρασκηνίου (24h)"
+
+msgid "Failed first requests"
+msgstr "Αποτυχημένα πρώτα αιτήματα"
 
 #, python-brace-format
 msgid "Failed to cancel order: {error}"
@@ -6314,6 +6345,12 @@ msgstr "Όνομα"
 msgid "First named by ACS at"
 msgstr "Πρώτη αναφορά από την ACS"
 
+msgid "First request"
+msgstr "Πρώτο αίτημα"
+
+msgid "First request in flight until"
+msgstr "Το πρώτο αίτημα εκκρεμεί έως"
+
 msgid "Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting."
 msgstr "Φορολογική ημερομηνία έκδοσης. Αμετάβλητη μόλις εκδοθεί το τιμολόγιο — χρησιμοποιείται για διαδοχική αρίθμηση και αναφορές."
 
@@ -7147,6 +7184,15 @@ msgstr "Μεγάλη Έκπτωση (>20%)"
 msgid "Height"
 msgstr "Ύψος"
 
+msgid "Held since"
+msgstr "Σε αναμονή από"
+
+msgid "Held voucher request last retried at"
+msgstr "Τελευταία νέα προσπάθεια του αιτήματος voucher σε αναμονή"
+
+msgid "Held: nothing is sent"
+msgstr "Σε αναμονή: δεν στέλνεται τίποτα"
+
 #, python-format
 msgid "Hello %(first_name)s,"
 msgstr "Γεια σας %(first_name)s,"
@@ -7240,6 +7286,9 @@ msgstr "Πώς επιστράφηκαν τα χρήματα"
 
 msgid "How it works"
 msgstr "Πώς λειτουργεί"
+
+msgid "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
+msgstr "Πόσες φορές χάθηκε η απάντηση και στο ένα αίτημα που στάλθηκε πρώτο. Κάθε φορά διπλασιάζεται η αναμονή πριν ελεγχθεί ξανά η ACS."
 
 msgid "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
 msgstr "Πώς εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, χειροκίνητη παράδοση, ...). Καταγράφεται στο ιστορικό της αποστολής."
@@ -7492,6 +7541,9 @@ msgstr "Σε περίπτωση που το ξεχάσατε, χρησιμοπο
 
 msgid "In depot"
 msgstr "Σε αποθήκη"
+
+msgid "In force"
+msgstr "Σε ισχύ"
 
 msgid "In stock"
 msgstr "Σε απόθεμα"
@@ -7920,6 +7972,9 @@ msgstr "Τελευταίο σφάλμα"
 
 msgid "Last event at"
 msgstr "Τελευταίο συμβάν"
+
+msgid "Last lost answer at"
+msgstr "Τελευταία χαμένη απάντηση στις"
 
 msgid "Last movement"
 msgstr "Τελευταία κίνηση"
@@ -9140,6 +9195,9 @@ msgstr "Χωρίς πάροχο"
 msgid "No readable voucher"
 msgstr "Χωρίς αναγνώσιμο voucher"
 
+msgid "No request waits: the next one goes alone"
+msgstr "Κανένα αίτημα σε αναμονή: το επόμενο θα σταλεί μόνο του"
+
 msgid "No sales in the same period last year"
 msgstr "Καμία πώληση την ίδια περίοδο πέρυσι"
 
@@ -9474,11 +9532,23 @@ msgstr "Στη λίστα παραλαβής %(no)s"
 msgid "One"
 msgstr "Ένα"
 
+msgid "One held voucher request is being sent to ACS. The others follow once ACS answers it."
+msgstr "Ένα αίτημα voucher που ήταν σε αναμονή στέλνεται στην ACS. Τα υπόλοιπα ακολουθούν μόλις η ACS το απαντήσει."
+
 msgid "One of the files is no longer available. Please re-attach it."
 msgstr "Ένα από τα αρχεία δεν είναι πλέον διαθέσιμο. Επισυνάψτε το ξανά."
 
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "Ένα προϊόν ανά γραμμή: sku;καθαρή τιμή (προ ΦΠΑ). Το κόμμα λειτουργεί επίσης ως διαχωριστικό και ως υποδιαστολή. Οι υπάρχουσες γραμμές αυτής της ομάδας ενημερώνονται."
+
+msgid "One request allowed since"
+msgstr "Ένα αίτημα επιτρέπεται από"
+
+msgid "One request first"
+msgstr "Πρώτα ένα αίτημα"
+
+msgid "One voucher request was already allowed to go first. Nothing more was sent."
+msgstr "Έχει ήδη επιτραπεί να σταλεί πρώτα ένα αίτημα voucher. Δεν στάλθηκε τίποτα άλλο."
 
 msgid "One-click unsubscribe"
 msgstr "Απεγγραφή με ένα κλικ"
@@ -12844,6 +12914,9 @@ msgstr "Αποστολή μηνύματος επικοινωνίας στους 
 msgid "Send as the X-Cart-Token header."
 msgstr "Στείλτε το ως κεφαλίδα X-Cart-Token."
 
+msgid "Send one voucher request to ACS now"
+msgstr "Αποστολή ενός αιτήματος voucher στην ACS τώρα"
+
 msgid "Send receipt to myDATA"
 msgstr "Αποστολή απόδειξης στο myDATA"
 
@@ -13099,11 +13172,17 @@ msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
 msgid "Set up your authenticator app in the admin first, then connect again."
 msgstr "Ρυθμίστε πρώτα την εφαρμογή ελέγχου ταυτότητας στη διαχείριση και μετά συνδεθείτε ξανά."
 
+msgid "Set when ACS answered a read, or staff said it answers again. One voucher request is then sent first; the rest follow only after ACS answers it."
+msgstr "Ορίζεται όταν η ACS απάντησε σε ένα αίτημα ανάγνωσης ή όταν το προσωπικό δήλωσε ότι απαντά ξανά. Τότε στέλνεται πρώτα ένα αίτημα voucher· τα υπόλοιπα ακολουθούν μόνο αφού η ACS το απαντήσει."
+
 msgid "Set when a voucher request was sent to ACS and its answer was lost (a timeout, a dropped connection, a server error, or a worker that stopped before saving). ACS may hold a voucher for this order, so no new request is sent while this is set. Staff clear it with “Adopt ACS voucher” or “No voucher at ACS: request again”."
 msgstr "Ορίζεται όταν ένα αίτημα voucher στάλθηκε στην ACS και η απάντησή του χάθηκε (λήξη χρόνου, διακοπή σύνδεσης, σφάλμα διακομιστή ή διεργασία που σταμάτησε πριν την αποθήκευση). Η ACS μπορεί να έχει voucher για αυτή την παραγγελία, γι' αυτό δεν στέλνεται νέο αίτημα όσο είναι ορισμένο. Το προσωπικό το καθαρίζει με «Υιοθέτηση voucher ACS» ή «Κανένα voucher στην ACS: νέο αίτημα»."
 
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Ορίζεται όταν ο πελάτης απεγγράφηκε από κάθε διαφημιστικό email (με τον σύνδεσμο ενός κλικ σε διαφημιστικό email). Όσο ισχύει, καμία αποστολή marketing δεν στέλνεται στον λογαριασμό."
+
+msgid "Set when the voucher request was not sent because ACS was failing (an ACS voucher hold was in force). Nothing reached ACS; the request is sent automatically once ACS answers again."
+msgstr "Ορίζεται όταν το αίτημα voucher δεν στάλθηκε επειδή η ACS παρουσίαζε πρόβλημα (ίσχυε αναμονή αιτημάτων voucher ACS). Τίποτα δεν έφτασε στην ACS· το αίτημα στέλνεται αυτόματα μόλις η ACS απαντήσει ξανά."
 
 msgid "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
 msgstr "Ορίζεται όσο το βιβλίο πληρωμών κρατά περισσότερα χρήματα για την παραγγελία από την αξία της (ο πελάτης πλήρωσε δύο φορές). Σβήνει όταν οι επιστροφές το επαναφέρουν. Τίποτα δεν επιστρέφεται αυτόματα."
@@ -13325,6 +13404,10 @@ msgstr "Εγγραφή λογαριασμού"
 
 msgid "Similar product"
 msgstr "Παρόμοιο προϊόν"
+
+#, python-format
+msgid "Since %(since)s, because ACS is failing. They are sent when it answers again"
+msgstr "Από %(since)s, επειδή η ACS παρουσιάζει πρόβλημα. Θα σταλούν μόλις απαντήσει ξανά"
 
 msgid "Single Use (1)"
 msgstr "Μία χρήση (1)"
@@ -14630,6 +14713,9 @@ msgstr "Το τελευταίο αίτημα voucher για την παραγγ�
 msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."
 msgstr "Το τελευταίο αίτημα voucher για την παραγγελία #%(order)s μπορεί να έφτασε στην ACS χωρίς απάντηση, οπότε η ACS ίσως έχει ήδη voucher γι' αυτήν. Ελέγξτε την πύλη της ACS και έπειτα χρησιμοποιήστε την ενέργεια «Υιοθέτηση voucher ACS» ή «Κανένα voucher στην ACS: νέο αίτημα» στην αποστολή."
 
+msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
+msgstr "Το τελευταίο αίτημα voucher του οποίου η απάντηση χάθηκε, όπως το ανέφερε η ACS ή το δίκτυο."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "Ο νόμος απαιτεί να εμφανίζονται στο ηλεκτρονικό σας κατάστημα τα στοιχεία της επιχείρησης. Συμπληρώστε όσα λείπουν:"
 
@@ -15042,6 +15128,9 @@ msgstr "Το voucher έχει ήδη ακυρωθεί."
 msgid "The voucher number as the ACS portal shows it."
 msgstr "Ο αριθμός του voucher όπως τον δείχνει η πύλη της ACS."
 
+msgid "The voucher request that has the turn: the shipment and the request's own mint claim. Only this request's answer ends the hold or closes it again."
+msgstr "Το αίτημα voucher που έχει σειρά: η αποστολή και το αναγνωριστικό της δικής του έκδοσης. Μόνο η απάντηση σε αυτό το αίτημα τερματίζει την αναμονή ή την κλείνει ξανά."
+
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "Η ημερομηνία παραλαβής του voucher: η εκτέλεση λίστας παραλαβής που το ανέφερε πρώτη, ή η ημερομηνία που έφερε το αίτημα voucher του."
 
@@ -15179,6 +15268,9 @@ msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
 
 msgid "This file cannot be used."
 msgstr "Αυτό το αρχείο δεν μπορεί να χρησιμοποιηθεί."
+
+msgid "This hold is no longer in force."
+msgstr "Αυτή η αναμονή δεν ισχύει πλέον."
 
 msgid "This id is used twice."
 msgstr "Αυτό το αναγνωριστικό χρησιμοποιείται δύο φορές."
@@ -16043,6 +16135,9 @@ msgstr "Χρήση άλλου λογαριασμού"
 msgid "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
 msgstr "Χρησιμοποιήστε το όταν η παραγγελία δεν χρειάζεται πλέον voucher (η παραγγελία ή η αποστολή της έχει ακυρωθεί). Τίποτα δεν στέλνεται στην ACS. Αν η ACS έχει το χαμένο voucher, διαγράψτε το εκεί και σημειώστε το."
 
+msgid "Use it when you know ACS answers again and do not want to wait. One held voucher request is sent first; the others follow only after ACS answers it. If that answer is lost too, that one order has to be checked at the ACS portal and the rest keep waiting."
+msgstr "Χρησιμοποιήστε το όταν γνωρίζετε ότι η ACS απαντά ξανά και δεν θέλετε να περιμένετε. Στέλνεται πρώτα ένα αίτημα voucher από όσα είναι σε αναμονή· τα υπόλοιπα ακολουθούν μόνο αφού η ACS το απαντήσει. Αν χαθεί και αυτή η απάντηση, η συγκεκριμένη παραγγελία πρέπει να ελεγχθεί στην πύλη της ACS και τα υπόλοιπα παραμένουν σε αναμονή."
+
 msgid "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 msgstr "Χρησιμοποιήστε το όταν γνωρίζετε το voucher (δημιουργήθηκε στην πύλη της ACS, διευθετήθηκε σε κατάστημα ACS). Παύει να μετριέται· τίποτα δεν στέλνεται στην ACS."
 
@@ -16520,6 +16615,12 @@ msgstr "Στάλθηκε η εργασία δημιουργίας voucher."
 msgid "Voucher number"
 msgstr "Αριθμός voucher"
 
+msgid "Voucher request held since"
+msgstr "Αίτημα voucher σε αναμονή από"
+
+msgid "Voucher request held while ACS is failing"
+msgstr "Αίτημα voucher σε αναμονή λόγω προβλήματος της ACS"
+
 msgid "Voucher request outcome unknown since"
 msgstr "Άγνωστη έκβαση αιτήματος voucher από"
 
@@ -16708,6 +16809,9 @@ msgstr "Όταν είναι ενεργοποιημένο, οι πελάτες μ
 
 msgid "When enabled, this attribute is rendered as a variant selector (e.g. Colour, Memory) across a product's variant group instead of as a plain read-only specification."
 msgstr "Όταν είναι ενεργοποιημένο, αυτό το χαρακτηριστικό εμφανίζεται ως επιλογέας παραλλαγής (π.χ. Χρώμα, Μνήμη) σε όλη την ομάδα παραλλαγών ενός προϊόντος αντί ως απλή προδιαγραφή μόνο για ανάγνωση."
+
+msgid "When issue_held_acs_vouchers last sent this held request. It sends the one it tried longest ago first, so a request that cannot be sent never keeps the others waiting."
+msgstr "Πότε το issue_held_acs_vouchers έστειλε τελευταία φορά αυτό το αίτημα που ήταν σε αναμονή. Στέλνει πρώτα εκείνο που δοκίμασε πιο παλιά, ώστε ένα αίτημα που δεν μπορεί να σταλεί να μην κρατά ποτέ τα υπόλοιπα σε αναμονή."
 
 msgid "When set, only checkouts with this email can redeem the code — covers guests without an account"
 msgstr "Όταν ορίζεται, μόνο αγορές με αυτό το email μπορούν να εξαργυρώσουν τον κωδικό — καλύπτει επισκέπτες χωρίς λογαριασμό"

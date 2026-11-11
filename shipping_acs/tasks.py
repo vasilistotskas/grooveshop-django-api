@@ -5,6 +5,7 @@ Schedule (registered in ``settings.CELERY_BEAT_SCHEDULE``):
 * ``sync-acs-stations`` — daily 03:00 Europe/Athens (Phase 2 only).
 * ``issue-acs-pickup-list`` — Mon–Fri 16:30 Europe/Athens.
 * ``poll-acs-tracking`` — every 15 minutes.
+* ``issue-held-acs-vouchers`` — every 5 minutes.
 * ``reconcile-acs-cod-payouts`` — daily 02:30 Europe/Athens.
 * ``alert-unremitted-acs-cod`` — daily 03:00 Europe/Athens, after the
   reconcile so an overnight payout is already recorded.
@@ -27,6 +28,7 @@ from typing import Any
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from core.retention import delete_in_batches
@@ -34,6 +36,8 @@ from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.tenant_urls import storefront_path
 from emails.send import send_email, was_sent
 from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping_acs import voucher_hold
+from shipping_acs.attention import voucher_requests_held
 from shipping_acs.client import TRACKING_ALIASES
 from shipping_acs.emails import StaleShipments, UnremittedCod
 from shipping_acs.enum.shipment_state import TERMINAL_STATES
@@ -41,9 +45,13 @@ from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
     AcsRetryableError,
+    AcsUndocumentedHttpError,
     AcsUnprintedVouchersError,
+    AcsVoucherRequestHeldError,
     AcsVoucherRequestUnknownError,
 )
+from shipping_acs.models import AcsShipment
+from shipping_acs.services import AcsService
 from tenant.celery import TenantTask
 
 logger = logging.getLogger(__name__)
@@ -170,6 +178,22 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
             "order_id": order_id,
             "message": str(exc),
         }
+    except AcsVoucherRequestHeldError as exc:
+        # Not sent: ACS is failing and the store's voucher requests
+        # wait (``shipping_acs.voucher_hold``). No retry from here: a
+        # hold outlasts this task's retries, and
+        # ``issue_held_acs_vouchers`` sends the order once ACS answers.
+        logger.info(
+            "ACS voucher request for order %s is held: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {
+            "status": "voucher_request_held",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except AcsRetryableError:
         # Never reached ACS (a connection never made, the request cap,
         # 403 / 406). Re-raise so Celery's autoretry_for handles it —
@@ -178,6 +202,51 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
         # business error. A lost answer never gets here: the service
         # turns it into AcsVoucherRequestUnknownError.
         raise
+    except AcsUndocumentedHttpError as exc:
+        # An HTTP 4xx that is not ACS's own answer (a proxy's, a
+        # gateway's): no voucher was made, and nothing was said about
+        # the order. While a hold is in force the service left a held
+        # order held, and ``issue_held_acs_vouchers`` sends it again.
+        if voucher_requests_held().filter(order_id=order_id).exists():
+            logger.warning(
+                "ACS voucher request for order %s was answered by "
+                "something that is not ACS; it stays held: %s",
+                order_id,
+                exc,
+                extra={"order_id": order_id, "http_status": exc.http_status},
+            )
+            return {
+                "status": "voucher_request_held",
+                "order_id": order_id,
+                "message": str(exc),
+            }
+        # Nothing sends any other order again by itself (one that was
+        # not held, or was held with no hold in force any more), so
+        # staff are told, and not to fix an address that nobody refused.
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
+        logger.error(
+            "ACS voucher request for order %s was answered by something "
+            "that is not ACS: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id, "http_status": exc.http_status},
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id,
+            carrier="ACS",
+            error=str(exc),
+            remedy=(
+                "The answer did not come from ACS itself, so ACS refused "
+                "nothing about the order. Press “Issue ACS voucher now” on "
+                "the order's ACS shipment to send the request again."
+            ),
+        )
+        return {
+            "status": "acs_api_error",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except AcsAPIError as exc:
         # Business error (bad address, unacceptable destination
         # station, …) — permanent, no retry. Tell a human immediately:
@@ -221,6 +290,85 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
         "order_id": order_id,
         "voucher_no": shipment.voucher_no,
     }
+
+
+@shared_task(base=TenantTask)
+def issue_held_acs_vouchers(*, max_per_run: int = 100) -> dict[str, Any]:
+    """Send the voucher requests that waited while ACS was failing.
+
+    The only retry of a held request: ``create_acs_voucher_for_order``
+    ends as ``voucher_request_held`` without using its own retries, which
+    a real outage outlasts. Three cases, by the store's voucher hold
+    (``shipping_acs.voucher_hold``):
+
+    * **closed**: once ``AcsVoucherHold.retry_after`` has passed, ask ACS
+      one read. No answer, nothing else is sent. An answer allows one
+      request first.
+    * **one request first**: dispatch one held request, unless one is
+      already in flight. Its voucher ends the hold; a lost answer closes
+      it again and doubles the wait.
+    * **no hold**: dispatch every held request, at most ``max_per_run`` a
+      run and spaced like the tracking polls
+      (``ACS_POLL_DISPATCH_SPACING_SECONDS``: 100 take 200 s at the
+      defaults, inside the 5-minute tick), so they do not queue for a
+      request slot and exhaust their retries on it.
+
+    **Which request goes first**: the one this sweep tried longest ago,
+    never tried before all others, then the one held longest. The sweep
+    records its choice (``voucher_request_retried_at``) before it
+    dispatches, so whatever becomes of that request, even one that never
+    runs or is refused before its claim on every attempt, the next tick
+    chooses another and no order keeps the rest waiting behind it.
+
+    No retry policy: the next tick is the retry.
+    """
+    if _skip_if_acs_unconfigured("issue_held_acs_vouchers"):
+        return {"status": "skipped_unconfigured"}
+
+    hold = voucher_hold.in_force()
+    if hold is not None and hold.trial_allowed_at is None:
+        if (
+            timezone.now() < hold.retry_after
+            or not AcsService.acs_answers_a_read()
+        ):
+            return {"status": "held", "dispatched": 0}
+        voucher_hold.allow_trial()
+        hold = voucher_hold.in_force()
+
+    if hold is None:
+        status, limit = "open", max_per_run
+    elif hold.holds(timezone.now()):
+        # Closed again meanwhile, or the one request is in flight.
+        return {"status": "one_request_first", "dispatched": 0}
+    else:
+        status, limit = "one_request_first", 1
+
+    chosen = list(
+        voucher_requests_held()
+        .order_by(
+            F("voucher_request_retried_at").asc(nulls_first=True),
+            "voucher_request_held_at",
+            "pk",
+        )
+        .values_list("pk", "order_id")[:limit]
+    )
+    AcsShipment.objects.filter(pk__in=[pk for pk, _order_id in chosen]).update(
+        voucher_request_retried_at=timezone.now()
+    )
+    order_ids = [order_id for _pk, order_id in chosen]
+    spacing = settings.ACS_POLL_DISPATCH_SPACING_SECONDS
+    for index, order_id in enumerate(order_ids):
+        create_acs_voucher_for_order.apply_async(
+            args=[order_id], countdown=index * spacing
+        )
+    if order_ids:
+        logger.info(
+            "issue_held_acs_vouchers: %s held voucher request(s) dispatched "
+            "(%s)",
+            len(order_ids),
+            status,
+        )
+    return {"status": status, "dispatched": len(order_ids)}
 
 
 @shared_task(

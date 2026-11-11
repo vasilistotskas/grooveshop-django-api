@@ -313,6 +313,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "shipping_acs.AcsUnrecognisedVoucher": _scrub_all(
         resolution_note=Kind.FREE_TEXT
     ),
+    # The text of the exception that lost an answer: the client's own
+    # wording, or an unclassified error that may quote the request.
+    "shipping_acs.AcsVoucherHold": _scrub_all(reason=Kind.TEXT),
     "shipping_boxnow.BoxNowShipment": Scrub(
         order_fk="order", fields={"metadata": Kind.JSON}
     ),

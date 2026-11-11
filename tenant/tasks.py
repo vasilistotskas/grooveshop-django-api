@@ -189,6 +189,11 @@ def fanout_poll_acs_tracking_batch():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_issue_held_acs_vouchers():
+    return run_for_all_tenants("shipping_acs.tasks.issue_held_acs_vouchers")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_reconcile_acs_cod_payouts():
     return run_for_all_tenants("shipping_acs.tasks.reconcile_acs_cod_payouts")
 

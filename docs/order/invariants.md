@@ -67,9 +67,10 @@ These invariants need more than a table row. Each ends with its anchor.
     `OrderService.maybe_advance_to_completed`
 - `_suppress_customer_status_notifications` on chained transitions. A carrier
   DELIVERED that completes the order, a payment that moves it to PROCESSING
-  and tracking added from PENDING each fire two status changes milliseconds
-  apart, and without the suppression the customer gets two emails and two
-  toasts that say the same thing
+  (the confirmation email follows at once) and tracking added from PENDING
+  each produce two customer messages milliseconds apart: without the
+  suppression the customer gets two emails and two toasts that say the same
+  thing
   - Anchor: [§6.3](emails-and-notifications.md), commit `c82711884`
     (2026-05-01)
 - ACS COD numeric fields use Greek-locale (comma decimal). ACS reads a dot as

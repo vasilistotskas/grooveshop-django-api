@@ -14,7 +14,7 @@ on:
   # there is code to test; ``gate`` always reports. The push trigger keeps
   # its list: release_target.sh relies on a docs-only push starting no run.
   pull_request:
-    branches: ['main']
+    branches: ['main', 'demo-rev-base']
   workflow_dispatch:
 
 # A new push to a pull request cancels the run it supersedes: those runs

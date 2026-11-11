@@ -4,7 +4,7 @@ A resolver (``EmailType.recipients``) returns :class:`Recipient` rows and
 states each one's language, so the pipeline never guesses it: a customer
 reads the language their order or account recorded, the store's own staff
 the store's, the platform's operators the platform's
-(``docs/order-system.md`` section 6.2).
+(``docs/order/emails-and-notifications.md`` section 6.2).
 """
 
 from __future__ import annotations

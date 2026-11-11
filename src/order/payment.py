@@ -1001,7 +1001,8 @@ def alpha_currency(reported: str | None) -> str | None:
     """Normalise Viva's currency code to the alphabetic form we store.
 
     Viva reports ISO 4217 in its NUMERIC form as a string — ``"978"`` for
-    the euro (see ``docs/viva-payment-api.yaml``, Retrieve Transaction).
+    the euro (Retrieve Transaction in Viva's Payment API spec,
+    https://developer.viva.com/apis-for-payments/payment-api/).
     Everything on our side is alphabetic, so returning Viva's value raw
     meant the field held two different vocabularies depending on the
     call, and nothing could compare it. The table comes from the money

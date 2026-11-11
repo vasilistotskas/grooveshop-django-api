@@ -3,6 +3,13 @@ from django.utils.translation import gettext_lazy as _
 
 
 class ShippingAcsConfig(AppConfig):
+    """The ACS Courier integration: vouchers, pickup lists, tracking and COD
+    payouts.
+
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/order/shipping-acs.md`` and ``docs/acs-debugging.md``.
+    """
+
     name = "shipping_acs"
     verbose_name = _("ACS Shipping")
     default_auto_field = "django.db.models.BigAutoField"

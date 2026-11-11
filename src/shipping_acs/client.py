@@ -1,6 +1,8 @@
 """HTTP client for the ACS REST API (single endpoint, RPC-style).
 
-The full API is documented in ``docs/acs-web-services.pdf``.  Every
+The full API is documented in ACS's manual, "ACS Rest API"
+(https://www.acscourier.net/media/syoaswsf/acs-web-services.pdf);
+"the manual" and "the PDF" in this app mean that document.  Every
 call is a ``POST`` to the same URL with body
 ``{"ACSAlias": "<MethodName>", "ACSInputParameters": {...}}`` and a
 single static ``AcsApiKey`` header.  The wire envelope mis-spells
@@ -515,7 +517,7 @@ class AcsClient:
         ``Unprinted_Vouchers`` list lifted out of ``ACSTableOutput``.
 
         That list is the whole point of the rejection response: the
-        manual (``docs/_acs-web-services.txt``) documents a refusal as
+        manual (the module docstring has its URL) documents a refusal as
         ``PickupList_No: null`` + ``Unprinted_Found: N`` in the value
         row, with the offending voucher numbers ONLY in the table
         rows. Returning the value row alone threw away the one field

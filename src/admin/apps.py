@@ -2,6 +2,14 @@ from django.contrib.admin.apps import AdminConfig
 
 
 class MyAdminConfig(AdminConfig):
+    """The Unfold admin: the store admin site, the platform admin site, the
+    dashboards and the reports.
+
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/turnover-report.md`` and ``docs/profit-report.md`` for the
+    reports.
+    """
+
     default_site = "admin.admin.MyAdminSite"
 
     def ready(self):

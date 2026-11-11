@@ -10,7 +10,7 @@ When a sale is earned
     stamped by ``Order.save`` the first time the order is in a dispatched
     status), for every payment method alike. The retail receipt is issued
     when the parcel ships (``order.invoicing.receipt_issuable``,
-    ``docs/order-system.md`` section 7.4), and the books of a Greek store
+    ``docs/order/fiscal-mydata.md`` section 7.4), and the books of a Greek store
     are accrual books (ν.4308/2014): the sale belongs to the period of its
     receipt, not to the day the courier pays the cash on delivery out, nor
     to the day an online payment cleared before the parcel left. So a
@@ -432,7 +432,7 @@ def _ledger_goods(rows: QuerySet) -> QuerySet:
 
     A refund pays a duplicate payment back first, and that part is no
     return: it owes no credit document and takes no room on the receipt
-    (``docs/order-system.md`` section 7). What the refund returned of
+    (``docs/order/fiscal-credit-vat-split.md``). What the refund returned of
     goods is ``CreditAllocation.goods_claimed``, written once when the
     money was claimed or booked and never scaled afterwards, capped to
     what the refund really moved. A refund with no allocation at all (not

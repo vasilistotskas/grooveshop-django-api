@@ -11,6 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class MeiliConfig(AppConfig):
+    """The Meilisearch layer: ``IndexMixin``, the client, the index tasks and
+    the management commands.
+
+    Models and entry points: ``docs/app-map.md``. Read the files under
+    ``docs/search/``.
+    """
+
     default_auto_field = "django.db.models.BigAutoField"
     name = "meili"
     verbose_name = _("Search index")

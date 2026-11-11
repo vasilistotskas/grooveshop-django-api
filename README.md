@@ -172,7 +172,7 @@ detail.
 - [`docs/`](docs/): the deep reference for this service (orders, emails,
   search, pricing, the page builder, migrations, testing and more). It is
   published on the docs site under
-  [/dev/django/reference](https://docs.grooveshop.space/dev/django/reference/order-system)
+  [/dev/django/reference](https://docs.grooveshop.space/dev/django/reference/)
   (basic auth).
 - [docs.grooveshop.space](https://docs.grooveshop.space): the public admin guide
   for store owners (Greek and English), and the developer docs under `/dev`

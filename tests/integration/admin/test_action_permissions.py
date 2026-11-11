@@ -35,7 +35,7 @@ from django.contrib.auth import get_permission_codename
 from django.contrib.auth.models import Permission
 from django.test import Client, RequestFactory
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 from djmoney.money import Money
 from djstripe.admin.views import ConfirmCustomAction
 from djstripe.enums import APIKeyType
@@ -507,6 +507,44 @@ class TestADeletionNeedsTheDeletePermission:
         assert CartItem.objects.filter(pk=item.pk).exists() is not deleted
 
     @pytest.mark.parametrize(
+        ("who", "deleted"),
+        [
+            (TenantMembershipRole.STAFF, False),
+            (TenantMembershipRole.ADMIN, True),
+            (TenantMembershipRole.OWNER, True),
+            ("superuser", True),
+        ],
+    )
+    def test_deleting_an_unrecognised_voucher_at_acs(self, store, who, deleted):
+        """It cannot be undone at ACS, so it asks for ``delete`` on these
+        rows although the admin deletes no row here (it resolves it)."""
+        voucher = AcsUnrecognisedVoucher.objects.create(
+            voucher_no="7000000004",
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+        )
+        user = (
+            UserAccountFactory(admin=True)
+            if who == "superuser"
+            else store_staff(store, role=who)
+        )
+
+        with patch(
+            "shipping_acs.services.AcsService.delete_unrecognised_voucher"
+        ) as delete_at_acs:
+            response = _signed_in(user).post(
+                reverse(
+                    "admin:shipping_acs_acsunrecognisedvoucher_delete_at_acs",
+                    args=[voucher.pk],
+                ),
+                DIALOG | {"note": "A second voucher for order 12"},
+            )
+
+        assert delete_at_acs.called is deleted
+        assert (response.status_code == 403) is not deleted
+
+    @pytest.mark.parametrize(
         ("role", "offered"),
         [
             (
@@ -560,6 +598,37 @@ class TestADeletionNeedsTheDeletePermission:
             if message.level == messages.WARNING
         ]
         assert len(warned) == (1 if before == 1 else 0)
+
+    @pytest.mark.parametrize(
+        ("role", "pointed_to_remove"),
+        [
+            (TenantMembershipRole.STAFF, False),
+            (TenantMembershipRole.ADMIN, True),
+            (TenantMembershipRole.OWNER, True),
+        ],
+    )
+    def test_the_warning_at_one_names_only_an_action_on_offer(
+        self, store, role, pointed_to_remove
+    ):
+        """STAFF are not offered "Remove from cart", so their warning says
+        who can remove the line instead of pointing them to it."""
+        item = CartItemFactory(quantity=1)
+        client = _signed_in(store_staff(store, role=role))
+
+        response = client.post(
+            reverse("admin:cart_cartitem_changelist"),
+            {"action": "decrease_quantity", "_selected_action": [item.pk]},
+            follow=True,
+        )
+
+        [warning] = [
+            str(message)
+            for message in response.context["messages"]
+            if message.level == messages.WARNING
+        ]
+        with translation.override(response.wsgi_request.LANGUAGE_CODE):
+            remove = translation.gettext("Remove from cart")
+        assert (remove in warning) is pointed_to_remove
 
     def test_staff_still_approve_a_comment(self, store):
         comment = BlogCommentFactory(approved=False)

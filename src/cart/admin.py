@@ -600,13 +600,21 @@ class CartItemAdmin(BaseModelAdmin):
                 % {"count": decreased},
             )
         if at_one:
-            self.message_user(
-                request,
-                _(
+            # Point only to an action this user is offered: STAFF are not
+            # offered "Remove from cart".
+            if self.has_delete_permission(request):
+                warning = _(
                     "%(count)d items at quantity 1 were left as they are. "
                     'Use "Remove from cart" to remove them.'
                 )
-                % {"count": at_one},
+            else:
+                warning = _(
+                    "%(count)d items at quantity 1 were left as they are. "
+                    "Removing them needs a role that may delete cart items."
+                )
+            self.message_user(
+                request,
+                warning % {"count": at_one},
                 level=messages.WARNING,
             )
 

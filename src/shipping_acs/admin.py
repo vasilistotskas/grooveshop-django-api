@@ -1229,6 +1229,16 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def has_delete_at_acs_permission(self, request, object_id=None) -> bool:
+        """Deleting at ACS cannot be undone, so it asks what a deletion
+        asks: the role's ``delete`` on these rows, besides ``change`` for
+        resolving the row here. Read from the backend, not through
+        ``has_delete_permission``, which refuses everyone because a row
+        is resolved, never removed."""
+        return self.has_change_permission(request) and request.user.has_perm(
+            "shipping_acs.delete_acsunrecognisedvoucher"
+        )
+
     @staticmethod
     def _back_to_voucher(object_id) -> HttpResponse:
         return HttpResponse(
@@ -1242,7 +1252,7 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
 
     @action(
         description=_("Delete at ACS"),
-        permissions=["change"],
+        permissions=["delete_at_acs"],
         icon="delete",
         variant=ActionVariant.DANGER,
         dialog=ActionDialog(

@@ -53,7 +53,7 @@ def _one_page_pdf(text: str = "label") -> bytes:
 def admin_and_request():
     admin = AcsShipmentAdmin(AcsShipment, AdminSite())
     request = RequestFactory().get("/")
-    request.user = get_user_model()(id=7, username="staff")
+    request.user = get_user_model()(id=7, username="staff", is_superuser=True)
     return admin, request
 
 

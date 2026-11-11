@@ -34,7 +34,7 @@ TASK = "shipping_boxnow.tasks.create_boxnow_shipment_for_order.apply_async"
 
 def _press(shipment):
     request = RequestFactory().post("/")
-    request.user = get_user_model()(id=1, username="staff")
+    request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)
     admin = BoxNowShipmentAdmin(BoxNowShipment, AdminSite())

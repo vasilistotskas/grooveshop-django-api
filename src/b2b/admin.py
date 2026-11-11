@@ -174,6 +174,7 @@ class BusinessProfileAdmin(BaseModelAdmin):
 
     @action(
         description=_("Approve"),
+        permissions=["change"],
         icon="verified",
         dialog=ActionDialog(
             title=_("Approve business profile"),
@@ -206,6 +207,7 @@ class BusinessProfileAdmin(BaseModelAdmin):
 
     @action(
         description=_("Reject"),
+        permissions=["change"],
         icon="block",
         dialog=ActionDialog(
             title=_("Reject business profile"),
@@ -235,7 +237,9 @@ class BusinessProfileAdmin(BaseModelAdmin):
             }
         )
 
-    @action(description=_("Suspend"), icon="pause_circle")
+    @action(
+        description=_("Suspend"), icon="pause_circle", permissions=["change"]
+    )
     def suspend(self, request: HttpRequest, object_id: int) -> HttpResponse:
         from django.shortcuts import redirect
 
@@ -248,7 +252,7 @@ class BusinessProfileAdmin(BaseModelAdmin):
             reverse("admin:b2b_businessprofile_change", args=[object_id])
         )
 
-    @action(description=_("Re-check VIES"), icon="sync")
+    @action(description=_("Re-check VIES"), icon="sync", permissions=["change"])
     def recheck_vies(
         self, request: HttpRequest, object_id: int
     ) -> HttpResponse:
@@ -301,6 +305,7 @@ class CustomerGroupAdmin(BaseModelAdmin):
 
     @action(
         description=_("Import prices"),
+        permissions=["change"],
         icon="upload",
         dialog=ActionDialog(
             title=_("Import price list"),

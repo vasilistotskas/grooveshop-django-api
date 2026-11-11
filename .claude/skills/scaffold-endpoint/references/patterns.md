@@ -848,6 +848,8 @@ class YourModelAdmin(BaseModelAdmin):
 
 `BaseModelAdmin` already sets the Unfold flags and prefetches translations. For translatable models inherit `admin.base.BaseTranslatableAdmin`.
 
+An admin action (`@action` from `unfold.decorators`, or `@admin.action`) passes `permissions=[...]` in its decorator: `["change"]` for an edit, `["delete"]` for a deletion, `["view"]` only for one that reads. Unfold serves list, row and detail actions at URLs of their own and checks nothing else; `tests/unit/admin/test_actions_declare_permissions.py` fails for an action without one.
+
 ---
 
 ## 8. Factory Patterns

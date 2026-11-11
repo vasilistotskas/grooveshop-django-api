@@ -3,6 +3,72 @@
 
 
 
+## v3.244.2 (2026-11-11)
+
+### Bug fixes
+
+* fix(admin): every admin action declares its permission, so its URL enforces it (#668)
+
+Every admin action now names the model permission it needs in its
+decorator. Unfold serves list, row and detail actions as URLs of their
+own and enforces only the decorator's `permissions`, so until now any
+signed-in member of a store's staff could run 33 actions by their URL,
+whatever their role allowed: the ACS COD reconciliation, a gift-card
+balance adjustment off the store's plan, and deletions STAFF may not
+make.
+
+- 80 actions declare `permissions=[...]` by what they do: `change` for
+  an edit, `delete` for a deletion, `add` for a copy, `view` only for
+  the six read-only actions listed in the guard. The base-class default
+  that set `allowed_permissions` after the fact is removed: Django read
+  it, Unfold never did.
+- dj-stripe is platform-only. Its app joins `PLATFORM_ONLY_APP_LABELS`,
+  and `StripeMirrorModelAdmin` makes its admins superuser-only and
+  guards dj-stripe's own action URL. Every store role could disable the
+  store's webhook endpoint at Stripe, cancel subscriptions and run syncs
+  with the store's key.
+- "Decrease quantity by 1" decreases only: a cart line at 1 stays, with
+  a warning to use "Remove from cart", which asks for `delete`; a user
+  without `delete` (STAFF) is told a role that may delete must remove it.
+- "Delete at ACS" (vouchers matching no order) cannot be undone at ACS,
+  so it asks for the role's `delete` on those rows besides `change`
+  (`has_delete_at_acs_permission`); the admin still removes no row.
+- Guards: an AST walk over `src/` requires a literal permission on
+  every action; the registry check covers inherited actions and dropdown
+  items; every third-party admin and URL on the store site is named with
+  the check in front of it. Behaviour tests send every action, as
+  each role, against the real admin site.
+
+Closes #646 ([`a0e239a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a0e239adbae1b9e3c9ae77d42358b09d99e1eab4))
+
+### Documentation
+
+* docs(order): split order-system.md into docs/order/, repair stale pointers, bring the app map here (#657)
+
+`docs/order-system.md` (273,341 characters, its longest line 17,433)
+becomes eighteen pages under `docs/order/`, each under 40,000 characters,
+with `docs/order/index.md` saying which page to read for which change. The
+split moved the text unchanged (1,823 sentence fragments and 2,700 code
+spans compared, none lost); what changed on purpose:
+
+- invariants that cited notes outside the repository now carry their
+  reason and the commit that introduced them;
+- stale pointers repaired (handlers and methods that moved or no longer
+  exist), the storefront-only rows and the audit history dropped;
+- three passages corrected against the code: a status edit made by hand
+  is no longer recovered by canceling the order, restored loyalty points
+  do not reduce a receipt, and a failed Stripe refund is reversed in the
+  ledger;
+- ACS code comments cite the public manual;
+- `docs/app-map.md` now lives here (the site copies it), every app entry
+  names the document to read first, and each `AppConfig` has a docstring.
+
+`tests/unit/test_doc_references.py` also reads `docs/` paths named in
+Python, holds every doc under 40,000 characters (two named exceptions,
+#656) and walks `docs/` recursively.
+
+Closes #561 ([`82d3cba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82d3cba704b93e82beff618f99ec52e087ae93c9))
+
 ## v3.244.1 (2026-11-11)
 
 ### Refactoring

@@ -142,7 +142,7 @@ fi
 # A later code commit: its own run has to do the release.
 run=""
 for _ in $(seq 1 "${RELEASE_TARGET_ATTEMPTS:-12}"); do
-  run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$newest_code&event=push" \
+  run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$newest_code&event=push&branch=main" \
     --jq "[.workflow_runs[] | select((.path | split(\"@\")[0]) == \"$workflow_path\")][0] | select(. != null) | \"\(.status) \(.conclusion // \"none\") \(.id) \(.html_url)\"")
   [[ -n $run ]] && break
   sleep "${RELEASE_TARGET_WAIT:-10}"

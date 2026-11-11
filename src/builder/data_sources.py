@@ -62,6 +62,12 @@ ORDERINGS = {
     "blogPost": ("newest", "mostViewed"),
 }
 
+#: What a product rule does with stock (the optional ``stock`` key):
+#: ``any`` ignores it, ``inStockFirst`` puts products in stock before sold-out
+#: ones (each group in the chosen ordering), ``inStockOnly`` leaves sold-out
+#: products out.
+PRODUCT_STOCK = ("any", "inStockFirst", "inStockOnly")
+
 ANY = "*"
 
 
@@ -179,6 +185,11 @@ def _ordering(out: Outcome, value: Mapping[str, Any], source: str) -> None:
         out.add("/ordering", INVALID)
 
 
+def _stock(out: Outcome, value: Mapping[str, Any]) -> None:
+    if "stock" in value and value["stock"] not in PRODUCT_STOCK:
+        out.add("/stock", INVALID)
+
+
 def _product(
     out: Outcome,
     value: Mapping[str, Any],
@@ -190,8 +201,9 @@ def _product(
     if mode == "picked":
         _picked(out, value, limits, ReferenceKind.PRODUCT)
     elif mode == "filter":
-        _only(out, value, {"mode", "categories", "ordering", "limit"})
+        _only(out, value, {"mode", "categories", "ordering", "stock", "limit"})
         _ordering(out, value, "product")
+        _stock(out, value)
         _limit(out, value, max_limit)
         if "categories" in value:
             for category in _ids(

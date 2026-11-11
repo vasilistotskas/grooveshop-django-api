@@ -9,21 +9,20 @@ behind unless the same change updates the page.
 The second rule is about Claude memory notes (``project_*.md``,
 ``feedback_*.md``, ``reference_*.md``). They live in one person's home
 directory and in no repository, so a doc or a comment that gives one as
-the reason for a rule gives no reason at all to anyone else.
+the reason for a rule gives no reason at all to anyone else. It is read
+in the docs and in every source file of ``_SOURCE_SUFFIXES``: a workflow
+comment cited one unseen while only Python was read.
 
-Both rules start with the failures known on the day they were written,
-listed in ``doc_reference_exceptions.txt`` with the issue that removes
-them. The list only shrinks: an entry that no longer fails must be
-deleted.
+Neither rule has an allowlist: #561 fixed the last known failures.
 """
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXCEPTIONS_FILE = Path(__file__).with_name("doc_reference_exceptions.txt")
 
 _BACKTICKED = re.compile(r"`([^`\n]+)`")
 _EXTENSION = r"\.(?:py|md|txt|html|yml|yaml|toml|json|sh|mjs|po|j2)"
@@ -46,6 +45,10 @@ _MEMORY_NOTE = re.compile(r"\b(?:project|feedback|reference)_[a-z0-9_]+\.md\b")
 _SOURCE_DIRS_SKIPPED = frozenset(
     {".venv", "node_modules", ".git", "migrations", "__pycache__", "htmlcov"}
 )
+_ORDER_DOC_MAX_CHARACTERS = 40_000
+_ORDER_DOC_MAX_LINE = 200
+# Code, workflows, hooks and config: where a comment gives a reason.
+_SOURCE_SUFFIXES = frozenset({".py", ".yml", ".yaml", ".toml", ".sh", ".mjs"})
 
 
 def _doc_files() -> list[Path]:
@@ -71,14 +74,6 @@ def _first_party_roots() -> frozenset[str]:
                 path.name for path in (REPO_ROOT / source_dir).iterdir()
             )
     return frozenset(roots)
-
-
-def _exceptions() -> set[str]:
-    return {
-        line.strip()
-        for line in EXCEPTIONS_FILE.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
-    }
 
 
 def _missing_paths() -> set[str]:
@@ -109,13 +104,25 @@ def _missing_paths() -> set[str]:
     return missing
 
 
+def _source_files() -> list[Path]:
+    """Every file of ``_SOURCE_SUFFIXES`` outside the skipped folders."""
+    files = []
+    for folder, subfolders, names in os.walk(REPO_ROOT):
+        subfolders[:] = [
+            name for name in subfolders if name not in _SOURCE_DIRS_SKIPPED
+        ]
+        files += [
+            Path(folder, name)
+            for name in names
+            if Path(name).suffix in _SOURCE_SUFFIXES
+        ]
+    return files
+
+
 def _memory_note_citations() -> set[str]:
     """``<file>: <note>`` for every memory note named in a tracked text."""
     files = _doc_files() + [
-        path
-        for path in REPO_ROOT.rglob("*.py")
-        if not _SOURCE_DIRS_SKIPPED & set(path.relative_to(REPO_ROOT).parts)
-        and path != Path(__file__).resolve()
+        path for path in _source_files() if path != Path(__file__).resolve()
     ]
     found = set()
     for path in files:
@@ -134,27 +141,71 @@ def test_the_scan_reads_the_docs():
 
 
 def test_every_backticked_repo_path_exists():
-    new = sorted(_missing_paths() - _exceptions())
-    assert not new, (
+    missing = sorted(_missing_paths())
+    assert not missing, (
         "These docs name a file that does not exist. Fix the path, or "
-        "move the doc together with the code:\n  " + "\n  ".join(new)
+        "move the doc together with the code:\n  " + "\n  ".join(missing)
     )
 
 
 def test_nothing_cites_a_private_memory_note():
-    new = sorted(_memory_note_citations() - _exceptions())
-    assert not new, (
+    cited = sorted(_memory_note_citations())
+    assert not cited, (
         "A Claude memory note is in no repository. Write the reason "
-        "itself, or the commit that made the rule:\n  " + "\n  ".join(new)
+        "itself, or the commit that made the rule:\n  " + "\n  ".join(cited)
     )
 
 
-def test_the_exception_list_only_shrinks():
-    stale = sorted(_exceptions() - _missing_paths() - _memory_note_citations())
-    assert not stale, (
-        f"These entries of {EXCEPTIONS_FILE.name} no longer fail. Delete "
-        "them:\n  " + "\n  ".join(stale)
+def test_a_memory_note_in_a_workflow_comment_is_reported(tmp_path, monkeypatch):
+    workflow = tmp_path / ".github" / "workflows" / "ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "# stable per ``project_test_suite_stability.md``\n", encoding="utf-8"
     )
+    vendored = tmp_path / ".venv" / "lib" / "notes.py"
+    vendored.parent.mkdir(parents=True)
+    vendored.write_text("# see feedback_someone_else.md\n", encoding="utf-8")
+    monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
+
+    assert _memory_note_citations() == {
+        ".github/workflows/ci.yml: project_test_suite_stability.md"
+    }
+
+
+def test_the_app_map_names_every_app():
+    app_map = (REPO_ROOT / "docs" / "app-map.md").read_text(encoding="utf-8")
+    apps = sorted(
+        path.parent.name
+        for source_dir in _SOURCE_ROOTS
+        for path in (REPO_ROOT / source_dir).glob("*/apps.py")
+    )
+    assert len(apps) >= 30
+    missing = [app for app in apps if f"`{app}/`" not in app_map]
+    assert not missing, (
+        "docs/app-map.md has no entry for these apps. Say what each owns, "
+        "its entry points and the doc to read:\n  " + "\n  ".join(missing)
+    )
+
+
+def test_an_order_reference_file_fits_in_one_read():
+    """``docs/order-system.md`` grew to 273,000 characters in one file,
+    with paragraphs of up to 17,000 on one line, and could no longer be
+    read whole. Split a file on a subject before it reaches the limit
+    (``docs/order/index.md`` lists the files), and wrap prose: a table
+    row is the only line that may be long."""
+    too_big, too_long = [], []
+    for path in sorted((REPO_ROOT / "docs" / "order").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        if len(text) > _ORDER_DOC_MAX_CHARACTERS:
+            too_big.append(f"{path.name}: {len(text)} characters")
+        too_long += [
+            f"{path.name}:{number}: {len(line)} characters"
+            for number, line in enumerate(text.splitlines(), 1)
+            if len(line) > _ORDER_DOC_MAX_LINE
+            and not line.lstrip().startswith("|")
+        ]
+    assert not too_big, "\n  ".join(too_big)
+    assert not too_long, "\n  ".join(too_long)
 
 
 def test_a_package_moved_under_a_source_root_is_still_checked(

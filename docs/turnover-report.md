@@ -161,7 +161,7 @@ method is the order's `pay_way_key` snapshot, channel its `OrderAttribution.sour
 ## Where it shows
 
 Store admin, `Sales -> Turnover` (`admin:turnover`, `admin/turnover/`). Query
-parameters, validated by `admin.turnover.FilterForm`: `start`, `end` (ISO dates),
+parameters, validated by `admin.reports.FilterForm` (`src/admin/reports.py`): `start`, `end` (ISO dates),
 `bucket`, `compare` (`year` or empty), `group`. Absent parameters take their
 defaults (this year to date, by month, against last year, no breakdown); a
 parameter that is present and empty is kept. The page shows eight totals, a bar

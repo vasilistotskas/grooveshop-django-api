@@ -6,12 +6,10 @@ and says which file holds each § number used here.
 ## 8. Critical invariants
 
 These exist for a reason. Don't undo any without first re-reading
-the linked memory note or the originating PR's commit message.
+the linked section or the originating commit's message.
 
 | Invariant | Anchor |
 |---|---|
-| Backend uses `psycopg` pool with `CONN_MAX_AGE=0` under ASGI | `project_db_pool.md` |
-| `ShippingService.dispatch_create_shipment_task` wraps in `transaction.on_commit` | `project_shipping_dispatch_on_commit.md` |
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | [§5](shipping.md) |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | [§2.2](state-machines.md) |
 | A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | [§7.3](payment-ledger.md) |
@@ -34,22 +32,53 @@ the linked memory note or the originating PR's commit message.
 | `Order.payment_status` / `payment_id` are read-only in the admin, and the owner PATCH/PUT cannot change a priced order's country or region | [§7](cancel.md) |
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL, and a voucher request of unknown outcome (lost answer, unclassified error, expired claim) is never sent again: `voucher_request_unknown_at` holds every caller until staff adopt the voucher or request again | [§5.1](shipping-acs.md), `docs/acs-debugging.md` |
 | While an `AcsVoucherHold` is in force no `ACS_Create_Voucher` is sent for the store, and a held request is never a request of unknown outcome: it is stamped `voucher_request_held_at`, keeps no claim, and only `issue_held_acs_vouchers` sends it, one request first | [§5.1](shipping-acs.md), `src/shipping_acs/voucher_hold.py` |
-| `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
-| `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
 | Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `src/order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
 | A Stripe refund carries `idempotency_key=order-<id>-refund-<n>`, `n` counted from the ledger under the order lock. A refund the provider did not take on (`requires_action`, `failed`, `canceled`) records nothing and never moves the order to PROCESSING | [§7.2](refund-execution.md) |
 | `refund_order` returns a `RefundResult` (what actually moved), never a yes/no: a split refund declined part-way keeps the shares already made and reports them, and every caller (the staff action, `cancel_order`) says so instead of "nothing was refunded" | [§7.2](refund-execution.md) |
 | The refund confirmation email is one per REFUND ledger row, claimed by inserting a `RefundNotification` BEFORE it is sent (unique per refund), and the claim is released when the send fails for good. It is never decided by comparing counts: that let two workers both send and let one task swallow another refund's email | [§7.2](refunds.md), [§7.3](payment-ledger.md) |
 | A COD order's payment status and its `COD_COLLECTION` ledger row are written in ONE atomic step under the order lock (`OrderService.settle_cod_payment`), the status read under that lock. A failed insert rolls the status back, so a payout retry never skips an order that is paid but unrecorded | [§4.4](payments.md) |
 | The "shipped" email/toast fires only at genuine SHIPPED (status==SHIPPED **and** tracking present), never at voucher-mint; PROCESSING is internal-only (no customer email/toast). `send_shipping_notification_email` self-gates. | [§6.1](emails-and-notifications.md) |
-| Admin-WYSIWYG fields in emails render `\|safe` (.html) / `unescape(strip_tags())`+`\|safe` (.txt — Django autoescapes .txt too) | `CLAUDE.md` "Transactional email rendering" |
-| ACS COD numeric fields use Greek-locale (comma decimal) | `project_acs_cod_locale.md` |
-| Don't import from `'#shared/...'` in app/ or server/ | `feedback_no_shared_imports.md` |
-| Don't override generated Zod / OpenAPI types in Nuxt | `feedback_no_local_schema_overrides.md` |
-| OpenAPI regen workflow after Django serializer changes | `project_schema_regen.md` |
+| Admin-WYSIWYG fields in emails render `\|safe` (.html) / `unescape(strip_tags())`+`\|safe` (.txt — Django autoescapes .txt too) | `.claude/rules/domain-patterns.md` "Transactional email rendering" |
 
 These invariants need more than a table row. Each ends with its anchor.
 
+- The backend uses the `psycopg` pool with `CONN_MAX_AGE=0` under ASGI
+  (`DB_POOL_*` in `src/settings.py`). With persistent connections, asgiref's
+  per-request thread executor leaves each thread's connection open until the
+  thread is collected, which exhausts Postgres `max_connections` under load.
+  The pool bounds the connections of a process, and Django refuses a pool
+  beside a non-zero `CONN_MAX_AGE`
+  - Anchor: commit `8041546ce` (2026-04-06)
+- `ShippingService.dispatch_create_shipment_task` wraps the carrier dispatch
+  in `transaction.on_commit`. Queued inside the order-creation transaction,
+  the task looked the order up on another connection before the commit, did
+  not find it and gave up, so the order kept no voucher (prod order 47,
+  2026-04-30). Outside a transaction `on_commit` runs at once, so the admin
+  buttons need no special case
+  - Anchor: commit `59527a873` (2026-04-30),
+    `tests/unit/shipping/test_dispatch_helpers.py`
+- Fresh order columns are read with
+  `Order.objects.filter(pk=...).values(...).first()` — NOT
+  `refresh_from_db(fields=...)` and not `.only(...)`. Either leaves the other
+  columns deferred, and `Order.__init__` loads them when it snapshots
+  `_original_status`, `_original_tracking_number` and the rest, which recurses
+  through the manager without end
+  - Anchor: commit `6521f8f2a` (2026-05-01), the docstring of
+    `OrderService.maybe_advance_to_completed`
+- `_suppress_customer_status_notifications` on chained transitions. A carrier
+  DELIVERED that completes the order, a payment that moves it to PROCESSING
+  and tracking added from PENDING each fire two status changes milliseconds
+  apart, and without the suppression the customer gets two emails and two
+  toasts that say the same thing
+  - Anchor: [§6.3](emails-and-notifications.md), commit `c82711884`
+    (2026-05-01)
+- ACS COD numeric fields use Greek-locale (comma decimal). ACS reads a dot as
+  the thousands separator: `47.01` is taken as 4701 and refused by the 1500 €
+  cash cap, and a weight of `0.5` prints as 5 kg and is billed as such
+  (`_kg_from_grams` and the `Cod_Ammount` line of
+  `_build_create_voucher_params` in `src/shipping_acs/services.py`)
+  - Anchor: commits `61dd09854` (2026-04-29, the amount) and `ffe1718e4`
+    (2026-04-30, the weight)
 - The default cache fails open on a Redis outage (reads miss, writes no-op —
   `src/core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,

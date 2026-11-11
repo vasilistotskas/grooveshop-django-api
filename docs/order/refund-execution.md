@@ -163,11 +163,14 @@ so a sender that leaves one out raises). `order.payment_status` is already
 written (by `record_refund`) and says how much of the order is back:
 PARTIALLY_REFUNDED while part of the payment remains refundable, REFUNDED once
 nothing does. **Whatever hangs off the order's total is released only on
-REFUNDED, once, with the last refund**: the gift-card redemption
-(`giftcard.signals.handle_order_refunded_giftcard` →
-`GiftCardService.credit_refund`, the whole redemption) and the loyalty points
+REFUNDED, once, with the last refund**: the loyalty points
 (`loyalty.signals.handle_order_refunded_loyalty`, which is all-or-nothing and
-once per order). A partial refund is paid back by the provider first, so a
+once per order). The gift-card redemption has no `order_refunded` receiver any
+more (`giftcard.signals.handle_order_refunded_giftcard` is gone): `refund_order`
+credits the cards itself, with the value of a refund beyond the provider's
+money (`GiftCardService.credit_refund`, [§7.2](refunds.md)), and a cancel
+returns the whole redemption (`giftcard.signals.handle_order_canceled_giftcard`
+→ `giftcard.tasks.credit_refund_to_gift_cards`). A partial refund is paid back by the provider first, so a
 slice of the redemption on top would hand back more than that refund was worth
 (a EUR 5 refund once put EUR 60 back on a gift card), and the
 one-credit-per-card ledger could not top the card up when the rest is refunded.

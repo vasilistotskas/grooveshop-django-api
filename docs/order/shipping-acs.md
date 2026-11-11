@@ -8,8 +8,12 @@ and says which file holds each § number used here.
 - **REST API**, polling-based (no webhooks).
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
-  `idle_in_transaction_session_timeout` — see
-  `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6). The
+  `idle_in_transaction_session_timeout`: the row lock used to be held
+  across the ACS call, so a transaction Postgres killed rolled the
+  saved number back while ACS kept the voucher, and the retry made a
+  second one (stage order 682, commit `ffe1718e4`). No lock and no
+  transaction are open during the call now. **TTL 300s** (PR #6,
+  commit `65b465390`). The
   claim keeps two workers from minting at once; it was never designed
   against a lost answer.
 - **A voucher request of unknown outcome is never sent again** (#622).

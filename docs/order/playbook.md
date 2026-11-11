@@ -83,22 +83,3 @@ catalogue is fine.
 3. Drop the stale ones — `--drop-ids …` for a handful, `--drop-before
    YYYY-MM-DD` for a bulk import — and `--prune` the rows that equal
    the `.po`. Every write bumps the version key; no restart needed.
-
-## 10. Audit history (PRs #1–#8)
-
-All landed 2026-04-30 → 2026-05-01.
-
-| PR | Theme | Scope |
-|---|---|---|
-| 1 | Race conditions | COD voucher-mint advance, payment handler row locks, on_commit regression test |
-| 2 | State machine completion | Cancel cascade to courier, refund.created webhook, COD reconcile flips payment_status, DELIVERED→COMPLETED auto |
-| 3 | UX polish | PaymentStatus translations + display, COD alert suppression, cancellation surface, language_code capture |
-| 4 | Email gaps | Shipping notification email wiring, List-Unsubscribe transactional headers |
-| 5 | Audit trail | HistoricalRecords on shipments, is_online_payment list serializer, dispute_notification templates |
-| 6 | Concurrency hardening | Voucher-mint TTL 90→300s, ACS DELIVERED→COMPLETED tests |
-| 7 | Notification dedup | Suppress duplicate customer emails + WS toasts on chained transitions |
-| 8 | Last gap | Refund confirmation email |
-
-For the *why* behind each item, read the commit message — they're
-written specifically to survive a `git log --grep="^fix"` browse
-six months from now.

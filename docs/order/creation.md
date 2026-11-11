@@ -17,7 +17,8 @@ Two entry points in `src/order/services.py` (the legacy
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
-  `59527a87` — see `project_shipping_dispatch_on_commit.md`).
+  `59527a87`; the `transaction.on_commit` invariant in
+  [§8](invariants.md) has the reason).
 - **The provider is asked before the transaction opens.**
   `_retrieve_payment_intent` runs `get_payment_status` (for Stripe
   `PaymentIntent.retrieve` plus the dj-stripe sync, an HTTP round trip) and

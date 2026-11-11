@@ -548,7 +548,7 @@ class TestApplyWebhookEvent:
         state machine requires SHIPPED first — walk the missing step,
         customer-silently, then land RETURNED. Mirrors the ACS fix for
         prod orders 179 & 189 (2026-07)."""
-        from order.tasks import _status_update_reservation_key
+        from order.models.order import status_update_reservation_key
 
         order = OrderFactory(
             status=OrderStatus.PROCESSING,
@@ -572,7 +572,7 @@ class TestApplyWebhookEvent:
         # The bridge's SHIPPED hop is customer-silent; RETURNED itself
         # notifies normally.
         meta = order.metadata or {}
-        shipped_email_flag = _status_update_reservation_key(
+        shipped_email_flag = status_update_reservation_key(
             order.id, OrderStatus.SHIPPED.value
         )
         assert meta.get(shipped_email_flag) is True

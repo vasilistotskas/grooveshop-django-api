@@ -1082,6 +1082,23 @@ VIVA_DISPUTE_LOST_STATUS_ID = "ML"
 VIVA_DISPUTE_WON_STATUS_ID = "MW"
 
 
+def order_viva_codes(order) -> set[str]:
+    """Every Viva orderCode ever issued for this order.
+
+    Each ``create_checkout_session`` mints a fresh code and appends it to
+    ``metadata['viva_order_codes']``
+    (:meth:`VivaWalletPaymentProvider.record_checkout_session`). The
+    webhook's resolver matches the same list in SQL
+    (``order.views.viva_webhook.viva_order_code_q``).
+    """
+    # Exactly what the resolver matches, nothing more: ``payment_id``
+    # holds a TransactionId once an order is paid, never an orderCode.
+    metadata = order.metadata or {}
+    return {
+        str(code) for code in (metadata.get("viva_order_codes") or []) if code
+    }
+
+
 class VivaWalletPaymentProvider(PaymentProvider):
     DEMO_AUTH_URL = "https://demo-accounts.vivapayments.com/connect/token"
     LIVE_AUTH_URL = "https://accounts.vivapayments.com/connect/token"
@@ -1505,8 +1522,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
         decision. ``None`` when Viva could not be read.
         """
         import requests
-
-        from order.views.viva_webhook import order_viva_codes
 
         found: dict[str, ProviderRefund] = {}
         try:

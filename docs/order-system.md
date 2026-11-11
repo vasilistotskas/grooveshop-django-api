@@ -725,7 +725,7 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  │   ├── select_for_update on Order row
                  │   ├── PaymentLedger.record_charge (CHARGE row, whatever state the order is in)
                  │   ├── mark_as_paid → payment_status=COMPLETED
-                 │   ├── _suppress_customer_status_notifications(PROCESSING) ← PR #7
+                 │   ├── suppress_customer_status_notifications(PROCESSING) ← PR #7
                  │   ├── update_order_status(PROCESSING)
                  │   └── _dispatch_shipment_creation_task (on_commit)
                  │
@@ -751,7 +751,8 @@ use the same function.
 (`OrderService.get_payment_status`) does not write the provider's status onto
 the row. A polled COMPLETED settles through the same
 `handle_payment_succeeded` (and announces through
-`announce_stripe_payment_applied`, shared with the webhook), only for a Stripe
+`announce_stripe_payment_applied`, shared with the webhook and reached by the
+`order_stripe_payment_polled` signal), only for a Stripe
 intent no gift-card purchase holds; any other provider's payment is settled by
 its webhook alone. `PayWayService.check_payment_status` (a second, caller-less
 polling writer) was removed.
@@ -763,7 +764,7 @@ gets a history row or a customer email. `handle_payment_failed` returns
 the same outcome, so a late failure never tells a customer who paid
 that their payment failed.
 
-The `_suppress_customer_status_notifications(PROCESSING)` call is
+The `suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an
 `order_payment_confirmed` email AND an `order_processing` email within ms
 (PR #7).
@@ -869,7 +870,7 @@ Differences from the Stripe path that are easy to miss:
   skipped — Viva trusts that ``status==PENDING`` before the
   payment landed.
 - **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
-  handler calls ``OrderService._suppress_customer_status_notifications(
+  handler calls ``OrderService.suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
   so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without
@@ -1962,7 +1963,7 @@ emails / toasts within ms:
 2. `handle_payment_succeeded` → PENDING → PROCESSING (then `send_order_confirmation_email` covers the same ground).
 3. `OrderService.add_tracking_info` admin path → PENDING → PROCESSING → SHIPPED.
 
-`OrderService._suppress_customer_status_notifications(order, status)` pre-stamps two metadata flags:
+`OrderService.suppress_customer_status_notifications(order, status)` pre-stamps two metadata flags:
 - `status_update_email_sent_<status>` — short-circuits the email task's `_reserve_status_update_email`.
 - `suppress_status_ws_<status>` — read by `handle_order_status_changed` to skip `notify_order_status_changed_live.delay`.
 
@@ -2308,7 +2309,7 @@ the linked memory note or the originating PR's commit message.
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL, and a voucher request of unknown outcome (lost answer, unclassified error, expired claim) is never sent again: `voucher_request_unknown_at` holds every caller until staff adopt the voucher or request again | §5.1 above, `docs/acs-debugging.md` |
 | While an `AcsVoucherHold` is in force no `ACS_Create_Voucher` is sent for the store, and a held request is never a request of unknown outcome: it is stamped `voucher_request_held_at`, keeps no claim, and only `issue_held_acs_vouchers` sends it, one request first | §5.1 above, `src/shipping_acs/voucher_hold.py` |
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
-| `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
+| `suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
 | Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `src/order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
 | `order_refunded` always carries `amount`, and the gift-card redemption and the spent points go back only as the value of a refund beyond the provider's money (`refund_order`, value-based, §7.2) or on a cancel, never because the provider's share was refunded; the points an order earned are reversed once, when `payment_status` is REFUNDED. A Viva 1797 is applied from the REFUND transaction (`F`, refund/void type, negative amount), not from a REFUNDED status that Viva never reports | §4.3, §7.2 |
 | Money moved for an order is recorded on the append-only `PaymentTransaction` ledger, once, keyed on the provider's own id (`UNIQUE (provider, provider_reference, kind)`). What can still be refunded is read from it under the order row lock, and `PaymentLedger.refund_status` is the ONE place that decides REFUNDED versus PARTIALLY_REFUNDED: no path writes either status for itself, and none re-derives it from `Order.amount_due` (the amount owed at creation) or from a provider's refund `status`. A refund is as many `refund_order` calls as it takes, never past the remainder | §7.2, §7.3 |

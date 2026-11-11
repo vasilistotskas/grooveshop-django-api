@@ -147,16 +147,16 @@ publish validate it.
 A draft nobody opened since its block moved would therefore be refused at
 publish, and a release written before a block took data settings records no
 dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
-(or `--all-tenants`; `--dry-run` writes nothing) writes the upgrades into every
-stored draft and version, each validated against the store's catalogue, then
-rebuilds the current release's reference index. One document that does not pass
-stops its store with nothing written; a feature switched off does not count
-against a document here, as it does at a publish, but one the platform does not
-know does. There is no way back: an older
-storefront leaves out a node newer than it knows, so run it once the storefront
-release it follows has proved itself, with a restorable backup of the store. It
-is the only thing that rewrites a
-`BuilderVersion`: a version keeps its number and what it renders, and a draft
+(or `--all-tenants`; `--dry-run` does it all and rolls it back) writes the
+upgrades into every stored draft and version, each validated against the
+store's catalogue, then rebuilds the current release's reference index. One
+document that does not pass stops its store with nothing written; a feature
+switched off does not count against a document here, as it does at a publish,
+but one the platform does not know does. An older storefront leaves out a node
+newer than it knows, so run it once the storefront release it follows has
+proved itself. It rewrites a `BuilderVersion` in place
+(`builder/document_rewrite.py`, [the way back](#a-rewrite-in-place-and-the-way-back)
+below): a version keeps its number and what it renders, and a draft
 keeps its revision, so a store is not told it has unpublished changes.
 `builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
 to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
@@ -684,19 +684,90 @@ read is cached per release: that is what brings the rewrite to visitors.
 - **Alt text belongs to the image.** A use's alt goes onto the asset, per
   language, only where the asset has none. Only the drafts and the current
   release decide it; what an older version says is text the store has replaced.
-  Uses that disagree stop the store until someone writes the alt on the image,
-  which then wins, and each use that gives way to it is printed to read.
-- **It imports nothing.** A value that is no image of the store (it names the
-  place), an image not in the library yet, and a document that does not validate
-  each stop the store with nothing written. Run `import_builder_media
-  --all-versions` first. The images are read before the documents are locked,
-  so a draft saved in between stops the store the same way: run it again.
-- **One store, one transaction.** A stopped store is named with its reasons when
-  the command ends (exit 1) and the other stores are written. Nothing records
-  that a store was stopped: settle the reason and run it again.
-- A new setting already chosen stays and the URL beside it goes. An empty entry
-  of a list goes, since a list of references has no empty slot.
-- `--dry-run` does all of that and writes nothing. A second run finds nothing.
+  What the image already says wins, and each use that gives way to it is
+  printed to read. Uses that disagree, of an image with no alt, stop the store.
+- **It imports nothing.** An image of the store that is not in the library yet
+  stops the store: run `import_builder_media --all-versions` first. That
+  import is the only automatic fix, and its limits are the library's: a raster
+  file that exists in the store's own uploads or under the storefront's
+  `/img/`, an oversize photo shrunk. It never takes an address outside the
+  store (nothing is fetched for a staff member's sake), another store's file,
+  an SVG, a path with a query string, or a file that is gone.
+- **What stops a store.** A value with no library image, alt texts that
+  disagree, an empty list entry that cannot keep its place (below), a document
+  that does not validate, and a draft saved while the command read the store
+  (run it again). Each is printed with every document, version, block and
+  setting that holds it, and the command ends with exit 1. One store is one
+  transaction: nothing of a stopped store is written, the other stores are.
+- **A person decides what the import cannot fix**, one value at a time, in a
+  JSON file passed as `--decisions`
+  (`builder.media_migration.read_decisions`):
+
+  ```json
+  {"webside": {"images": {"https://example.org/a.png": 12,
+                          "/img/old-logo.svg": "empty"},
+               "alt": {"12": {"el": "Ο πάγκος", "en": ""}}}}
+  ```
+
+  A store is named by its schema. Under `images`, a value exactly as the
+  report prints it becomes the library image of that id, or no image
+  (`"empty"`: the setting is left unset and its alt goes with it). Under
+  `alt`, an image whose uses disagree gets the text stated, per language; an
+  empty text leaves it without one. There is no switch that ignores problems:
+  a value with no decision still stops the store. Each decision used is
+  printed, and the file is the record of what was decided: keep it with the
+  run's output.
+- **A decision reaches every version.** A version is immutable to the editor,
+  so a value only an old version holds can be settled nowhere else. Like the
+  rest of this command, a decision changes the content of every draft and
+  every version that holds the value, published and archived ones included.
+- **A list keeps its pairs.** `hero_carousel` has two lists,
+  `images` → `artworks` and `mobileImages` → `mobileArtworks`, and the default
+  design draws the phone image at the position of the desk one. A list of
+  references has no empty slot (the storefront's schema takes an asset id from
+  1 up, and a release refuses an id that names no asset), so an empty entry, as
+  written or by a decision, is handled by position: a position that is empty in
+  every list of the block goes from each, which moves no pair; an empty entry
+  beside an image of another list stops the store, because dropping it would
+  put every later image against the wrong partner. No decision settles that
+  one yet: it needs the storefront to accept an empty slot.
+- A new setting already chosen stays and the URL beside it goes.
+- `--dry-run` takes every step of the real run, the alt text and the release
+  included, in a transaction it rolls back. A second run finds nothing.
+- **Share-preview links are not rewritten.** A link's snapshot is outside the
+  version history and lives at most `BUILDER_PREVIEW_LINK_TTL_SECONDS`. It keeps
+  the URL it froze, which the storefront's read adapter still draws, so a link
+  made before the run opens as before. The adapter must outlive the last such
+  link: remove it no sooner than that period after the last store was moved.
+
+### A rewrite in place, and the way back
+
+`persist_block_upgrades` and `migrate_builder_media` change a draft without a
+new revision and a version that nothing else may edit, and neither model keeps
+history. So `builder/document_rewrite.py` first copies the columns it is about
+to replace into a `BuilderRewriteBackup` row, one per draft and per version, in
+the same transaction, under the id of the run. Each command prints
+`backup run <id>` for a store it wrote. A draft's old content is not kept as a
+version instead: a version is the store's own history (its numbers, its
+restore list), and one in the old shape would be the next thing to rewrite.
+
+`manage.py builder_rewrite_backups --tenant <schema>` lists the runs a store
+holds.
+
+- `--restore <run>` (with `--dry-run` to try it) puts a run back in that store:
+  each draft and version that still holds what the run stored gets its columns
+  exactly as they were, with no validation, and its backup is deleted. A draft
+  saved since is someone's work and a version rewritten since belongs to a later
+  run (restore that one first): both are left as they are and named, and their
+  backups stay. It ends with a new release of the same versions, like the
+  rewrite did. The command that made the run can then be run again.
+- Alt text `migrate_builder_media` wrote onto an image stays after a restore.
+  An image's alt is edited in the library, and the next run finds it there.
+- `--delete <run>` removes a run's backups. Nothing else does: there is no
+  sweep, so a run can be put back until someone decides it never will be. A
+  backup is a copy of a draft or a version, so it is the same kind of data as
+  those (`devtools/anonymise/rules.py`), and it is deleted with its document
+  or its version.
 
 ## Signing in to the editor
 

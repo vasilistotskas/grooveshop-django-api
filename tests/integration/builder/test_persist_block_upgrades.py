@@ -12,7 +12,12 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from builder import services
-from builder.models import BuilderDocument, BuilderReference, BuilderVersion
+from builder.models import (
+    BuilderDocument,
+    BuilderReference,
+    BuilderRewriteBackup,
+    BuilderVersion,
+)
 from builder.storefront import clear_catalogue_cache
 from tests.utils.builder import TEXT, _schema, document, section
 
@@ -102,14 +107,14 @@ def published(admin, catalogue, upgraded_catalogue, features_on):
 
 @pytest.fixture
 def run(tenant):
-    def go(*args):
+    def go(*args, command="persist_block_upgrades"):
         out = StringIO()
         with mock.patch(
             "django_tenants.utils.tenant_context",
             lambda _tenant: contextlib.nullcontext(),
         ):
             call_command(
-                "persist_block_upgrades",
+                command,
                 "--tenant",
                 tenant.schema_name,
                 *args,
@@ -148,6 +153,35 @@ def test_a_version_states_what_it_now_holds(published, run):
     assert after.block_types == ["offers_preview@2"]
     assert after.content_hash != version.content_hash
     assert after.catalogue_hash == "catalogue-hash-2"
+
+
+def test_a_run_is_kept_and_can_be_put_back(published, run):
+    version = published.versions.get()
+
+    run_id = run().rsplit("backup run ", 1)[1].split()[0]
+    kept = BuilderRewriteBackup.objects.filter(run=run_id).count()
+    report = run("--restore", run_id, command="builder_rewrite_backups")
+
+    after = BuilderVersion.objects.get(pk=version.pk)
+    assert kept == 2
+    assert "restored 1 draft(s), 1 version(s); 0 left" in report
+    assert BuilderDocument.objects.get(key=HOME).draft == published.draft
+    assert (after.data, after.block_types) == (
+        version.data,
+        ["offers_preview@1"],
+    )
+    assert after.content_hash == version.content_hash
+    assert after.catalogue_hash == version.catalogue_hash
+    assert not BuilderRewriteBackup.objects.exists()
+    assert "upgraded 1 draft(s), 1 version(s)" in run()
+
+
+def test_a_dry_run_keeps_nothing(published, run):
+    report = run("--dry-run")
+
+    assert "would upgrade 1 draft(s), 1 version(s)" in report
+    assert "backup run" not in report
+    assert not BuilderRewriteBackup.objects.exists()
 
 
 def test_a_store_is_not_told_it_has_unpublished_changes(published, run):

@@ -9,18 +9,33 @@ changes: what the document renders is meant to stay the same.
 Each rewritten document goes through ``validate_document`` against the store's
 catalogue, and what that returns is what is stored, hash and references
 included. A document that cannot be rewritten is a problem to report, and the
-caller, who holds the transaction, rolls back on any.
+caller, who holds the transaction, rolls back on any. A dry run is the same
+call in a transaction the caller rolls back, so it takes every step the real
+run does.
+
+Nothing else keeps what a rewrite replaces, so each row is first copied to a
+``BuilderRewriteBackup`` under the id of the run, in the same transaction.
+:func:`restore_run` puts a run back: every row that still holds what the run
+stored gets its columns as they were, and its backup goes. A row changed since
+(a draft someone saved, a version another rewrite moved on) is left as it is
+and named, with its backup kept.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from builder import storefront, validation
-from builder.models import BuilderDocument, BuilderVersion
+from builder.models import (
+    BuilderDocument,
+    BuilderRewriteBackup,
+    BuilderVersion,
+)
 from tenant.features import STORE_FEATURES
 
 #: A document and its overlay, to copies of both and what moved, by a label.
@@ -42,7 +57,7 @@ def known_feature_on(name: str) -> bool:
 
 @dataclass(slots=True)
 class Rewritten:
-    """What a rewrite did, or in a dry run would do."""
+    """What a rewrite did."""
 
     drafts: int = 0
     versions: int = 0
@@ -88,15 +103,32 @@ def _rewritten(
     return validated
 
 
-def rewrite_store(
-    transform: Transform,
+def _replace(
+    row: BuilderDocument | BuilderVersion,
+    columns: dict[str, Any],
     *,
-    catalogue: storefront.Catalogue,
-    dry_run: bool,
+    run: UUID,
+    rewritten_hash: str,
+) -> None:
+    """Store *columns* on *row*, what they replace kept under *run*."""
+    is_version = isinstance(row, BuilderVersion)
+    BuilderRewriteBackup.objects.create(
+        run=run,
+        document=row.document if is_version else row,
+        version=row if is_version else None,
+        original={name: getattr(row, name) for name in columns},
+        rewritten_hash=rewritten_hash,
+    )
+    type(row)._base_manager.filter(pk=row.pk).update(**columns)
+
+
+def rewrite_store(
+    transform: Transform, *, catalogue: storefront.Catalogue, run: UUID
 ) -> Rewritten:
-    """Every draft and version of the current store through *transform*. Call
-    it in a transaction: the documents are locked, and the caller rolls back on
-    ``problems``. A dry run does all of it and writes nothing."""
+    """Every draft and version of the current store through *transform*, what
+    each held before kept as a backup of *run*. Call it in a transaction: the
+    documents are locked, and the caller rolls back on ``problems`` and for a
+    dry run."""
     result = Rewritten()
     for document in BuilderDocument.objects.select_for_update():
         validated = _rewritten(
@@ -111,12 +143,16 @@ def rewrite_store(
         if validated is None:
             continue
         result.drafts += 1
-        if not dry_run:
-            BuilderDocument.objects.filter(pk=document.pk).update(
-                draft=validated.data,
-                draft_i18n=validated.i18n,
-                draft_catalogue_hash=catalogue.hash,
-            )
+        _replace(
+            document,
+            {
+                "draft": validated.data,
+                "draft_i18n": validated.i18n,
+                "draft_catalogue_hash": catalogue.hash,
+            },
+            run=run,
+            rewritten_hash=validated.content_hash,
+        )
     for version in BuilderVersion.objects.select_related("document").iterator():
         validated = _rewritten(
             key=version.document.key,
@@ -130,14 +166,69 @@ def rewrite_store(
         if validated is None:
             continue
         result.versions += 1
-        if not dry_run:
-            BuilderVersion.objects.filter(pk=version.pk).update(
-                data=validated.data,
-                i18n=validated.i18n,
-                block_types=validated.block_types,
-                refs=validated.refs,
-                catalogue_hash=catalogue.hash,
-                content_hash=validated.content_hash,
-                size_bytes=validated.size_bytes,
-            )
+        _replace(
+            version,
+            {
+                "data": validated.data,
+                "i18n": validated.i18n,
+                "block_types": validated.block_types,
+                "refs": validated.refs,
+                "catalogue_hash": catalogue.hash,
+                "content_hash": validated.content_hash,
+                "size_bytes": validated.size_bytes,
+            },
+            run=run,
+            rewritten_hash=validated.content_hash,
+        )
+    return result
+
+
+@dataclass(slots=True)
+class Restored:
+    """What putting a run back did."""
+
+    drafts: int = 0
+    versions: int = 0
+    #: A row that no longer holds what the run stored, with its backup kept.
+    left: list[str] = field(default_factory=list)
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.drafts or self.versions)
+
+
+def _draft_hash(document: BuilderDocument) -> str:
+    return hashlib.sha256(
+        validation.encode(document.draft, document.draft_i18n)
+    ).hexdigest()
+
+
+def restore_run(run: UUID) -> Restored:
+    """Put back what *run* replaced in the current store, and delete the
+    backups it used. Call it in a transaction. Only a row that still holds
+    what the run stored is put back: a draft saved since is someone's work,
+    and a version rewritten since belongs to that later run, which is the one
+    to restore first."""
+    result = Restored()
+    backups = BuilderRewriteBackup.objects.filter(run=run).select_related(
+        "document", "version"
+    )
+    for backup in backups.select_for_update(of=("self", "document")):
+        version = backup.version
+        if version is None:
+            row, label = backup.document, f"{backup.document.key} draft"
+            held = _draft_hash(backup.document)
+        else:
+            row = version
+            label = f"{backup.document.key} version {version.number}"
+            held = version.content_hash
+        if held != backup.rewritten_hash:
+            result.left.append(f"{label}: changed since the run, left as it is")
+            continue
+        type(row)._base_manager.filter(pk=row.pk).update(**backup.original)
+        backup.delete()
+        if version is None:
+            result.drafts += 1
+        else:
+            result.versions += 1
     return result

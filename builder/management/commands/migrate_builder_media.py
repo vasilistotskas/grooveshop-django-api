@@ -1,6 +1,7 @@
 """Move a store's documents from image URLs to the media library.
 
     uv run python manage.py migrate_builder_media --tenant webside --dry-run
+    uv run python manage.py migrate_builder_media --tenant webside --decisions decisions.json
     uv run python manage.py migrate_builder_media --all-tenants
 
 Run ``import_builder_media --all-versions`` first: this finds each image's asset
@@ -10,19 +11,42 @@ to report. For the settings the storefront's blocks declare as old
 place of the URL and loses the URL and its alt, in the settings and the overlay.
 
 The alt goes onto the image, per language, only where the image has none. Alt
-text belongs to the image, so uses that disagree stop the store until someone
-writes it on the image, which then wins. Only the drafts and the current release
-decide it, and a use that gives way to what the image says is printed to read.
+text belongs to the image, so uses that disagree stop the store. Only the
+drafts and the current release decide it, and a use that gives way to what the
+image says is printed to read.
 
-Anything wrong stops the store with nothing written: a value that is no image of
-the store, an image not imported, uses that disagree, a document that does not
-validate. ``--dry-run`` does all of that and writes nothing. A second run finds
-nothing to do. A version keeps its number and a draft its revision. The command
-ends with a new release of the same versions, so the rewrite reaches visitors
-through the cache like any release.
+Anything wrong stops the store with nothing written, and is printed with every
+document, version, block and setting that holds it: a value that is no image of
+the store, an image the library cannot take or does not hold, uses that
+disagree, a list whose empty entry cannot keep its place, a document that does
+not validate. The command then exits 1. What ``import_builder_media`` cannot
+bring in is for a person to decide, one value at a time, in the file
+``--decisions`` names (``builder.media_migration.read_decisions``)::
+
+    {"webside": {"images": {"https://example.org/a.png": 12,
+                            "/img/old-logo.svg": "empty"},
+                 "alt": {"12": {"el": "Ο πάγκος"}}}}
+
+An image value becomes the library image named, or no image (``"empty"``); an
+image whose uses disagree gets the alt stated (an empty text leaves it
+without). A decision holds for every draft and every version that has the
+value, published and older ones included. Each decision used is printed.
+
+``--dry-run`` takes every step of the real run, the alt text and the release
+included, in a transaction it rolls back. A second run finds nothing to do. A
+version keeps its number and a draft its revision. The command ends with a new
+release of the same versions, so the rewrite reaches visitors through the cache
+like any release.
+
+What each draft and version held is kept as a backup of the run, whose id is
+printed: ``builder_rewrite_backups`` puts a run back, and deletes its backups
+once they are no longer wanted.
 """
 
 from __future__ import annotations
+
+import uuid
+from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
@@ -48,72 +72,87 @@ class Command(TenantCommandMixin, BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Report what would change and write nothing.",
+            help="Do everything the real run does, then roll it back.",
+        )
+        parser.add_argument(
+            "--decisions",
+            type=Path,
+            help=(
+                "A JSON file of what was decided, per store, for each value "
+                "that has no library image and each alt its uses disagree on."
+            ),
         )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        decisions: dict[str, media_migration.Decisions] = {}
+        if options["decisions"] is not None:
+            try:
+                decisions = media_migration.read_decisions(options["decisions"])
+            except media_migration.DecisionsInvalid as exc:
+                raise CommandError(f"--decisions: {exc}") from exc
+        run = uuid.uuid4()
         failed: list[str] = []
         for context in self.iter_tenant_contexts(options):
             with context:
-                problems = self._store(dry_run)
-                failed += [
-                    f"{connection.schema_name}: {line}" for line in problems
-                ]
+                schema = connection.schema_name
+                problems = self._store(
+                    run,
+                    decisions.get(schema, media_migration.Decisions()),
+                    dry_run,
+                )
+                failed += [f"{schema}: {line}" for line in problems]
         if failed:
             raise CommandError(
-                f"{len(failed)} problem(s); nothing of those stores was "
-                "written:\n" + "\n".join(failed)
+                "Nothing of these stores was written. Settle each line, by "
+                "import_builder_media or in --decisions, and run it again:\n"
+                + "\n".join(failed)
             )
 
-    def _assets(
-        self, uses: list[media_migration.LegacyUse]
-    ) -> tuple[dict[str, int], list[str]]:
-        """``{url as written: asset id}``, and what stands in the way."""
-        plan, problems = media_migration.plan_of(uses)
-        outcomes = media_migration.run(plan, dry_run=True)
-        for url, outcome in outcomes.items():
-            if outcome.status == "failed":
-                problems.append(f"{url}: cannot be read ({outcome.detail})")
-            elif outcome.status == "new":
-                problems.append(
-                    f"{url}: not in the library yet, run import_builder_media"
-                )
-        return media_migration.mapping(plan, outcomes), problems
-
-    def _store(self, dry_run: bool) -> list[str]:
+    def _store(
+        self,
+        run: uuid.UUID,
+        decisions: media_migration.Decisions,
+        dry_run: bool,
+    ) -> list[str]:
         catalogue = storefront.fetch_catalogue(connection.schema_name)
         current, older = media_migration.stored_uses()
-        assets, problems = self._assets(current + older)
-        if problems:
-            return problems
-        decisions = media_migration.decide_alts(current, assets)
-        for line in decisions.gives_way:
+        resolution = media_migration.resolve(current + older, decisions.images)
+        for line in resolution.decided:
             self.stdout.write(line)
-        if decisions.conflicts:
-            return decisions.conflicts
+        if resolution.problems:
+            return resolution.problems
+        alts = media_migration.decide_alts(
+            current, resolution.assets, decisions.alts
+        )
+        for line in alts.gives_way + alts.decided:
+            self.stdout.write(line)
+        if alts.conflicts:
+            return alts.conflicts
 
         with transaction.atomic():
-            problems = [] if dry_run else self._fill_alts(decisions.fill)
+            problems = self._fill_alts(alts.fill)
             result = rewrite_store(
                 lambda data, i18n: media_migration.migrate_document(
-                    data, i18n, assets
+                    data, i18n, resolution.assets
                 ),
                 catalogue=catalogue,
-                dry_run=dry_run,
+                run=run,
             )
             problems += result.problems
-            if problems:
-                transaction.set_rollback(True)
-            elif result.changed and not dry_run:
+            if not problems and result.changed:
                 services.release_again(RELEASE_NOTE)
+            if problems or dry_run:
+                transaction.set_rollback(True)
 
-        verb = "would move" if dry_run or problems else "moved"
+        rolled_back = dry_run or bool(problems)
         self.stdout.write(
-            f"{verb} {result.drafts} draft(s), {result.versions} version(s), "
-            f"alt text on {len(decisions.fill)} image(s): "
-            f"{dict(sorted(result.moved.items()))}"
+            f"{'would move' if rolled_back else 'moved'} {result.drafts} "
+            f"draft(s), {result.versions} version(s), alt text on "
+            f"{len(alts.fill)} image(s): {dict(sorted(result.moved.items()))}"
         )
+        if result.changed and not rolled_back:
+            self.stdout.write(f"backup run {run}")
         return problems
 
     def _fill_alts(self, fill: dict[int, dict[str, str]]) -> list[str]:

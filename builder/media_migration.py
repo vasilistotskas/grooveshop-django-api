@@ -19,6 +19,8 @@ EXTERNAL: it is listed and never fetched.
 :func:`migrate_document` is what puts the asset in a document in place of the
 URL, for the settings the storefront's blocks declare as old ones
 (``legacy_image_fields.json``): ``manage.py migrate_builder_media``.
+:func:`resolve` finds the asset of each of those URLs, and names each one that
+has none for an operator to decide (:class:`Decisions`).
 """
 
 from __future__ import annotations
@@ -279,6 +281,8 @@ class LegacyUse:
     #: ``draft`` or ``version <number>``.
     source: str
     path: str
+    #: The node's ``type@version``.
+    block: str
     url: str
     #: ``{language: text}``, what this use says in each language it says it.
     alt: Mapping[str, str]
@@ -329,6 +333,7 @@ def legacy_uses(
                         document,
                         source,
                         f"/sections/{node_id}/settings/{legacy.source}{tail}",
+                        str(node["type"]),
                         url.strip(),
                         alt,
                     )
@@ -361,23 +366,150 @@ def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
     return current, older
 
 
-def plan_of(uses: list[LegacyUse]) -> tuple[Plan, list[str]]:
-    """*uses* as an import plan, and what cannot be one: a value that is no
-    image of this store has no asset to become."""
-    schema = connection.schema_name
-    plan = Plan()
-    problems: list[str] = []
-    for use in uses:
-        kind = classify(use.url, schema)
-        if kind in {None, EXTERNAL}:
-            problems.append(
-                f"{use.where} {use.path}: {use.url!r} is no image of this store"
-            )
+#: What a decision writes for a value that is to become no image.
+NO_IMAGE = "empty"
+
+
+class DecisionsInvalid(ValueError):
+    """The decisions file does not say what it must."""
+
+
+@dataclass(frozen=True, slots=True)
+class Decisions:
+    """What an operator decided for one store, value by value. Nothing else
+    settles a value the library cannot take or an alt its uses disagree on."""
+
+    #: ``{url as a document writes it: the library image, None for none}``.
+    images: Mapping[str, int | None] = field(default_factory=dict)
+    #: ``{(asset id, language): the image's alt, empty for none}``.
+    alts: Mapping[tuple[int, str], str] = field(default_factory=dict)
+
+
+def _decisions_of(schema: str, stated: Any) -> Decisions:
+    def bad(what: str) -> DecisionsInvalid:
+        return DecisionsInvalid(f"{schema}: {what}")
+
+    if not isinstance(stated, dict) or set(stated) - {"images", "alt"}:
+        raise bad('a store holds "images" and "alt", nothing else')
+    stated_images = stated.get("images", {})
+    stated_alts = stated.get("alt", {})
+    if not isinstance(stated_images, dict) or not isinstance(stated_alts, dict):
+        raise bad('"images" and "alt" are objects')
+    images: dict[str, int | None] = {}
+    for url, asset in stated_images.items():
+        if asset == NO_IMAGE:
+            images[url.strip()] = None
+        elif type(asset) is int and asset > 0:
+            images[url.strip()] = asset
         else:
-            plan.found.append(
-                Found(use.document, use.source, use.path, use.url, kind)
+            raise bad(
+                f'images[{url!r}] is an image id of the library or "{NO_IMAGE}"'
             )
-    return plan, problems
+    alts: dict[tuple[int, str], str] = {}
+    for asset, texts in stated_alts.items():
+        if not asset.isdecimal() or not isinstance(texts, dict):
+            raise bad(f"alt[{asset!r}] is an image id to {{language: text}}")
+        for locale, alt in texts.items():
+            if not isinstance(alt, str):
+                raise bad(f"alt[{asset!r}][{locale!r}] is a text")
+            alts[int(asset), locale] = alt.strip()
+    return Decisions(images, alts)
+
+
+def read_decisions(path: Path) -> dict[str, Decisions]:
+    """``{store schema: its decisions}`` of the file an operator wrote. A
+    store holds ``images``, each value as a document writes it to the id of a
+    library image or ``"empty"``, and ``alt``, an image id to its text per
+    language (``docs/builder.md`` has an example)."""
+    try:
+        stated = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise DecisionsInvalid(f"{path}: {exc}") from exc
+    if not isinstance(stated, dict):
+        raise DecisionsInvalid(
+            f"{path}: an object of store schema to decisions"
+        )
+    return {
+        schema: _decisions_of(schema, store) for schema, store in stated.items()
+    }
+
+
+@dataclass(slots=True)
+class Resolution:
+    """The asset of every old image setting of a store, or why not."""
+
+    #: ``{url as written: the asset it becomes, None for no image}``.
+    assets: dict[str, int | None] = field(default_factory=dict)
+    #: Each decision that settled a value, to print.
+    decided: list[str] = field(default_factory=list)
+    #: Each value with no asset and no decision, then where it is used.
+    problems: list[str] = field(default_factory=list)
+
+
+def resolve(
+    uses: list[LegacyUse], decided: Mapping[str, int | None]
+) -> Resolution:
+    """What each URL of *uses* becomes. A decision comes first. An image of
+    this store is found in the library by its content, and nothing is
+    imported: one not there yet is for ``import_builder_media``. Whatever is
+    left (an address outside the store, a value that is no image path, a file
+    that is gone or that the library refuses) has no asset to become and is a
+    problem, named with every place that holds it."""
+    schema = connection.schema_name
+    by_url: dict[str, list[LegacyUse]] = defaultdict(list)
+    for use in uses:
+        by_url[use.url].append(use)
+    in_library = set(
+        MediaAsset.objects.filter(
+            pk__in={asset for asset in decided.values() if asset is not None}
+        ).values_list("pk", flat=True)
+    )
+    resolution = Resolution()
+    reasons: dict[str, str] = {}
+    plan = Plan()
+    for url, where in sorted(by_url.items()):
+        if url in decided:
+            asset = decided[url]
+            if asset is not None and asset not in in_library:
+                reasons[url] = (
+                    f"is decided as image {asset}, which is not in the library"
+                )
+                continue
+            resolution.assets[url] = asset
+            became = "no image" if asset is None else f"image {asset}"
+            resolution.decided.append(
+                f"decision: {url!r} is {became} ({len(where)} use(s))"
+            )
+            continue
+        kind = classify(url, schema)
+        if kind is None:
+            reasons[url] = "is no image path"
+        elif kind == EXTERNAL:
+            reasons[url] = "is an address outside this store, never fetched"
+        else:
+            plan.found.extend(
+                Found(use.document, use.source, use.path, url, kind)
+                for use in where
+            )
+    outcomes = run(plan, dry_run=True)
+    for import_url, items in plan.internal.items():
+        outcome = outcomes[import_url]
+        for url in {item.url for item in items}:
+            if outcome.status == "failed":
+                reasons[url] = f"cannot be imported ({outcome.detail})"
+            elif outcome.status == "new":
+                reasons[url] = (
+                    "is not in the library yet, run import_builder_media "
+                    "--all-versions"
+                )
+            else:
+                resolution.assets[url] = outcome.asset_id
+    for url, reason in sorted(reasons.items()):
+        resolution.problems.append(f"{url!r} {reason}")
+        resolution.problems.extend(
+            f"    {use.where} {use.path} ({use.block})" for use in by_url[url]
+        )
+    return resolution
 
 
 @dataclass(slots=True)
@@ -388,27 +520,35 @@ class AltDecisions:
     fill: dict[int, dict[str, str]] = field(default_factory=dict)
     #: A use that says something else than the asset already does, which wins.
     gives_way: list[str] = field(default_factory=list)
+    #: Each decision that settled uses that disagree, to print.
+    decided: list[str] = field(default_factory=list)
     #: Uses that disagree, of an asset with nothing written to decide by.
     conflicts: list[str] = field(default_factory=list)
 
 
 def decide_alts(
-    uses: list[LegacyUse], assets: Mapping[str, int]
+    uses: list[LegacyUse],
+    assets: Mapping[str, int | None],
+    decided: Mapping[tuple[int, str], str],
 ) -> AltDecisions:
     """Alt text belongs to the image, so one image says one thing in a language.
     What the asset already says wins; a use's text fills a language it has
-    none in; and uses that disagree stop the store for someone to choose, by
-    writing it on the image. Nothing here guesses between them."""
+    none in; and uses that disagree stop the store for someone to choose: by
+    writing it on the image, or by a decision (*decided*), whose empty text
+    leaves the image without one. Nothing here guesses between them. A use
+    that becomes no image has no image to give its alt to."""
     said: dict[tuple[int, str], dict[str, list[LegacyUse]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for use in uses:
-        for locale, text in use.alt.items():
-            said[assets[use.url], locale][text].append(use)
+        asset = assets[use.url]
+        if asset is not None:
+            for locale, text in use.alt.items():
+                said[asset, locale][text].append(use)
     held = {
         (asset, locale): text
         for asset, locale, text in MediaAsset.translations.field.model.objects.filter(
-            master__in=set(assets.values())
+            master__in={asset for asset, _locale in said}
         ).values_list("master", "language_code", "alt")
         if text
     }
@@ -420,39 +560,97 @@ def decide_alts(
                 for text, uses_ in texts.items()
                 if text != kept
             )
-        elif len(texts) > 1:
+        elif len(texts) == 1:
+            decisions.fill.setdefault(asset, {})[locale] = next(iter(texts))
+        elif (stated := decided.get((asset, locale))) is not None:
+            if stated:
+                decisions.fill.setdefault(asset, {})[locale] = stated
+            decisions.decided.append(
+                f"decision: image {asset} [{locale}] "
+                + (f"says {stated!r}" if stated else "stays without alt")
+            )
+        else:
             versions = "; ".join(
                 f"{text!r} ({uses_[0].where})" for text, uses_ in texts.items()
             )
             decisions.conflicts.append(
                 f"image {asset} [{locale}]: its uses disagree and it has no alt "
-                f"of its own, so write one on the image: {versions}"
+                f"of its own, so decide it or write one on the image: {versions}"
             )
-        else:
-            decisions.fill.setdefault(asset, {})[locale] = next(iter(texts))
     return decisions
 
 
-def _asset_of(url: str, assets: Mapping[str, int]) -> int:
-    """The asset *url* became. One the store's read did not find was saved
-    since: the documents are locked only after it."""
+def _asset_of(value: Any, assets: Mapping[str, int | None]) -> int | None:
+    """The asset the entry *value* becomes: none for an empty entry and for a
+    value decided to be no image. A URL the store's read did not find was
+    saved since: the documents are locked only after it."""
+    if not isinstance(value, str) or not value.strip():
+        return None
     try:
-        return assets[url]
+        return assets[value.strip()]
     except KeyError:
         raise DocumentRefused(
-            f"{url!r} was saved after the store's images were read, "
+            f"{value.strip()!r} was saved after the store's images were read, "
             "run it again"
         ) from None
 
 
+def _place_lists(
+    node: dict[str, Any],
+    node_id: str,
+    node_settings: dict[str, Any],
+    slots: Mapping[LegacyField, list[int | None]],
+) -> None:
+    """Store the lists of one node: *slots* is each old list as assets, an
+    empty entry still in its place.
+
+    The lists of a block pair by position (``hero_carousel`` draws
+    ``mobileArtworks[i]`` as the phone's crop of ``artworks[i]``), and a list
+    of references has no empty slot (the storefront's schema takes an asset id
+    and nothing else). So no entry may move against another list. A position
+    that is empty in every list goes from each, which moves no pair. An empty
+    entry beside an image of another list can be neither kept nor dropped,
+    and is refused.
+    """
+    every: dict[LegacyField, list[Any]] = dict(slots)
+    for legacy in _fields_of(node):
+        chosen = node_settings.get(legacy.target)
+        if legacy.is_list and legacy not in slots and isinstance(chosen, list):
+            every[legacy] = chosen
+
+    def holders(position: int) -> list[str]:
+        """The settings that hold an image at *position*."""
+        return [
+            legacy.source if legacy in slots else legacy.target
+            for legacy, entries in every.items()
+            if position < len(entries) and entries[position] is not None
+        ]
+
+    for legacy, entries in slots.items():
+        kept: list[int] = []
+        for position, asset in enumerate(entries):
+            if asset is not None:
+                kept.append(asset)
+            elif others := holders(position):
+                raise DocumentRefused(
+                    f"{node['type']} {node_id!r}: /{legacy.source}/{position} "
+                    f"is empty and /{others[0]}/{position} is not; "
+                    "the lists pair by position and a list of images has no "
+                    "empty slot"
+                )
+        if kept:
+            node_settings[legacy.target] = kept
+
+
 def migrate_document(
-    data: Any, i18n: Any, assets: Mapping[str, int]
+    data: Any, i18n: Any, assets: Mapping[str, int | None]
 ) -> tuple[Any, Any, Counter[str]]:
     """Copies of document *data* and its overlay *i18n* with every old image
     setting replaced by the asset it names and its alt taken out of both, and
     how many settings of each block moved. A chosen new setting stays, and the
-    old one left beside it goes. An empty entry of a list goes, since a list of
-    references has no empty slot."""
+    old one left beside it goes. A value that became no image (*assets* says
+    ``None``) leaves its setting empty. The entries of a list keep their
+    positions against the block's other lists (:func:`_place_lists`)."""
     migrated = copy.deepcopy(data)
     overlay = copy.deepcopy(i18n or {})
     moved: Counter[str] = Counter()
@@ -461,6 +659,7 @@ def migrate_document(
         node_settings = (
             (node.get("settings") or {}) if isinstance(node, dict) else {}
         )
+        slots: dict[LegacyField, list[int | None]] = {}
         for legacy in _fields_of(node):
             present = legacy.source in node_settings
             value = node_settings.pop(legacy.source, None)
@@ -481,15 +680,14 @@ def migrate_document(
             if node_settings.get(legacy.target):
                 continue
             if legacy.is_list:
-                ids = [
-                    _asset_of(url.strip(), assets)
-                    for url in value or []
-                    if isinstance(url, str) and url.strip()
+                slots[legacy] = [
+                    _asset_of(url, assets)
+                    for url in (value if isinstance(value, list) else [])
                 ]
-                if ids:
-                    node_settings[legacy.target] = ids
-            elif isinstance(value, str) and value.strip():
-                node_settings[legacy.target] = _asset_of(value.strip(), assets)
+            elif (asset := _asset_of(value, assets)) is not None:
+                node_settings[legacy.target] = asset
+        if slots:
+            _place_lists(node, node_id, node_settings, slots)
     return migrated, _without_empties(overlay), moved
 
 

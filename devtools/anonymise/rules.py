@@ -519,6 +519,8 @@ NOT_PERSONAL: dict[str, str] = {
         "builder.MediaAsset",
         "builder.MediaAssetTranslation",
         "builder.BuilderScheduledPublish",
+        # A copy of a draft or a version above, as it was before a rewrite.
+        "builder.BuilderRewriteBackup",
         "page_config.ContentPageTranslation",
         "page_config.LegalDocumentVersion",
         "user.SubscriptionTopic",

@@ -4654,6 +4654,9 @@ msgstr "Empty cart"
 msgid "Empty for singular entries. Set for ngettext / msgid_plural entries; in that case each plural form has its own row identified by plural_index."
 msgstr "Empty for singular entries. Set for ngettext / msgid_plural entries; in that case each plural form has its own row identified by plural_index."
 
+msgid "Empty for the document's draft."
+msgstr "Empty for the document's draft."
+
 msgid "Empty for unlimited; 1 for single-use codes"
 msgstr "Empty for unlimited; 1 for single-use codes"
 
@@ -12441,6 +12444,18 @@ msgstr "Revisions"
 msgid "Reward Products"
 msgstr "Reward Products"
 
+msgid "Rewrite backup"
+msgstr "Rewrite backup"
+
+msgid "Rewrite backups"
+msgstr "Rewrite backups"
+
+msgid "Rewrite run"
+msgstr "Rewrite run"
+
+msgid "Rewritten content hash"
+msgstr "Rewritten content hash"
+
 msgid "Role"
 msgstr "Role"
 
@@ -17698,6 +17713,9 @@ msgstr "payment provider"
 msgid "sha256 of data+i18n"
 msgstr "sha256 of data+i18n"
 
+msgid "sha256 of the content the run stored. A restore puts back only a row that still holds it."
+msgstr "sha256 of the content the run stored. A restore puts back only a row that still holds it."
+
 msgid "shipping_provider_code is required for pickup_point."
 msgstr "shipping_provider_code is required for pickup_point."
 
@@ -17754,6 +17772,9 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+msgid "{column: value} of the row as it was before the run."
+msgstr "{column: value} of the row as it was before the run."
 
 msgid "{document key: draft revision it was taken from}"
 msgstr "{document key: draft revision it was taken from}"

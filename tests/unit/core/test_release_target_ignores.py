@@ -18,13 +18,15 @@ import yaml
 from semantic_release.const import DEFAULT_COMMIT_AUTHOR
 
 _GITHUB = Path(__file__).resolve().parents[3] / ".github"
-_SCRIPT = (_GITHUB / "scripts" / "release_target.sh").read_text(
-    encoding="utf-8"
-)
+_SCRIPTS = _GITHUB / "scripts"
+_SCRIPT = (_SCRIPTS / "release_target.sh").read_text(encoding="utf-8")
+# The one definition of the ignored paths, sourced by release_target.sh and
+# by the pull request change detection.
+_IGNORED = (_SCRIPTS / "ignored_paths.sh").read_text(encoding="utf-8")
 
 
 def _script_patterns() -> list[str]:
-    declared = re.search(r"^IGNORED=\((.*)\)$", _SCRIPT, re.MULTILINE)
+    declared = re.search(r"^IGNORED=\((.*)\)$", _IGNORED, re.MULTILINE)
     assert declared is not None
     return re.findall(r"'([^']+)'", declared.group(1))
 
@@ -37,14 +39,23 @@ def test_the_script_ignores_exactly_what_the_workflow_ignores():
     triggers = workflow[True]
 
     assert triggers["push"]["paths-ignore"] == _script_patterns()
-    assert triggers["pull_request"]["paths-ignore"] == _script_patterns()
+    # A pull request run starts on every change: a skipped workflow leaves a
+    # required check "Pending". The ``changes`` job applies the same list.
+    assert "paths-ignore" not in triggers["pull_request"]
+
+
+def test_both_scripts_use_the_one_definition():
+    for script in ("release_target.sh", "pr_touches_code.sh"):
+        text = (_SCRIPTS / script).read_text(encoding="utf-8")
+        assert "ignored_paths.sh" in text
+        assert "IGNORED=(" not in text
 
 
 def test_every_ignored_pattern_has_its_case_in_the_matcher():
     """``IGNORED`` is the declaration; the ``case`` is what runs."""
     matcher = re.search(
         r"ignored_path\(\) \{.*?case \$1 in\n\s*(.*?)\) return 0",
-        _SCRIPT,
+        _IGNORED,
         re.DOTALL,
     )
     assert matcher is not None
@@ -74,3 +85,37 @@ def test_the_script_knows_the_identity_semantic_release_commits_with():
     assert "GIT_COMMIT_AUTHOR" not in (
         _GITHUB / "workflows" / "ci.yml"
     ).read_text(encoding="utf-8")
+
+
+_WORKFLOW = yaml.safe_load(
+    (_GITHUB / "workflows" / "ci.yml").read_text(encoding="utf-8")
+)
+_JOBS = _WORKFLOW["jobs"]
+_GATE_EXEMPT = {"changes", "tested-in-pr", "gate", "release"}
+
+
+def test_the_gate_needs_every_job_that_tests_code():
+    """Branch protection requires ``gate`` alone, so it must wait for all."""
+    tested = set(_JOBS) - _GATE_EXEMPT
+    assert set(_JOBS["gate"]["needs"]) == tested | {"changes", "tested-in-pr"}
+    assert _JOBS["gate"]["if"] == "always()"
+
+
+def test_the_gate_keeps_its_name():
+    """Its name is the check context the repository settings require."""
+    assert _JOBS["gate"]["name"] == "CI Gate"
+
+
+def test_every_job_that_tests_code_waits_for_the_change_detection():
+    # ``coverage`` needs ``testing``, so it is skipped with it.
+    for name in set(_JOBS) - _GATE_EXEMPT - {"coverage"}:
+        job = _JOBS[name]
+        needs = job["needs"]
+        needs = [needs] if isinstance(needs, str) else needs
+        assert "changes" in needs, name
+        assert "needs.changes.outputs.code == 'true'" in job["if"], name
+
+
+def test_the_change_detection_runs_the_pinned_script():
+    steps = _JOBS["changes"]["steps"]
+    assert any("pr_touches_code.sh" in step.get("run", "") for step in steps)

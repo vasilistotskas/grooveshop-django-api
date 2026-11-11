@@ -490,8 +490,7 @@ jobs:
           HYPOTHESIS_PROFILE: ci
 
       - name: Run Tests (shard)
-        # ``--dist loadfile`` is mandatory for stability per
-        # ``project_test_suite_stability.md`` — interleaving tests
+        # ``--dist loadfile`` is mandatory for stability: interleaving tests
         # from different files on the same xdist worker (the
         # ``worksteal`` default) leaks module-level singletons (the
         # ``translation_reload`` middleware version, ``extra_settings``

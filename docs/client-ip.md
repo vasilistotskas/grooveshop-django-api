@@ -25,5 +25,5 @@ else the rightmost `X-Forwarded-For` hop Traefik appended, else
 any function whose name says `trusted` or `secret` as a source of
 secrets, so under its old name every log line carrying an address was a
 clear-text-logging alert. Operator-side detail, including the fact that the secret
-lives in two separate Cloudflare accounts, is in the infrastructure
-repo's `docs/edge-trust-boundary.md`.
+lives in two separate Cloudflare accounts, is in
+`grooveshop-infrastructure/docs/edge-trust-boundary.md`.

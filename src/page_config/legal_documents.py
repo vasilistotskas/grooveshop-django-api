@@ -80,8 +80,9 @@ both. Every order records the version of each it was placed under
 # Every claim is a fact of the running platform, not boilerplate: the
 # fields, the query-string drop and the token redaction are Traefik's
 # access-log config and the Vector transform, and 14 days is
-# VictoriaLogs' ``retentionPeriod`` (grooveshop-infrastructure
-# ``docs/logging.md``). Change one there and this text changes with it,
+# VictoriaLogs' ``retentionPeriod``
+# (``grooveshop-infrastructure/docs/logging.md``). Change one there and
+# this text changes with it,
 # as a new ``LEGAL_TEXT_UPDATES`` revision.
 PRIVACY_SERVER_LOGS_SECTION: dict[str, str] = {
     "el": """<section id="server-logs"><h2>Αρχεία καταγραφής διακομιστή</h2>

@@ -1,7 +1,8 @@
 """Canonical resolution of the real client IP behind Cloudflare.
 
-The infrastructure side is ``docs/edge-trust-boundary.md`` in
-grooveshop-infrastructure; this module is the decision it leaves to us.
+The infrastructure side is
+``grooveshop-infrastructure/docs/edge-trust-boundary.md``; this module is
+the decision it leaves to us.
 
 **What Traefik can and cannot tell us.** The address Traefik saw is its
 TCP peer, and it appends that as the rightmost ``X-Forwarded-For`` hop

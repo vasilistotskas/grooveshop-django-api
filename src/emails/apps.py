@@ -4,6 +4,12 @@ from django.utils.translation import gettext_lazy as _
 
 
 class EmailsConfig(AppConfig):
+    """Every email the platform sends: the type registry, ``send_email``,
+    per-store switches, opt-outs, the log and the Resend webhook.
+
+    Models and entry points: ``docs/app-map.md``. Read ``docs/emails.md``.
+    """
+
     default_auto_field = "django.db.models.BigAutoField"
     name = "emails"
     verbose_name = _("Emails")

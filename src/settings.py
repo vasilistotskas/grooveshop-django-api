@@ -4508,7 +4508,7 @@ ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
 # of production logs (2026-10-11 to 10-20), each tracking task against how
 # many ACS tasks were in flight at its start, gave a rejection rate of 0.9%
 # at 1, 2.0% at 2, 3.6% at 3, 7.9% at 6, 17% at 8 and 19-50% at 9 or more
-# (table in ``docs/order-system.md``). 2 halves the rate against 3; with
+# (table in ``docs/order/shipping-acs.md``). 2 halves the rate against 3; with
 # the reserve below the polls run one at a time and still finish inside
 # their tick, see the spacing.
 ACS_MAX_CONCURRENT_REQUESTS = int(getenv("ACS_MAX_CONCURRENT_REQUESTS", "2"))

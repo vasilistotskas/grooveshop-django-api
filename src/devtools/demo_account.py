@@ -854,7 +854,7 @@ def _seed_orders(
             "pay_way": pay_way,
             "status": row.status,
             "payment_status": row.payment_status,
-            # The gateway that took the money (docs/order-system.md §1),
+            # The gateway that took the money (docs/order/overview.md §1),
             # so only an order whose money moved names one.
             "payment_method": pay_way.provider_code if paid else "",
             "payment_method_fee": pay_way.cost,

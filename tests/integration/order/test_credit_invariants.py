@@ -52,7 +52,7 @@ ledger in time order and says what the books should hold. The invariants:
    is never offered for refund again (points included: value back, though no
    credit).
 
-The oracle encodes the product rules of ``docs/order-system.md`` §7 from
+The oracle encodes the product rules of ``docs/order/index.md`` §7 from
 first principles, never through the code's formulas (see ``Oracle``). The
 exemptions it keeps are each a documented rule: a claim that only answered
 another claim's refund moved no money; a reversal after a credit was issued
@@ -326,7 +326,7 @@ class Replay:
 
 class Oracle:
     """What the order's ledger says was goods, replayed in time order and
-    independent of how the platform stores it (``docs/order-system.md`` §7).
+    independent of how the platform stores it (``docs/order/index.md`` §7).
 
     The rules, from first principles:
 
@@ -506,7 +506,7 @@ class Oracle:
                 )
                 amount = Decimal(obj.amount.amount)
                 # A refund by lines is goods returned: it takes none of a
-                # duplicate payment (docs/order-system.md, refund by lines).
+                # duplicate payment (docs/order/refunds.md, refund by lines).
                 excess = ZERO if obj.request_id else min(excess, amount)
                 src = new_source(amount - excess, when, claim=True)
                 pending[obj.pk] = (src, excess)

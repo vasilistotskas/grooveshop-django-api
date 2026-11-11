@@ -565,7 +565,7 @@ include = ["src/order/payment.py"]
 invalid-argument-type = "ignore"
 
 # ─────────────────────────────────────────────────────────
-# Import contracts (import-linter): `uv run lint-imports`
+# Import contracts (import-linter): `PYTHONPATH=src uv run lint-imports`
 # ─────────────────────────────────────────────────────────
 # Which app may import which. grimp reads every import statement,
 # `lazy` ones and those inside functions included. `ignore_imports`

@@ -3,6 +3,12 @@ from django.utils.translation import gettext_lazy as _
 
 
 class ShippingBoxNowConfig(AppConfig):
+    """The BoxNow integration: parcels, lockers, tracking and the webhook.
+
+    Models and entry points: ``docs/app-map.md``. Read
+    ``docs/order/shipping-boxnow.md``.
+    """
+
     name = "shipping_boxnow"
     verbose_name = _("BoxNow Shipping")
     default_auto_field = "django.db.models.BigAutoField"

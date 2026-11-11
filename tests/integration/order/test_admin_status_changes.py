@@ -92,7 +92,7 @@ def test_cancel_action_restores_the_stock_the_order_took():
 
 def test_returned_action_uses_the_transition_table_and_keeps_stock():
     """RETURNED leaves stock alone on purpose — the goods come back days
-    later and may be damaged (docs/order-system.md §5.1) — so the action
+    later and may be damaged (docs/order/shipping-acs.md §5.1) — so the action
     must not restock, only move the status the legal way."""
     product = ProductFactory(stock=10, num_images=0, num_reviews=0)
     shipped = _order(OrderStatus.SHIPPED)

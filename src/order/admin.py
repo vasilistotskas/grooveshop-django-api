@@ -2099,7 +2099,7 @@ class OrderAdmin(BaseModelAdmin):
     def mark_as_returned(self, request, queryset):
         # Stock is deliberately untouched: the goods come back days later
         # and may be damaged, so restocking is a staff decision on the
-        # physical parcel (docs/order-system.md §5.1).
+        # physical parcel (docs/order/shipping-acs.md §5.1).
         self._bulk_update_status(
             request,
             queryset,
@@ -2116,7 +2116,7 @@ class OrderAdmin(BaseModelAdmin):
         # The order status only; the money moves through the "Refund"
         # action below (``OrderService.refund_order``) or the provider's
         # refund webhook, neither of which changes ``status``
-        # (docs/order-system.md §4.2).
+        # (docs/order/payments.md §4.2).
         self._bulk_update_status(
             request,
             queryset,

@@ -2673,7 +2673,7 @@ class AcsService:
             # Past the candidate guard above there ARE vouchers waiting,
             # so ACS declining to return a PickupList_No is a FAILURE —
             # never "nothing to issue". The manual documents exactly two
-            # shapes for this call (docs/_acs-web-services.txt): a
+            # shapes for this call (URL in ``shipping_acs.client``): a
             # PickupList_No on success, or null + Unprinted_Found > 0
             # with Error_Message and the offending numbers in the table.
             # Treating anything else as a no-op logged one INFO line,
@@ -2780,7 +2780,7 @@ class AcsService:
                 )
                 return None
             if unprinted_count or unprinted_vouchers:
-                # The documented refusal (docs/_acs-web-services.txt,
+                # The documented refusal (the ACS manual,
                 # ACS_Issue_Pickup_List: ``PickupList_No: null`` with
                 # ``Unprinted_Found > 0`` and the voucher numbers in the
                 # table rows). A normal business outcome with one fix —

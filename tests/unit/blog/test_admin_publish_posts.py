@@ -69,6 +69,7 @@ def test_the_action_publishes_drafts_only(posts):
     before = {k: p.published_at for k, p in posts.items()}
     admin = BlogPostAdmin(BlogPost, AdminSite())
     request = RequestFactory().post("/admin/")
+    request.user = UserAccountFactory(admin=True)
     sent: list[tuple[str, int | None]] = []
     admin.message_user = lambda request, message, level=None: sent.append(
         (str(message), level)

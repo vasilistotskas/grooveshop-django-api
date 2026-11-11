@@ -26,7 +26,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 def _retire(*shipments):
     admin = AcsShipmentAdmin(AcsShipment, AdminSite())
     request = RequestFactory().post("/")
-    request.user = get_user_model()(id=7, username="staff")
+    request.user = get_user_model()(id=7, username="staff", is_superuser=True)
     with (
         patch.object(admin, "message_user") as message,
         patch("shipping_acs.services.AcsClient") as client,

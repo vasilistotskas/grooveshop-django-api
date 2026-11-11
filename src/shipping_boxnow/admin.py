@@ -324,6 +324,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Cancel parcels via BoxNow API"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -374,6 +375,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Re-fetch label URL from BoxNow"),
+        permissions=["view"],
         variant=ActionVariant.INFO,
         icon="download",
     )
@@ -419,6 +421,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Download voucher PDFs (zip)"),
+        permissions=["view"],
         variant=ActionVariant.PRIMARY,
         icon="folder_zip",
     )
@@ -473,6 +476,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Download BoxNow voucher (PDF)"),
+        permissions=["view"],
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -550,6 +554,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Create BoxNow parcel now"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="local_shipping",
     )
@@ -640,6 +645,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @action(
         description=_("Cancel parcel via BoxNow API"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -780,6 +786,7 @@ class BoxNowLockerAdmin(BaseModelAdmin):
 
     @action(
         description=_("Sync lockers from BoxNow API"),
+        permissions=["change"],
         variant=ActionVariant.INFO,
         icon="sync",
     )

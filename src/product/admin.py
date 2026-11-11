@@ -425,6 +425,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Activate selected attributes"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -444,6 +445,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Deactivate selected attributes"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -568,6 +570,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Activate selected values"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -587,6 +590,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Deactivate selected values"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1343,6 +1347,7 @@ class ProductAdmin(
 
     @action(
         description=_("Activate selected products"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1364,6 +1369,7 @@ class ProductAdmin(
 
     @action(
         description=_("Deactivate selected products"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1462,6 +1468,7 @@ class ProductAdmin(
 
     @action(
         description=_("Clear discount from selected products"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1492,6 +1499,7 @@ class ProductAdmin(
 
     @action(
         description=_("Duplicate as draft"),
+        permissions=["add"],
         icon="content_copy",
         variant=ActionVariant.INFO,
     )
@@ -2040,6 +2048,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Approve selected reviews"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -2058,6 +2067,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Reject selected reviews"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -2084,6 +2094,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Approve"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -2096,6 +2107,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Reject"),
+        permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
     )

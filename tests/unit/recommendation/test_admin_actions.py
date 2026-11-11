@@ -20,6 +20,7 @@ from recommendation.presets import PRESETS, seed_recommendation_slots
 from tenant.models import StoreVertical
 from tests.utils.staff import (
     bind_store_tenant,
+    stamp_platform_identity,
     store_tenant,
     unbind_store_tenant,
 )
@@ -40,7 +41,9 @@ def _post(staff_user):
 
 @pytest.fixture
 def staff_user():
-    return UserAccountFactory(is_staff=True, is_superuser=True)
+    return stamp_platform_identity(
+        UserAccountFactory(is_staff=True, is_superuser=True)
+    )
 
 
 @pytest.fixture
@@ -50,7 +53,11 @@ def slot_admin():
 
 @pytest.fixture
 def fashion_store():
-    tenant = store_tenant("recs_reset_tenant", vertical=StoreVertical.FASHION)
+    tenant = store_tenant(
+        "recs_reset_tenant",
+        vertical=StoreVertical.FASHION,
+        recommendations_enabled=True,
+    )
     previous = bind_store_tenant(tenant)
     yield tenant
     unbind_store_tenant(previous)

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import (
     BooleanField,
@@ -566,6 +566,7 @@ class CartItemAdmin(BaseModelAdmin):
 
     @action(
         description=_("Increase quantity by 1"),
+        permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="add",
     )
@@ -580,23 +581,46 @@ class CartItemAdmin(BaseModelAdmin):
 
     @action(
         description=_("Decrease quantity by 1"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="remove",
     )
     def decrease_quantity(self, request, queryset):
-        count = queryset.count()
-        with transaction.atomic():
-            # Delete items that are already at quantity 1 (would reach 0)
-            queryset.filter(quantity__lte=1).delete()
-            # Decrease the rest
-            queryset.filter(quantity__gt=1).update(quantity=F("quantity") - 1)
-        self.message_user(
-            request,
-            _("Quantity decreased for %(count)d items.") % {"count": count},
+        """Decrease only: a line at quantity 1 is left as it is. Taking it
+        to 0 is removing it, which is "Remove from cart" and asks for
+        ``delete``; STAFF hold ``change`` and no ``delete``."""
+        at_one = queryset.filter(quantity__lte=1).count()
+        decreased = queryset.filter(quantity__gt=1).update(
+            quantity=F("quantity") - 1
         )
+        if decreased:
+            self.message_user(
+                request,
+                _("Quantity decreased for %(count)d items.")
+                % {"count": decreased},
+            )
+        if at_one:
+            # Point only to an action this user is offered: STAFF are not
+            # offered "Remove from cart".
+            if self.has_delete_permission(request):
+                warning = _(
+                    "%(count)d items at quantity 1 were left as they are. "
+                    'Use "Remove from cart" to remove them.'
+                )
+            else:
+                warning = _(
+                    "%(count)d items at quantity 1 were left as they are. "
+                    "Removing them needs a role that may delete cart items."
+                )
+            self.message_user(
+                request,
+                warning % {"count": at_one},
+                level=messages.WARNING,
+            )
 
     @action(
         description=_("Remove from cart"),
+        permissions=["delete"],
         variant=ActionVariant.DANGER,
         icon="delete",
     )

@@ -1204,6 +1204,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @action(
         description=_("Resend confirmation"),
+        permissions=["change"],
         variant=ActionVariant.INFO,
         icon="forward_to_inbox",
     )
@@ -1239,6 +1240,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @action(
         description=_("Deactivate selected subscriptions"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )

@@ -168,7 +168,9 @@ class TestTheTracedSequence:
         again = _run_task_with_retries(order_id)
 
         request = RequestFactory().get("/")
-        request.user = get_user_model()(id=1, username="staff")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
         with (
             patch(
                 "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
@@ -754,7 +756,9 @@ class TestIssueVoucherNowFollowsTheRule:
         from shipping_acs.admin import AcsShipmentAdmin
 
         request = RequestFactory().get("/")
-        request.user = get_user_model()(id=1, username="staff")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
         with (
             patch(
                 "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
@@ -1591,7 +1595,9 @@ class TestAResetWhileAMintIsInFlight:
             shipment_state=AcsShipmentState.CANCELED
         )
         request = RequestFactory().get("/")
-        request.user = get_user_model()(id=1, username="staff")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
 
         with (
             patch(

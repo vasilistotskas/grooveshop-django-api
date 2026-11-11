@@ -3,6 +3,138 @@
 
 
 
+## v3.244.0 (2026-11-11)
+
+### Continuous integration
+
+* ci: build each test database once, migrate the multi-tenant schemas side by side, never cancel a run on main (#644) ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: use every runner core in the test shards, build the multi-tenant schemas side by side
+
+Three pull_request runs of 2026-11-10 put a run at 12 to 14 minutes, set
+by the multi-tenant lane and the slowest shard.
+
+- Test shards ran 2 xdist workers on a 4-vCPU runner: with psutil
+  installed `-n auto` counts physical cores. CI now passes `-n logical`.
+- The multi-tenant lane replayed the migration history four times in a
+  row (public, webside, mt_smoke, mt_smoke_b), 8 of its 12 minutes. The
+test database is now built with the public schema only and the three
+  store schemas are migrated at the same time by django-tenants'
+  subprocess executor. The CI database name follows DB_NAME so those
+  processes can be pointed at the test database.
+- A new push cancels the superseded run of a pull request only. A run on
+  main is no longer cancelled in progress, and the release job skips a
+  commit that is no longer the tip of main. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: build each shard's test database once and copy it per worker
+
+With one xdist worker per vCPU the four replays ran side by side and took
+4.5 to 5 minutes, which cost what the extra workers gained (run
+42872796937). One serial pytest run now builds the database and
+PostgreSQL copies it for each worker.
+
+CLAUDE.md and docs/testing.md say what to run before pushing, when a
+branch behind main may be merged as it is, and how the multi-tenant lane
+builds its schemas. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: main runs are never cancelled or queued, CI merges the shard durations, the amount_due migration tests walk back once
+
+- Concurrency: only pull_request runs share a group; every other run is
+  its own, so a run on main neither cancels nor waits for another.
+- The Coverage Gate job merges the shard durations into one artifact,
+test-durations, which is what a refresh of .test_durations commits.
+- test_migration_amount_due*.py unapplied 35 order migrations and
+  everything depending on them in every test, 40 to 50 s each. The walk
+  back now happens once per class, in setUpTestData; each test still
+  runs the migration under test from a savepoint. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: refresh .test_durations from CI, print each shard's slowest phases
+
+.test_durations is the test-durations artifact of run 42883125945: the
+first timings taken with one worker per vCPU, the copied test database
+and the cheaper amount_due migration tests. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: start test files in collection order, not by test count
+
+xdist's loadfile hands out the files with the most tests first, so a
+file with five tests and a 160 to 214 s class setup started last and
+shard 1 waited for it with three workers idle. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: a release that cannot happen from its own run is released from the tip or fails, never skipped quietly
+
+The tip check skipped the release with a green job whenever main had
+moved, but a docs-only merge and the bot's version commit start no run,
+so nothing released the skipped commit.
+
+- .github/scripts/release_target.sh decides: at the tip, release; behind
+  commits that start no run, release from the tip; behind a code commit,
+  leave it to that commit's run, with a warning while that run is alive
+  and a failed job when it failed, was cancelled, or lost its release job.
+- The durations merge in the Coverage Gate can no longer fail the job
+  the release needs; it leaves a warning and no artifact.
+- Pull request runs are grouped by PR number, not by branch name. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: the release decision sees renames and the release bot's identity
+
+- git diff --no-renames: a code file moved into an ignored path is listed
+  under its old path too, so the commit counts as code with a run.
+- A version commit is recognised by subject, files and semantic-release
+  as author and committer; a test pins that identity to the package's
+  default commit_author.
+- ::warning:: and ::error:: go to stdout, where the runner reads
+  workflow commands; the outputs are written to GITHUB_OUTPUT directly. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+* ci: the release decision asks for the newer commit's run on main only
+
+A run for the same commit on another ref could be read as the run that
+releases it. The runs query now also filters by branch.
+
+docs/testing.md named the multi-tenant fixtures where it meant their
+schemas. ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
+### Features
+
+* feat(builder): migrate_builder_media moves stored image URLs to the library (#524)
+
+`manage.py migrate_builder_media` replaces, in every draft and version of
+a store, each old image field (a URL and its alt text in a block's
+settings, listed in `builder/legacy_image_fields.json`) with the media
+library image for that URL. The alt moves onto the library image where it
+has none. The command ends with a release of the versions that were
+already published, because the public read is cached per release. It is
+run later, per store, by an operator; merging this runs nothing.
+
+- One transaction per store. The store is locked first (release sequence,
+  documents, the chosen library images), re-read, and everything written
+  is planned from that read, so a change staff made meanwhile is moved or
+  stops the store with "run it again", never overwritten.
+- A value the command cannot settle is decided in a file (`--decisions`):
+  a library image, "empty", a stated alt, or, for a hole in lists paired
+  by position, an image or "remove". Unresolved values are listed and the
+  command exits non-zero. A decision an earlier run already applied is
+  reported as such, so fixing the file and running again works.
+- A way back: `BuilderRewriteBackup` keeps what each rewrite replaced and
+  `BuilderRewriteRun` records the run and its decisions (migration
+  `builder.0012`, additive). `manage.py builder_rewrite_backups` lists,
+  restores (all or nothing per store) and deletes a run.
+- A rewritten draft gets a new revision, so an editor that was open before
+  the run meets the usual conflict instead of saving the old fields back.
+- The dry run is the real run rolled back.
+- `persist_block_upgrades` shares the rewrite and backup code.
+- The importer no longer skips a path written without a leading slash.
+- `delete_asset` locks the image before checking where it is used. ([`80942f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80942f40efc424d1a1be1e7c60d743708d7e10a6))
+
+### Testing
+
+* test(core): models declared inside a test stay out of the app registry
+
+test_manager_delegation.py and test_managers.py declare model classes
+in test bodies, and each registered itself with django.apps.apps for the
+rest of the worker process. test_anonymise_covers_every_model.py then
+failed on core.TestModel whenever it ran later on the same worker, which
+collection order makes likely (run 42895773295, shard 4). The tests now
+run inside isolate_apps(). ([`3f06c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f06c285ed378ee49e8dac2a904f1dc0bf6f68c0))
+
 ## v3.243.0 (2026-11-11)
 
 ### Bug fixes

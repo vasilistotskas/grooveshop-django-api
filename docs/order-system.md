@@ -1327,7 +1327,10 @@ accepting Cyprus orders at the Greek flat rate.
     next order's request goes alone and its voucher ends the hold, but it
     is no row: nobody has anything to do. An order canceled while it
     waits is not sent (`attention.voucher_requests_held`). "Issue ACS
-    voucher now" says the request waits.
+    voucher now" says the request waits when the mint's own rule holds
+    it at the press (`voucher_hold.holding`: the hold is closed, or
+    another request has the turn); with the turn free the request is the
+    one sent, and the page says it was dispatched.
   - **A release reverted while orders are stamped.** The previous release
     does not know the column or the table: to it a stamped shipment is a
     `pending_creation` one with no claim and no unknown flag. Nothing

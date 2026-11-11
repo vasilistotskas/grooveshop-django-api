@@ -1031,10 +1031,16 @@ class AcsShipmentAdmin(BaseModelAdmin):
                 _("Cancelled shipment reset — minting a fresh voucher."),
             )
 
+        # The mint holds the request (``AcsVoucherRequestHeldError``) in a
+        # Celery task whose answer never reaches this page, so the page
+        # says what the mint's own rule says at the press, read before
+        # the task can run: ``holding``, not ``in_force``. A hold that
+        # lets one request go and has the turn free does not hold this
+        # request; it is the one sent. The state can still change before
+        # the task reaches its slot; either way the request is sent by
+        # itself, now or once ACS answers again.
+        hold = voucher_hold.holding()
         dispatch_on_commit(create_acs_voucher_for_order, [shipment.order_id])
-        # The mint holds the request too (``AcsVoucherRequestHeldError``),
-        # in a Celery task whose answer never reaches this page.
-        hold = voucher_hold.in_force()
         if hold is not None:
             messages.warning(
                 request,

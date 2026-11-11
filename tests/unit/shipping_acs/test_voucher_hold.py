@@ -403,6 +403,60 @@ class TestWhileHeldNothingIsSent:
         assert waiting.voucher_request_held_at is not None
         assert acs.aliases() == [CREATE]
 
+    @pytest.mark.parametrize(
+        ("state", "told_it_waits"),
+        [
+            ("no hold", False),
+            ("closed", True),
+            ("one request first, the turn free", False),
+            ("one request first, the turn taken", True),
+        ],
+    )
+    def test_issue_voucher_now_says_what_the_mint_will_do(
+        self, acs, sent, state, told_it_waits
+    ):
+        """The message follows the rule the mint follows
+        (``voucher_hold.holding``), as it stands at the press. A hold
+        that lets one request go and has the turn free does not hold
+        this request: it is the one sent, so staff are not told it
+        waits."""
+        if state != "no hold":
+            _lose_one_answer(acs)
+        if state.startswith("one request first"):
+            assert voucher_hold.allow_trial()
+        if state.endswith("the turn taken"):
+            voucher_hold.admit(lease_seconds=78, request_id=OTHER)
+        shipment = _shipment()
+        admin = AcsShipmentAdmin(AcsShipment, AdminSite())
+        request = RequestFactory().get("/")
+        request.user = get_user_model()(id=1, username="staff")
+
+        # As in production, the worker runs the task after the page has
+        # answered (here the dispatch would run it inline, before the
+        # message is chosen).
+        with (
+            patch("django.contrib.messages.warning") as warned,
+            patch("django.contrib.messages.info") as informed,
+            patch("shipping_acs.admin.dispatch_on_commit") as dispatched,
+        ):
+            admin.issue_voucher_now(request, shipment.pk)
+        dispatched.assert_called_once_with(
+            create_acs_voucher_for_order, [shipment.order_id]
+        )
+        create_acs_voucher_for_order.run(shipment.order_id)
+
+        shipment.refresh_from_db()
+        if told_it_waits:
+            assert "held" in str(warned.call_args.args[1])
+            informed.assert_not_called()
+            assert shipment.voucher_request_held_at is not None
+            assert shipment.voucher_no is None
+        else:
+            warned.assert_not_called()
+            assert "dispatched" in str(informed.call_args.args[1])
+            assert shipment.voucher_no
+            assert shipment.voucher_request_held_at is None
+
 
 class TestAskingAcsAgain:
     def test_nothing_is_asked_before_the_wait_is_over(self, acs, sent):

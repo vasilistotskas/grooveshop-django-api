@@ -3,6 +3,40 @@
 
 
 
+## v3.244.1 (2026-11-11)
+
+### Refactoring
+
+* refactor(layout): move every app, settings and asgi into src/ (#611)
+
+Every Django app, `settings.py` and the `asgi` package move into `src/`
+with `git mv`; `src/` is on the Python path, so import names do not
+change (`from order.services import ...`, `DJANGO_SETTINGS_MODULE=settings`,
+`celery -A core`). Task names, migrations, app labels and the stored
+validator paths are unchanged.
+
+Stays at the root: `manage.py` (it puts `src/` on `sys.path`),
+`pyproject.toml`, `uv.lock`, the Dockerfiles and compose files,
+`gunicorn.conf.py`, `tests/`, `tests_mt/`, `docs/`, `api-contract/`,
+`.github/`, `schema.yml`, `allauth-schema.yml`. The image keeps its
+working directory, `manage.py` and `.venv`; it gains
+`PYTHONPATH=/home/app/src`.
+
+Configuration that names paths follows the move: pytest, coverage, ruff,
+ty and import-linter in `pyproject.toml`, the workflows and their
+scripts, pre-commit, the Dockerfiles, the upstream-copy targets, and
+every repo path cited in `docs/`, `CLAUDE.md` and `.claude/`.
+`tests/unit/test_doc_references.py` now also reads a root-level file
+cited by bare name, so a moved file cannot be cited at its old place.
+
+Proof it only moved: 2098 files are 100% renames; `makemigrations`
+reports no changes and the migration preflight is safe; `schema.yml`,
+the 211 registered task names and the task-name lock are unchanged; the
+settings differ only in five path names under the dev, ci and production
+profiles.
+
+Closes #560 ([`9224f36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9224f360b4d94eca4498c19538c1972d1c539f3f))
+
 ## v3.244.0 (2026-11-11)
 
 ### Continuous integration

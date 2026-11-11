@@ -29,7 +29,7 @@ Staging is a refreshable clone, so its own `pg_dump` has nothing to protect.
 behaviour) removes both `scheduled-database-backup` and `cleanup-old-backups`
 from `CELERY_BEAT_SCHEDULE`. The restored production database carries those
 rows, and beat deletes every row the schedule does not declare when it starts
-(`scheduler/beat.py`).
+(`src/scheduler/beat.py`).
 A refresh that swaps in a database while beat keeps running leaves the rows
 until the next beat restart. Nothing else reads the dump directory: the health
 monitor checks the database, Redis and Celery, never the existence or age of a
@@ -59,7 +59,7 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
 - **Production credentials are cleared**, not scrubbed: staging's
   field-encryption keys open production's ciphertext, so a restored `Tenant`
   row would hand anyone with staging admin, a shell or a dump the live Stripe,
-  Viva, ACS, BoxNow, myDATA, chat and ACP secrets. `devtools/anonymise/credentials.py`
+  Viva, ACS, BoxNow, myDATA, chat and ACP secrets. `src/devtools/anonymise/credentials.py`
   derives the columns from the model: every `EncryptedCharField` whatever its
   name, every text field that starts with an integration prefix (merchant ids,
   public keys, analytics ids) and every `*_live_mode` boolean (forced off). It
@@ -94,7 +94,7 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
 Fakes are a pure function of a key, so the same account, its orders and its
 addresses resolve to one fake person, a second run changes nothing, and a
 tester's bookmark of an order keeps meaning the same order. Names come from
-hand-authored Greek pools in `devtools/anonymise/pools.py` (Faker is a dev-only
+hand-authored Greek pools in `src/devtools/anonymise/pools.py` (Faker is a dev-only
 dependency and is absent from the deployed image).
 
 ### What keeps working
@@ -111,7 +111,7 @@ dependency and is absent from the deployed image).
 
 Three layers, each failing differently.
 
-1. **`devtools/anonymise/rules.py`** resolves every model to a `Scrub`, a
+1. **`src/devtools/anonymise/rules.py`** resolves every model to a `Scrub`, a
    `Delete`, or a `NOT_PERSONAL` entry with a reason.
 2. **Guard tests** (`tests/unit/devtools/test_anonymise_covers_every_model.py`)
    fail CI when a model has no decision, when a field that looks personal (an
@@ -120,7 +120,7 @@ Three layers, each failing differently.
    (`user.services.gdpr.anonymise_and_delete_user`) handles a model this table
    calls not personal. It reuses the erasure test's own detector, so the two
    cannot drift.
-3. **The residual scan** (`devtools/anonymise/scan.py`) runs at the end of every
+3. **The residual scan** (`src/devtools/anonymise/scan.py`) runs at the end of every
    refresh. It collects every original e-mail, phone, IP and full name the run
    replaced, then reads every text, JSON and inet column of every table in
    every schema, including tables no rule mentions, and fails the run (rolling

@@ -60,7 +60,7 @@ uv run python manage.py migration_preflight
 ### 4. Report findings
 
 For each UNSAFE op, output:
-- File and operation (e.g. `product/migrations/0042_remove_product_legacy_sku.py: RemoveField`)
+- File and operation (e.g. `src/product/migrations/0042_remove_product_legacy_sku.py: RemoveField`)
 - Why it's unsafe (which queries from old code break)
 - The two-release split that fixes it
 

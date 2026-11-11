@@ -17,9 +17,9 @@ A modified app `<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>
 (not every app has both): `uv run pytest tests/unit/<app>/ tests/integration/<app>/`.
 Exceptions:
 
-- `user/` social login (`user/adapter.py`, `user/signals.py`) is also covered by `tests/unit/authentication/` and `tests/integration/authentication/`
-- `core/celery.py` and `core/urls.py` are also covered by `tests/unit/app/`
-- `settings.py` is covered by `tests/unit/config/` and the `tests/unit/test_*.py` files at the root of `tests/unit/`
+- `src/user/` social login (`src/user/adapter.py`, `src/user/signals.py`) is also covered by `tests/unit/authentication/` and `tests/integration/authentication/`
+- `src/core/celery.py` and `src/core/urls.py` are also covered by `tests/unit/app/`
+- `src/settings.py` is covered by `tests/unit/config/` and the `tests/unit/test_*.py` files at the root of `tests/unit/`
 - Cross-app changes: `uv run pytest`
 
 ## Process

@@ -1,10 +1,10 @@
 # Store-editable texts
 
 A store changes the wording of its own storefront, per language, from one
-editor page in the store admin. Source: `texts/` (`models.py`,
+editor page in the store admin. Source: `src/texts/` (`models.py`,
 `storefront.py`, `validation.py`, `services.py`, `editor.py`, `admin.py`,
-`views.py`), `core/cache/surfaces.py` (`store_texts`),
-`tenant/signals.py` (`bump_generation_on_text_override_change`). The code
+`views.py`), `src/core/cache/surfaces.py` (`store_texts`),
+`src/tenant/signals.py` (`bump_generation_on_text_override_change`). The code
 wins over this page.
 
 ## What is stored
@@ -18,7 +18,7 @@ nothing here is a foreign key. `surface` is `storefront` today; emails join
 later.
 
 The staff member is a platform-public identity, so it is a plain id read
-through `updated_by_staff` (`tenant/staff_actors.py`), like every other
+through `updated_by_staff` (`src/tenant/staff_actors.py`), like every other
 store-schema row a staff member acts on.
 
 ## What can be edited: the storefront's catalogue
@@ -26,7 +26,7 @@ store-schema row a staff member acts on.
 The storefront's locale files and component `<i18n>` blocks are the one
 source of every text. Django never keeps a copy of the list or of the
 message syntax; it asks the storefront over `NUXT_INTERNAL_BASE_URL`
-(`texts/storefront.py`):
+(`src/texts/storefront.py`):
 
 - `GET /api/texts/catalogue?schema=<schema>`: `{hash, locales, entries}`,
   each entry `{namespace, key, defaults, placeholders, locked}`. Held per
@@ -42,14 +42,14 @@ and the editor says so. There is no fallback.
 
 ## Saving
 
-`texts/services.py` is the only writer (the admin has no add/change form):
+`src/texts/services.py` is the only writer (the admin has no add/change form):
 
 1. permission `texts.change_textoverride`, held by a store's **ADMIN and
    OWNER**. STAFF only see the editor, read-only, with a notice. The rule
-   lives in the role system, `tenant/role_scopes.py`: `texts` is in
+   lives in the role system, `src/tenant/role_scopes.py`: `texts` is in
    `STORE_SETTINGS_APP_LABELS` (so STAFF's operational grant leaves it out)
    and in `STAFF_READ_ONLY_APP_LABELS` (which gives STAFF `view`, applied in
-   `tenant/auth_backends.py`). Reset is a delete, but it is gated by the
+   `src/tenant/auth_backends.py`). Reset is a delete, but it is gated by the
    change permission, like restore;
 2. normalise (CRLF to LF, strip), blank refused (`value_blank`), length cap
    `TEXTS_MAX_VALUE_LENGTH` (`value_too_long`);
@@ -57,7 +57,7 @@ and the editor says so. There is no fallback.
    `placeholder_mismatch`.
 
 Each refusal is a Django `ValidationError` with that `code` and a message
-in the admin's language (`texts/validation.py`). A value equal to the
+in the admin's language (`src/texts/validation.py`). A value equal to the
 default removes the override. A save is all or nothing across languages.
 Restore re-validates the old value, since the storefront may have changed.
 
@@ -93,7 +93,7 @@ Django does not filter either.
 
 `/admin/texts/textoverride/` (sidebar: Content, "Storefront Texts"): search
 across key, defaults and the store's wording in every language; filter by
-area (`texts/areas.py`, the one table mapping namespaces onto human names),
+area (`src/texts/areas.py`, the one table mapping namespaces onto human names),
 "changed only", "missing a translation"; per text the languages side by
 side, the original above the store's version, placeholders as insertable
 chips, a character count, validation while typing (`validate/`, debounced),

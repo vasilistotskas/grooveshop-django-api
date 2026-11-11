@@ -43,7 +43,7 @@ deployment**, so the specification is not served on any store's host.
     responses carry.
 
 Everything else the real endpoints disagree on is a correction in
-`core/allauth_spec_corrections.py`, applied by the command, each naming the
+`src/core/allauth_spec_corrections.py`, applied by the command, each naming the
 allauth source it was read from: `Flow.id` lists every flow and `Flow.providers`
 the provider ids of a provider flow, `meta.is_authenticated` is nullable (null
 for an expired session), the passkey signup answers creation options, not

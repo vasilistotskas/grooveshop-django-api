@@ -2,16 +2,16 @@
 
 Each tenant owns two indexes, `{schema}__ProductTranslation` and
 `{schema}__BlogPostTranslation`. Their settings come from the model's
-`MeiliMeta` (`product/models/product.py`, `blog/models/post.py`), are turned
-into a payload by `MeiliIndexSettings` (`meili/dataclasses.py`) and
-`Client.with_settings` (`meili/_client.py`), and are PATCHed whole by
-`IndexMixin.update_meili_settings` (`meili/models.py`). The PreSync hook runs
+`MeiliMeta` (`src/product/models/product.py`, `src/blog/models/post.py`), are turned
+into a payload by `MeiliIndexSettings` (`src/meili/dataclasses.py`) and
+`Client.with_settings` (`src/meili/_client.py`), and are PATCHed whole by
+`IndexMixin.update_meili_settings` (`src/meili/models.py`). The PreSync hook runs
 `meilisearch_apply_settings --all-tenants` on every deploy, so a change to
 `MeiliMeta` reaches every store with the next release.
 
 The rule behind every value: **the engine builds a structure for each thing
 it is told it may do, so it is told only what a query really does.** The
-list of what the queries do is `search/views.py`; when a view starts to filter,
+list of what the queries do is `src/search/views.py`; when a view starts to filter,
 sort or facet on a new field, that field is added to `MeiliMeta` in the same
 change.
 

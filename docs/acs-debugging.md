@@ -1,9 +1,9 @@
 # Debugging ACS
 
 ACS (the courier) is called through one chokepoint, `AcsClient._call`
-(`shipping_acs/client.py`). Everything below follows from what that
+(`src/shipping_acs/client.py`). Everything below follows from what that
 chokepoint records. The code wins over this page; the observability code is
-`shipping_acs/observability.py`.
+`src/shipping_acs/observability.py`.
 
 ## What is recorded
 

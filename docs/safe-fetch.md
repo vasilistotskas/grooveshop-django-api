@@ -1,11 +1,11 @@
-# Fetching a URL a stranger chose (`core/net/safe_fetch.py`)
+# Fetching a URL a stranger chose (`src/core/net/safe_fetch.py`)
 
 A catalogue file names image URLs and a social provider names an avatar URL.
 Fetched with a bare `requests.get`, either could point a worker at
 `http://169.254.169.254/` (the cloud metadata service), at a service on the
 cluster network or at `localhost` (SSRF). `core.net.safe_fetch.safe_fetch(url,
 max_bytes=...)` is the one way to download such a URL. Its callers today are
-the social-avatar task (`user/tasks.py`, URL from `user/signals.py`, the bytes
+the social-avatar task (`src/user/tasks.py`, URL from `src/user/signals.py`, the bytes
 then through `prepare_servable_image`, so a file that is not a servable raster
 is dropped and GPS is stripped); the
 catalogue import's image phase will be the second.
@@ -31,7 +31,7 @@ has several public addresses a refused connection moves on to the next one.
 
 ## Errors and retries
 
-The failures are typed for `core/retry.py`:
+The failures are typed for `src/core/retry.py`:
 
 - Permanent, never retried (`FetchError`): `UnsafeUrlError` (URL, redirect
   target or address refused), `TooManyRedirectsError`, `ResponseTooLargeError`,

@@ -2,10 +2,10 @@
 
 **Status:** implemented in v3.4.0 (2026-08-22). This document is kept as
 the design record; the sections below describing the design as "deferred"
-are historical. The shipped implementation lives in `tenant/staff_api.py`
-(`PlatformStaffLoginView` / `PlatformStaffLogoutView`), `tenant/api_tokens.py`
+are historical. The shipped implementation lives in `src/tenant/staff_api.py`
+(`PlatformStaffLoginView` / `PlatformStaffLogoutView`), `src/tenant/api_tokens.py`
 (`PlatformStaffTokenAuthentication`), and the `PlatformStaffToken` model
-(`tenant/migrations/0017_platformstafftoken.py`) — a Knox `AbstractAuthToken`
+(`src/tenant/migrations/0017_platformstafftoken.py`) — a Knox `AbstractAuthToken`
 subclass in the SHARED-only `tenant` app, exactly as prescribed below.
 A follow-up (`fix(audit): stop cross-schema attribution FKs from breaking
 staff writes`) closed the cross-schema-FK prerequisite noted later in this
@@ -284,7 +284,7 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
 
 - **What:** an authenticator (TOTP) code or an unused recovery code, checked
   with allauth's own helpers (`allauth.mfa`: code validation, replay
-  protection, recovery codes and their encryption). `admin/staff_mfa.py`
+  protection, recovery codes and their encryption). `src/admin/staff_mfa.py`
   only decides when a code is required and carries the enrolment.
   `allauth.mfa` is in `SHARED_APPS` as well as `TENANT_APPS`, so the
   authenticator rows sit in the public schema next to the platform user.
@@ -331,7 +331,7 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
 
 allauth's limiter covers `/_allauth/` only, so attempts at the Django admin
 login and at the token endpoint are counted by
-`tenant/staff_login_limits.py`. Both reach the password check through
+`src/tenant/staff_login_limits.py`. Both reach the password check through
 `PlatformStaffBackend.authenticate_staff`, which does the counting, so there is
 no second copy.
 
@@ -397,7 +397,7 @@ the cache; with Redis down, restore Redis first.
 ## Forgotten password (admin login)
 
 The admin login offers **"Forgotten your password or username?"** on the
-platform and on every store host (`admin/password_reset.py`, mounted by
+platform and on every store host (`src/admin/password_reset.py`, mounted by
 `StaffPasswordResetMixin` on both admin sites). It is **Django's own**
 `PasswordResetView` / `PasswordResetConfirmView`, not allauth's reset flow.
 allauth's reset belongs to the shopper's account (a tenant-schema
@@ -429,7 +429,7 @@ protect the Django admin login either.
   changes; it expires after `PASSWORD_RESET_TIMEOUT` (an hour by default).
   Django swaps the token for a session marker on the first visit, so it does
   not leak in a `Referer`.
-- **Mail.** `platform.staff_password_reset` (`tenant/emails.py`, see
+- **Mail.** `platform.staff_password_reset` (`src/tenant/emails.py`, see
   `docs/emails.md`): the PLATFORM sends it, from `"{SITE_NAME}"
   <DEFAULT_FROM_EMAIL>` under `public`, in the store's `default_locale` (the
   project default on the platform host). The subject and the heading name the
@@ -467,7 +467,7 @@ constraint, so it either rejected a staff member the store has no copy of
 it and **showed the shopper as the actor**. Reproduced in
 `tests_mt/test_staff_actor_resolution.py`.
 
-So these columns are plain ids with no relation (`tenant/staff_actors.py`):
+So these columns are plain ids with no relation (`src/tenant/staff_actors.py`):
 
 - `x_id` is a nullable `BigIntegerField`; `x` is a `StaffActor` property that
   resolves the id in `public`: the account, `None` when empty, or an

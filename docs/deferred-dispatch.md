@@ -67,12 +67,12 @@ A publish that follows a committed change goes through the helper, whether it
 is called from a request, a signal, a task or the admin: the order's emails,
 the carrier voucher and shipment tasks (`ShippingCarrierInterface.
 dispatch_create_shipment_task` implementations publish with it and pass the
-`schema_name` the caller captured), the myDATA chain in `order/tasks.py`, the
+`schema_name` the caller captured), the myDATA chain in `src/order/tasks.py`, the
 data export and account erasure, comment-liked notifications, search
 reindexing, the cache and edge-cache purges, the offer refresh, the
 recommendation impression, the carrier arrival notification and the admin's
 voucher / shipment reissue. A hook that runs inside another `on_commit` hook
-(the loyalty tier receivers, `_flush` in `core/cache/invalidation.py`) is
+(the loyalty tier receivers, `_flush` in `src/core/cache/invalidation.py`) is
 handed the schema registered with the change and passes it as `schema_name=`,
 because the connection no longer says which store it was.
 

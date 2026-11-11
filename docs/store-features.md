@@ -1,11 +1,11 @@
 # Store features
 
 What a store can switch on or off, and how a client learns the answer.
-Source: `tenant/features.py` (`STORE_FEATURES`, `feature_on`,
-`effective_features`), `tenant/permissions.py` (the gates),
-`tenant/serializers.py` (`StoreFeaturesSerializer`), `admin/features.py`
-(the admin's registry), `admin/mixins.py` (`FeatureGatedModelAdmin`,
-`FeatureInline`), `admin/navigation.py`. The code wins over this page.
+Source: `src/tenant/features.py` (`STORE_FEATURES`, `feature_on`,
+`effective_features`), `src/tenant/permissions.py` (the gates),
+`src/tenant/serializers.py` (`StoreFeaturesSerializer`), `src/admin/features.py`
+(the admin's registry), `src/admin/mixins.py` (`FeatureGatedModelAdmin`,
+`FeatureInline`), `src/admin/navigation.py`. The code wins over this page.
 
 ## The rule
 
@@ -37,7 +37,7 @@ fallback for a setting it could not fetch.
   a switch from `TenantConfig` and nowhere else.
 - A store value with structure (`ANNOUNCEMENT_BAR`, `AUTH_PANEL`,
   `FUNDING_BANNER`, `STORE_OFFICES`, `BUSINESS_HOURS`) is a serializer in
-  `core/store_setting_shapes.py`, registered in `STRUCTURED_SETTINGS`. That
+  `src/core/store_setting_shapes.py`, registered in `STRUCTURED_SETTINGS`. That
   one class validates the admin's save (the `"validator"` path on the
   declaration is a one-line call to `is_valid_structured`), is the schema of
   the typed key `GET /settings/public` serves next to the string map
@@ -58,7 +58,7 @@ fallback for a setting it could not fetch.
   setting, e.g. `giftCardMinAmount: number`, `returnWindowDays: integer`,
   `storeGeoLat: number | null`) in the type its entry in
   `EXTRA_SETTINGS_DEFAULTS` declares: `PublicValuesSerializer` is built from
-  `PUBLIC_SETTING_KEYS` (in `core/store_settings.py`) and `DECLARED_TYPES`, so
+  `PUBLIC_SETTING_KEYS` (in `src/core/store_settings.py`) and `DECLARED_TYPES`, so
   a new public setting gets its typed field by being declared. A type with no
   field there raises at import. Only the exceptions are written down
   (`_FIELD_OVERRIDES`: coordinates, return fees).
@@ -76,7 +76,7 @@ Two classes matter to a client:
   that must refuse when it is off. Lives in `STORE_FEATURES`.
 - **(b) presentation preference**: a UI choice with no API surface.
   Served in `TenantConfig.preferences` (`STORE_PREFERENCES` in
-  `tenant/features.py`), so a client reads it from the tenant payload like
+  `src/tenant/features.py`), so a client reads it from the tenant payload like
   a feature, never from a settings read that can fail. A switch purges the
   store's pages and the storefront's copy of the payload, as a feature
   switch does.
@@ -116,33 +116,33 @@ consumed by tasks and integrations.
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |
 
 `ACCOUNT_LOGIN_BY_CODE_ENABLED`, `MFA_*_ENABLED`, `DB_POOL_ENABLED` and the
-other `settings.py` constants are deployment configuration, not store
+other `src/settings.py` constants are deployment configuration, not store
 settings.
 
 ## Features, gates and dependencies
 
 | Feature | Plan flag | Settings (all on) | Gated in |
 |---|---|---|---|
-| `blog` | `blog_enabled` | | `blog/views/` (posts, categories, authors, tags) |
-| `blog_comments` | `blog_enabled` | `BLOG_COMMENTS_ENABLED` | `blog/views/comment.py`, `blog/views/post.py` |
-| `product_reviews` | | `PRODUCT_REVIEWS_ENABLED` | `product/views/review.py`, `product/views/product.py` |
-| `account_reviews` | | `PRODUCT_REVIEWS_ENABLED`, `ACCOUNT_REVIEWS_ENABLED` | `user/views/account.py` |
-| `favourites` | | `CATALOGUE_ENABLED`, `FAVOURITES_ENABLED` | `product/views/favourite.py`, `user/views/account.py` (`favourite_products`), `agent/views.py` |
-| `newsletter` | | `NEWSLETTER_ENABLED` | `user/views/` subscription views (token links in sent emails stay open) |
-| `feedback` | | `FEEDBACK_ENABLED` | `contact/views.py` |
-| `loyalty` | `loyalty_enabled` | `LOYALTY_ENABLED` | `loyalty/views/loyalty.py` |
-| `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `promotion/views.py`, cart coupon actions |
-| `gift_cards` | `gift_cards_enabled` | `CATALOGUE_ENABLED`, `GIFT_CARDS_ENABLED` | `giftcard/views.py` (a purchase's status stays open) |
-| `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `b2b/views.py` |
-| `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
-| `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
-| `product_alerts` | | `CATALOGUE_ENABLED`, `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
-| `price_history` | | `PRICE_HISTORY_ENABLED` | `product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
-| `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
+| `blog` | `blog_enabled` | | `src/blog/views/` (posts, categories, authors, tags) |
+| `blog_comments` | `blog_enabled` | `BLOG_COMMENTS_ENABLED` | `src/blog/views/comment.py`, `src/blog/views/post.py` |
+| `product_reviews` | | `PRODUCT_REVIEWS_ENABLED` | `src/product/views/review.py`, `src/product/views/product.py` |
+| `account_reviews` | | `PRODUCT_REVIEWS_ENABLED`, `ACCOUNT_REVIEWS_ENABLED` | `src/user/views/account.py` |
+| `favourites` | | `CATALOGUE_ENABLED`, `FAVOURITES_ENABLED` | `src/product/views/favourite.py`, `src/user/views/account.py` (`favourite_products`), `src/agent/views.py` |
+| `newsletter` | | `NEWSLETTER_ENABLED` | `src/user/views/` subscription views (token links in sent emails stay open) |
+| `feedback` | | `FEEDBACK_ENABLED` | `src/contact/views.py` |
+| `loyalty` | `loyalty_enabled` | `LOYALTY_ENABLED` | `src/loyalty/views/loyalty.py` |
+| `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `src/promotion/views.py`, cart coupon actions |
+| `gift_cards` | `gift_cards_enabled` | `CATALOGUE_ENABLED`, `GIFT_CARDS_ENABLED` | `src/giftcard/views.py` (a purchase's status stays open) |
+| `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `src/b2b/views.py` |
+| `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `src/order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
+| `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `src/recommendation/views.py`, `src/search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
+| `product_alerts` | | `CATALOGUE_ENABLED`, `PRODUCT_ALERTS_ENABLED` | `src/product/views/alert.py` |
+| `price_history` | | `PRICE_HISTORY_ENABLED` | `src/product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
+| `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `src/contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
-| `catalogue` | | `CATALOGUE_ENABLED` | `product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
-| `staff_ai_access` | | `STAFF_AI_ACCESS_ENABLED` | `agent/staff_views.py` (all of `/api/v1/agent/staff/*`, a connected app's token included), and the staff consent on the connect host (`agent/staff_connect.py`); the gateway refuses `/mcp/admin` on the same answer |
-| `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `cart/views/` (every cart and cart-item action but the staff `cart/list`), `order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
+| `catalogue` | | `CATALOGUE_ENABLED` | `src/product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `src/search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
+| `staff_ai_access` | | `STAFF_AI_ACCESS_ENABLED` | `src/agent/staff_views.py` (all of `/api/v1/agent/staff/*`, a connected app's token included), and the staff consent on the connect host (`src/agent/staff_connect.py`); the gateway refuses `/mcp/admin` on the same answer |
+| `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `src/cart/views/` (every cart and cart-item action but the staff `cart/list`), `src/order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
 
 `chat_widget` is the one feature whose consumer endpoint is not Django's:
 the widget talks to the agent gateway, which refuses a store whose agent
@@ -221,7 +221,7 @@ unchanged queues nothing.
 The store admin shows a feature by one rule: **a feature's surface is shown
 when the store can use the feature, or when it holds records.** Nothing that
 exists is made unreachable, nothing empty and unusable is shown, and a hidden
-page is refused (403), not only unlinked. `admin/features.py` is the one
+page is refused (403), not only unlinked. `src/admin/features.py` is the one
 registry: `FEATURES` is `STORE_FEATURES` plus `retail_documents`
 (`MYDATA_ENABLED`, a server-side setting no client reads), and
 `FEATURE_SURFACES` names the model pages each feature owns.

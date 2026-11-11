@@ -51,7 +51,7 @@ for how the services fit together. The developer docs are behind basic auth.
   Django Channels for WebSockets
 - PostgreSQL 18 with django-tenants (schema per store)
 - Redis (cache, Channels layer, WebSocket tickets)
-- Celery with a RabbitMQ broker; `scheduler/` for schedules
+- Celery with a RabbitMQ broker; `src/scheduler/` for schedules
 - Meilisearch
 - drf-spectacular for the OpenAPI schema
 - Django Unfold for the admin
@@ -126,7 +126,7 @@ settings, seeds or the cache.
 ## Project layout
 
 Every Django app sits at the repository root; there is no `src/` directory.
-`settings.py`, `asgi/` and `manage.py` are at the root too, and `core/urls.py`
+`src/settings.py`, `src/asgi/` and `manage.py` are at the root too, and `src/core/urls.py`
 mounts every app under `api/v1/`.
 
 | Area | Apps |

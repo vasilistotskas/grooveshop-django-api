@@ -19,7 +19,7 @@ This file contains every pattern you need to scaffold a complete endpoint. Read 
 
 ## 1. Model Patterns
 
-### Available Abstract Mixins (from `core/models.py`)
+### Available Abstract Mixins (from `src/core/models.py`)
 
 | Mixin | Fields Added | When to Use |
 |-------|-------------|-------------|
@@ -434,7 +434,7 @@ image = ImageAndSvgField(upload_to="uploads/your_app/")
 
 ## 4. FilterSet Patterns
 
-### Available Core Mixins (from `core/filters/`)
+### Available Core Mixins (from `src/core/filters/`)
 
 | Mixin | Filters Added | For Models With |
 |-------|--------------|-----------------|
@@ -452,7 +452,7 @@ image = ImageAndSvgField(upload_to="uploads/your_app/")
 
 Publishable filtering (`is_published`, `published_after/before`,
 `currently_published`) comes from `CamelCasePublishableTimeStampFilterSet`
-(`core/filters/camel_case_filters.py`); there is no standalone publishable
+(`src/core/filters/camel_case_filters.py`); there is no standalone publishable
 mixin and no soft-delete filter mixin.
 
 ### Standard FilterSet Template
@@ -712,7 +712,7 @@ def get_permissions(self):
 
 Store-scoped staff routes use `StoreStaffModelPermissions`; routes no store
 operator may reach use `IsPlatformSuperuser` (both in
-`core/api/permissions.py`). Never DRF's `IsAdminUser` or a
+`src/core/api/permissions.py`). Never DRF's `IsAdminUser` or a
 `request.user.is_staff` check — see `docs/api-staff-identity.md`.
 
 ---
@@ -814,7 +814,7 @@ urlpatterns = format_suffix_patterns(urlpatterns)
 
 ### Core URL Registration
 
-In `core/urls.py`, new apps are registered under `api/v1/`:
+In `src/core/urls.py`, new apps are registered under `api/v1/`:
 
 ```python
 (path("api/v1/", include("your_app.urls")),)
@@ -939,9 +939,9 @@ def get_or_create_category():
 
 ## 9. App Registration
 
-### settings.py
+### src/settings.py
 
-Add the app to `TENANT_APPS` in `settings.py` if its rows are per-store, or
+Add the app to `TENANT_APPS` in `src/settings.py` if its rows are per-store, or
 to `SHARED_APPS` if they live in the public schema:
 
 ```python
@@ -965,7 +965,7 @@ class YourAppConfig(AppConfig):
         from . import signals  # noqa: F401
 ```
 
-### core/urls.py
+### src/core/urls.py
 
 Add the include to `_storefront_i18n_patterns` (per-store data) or `_shared_i18n_patterns` (platform data):
 

@@ -2,10 +2,10 @@
 
 Tells search engines that a product or a blog post of a store was created,
 changed or unpublished, instead of waiting for them to crawl it. Source:
-`indexnow/` (`models.py`, `signals.py`, `service.py`, `tasks.py`),
-`tenant/models.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
-`tenant/validators.py` (`generate_indexnow_key`), `tenant/serializers.py`
-(`TenantConfigSerializer.indexnow_key`), `core/utils/tenant_urls.py` (the
+`src/indexnow/` (`models.py`, `signals.py`, `service.py`, `tasks.py`),
+`src/tenant/models.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
+`src/tenant/validators.py` (`generate_indexnow_key`), `src/tenant/serializers.py`
+(`TenantConfigSerializer.indexnow_key`), `src/core/utils/tenant_urls.py` (the
 URLs). The code wins over this page.
 
 ## The protocol, as the IndexNow documentation states it
@@ -62,7 +62,7 @@ stored like any other (`docs/celery-results.md`).
 - A slug change announces the new address only; the old one is not known.
 - Environment: `INDEXNOW_ENDPOINT` and `INDEXNOW_TIMEOUT_SECONDS` (settings).
   A staging copy of a production database carries the switch: the anonymiser
-  deletes the queue (`devtools/anonymise/rules.py`), and what staging sends
+  deletes the queue (`src/devtools/anonymise/rules.py`), and what staging sends
   names the staging store's own domain.
 
 ## Tests

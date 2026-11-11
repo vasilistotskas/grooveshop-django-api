@@ -1,14 +1,14 @@
 # Blog related posts
 
 The "related posts" block under a post is `GET /api/v1/blog/post/<id>/related_posts`
-(`BlogPostViewSet.related_posts`, `blog/views/post.py`). It answers up to
+(`BlogPostViewSet.related_posts`, `src/blog/views/post.py`). It answers up to
 `RELATED_POSTS_LIMIT` published posts, never the post itself, in the order the
 strategy chain ranked them. The storefront caches the answer per store, language
 and post (`server/api/blog/posts/[id]/related-posts.get.ts`, `BlogPostRelatedPosts`).
 
 ## The chain
 
-`RELATED_POSTS_STRATEGIES` (settings.py) lists the strategies, the closest match
+`RELATED_POSTS_STRATEGIES` (src/settings.py) lists the strategies, the closest match
 first, each with a weight:
 
 | Order | Strategy | Weight | Finds |
@@ -17,7 +17,7 @@ first, each with a weight:
 | 2 | `DefaultRelatedPostsStrategy` | 0.6 | The post's category, newest first |
 | 3 | `TagBasedRelatedPostsStrategy` | 0.4 | Posts sharing a tag, newest first |
 
-`WeightedRelatedPostsStrategy` (`blog/strategies/weighted_related_posts_strategy.py`)
+`WeightedRelatedPostsStrategy` (`src/blog/strategies/weighted_related_posts_strategy.py`)
 asks each strategy once, for ids (`RelatedPostsStrategy.related_ids`). Each
 strategy first gets its weight's share of the limit, in chain order, and then the
 chain fills what is left in the same order. The answer keeps that order: the
@@ -27,7 +27,7 @@ of queries does not depend on what the strategies find
 
 ## Shared words
 
-`ranked_by_shared_terms` (`blog/strategies/shared_terms_related_posts_strategy.py`)
+`ranked_by_shared_terms` (`src/blog/strategies/shared_terms_related_posts_strategy.py`)
 works as follows:
 
 1. It reads the titles of the store's `RELATED_POSTS_CANDIDATES` newest published

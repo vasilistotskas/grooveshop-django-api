@@ -2,7 +2,7 @@
 
 The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
-Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
+Source: `src/emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
 `transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `figures.py`, `testsend.py`, `models.py`,
 `services.py`), `tests/utils/emails.py` and
@@ -86,7 +86,7 @@ moved onto the pipeline are none of its business.
 
 ## Registered types
 
-Declared in `order/emails.py`, next to the builders that read the order:
+Declared in `src/order/emails.py`, next to the builders that read the order:
 
 | Key | About | Requirement / gates |
 |---|---|---|
@@ -103,7 +103,7 @@ Declared in `order/emails.py`, next to the builders that read the order:
 | `team.new_order` | the `Order` | switchable, store staff |
 | `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
 
-Declared in `product/emails.py` (templates in `emails/product_alerts/`; the
+Declared in `src/product/emails.py` (templates in `emails/product_alerts/`; the
 ops alert `ops.review_pending` is under Operational alerts below):
 
 | Key | About | Requirement / gates |
@@ -113,7 +113,7 @@ ops alert `ops.review_pending` is under Operational alerts below):
 | `product.alert_confirmation` | a guest's pending `ProductAlert` (its confirmation link) | customer, transactional (it answers the request just made); `FeatureGate("product_alerts")` |
 | `team.low_stock` | a `LowStock` (the products at their threshold) | switchable, store staff; `FeatureGate("catalogue")` |
 
-Declared in `giftcard/emails.py` (`FeatureGate("gift_cards")` on all):
+Declared in `src/giftcard/emails.py` (`FeatureGate("gift_cards")` on all):
 
 | Key | About | Requirement |
 |---|---|---|
@@ -121,21 +121,21 @@ Declared in `giftcard/emails.py` (`FeatureGate("gift_cards")` on all):
 | `giftcard.purchase_receipt` | the `GiftCardPurchase`, to the buyer | required |
 | `giftcard.expiry_reminder` | the `GiftCard`, to its recipient | switchable |
 
-Declared in `b2b/emails.py` (`FeatureGate("wholesale")` on all):
+Declared in `src/b2b/emails.py` (`FeatureGate("wholesale")` on all):
 
 | Key | About | Requirement |
 |---|---|---|
 | `b2b.profile_approved`, `b2b.profile_rejected` | the `BusinessProfile`, to its applicant | required |
 | `team.b2b_application` | the `BusinessProfile`, to the store's staff | switchable, store staff |
 
-Declared in `contact/emails.py` (the submitter is `Reply-To`):
+Declared in `src/contact/emails.py` (the submitter is `Reply-To`):
 
 | Key | About | Requirement / gates |
 |---|---|---|
 | `team.contact_message` | the `Contact` | switchable, store staff |
 | `team.feedback` | the `Feedback` | switchable, store staff; `FeatureGate("feedback")` |
 
-Declared in `user/emails.py` and `cart/emails.py`:
+Declared in `src/user/emails.py` and `src/cart/emails.py`:
 
 | Key | About | Requirement / gates |
 |---|---|---|
@@ -179,7 +179,7 @@ check.
 ### Operational alerts (`ops.*`)
 
 Fourteen mails to the store's own staff, for work that needs a person. They were
-`OpsAlertKind` and `send_ops_alert` (`shipping/alerts.py`); each is now an
+`OpsAlertKind` and `send_ops_alert` (`src/shipping/alerts.py`); each is now an
 email type declared with `staff_email(..., area="ops")`, so the store's
 `EmailSwitch`, the gates and `store_operators()` apply. All are switchable,
 store staff, with no list headers. A store with no contact or owner address
@@ -189,20 +189,20 @@ the order note, whatever the switch says.
 
 | Key | About | Declared in | Gate |
 |---|---|---|---|
-| `ops.shipment_rejected` | a `ShipmentRejected` (order id, carrier, its error, the remedy) | `shipping/emails.py` | |
-| `ops.webhook_failed` | a `WebhookFailed` (carrier, message id, error) | `shipping/emails.py` | |
-| `ops.stale_shipments` | a `StaleShipments` (the `AcsShipment` rows, threshold, clock) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
-| `ops.unremitted_cod` | an `UnremittedCod` (the rows of `_unremitted_cod_rows`) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
-| `ops.unattributable_cod_payouts` | an `UnattributablePayouts` (counts, payment date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
-| `ops.acs_voucher_request_unknown` | a `VoucherRequestUnknown` (order id, how the request ended) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
-| `ops.acs_unrecognised_vouchers` | an `UnrecognisedVouchers` (the voucher numbers ACS named for the first time, the pickup date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
-| `ops.payment_after_cancel` | a `PaymentAfterCancel` | `order/emails.py` | |
-| `ops.payment_mismatch` | a `PaymentMismatch` | `order/emails.py` | |
-| `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `order/emails.py` | |
-| `ops.refund_failed` | a `RefundFailed` | `order/emails.py` | |
-| `ops.builder_schedule_failed` | a `ScheduleFailed` (a failed scheduled page publish) | `builder/emails.py` | |
-| `ops.gift_card_reversal` | a `GiftCardReversal` (the purchase, and what was already spent, or none when only disputed) | `giftcard/emails.py` | none |
-| `ops.review_pending` | the `ProductReview` | `product/emails.py` | `FeatureGate("product_reviews")` |
+| `ops.shipment_rejected` | a `ShipmentRejected` (order id, carrier, its error, the remedy) | `src/shipping/emails.py` | |
+| `ops.webhook_failed` | a `WebhookFailed` (carrier, message id, error) | `src/shipping/emails.py` | |
+| `ops.stale_shipments` | a `StaleShipments` (the `AcsShipment` rows, threshold, clock) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.unremitted_cod` | an `UnremittedCod` (the rows of `_unremitted_cod_rows`) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.unattributable_cod_payouts` | an `UnattributablePayouts` (counts, payment date) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.acs_voucher_request_unknown` | a `VoucherRequestUnknown` (order id, how the request ended) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.acs_unrecognised_vouchers` | an `UnrecognisedVouchers` (the voucher numbers ACS named for the first time, the pickup date) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.payment_after_cancel` | a `PaymentAfterCancel` | `src/order/emails.py` | |
+| `ops.payment_mismatch` | a `PaymentMismatch` | `src/order/emails.py` | |
+| `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `src/order/emails.py` | |
+| `ops.refund_failed` | a `RefundFailed` | `src/order/emails.py` | |
+| `ops.builder_schedule_failed` | a `ScheduleFailed` (a failed scheduled page publish) | `src/builder/emails.py` | |
+| `ops.gift_card_reversal` | a `GiftCardReversal` (the purchase, and what was already spent, or none when only disputed) | `src/giftcard/emails.py` | none |
+| `ops.review_pending` | the `ProductReview` | `src/product/emails.py` | `FeatureGate("product_reviews")` |
 
 `ops.gift_card_reversal` is not behind the gift cards feature, unlike the
 other gift card mail: a store that switched the feature off can still have a
@@ -257,11 +257,11 @@ an alert to the operators must not be mutable. None carries list headers
 
 | Key | Declared in | About | Audience, language |
 |---|---|---|---|
-| `platform.billing_expiring`, `platform.billing_expired`, `platform.billing_suspended` | `tenant/emails.py` | a `BillingNotice` (the `Tenant` row and the grace days), sent by `tenant.billing._send_stage_email` | the owner (`Tenant.owner_email`), in the store's `default_locale` |
-| `platform.billing_stage_copy` | `tenant/emails.py` | a `BillingStageCopy` (store, stage), the operators' trail of stages 2 and 3 | `settings.ADMINS` (`platform_operators()`), `settings.LANGUAGE_CODE` |
-| `platform.staff_password_reset` | `tenant/emails.py` | a `StaffPasswordReset` (the link, built by `tenant.tasks.send_staff_password_reset_email`) | the staff member's address, in the asked store's language |
-| `platform.health_alert` | `core/emails.py` | a `HealthAlert` (the failed components and their errors), from `core.tasks.monitor_system_health` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
-| `platform.backup_failed` | `core/emails.py` | a `BackupFailed` (the error), from `core.tasks.scheduled_database_backup` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.billing_expiring`, `platform.billing_expired`, `platform.billing_suspended` | `src/tenant/emails.py` | a `BillingNotice` (the `Tenant` row and the grace days), sent by `tenant.billing._send_stage_email` | the owner (`Tenant.owner_email`), in the store's `default_locale` |
+| `platform.billing_stage_copy` | `src/tenant/emails.py` | a `BillingStageCopy` (store, stage), the operators' trail of stages 2 and 3 | `settings.ADMINS` (`platform_operators()`), `settings.LANGUAGE_CODE` |
+| `platform.staff_password_reset` | `src/tenant/emails.py` | a `StaffPasswordReset` (the link, built by `tenant.tasks.send_staff_password_reset_email`) | the staff member's address, in the asked store's language |
+| `platform.health_alert` | `src/core/emails.py` | a `HealthAlert` (the failed components and their errors), from `core.tasks.monitor_system_health` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.backup_failed` | `src/core/emails.py` | a `BackupFailed` (the error), from `core.tasks.scheduled_database_backup` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
 
 The staff reset is built under `public`, which knows only the platform, so
 the task reads the store's name in the store's schema first and carries it
@@ -304,7 +304,7 @@ A product alert made by a signed-in customer whose account address opted
 out of its type is refused with a `409` (`email_opted_out`) instead of a
 `201` that could never be delivered (`product.views.alert`).
 
-A guest's alert is a double opt-in (`product/alerts.py`). Every guest
+A guest's alert is a double opt-in (`src/product/alerts.py`). Every guest
 request answers the same `202` and a `detail`, whatever the address holds
 (nothing, a live or pending alert, an opt-out), and always enqueues one
 task, `request_guest_product_alert_task`, which does every
@@ -477,7 +477,7 @@ request or task sees it. A request that already holds the store row keeps
 the old list until it ends. The public schema has no generation and reads
 the table directly.
 
-### The store's email pages (`emails/admin.py`, `emails/switches.py`, `emails/figures.py`)
+### The store's email pages (`src/emails/admin.py`, `src/emails/switches.py`, `src/emails/figures.py`)
 
 `Settings -> Emails` in the store admin. A dedicated page, like the text
 editor, not a changelist: `EmailSwitchAdmin.changelist_view` is the **status
@@ -506,7 +506,7 @@ what was just written. The page never shows an address.
 the masked recipient, the status and what the provider reported (the
 `EmailEvent` timeline), in a table that scrolls sideways on a phone.
 
-**Send test** (`emails/testsend.py`, `test_send_view`) mails the email to the
+**Send test** (`src/emails/testsend.py`, `test_send_view`) mails the email to the
 signed-in staff member's own address and to nobody else (the request's `to`,
 `email` or `address` fields are never read), in the chosen language and from
 the sample or a chosen order. It skips the gates, the switch, the opt-out and
@@ -524,7 +524,7 @@ read-only except removing a row, behind the standard delete confirmation whose
 dialog says the address must also be removed in Resend's dashboard (Resend
 keeps its own list; no API removes an address); the admin log names the actor.
 
-Permissions (`tenant/role_scopes.py`): `emails` is in `STORE_SETTINGS_APP_LABELS`,
+Permissions (`src/tenant/role_scopes.py`): `emails` is in `STORE_SETTINGS_APP_LABELS`,
 so ADMIN and OWNER hold every `emails.*` permission (switch, send a test, remove a
 suppression); it is also in `STAFF_READ_ONLY_APP_LABELS`, so STAFF only **look**
 (the page, the log and the suppression list, with the switch disabled and no
@@ -569,7 +569,7 @@ counts the last 7 days of failed, bounced, complained and provider-suppressed
 rows (`figures.failing_since`, in `attention_counts`), and opens the log under
 the same filter.
 
-### The preview (`emails/preview.py`)
+### The preview (`src/emails/preview.py`)
 
 `EmailSwitchAdmin.type_view` embeds a panel that an htmx form fills
 (`preview/render/`, POST only): a language, the data (sample data, or one of
@@ -659,7 +659,7 @@ named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
 
 A required environment variable in production **and staging** (any
 non-dev, non-CI deployment: the process refuses to start without it), so it
-must exist in the environment BEFORE the release containing `emails/`
+must exist in the environment BEFORE the release containing `src/emails/`
 deploys. Development and CI get a fixed insecure key. Generate one
 with `secrets.token_urlsafe(48)` and keep it with the other platform
 secrets. It is separate from `SECRET_KEY` on purpose: rotating `SECRET_KEY`
@@ -714,10 +714,10 @@ view: a 421 from the mail server then failed the sign-up request (production,
 2026-09-15), where in the task it is a retry.
 
 The 19 types are `account.*` (twelve), `mfa.*` (five) and `social.*` (two),
-declared in `user/emails.py` through `_allauth_email`, which also fills the
+declared in `src/user/emails.py` through `_allauth_email`, which also fills the
 prefix map. All are customer mail, transactional and **required**: a store
 cannot switch a sign-in code, a reset link or a security notice off. Their
-templates are `core/templates/emails/{account,mfa,social}/<name>.{html,txt}`;
+templates are `src/core/templates/emails/{account,mfa,social}/<name>.{html,txt}`;
 the security notices share `emails/base/security_notice.{html,txt}` and the
 plain-text footer `emails/base/account_message.txt`. The two sign-up
 confirmations share one template pair (`email_confirmation`).
@@ -793,7 +793,7 @@ without its own domain.
   (`settings.EMAIL_SEND_TIMEOUT`) bounds both the SMTP socket and the
   Resend request.
 
-### Guarding the switch (`emails/setup.py`, `emails/checks.py`)
+### Guarding the switch (`src/emails/setup.py`, `src/emails/checks.py`)
 
 A store that sends from its own verified domain and has no key cannot send
 over Resend at all, so selecting `resend` while one exists would fail all its
@@ -951,7 +951,7 @@ keeps everything, validator `emails.log.validate_retention_days_setting`).
 `core.retention.delete_in_batches`, in public from beat and per store through
 `tenant.tasks.fanout_purge_expired_email_logs` (`include_suspended=True`);
 events cascade, suppressions stay. Staging anonymisation deletes all three
-tables (`devtools/anonymise/rules.py`).
+tables (`src/devtools/anonymise/rules.py`).
 
 ## Not built yet
 
@@ -1004,7 +1004,7 @@ tables (`devtools/anonymise/rules.py`).
   pins what the rows cannot (the user and product ids, the signer's clock,
   `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
 - `tests/unit/emails/test_only_transport_sends.py` reads every module's
-  syntax tree and fails when a module outside `emails/transport.py` imports or
+  syntax tree and fails when a module outside `src/emails/transport.py` imports or
   calls `EmailMessage`, `EmailMultiAlternatives`, `send_mail`,
   `send_mass_mail`, `mail_admins` or `mail_managers`: a send site that skips
   the pipeline skips the switch, the opt-out and the headers.

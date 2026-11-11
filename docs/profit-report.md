@@ -4,11 +4,11 @@ What the store earned after what it cost to earn it, for the store OWNER only.
 It is **management profit**, not the statutory or tax profit (ν.4308/2014): that
 comes from the books (opening stock plus purchases less closing stock, payroll,
 depreciation, financial items), none of which the platform records. Source:
-`order/profit.py` (the definition and every query), `admin/profit.py` (the page
-and the two exports), `core/templates/admin/profit.html`,
-`order/models/expense.py` and `order/models/item.py` / `payment_transaction.py`
-(the inputs), `order/payment_fees.py` and `order/views/viva_webhook.py` (the
-provider fees), `tenant/role_scopes.py` (who may see it). The code wins over
+`src/order/profit.py` (the definition and every query), `src/admin/profit.py` (the page
+and the two exports), `src/core/templates/admin/profit.html`,
+`src/order/models/expense.py` and `src/order/models/item.py` / `payment_transaction.py`
+(the inputs), `src/order/payment_fees.py` and `src/order/views/viva_webhook.py` (the
+provider fees), `src/tenant/role_scopes.py` (who may see it). The code wins over
 this page.
 
 ## The definition
@@ -66,7 +66,7 @@ negative (a CHECK). Null means "not reported": it adds nothing and lowers the
 **fee coverage**, the share of online payments (CHARGE rows) by value with a
 fee.
 
-- **Stripe** (`order/payment_fees.py`): the `fee` of the charge's balance
+- **Stripe** (`src/order/payment_fees.py`): the `fee` of the charge's balance
   transaction, reached through dj-stripe (`Charge.sync_from_stripe_data`,
   `Charge.balance_transaction`). Written by `handle_stripe_charge_fee` on
   `charge.succeeded` and `charge.updated`, and by

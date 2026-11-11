@@ -118,6 +118,7 @@ shipping_acs.tasks.alert_unremitted_cod_payouts
 shipping_acs.tasks.check_stale_acs_shipments
 shipping_acs.tasks.create_acs_voucher_for_order
 shipping_acs.tasks.issue_daily_acs_pickup_list
+shipping_acs.tasks.issue_held_acs_vouchers
 shipping_acs.tasks.poll_acs_tracking_batch
 shipping_acs.tasks.poll_acs_tracking_one
 shipping_acs.tasks.purge_expired_acs_api_calls
@@ -149,6 +150,7 @@ tenant.tasks.fanout_complete_paid_delivered_orders
 tenant.tasks.fanout_deliver_scheduled_gift_cards
 tenant.tasks.fanout_expire_gift_cards
 tenant.tasks.fanout_issue_daily_acs_pickup_list
+tenant.tasks.fanout_issue_held_acs_vouchers
 tenant.tasks.fanout_learn_recommendation_weights
 tenant.tasks.fanout_poll_acs_tracking_batch
 tenant.tasks.fanout_poll_boxnow_tracking_batch

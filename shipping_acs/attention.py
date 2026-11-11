@@ -24,7 +24,9 @@ from shipping_acs.models import (
     AcsCodPayout,
     AcsShipment,
     AcsUnrecognisedVoucher,
+    AcsVoucherHold,
 )
+from shipping_acs.models.voucher_hold import IN_FORCE
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -153,6 +155,53 @@ def voucher_requests_waiting() -> QuerySet[AcsShipment]:
     The others are closed by staff (``AcsService.close_voucher_request``).
     """
     return voucher_requests_unknown().exclude(needs_no_voucher_q())
+
+
+def voucher_hold_in_force_q() -> Q:
+    """The store's voucher hold, while it is in force, as a ``Q`` on
+    ``AcsVoucherHold``."""
+    return IN_FORCE
+
+
+def voucher_holds_in_force() -> QuerySet[AcsVoucherHold]:
+    """The hold that keeps the store's voucher requests from ACS: one row
+    or none (``shipping_acs.voucher_hold``)."""
+    return AcsVoucherHold.objects.filter(voucher_hold_in_force_q())
+
+
+def voucher_holds_holding_requests() -> QuerySet[AcsVoucherHold]:
+    """The hold in force while it is something for staff to know: it is
+    closed (ACS has not answered again), or requests wait behind it.
+
+    What the dashboard counts. A hold that allowed one request first and
+    has nothing left to send (the orders were canceled, or ACS refused
+    them) stays in force, so the next order's request goes alone, but
+    asks nobody for anything.
+    """
+    return voucher_holds_in_force().filter(
+        Q(trial_allowed_at__isnull=True) | Exists(voucher_requests_held())
+    )
+
+
+def voucher_request_held_q() -> Q:
+    """Shipments whose voucher request was held, as a ``Q``: nothing was
+    sent to ACS for them, and no voucher was saved since."""
+    return Q(voucher_request_held_at__isnull=False, voucher_no__isnull=True)
+
+
+def voucher_requests_held() -> QuerySet[AcsShipment]:
+    """The held voucher requests still to send, once ACS answers again.
+
+    What ``issue_held_acs_vouchers`` sends. A request of unknown outcome
+    is staff's to resolve and is never sent from here, and an order that
+    no longer needs a voucher (canceled while it waited) is left alone.
+    """
+    return (
+        AcsShipment.objects.real()
+        .filter(voucher_request_held_q())
+        .exclude(voucher_request_unknown_q())
+        .exclude(needs_no_voucher_q())
+    )
 
 
 def unresolved_unrecognised_voucher_q() -> Q:

@@ -95,8 +95,9 @@ document.
 
 A break that only exists because a consumer requires something Django does not
 provide yet is never accepted: split the change. The two differ in time. "Not
-yet" is something Django will send once its side lands, so the consumer can
-ship first or the change can be split. "Must never" is something Django does
+yet" is something Django will send once its side lands, so the change is split
+by order: Django ships the field first, then the consumer that requires it (a
+new requirement ships Django first, as above). "Must never" is something Django does
 not send and will not, so no order and no split can meet it; only a corrected
 document can.
 

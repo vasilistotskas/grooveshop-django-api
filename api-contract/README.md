@@ -57,9 +57,9 @@ never pass in one piece.
 
 ## An accepted break
 
-Only a break with no safe order (a route nothing calls) is accepted. Add the
-line oasdiff printed to `ignore.txt` in the pull request that makes the
-change:
+Only a break with no safe order is accepted, in one of the two cases below.
+Add the line oasdiff printed to `ignore.txt` in the pull request that makes
+the change:
 
 ```
 <date> until <service> <vX.Y.Z> | <reason and who decided> | <oasdiff line>
@@ -67,9 +67,38 @@ change:
 
 `until` is the first release of that consumer that no longer needs it. Once
 production runs it, `check-ignore.py` fails the line, and deleting it is
-proved safe by the same check. A break that only exists because a consumer
-requires something Django does not provide yet is never accepted: split the
-change.
+proved safe by the same check.
+
+**A route nothing calls.** No consumer sends a request to it, so no order
+can break one.
+
+**A declaration that never matched the body.** The schema declared a response
+field the server never sent (a comment's parent author declared as the full
+account while the body carried the public author). The consumer generates its
+checks from that document, so it requires something no response ever had. The
+pull request must show all of this:
+
+- The body is unchanged: a test that validates real responses against the
+  schema fails before the declaration is corrected and passes after, and a
+  real response compared before and after is identical.
+- Every order is refused by the gate, the consumer-first one included. The
+  consumer regenerates its checks from this document, so it can only stop
+  requiring the field once Django no longer declares it. A transitional
+  declaration that offers both shapes is refused as well
+  (`response-property-one-of-added`) and publishes a shape the server never
+  sends.
+- The fields the consumer requires must never be sent (another reader's
+  private data, say), so splitting the change cannot satisfy it.
+
+`until` then names the consumer release regenerated from the corrected
+document.
+
+A break that only exists because a consumer requires something Django does not
+provide yet is never accepted: split the change. The two differ in time. "Not
+yet" is something Django will send once its side lands, so the consumer can
+ship first or the change can be split. "Must never" is something Django does
+not send and will not, so no order and no split can meet it; only a corrected
+document can.
 
 ## Run it locally
 

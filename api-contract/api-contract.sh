@@ -333,7 +333,8 @@ Ship the consumer first, then this change:
      against this schema.yml), make its own check pass, deploy it.
   3. Re-run this check; it passes once the consumer that is live accepts
      the change.
-A deliberate break with no safe order (a route nothing calls) needs a dated
+A deliberate break with no safe order (a route nothing calls, or a declaration
+that never matched the body: see README, "An accepted break") needs a dated
 `until` entry in api-contract/ignore.txt in THIS pull request.
 EOF
         ;;

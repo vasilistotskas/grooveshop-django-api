@@ -56,6 +56,8 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
+from typing import Any
 
 from django.apps import apps
 from django.db import transaction
@@ -219,7 +221,11 @@ def _make_receiver(
         if platform_rows_in_public and _in_public_schema():
             return
         update_fields = kwargs.get("update_fields")
-        if update_fields and set(update_fields) <= ignored_update_fields:
+        if (
+            update_fields
+            and set(update_fields) <= ignored_update_fields
+            and not _is_significant(sender, kwargs.get("instance"))
+        ):
             return
         _mark_stale(code)
 
@@ -230,6 +236,32 @@ def _make_receiver(
 # holds receivers weakly, so a closure that nothing else references is
 # garbage collected and the signal silently stops firing.
 _receivers: list[object] = []
+
+# Saves that touch only an ignored field (a sale's ``stock``) are not edits,
+# except the few a model's app can tell apart: ``label -> predicates(instance)``.
+# A predicate says the save changes what the surface shows after all.
+_significant_saves: dict[str, list[Callable[[Any], bool]]] = {}
+
+
+def register_significant_save(
+    label: str, predicate: Callable[[Any], bool]
+) -> None:
+    """Make a save of ``label`` (``"app.Model"``) that only touches ignored
+    fields invalidate its surfaces anyway when ``predicate(instance)`` holds.
+
+    The predicate runs in ``post_save`` and must not query: whatever it needs
+    from before the save is kept by a ``pre_save`` of the model's app.
+    """
+    predicates = _significant_saves.setdefault(label, [])
+    if predicate not in predicates:
+        predicates.append(predicate)
+
+
+def _is_significant(sender, instance) -> bool:
+    label = getattr(getattr(sender, "_meta", None), "label", None)
+    return instance is not None and any(
+        predicate(instance) for predicate in _significant_saves.get(label, ())
+    )
 
 
 def _in_public_schema() -> bool:

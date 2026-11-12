@@ -293,7 +293,10 @@ def register_default_surfaces() -> None:
                 "product.ProductReviewTranslation",
             ),
             # Each order's stock decrement; the product pages show stock,
-            # but checkout re-validates it and the page TTL bounds it.
+            # but checkout re-validates it and the page TTL bounds it. A
+            # sale that sells the product out is not ignored
+            # (``product.availability``): the listing puts sold-out
+            # products last and the builder's lists read this surface's data.
             ignored_update_fields=frozenset({"stock", "updated_at"}),
             icon="inventory_2",
             group="catalog",

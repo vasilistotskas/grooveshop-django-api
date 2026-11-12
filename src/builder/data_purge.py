@@ -35,6 +35,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from builder.data_sources import ANY
 from builder.models import BuilderReference, ReferenceKind
 from core.publication import went_live
+from product.availability import availability_flipped, stored_category_id
 
 logger = logging.getLogger(__name__)
 
@@ -212,34 +213,22 @@ def _promotion_documents() -> set[str]:
 # --- the receivers --------------------------------------------------------
 
 
-def _remember(model, **attributes: str):
-    """A ``pre_save`` that keeps on the instance the stored value of each
-    field (``attribute=field``), read in ONE query, so the receiver after the
-    save knows where the record WAS."""
-    fields = tuple(attributes.values())
+def _remember(attribute: str, model, field: str):
+    """A ``pre_save`` that keeps the stored value of ``field`` on the
+    instance, so the receiver after the save knows where the record WAS."""
 
     def receiver(sender, instance, **kwargs):
         if kwargs.get("raw") or instance.pk is None:
             return
-        row = (
+        setattr(
+            instance,
+            attribute,
             model._base_manager.filter(pk=instance.pk)
-            .values_list(*fields)
-            .first()
+            .values_list(field, flat=True)
+            .first(),
         )
-        for attribute, value in zip(
-            attributes, row or (None,) * len(fields), strict=True
-        ):
-            setattr(instance, attribute, value)
 
     return receiver
-
-
-def _availability_flipped(instance) -> bool:
-    """Whether the save moved the product between available (stock above
-    zero, the storefront's own test) and sold out. Needs the stock read
-    before the save; without it nothing is known and nothing flips."""
-    before = getattr(instance, "_builder_old_stock", None)
-    return before is not None and (before > 0) != (instance.stock > 0)
 
 
 def _later(compute) -> None:
@@ -289,10 +278,10 @@ def connect(*, force: bool = False) -> None:
         # ``stock`` rule, so the flip reaches every list a product edit
         # reaches; over-purging is the safe direction and the flip is rare.
         if kwargs.get("raw") or (
-            _skip(kwargs) and not _availability_flipped(instance)
+            _skip(kwargs) and not availability_flipped(instance)
         ):
             return
-        before = getattr(instance, "_builder_old_category", None)
+        before = stored_category_id(instance)
         _later(
             lambda: _product_documents(
                 instance.pk, [before, instance.category_id]
@@ -379,23 +368,13 @@ def connect(*, force: bool = False) -> None:
 
     _connect(
         pre_save,
-        _remember(
-            product,
-            _builder_old_category="category_id",
-            _builder_old_stock="stock",
-        ),
-        product,
-        "builder-data:pre:product",
-    )
-    _connect(
-        pre_save,
-        _remember(category, _builder_old_parent="parent_id"),
+        _remember("_builder_old_parent", category, "parent_id"),
         category,
         "builder-data:pre:category",
     )
     _connect(
         pre_save,
-        _remember(post, _builder_old_category="category_id"),
+        _remember("_builder_old_category", post, "category_id"),
         post,
         "builder-data:pre:post",
     )

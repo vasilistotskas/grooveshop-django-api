@@ -76,7 +76,10 @@ class CacheSurface:
     # invalidate the surface. For bookkeeping writes that are frequent and
     # not what the cached pages are for: the stock decrement every order
     # makes (``order/stock.py``) would otherwise empty a store's product
-    # cache on each sale. A full ``save()`` still invalidates.
+    # cache on each sale. A full ``save()`` still invalidates, and so does
+    # a save a model's app registers as significant
+    # (``core.cache.invalidation.register_significant_save``): a product
+    # that sells out or comes back.
     ignored_update_fields: frozenset[str] = frozenset()
 
 

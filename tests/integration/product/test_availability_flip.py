@@ -126,3 +126,41 @@ class TestTheProductSurfaces:
         item.save()
 
         assert [c.args[0] for c in stale.call_args_list].count("products") == 1
+
+
+class TestAStockThatIsNotANumber:
+    """A caller may save ``F("stock") - n``. The predicate must not break the
+    save, and when it cannot tell, over-purging once is the safe answer."""
+
+    def test_an_expression_counts_as_a_flip(self):
+        from types import SimpleNamespace
+
+        from django.db.models import F
+
+        saved = SimpleNamespace(_stored_stock=5, stock=F("stock") - 1)
+
+        assert availability.availability_flipped(saved) is True
+
+    def test_a_save_with_an_expression_that_sells_out_purges(self, stale):
+        from django.db.models import F
+
+        item = product(stock=1)
+        stale.reset_mock()
+
+        item.stock = F("stock") - 1
+        item.save(update_fields=SALE)
+
+        assert marked(stale) >= PRODUCT_SURFACES
+
+    def test_a_save_with_an_expression_that_stays_in_stock_purges_nothing(
+        self, stale
+    ):
+        from django.db.models import F
+
+        item = product(stock=5)
+        stale.reset_mock()
+
+        item.stock = F("stock") - 1
+        item.save(update_fields=SALE)
+
+        assert marked(stale) & PRODUCT_SURFACES == set()

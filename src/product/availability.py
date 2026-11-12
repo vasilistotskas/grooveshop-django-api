@@ -38,10 +38,19 @@ def _remember_stored(sender, instance, **kwargs) -> None:
 
 def availability_flipped(instance) -> bool:
     """Whether the save moved the product between available (stock above
-    zero, the product list's own test) and sold out. Without the stored stock
-    nothing is known and nothing flips."""
+    zero, the product list's own test) and sold out.
+
+    Without the stored stock nothing is known and nothing flips. A stock that
+    is not a plain number (a caller saved ``F("stock") - n``) is unknown too,
+    but then it counts as a flip: over-purging once is harmless, and a
+    predicate must never break the save that asked it."""
     before = getattr(instance, "_stored_stock", None)
-    return before is not None and (before > 0) != (instance.stock > 0)
+    if before is None:
+        return False
+    after = instance.stock
+    if not isinstance(after, int):
+        return True
+    return (before > 0) != (after > 0)
 
 
 def stored_category_id(instance) -> int | None:

@@ -169,16 +169,34 @@ def _types_of(node: ast.expr) -> set[str] | None:
     return None
 
 
-def _data_serializers(node: ast.AST) -> set[str]:
-    """``X`` for every ``X(...).data`` inside ``node``, as a component name."""
-    found = set()
-    for child in ast.walk(node):
-        if (
-            isinstance(child, ast.Attribute)
-            and child.attr == "data"
-            and isinstance(child.value, ast.Call)
+def _alternatives(node: ast.expr) -> list[ast.expr]:
+    """The expressions ``node`` can evaluate to: the branches of a
+    conditional expression and the operands of ``or`` / ``and``."""
+    if isinstance(node, ast.IfExp):
+        return _alternatives(node.body) + _alternatives(node.orelse)
+    if isinstance(node, ast.BoolOp):
+        return [leaf for value in node.values for leaf in _alternatives(value)]
+    return [node]
+
+
+def _outputs(node: ast.expr) -> set[str]:
+    """The serializers the expression ITSELF yields: ``X(...).data`` for
+    each alternative, and the same for the elements of a list or a
+    comprehension. A serializer that is only an argument of another call
+    (``helper(X(...).data)``) is an input, not an output."""
+    found: set[str] = set()
+    for leaf in _alternatives(node):
+        if isinstance(leaf, (ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+            found |= _outputs(leaf.elt)
+        elif isinstance(leaf, (ast.List, ast.Tuple)):
+            for element in leaf.elts:
+                found |= _outputs(element)
+        elif (
+            isinstance(leaf, ast.Attribute)
+            and leaf.attr == "data"
+            and isinstance(leaf.value, ast.Call)
         ):
-            func = child.value.func
+            func = leaf.value.func
             name = (
                 func.id
                 if isinstance(func, ast.Name)
@@ -186,6 +204,39 @@ def _data_serializers(node: ast.AST) -> set[str]:
             )
             if name.endswith("Serializer"):
                 found.add(_component(name))
+    return found
+
+
+def _objects(node: ast.expr) -> list[ast.Dict]:
+    """The dict literals the expression yields as ITS OWN objects: the
+    alternatives, and the elements of a list or a comprehension. Dicts nested
+    inside another dict's values are that object's properties, not objects
+    to compare at this level."""
+    found: list[ast.Dict] = []
+    for leaf in _alternatives(node):
+        if isinstance(leaf, ast.Dict):
+            found.append(leaf)
+        elif isinstance(leaf, (ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+            found += _objects(leaf.elt)
+        elif isinstance(leaf, (ast.List, ast.Tuple)):
+            for element in leaf.elts:
+                found += _objects(element)
+    return found
+
+
+def _own_returns(method: ast.FunctionDef) -> list[ast.Return]:
+    """The method's own ``return`` statements, not those of a function or
+    class defined inside it."""
+    found: list[ast.Return] = []
+    stack: list[ast.AST] = list(method.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, ast.Return):
+            found.append(node)
+        elif not isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            stack.extend(ast.iter_child_nodes(node))
     return found
 
 
@@ -275,33 +326,32 @@ def _declared_dict(argument: ast.Dict, declared: _Declared) -> None:
 
 @dataclass
 class _Returned:
-    serializers: set[str]
-    keys: set[str]
-    refs: dict[str, str]
+    serializers: set[str]  # every alternative the returns yield as an output
+    keys: set[str]  # the keys of the returned object, one level
+    refs: dict[str, set[str]]  # per key, every serializer it can hold
     types: set[str]
     unknown: bool
 
 
 def _returned(method: ast.FunctionDef) -> _Returned:
     returned = _Returned(set(), set(), {}, set(), False)
-    for node in ast.walk(method):
-        if not (isinstance(node, ast.Return) and node.value is not None):
+    for node in _own_returns(method):
+        if node.value is None:
             continue
         types = _types_of(node.value)
         if types is None:
             returned.unknown = True
         else:
             returned.types |= types
-        returned.serializers |= _data_serializers(node.value)
-        for literal in (
-            n for n in ast.walk(node.value) if isinstance(n, ast.Dict)
-        ):
+        returned.serializers |= _outputs(node.value)
+        for literal in _objects(node.value):
             for key, value in zip(literal.keys, literal.values, strict=True):
                 if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                    returned.keys.add(_camel(key.value))
-                    nested = _data_serializers(value)
+                    name = _camel(key.value)
+                    returned.keys.add(name)
+                    nested = _outputs(value)
                     if nested:
-                        returned.refs[_camel(key.value)] = next(iter(nested))
+                        returned.refs.setdefault(name, set()).update(nested)
     return returned
 
 
@@ -323,16 +373,19 @@ def _hint(annotation: ast.expr | None) -> tuple[str | None, bool]:
     return None, False
 
 
+def _accepted(jtype: str) -> set[str]:
+    """The inferred types a declared JSON type accepts: a ``number`` takes
+    an integer too."""
+    return {jtype, "integer"} if jtype == "number" else {jtype}
+
+
 def _problems(declared: _Declared, returned: _Returned) -> list[str]:
     problems = []
-    if (
-        declared.serializers
-        and returned.serializers
-        and not declared.serializers & returned.serializers
-    ):
+    disagree = returned.serializers - declared.serializers
+    if declared.serializers and disagree:
         problems.append(
-            f"declares {sorted(declared.serializers)}, returns "
-            f"{sorted(returned.serializers)}"
+            f"declares {sorted(declared.serializers)}, "
+            f"also returns {sorted(disagree)}"
         )
     if declared.keys is not None and returned.keys:
         missing, extra = (
@@ -344,9 +397,11 @@ def _problems(declared: _Declared, returned: _Returned) -> list[str]:
         if extra:
             problems.append(f"returned but not declared: {sorted(extra)}")
         for key, component in declared.refs.items():
-            got = returned.refs.get(key)
-            if got and got != component:
-                problems.append(f"{key} declares {component}, returns {got}")
+            others = returned.refs.get(key, set()) - {component}
+            if others:
+                problems.append(
+                    f"{key} declares {component}, returns {sorted(others)}"
+                )
     if (
         declared.jtype in {"string", "integer", "boolean", "number"}
         and returned.types
@@ -355,7 +410,7 @@ def _problems(declared: _Declared, returned: _Returned) -> list[str]:
         got = returned.types - ({"null"} if declared.nullable else set())
         if "null" in got:
             problems.append("returns null but is not declared nullable")
-        elif got and not got <= {declared.jtype}:
+        elif got and not got <= _accepted(declared.jtype):
             problems.append(f"declares {declared.jtype}, returns {sorted(got)}")
     return problems
 
@@ -514,7 +569,7 @@ def test_a_declared_account_for_a_returned_public_user_is_caught():
     [(kind, detail)] = _kinds(PRE_FIX_COMMENT)
 
     assert kind == "mismatch"
-    assert "user declares UserDetails, returns UserPublic" in detail
+    assert "user declares UserDetails, returns ['UserPublic']" in detail
 
 
 def test_the_declaration_that_matches_passes():
@@ -603,6 +658,121 @@ class S:
     @extend_schema_field(UserPublicSerializer)
     def get_x(self, obj):
         return helper(obj)
+"""
+
+    assert _kinds(source) == []
+
+
+def test_a_return_inside_a_nested_function_is_not_the_methods_own():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    def get_x(self, obj) -> str:
+        def helper():
+            return 1
+
+        return str(helper())
+"""
+
+    assert _kinds(source) == []
+
+
+def test_a_nested_key_is_not_an_undeclared_property_of_the_outer_object():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field({"type": "object", "properties": {"meta": {"type": "object"}}})
+    def get_x(self, obj):
+        return {"meta": {"count": 1}}
+"""
+
+    assert _kinds(source) == []
+
+
+def test_an_arrays_item_object_is_compared_at_its_own_level():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {"type": "object", "properties": {"id": {"type": "integer"}, "meta": {"type": "object"}}},
+        }
+    )
+    def get_x(self, obj):
+        return [{"id": item.id, "meta": {"count": 1}} for item in obj.items]
+"""
+
+    assert _kinds(source) == []
+
+
+def test_every_serializer_a_property_can_hold_must_match_its_declaration():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {"user": {"$ref": "#/components/schemas/UserPublic"}},
+        }
+    )
+    def get_x(self, obj):
+        return {
+            "user": UserPublicSerializer(obj.user).data
+            if obj.public
+            else UserDetailsSerializer(obj.user).data
+        }
+"""
+
+    [(kind, detail)] = _kinds(source)
+
+    assert kind == "mismatch"
+    assert "user declares UserPublic, returns ['UserDetails']" in detail
+
+
+def test_one_branch_of_several_that_disagrees_is_caught():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field(UserPublicSerializer)
+    def get_x(self, obj):
+        if obj.public:
+            return UserPublicSerializer(obj).data
+        return UserDetailsSerializer(obj).data
+"""
+
+    [(kind, detail)] = _kinds(source)
+
+    assert kind == "mismatch"
+    assert "also returns ['UserDetails']" in detail
+
+
+def test_a_serializer_that_is_only_an_input_is_not_an_output():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field(UserPublicSerializer)
+    def get_x(self, obj):
+        return wrap(UserDetailsSerializer(obj).data)
+"""
+
+    assert _kinds(source) == []
+
+
+def test_a_declared_number_accepts_a_returned_integer():
+    source = """
+class S:
+    x = serializers.SerializerMethodField()
+
+    @extend_schema_field({"type": "number"})
+    def get_x(self, obj):
+        return 0
 """
 
     assert _kinds(source) == []

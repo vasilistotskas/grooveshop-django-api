@@ -3,6 +3,59 @@
 
 
 
+## v3.245.1 (2026-11-12)
+
+### Bug fixes
+
+* fix(cache): a product that sells out or comes back purges the data its pages are built from (#678) ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): a product that sells out or comes back purges the data its pages are built from
+
+A sale saves stock alone and the product surfaces ignore that save, so the
+page builder's product lists kept reading their cached data after a product
+sold out: only the rendered pages were purged, then rebuilt from the stale
+list and stored again.
+
+The save that moves a product between available and sold out is now an edit
+for the cache surfaces as well. A model's app can register such a save with
+core.cache.invalidation.register_significant_save; product.availability does
+it for Product and keeps the stored category and stock from one query before
+the save, shared with the page builder's document purge, so one definition
+serves both and an ordinary sale still costs no extra query and purges
+nothing.
+
+In a batched purge the surface that purges builder documents now runs after
+the others, so a page rendered in between cannot store the data that is about
+to go.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): an ordinary sale no longer purges the recommendation strips
+
+Every sale saves stock alone, and the recommendations surface had no ignore
+list, so each sale purged the cached strips and the tenant context. The
+engine reads stock live (its guard drops sold-out products), so only the
+storefront's hydrated strips can show an old stock figure, bounded by their
+TTL like the listing's cards. The surface now ignores sale saves like
+products and sitemap_seo, which share one named set, and a product that
+sells out or comes back still purges it.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): the flip purge is held by a real-machinery test, and an unknown stock counts as a flip
+
+The batched purge of a sold-out product is now proved end to end: a real
+stock-only save inside a transaction, the real flush and queued purge, with
+only the calls to the storefront stubbed. It checks the product data purge
+comes before the page documents, that the documents request is last, and that
+an ordinary sale and an ordinary edit behave as designed.
+
+The availability predicate no longer assumes a plain number: a stock that is
+an expression counts as a flip (over-purging once is harmless) instead of
+raising inside the save.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
 ## v3.245.0 (2026-11-12)
 
 ### Bug fixes

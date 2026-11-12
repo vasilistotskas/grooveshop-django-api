@@ -26,7 +26,7 @@ pytestmark = pytest.mark.django_db
 
 SALE = ["stock", "updated_at"]
 #: The surfaces that ignore a sale and so need the flip to purge them.
-PRODUCT_SURFACES = {"products", "sitemap_seo"}
+PRODUCT_SURFACES = {"products", "sitemap_seo", "recommendations"}
 
 
 @pytest.fixture(autouse=True)

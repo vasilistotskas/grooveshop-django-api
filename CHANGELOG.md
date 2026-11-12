@@ -3,6 +3,41 @@
 
 
 
+## v3.245.0 (2026-11-12)
+
+### Bug fixes
+
+* fix(builder): a product that sells out or comes back refreshes the pages that list products
+
+A save of stock alone is skipped by the page purge because every sale makes
+one. A product list that puts products in stock first or leaves sold-out ones
+out shows something else once a product sells out or is restocked, so that
+save now queues the same pages a product edit does when the stock crosses
+zero. Any other stock-only save still queues nothing.
+
+The stock before the save is read by the query that already reads the stored
+category, so a sale costs the same number of queries as before.
+
+Refs #676 ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
+### Features
+
+* feat(builder): a product list can put in-stock products first or leave sold-out ones out (#677) ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
+* feat(builder): a product list can put in-stock products first or leave sold-out ones out
+
+A product rule (filter mode) takes one more optional key, stock, with the
+values any, inStockFirst and inStockOnly. A missing key behaves as before, any
+other value is refused as invalid_data_value, and a hand-picked list still
+takes no stock (unknown_filter). The allowed values live in PRODUCT_STOCK next
+to ORDERINGS. Stock does not change which category facets a list depends on,
+so the recorded query dependencies are the same as without the key.
+
+docs/builder.md lists the keys and notes that a stock-only save does not purge
+pages, as before.
+
+Refs #676 ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
 ## v3.244.2 (2026-11-11)
 
 ### Bug fixes

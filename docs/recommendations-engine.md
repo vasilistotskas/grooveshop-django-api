@@ -428,7 +428,12 @@ Cache **candidates** (product-level, shared by every viewer), never
 `invalidated_by = (Product, ProductCategory, ProductRelation,
 RecommendationSlot)` — the auto-invalidation in
 `src/core/cache/invalidation.py` — so a merchant curating a relation sees
-it on the next request rather than behind a 7200 s TTL.
+it on the next request rather than behind a 7200 s TTL. A save of `stock`
+alone (every sale) purges nothing, except a product that sells out or comes
+back. The engine reads stock live, so a sold-out product never reaches a
+strip; only the "only N left" line on a cached strip can lag after a sale,
+for at most the handler's 300 s fresh window plus the stale-while-revalidate
+window after it, the same bound as the product listing's cards.
 `RecommendationCandidate` is deliberately **not** listed: the nightly
 pass rewrites it per product, and per-row signals would purge the
 surface once per product; `recompute_all_candidates` purges once at

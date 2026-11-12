@@ -16,6 +16,7 @@ from django.test.utils import CaptureQueriesContext
 
 from builder import data_purge
 from builder.models import BuilderReference, ReferenceKind
+from product import availability
 from product.factories.category import ProductCategoryFactory
 from product.models.product import Product
 from vat.factories import VatFactory
@@ -26,10 +27,12 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture(autouse=True)
 def queued():
     """The documents each change would queue, one set per change."""
+    availability.connect(force=True)
     data_purge.connect(force=True)
     with mock.patch("builder.data_purge.record") as record:
         yield record
     data_purge.disconnect()
+    availability.disconnect()
 
 
 def index(kind, target, document):

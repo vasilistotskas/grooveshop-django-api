@@ -152,7 +152,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             "properties": {
                 "id": {"type": "integer"},
                 "content_preview": {"type": "string"},
-                "user": {"$ref": "#/components/schemas/UserDetails"},
+                "user": {"$ref": "#/components/schemas/UserPublic"},
                 "created_at": {"type": "string", "format": "date-time"},
             },
             "required": ["id", "content_preview", "user", "created_at"],
@@ -196,7 +196,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
                 "properties": {
                     "id": {"type": "integer"},
                     "content_preview": {"type": "string"},
-                    "user": {"$ref": "#/components/schemas/UserDetails"},
+                    "user": {"$ref": "#/components/schemas/UserPublic"},
                 },
                 "required": ["id", "content_preview", "user"],
             },

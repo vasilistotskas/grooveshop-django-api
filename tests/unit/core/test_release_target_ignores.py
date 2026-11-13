@@ -10,7 +10,10 @@ tree no run tested.
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -18,13 +21,15 @@ import yaml
 from semantic_release.const import DEFAULT_COMMIT_AUTHOR
 
 _GITHUB = Path(__file__).resolve().parents[3] / ".github"
-_SCRIPT = (_GITHUB / "scripts" / "release_target.sh").read_text(
-    encoding="utf-8"
-)
+_SCRIPTS = _GITHUB / "scripts"
+_SCRIPT = (_SCRIPTS / "release_target.sh").read_text(encoding="utf-8")
+# The one definition of the ignored paths, sourced by release_target.sh and
+# by the pull request change detection.
+_IGNORED = (_SCRIPTS / "ignored_paths.sh").read_text(encoding="utf-8")
 
 
 def _script_patterns() -> list[str]:
-    declared = re.search(r"^IGNORED=\((.*)\)$", _SCRIPT, re.MULTILINE)
+    declared = re.search(r"^IGNORED=\((.*)\)$", _IGNORED, re.MULTILINE)
     assert declared is not None
     return re.findall(r"'([^']+)'", declared.group(1))
 
@@ -37,14 +42,23 @@ def test_the_script_ignores_exactly_what_the_workflow_ignores():
     triggers = workflow[True]
 
     assert triggers["push"]["paths-ignore"] == _script_patterns()
-    assert triggers["pull_request"]["paths-ignore"] == _script_patterns()
+    # A pull request run starts on every change: a skipped workflow leaves a
+    # required check "Pending". The ``changes`` job applies the same list.
+    assert "paths-ignore" not in triggers["pull_request"]
+
+
+def test_both_scripts_use_the_one_definition():
+    for script in ("release_target.sh", "pr_touches_code.sh"):
+        text = (_SCRIPTS / script).read_text(encoding="utf-8")
+        assert "ignored_paths.sh" in text
+        assert "IGNORED=(" not in text
 
 
 def test_every_ignored_pattern_has_its_case_in_the_matcher():
     """``IGNORED`` is the declaration; the ``case`` is what runs."""
     matcher = re.search(
         r"ignored_path\(\) \{.*?case \$1 in\n\s*(.*?)\) return 0",
-        _SCRIPT,
+        _IGNORED,
         re.DOTALL,
     )
     assert matcher is not None
@@ -74,3 +88,268 @@ def test_the_script_knows_the_identity_semantic_release_commits_with():
     assert "GIT_COMMIT_AUTHOR" not in (
         _GITHUB / "workflows" / "ci.yml"
     ).read_text(encoding="utf-8")
+
+
+_WORKFLOW = yaml.safe_load(
+    (_GITHUB / "workflows" / "ci.yml").read_text(encoding="utf-8")
+)
+_JOBS = _WORKFLOW["jobs"]
+_GATE_EXEMPT = {"changes", "tested-in-pr", "gate", "release"}
+
+
+def test_the_gate_needs_every_job_that_tests_code():
+    """Branch protection requires ``gate`` alone, so it must wait for all."""
+    tested = set(_JOBS) - _GATE_EXEMPT
+    assert set(_JOBS["gate"]["needs"]) == tested | {"changes", "tested-in-pr"}
+    assert _JOBS["gate"]["if"] == "always()"
+
+
+def test_the_gate_keeps_its_name():
+    """Its name is the check context the repository settings require."""
+    assert _JOBS["gate"]["name"] == "CI Gate"
+
+
+def _needs(name: str) -> list[str]:
+    needs = _JOBS[name].get("needs", [])
+    return [needs] if isinstance(needs, str) else needs
+
+
+def _skipped_with_the_change_detection(name: str) -> bool:
+    """Carries the ``changes`` condition itself, or only needs such jobs."""
+    if "needs.changes.outputs.code == 'true'" in _JOBS[name].get("if", ""):
+        return "changes" in _needs(name)
+    needs = _needs(name)
+    return bool(needs) and all(
+        _skipped_with_the_change_detection(need) for need in needs
+    )
+
+
+def test_every_job_that_tests_code_is_skipped_on_a_docs_only_change():
+    """A new job runs on docs-only pull requests unless it is named here.
+
+    The named jobs are the cheap ones that must always run: the detection,
+    the push-only check, the gate, and the release (``main`` only).
+    ``coverage`` is skipped with ``testing``, which it needs.
+    """
+    for name in set(_JOBS) - _GATE_EXEMPT:
+        assert _skipped_with_the_change_detection(name), name
+
+
+def test_the_change_detection_runs_the_pinned_script():
+    steps = _JOBS["changes"]["steps"]
+    assert any("pr_touches_code.sh" in step.get("run", "") for step in steps)
+
+
+def _detect(repo: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [shutil.which("bash") or "bash", str(_SCRIPTS / "pr_touches_code.sh")],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.com",
+            "-c",
+            "commit.gpgsign=false",
+            *args,
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _repo_with_change(tmp_path: Path, change) -> Path:
+    """A base commit, then one commit made by ``change`` (the merge ref)."""
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "docs").mkdir()
+    (repo / "src" / "a.py").write_text("print('a')\n" * 20)
+    (repo / "docs" / "a.md").write_text("a\n")
+    _git(repo, "init", "-q")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    change(repo)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "change")
+    return repo
+
+
+def test_a_docs_only_change_touches_no_code(tmp_path):
+    repo = _repo_with_change(
+        tmp_path, lambda r: (r / "docs" / "a.md").write_text("b\n")
+    )
+    result = _detect(repo)
+    assert result.stdout.strip() == "code=false"
+
+
+def test_a_change_to_code_and_docs_touches_code(tmp_path):
+    def change(repo: Path) -> None:
+        (repo / "docs" / "a.md").write_text("b\n")
+        (repo / "src" / "a.py").write_text("print('b')\n" * 20)
+
+    result = _detect(_repo_with_change(tmp_path, change))
+    assert result.stdout.strip() == "code=true"
+
+
+def test_moving_code_into_docs_touches_code(tmp_path):
+    """The old path is listed too (``--no-renames``): a deletion of code."""
+
+    def change(repo: Path) -> None:
+        (repo / "src" / "a.py").rename(repo / "docs" / "a.py")
+
+    result = _detect(_repo_with_change(tmp_path, change))
+    assert result.stdout.strip() == "code=true"
+
+
+def test_an_unreadable_diff_fails_instead_of_reporting_docs_only(tmp_path):
+    result = _detect(tmp_path)
+    assert result.returncode != 0
+    assert "code=" not in result.stdout
+
+
+def test_the_gate_fails_when_the_detection_gave_no_verdict():
+    steps = _JOBS["gate"]["steps"]
+    script = "".join(step.get("run", "") for step in steps)
+    assert "needs.changes" not in script  # reads the env, not expressions
+    assert "$CODE == true || $CODE == false" in script
+    assert '"success" and .value.result != "skipped"' in script
+
+
+def test_code_changed_then_reverted_leaves_only_docs(tmp_path):
+    """The merge ref holds the net change: a reverted edit is no change."""
+    repo = _repo_with_change(
+        tmp_path, lambda r: (r / "docs" / "x.md").write_text("x\n")
+    )
+    # The pull request starts from the base commit (HEAD^1) ...
+    _git(repo, "checkout", "-q", "-b", "pr", "HEAD^1")
+    original = (repo / "src" / "a.py").read_text()
+    (repo / "src" / "a.py").write_text("print('b')\n")
+    _git(repo, "commit", "-q", "-am", "change code")
+    (repo / "src" / "a.py").write_text(original)
+    (repo / "docs" / "a.md").write_text("c\n")
+    _git(repo, "commit", "-q", "-am", "revert the code, change docs")
+    # ... and the merge ref is the pull request merged into the base.
+    _git(repo, "checkout", "-q", "--detach", "pr~2")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "merge", "pr")
+
+    assert _detect(repo).stdout.strip() == "code=false"
+
+
+_TESTED = (_SCRIPTS / "tested_in_pr.sh").read_text(encoding="utf-8")
+
+
+def _required_jobs() -> list[str]:
+    declared = re.search(r"^REQUIRED_JOBS=\((.*)\)$", _TESTED, re.MULTILINE)
+    assert declared is not None
+    return re.findall(r"'([^']+)'", declared.group(1))
+
+
+def test_tested_in_pr_requires_the_jobs_the_gate_waits_for():
+    """One list, two files: a job added to the gate is added there too.
+
+    ``Coverage Gate`` stands for the ``Testing`` shards: it needs them, so
+    it is skipped unless they all ran.
+    """
+    tested = set(_JOBS) - {"changes", "tested-in-pr", "gate", "release"}
+    names = {_JOBS[job]["name"] for job in tested} - {"Testing"}
+
+    assert set(_required_jobs()) == names
+    assert _JOBS["coverage"]["needs"] == "testing"
+
+
+_STUB_GH = r"""#!/usr/bin/env bash
+case "$*" in
+  *"/pulls"*) echo "$HEAD" ;;
+  *"/compare/"*) echo ahead ;;
+  *"/jobs?"*)
+    [[ $* == *filter=latest* ]] || exit 3
+    [[ -n ${JOBS_API_ERROR:-} ]] && exit 1
+    cat "$JOBS_FILE" ;;
+  *"/actions/runs?"*) echo "123 https://example.test/runs/123" ;;
+  *) echo "tree-of-both" ;;
+esac
+"""
+
+_SHA = "a" * 40
+_BEFORE = "b" * 40
+_HEAD = "c" * 40
+_TESTS_RAN = {job: "success" for job in _required_jobs()}
+
+
+def _certify(tmp_path: Path, jobs: dict[str, str], **env: str) -> str:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    gh = bin_dir / "gh"
+    gh.write_text(_STUB_GH, encoding="utf-8", newline="\n")
+    gh.chmod(0o755)
+    jobs_file = tmp_path / "jobs.tsv"
+    jobs_file.write_text(
+        "".join(f"{name}\t{result}\n" for name, result in jobs.items()),
+        encoding="utf-8",
+        newline="\n",
+    )
+    result = subprocess.run(
+        [
+            shutil.which("bash") or "bash",
+            str(_SCRIPTS / "tested_in_pr.sh"),
+            _SHA,
+            _BEFORE,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "GITHUB_WORKFLOW_REF": "owner/repo/.github/workflows/ci.yml@x",
+            "HEAD": _HEAD,
+            "JOBS_FILE": str(jobs_file),
+            **env,
+        },
+    )
+    return result.stdout
+
+
+def test_a_full_green_run_is_a_certificate(tmp_path):
+    assert _certify(tmp_path, _TESTS_RAN).strip() == "tested=true"
+
+
+def test_a_green_run_with_skipped_tests_is_no_certificate(tmp_path):
+    """A docs-only pull request runs green with every test job skipped."""
+    skipped = dict.fromkeys(_required_jobs(), "skipped")
+    assert _certify(tmp_path, skipped).strip() == "tested=false"
+
+
+def test_one_skipped_or_cancelled_test_job_is_no_certificate(tmp_path):
+    for result in ("skipped", "cancelled", "failure"):
+        jobs = {**_TESTS_RAN, "Migration Check": result}
+        assert _certify(tmp_path / result, jobs).strip() == "tested=false"
+
+
+def test_a_job_cancelled_and_re_run_counts_by_its_re_run(tmp_path):
+    """The script asks for the latest attempt, whose jobs are all green."""
+    # The stub refuses (exit 3) a jobs request without ``filter=latest``.
+    assert _certify(tmp_path, _TESTS_RAN).strip() == "tested=true"
+
+
+def test_an_api_error_certifies_nothing(tmp_path):
+    out = _certify(tmp_path, _TESTS_RAN, JOBS_API_ERROR="1")
+    assert "tested=true" not in out
+
+
+def test_a_non_ascii_docs_path_is_docs(tmp_path):
+    """git quotes such a path without ``-z``, which would read as code."""
+    repo = _repo_with_change(
+        tmp_path, lambda r: (r / "docs" / "\u00e9.md").write_text("x\n")
+    )
+    assert _detect(repo).stdout.strip() == "code=false"

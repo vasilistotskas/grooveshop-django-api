@@ -198,7 +198,7 @@ emails / toasts within ms:
 3. `OrderService.add_tracking_info` admin path → PENDING → PROCESSING →
    SHIPPED.
 
-`OrderService._suppress_customer_status_notifications(order, status)`
+`OrderService.suppress_customer_status_notifications(order, status)`
 pre-stamps two metadata flags:
 - `status_update_email_sent_<status>` — short-circuits the email task's
   `_reserve_status_update_email`.

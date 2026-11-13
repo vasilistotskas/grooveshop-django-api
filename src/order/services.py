@@ -60,7 +60,11 @@ from order.exceptions import (
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
-from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
+from order.models.order import (
+    PAYMENT_ID_UNIQUE_CONSTRAINT,
+    Order,
+    status_update_reservation_key,
+)
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
@@ -87,7 +91,11 @@ from order.payment_ledger import (
     is_cash_collection,
 )
 from order.refund_lines import plan_pieces
-from order.signals import order_refunded, order_stored_value_returned
+from order.signals import (
+    order_refunded,
+    order_stored_value_returned,
+    order_stripe_payment_polled,
+)
 from order.stock import StockManager
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
@@ -2565,7 +2573,7 @@ class OrderService:
         """Validate + apply a status transition.
 
         ``silent_for_customer=True`` pre-stamps the suppression flags
-        (see ``_suppress_customer_status_notifications``) so the
+        (see ``suppress_customer_status_notifications``) so the
         customer email/WS toast for THIS transition is skipped while
         history, signals and internal state still flow. Used by chained
         transitions — e.g. the carrier bridge that walks PROCESSING →
@@ -2639,7 +2647,7 @@ class OrderService:
         old_status = order.status
 
         if silent_for_customer:
-            cls._suppress_customer_status_notifications(order, new_status)
+            cls.suppress_customer_status_notifications(order, new_status)
 
         order.status = new_status
         order.status_updated_at = timezone.now()
@@ -2658,7 +2666,7 @@ class OrderService:
         return order
 
     @classmethod
-    def _suppress_customer_status_notifications(
+    def suppress_customer_status_notifications(
         cls, order: Order, new_status: str
     ) -> None:
         """Pre-stamp metadata so the next ``new_status`` transition
@@ -2677,15 +2685,13 @@ class OrderService:
         runs. Only the user-visible ``send_order_status_update_email``
         + ``notify_order_status_changed_live`` dispatches are skipped.
 
-        ``_status_update_reservation_key`` is the same key the email
+        ``status_update_reservation_key`` is the same key the email
         task uses to dedupe — pre-stamping it makes the task short-
         circuit. The matching ``suppress_status_ws_<status>`` flag
         is read by ``handle_order_status_changed`` for the live-
         notification dispatch.
         """
-        from order.tasks import _status_update_reservation_key
-
-        email_flag = _status_update_reservation_key(order.id, new_status)
+        email_flag = status_update_reservation_key(order.id, new_status)
         ws_flag = f"suppress_status_ws_{new_status}"
         if not order.metadata:
             order.metadata = {}
@@ -2740,7 +2746,7 @@ class OrderService:
         order.status = row["status"]
         order.payment_status = row["payment_status"]
         if silent_for_customer:
-            cls._suppress_customer_status_notifications(
+            cls.suppress_customer_status_notifications(
                 order, OrderStatus.COMPLETED.value
             )
         try:
@@ -3463,7 +3469,7 @@ class OrderService:
         webhook or a retry settles it.
         """
         reference = repayment_reference.strip()
-        reason = cls._reason_text(reason_code, reason)
+        reason = cls.reason_text(reason_code, reason)
         attempts, declined = cls._claim_refund(
             order,
             amount,
@@ -3512,7 +3518,7 @@ class OrderService:
         )
 
     @staticmethod
-    def _reason_text(reason_code: str, note: str) -> str:
+    def reason_text(reason_code: str, note: str) -> str:
         """The reason as it is written on the ledger and in the history:
         the category's label, then the note."""
         note = note.strip()
@@ -4414,11 +4420,11 @@ class OrderService:
         Now only a Stripe intent that no gift-card purchase holds settles,
         and it does so through ``handle_payment_succeeded`` (amount
         compared with the order, charge booked, status advanced), then
-        announces exactly as the webhook does. Any other provider's
+        announces exactly as the webhook does
+        (``order_stripe_payment_polled``). Any other provider's
         settlement is its own webhook's.
         """
         from giftcard.models import GiftCardPurchase
-        from order.signals.handlers import announce_stripe_payment_applied
 
         if (
             order.pay_way.provider_code != StripePaymentProvider.code
@@ -4440,7 +4446,9 @@ class OrderService:
             order.payment_id,
             captured=Money(Decimal(str(amount)), currency),
         )
-        announce_stripe_payment_applied(outcome, order.payment_id)
+        order_stripe_payment_polled.send(
+            sender=cls, outcome=outcome, payment_intent_id=order.payment_id
+        )
         if outcome is not None:
             order.refresh_from_db()
 
@@ -4482,7 +4490,7 @@ class OrderService:
             # admin path's only remaining duplicate. The PROCESSING
             # transition still fires the signal + OrderHistory row,
             # only the user-visible dispatches are skipped.
-            cls._suppress_customer_status_notifications(
+            cls.suppress_customer_status_notifications(
                 order, OrderStatus.PROCESSING.value
             )
             cls.update_order_status(order, OrderStatus.PROCESSING)
@@ -4694,7 +4702,7 @@ class OrderService:
         cancel failed on the way and is worth another attempt.
         """
         if silent_for_customer:
-            cls._suppress_customer_status_notifications(
+            cls.suppress_customer_status_notifications(
                 order, OrderStatus.CANCELED.value
             )
         if order.is_paid:
@@ -5267,7 +5275,7 @@ class OrderService:
             # PENDING → PROCESSING advance for COD voucher mints
             # (AcsService._advance_pending_order_to_processing) keeps
             # firing its email as before.
-            cls._suppress_customer_status_notifications(
+            cls.suppress_customer_status_notifications(
                 order, OrderStatus.PROCESSING.value
             )
             cls.update_order_status(order, OrderStatus.PROCESSING)

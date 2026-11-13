@@ -274,3 +274,35 @@ class TestTenantConfigFlag:
         assert not nuxt_client_mock.request_purge.call_args.kwargs[
             "tenant_config"
         ]
+
+
+class TestThePagesGoLast:
+    """A page rendered between the data purge and the page purge would read
+    the data cache that is still stale and store it again."""
+
+    def test_the_surface_that_purges_documents_runs_after_the_data(
+        self, isolated_registry, cache_instance_mock, nuxt_client_mock
+    ):
+        for code, documents in (
+            ("builder_documents", True),
+            ("products", False),
+            ("tags", False),
+        ):
+            register_surface(
+                CacheSurface(
+                    code=code,
+                    label=code,
+                    description="",
+                    purges_builder_documents=documents,
+                )
+            )
+
+        report = CacheService.purge(
+            ["builder_documents", "products", "tags"], include_related=False
+        )
+
+        assert [s.code for s in report.surfaces] == [
+            "products",
+            "tags",
+            "builder_documents",
+        ]

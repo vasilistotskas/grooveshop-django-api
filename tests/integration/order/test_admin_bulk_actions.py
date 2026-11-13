@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory
 
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
@@ -38,11 +40,13 @@ class TestOrderAdminBulkStatusActions:
         )
 
         admin = self._admin()
+        request = RequestFactory().post("/admin/")
+        request.user = get_user_model()(is_superuser=True)
         queryset = Order.objects.filter(pk__in=[eligible.pk, ineligible.pk])
 
         # Must not raise — the illegal row is caught and reported.
         with patch.object(admin, "message_user") as mock_message:
-            admin.mark_as_processing(request=object(), queryset=queryset)
+            admin.mark_as_processing(request=request, queryset=queryset)
 
         eligible.refresh_from_db()
         ineligible.refresh_from_db()

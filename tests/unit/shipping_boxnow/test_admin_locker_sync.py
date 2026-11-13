@@ -16,7 +16,7 @@ from shipping_boxnow.models import BoxNowLocker
 
 def _request():
     request = RequestFactory().get("/")
-    request.user = get_user_model()(id=1, username="staff")
+    request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     return request
 
 

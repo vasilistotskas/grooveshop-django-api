@@ -106,6 +106,29 @@ def test_no_store_role_reaches_a_customers_sign_in_identity(
     )
 
 
+# The store's Stripe mirror. Saving a webhook endpoint updates it AT
+# Stripe (unticked "enabled" stops Stripe confirming payments), and the
+# subscription admin cancels at Stripe; only the platform works it.
+STRIPE_MIRROR_PERMS = (
+    "djstripe.view_customer",
+    "djstripe.view_subscription",
+    "djstripe.change_subscription",
+    "djstripe.change_webhookendpoint",
+    "djstripe.delete_webhookendpoint",
+    "djstripe.add_apikey",
+)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["owner", "admin", "staff"])
+@pytest.mark.parametrize("perm", STRIPE_MIRROR_PERMS)
+def test_no_store_role_works_the_stripe_mirror(tenant, bind_tenant, role, perm):
+    user = _staff_identity()
+    _member(user, tenant, role)
+    bind_tenant(tenant)
+    assert not TenantRolePermissionBackend().has_perm(user, perm)
+
+
 @pytest.mark.django_db
 class TestOwnerAndAdmin:
     @pytest.mark.parametrize("role", ["owner", "admin"])

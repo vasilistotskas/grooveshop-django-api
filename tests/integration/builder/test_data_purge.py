@@ -11,9 +11,12 @@ from decimal import Decimal
 from unittest import mock
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from builder import data_purge
 from builder.models import BuilderReference, ReferenceKind
+from product import availability
 from product.factories.category import ProductCategoryFactory
 from product.models.product import Product
 from vat.factories import VatFactory
@@ -24,10 +27,12 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture(autouse=True)
 def queued():
     """The documents each change would queue, one set per change."""
+    availability.connect(force=True)
     data_purge.connect(force=True)
     with mock.patch("builder.data_purge.record") as record:
         yield record
     data_purge.disconnect()
+    availability.disconnect()
 
 
 def index(kind, target, document):
@@ -46,7 +51,7 @@ def product(category=None, **fields):
         sku=fields.pop("sku", "P-1"),
         price=Decimal("10.00"),
         active=True,
-        stock=5,
+        stock=fields.pop("stock", 5),
         vat=VatFactory(value=Decimal("20.0")),
         category=category,
         **fields,
@@ -105,14 +110,83 @@ class TestAProduct:
 
         assert last(queued) == {"page:old", "page:new"}
 
-    def test_a_stock_only_save_queues_nothing(self, queued, pages):
+    def test_a_stock_only_save_that_stays_in_stock_queues_nothing(
+        self, queued, pages
+    ):
         item = product()
         queued.reset_mock()
 
         item.stock = 4
-        item.save(update_fields=["stock"])
+        item.save(update_fields=["stock", "updated_at"])
 
         queued.assert_not_called()
+
+    def test_a_sale_that_sells_the_product_out_reaches_its_pages(
+        self, queued, pages
+    ):
+        item = product()
+        index(ReferenceKind.PRODUCT, item.pk, "template:home")
+        queued.reset_mock()
+
+        item.stock = 0
+        item.save(update_fields=["stock", "updated_at"])
+
+        assert last(queued) == {"template:home", "page:everything"}
+        assert queued.call_count == 1
+
+    def test_a_restock_reaches_the_same_pages(self, queued, pages):
+        item = product(stock=0)
+        index(ReferenceKind.PRODUCT, item.pk, "template:home")
+        queued.reset_mock()
+
+        item.stock = 3
+        item.save(update_fields=["stock"])
+
+        assert last(queued) == {"template:home", "page:everything"}
+        assert queued.call_count == 1
+
+    def test_a_stock_only_save_that_stays_sold_out_queues_nothing(
+        self, queued, pages
+    ):
+        item = product(stock=0)
+        queued.reset_mock()
+
+        item.stock = 0
+        item.save(update_fields=["stock", "updated_at"])
+
+        queued.assert_not_called()
+
+    def test_an_updated_at_only_save_queues_nothing(self, queued, pages):
+        item = product(stock=0)
+        queued.reset_mock()
+
+        item.save(update_fields=["updated_at"])
+
+        queued.assert_not_called()
+
+    def test_a_full_save_that_sells_out_queues_its_pages_once(
+        self, queued, pages
+    ):
+        item = product()
+        queued.reset_mock()
+
+        item.stock = 0
+        item.save()
+
+        assert last(queued) == {"page:everything"}
+        assert queued.call_count == 1
+
+    def test_a_stock_only_save_costs_no_query_for_the_purge(self, queued):
+        """Ten queries is what the save costs without ``builder.data_purge``
+        (history row, stock log, store settings): the one query that reads
+        the stored category also reads the stock."""
+        item = product()
+        item.stock = 4
+
+        with CaptureQueriesContext(connection) as queries:
+            item.save(update_fields=["stock", "updated_at"])
+
+        assert len(queries) == 10
 
     def test_deleting_a_product_reaches_the_same_pages(self, queued, pages):
         item = product()

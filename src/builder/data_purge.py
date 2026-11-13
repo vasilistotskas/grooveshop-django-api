@@ -35,6 +35,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from builder.data_sources import ANY
 from builder.models import BuilderReference, ReferenceKind
 from core.publication import went_live
+from product.availability import availability_flipped, stored_category_id
 
 logger = logging.getLogger(__name__)
 
@@ -270,9 +271,17 @@ def connect(*, force: bool = False) -> None:
     promotion_tr = apps.get_model("promotion.PromotionTranslation")
 
     def saved_product(sender, instance, **kwargs):
-        if _skip(kwargs):
+        # A save of ``stock`` alone changes no page, except when it sells the
+        # product out or brings it back: a list that puts products in stock
+        # first or leaves sold-out ones out then shows something else. The
+        # index records a list's facets (``*``, ``category:<id>``), not its
+        # ``stock`` rule, so the flip reaches every list a product edit
+        # reaches; over-purging is the safe direction and the flip is rare.
+        if kwargs.get("raw") or (
+            _skip(kwargs) and not availability_flipped(instance)
+        ):
             return
-        before = getattr(instance, "_builder_old_category", None)
+        before = stored_category_id(instance)
         _later(
             lambda: _product_documents(
                 instance.pk, [before, instance.category_id]
@@ -357,12 +366,6 @@ def connect(*, force: bool = False) -> None:
             return
         _later(_promotion_documents)
 
-    _connect(
-        pre_save,
-        _remember("_builder_old_category", product, "category_id"),
-        product,
-        "builder-data:pre:product",
-    )
     _connect(
         pre_save,
         _remember("_builder_old_parent", category, "parent_id"),

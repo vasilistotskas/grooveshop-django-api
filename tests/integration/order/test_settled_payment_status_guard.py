@@ -26,6 +26,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.factories.order import OrderFactory
+from order.models.history import OrderHistory
 from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.models.payment_transaction import PaymentTransaction
 from order.services import OrderService
@@ -115,15 +116,52 @@ def test_polling_still_advances_an_unsettled_order():
     ).exists()
 
 
+def _payment_entries(order):
+    return OrderHistory.objects.filter(order=order, change_type="PAYMENT")
+
+
+def test_a_poll_that_settles_announces_as_the_webhook_does():
+    """The history row and the confirmation email follow a payment the
+    poll applied, exactly as they follow the webhook's."""
+    order = _stripe_order()
+
+    with (
+        _stripe_says_paid(order),
+        patch(
+            "order.tasks.send_order_confirmation_email.apply_async"
+        ) as confirmation,
+    ):
+        OrderService.get_payment_status(order)
+
+    [entry] = _payment_entries(order)
+    assert entry.previous_value == {
+        "payment_status": PaymentStatus.PENDING.value
+    }
+    assert entry.new_value == {
+        "payment_status": PaymentStatus.COMPLETED.value,
+        "payment_id": "pi_test_123",
+    }
+    confirmation.assert_called_once()
+    assert confirmation.call_args.kwargs["args"] == [order.id]
+
+
 def test_a_poll_never_settles_for_an_amount_that_is_not_the_orders():
     order = _stripe_order()
 
-    with _stripe_says_paid(order, amount=Decimal("0.50")):
+    with (
+        _stripe_says_paid(order, amount=Decimal("0.50")),
+        patch(
+            "order.tasks.send_order_confirmation_email.apply_async"
+        ) as confirmation,
+    ):
         OrderService.get_payment_status(order)
 
     order.refresh_from_db()
     assert order.payment_status == PaymentStatus.PENDING
     assert AMOUNT_MISMATCH_FLAG in order.metadata
+    # Nothing was applied, so nothing is announced.
+    assert not _payment_entries(order).exists()
+    confirmation.assert_not_called()
 
 
 def test_a_poll_never_settles_an_intent_a_gift_card_purchase_holds():

@@ -3,6 +3,41 @@
 
 
 
+## v3.245.3 (2026-11-13)
+
+### Bug fixes
+
+* fix(blog): a reply's parent and ancestors declare the public user they return (#680)
+
+parentComment.user and ancestorsPath[].user are declared as UserPublic, the shape they always returned; 170 dated api-contract entries cover the accepted break until storefront v3.341.3 regenerates. ([`ce70d4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce70d4dee93ebe675f60d61de285cb69aa0f6e4a))
+
+* fix(builder): upgrade stored icon settings to the builder's icon list (#688)
+
+Python port of the storefront's icon upgrade for the six blocks with an icon setting (the list read from the live catalogue; an icon-only trust badge keeps its default preset's icon), re-pinned catalogue, seeds and upgrade cases at storefront 3.341.1, demo pages at the blocks' current versions. ([`424acf0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/424acf0795274cd6beca5c9c76dfd57932389801))
+
+### Continuous integration
+
+* ci: one gate job that always reports, so CI can be a required check (#652)
+
+Branch protection required only the API contract check, so a PR could merge
+with failing tests. The CI jobs could not be required directly: with
+paths-ignore on pull_request, a workflow skipped by path filtering leaves its
+required checks pending.
+
+- pull_request runs no longer use paths-ignore (push keeps it). A Changes job
+  diffs the merge ref against the ignored paths, defined once in
+  .github/scripts/ignored_paths.sh, and the test jobs run only when code
+  changed.
+- CI Gate runs under always() and passes only when every job it needs
+  succeeded or was skipped for a docs-only change; a failed, cancelled or
+  unknown result, or a missing change verdict, makes it red.
+- tested_in_pr.sh certifies a push to main only when the PR run's latest
+  attempt actually ran the required jobs to success, not on the run's overall
+  result.
+
+After this merges, CI Gate can be required on ruleset 26551765 next to the
+API contract check. ([`1a23727`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a237277ccdb40b1b0193572d62df06dcbf750a4))
+
 ## v3.245.2 (2026-11-13)
 
 ### Bug fixes

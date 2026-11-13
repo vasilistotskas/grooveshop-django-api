@@ -520,7 +520,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         """The task is done (``True``), nothing is sent, and the
         reservation stays, so a re-fired signal does not ask again."""
         from emails.models import EmailSwitch
-        from order.tasks import _status_update_reservation_key
+        from order.models.order import status_update_reservation_key
 
         EmailSwitch.objects.create(type_key="order.delivered")
 
@@ -533,7 +533,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.order.refresh_from_db()
         self.assertTrue(
             self.order.metadata[
-                _status_update_reservation_key(
+                status_update_reservation_key(
                     self.order.id, OrderStatus.DELIVERED
                 )
             ]

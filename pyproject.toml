@@ -1,5 +1,5 @@
 [project]
-version = "3.244.2"
+version = "3.245.2"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -757,4 +757,32 @@ ignore_imports = [
     "user.services.gdpr -> shipping_acs.models",
     "user.services.gdpr -> shipping_boxnow.models.shipment",
 ]
+allow_indirect_imports = true
+
+# Inside `order` (issue #565). Each names one direction that held on the day
+# it was written; the layer contracts follow the subpackages (#566).
+[[tool.importlinter.contracts]]
+name = "order views are imported only by the URL confs"
+type = "protected"
+protected_modules = ["order.views"]
+allowed_importers = ["core.urls", "order.urls"]
+
+[[tool.importlinter.contracts]]
+name = "order receivers are imported only by the app config"
+type = "protected"
+protected_modules = ["order.signals.handlers"]
+allowed_importers = ["order.apps"]
+
+[[tool.importlinter.contracts]]
+name = "order.services imports neither the tasks nor the refund reconciliation"
+type = "forbidden"
+source_modules = ["order.services"]
+forbidden_modules = ["order.refund_reconciliation", "order.tasks"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "order credit documents are imported by neither allocation nor ledger"
+type = "forbidden"
+source_modules = ["order.credit_allocation", "order.payment_ledger"]
+forbidden_modules = ["order.credit_documents"]
 allow_indirect_imports = true

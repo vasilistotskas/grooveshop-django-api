@@ -384,12 +384,13 @@ class TestIgnoredUpdateFields:
             receiver(sender=None, update_fields=None)
         assert mark.call_count == 2
 
-    def test_the_product_surface_declares_the_stock_fields(self):
+    def test_the_surfaces_that_ignore_a_sale_declare_the_stock_fields(self):
         from core.cache.registry import get_surface
 
-        assert get_surface("products").ignored_update_fields == frozenset(
-            {"stock", "updated_at"}
-        )
+        for code in ("products", "sitemap_seo", "recommendations"):
+            assert get_surface(code).ignored_update_fields == frozenset(
+                {"stock", "updated_at"}
+            ), code
 
 
 class TestPublicSchemaWrites:

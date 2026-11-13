@@ -13,6 +13,11 @@ STORE_PAGES_SURFACE = "store_pages"
 #: The sitemap, RSS, llms.txt and OG image caches.
 SITEMAP_SEO_SURFACE = "sitemap_seo"
 
+#: The fields a sale saves (``order/stock.py``). A save of nothing else is
+#: bookkeeping for the surfaces that name this set, except a product that
+#: sells out or comes back (``product.availability``).
+SALE_UPDATE_FIELDS = frozenset({"stock", "updated_at"})
+
 
 def _nuxt(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.
@@ -178,6 +183,12 @@ def register_default_surfaces() -> None:
                 "product.ProductRelation",
                 "recommendation.RecommendationSlot",
             ),
+            # The engine reads stock live (its guard drops sold-out
+            # products), so only the storefront's hydrated strips can show
+            # an old stock figure ("only 2 left"), bounded by their TTL like
+            # the listing's cards. A sale does not purge them; a product
+            # that sells out or comes back does.
+            ignored_update_fields=SALE_UPDATE_FIELDS,
             icon="recommend",
             group="commerce",
         )
@@ -293,8 +304,11 @@ def register_default_surfaces() -> None:
                 "product.ProductReviewTranslation",
             ),
             # Each order's stock decrement; the product pages show stock,
-            # but checkout re-validates it and the page TTL bounds it.
-            ignored_update_fields=frozenset({"stock", "updated_at"}),
+            # but checkout re-validates it and the page TTL bounds it. A
+            # sale that sells the product out is not ignored
+            # (``product.availability``): the listing puts sold-out
+            # products last and the builder's lists read this surface's data.
+            ignored_update_fields=SALE_UPDATE_FIELDS,
             icon="inventory_2",
             group="catalog",
         )
@@ -735,7 +749,7 @@ def register_default_surfaces() -> None:
                 "page_config.ContentPageTranslation",
             ),
             # Each order's stock decrement, as on the products surface.
-            ignored_update_fields=frozenset({"stock", "updated_at"}),
+            ignored_update_fields=SALE_UPDATE_FIELDS,
             icon="map",
             group="content",
         )

@@ -74,6 +74,13 @@ PLATFORM_ONLY_APP_LABELS: frozenset[str] = frozenset(
         "mfa",
         "account",
         "usersessions",
+        # The store's mirror of its Stripe account. The store's payments
+        # run through its orders, and only the platform works the mirror:
+        # dj-stripe's own pages edit the webhook endpoint AT Stripe
+        # (unticking "enabled" stops Stripe confirming the store's
+        # payments), cancel subscriptions and sync with the store's key.
+        # Its admin is a superuser's (``admin.mixins.StripeMirrorModelAdmin``).
+        "djstripe",
     }
 )
 

@@ -38,7 +38,10 @@ from order.models import (
     PendingPaymentFee,
     RefundNotification,
 )
-from order.models.order import AMOUNT_MISMATCH_FLAG
+from order.models.order import (
+    AMOUNT_MISMATCH_FLAG,
+    status_update_reservation_key,
+)
 from order.payment import get_payment_provider_class
 from order.review_request import awaiting_review_request, delivery_window
 from order.services import OrderService
@@ -267,18 +270,6 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         return False
 
 
-STATUS_UPDATE_EMAIL_SENT_FLAG = "status_update_email_sent"
-
-
-def _status_update_reservation_key(order_id: int, new_status: str) -> str:
-    """Build the metadata key for a specific order+status combination.
-
-    Different status transitions for the same order are independent —
-    the PROCESSING email must not block the SHIPPED email.
-    """
-    return f"{STATUS_UPDATE_EMAIL_SENT_FLAG}_{new_status}"
-
-
 def _reserve_status_update_email(order_id: int, new_status: str) -> bool:
     """Atomically claim the status-update-email slot for (order, status).
 
@@ -288,7 +279,7 @@ def _reserve_status_update_email(order_id: int, new_status: str) -> bool:
     different status transitions remain independent.
     Raises Order.DoesNotExist if the order is missing.
     """
-    flag_key = _status_update_reservation_key(order_id, new_status)
+    flag_key = status_update_reservation_key(order_id, new_status)
     with transaction.atomic():
         order = Order.objects.select_for_update().get(id=order_id)
         if order.metadata and order.metadata.get(flag_key):
@@ -302,7 +293,7 @@ def _reserve_status_update_email(order_id: int, new_status: str) -> bool:
 
 def _release_status_update_email(order_id: int, new_status: str) -> None:
     """Clear the status-update-email reservation on permanent failure."""
-    flag_key = _status_update_reservation_key(order_id, new_status)
+    flag_key = status_update_reservation_key(order_id, new_status)
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
@@ -983,7 +974,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
 RECEIPT_DEFERRED_FLAG = "receipt_deferred"
 
 
-def _set_receipt_deferred(order_id: int, deferred: bool) -> None:
+def set_receipt_deferred(order_id: int, deferred: bool) -> None:
     """Record, or clear, that the order's receipt waits for a refund claim
     still PENDING (``order.invoicing.ReceiptDeferred``)."""
     with transaction.atomic():
@@ -1049,7 +1040,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
             waiting,
             extra={"order_id": order_id},
         )
-        _set_receipt_deferred(order_id, True)
+        set_receipt_deferred(order_id, True)
         return False
     except ReceiptNotIssuable as refusal:
         logger.info(
@@ -1060,7 +1051,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
         )
         # Not waiting for a refund any more: it is final (fully refunded,
         # myDATA off, not a receipt order), so nothing asks again.
-        _set_receipt_deferred(order_id, False)
+        set_receipt_deferred(order_id, False)
         return False
     except Exception as e:
         logger.exception(
@@ -1072,7 +1063,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
             raise self.retry(exc=e) from e
         return False
 
-    _set_receipt_deferred(order_id, False)
+    set_receipt_deferred(order_id, False)
     logger.info(
         "Receipt %s ready for order #%s", invoice.invoice_number, order_id
     )
@@ -1773,12 +1764,12 @@ def allocate_credit_sources() -> int:
         **{f"metadata__{RECEIPT_DEFERRED_FLAG}": True}
     ):
         if hasattr(order, "invoice"):
-            _set_receipt_deferred(order.pk, False)
+            set_receipt_deferred(order.pk, False)
         elif not credit_allocation.undecided(order):
             # The flag means "waiting for undecided sources", nothing more:
             # they are decided, so from here the receipt follows the normal
             # failure path (a failure record, retries) like any other.
-            _set_receipt_deferred(order.pk, False)
+            set_receipt_deferred(order.pk, False)
             dispatch_on_commit(generate_order_invoice, [order.pk])
     return done
 

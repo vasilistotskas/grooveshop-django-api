@@ -16,9 +16,6 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from functools import wraps
-
 from django.contrib.admin.utils import get_fields_from_path
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -67,16 +64,6 @@ def unfold_filter_for(field: models.Field) -> type:
     return AllValuesCheckboxFilter
 
 
-def _own_copy(method: Callable) -> Callable:
-    """A per-class wrapper around an inherited action function."""
-
-    @wraps(method)
-    def action(*args, **kwargs):
-        return method(*args, **kwargs)
-
-    return action
-
-
 class BaseModelAdmin(
     FeatureGatedModelAdmin, WithheldOnTenantHostModelAdmin, ModelAdmin
 ):
@@ -119,62 +106,11 @@ class BaseModelAdmin(
         will have 1000s). Override per-admin where needed.
     """
 
-    # Every admin action here requires the model's `change` permission
-    # unless it declares its own.
-    #
-    # Django and unfold both FAIL OPEN on an action with no
-    # `allowed_permissions`: Django's `_filter_actions_by_permissions`
-    # keeps it, and unfold's `_filter_unfold_actions_by_permissions`
-    # appends it unconditionally —
-    #
-    #     if not hasattr(action.method, "allowed_permissions"):
-    #         filtered_actions.append(action)
-    #         continue
-    #
-    # — so an undeclared action is offered to anyone who passes the
-    # admin site's own gate. Worse for `actions_detail`, which unfold
-    # registers as real URLs wrapped only in `admin_site.admin_view`
-    # (active + staff), so a member with no model permissions at all
-    # could GET one directly. 80 actions across this codebase declared
-    # nothing; the mechanism was available and simply unused.
-    #
-    # `change` rather than `view` is deliberate: it is the restrictive
-    # direction, and it is right for the ones that matter (cancel a
-    # parcel, publish a post, purge a payout). A genuinely read-only
-    # action declares `permissions=["view"]` and says so.
-    #
-    # An inherited action (a mixin's, a third-party base's) is one
-    # function object shared by every class that inherits it. Stamping it
-    # in place from the first subclass silently set the policy for all
-    # of them, so an inherited undeclared action gets its OWN stamped
-    # wrapper on the inheriting class instead.
-    _DEFAULT_ACTION_PERMISSIONS = ("change",)
-
-    _ACTION_ATTRIBUTES = (
-        "actions",
-        "actions_list",
-        "actions_detail",
-        "actions_row",
-        "actions_submit_line",
-    )
-
-    def __init_subclass__(cls, **kwargs) -> None:
-        super().__init_subclass__(**kwargs)
-        for attribute in cls._ACTION_ATTRIBUTES:
-            for name in getattr(cls, attribute, None) or []:
-                if not isinstance(name, str):
-                    continue
-                method = getattr(cls, name, None)
-                if method is None or getattr(
-                    method, "allowed_permissions", None
-                ):
-                    continue
-                if name not in cls.__dict__:
-                    method = _own_copy(method)
-                    setattr(cls, name, method)
-                method.allowed_permissions = list(
-                    cls._DEFAULT_ACTION_PERMISSIONS
-                )
+    # Every admin action declares its own permission in its decorator
+    # (``permissions=[...]``). Django and Unfold both fail open on one
+    # that declares nothing, and Unfold enforces only what the decorator
+    # was given: ``tests/unit/admin/test_actions_declare_permissions.py``
+    # fails for an action without one.
 
     # ``StaffActor`` attributes (``tenant.staff_actors``) the changelist and
     # datasets show: resolved for the whole page in one public query.

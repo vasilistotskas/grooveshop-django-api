@@ -45,6 +45,22 @@ from shipping.enum import ShippingKind
 # reads it, and a task must not import a view.
 AMOUNT_MISMATCH_FLAG = "viva_amount_mismatch"
 
+# Prefix of the ``Order.metadata`` key that claims a status-update email.
+# Lives here for the same reason: the email task claims it
+# (``order.tasks``) and ``OrderService`` stamps it ahead of a transition
+# that must stay silent, and the service must not import the tasks.
+STATUS_UPDATE_EMAIL_SENT_FLAG = "status_update_email_sent"
+
+
+def status_update_reservation_key(order_id: int, new_status: str) -> str:
+    """Build the metadata key for a specific order+status combination.
+
+    Different status transitions for the same order are independent —
+    the PROCESSING email must not block the SHIPPED email.
+    """
+    return f"{STATUS_UPDATE_EMAIL_SENT_FLAG}_{new_status}"
+
+
 # The partial unique index on ``Order.payment_id``. ``OrderService`` reads
 # it back off a database error, to tell "this payment already has an
 # order" from any other integrity failure.

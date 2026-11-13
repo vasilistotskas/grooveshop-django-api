@@ -45,8 +45,9 @@
 # A release that does not happen is therefore either a warning that names
 # the run responsible for it, or a red job. Never a silent green.
 #
-# ``IGNORED`` mirrors ``on.push.paths-ignore`` in ci.yml;
-# tests/unit/core/test_release_target_ignores.py fails when the two differ.
+# The ignored paths are defined once, in ignored_paths.sh, which the PR
+# change detection shares; tests/unit/core/test_release_target_ignores.py
+# fails when that list and ``on.push.paths-ignore`` in ci.yml differ.
 #
 # Needs a full clone, GH_TOKEN with actions read, GITHUB_REPOSITORY and
 # GITHUB_WORKFLOW_REF.
@@ -56,7 +57,9 @@ sha=$1
 workflow_path=${GITHUB_WORKFLOW_REF#"$GITHUB_REPOSITORY"/}
 workflow_path=${workflow_path%%@*}
 
-IGNORED=('**.md' 'docs/**' 'LICENSE' '.editorconfig')
+# shellcheck source=ignored_paths.sh
+source "$(dirname "${BASH_SOURCE[0]}")/ignored_paths.sh"
+
 RELEASE_FILES=('pyproject.toml' 'uv.lock' 'CHANGELOG.md')
 RELEASE_SUBJECT='^chore\(release\): release version [0-9]+\.[0-9]+\.[0-9]+ \[skip ci\]$'
 # Who semantic-release commits as: its default ``commit_author``, which
@@ -70,15 +73,6 @@ output() {
 fail() {
   echo "::error::$1"
   exit 1
-}
-
-ignored_path() {
-  # The four patterns as GitHub reads them: ``**.md`` and ``docs/**``
-  # cross directories, the other two are exact.
-  case $1 in
-    *.md | docs/* | LICENSE | .editorconfig) return 0 ;;
-  esac
-  return 1
 }
 
 release_file() {

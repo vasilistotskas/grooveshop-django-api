@@ -54,7 +54,7 @@ def _limit(value):
 
 @pytest.fixture
 def tenant():
-    store = store_tenant("limit_store")
+    store = store_tenant("limit_store", gift_cards_enabled=True)
     previous = bind_store_tenant(store)
     yield store
     unbind_store_tenant(previous)

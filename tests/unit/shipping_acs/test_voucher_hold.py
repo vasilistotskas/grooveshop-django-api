@@ -388,7 +388,9 @@ class TestWhileHeldNothingIsSent:
         waiting = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
         request = RequestFactory().get("/")
-        request.user = get_user_model()(id=1, username="staff")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
 
         with (
             patch("django.contrib.messages.warning") as warned,
@@ -429,7 +431,9 @@ class TestWhileHeldNothingIsSent:
         shipment = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
         request = RequestFactory().get("/")
-        request.user = get_user_model()(id=1, username="staff")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
 
         # As in production, the worker runs the task after the page has
         # answered (here the dispatch would run it inline, before the

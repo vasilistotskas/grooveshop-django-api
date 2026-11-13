@@ -13,7 +13,9 @@
 #   1. the sha is the merge commit of a merged PR;
 #   2. the previous tip is an ancestor of (or equal to) the PR head;
 #   3. the sha and the PR head have the same tree;
-#   4. this workflow succeeded on a pull_request run for the PR head.
+#   4. this workflow succeeded on a pull_request run for the PR head, and
+#      the jobs that test code succeeded in it (not skipped: a pull request
+#      that touches only ignored paths runs green without the tests).
 # Anything else (a branch behind main, a direct push, a dispatch) is
 # "not tested", and the workflow runs in full.
 #
@@ -48,9 +50,34 @@ tree() { gh api "repos/$GITHUB_REPOSITORY/commits/$1" --jq .commit.tree.sha; }
 [[ $(tree "$sha") == $(tree "$head") ]] \
   || untested "the merged tree differs from PR head $head"
 
-run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head&event=pull_request&status=success" \
-  --jq "[.workflow_runs[] | select((.path | split(\"@\")[0]) == \"$workflow_path\")][0].html_url // empty")
-[[ -n $run ]] || untested "no successful $workflow_path run for PR head $head"
+# A green run is not enough: a pull request that changes only ignored paths
+# runs this workflow green with every test job skipped. The run counts only
+# when the jobs that test code ran and succeeded in its LATEST attempt (a job
+# cancelled and then re-run counts by its re-run). ``skipped`` is not enough.
+# Any API error aborts the script (``set -e``): no output, so ``tested`` is
+# unset, and the workflow runs everything.
+#
+# ``REQUIRED_JOBS`` is the names of the jobs in the gate's ``needs`` that
+# test code; tests/unit/core/test_release_target_ignores.py fails when it
+# differs from ci.yml. ``Coverage Gate`` needs every ``Testing`` shard, so it
+# is green only when they all were.
+REQUIRED_JOBS=('Security Scan (Trivy)' 'Code Quality' 'Migration Check' 'Testing (multi-tenant lane)' 'Coverage Gate')
 
-echo "tested in $run (PR head $head, same tree)" >&2
+# The latest successful run of this workflow for the head, picked by its
+# creation time rather than by the order the API lists runs in. An empty
+# answer is "no such run"; an API error aborts (``set -e``).
+run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head&event=pull_request&status=success&per_page=100" \
+  --jq "[.workflow_runs[] | select((.path | split(\"@\")[0]) == \"$workflow_path\")] | sort_by(.created_at) | last | select(. != null) | \"\(.id) \(.html_url)\"")
+[[ -n $run ]] || untested "no successful $workflow_path run for PR head $head"
+read -r run_id run_url <<<"$run"
+
+# One ``name<TAB>conclusion`` line per job of the latest attempt.
+jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+  --jq '.jobs[] | "\(.name)\t\(.conclusion)"')
+for job in "${REQUIRED_JOBS[@]}"; do
+  grep -qxF "$job"$'\t'"success" <<<"$jobs" \
+    || untested "run $run_url did not run $job to success (a docs-only run skips the tests)"
+done
+
+echo "tested in $run_url (PR head $head, same tree, tests ran)" >&2
 echo "tested=true"

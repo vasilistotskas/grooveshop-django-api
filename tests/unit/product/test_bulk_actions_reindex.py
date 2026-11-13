@@ -87,6 +87,7 @@ def test_the_admin_action_reindexes_what_it_deactivated():
     """Through the action: it saves each row, so the post_save receiver
     queues the reindex (no explicit helper call is needed)."""
     from django.contrib.admin.sites import AdminSite
+    from django.contrib.auth import get_user_model
     from django.test import RequestFactory
 
     from product.admin import ProductAdmin
@@ -97,7 +98,7 @@ def test_the_admin_action_reindexes_what_it_deactivated():
     ]
     ids = [p.pk for p in products]
     request = RequestFactory().post("/admin/")
-    request.user = None
+    request.user = get_user_model()(is_superuser=True)
     admin_instance = ProductAdmin(Product, AdminSite())
 
     with (

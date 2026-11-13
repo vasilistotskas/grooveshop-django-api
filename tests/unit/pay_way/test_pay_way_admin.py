@@ -162,6 +162,8 @@ class PayWayAdminTestCase(TestCase):
             email="test@example.com",
             username="testuser",
             password="testpass123",
+            is_staff=True,
+            is_superuser=True,
         )
 
         self.payway = PayWay.objects.create(

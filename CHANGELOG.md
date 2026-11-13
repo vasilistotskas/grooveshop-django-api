@@ -3,6 +3,210 @@
 
 
 
+## v3.245.2 (2026-11-13)
+
+### Bug fixes
+
+* fix(order): break the import cycles that block clean moves (#667)
+
+Five of the six import cycles inside order/ are gone, so the coming moves of
+#566 can relocate modules without function-local imports holding them
+together:
+
+- payment <-> views.viva_webhook: the Viva status codes live in
+  order.payment.
+- services <-> tasks: the status-update reservation key lives in
+  order.models.order.
+- services <-> signals.handlers: a polled Stripe settlement sends
+  order_stripe_payment_polled, and its receiver announces the payment.
+- credit_allocation <-> credit_documents: allocate_order no longer requests
+  credit documents; the backfill requests them itself.
+- refund_reconciliation <-> services: closed by removing services -> tasks.
+
+The four private helpers used across modules are public (status update
+reservation key, notification suppression, refund reason text, receipt
+deferral). New import-linter contracts keep the closed cycles closed.
+
+credit_allocation <-> payment_ledger stays; its direction is decided in #658.
+Part of #565. ([`42e49e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42e49e1f2e767621c6f2d212a652bc223bbd17b8))
+
+### Chores
+
+* chore(builder): re-pin the storefront catalogue and data cases to 3.340.0 (#687)
+
+Refreshes the copy of the storefront's block catalogue with
+sync_upstream_sources.py, from the storefront's main at 38b6a33 (the 3.340.0
+release commit). The catalogue gains newsletter_signup.headingColor and
+blog_posts_grid.phoneLayout (one value each) and the two accent-muted theme
+contrast rules, both warnings. The data cases and the other copies are
+unchanged; the pin in upstream-sources.lock.json moves with it. ([`f26c16c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f26c16c6889847874349ebb93dcf2cfabd716321))
+
+* chore(builder): re-pin the storefront catalogue and data cases (#685)
+
+Refreshes the copies of the storefront's block catalogue and data cases with
+sync_upstream_sources.py, from the storefront's main at 0fc5512 (the script
+copies main, not a release tag; the newest release when run was v3.339.1,
+which main is ahead of). The pin in upstream-sources.lock.json moves with it.
+
+The catalogue gains hero_showcase, store_assurances, colorScheme on the rails,
+the blog_categories layout and call-to-action settings and the product stock
+choice; data-cases.json gains the cases for the stock key (any, inStockFirst,
+inStockOnly, an unknown value, and stock on a hand-picked list). ([`c5fce0c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5fce0cc45f63e482f4d7123efdfd004b2c8fabb))
+
+## v3.245.1 (2026-11-12)
+
+### Bug fixes
+
+* fix(cache): a product that sells out or comes back purges the data its pages are built from (#678) ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): a product that sells out or comes back purges the data its pages are built from
+
+A sale saves stock alone and the product surfaces ignore that save, so the
+page builder's product lists kept reading their cached data after a product
+sold out: only the rendered pages were purged, then rebuilt from the stale
+list and stored again.
+
+The save that moves a product between available and sold out is now an edit
+for the cache surfaces as well. A model's app can register such a save with
+core.cache.invalidation.register_significant_save; product.availability does
+it for Product and keeps the stored category and stock from one query before
+the save, shared with the page builder's document purge, so one definition
+serves both and an ordinary sale still costs no extra query and purges
+nothing.
+
+In a batched purge the surface that purges builder documents now runs after
+the others, so a page rendered in between cannot store the data that is about
+to go.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): an ordinary sale no longer purges the recommendation strips
+
+Every sale saves stock alone, and the recommendations surface had no ignore
+list, so each sale purged the cached strips and the tenant context. The
+engine reads stock live (its guard drops sold-out products), so only the
+storefront's hydrated strips can show an old stock figure, bounded by their
+TTL like the listing's cards. The surface now ignores sale saves like
+products and sitemap_seo, which share one named set, and a product that
+sells out or comes back still purges it.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+* fix(cache): the flip purge is held by a real-machinery test, and an unknown stock counts as a flip
+
+The batched purge of a sold-out product is now proved end to end: a real
+stock-only save inside a transaction, the real flush and queued purge, with
+only the calls to the storefront stubbed. It checks the product data purge
+comes before the page documents, that the documents request is last, and that
+an ordinary sale and an ordinary edit behave as designed.
+
+The availability predicate no longer assumes a plain number: a stock that is
+an expression counts as a flip (over-purging once is harmless) instead of
+raising inside the save.
+
+Refs #676 ([`8d98a99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d98a99320d4431aee7be94011339990406ba805))
+
+## v3.245.0 (2026-11-12)
+
+### Bug fixes
+
+* fix(builder): a product that sells out or comes back refreshes the pages that list products
+
+A save of stock alone is skipped by the page purge because every sale makes
+one. A product list that puts products in stock first or leaves sold-out ones
+out shows something else once a product sells out or is restocked, so that
+save now queues the same pages a product edit does when the stock crosses
+zero. Any other stock-only save still queues nothing.
+
+The stock before the save is read by the query that already reads the stored
+category, so a sale costs the same number of queries as before.
+
+Refs #676 ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
+### Features
+
+* feat(builder): a product list can put in-stock products first or leave sold-out ones out (#677) ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
+* feat(builder): a product list can put in-stock products first or leave sold-out ones out
+
+A product rule (filter mode) takes one more optional key, stock, with the
+values any, inStockFirst and inStockOnly. A missing key behaves as before, any
+other value is refused as invalid_data_value, and a hand-picked list still
+takes no stock (unknown_filter). The allowed values live in PRODUCT_STOCK next
+to ORDERINGS. Stock does not change which category facets a list depends on,
+so the recorded query dependencies are the same as without the key.
+
+docs/builder.md lists the keys and notes that a stock-only save does not purge
+pages, as before.
+
+Refs #676 ([`999ada4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999ada4814176dd0eb36c9841edb5e61b3fd6d6b))
+
+## v3.244.2 (2026-11-11)
+
+### Bug fixes
+
+* fix(admin): every admin action declares its permission, so its URL enforces it (#668)
+
+Every admin action now names the model permission it needs in its
+decorator. Unfold serves list, row and detail actions as URLs of their
+own and enforces only the decorator's `permissions`, so until now any
+signed-in member of a store's staff could run 33 actions by their URL,
+whatever their role allowed: the ACS COD reconciliation, a gift-card
+balance adjustment off the store's plan, and deletions STAFF may not
+make.
+
+- 80 actions declare `permissions=[...]` by what they do: `change` for
+  an edit, `delete` for a deletion, `add` for a copy, `view` only for
+  the six read-only actions listed in the guard. The base-class default
+  that set `allowed_permissions` after the fact is removed: Django read
+  it, Unfold never did.
+- dj-stripe is platform-only. Its app joins `PLATFORM_ONLY_APP_LABELS`,
+  and `StripeMirrorModelAdmin` makes its admins superuser-only and
+  guards dj-stripe's own action URL. Every store role could disable the
+  store's webhook endpoint at Stripe, cancel subscriptions and run syncs
+  with the store's key.
+- "Decrease quantity by 1" decreases only: a cart line at 1 stays, with
+  a warning to use "Remove from cart", which asks for `delete`; a user
+  without `delete` (STAFF) is told a role that may delete must remove it.
+- "Delete at ACS" (vouchers matching no order) cannot be undone at ACS,
+  so it asks for the role's `delete` on those rows besides `change`
+  (`has_delete_at_acs_permission`); the admin still removes no row.
+- Guards: an AST walk over `src/` requires a literal permission on
+  every action; the registry check covers inherited actions and dropdown
+  items; every third-party admin and URL on the store site is named with
+  the check in front of it. Behaviour tests send every action, as
+  each role, against the real admin site.
+
+Closes #646 ([`a0e239a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a0e239adbae1b9e3c9ae77d42358b09d99e1eab4))
+
+### Documentation
+
+* docs(order): split order-system.md into docs/order/, repair stale pointers, bring the app map here (#657)
+
+`docs/order-system.md` (273,341 characters, its longest line 17,433)
+becomes eighteen pages under `docs/order/`, each under 40,000 characters,
+with `docs/order/index.md` saying which page to read for which change. The
+split moved the text unchanged (1,823 sentence fragments and 2,700 code
+spans compared, none lost); what changed on purpose:
+
+- invariants that cited notes outside the repository now carry their
+  reason and the commit that introduced them;
+- stale pointers repaired (handlers and methods that moved or no longer
+  exist), the storefront-only rows and the audit history dropped;
+- three passages corrected against the code: a status edit made by hand
+  is no longer recovered by canceling the order, restored loyalty points
+  do not reduce a receipt, and a failed Stripe refund is reversed in the
+  ledger;
+- ACS code comments cite the public manual;
+- `docs/app-map.md` now lives here (the site copies it), every app entry
+  names the document to read first, and each `AppConfig` has a docstring.
+
+`tests/unit/test_doc_references.py` also reads `docs/` paths named in
+Python, holds every doc under 40,000 characters (two named exceptions,
+#656) and walks `docs/` recursively.
+
+Closes #561 ([`82d3cba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82d3cba704b93e82beff618f99ec52e087ae93c9))
+
 ## v3.244.1 (2026-11-11)
 
 ### Refactoring

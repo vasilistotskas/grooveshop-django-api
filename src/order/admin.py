@@ -2253,7 +2253,7 @@ class OrderAdmin(BaseModelAdmin):
             # not paid through a provider).
             self.message_user(request, str(exc), messages.ERROR)
         else:
-            reason = OrderService._reason_text(reason_code, note)
+            reason = OrderService.reason_text(reason_code, note)
             if free_lines:
                 self._restock(request, order.pk, form.units(), reason)
                 return HttpResponse(
@@ -2883,9 +2883,9 @@ class OrderAdmin(BaseModelAdmin):
                 credit_allocation.allocate_order(locked)
                 waiting = credit_allocation.undecided(locked)
             if waiting:
-                from order.tasks import _set_receipt_deferred
+                from order.tasks import set_receipt_deferred
 
-                _set_receipt_deferred(order.id, True)
+                set_receipt_deferred(order.id, True)
                 messages.warning(
                     request,
                     _(

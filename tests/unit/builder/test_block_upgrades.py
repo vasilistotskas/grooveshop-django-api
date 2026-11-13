@@ -278,8 +278,13 @@ class TestOverlay:
         }
 
 
-def icon_block(*names: str, name: str = "nav_link"):
-    """A block whose icon setting takes *names*, as the catalogue states it."""
+def icon_block(
+    *names: str,
+    name: str = "nav_link",
+    presets: list[dict[str, Any]] | None = None,
+):
+    """A block whose icon setting takes *names*, as the catalogue states it,
+    with the *presets* the catalogue gives it."""
     return parse_catalogue(
         {
             "hash": "h",
@@ -297,6 +302,7 @@ def icon_block(*names: str, name: str = "nav_link"):
                     "translatable": [],
                     "linkRefs": [],
                     "kinds": ["block"],
+                    "presets": presets or [],
                 }
             ],
         }
@@ -386,9 +392,51 @@ class TestTrustBadgeKeepsAMark:
 
     block = staticmethod(
         lambda: icon_block(
-            "i-lucide-shield-check", "i-heroicons-truck", name="trust_badge"
+            "i-lucide-shield-check",
+            "i-heroicons-truck",
+            name="trust_badge",
+            presets=[
+                {
+                    "id": "default",
+                    "settings": {
+                        "kind": "custom",
+                        "icon": "i-lucide-shield-check",
+                    },
+                }
+            ],
         )
     )
+
+    def test_the_kept_mark_is_the_default_preset_s_icon_the_catalogue_states(
+        self,
+    ):
+        block = icon_block(
+            "i-heroicons-truck",
+            "i-lucide-shield",
+            name="trust_badge",
+            presets=[
+                {"id": "default", "settings": {"icon": "i-lucide-shield"}}
+            ],
+        )
+
+        upgraded = upgrade_node(
+            {"type": "trust_badge@1", "settings": {"icon": "i-lucide-star"}},
+            block,
+        )
+
+        assert upgraded["settings"] == {"icon": "i-lucide-shield"}
+
+    def test_a_default_preset_without_an_icon_is_refused_not_guessed_at(self):
+        block = icon_block("i-heroicons-truck", name="trust_badge")
+
+        with pytest.raises(NoUpgradePath, match="names no icon"):
+            upgrade_node(
+                {
+                    "type": "trust_badge@1",
+                    "settings": {"icon": "i-lucide-star"},
+                },
+                block,
+            )
 
     def upgraded(self, **settings):
         return upgrade_node(

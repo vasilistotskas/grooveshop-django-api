@@ -37,11 +37,11 @@ Upgrade = Callable[[Settings], Settings]
 
 @dataclass(frozen=True)
 class SchemaUpgrade:
-    """An upgrade that reads its block's CURRENT schema, the catalogue's: what
-    it may write is what that schema allows now, as the storefront's upgrade
-    reads its own list as it is now."""
+    """An upgrade that reads its block's CURRENT definition, the catalogue's
+    schema and presets: what it may write is what that block allows now, as
+    the storefront's upgrade reads its own list and preset as they are now."""
 
-    run: Callable[[Settings, dict[str, Any]], Settings]
+    run: Callable[[Settings, BlockDefinition], Settings]
 
 
 #: What the first product rails called their orderings, and what each sorted by.
@@ -159,7 +159,9 @@ def _icon_names(schema: dict[str, Any]) -> list[str]:
     return [name for name in names if isinstance(name, str)]
 
 
-def _icon_onto_list(settings: Settings, schema: dict[str, Any]) -> Settings:
+def _icon_onto_list(
+    settings: Settings, definition: BlockDefinition
+) -> Settings:
     """An icon setting was free text and takes one of a list now: a saved name
     is written as its entry (``i-lucide:shield`` is ``i-lucide-shield``, which
     the icon sets read alike) and one the list does not hold is left out, the
@@ -170,7 +172,7 @@ def _icon_onto_list(settings: Settings, schema: dict[str, Any]) -> Settings:
     listed = next(
         (
             name
-            for name in _icon_names(schema)
+            for name in _icon_names(definition.schema)
             if name in (icon, icon.replace(":", "-", 1))
         ),
         None,
@@ -183,26 +185,31 @@ def _icon_onto_list(settings: Settings, schema: dict[str, Any]) -> Settings:
 _ICON_ONTO_LIST = SchemaUpgrade(_icon_onto_list)
 
 
-def _icon_keeping_a_mark(fallback: str) -> SchemaUpgrade:
+def _preset_icon(definition: BlockDefinition) -> str:
+    """The icon of the block's ``default`` preset, as the catalogue states it
+    (the storefront's one constant behind both the preset and the upgrade)."""
+    icon = definition.presets.get("default", {}).get("icon")
+    if not isinstance(icon, str):
+        raise NoUpgradePath(
+            f"{definition.type}'s default preset names no icon to keep"
+        )
+    return icon
+
+
+def _icon_keeping_a_mark(
+    settings: Settings, definition: BlockDefinition
+) -> Settings:
     """``_icon_onto_list`` for a block that needs a mark, an image, an image
     URL or an icon (``trust_badge``): when the icon it leaves out was the only
-    one, *fallback* (the block's preset icon) takes its place, so the node
+    one, the icon of the block's default preset takes its place, so the node
     still passes its block's rule. The storefront's
     ``upgradeIconSettingKeepingAMark``."""
-
-    def upgrade(settings: Settings, schema: dict[str, Any]) -> Settings:
-        upgraded = _icon_onto_list(settings, schema)
-        dropped = (
-            isinstance(settings.get("icon"), str) and "icon" not in upgraded
-        )
-        marked = "image" in upgraded or bool(upgraded.get("imageUrl"))
-        return (
-            {**upgraded, "icon": fallback}
-            if dropped and not marked
-            else upgraded
-        )
-
-    return SchemaUpgrade(upgrade)
+    upgraded = _icon_onto_list(settings, definition)
+    dropped = isinstance(settings.get("icon"), str) and "icon" not in upgraded
+    marked = "image" in upgraded or bool(upgraded.get("imageUrl"))
+    if dropped and not marked:
+        return {**upgraded, "icon": _preset_icon(definition)}
+    return upgraded
 
 
 def _title_into_heading(settings: Settings) -> Settings:
@@ -250,7 +257,7 @@ UPGRADES: dict[str, dict[int, Upgrade | SchemaUpgrade]] = {
     "footer_column": {1: _ICON_ONTO_LIST},
     "nav_link": {1: _ICON_ONTO_LIST},
     "timeline_entry": {1: _ICON_ONTO_LIST},
-    "trust_badge": {1: _icon_keeping_a_mark("i-lucide-shield-check")},
+    "trust_badge": {1: SchemaUpgrade(_icon_keeping_a_mark)},
 }
 
 
@@ -273,7 +280,7 @@ def upgrade_node(
         if step is None:
             raise NoUpgradePath(f"no upgrade from {name}@{version}")
         settings = (
-            step.run(settings, definition.schema)
+            step.run(settings, definition)
             if isinstance(step, SchemaUpgrade)
             else step(settings)
         )

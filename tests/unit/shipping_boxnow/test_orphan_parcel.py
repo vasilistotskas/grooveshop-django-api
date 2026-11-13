@@ -145,6 +145,12 @@ def http():
 
 
 def _paid_order(**kwargs: Any):
+    """A paid order waiting for its first parcel, so no tracking number.
+
+    ``OrderFactory`` gives half of its orders a random one, which the
+    assertions that nothing was saved would then read as ours.
+    """
+    kwargs.setdefault("tracking_number", "")
     return OrderFactory(
         status=OrderStatus.PROCESSING,
         payment_status=PaymentStatus.COMPLETED,

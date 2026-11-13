@@ -183,6 +183,28 @@ def _icon_onto_list(settings: Settings, schema: dict[str, Any]) -> Settings:
 _ICON_ONTO_LIST = SchemaUpgrade(_icon_onto_list)
 
 
+def _icon_keeping_a_mark(fallback: str) -> SchemaUpgrade:
+    """``_icon_onto_list`` for a block that needs a mark, an image, an image
+    URL or an icon (``trust_badge``): when the icon it leaves out was the only
+    one, *fallback* (the block's preset icon) takes its place, so the node
+    still passes its block's rule. The storefront's
+    ``upgradeIconSettingKeepingAMark``."""
+
+    def upgrade(settings: Settings, schema: dict[str, Any]) -> Settings:
+        upgraded = _icon_onto_list(settings, schema)
+        dropped = (
+            isinstance(settings.get("icon"), str) and "icon" not in upgraded
+        )
+        marked = "image" in upgraded or bool(upgraded.get("imageUrl"))
+        return (
+            {**upgraded, "icon": fallback}
+            if dropped and not marked
+            else upgraded
+        )
+
+    return SchemaUpgrade(upgrade)
+
+
 def _title_into_heading(settings: Settings) -> Settings:
     """A band's heading was two settings, and every component drew ``heading``
     first: the one it drew stays, under the one name."""
@@ -228,7 +250,7 @@ UPGRADES: dict[str, dict[int, Upgrade | SchemaUpgrade]] = {
     "footer_column": {1: _ICON_ONTO_LIST},
     "nav_link": {1: _ICON_ONTO_LIST},
     "timeline_entry": {1: _ICON_ONTO_LIST},
-    "trust_badge": {1: _ICON_ONTO_LIST},
+    "trust_badge": {1: _icon_keeping_a_mark("i-lucide-shield-check")},
 }
 
 

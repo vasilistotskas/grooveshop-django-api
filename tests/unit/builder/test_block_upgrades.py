@@ -278,14 +278,14 @@ class TestOverlay:
         }
 
 
-def icon_block(*names: str):
+def icon_block(*names: str, name: str = "nav_link"):
     """A block whose icon setting takes *names*, as the catalogue states it."""
     return parse_catalogue(
         {
             "hash": "h",
             "blocks": [
                 {
-                    "type": "nav_link",
+                    "type": name,
                     "version": 2,
                     "schema": {
                         "type": "object",
@@ -300,7 +300,7 @@ def icon_block(*names: str):
                 }
             ],
         }
-    ).get("nav_link")
+    ).get(name)
 
 
 class TestIconOntoTheList:
@@ -378,3 +378,51 @@ class TestIconOntoTheList:
         last = max(UPGRADES[name])
 
         assert isinstance(UPGRADES[name][last], SchemaUpgrade)
+
+
+class TestTrustBadgeKeepsAMark:
+    """A trust badge needs a mark (an image, an image URL or an icon): when the
+    icon left out was its only one, its preset icon takes its place."""
+
+    block = staticmethod(
+        lambda: icon_block(
+            "i-lucide-shield-check", "i-heroicons-truck", name="trust_badge"
+        )
+    )
+
+    def upgraded(self, **settings):
+        return upgrade_node(
+            {"type": "trust_badge@1", "settings": settings}, self.block()
+        )["settings"]
+
+    def test_a_badge_whose_only_mark_was_an_icon_off_the_list_takes_its_preset(
+        self,
+    ):
+        assert self.upgraded(
+            kind="custom", label="Εγγύηση", icon="i-lucide-star"
+        ) == {
+            "kind": "custom",
+            "label": "Εγγύηση",
+            "icon": "i-lucide-shield-check",
+        }
+
+    def test_a_badge_with_a_logo_only_loses_the_icon_off_the_list(self):
+        assert self.upgraded(
+            kind="payment",
+            label="Visa",
+            imageUrl="https://example.test/visa.svg",
+            icon="i-lucide-star",
+        ) == {
+            "kind": "payment",
+            "label": "Visa",
+            "imageUrl": "https://example.test/visa.svg",
+        }
+
+    def test_a_listed_icon_stays(self):
+        assert self.upgraded(
+            kind="shipping", label="ACS", icon="i-heroicons-truck"
+        ) == {
+            "kind": "shipping",
+            "label": "ACS",
+            "icon": "i-heroicons-truck",
+        }

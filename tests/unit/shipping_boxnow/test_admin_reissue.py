@@ -95,6 +95,32 @@ def test_a_live_parcel_is_left_alone():
     assert shipment.parcel_id == parcel
 
 
+def test_a_parcel_taken_over_after_p410_is_left_alone():
+    """A parcel taken over from BoxNow's listing has no delivery request id.
+
+    The creation task already returns it unchanged, so the button must not
+    claim to create one.
+    """
+    shipment = BoxNowShipmentFactory(
+        order=OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        ),
+        with_parcel=True,
+        parcel_state=BoxNowParcelState.NEW,
+    )
+    BoxNowShipment.objects.filter(pk=shipment.pk).update(
+        delivery_request_id=None
+    )
+    shipment.refresh_from_db()
+
+    with patch(TASK) as task:
+        _response, messages = _press(shipment)
+
+    task.assert_not_called()
+    assert messages == ["This shipment already has a BoxNow parcel."]
+
+
 def test_a_broker_failure_after_the_reset_keeps_the_request():
     shipment = _cancelled()
 

@@ -289,7 +289,7 @@ class BoxNowService:
         success and the local save:
 
         1. **Claim** — short atomic block: lock the shipment row,
-           short-circuit on existing ``delivery_request_id``, and stamp
+           short-circuit on an existing parcel (``has_parcel``), and stamp
            ``metadata['mint_started_at']``. The claim prevents two
            concurrent Celery workers from both POSTing to BoxNow and
            minting duplicate parcels.
@@ -325,10 +325,7 @@ class BoxNowService:
                     "Create a BoxNowShipment at order-creation time."
                 ) from exc
 
-            # A parcel taken over after a P410 has a ``parcel_id`` and no
-            # ``delivery_request_id`` (BoxNow's parcel listing does not
-            # carry one), so either identifier means "already created".
-            if shipment.delivery_request_id or shipment.parcel_id:
+            if shipment.has_parcel:
                 logger.info(
                     "create_shipment_for_order: order=%s already has "
                     "parcel_id=%s delivery_request_id=%s — returning "
@@ -1368,7 +1365,7 @@ class BoxNowService:
                 )
 
             metadata = dict(locked.metadata or {})
-            if locked.delivery_request_id or locked.parcel_id:
+            if locked.has_parcel:
                 metadata.setdefault("previous_parcels", []).append(
                     {
                         "delivery_request_id": locked.delivery_request_id,

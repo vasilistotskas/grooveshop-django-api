@@ -20,7 +20,9 @@ It only chooses the orders; each is decided by ``allocate_order`` on the
 live models under its row lock, so there is one definition of the headroom,
 of the duplicate-payment excess and of what "allocated" means. A source that
 owes a credit is allocated exactly once and is then left alone (a source
-that owes nothing is marked by a row of amount zero).
+that owes nothing is marked by a row of amount zero). No write path follows
+a source decided here, so when the order already has a receipt its credit
+documents are asked for here (``request_credit_documents``).
 
 Money that moved before its order's receipt row existed is left alone: the
 receipt was issued net of it and owes no credit. A stored-value attempt
@@ -35,7 +37,8 @@ import logging
 from django.db import transaction
 
 from order import credit_allocation
-from order.models import Order
+from order.credit_documents import request_credit_documents
+from order.models import Invoice, Order
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,8 @@ def backfill_credit_allocations() -> int:
     ):
         with transaction.atomic():
             order = Order.objects.select_for_update().get(pk=order_id)
-            done += credit_allocation.allocate_order(
-                order, request_credits=True
-            )
+            decided = credit_allocation.allocate_order(order)
+            if decided and Invoice.objects.filter(order=order).exists():
+                request_credit_documents(order.pk)
+            done += decided
     return done

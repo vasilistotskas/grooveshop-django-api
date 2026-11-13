@@ -462,7 +462,7 @@ class TestPollShipmentDeliveryTransitions:
         + COMPLETED emails or toasts. The DELIVERED transition fires
         normally; COMPLETED is suppressed."""
         from order.enum.status import OrderStatus, PaymentStatus
-        from order.tasks import _status_update_reservation_key
+        from order.models.order import status_update_reservation_key
 
         order = courier_cash_order(
             status=OrderStatus.SHIPPED,
@@ -482,7 +482,7 @@ class TestPollShipmentDeliveryTransitions:
         meta = order.metadata or {}
         # Email reservation flag is pre-stamped → email task short-
         # circuits the COMPLETED send.
-        completed_email_flag = _status_update_reservation_key(
+        completed_email_flag = status_update_reservation_key(
             order.id, OrderStatus.COMPLETED.value
         )
         assert meta.get(completed_email_flag) is True
@@ -818,7 +818,7 @@ class TestPollShipmentReturnTransitions:
         self, acs_client_mock_returned
     ):
         from order.enum.status import OrderStatus, PaymentStatus
-        from order.tasks import _status_update_reservation_key
+        from order.models.order import status_update_reservation_key
 
         order = courier_cash_order(
             status=OrderStatus.PROCESSING,
@@ -841,7 +841,7 @@ class TestPollShipmentReturnTransitions:
         # is on the way" email/toast moments before the return
         # notification would mislead.
         meta = order.metadata or {}
-        shipped_email_flag = _status_update_reservation_key(
+        shipped_email_flag = status_update_reservation_key(
             order.id, OrderStatus.SHIPPED.value
         )
         assert meta.get(shipped_email_flag) is True

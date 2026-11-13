@@ -40,6 +40,14 @@ order_stored_value_returned = Signal()
 # back to the customer, so no refund email, Meta event or gift-card
 # release follows. ``chargeback`` is the ledger row.
 order_charged_back = Signal()
+# Dispatched when a poll of the provider put a Stripe payment through
+# ``OrderService.handle_payment_succeeded``
+# (``OrderService.get_payment_status``), with what that returned. Keyword
+# arguments: ``outcome`` (the ``PaymentEventOutcome``, or ``None`` when no
+# order holds the intent) and ``payment_intent_id``. The receiver announces
+# it as the webhook announces its own (``announce_stripe_payment_applied``).
+# A signal and not a call, because the receivers import the service.
+order_stripe_payment_polled = Signal()
 # Dispatched the first time an order gets a tracking number / carrier.
 # Kept distinct from ``order_shipped`` (which fires on status transition
 # to SHIPPED) because admins sometimes add tracking before flipping

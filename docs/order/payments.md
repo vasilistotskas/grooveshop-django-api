@@ -51,7 +51,7 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  │   ├── select_for_update on Order row
                  │   ├── PaymentLedger.record_charge (CHARGE row, whatever state the order is in)
                  │   ├── mark_as_paid → payment_status=COMPLETED
-                 │   ├── _suppress_customer_status_notifications(PROCESSING) ← PR #7
+                 │   ├── suppress_customer_status_notifications(PROCESSING) ← PR #7
                  │   ├── update_order_status(PROCESSING)
                  │   └── _dispatch_shipment_creation_task (on_commit)
                  │
@@ -77,7 +77,8 @@ use the same function.
 (`OrderService.get_payment_status`) does not write the provider's status onto
 the row. A polled COMPLETED settles through the same
 `handle_payment_succeeded` (and announces through
-`announce_stripe_payment_applied`, shared with the webhook), only for a Stripe
+`announce_stripe_payment_applied`, shared with the webhook and reached by the
+`order_stripe_payment_polled` signal), only for a Stripe
 intent no gift-card purchase holds; any other provider's payment is settled by
 its webhook alone. `PayWayService.check_payment_status` (a second, caller-less
 polling writer) was removed.
@@ -89,7 +90,7 @@ gets a history row or a customer email. `handle_payment_failed` returns
 the same outcome, so a late failure never tells a customer who paid
 that their payment failed.
 
-The `_suppress_customer_status_notifications(PROCESSING)` call is
+The `suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an
 `order_payment_confirmed` email AND an `order_processing` email within ms
 (PR #7).
@@ -339,7 +340,7 @@ Differences from the Stripe path that are easy to miss:
   skipped — Viva trusts that ``status==PENDING`` before the
   payment landed.
 - **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
-  handler calls ``OrderService._suppress_customer_status_notifications(
+  handler calls ``OrderService.suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
   so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without

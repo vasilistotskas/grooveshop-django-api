@@ -65,7 +65,7 @@ These invariants need more than a table row. Each ends with its anchor.
   through the manager without end
   - Anchor: commit `6521f8f2a` (2026-05-01), the docstring of
     `OrderService.maybe_advance_to_completed`
-- `_suppress_customer_status_notifications` on chained transitions. A carrier
+- `suppress_customer_status_notifications` on chained transitions. A carrier
   DELIVERED that completes the order, a payment that moves it to PROCESSING
   (the confirmation email follows at once) and tracking added from PENDING
   each produce two customer messages milliseconds apart: without the

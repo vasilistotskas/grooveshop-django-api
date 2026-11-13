@@ -8,13 +8,13 @@ on:
       - 'docs/**'
       - 'LICENSE'
       - '.editorconfig'
+  # No ``paths-ignore`` here: a workflow GitHub skips for its paths leaves
+  # its required checks "Pending" and blocks the merge forever. The run
+  # starts on every pull request and the ``changes`` job decides whether
+  # there is code to test; ``gate`` always reports. The push trigger keeps
+  # its list: release_target.sh relies on a docs-only push starting no run.
   pull_request:
     branches: ['main']
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.editorconfig'
   workflow_dispatch:
 
 # A new push to a pull request cancels the run it supersedes: those runs
@@ -45,6 +45,32 @@ env:
   FORCE_COLOR: 1
 
 jobs:
+  changes:
+    name: Changes
+    # Does this pull request touch anything but the ignored paths
+    # (.github/scripts/ignored_paths.sh, pinned to ``on.push.paths-ignore``
+    # by a test)? A docs-only pull request skips every job that tests code,
+    # and ``gate`` still reports. Every other event always has code.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Does the change touch code
+        id: detect
+        run: |
+          if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
+            bash .github/scripts/pr_touches_code.sh >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
   tested-in-pr:
     name: Already tested in its PR
     # A push to main whose tree is exactly what a green pull_request run
@@ -79,6 +105,8 @@ jobs:
 
   security-scan:
     name: Security Scan (Trivy)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -110,8 +138,8 @@ jobs:
 
   quality:
     name: Code Quality
-    needs: tested-in-pr
-    if: needs.tested-in-pr.outputs.tested != 'true'
+    needs: [changes, tested-in-pr]
+    if: needs.changes.outputs.code == 'true' && needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -227,8 +255,8 @@ jobs:
 
   migrations:
     name: Migration Check
-    needs: tested-in-pr
-    if: needs.tested-in-pr.outputs.tested != 'true'
+    needs: [changes, tested-in-pr]
+    if: needs.changes.outputs.code == 'true' && needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Replays a deploy: the database is migrated at the BASE commit (PR
@@ -361,8 +389,8 @@ jobs:
 
   testing:
     name: Testing
-    needs: tested-in-pr
-    if: needs.tested-in-pr.outputs.tested != 'true'
+    needs: [changes, tested-in-pr]
+    if: needs.changes.outputs.code == 'true' && needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -596,8 +624,8 @@ jobs:
 
   test-mt:
     name: Testing (multi-tenant lane)
-    needs: tested-in-pr
-    if: needs.tested-in-pr.outputs.tested != 'true'
+    needs: [changes, tested-in-pr]
+    if: needs.changes.outputs.code == 'true' && needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     # Nearly all of the lane is the migration replays that build its
     # schemas: public, then the stores ``webside``, ``mt_smoke`` and
@@ -778,6 +806,40 @@ jobs:
           path: test-durations.json
           if-no-files-found: error
           retention-days: 14
+
+  gate:
+    name: CI Gate
+    # The one check branch protection requires. It always reports (the
+    # workflow starts on every pull request), so it can never stay
+    # "Pending". Green when every job it needs succeeded or was skipped
+    # for a reason: no code in the change, or a push to main already tested
+    # in its PR. Red when any failed or was cancelled, or when ``changes``
+    # itself did not succeed (every other job would then be skipped).
+    needs:
+      [changes, tested-in-pr, security-scan, quality, migrations, testing, test-mt, coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEEDS: ${{ toJSON(needs) }}
+      CODE: ${{ needs.changes.outputs.code }}
+      TESTED: ${{ needs.tested-in-pr.outputs.tested }}
+    steps:
+      - name: Every job that had to run succeeded
+        # ``needs.<job>.result`` is one of success, failure, cancelled or
+        # skipped. Only success and skipped can pass, so a value this file
+        # does not know fails too.
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(", ")')
+          [[ -z $bad ]] || { echo "::error::failed, cancelled or unknown: $bad"; exit 1; }
+          # A skipped ``changes`` would skip every test job: no verdict.
+          [[ $(echo "$NEEDS" | jq -r .changes.result) == success ]]             || { echo "::error::the change detection did not succeed"; exit 1; }
+          [[ $CODE == true || $CODE == false ]]             || { echo "::error::the change detection gave no verdict (code='$CODE')"; exit 1; }
+          if [[ $CODE == true && $TESTED != true ]]; then
+            skipped=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result == "skipped") | .key] | join(", ")')
+            [[ -z $skipped ]] || { echo "::error::skipped although code changed: $skipped"; exit 1; }
+          fi
 
   release:
     needs:

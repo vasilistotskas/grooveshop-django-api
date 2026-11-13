@@ -15,3 +15,6 @@ class ProductConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa
+        from product import availability
+
+        availability.connect()

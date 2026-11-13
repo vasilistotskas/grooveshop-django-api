@@ -262,6 +262,15 @@ A block can declare a setting in the catalogue's `data` map, beside `refs`
   for `source` in `product`, `blogPost`, `category`, `blogCategory`,
   `promotion`.
 
+A product rule (`{mode: "filter", ...}`) takes `categories`, `ordering`
+(`newest`, `mostViewed`, `mostLiked`, `topRated`, `discounted`, `priceAsc`,
+`priceDesc`), `limit` and an optional `stock`: `any` (or no key) ignores
+stock, `inStockFirst` puts products in stock before sold-out ones (each group
+in the chosen ordering), `inStockOnly` leaves sold-out products out. Any other
+value is `invalid_data_value`; a hand-picked list takes no `stock`
+(`unknown_filter`). Stock does not change the facets of the list (see the
+purge section below).
+
 `data_sources.check(declaration, value)` judges a value and says what it
 names. A value that is not valid yields problems and nothing else:
 `invalid_data_value`, `unknown_filter` (a key the list does not have) and
@@ -302,7 +311,19 @@ transaction commits and queue them in a per-store Redis set; the batched purge
 (`core.cache.invalidation`) then sends the storefront `builderDocuments`
 (document keys, at most 64 per call, `patterns` empty) through the
 `builder_documents` surface, and the storefront maps a key to its own routes.
-A save of `stock` or `updated_at` alone queues nothing. A promotion reaches
+A save of `stock` or `updated_at` alone queues nothing, unless it sells the
+product out or brings it back (stock crossing zero, `product.availability`): a
+list that puts products in stock first or leaves sold-out ones out then shows
+something else, so the save reaches the same pages a product edit does. The
+index records a list's facets, not its `stock` rule, so every list is reached.
+That one definition of "this stock save matters" serves both purges: the
+documents here and the `products` and `sitemap_seo` cache surfaces
+(`core.cache.invalidation.register_significant_save`), which are the data the
+pages are rebuilt from (`builderDataProduct`), the product pages and the
+listing. A `pre_save` of the product reads the stored category and stock in
+one query, so a sale costs no query for either purge. In a batched purge the
+surfaces that purge documents run last, so a page rendered in between never
+stores the data cache that is about to go. A promotion reaches
 the offer lists and every page that shows a product. Over-purging is safe;
 under-purging is the bug, so a list is matched by ANY of its facets.
 

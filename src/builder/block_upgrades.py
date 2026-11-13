@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 from collections import Counter
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from builder import pointers
@@ -32,6 +33,16 @@ from builder.validation import VERSIONED_TYPE
 
 Settings = dict[str, Any]
 Upgrade = Callable[[Settings], Settings]
+
+
+@dataclass(frozen=True)
+class SchemaUpgrade:
+    """An upgrade that reads its block's CURRENT schema, the catalogue's: what
+    it may write is what that schema allows now, as the storefront's upgrade
+    reads its own list as it is now."""
+
+    run: Callable[[Settings, dict[str, Any]], Settings]
+
 
 #: What the first product rails called their orderings, and what each sorted by.
 LEGACY_PRODUCT_ORDERING = {
@@ -138,6 +149,40 @@ def _hero_slide(settings: Settings) -> Settings:
     return kept
 
 
+def _icon_names(schema: dict[str, Any]) -> list[str]:
+    """The icons a block's ``icon`` setting takes: the enum of the schema the
+    catalogue states for it (the storefront's ``BUILDER_ICONS``)."""
+    icon = (schema.get("properties") or {}).get("icon") or {}
+    names = icon.get("enum")
+    if not isinstance(names, list):
+        raise NoUpgradePath("the block's icon setting lists no icons")
+    return [name for name in names if isinstance(name, str)]
+
+
+def _icon_onto_list(settings: Settings, schema: dict[str, Any]) -> Settings:
+    """An icon setting was free text and takes one of a list now: a saved name
+    is written as its entry (``i-lucide:shield`` is ``i-lucide-shield``, which
+    the icon sets read alike) and one the list does not hold is left out, the
+    setting being optional. The storefront's ``upgradeIconSetting``."""
+    icon = settings.get("icon")
+    if not isinstance(icon, str):
+        return settings
+    listed = next(
+        (
+            name
+            for name in _icon_names(schema)
+            if name in (icon, icon.replace(":", "-", 1))
+        ),
+        None,
+    )
+    kept = {key: value for key, value in settings.items() if key != "icon"}
+    return {**kept, "icon": listed} if listed else kept
+
+
+#: Every block whose ``icon`` setting took the list, at the version it had.
+_ICON_ONTO_LIST = SchemaUpgrade(_icon_onto_list)
+
+
 def _title_into_heading(settings: Settings) -> Settings:
     """A band's heading was two settings, and every component drew ``heading``
     first: the one it drew stays, under the one name."""
@@ -150,7 +195,7 @@ def _title_into_heading(settings: Settings) -> Settings:
 
 #: ``{block type: {version: the upgrade to the next one}}``, with the arguments
 #: of each block's ``upgrade`` in the storefront's ``app/blocks/*.block.ts``.
-UPGRADES: dict[str, dict[int, Upgrade]] = {
+UPGRADES: dict[str, dict[int, Upgrade | SchemaUpgrade]] = {
     "featured_products": {
         1: _product_rail("featured", 8, 24),
         2: _title_into_heading,
@@ -163,7 +208,7 @@ UPGRADES: dict[str, dict[int, Upgrade]] = {
         1: _product_rail("newest", 8, 24),
         2: _title_into_heading,
     },
-    "blog_posts_grid": {1: _blog_rail(3, 24)},
+    "blog_posts_grid": {1: _blog_rail(3, 24), 2: _ICON_ONTO_LIST},
     "blog_posts_list": {1: _blog_rail(3, 24)},
     "blog_posts_carousel": {1: _blog_rail(6, 12)},
     "blog_categories": {1: _blog_categories(10)},
@@ -179,13 +224,21 @@ UPGRADES: dict[str, dict[int, Upgrade]] = {
     "story_timeline": {1: _title_into_heading},
     "testimonials": {1: _title_into_heading},
     "trust_badges": {1: _title_into_heading},
+    "feature_item": {1: _ICON_ONTO_LIST},
+    "footer_column": {1: _ICON_ONTO_LIST},
+    "nav_link": {1: _ICON_ONTO_LIST},
+    "timeline_entry": {1: _ICON_ONTO_LIST},
+    "trust_badge": {1: _ICON_ONTO_LIST},
 }
 
 
-def upgrade_node(node: dict[str, Any], current: int) -> dict[str, Any]:
-    """*node* at version *current* of its block; its children are left to
-    :func:`upgrade_document`, as the storefront's ``upgradeNode`` leaves them
-    to the walk over the document."""
+def upgrade_node(
+    node: dict[str, Any], definition: BlockDefinition
+) -> dict[str, Any]:
+    """*node* at the current version of its block, *definition*; its children
+    are left to :func:`upgrade_document`, as the storefront's ``upgradeNode``
+    leaves them to the walk over the document."""
+    current = definition.version
     match = VERSIONED_TYPE.match(node["type"])
     if match is None:
         raise NoUpgradePath(f"{node['type']} is not <type>@<version>")
@@ -197,7 +250,11 @@ def upgrade_node(node: dict[str, Any], current: int) -> dict[str, Any]:
         step = UPGRADES.get(name, {}).get(version)
         if step is None:
             raise NoUpgradePath(f"no upgrade from {name}@{version}")
-        settings = step(settings)
+        settings = (
+            step.run(settings, definition.schema)
+            if isinstance(step, SchemaUpgrade)
+            else step(settings)
+        )
     return {**node, "type": f"{name}@{current}", "settings": settings}
 
 
@@ -215,12 +272,12 @@ def upgrade_translations(
     repeats the draft's text is left out, since the setting falls back to that
     text anyway. The storefront's ``upgradeNodeTranslations``, held to the same
     cases."""
-    upgraded = upgrade_node(node, definition.version)
+    upgraded = upgrade_node(node, definition)
     if upgraded is node:
         return translations
     translated = upgrade_node(
         {**node, "settings": localised(node["settings"], translations)},
-        definition.version,
+        definition,
     )
     moved: dict[str, Any] = {}
     for declared in definition.translatable:
@@ -264,7 +321,7 @@ def upgrade_document(
         if definition is None or int(match.group(2)) >= definition.version:
             continue
         before[node_id] = (node, definition)
-        parent[node_id] = upgrade_node(node, definition.version)
+        parent[node_id] = upgrade_node(node, definition)
         moved[versioned] += 1
     return upgraded, _upgraded_overlay(i18n, before), moved
 

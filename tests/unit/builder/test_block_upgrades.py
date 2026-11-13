@@ -19,6 +19,7 @@ import pytest
 from builder.block_upgrades import (
     UPGRADES,
     NoUpgradePath,
+    SchemaUpgrade,
     upgrade_document,
     upgrade_node,
     upgrade_translations,
@@ -56,18 +57,16 @@ def catalogue(*, translatable: tuple[str, ...] = (), **versions: int):
     )
 
 
+def block_of(case: dict[str, Any]):
+    return seed_catalogue().get(case["before"]["type"].partition("@")[0])
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["name"])
 def test_a_node_upgrades_as_the_storefront_upgrades_it(case):
-    current = int(case["after"]["type"].partition("@")[2])
-
-    assert upgrade_node(case["before"], current) == case["after"]
+    assert upgrade_node(case["before"], block_of(case)) == case["after"]
 
 
 TRANSLATED = [case for case in CASES if "translations" in case]
-
-
-def block_of(case: dict[str, Any]):
-    return seed_catalogue().get(case["before"]["type"].partition("@")[0])
 
 
 @pytest.mark.parametrize("case", TRANSLATED, ids=lambda case: case["name"])
@@ -89,11 +88,9 @@ def test_a_language_reads_what_it_read_across_an_upgrade(case):
 
     read_before = upgrade_node(
         {**node, "settings": localised(node["settings"], translations)},
-        definition.version,
+        definition,
     )["settings"]
-    read_after = localised(
-        upgrade_node(node, definition.version)["settings"], moved
-    )
+    read_after = localised(upgrade_node(node, definition)["settings"], moved)
 
     for pointer in definition.translatable:
         name = pointer.removeprefix("/")
@@ -127,12 +124,18 @@ def test_every_upgrade_here_has_a_case():
 def test_a_node_at_its_current_version_is_left_alone():
     node = {"type": "offers_preview@2", "settings": {"offers": {"limit": 1}}}
 
-    assert upgrade_node(node, 2) is node
+    assert (
+        upgrade_node(node, catalogue(offers_preview=2).get("offers_preview"))
+        is node
+    )
 
 
 def test_a_version_nothing_reaches_is_refused_rather_than_guessed_at():
     with pytest.raises(NoUpgradePath, match="no upgrade from about_content@1"):
-        upgrade_node({"type": "about_content@1", "settings": {}}, 2)
+        upgrade_node(
+            {"type": "about_content@1", "settings": {}},
+            catalogue(about_content=2).get("about_content"),
+        )
 
 
 class TestDocument:
@@ -273,3 +276,105 @@ class TestOverlay:
         assert i18n == {
             "en": {"old": {"/title": "Title"}, "new": {"/heading": "New"}}
         }
+
+
+def icon_block(*names: str):
+    """A block whose icon setting takes *names*, as the catalogue states it."""
+    return parse_catalogue(
+        {
+            "hash": "h",
+            "blocks": [
+                {
+                    "type": "nav_link",
+                    "version": 2,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "icon": {"type": "string", "enum": list(names)},
+                        },
+                    },
+                    "translatable": [],
+                    "linkRefs": [],
+                    "kinds": ["block"],
+                }
+            ],
+        }
+    ).get("nav_link")
+
+
+class TestIconOntoTheList:
+    """The icon settings took the storefront's list (``BUILDER_ICONS``): what
+    a node saved before writes as is the list's entry, read off the catalogue
+    the store is checked against, so the port keeps what the storefront keeps
+    however the list grows."""
+
+    def node(self, **settings):
+        return {
+            "type": "nav_link@1",
+            "settings": {"label": "Βοήθεια", **settings},
+        }
+
+    @pytest.mark.parametrize(
+        ("saved", "entry"),
+        [
+            ("i-lucide-shield", "i-lucide-shield"),
+            ("i-lucide:shield", "i-lucide-shield"),
+            ("i-fa6-solid:shield", "i-fa6-solid-shield"),
+        ],
+    )
+    def test_a_saved_icon_is_written_as_its_entry(self, saved, entry):
+        block = icon_block("i-lucide-shield", "i-fa6-solid-shield")
+
+        upgraded = upgrade_node(self.node(icon=saved), block)
+
+        assert upgraded == {
+            "type": "nav_link@2",
+            "settings": {"label": "Βοήθεια", "icon": entry},
+        }
+
+    def test_an_icon_the_list_does_not_hold_is_left_out(self):
+        upgraded = upgrade_node(
+            self.node(icon="i-lucide-star"), icon_block("i-lucide-shield")
+        )
+
+        assert upgraded["settings"] == {"label": "Βοήθεια"}
+
+    def test_a_node_without_an_icon_is_only_renumbered(self):
+        upgraded = upgrade_node(self.node(), icon_block("i-lucide-shield"))
+
+        assert upgraded == {
+            "type": "nav_link@2",
+            "settings": {"label": "Βοήθεια"},
+        }
+
+    def test_an_icon_added_to_the_list_later_is_kept(self):
+        block = icon_block("i-lucide-shield", "i-lucide-star")
+
+        upgraded = upgrade_node(self.node(icon="i-lucide-star"), block)
+
+        assert upgraded["settings"]["icon"] == "i-lucide-star"
+
+    def test_a_catalogue_that_lists_no_icons_is_refused_rather_than_guessed_at(
+        self,
+    ):
+        block = catalogue(nav_link=2).get("nav_link")
+
+        with pytest.raises(NoUpgradePath, match="lists no icons"):
+            upgrade_node(self.node(icon="i-lucide-shield"), block)
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "blog_posts_grid",
+            "feature_item",
+            "footer_column",
+            "nav_link",
+            "timeline_entry",
+            "trust_badge",
+        ],
+    )
+    def test_every_block_with_an_icon_setting_takes_the_step(self, name):
+        last = max(UPGRADES[name])
+
+        assert isinstance(UPGRADES[name][last], SchemaUpgrade)

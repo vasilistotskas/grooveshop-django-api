@@ -27,7 +27,7 @@
               "text": "Ξεκινάμε με 12 κωδικούς καλωδίων.",
               "title": "Τα πρώτα βήματα"
             },
-            "type": "timeline_entry@1"
+            "type": "timeline_entry@2"
           },
           "3907e9e1-a7f8-410e-9b61-f68766b95c3d-2": {
             "settings": {
@@ -36,7 +36,7 @@
               "text": "Μετακομίζουμε σε δικό μας χώρο.",
               "title": "Πρώτη αποθήκη"
             },
-            "type": "timeline_entry@1"
+            "type": "timeline_entry@2"
           },
           "3907e9e1-a7f8-410e-9b61-f68766b95c3d-3": {
             "settings": {
@@ -45,7 +45,7 @@
               "text": "Συνεργασία με ACS και BoxNow.",
               "title": "Πανελλαδική αποστολή"
             },
-            "type": "timeline_entry@1"
+            "type": "timeline_entry@2"
           },
           "3907e9e1-a7f8-410e-9b61-f68766b95c3d-4": {
             "settings": {
@@ -54,7 +54,7 @@
               "text": "Ανοίγουμε πρόγραμμα για επαγγελματίες.",
               "title": "Χονδρική"
             },
-            "type": "timeline_entry@1"
+            "type": "timeline_entry@2"
           }
         },
         "settings": {
@@ -132,7 +132,7 @@
               "text": "Από την αποθήκη μας στη Θεσσαλονίκη.",
               "title": "Αποστολή σε 1-3 ημέρες"
             },
-            "type": "feature_item@1"
+            "type": "feature_item@2"
           },
           "ea50d7aa-e4ca-4e48-ae5e-3fb27944c009-2": {
             "settings": {
@@ -140,7 +140,7 @@
               "text": "Σε όλα τα προϊόντα μας.",
               "title": "Εγγύηση 2 ετών"
             },
-            "type": "feature_item@1"
+            "type": "feature_item@2"
           },
           "ea50d7aa-e4ca-4e48-ae5e-3fb27944c009-3": {
             "settings": {
@@ -148,7 +148,7 @@
               "text": "14 ημέρες, χωρίς ερωτήσεις.",
               "title": "Δωρεάν επιστροφή"
             },
-            "type": "feature_item@1"
+            "type": "feature_item@2"
           }
         },
         "settings": {

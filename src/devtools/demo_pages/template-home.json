@@ -71,7 +71,7 @@
               "kind": "shipping",
               "label": "Δωρεάν αποστολή από 50€"
             },
-            "type": "trust_badge@1"
+            "type": "trust_badge@2"
           },
           "26c15d55-ac34-4aba-83bd-e9452bbf76df-2": {
             "settings": {
@@ -79,7 +79,7 @@
               "kind": "custom",
               "label": "Επιστροφές 30 ημερών"
             },
-            "type": "trust_badge@1"
+            "type": "trust_badge@2"
           },
           "26c15d55-ac34-4aba-83bd-e9452bbf76df-3": {
             "settings": {
@@ -87,7 +87,7 @@
               "kind": "custom",
               "label": "Εγγύηση 2 ετών"
             },
-            "type": "trust_badge@1"
+            "type": "trust_badge@2"
           },
           "26c15d55-ac34-4aba-83bd-e9452bbf76df-4": {
             "settings": {
@@ -95,7 +95,7 @@
               "kind": "payment",
               "label": "Ασφαλείς πληρωμές"
             },
-            "type": "trust_badge@1"
+            "type": "trust_badge@2"
           },
           "26c15d55-ac34-4aba-83bd-e9452bbf76df-5": {
             "settings": {
@@ -109,7 +109,7 @@
               "kind": "ai",
               "label": "Έτοιμο για AI agents"
             },
-            "type": "trust_badge@1"
+            "type": "trust_badge@2"
           }
         },
         "settings": {
@@ -189,7 +189,7 @@
             "limit": 3
           }
         },
-        "type": "blog_posts_grid@2"
+        "type": "blog_posts_grid@3"
       },
       "7ea1f9de-48d6-47da-bcd2-e39c6d901898": {
         "settings": {

@@ -26,35 +26,35 @@
                   "contentPage": "cookies",
                   "label": "Πολιτική Cookies"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "39fa1fbf-b813-47f6-b478-d6acb331344b": {
                 "settings": {
                   "contentPage": "privacy",
                   "label": "Πολιτική Απορρήτου"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "60662956-2ba4-4b2a-bbff-0d5cec12be9f": {
                 "settings": {
                   "contentPage": "terms",
                   "label": "Όροι Χρήσης"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "ab620003-6e14-4df9-bf28-54d5bf12623d": {
                 "settings": {
                   "contentPage": "return-policy",
                   "label": "Πολιτική Επιστροφών"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               }
             },
             "settings": {
               "icon": "i-heroicons-rectangle-group",
               "label": "Όροι & Προϋποθέσεις"
             },
-            "type": "footer_column@1"
+            "type": "footer_column@2"
           },
           "87389a9a-e3c2-4409-aacd-4ac369166c72": {
             "blockOrder": [
@@ -67,21 +67,21 @@
                   "label": "Σχετικά με εμάς",
                   "page": "about"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "dafe0b08-b6b6-4d3b-80ea-c169540e8e1f": {
                 "settings": {
                   "label": "Blog",
                   "route": "/blog"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               }
             },
             "settings": {
               "icon": "i-heroicons-information-circle",
               "label": "Η εταιρεία"
             },
-            "type": "footer_column@1"
+            "type": "footer_column@2"
           },
           "8cbaab6f-7f90-4172-9eb8-a8089af402d1": {
             "blockOrder": [
@@ -96,35 +96,35 @@
                   "label": "Επικοινωνία",
                   "page": "contact"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "a6fb1722-dc35-4f47-ac22-3d204cf7ef45": {
                 "settings": {
                   "contentPage": "faq",
                   "label": "Συχνές Ερωτήσεις"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "bdb2a4c5-83e2-4eb6-9df5-148f89fa6753": {
                 "settings": {
                   "contentPage": "shipping-info",
                   "label": "Πληροφορίες Αποστολής"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "cc6b21e9-3028-4fff-997c-fb1c38fd8369": {
                 "settings": {
                   "label": "Αξιολόγησε μας",
                   "page": "feedback"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               }
             },
             "settings": {
               "icon": "i-heroicons-lifebuoy",
               "label": "Εξυπηρέτηση"
             },
-            "type": "footer_column@1"
+            "type": "footer_column@2"
           },
           "afb4a7da-9c56-482b-9c98-250b781e4115": {
             "blockOrder": [
@@ -139,35 +139,35 @@
                   "label": "Όλα τα προϊόντα",
                   "route": "/products"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "8aac0bdf-53e6-4df8-bfb7-e0f745eacd07": {
                 "settings": {
                   "label": "Προσφορές",
                   "route": "/offers"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "c335e1d3-572e-44c6-8ed2-57a36a715039": {
                 "settings": {
                   "label": "Πρόγραμμα Επιβράβευσης",
                   "route": "/loyalty-program"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               },
               "ce5ad2f1-61fc-4e02-bad7-a4663e7e51d4": {
                 "settings": {
                   "label": "Δωροκάρτες",
                   "route": "/gift-cards"
                 },
-                "type": "nav_link@1"
+                "type": "nav_link@2"
               }
             },
             "settings": {
               "icon": "i-heroicons-shopping-bag",
               "label": "Κατάστημα"
             },
-            "type": "footer_column@1"
+            "type": "footer_column@2"
           }
         },
         "settings": {},

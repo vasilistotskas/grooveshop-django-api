@@ -70,6 +70,9 @@ class BlockDefinition:
     templates: frozenset[str] | None
     feature: str | None
     deprecated: bool
+    #: ``presets``: id -> the settings that preset starts a new block with
+    #: (``default`` is the one the editor inserts).
+    presets: dict[str, dict[str, Any]]
     validator: Validator = field(compare=False, repr=False)
 
     @property
@@ -173,6 +176,10 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
         templates=_optional_set(raw.get("templates")),
         feature=raw.get("feature"),
         deprecated=bool(raw.get("deprecated", False)),
+        presets={
+            str(preset["id"]): dict(preset.get("settings") or {})
+            for preset in raw.get("presets") or ()
+        },
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),

@@ -19,35 +19,35 @@
               "label": "Επικοινωνία",
               "page": "contact"
             },
-            "type": "nav_link@1"
+            "type": "nav_link@2"
           },
           "6576c7b7-4c52-41f7-8544-75e584c076be": {
             "settings": {
               "label": "Κατάστημα",
               "route": "/products"
             },
-            "type": "nav_link@1"
+            "type": "nav_link@2"
           },
           "b46daa57-90ed-4a50-bd3e-071dd09aa23f": {
             "settings": {
               "label": "Αρχική",
               "route": "/"
             },
-            "type": "nav_link@1"
+            "type": "nav_link@2"
           },
           "c6ebd634-d037-4563-b13f-bd00b691b21d": {
             "settings": {
               "label": "Δωροκάρτες",
               "route": "/gift-cards"
             },
-            "type": "nav_link@1"
+            "type": "nav_link@2"
           },
           "caeb923b-2f10-43c7-ad11-8fea3284fe36": {
             "settings": {
               "label": "Blog",
               "route": "/blog"
             },
-            "type": "nav_link@1"
+            "type": "nav_link@2"
           }
         },
         "settings": {},

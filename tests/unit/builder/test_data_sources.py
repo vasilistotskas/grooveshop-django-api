@@ -106,3 +106,75 @@ class TestTheCataloguesLimits:
                     "maxQueryLimit": 24,
                 }
             )
+
+
+class TestTheProductStockKey:
+    DECLARATION = {
+        "field": "query",
+        "source": "product",
+        "onEmpty": "hide",
+        "maxLimit": 6,
+    }
+
+    def _check(self, **extra):
+        value = {"mode": "filter", "ordering": "newest", "limit": 6, **extra}
+        return data_sources.check(self.DECLARATION, value, LIMITS)
+
+    @pytest.mark.parametrize("stock", data_sources.PRODUCT_STOCK)
+    def test_each_stock_value_is_accepted(self, stock):
+        outcome = self._check(stock=stock)
+
+        assert outcome.valid
+        assert outcome.deps == {("queryProduct", "*")}
+
+    def test_no_stock_key_is_accepted(self):
+        assert self._check().valid
+
+    def test_stock_does_not_change_the_facets(self):
+        outcome = self._check(categories=[3], stock="inStockOnly")
+
+        assert outcome.deps == {("queryProduct", "category:3")}
+
+    @pytest.mark.parametrize("bad", ["soldOut", "", "INSTOCKONLY", None])
+    def test_another_value_is_refused(self, bad):
+        outcome = self._check(stock=bad)
+
+        assert [(p.path, p.code) for p in outcome.problems] == [
+            ("/stock", data_sources.INVALID)
+        ]
+        assert outcome.deps == set()
+
+    @pytest.mark.parametrize("bad", [True, 1, ["inStockOnly"], {"a": 1}])
+    def test_a_value_that_is_not_a_string_is_refused(self, bad):
+        outcome = self._check(stock=bad)
+
+        assert [(p.path, p.code) for p in outcome.problems] == [
+            ("/stock", data_sources.INVALID)
+        ]
+
+    def test_a_picked_list_takes_no_stock(self):
+        outcome = data_sources.check(
+            self.DECLARATION,
+            {"mode": "picked", "ids": [1], "stock": "inStockOnly"},
+            LIMITS,
+        )
+
+        assert [(p.path, p.code) for p in outcome.problems] == [
+            ("/stock", data_sources.UNKNOWN_FILTER)
+        ]
+
+    def test_a_blog_post_list_takes_no_stock(self):
+        outcome = data_sources.check(
+            {**self.DECLARATION, "source": "blogPost"},
+            {
+                "mode": "filter",
+                "ordering": "newest",
+                "limit": 6,
+                "stock": "any",
+            },
+            LIMITS,
+        )
+
+        assert [(p.path, p.code) for p in outcome.problems] == [
+            ("/stock", data_sources.UNKNOWN_FILTER)
+        ]

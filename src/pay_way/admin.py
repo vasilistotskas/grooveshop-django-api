@@ -225,6 +225,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Activate selected payment methods"),
+        permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -238,6 +239,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     @action(
         description=_("Deactivate selected payment methods"),
+        permissions=["change"],
         variant=ActionVariant.WARNING,
         icon="cancel",
     )

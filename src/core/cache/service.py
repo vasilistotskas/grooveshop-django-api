@@ -108,6 +108,21 @@ class PurgeReport:
         ]
 
 
+def _documents_last(codes: list[str]) -> list[str]:
+    """``codes`` with the surfaces that purge the page builder's documents
+    last. The data a page is built from goes first: a page rendered between
+    the two purges would read the cache that is still stale and store it
+    again."""
+
+    def purges_documents(code: str) -> bool:
+        try:
+            return get_surface(code).purges_builder_documents
+        except KeyError:
+            return False
+
+    return sorted(codes, key=purges_documents)
+
+
 class CacheService:
     """Top-level cache management API used by admin views, management
     commands, signals, and tests.
@@ -143,7 +158,9 @@ class CacheService:
     ) -> PurgeReport:
         report = PurgeReport(dry_run=dry_run)
 
-        ordered = expand_with_related(codes) if include_related else list(codes)
+        ordered = _documents_last(
+            expand_with_related(codes) if include_related else list(codes)
+        )
 
         purged_pages = False
         for code in ordered:

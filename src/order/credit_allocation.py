@@ -746,7 +746,7 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
     return out
 
 
-def allocate_order(order: Order, *, request_credits: bool = False) -> int:
+def allocate_order(order: Order) -> int:
     """Decide every source of *order* that has no allocation yet, oldest
     first, each over what the ones before it left. The caller holds the
     order's row lock, and the sources are read inside it.
@@ -759,8 +759,9 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
     anything else reads or takes the room. A read path (a specimen render,
     the admin) never calls it. Returns how many sources were decided. A
     write path issues the credits itself (or its caller does, once the money
-    is booked); the periodic task passes *request_credits*, so a source
-    decided on an order that already has a receipt is credited now.
+    is booked); the periodic task asks for them
+    (``order.credit_allocation_backfill``), so a source decided on an order
+    that already has a receipt is credited then.
 
     Sources are decided strictly oldest first, and the first one that
     cannot be decided yet (:func:`allocate_source`: a claim still PENDING
@@ -809,14 +810,6 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
         )
         if newest is not None:
             PaymentLedger.sync_overcharge(order, newest)
-    if (
-        done
-        and request_credits
-        and Invoice.objects.filter(order=order).exists()
-    ):
-        from order.credit_documents import request_credit_documents
-
-        request_credit_documents(order.pk)
     return done
 
 

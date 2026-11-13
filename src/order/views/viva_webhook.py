@@ -32,6 +32,7 @@ from order.enum.status import (
 )
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.payment import order_viva_codes
 from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
@@ -1148,21 +1149,6 @@ def _gift_card_payment_problem(purchase, verified_data) -> str | None:
     return None
 
 
-def order_viva_codes(order) -> set[str]:
-    """Every Viva orderCode ever issued for this order.
-
-    The mirror of :func:`viva_order_code_q`, evaluated in Python: each
-    ``create_checkout_session`` mints a fresh code and appends it to
-    ``metadata['viva_order_codes']``.
-    """
-    # Exactly what the resolver matches, nothing more: ``payment_id``
-    # holds a TransactionId once an order is paid, never an orderCode.
-    metadata = order.metadata or {}
-    return {
-        str(code) for code in (metadata.get("viva_order_codes") or []) if code
-    }
-
-
 def _transaction_belongs_to_order(order, verified_data) -> bool:
     """Does the VERIFIED transaction actually belong to this order?
 
@@ -1534,7 +1520,7 @@ def _handle_payment_created(order, event_data, transaction_id):
         # Without this pre-stamp the post-save signal would fire a
         # second PROCESSING email + toast within ms of the
         # confirmation email.
-        OrderService._suppress_customer_status_notifications(
+        OrderService.suppress_customer_status_notifications(
             order, OrderStatus.PROCESSING.value
         )
         order.status = OrderStatus.PROCESSING

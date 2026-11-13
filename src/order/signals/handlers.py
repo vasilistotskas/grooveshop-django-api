@@ -53,6 +53,7 @@ from order.signals import (
     order_shipped,
     order_status_changed,
     order_stored_value_returned,
+    order_stripe_payment_polled,
 )
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
@@ -337,7 +338,7 @@ def handle_order_status_changed(
     )
 
     # Customer-notifications suppression flag (set by
-    # OrderService._suppress_customer_status_notifications for chained
+    # OrderService.suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
     # email/toast and a second one ms later would feel like spam, e.g.
     # the DELIVERED → COMPLETED auto-advance). Gates both the email and
@@ -784,7 +785,8 @@ def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
     """What follows a Stripe payment the order service actually applied:
     the history row, the confirmation email and the live toast.
 
-    Shared by the webhook and by the polled-status path, which settles
+    Shared by the webhook and by the polled-status path
+    (``handle_stripe_payment_polled``), which settles
     through the same ``OrderService.handle_payment_succeeded``. A stale
     event, a repeat, or a charge on a canceled order changes nothing to
     confirm: no history row, no "order confirmed" email.
@@ -802,6 +804,18 @@ def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
         dispatch_on_commit(send_order_confirmation_email, [order.id])
         if order.user_id:
             dispatch_on_commit(notify_payment_confirmed_live, [order.id])
+
+
+@receiver(
+    order_stripe_payment_polled,
+    dispatch_uid="order.handle_stripe_payment_polled",
+)
+def handle_stripe_payment_polled(
+    sender: Any, outcome, payment_intent_id: str, **kwargs: Any
+) -> None:
+    """A poll put a Stripe payment through the order service: announce it
+    as the webhook announces its own."""
+    announce_stripe_payment_applied(outcome, payment_intent_id)
 
 
 @djstripe_receiver("payment_intent.payment_failed")

@@ -103,6 +103,7 @@ product.tasks.send_review_pending_alert
 product.tasks.sync_price_records
 promotion.tasks.reindex_offer_products_task
 promotion.tasks.reindex_offer_window_changes_task
+push_force_logout
 recommendation.tasks.learn_slot_weights
 recommendation.tasks.purge_expired_recommendation_events
 recommendation.tasks.recompute_all_candidates

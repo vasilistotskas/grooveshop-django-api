@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -356,6 +357,41 @@ def export_user_data_task(self, export_id: int) -> dict:
             "export_user_data_task: failed for export %s", export_id
         )
         raise
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    name="push_force_logout",
+    max_retries=3,
+    # ``send_to_user_group`` raises the builtin ``TimeoutError`` at its
+    # deadline, which ``TRANSIENT_ERRORS`` already retries.
+    autoretry_for=TRANSIENT_ERRORS,
+    retry_backoff=True,
+    soft_time_limit=settings.NOTIFICATION_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.NOTIFICATION_TASK_TIME_LIMIT,
+)
+def push_force_logout(self, user_id: int, revoked_at: float) -> None:
+    """Tell the user's open sockets that their tokens were revoked.
+
+    Queued after a password change, a password reset, an email change or
+    an account deletion, which revoke the tokens themselves before this
+    runs: the push only closes the tabs sooner, so it never decides the
+    request's answer (#673). ``revoked_at`` (a Unix timestamp taken when
+    the tokens were revoked) lets a socket opened by a later sign-in keep
+    running when this push arrives after it.
+    """
+    from channels.layers import get_channel_layer
+
+    from notification.groups import send_to_user_group
+
+    layer = get_channel_layer()
+    if layer:
+        send_to_user_group(
+            layer,
+            user_id,
+            {"type": "force.logout", "revoked_at": revoked_at},
+        )
 
 
 @celery_app.task(

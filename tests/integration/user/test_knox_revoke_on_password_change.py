@@ -34,6 +34,7 @@ from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 AuthToken = get_token_model()
+PUSH = "user.tasks.push_force_logout.apply_async"
 
 pytestmark = pytest.mark.django_db
 
@@ -136,47 +137,59 @@ class TestRevokeKnoxTokensOnPasswordChange:
         assert AuthToken.objects.filter(user=user_b).count() == 0
         assert AuthToken.objects.filter(user=user_c).count() == 2
 
-    def test_force_logout_broadcast_is_attempted_after_token_revocation(self):
-        """_broadcast_force_logout is called even when the channel layer is
-        available; here we verify it is invoked with the correct user group."""
+    def test_the_force_logout_push_is_queued_not_sent_in_the_request(self):
+        """A channel layer that fails never turns the saved change into an error.
+
+        The push follows the change on Celery (#673): the request revokes the
+        tokens, queues the push and never waits on the channel layer.
+        """
+        from unittest.mock import AsyncMock, MagicMock
+
+        from django.test import TestCase
+
+        from tests.utils.dispatch import assert_published_once
+
         user = UserAccountFactory()
-        _create_tokens(user, 1)
-
-        group_sends: list[tuple] = []
-
-        def fake_group_send(group, message):
-            group_sends.append((group, message))
-
-        fake_layer = type(
-            "_FakeLayer",
-            (),
-            {"group_send": staticmethod(fake_group_send)},
-        )()
+        _create_tokens(user, 2)
+        layer = MagicMock()
+        layer.group_send = AsyncMock(side_effect=TimeoutError)
 
         with (
-            patch("channels.layers.get_channel_layer", return_value=fake_layer),
-            patch(
-                "asgiref.sync.async_to_sync",
-                side_effect=lambda fn: fn,
-            ),
+            patch("channels.layers.get_channel_layer", return_value=layer),
+            patch(PUSH) as push,
+            TestCase.captureOnCommitCallbacks(execute=True),
         ):
-            password_changed.send(
-                sender=User,
-                request=None,
-                user=user,
-            )
+            password_changed.send(sender=User, request=None, user=user)
 
-        # Tokens revoked.
         assert AuthToken.objects.filter(user=user).count() == 0
-        # WS broadcast called with the user's tenant-scoped personal group.
-        # Tests run in the public schema (DATABASE_ROUTERS disabled in
-        # conftest), so the group prefix is "tenant_public".
-        from notification.groups import user_group
+        assert_published_once(push)
+        user_id, revoked_at = push.call_args.kwargs["args"]
+        assert user_id == user.pk
+        assert isinstance(revoked_at, float)
+        layer.group_send.assert_not_awaited()
 
-        expected_group = user_group("public", user.pk)
-        assert any(group == expected_group for group, _ in group_sends), (
-            f"Expected group_send to target {expected_group}, got {group_sends}"
-        )
+    def test_the_force_logout_task_reaches_the_users_sockets(self):
+        from asgiref.sync import async_to_sync
+        from channels.layers import InMemoryChannelLayer
+
+        from notification.groups import user_group
+        from user.tasks import push_force_logout
+
+        user = UserAccountFactory()
+        # A socket of the user's, joined to their tenant-scoped personal
+        # group. Tests run in the public schema (DATABASE_ROUTERS disabled
+        # in conftest), so the group prefix is "tenant_public".
+        layer = InMemoryChannelLayer()
+        channel = async_to_sync(layer.new_channel)()
+        async_to_sync(layer.group_add)(user_group("public", user.pk), channel)
+
+        with patch("channels.layers.get_channel_layer", return_value=layer):
+            push_force_logout.apply(args=[user.pk, 1_800_000_000.0]).get()
+
+        assert async_to_sync(layer.receive)(channel) == {
+            "type": "force.logout",
+            "revoked_at": 1_800_000_000.0,
+        }
 
 
 class TestRevocationSignalHandlerRegistration:

@@ -1,13 +1,12 @@
 import logging
 
-from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from django.db import connection
+from django.conf import settings
 
 from core import celery_app
 from core.retry import TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
-from notification.groups import user_group
+from notification.groups import send_to_user_group
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +16,12 @@ logger = logging.getLogger(__name__)
     bind=True,
     name="Send Notification Task",
     max_retries=3,
+    # ``send_to_user_group`` raises the builtin ``TimeoutError`` at its
+    # deadline, which ``TRANSIENT_ERRORS`` already retries.
     autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
+    soft_time_limit=settings.NOTIFICATION_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.NOTIFICATION_TASK_TIME_LIMIT,
 )
 def send_notification_task(self, data: dict, *args, **kwargs):
     user_id = data.get("user_id")
@@ -31,14 +34,13 @@ def send_notification_task(self, data: dict, *args, **kwargs):
         logger.error("send_notification_task: channel layer is not configured")
         return
 
-    # Use the schema currently active on this worker connection.  The task
-    # is dispatched via TenantTask (or MonitoredTask with a _schema_name
-    # header) so connection.schema_name is set correctly by the time we run.
-    schema_name = getattr(connection, "schema_name", None) or "public"
-    group = user_group(schema_name, user_id)
-
-    async_to_sync(channel_layer.group_send)(
-        group,
+    # The group is named after the schema active on this worker
+    # connection.  The task is dispatched via TenantTask (or MonitoredTask
+    # with a _schema_name header) so connection.schema_name is set
+    # correctly by the time we run.
+    send_to_user_group(
+        channel_layer,
+        user_id,
         {
             "type": "send_notification",
             "user": user_id,

@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
@@ -24,6 +25,10 @@ HEARTBEAT_PONG = "pong"
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     user: AbstractBaseUser | AnonymousUser | None = None
+    # When this socket's ticket was accepted: the middleware refuses a
+    # ticket once every Knox token is revoked, so a later time means a
+    # sign-in that followed any revocation before it.
+    authenticated_at: float | None = None
     group_name: str | None = None
 
     def _get_schema_name(self) -> str:
@@ -56,6 +61,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                     f"Authenticated user: {self.user.username} "
                     f"(ID: {self.user.id})"
                 )
+                self.authenticated_at = time.time()
                 self.group_name = user_group(schema_name, self.user.id)
 
                 logger.debug(f"Adding user to group: {self.group_name}")
@@ -109,6 +115,16 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         4003 so connected clients know they must re-authenticate.
         """
         user_pk = getattr(self.user, "pk", "unknown")
+        # The push follows the change on Celery and can arrive after the
+        # user signed in again: that newer socket is not the one revoked.
+        if (
+            self.authenticated_at is not None
+            and self.authenticated_at > event["revoked_at"]
+        ):
+            logger.info(
+                f"Force-logout for user {user_pk} predates this socket; kept"
+            )
+            return
         logger.info(f"Force-logout WebSocket for user {user_pk}")
         await self.close(code=4003)
 

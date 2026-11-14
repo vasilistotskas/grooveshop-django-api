@@ -1850,6 +1850,20 @@ CHANNEL_LAYERS = {
     },
 }
 
+# A push to a user's WebSocket group is best effort, so a sender gives up
+# after this many seconds and leaves the rest to its caller (the task's
+# retry). The socket timeout above cannot serve as that deadline: it is
+# sized for the consumer's blocking receive, and it bounds each Redis
+# command, of which one ``group_send`` issues up to four.
+NOTIFICATION_PUSH_TIMEOUT_SECONDS = float(
+    getenv("NOTIFICATION_PUSH_TIMEOUT_SECONDS", "5")
+)
+# ``send_notification_task`` does nothing but that push, so it needs no
+# more than twice its deadline. The soft limit catches a send the deadline
+# could not interrupt; the hard limit ends a worker that ignored both.
+NOTIFICATION_TASK_SOFT_TIME_LIMIT = NOTIFICATION_PUSH_TIMEOUT_SECONDS * 2
+NOTIFICATION_TASK_TIME_LIMIT = NOTIFICATION_PUSH_TIMEOUT_SECONDS * 3
+
 
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from allauth.account.models import EmailAddress
@@ -108,25 +109,18 @@ def _revoke_knox_tokens(user) -> int:
 
 
 def _broadcast_force_logout(user) -> None:
-    """Push a force.logout event to the user's WebSocket group.
+    """Queue the force.logout push to the user's WebSocket group.
 
-    Uses the tenant-aware group name from notification.groups so the
-    message reaches the correct channel-layer group.  The schema_name is
-    read from the active DB connection — allauth signals always run inside
-    a request/response cycle where TenantMiddleware has already switched
-    the connection to the right schema.
+    The push runs on Celery after the commit (``user.tasks.
+    push_force_logout``), so a channel layer that fails or stops answering
+    never turns the saved change into an error (#673). The tokens are
+    already revoked by the caller. ``dispatch_on_commit`` pins the schema
+    active now, which the task's group name is built from.
     """
-    from asgiref.sync import async_to_sync
-    from channels.layers import get_channel_layer
-    from django.db import connection
+    from tenant.celery import dispatch_on_commit
+    from user.tasks import push_force_logout
 
-    from notification.groups import user_group
-
-    layer = get_channel_layer()
-    if layer:
-        schema_name = getattr(connection, "schema_name", None) or "public"
-        group = user_group(schema_name, user.pk)
-        async_to_sync(layer.group_send)(group, {"type": "force.logout"})
+    dispatch_on_commit(push_force_logout, [user.pk, time.time()])
 
 
 @receiver(

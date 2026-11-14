@@ -253,6 +253,12 @@ class AttributionInput:
     agent_protocol: str = ""
     user_agent: str = ""
 
+    @property
+    def from_agent(self) -> bool:
+        """True when the agent gateway sent it: the order is an agent's.
+        ``from_payload`` keeps a protocol only from the gateway."""
+        return self.agent_protocol in AGENT_PROTOCOLS
+
     @classmethod
     def from_payload(
         cls,
@@ -315,7 +321,7 @@ def classify(
         None,
     )
 
-    if inp.agent_protocol in AGENT_PROTOCOLS:
+    if inp.from_agent:
         return ClassifiedAttribution(
             OrderSourceType.AGENT, source=inp.agent_protocol, **common
         )

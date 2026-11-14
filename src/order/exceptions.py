@@ -13,7 +13,8 @@ Exception Hierarchy:
     │   └── StockReservationError
     ├── ProductNotFoundError
     ├── InvalidOrderDataError
-    │   └── CartNotReadyError
+    │   ├── CartNotReadyError
+    │   └── CartHasUnpaidOrderError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -206,6 +207,26 @@ class CartNotReadyError(InvalidOrderDataError):
             result.get("errors", []),
             insufficient_stock=bool(result.get("insufficient_stock")),
         )
+
+
+class CartHasUnpaidOrderError(InvalidOrderDataError):
+    """Raised when the agent gateway orders from a cart whose earlier
+    order still awaits its online payment.
+
+    Nothing was created. The message names no order: an order's uuid opens
+    a guest order, and the caller may hold only the cart's id. The API
+    answers it with the code ``cart_has_unpaid_order``.
+
+    A subclass of ``InvalidOrderDataError`` so order creation passes it on
+    as it passes its other refusals.
+
+    Its own message is for logs. The sentence a client reads is the
+    view's, as for the view's other cart refusals: what a caught
+    exception carries is never sent to a client.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("an order of this cart awaits its online payment")
 
 
 class InvalidCouponError(OrderServiceError):

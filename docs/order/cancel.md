@@ -44,6 +44,9 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   online orders count, offline (COD) and paid ones do not. An order over the
   limit is refused with a plain message. Counted under the cart lock, so two
   carts of one customer racing can overshoot by the number in flight.
+  An order the agent gateway places has a second bound, per cart: none while
+  an earlier order of that cart awaits its online payment
+  (`cart_has_unpaid_order`, [§3.2](creation.md)).
 - **Carrier-driven (ACS only)**: `OrderService.cancel_for_dead_shipment`
   (`customer_initiated=False`, `refund_payment=False`; the shipment is already
   canceled), called by the ACS status sync for a CANCELED shipment of an order

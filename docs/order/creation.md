@@ -158,6 +158,43 @@ Two entry points in `src/order/services.py` (the legacy
   the service's: the open order already took the stock), and what the first
   creation consumed (the coupon, the gift-card balance, the loyalty points) is
   not recoverable from the inputs. It is a separate change, not a lookup.
+- **An agent order is refused while its cart's earlier order awaits its
+  online payment** (`OrderService._refuse_agent_order_on_unpaid_cart`, #692).
+  The repeat submit above is a person's own act on the storefront ("Back,
+  then order again") and stays as it is. Through the agent gateway it is a
+  platform that lost its checkout or sent it twice: a second order for the
+  same goods, with its own stock decrement, that the buyer never asked for.
+  - **Which new order.** One the gateway places: `AttributionInput.from_agent`,
+    an `agentProtocol` believed beside the gateway's secret
+    ([§3.4](creation-records.md)), the signal that books the order "AI
+    agent". Any other order is not looked at. Its own pay way does not
+    matter: cash on delivery is refused too.
+  - **Which earlier order.** Any order of this cart
+    (`metadata["cart_snapshot"]["cart_uuid"]`, a `@>` lookup that
+    `order_meta_ix` serves) in `OrderQuerySet.awaiting_online_payment()`: not
+    deleted, an ONLINE pay way, a payment that is not settled. A payment
+    that FAILED or is PROCESSING is still awaited: a failed attempt does not
+    end the payment ([§7.1.0](cancel.md)). The earlier order need not be an
+    agent's. It stops counting when it is paid, canceled (by its buyer, staff
+    or the sweep at the end of its hold) or deleted.
+  - **Where.** In `create_order_from_cart_offline` alone, under the cart row
+    lock and before the cart is validated. The lock is what serialises two
+    agent orders racing for one cart: the second waits for it and then finds
+    the first one's committed order.
+  - **Not on the payment-first path (§3.1).** There the payment is already
+    taken when the order is created, so a refusal would keep money for no
+    order, and the order it creates is a paid one, not a second order
+    awaiting its payment; the earlier unpaid order is left to the sweep. The
+    gateway sends no payment intent, so no agent order takes that path
+    today.
+  - **The answer.** `CartHasUnpaidOrderError`, which `OrderViewSet.create`
+    answers as it answers `cart_empty`: `400`, `code`
+    `cart_has_unpaid_order`, the message under `cart`. It names no order: an
+    order's uuid opens a guest order, and the caller may hold only the
+    cart's id.
+  - **Limits.** The view checks the cart's stock before the service runs, so
+    when the earlier order took the last units the second call is answered
+    `insufficient_stock`; no second order either way.
 - For **COD/offline**: dispatches courier task via
   `_dispatch_shipment_creation_task` immediately. The
   dispatch is wrapped in `transaction.on_commit` inside

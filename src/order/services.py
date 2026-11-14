@@ -1041,8 +1041,6 @@ class OrderService:
             if existing_order is not None:
                 return existing_order
 
-            cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
-
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -1721,9 +1719,15 @@ class OrderService:
 
         The earlier order is any order of this cart that still awaits its
         online payment (``OrderQuerySet.awaiting_online_payment``), an
-        agent's or not. Both creation paths call this under the cart row
-        lock, so two agent orders racing for one cart are judged one
+        agent's or not.
+
+        Called by ``create_order_from_cart_offline`` alone, under the cart
+        row lock, so two agent orders racing for one cart are judged one
         after the other and the second finds the first's committed order.
+        Not by the payment-first path: there the payment is already taken
+        when the order is created, so a refusal would keep money for no
+        order, and the order it creates is a paid one, not a second order
+        awaiting its payment. The gateway sends no payment intent.
         """
         if attribution is None or not attribution.from_agent:
             return

@@ -10,8 +10,10 @@ own stock decrement, that the buyer never asked for (#692).
 What is pinned here:
 
 * an order the gateway places (a believed ``agentProtocol``) on such a cart
-  is refused with ``cart_has_unpaid_order``, on both creation paths and
-  whatever its own pay way, and changes nothing;
+  is refused with ``cart_has_unpaid_order``, whatever its own pay way, and
+  changes nothing;
+* an agent order on a verified payment intent is placed all the same: its
+  payment is already taken, and a refusal would keep money for no order;
 * the same call without a believed agent protocol places the second order;
 * the earlier order counts only while it is this cart's and still awaits
   its online payment;
@@ -184,17 +186,6 @@ class TestAnAgentOrderIsRefused:
         assert Order.objects.count() == 1
         assert checkout.stock() == STOCK - 1
 
-    @pytest.mark.usefixtures("trust_intent_binding")
-    def test_on_the_payment_first_path_too(self):
-        checkout = _Cart()
-        checkout.order()
-
-        with pytest.raises(CartHasUnpaidOrderError):
-            checkout.pay_first(attribution=AGENT)
-
-        assert Order.objects.count() == 1
-        assert checkout.stock() == STOCK - 1
-
     @pytest.mark.parametrize(
         "payment_status", [PaymentStatus.FAILED, PaymentStatus.PROCESSING]
     )
@@ -223,16 +214,6 @@ class TestTheStorefrontIsUnchanged:
 
         assert second.pk != earlier.pk
         assert Order.objects.count() == 2
-        assert checkout.stock() == STOCK - 2
-
-    @pytest.mark.usefixtures("trust_intent_binding")
-    def test_on_the_payment_first_path_too(self):
-        checkout = _Cart()
-        earlier = checkout.order()
-
-        second = checkout.pay_first()
-
-        assert second.pk != earlier.pk
         assert checkout.stock() == STOCK - 2
 
     def test_an_agent_protocol_django_does_not_know_is_not_an_agents(self):
@@ -290,6 +271,23 @@ class TestAnAgentOrderGoesThrough:
         checkout.order(attribution=AGENT)
 
         assert Order.objects.count() == 2
+
+    @pytest.mark.usefixtures("trust_intent_binding")
+    def test_on_a_verified_intent_whose_payment_is_already_taken(self):
+        """The payment-first path is not checked: the intent is paid when
+        the order is created, so a refusal would keep money for no order,
+        and the order placed is a paid one."""
+        checkout = _Cart()
+        earlier = checkout.order()
+
+        order = checkout.pay_first(attribution=AGENT)
+
+        assert order.pk != earlier.pk
+        assert order.attribution.source_type == OrderSourceType.AGENT
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert order.payment_id == "pi_agent_second_order"
+        assert Order.objects.count() == 2
+        assert checkout.stock() == STOCK - 2
 
     def test_when_the_unpaid_order_is_another_carts(self):
         other = _Cart()

@@ -177,11 +177,16 @@ Two entry points in `src/order/services.py` (the legacy
     end the payment ([§7.1.0](cancel.md)). The earlier order need not be an
     agent's. It stops counting when it is paid, canceled (by its buyer, staff
     or the sweep at the end of its hold) or deleted.
-  - **Where.** Under the cart row lock and before the cart is validated, on
-    both creation paths (in §3.1 right after the repeat lookup, so a repeat
-    of the same intent still answers its order). The lock is what serialises
-    two agent orders racing for one cart: the second waits for it and then
-    finds the first one's committed order.
+  - **Where.** In `create_order_from_cart_offline` alone, under the cart row
+    lock and before the cart is validated. The lock is what serialises two
+    agent orders racing for one cart: the second waits for it and then finds
+    the first one's committed order.
+  - **Not on the payment-first path (§3.1).** There the payment is already
+    taken when the order is created, so a refusal would keep money for no
+    order, and the order it creates is a paid one, not a second order
+    awaiting its payment; the earlier unpaid order is left to the sweep. The
+    gateway sends no payment intent, so no agent order takes that path
+    today.
   - **The answer.** `CartHasUnpaidOrderError`, which `OrderViewSet.create`
     answers as it answers `cart_empty`: `400`, `code`
     `cart_has_unpaid_order`, the message under `cart`. It names no order: an
@@ -189,9 +194,7 @@ Two entry points in `src/order/services.py` (the legacy
     cart's id.
   - **Limits.** The view checks the cart's stock before the service runs, so
     when the earlier order took the last units the second call is answered
-    `insufficient_stock`; no second order either way. On the payment-first
-    path the intent is already paid when the refusal comes, as for every
-    refusal of that transaction; the gateway sends no intent today.
+    `insufficient_stock`; no second order either way.
 - For **COD/offline**: dispatches courier task via
   `_dispatch_shipment_creation_task` immediately. The
   dispatch is wrapped in `transaction.on_commit` inside

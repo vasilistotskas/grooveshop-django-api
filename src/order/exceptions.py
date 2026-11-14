@@ -217,8 +217,8 @@ class CartHasUnpaidOrderError(InvalidOrderDataError):
     a guest order, and the caller may hold only the cart's id. The API
     answers it with the code ``cart_has_unpaid_order``.
 
-    A subclass of ``InvalidOrderDataError`` so both creation paths pass it
-    on as they pass their other refusals.
+    A subclass of ``InvalidOrderDataError`` so order creation passes it on
+    as it passes its other refusals.
     """
 
 

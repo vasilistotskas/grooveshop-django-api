@@ -44,7 +44,9 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   still awaiting its online payment counts
   (`Order.objects.awaiting_online_payment()`: payment pending, processing or
   failed, since a failed attempt keeps its stock until the sweep); offline
-  (COD), paid and canceled ones do not. An order over the
+  (COD), paid and canceled ones do not. A PENDING order whose payment is
+  PROCESSING is in neither sweep bucket: it counts until its final webhook
+  lands or the customer cancels it. An order over the
   limit is refused with a plain message. Counted under the cart lock, so two
   carts of one customer racing can overshoot by the number in flight.
   An order the agent gateway places has a second bound, per cart: none while

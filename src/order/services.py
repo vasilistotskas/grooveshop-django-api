@@ -57,6 +57,7 @@ from order.exceptions import (
     ProductNotFoundError,
     RefundOutstandingError,
     StockReservationError,
+    UnpaidOrderLimitError,
 )
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
@@ -1680,12 +1681,7 @@ class OrderService:
         limit = int(store_setting("ORDER_MAX_UNPAID_ONLINE_ORDERS"))
         if limit <= 0:
             return
-        # Every PENDING order still owed through a hosted flow, whatever
-        # its last attempt did: one whose payment failed or is processing
-        # keeps its stock until it is paid or the sweep cancels it.
-        waiting = Order.objects.awaiting_online_payment().filter(
-            status=OrderStatus.PENDING
-        )
+        waiting = Order.objects.holding_stock_for_online_payment()
         if user is not None and user.is_authenticated:
             waiting = waiting.filter(user=user)
         elif email:
@@ -1693,15 +1689,7 @@ class OrderService:
         else:
             return
         if waiting.count() >= limit:
-            raise InvalidOrderDataError(
-                str(
-                    _(
-                        "You already have {count} orders waiting for their "
-                        "payment. Pay for or cancel one before placing "
-                        "another."
-                    ).format(count=limit)
-                )
-            )
+            raise UnpaidOrderLimitError(limit)
 
     @staticmethod
     def _refuse_agent_order_on_unpaid_cart(

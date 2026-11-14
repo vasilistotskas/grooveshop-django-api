@@ -18,7 +18,7 @@ from djmoney.money import Money
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import InvalidOrderDataError
+from order.exceptions import InvalidOrderDataError, UnpaidOrderLimitError
 from order.factories import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
@@ -108,10 +108,12 @@ class TestAGuestIsBoundedByEmail:
         for _ in range(2):
             _waiting()
 
-        with _limit(2), pytest.raises(InvalidOrderDataError) as excinfo:
+        with _limit(2), pytest.raises(UnpaidOrderLimitError) as excinfo:
             _place()
 
-        assert "already have 2 orders waiting" in str(excinfo.value)
+        assert excinfo.value.limit == 2
+        # Callers that catch InvalidOrderDataError still catch it.
+        assert isinstance(excinfo.value, InvalidOrderDataError)
         assert Order.objects.filter(email="maria@example.com").count() == 2
 
     def test_an_order_under_the_limit_is_placed(self):
@@ -160,6 +162,10 @@ class TestOnlyWhatIsStillWaitingCounts:
             {"status": OrderStatus.CANCELED},
             {"payment_status": PaymentStatus.COMPLETED},
             {"status": OrderStatus.PROCESSING},
+            # Settled payments on a PENDING order: nothing is owed.
+            {"payment_status": PaymentStatus.CANCELED},
+            {"payment_status": PaymentStatus.REFUNDED},
+            {"payment_status": PaymentStatus.PARTIALLY_REFUNDED},
         ],
     )
     def test_a_paid_canceled_or_processing_order_does_not(self, state):
@@ -219,3 +225,72 @@ class TestTheLimitIsTheStoresChoice:
 
         with pytest.raises(InvalidOrderDataError):
             _place()
+
+
+@pytest.mark.usefixtures("checkout_legal_documents")
+class TestThroughTheEndpoint:
+    """The shopper reads why: the limit has its own code and sentence on
+    the payment method, not the generic ``invalid_order_data``."""
+
+    @pytest.fixture(autouse=True)
+    def _a_store_with_viva(self):
+        from region.factories import RegionFactory
+        from tests.integration.order.test_agent_order_unpaid_cart import (
+            _Cart,
+            _viva,
+        )
+
+        with patch(
+            "pay_way.services.PayWayService.is_provider_configured",
+            return_value=True,
+        ):
+            self.checkout = _Cart()
+            self.region = RegionFactory(country=self.checkout.country)
+            self.viva = _viva()
+            yield
+
+    def _post(self):
+        from django.urls import reverse
+        from rest_framework.test import APIClient
+
+        address = self.checkout.address()
+        return APIClient().post(
+            reverse("order-list"),
+            {
+                "payWayId": self.viva.id,
+                "termsAccepted": True,
+                "firstName": address["first_name"],
+                "lastName": address["last_name"],
+                "email": address["email"],
+                "street": address["street"],
+                "streetNumber": address["street_number"],
+                "city": address["city"],
+                "zipcode": address["zipcode"],
+                "countryId": address["country_id"],
+                "regionId": self.region.alpha,
+                "phone": address["phone"],
+            },
+            format="json",
+            HTTP_X_CART_ID=str(self.checkout.cart.uuid),
+            HTTP_X_LANGUAGE="en",
+        )
+
+    def test_the_refusal_has_its_own_code_and_sentence(self, documented):
+        _waiting(email=self.checkout.address()["email"], pay_way=self.viva)
+        before = Order.objects.count()
+
+        with _limit(1):
+            response = self._post()
+
+        message = (
+            "You already have 1 orders waiting for their payment. Pay for "
+            "or cancel one before placing another."
+        )
+        assert response.status_code == 400, response.json()
+        body = response.json()
+        assert body["code"] == "unpaid_order_limit"
+        assert body["fields"]["payWayId"] == [
+            {"message": message, "code": "unpaid_order_limit"}
+        ]
+        documented(response, "/api/v1/order", "post")
+        assert Order.objects.count() == before

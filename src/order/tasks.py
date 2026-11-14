@@ -1949,7 +1949,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     # paying for locks stock other shoppers cannot buy.
     alert_threshold = int(store_setting(payment_hold.ALERT_SETTING))
     if alert_threshold > 0:
-        unpaid = payment_hold.unpaid_online_orders().count()
+        unpaid = Order.objects.holding_stock_for_online_payment().count()
         if unpaid >= alert_threshold:
             logger.warning(
                 payment_hold.SPIKE_MESSAGE,

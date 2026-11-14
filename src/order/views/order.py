@@ -74,6 +74,7 @@ from order.exceptions import (
     PaymentVerificationError,
     RefundOutstandingError,
     StockReservationError,
+    UnpaidOrderLimitError,
 )
 from order.filters import OrderFilter
 from order.invoicing import SpecimenNotAvailable, render_specimen_pdf
@@ -991,6 +992,23 @@ class OrderViewSet(BaseModelViewSet):
                     ]
                 },
                 code="cart_has_unpaid_order",
+            ) from e
+
+        except UnpaidOrderLimitError as e:
+            # Before InvalidOrderDataError, which it subclasses. On the
+            # payment method: the customer pays for or cancels one of the
+            # waiting orders, or chooses an offline method.
+            raise ValidationError(
+                {
+                    "pay_way_id": [
+                        _(
+                            "You already have {count} orders waiting for "
+                            "their payment. Pay for or cancel one before "
+                            "placing another."
+                        ).format(count=e.limit)
+                    ]
+                },
+                code="unpaid_order_limit",
             ) from e
 
         except InvalidOrderDataError as e:

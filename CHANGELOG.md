@@ -3,6 +3,32 @@
 
 
 
+## v3.245.8 (2026-11-14)
+
+### Refactoring
+
+* refactor(settings): settings.py into a settings/ package with no value changed (#695)
+
+src/settings.py (4,772 lines) is now src/settings/, 19 modules that
+src/settings/__init__.py star-imports in the order the file ran: env,
+application, auth, i18n, api, cache, websocket, celery, schedule,
+security, database, search, store_settings, email, admin, storage,
+logging, integrations, domain. Each imports earlier values by name, never
+a later one. DJANGO_SETTINGS_MODULE stays "settings".
+
+Every statement moved verbatim. Statements with an effect beyond their own
+value (the .env load, the boot checks, makedirs, the list mutations) keep
+their relative order. The setting dumps of six environments are identical
+apart from the new submodule names and five underscore names nothing
+reads.
+
+Tests that reload or patch a setting target the module that owns it; the
+storage test reloads settings.env before settings.storage. The admin UI
+guards read app admins only. Docs, rules and comments that named
+settings.py name the owning module.
+
+Closes #564 ([`14dead3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14dead3c430011bbee4a2f6ab69704ee413ddc1f))
+
 ## v3.245.7 (2026-11-14)
 
 ### Bug fixes

@@ -26,17 +26,26 @@ and says which file holds each § number used here.
   answered by looking the order up: `GET /api/v1/parcels?orderNumber=`
   ("Return only parcels related to this order number", manual v7.2,
   §6.5.3, p. 45; `BoxNowClient.get_parcel_info(order_number=...)`; never
-  `q`, which is P417 for a server account, §5, p. 22). Exactly one parcel
-  that is not `canceled`, has no cancel requested and is `new` is taken
-  over: its id is saved as `parcel_id`, the state `new`, the order gets the
-  tracking number, and `metadata["adopted_parcel"]` records it (id and
-  state only: the row also carries the recipient's contact details, which
-  stay out of `metadata`). The documented row has no delivery-request id
+  `q`, which is P417 for a server account, §5, p. 22). The lookup asks
+  once per payment mode, because `paymentMode` has "Default value:
+  prepaid" (§6.5.3; the OpenAPI file's `PaymentMode`), and reads every
+  page through `pagination.next` ("Token to use to get to the next
+  page"). Exactly one parcel that is not `canceled`, has no cancel
+  requested (`cancelationRequested`) and is `new` is taken over, and only
+  when it was created for this shipment's terms: the same locker
+  (`destination.locationId`), `paymentMode` and, for `cod`,
+  `amountToBeCollected`. Staff may change the locker and dispatch again,
+  and BoxNow's parcel still goes to the old one. Its id is saved as
+  `parcel_id`, the state `new`, the order gets the tracking number, and
+  `metadata["adopted_parcel"]` records it (id and state only: the row also
+  carries the recipient's contact details, which stay out of
+  `metadata`). The documented row has no delivery-request id
   (the OpenAPI file's `DeliveryRequest` schema has none), so
   `delivery_request_id` stays empty and phase 1 treats a `parcel_id` as
   "already created". No such parcel (none listed, only canceled ones, one
-  past `new`, more than one live) is the usual `P410` refusal and creation
-  alert, its message naming what the lookup found. A lookup that fails is
+  past `new`, more than one live, one whose cancel was requested, one
+  created for other terms) is the usual `P410` refusal and creation alert,
+  its message naming what the lookup found. A lookup that fails is
   that failure: a `BoxNowRetryableError` retries the task, a refusal or an
   answer with no parcel list alerts. A row's `state` is read through
   `BoxNowParcelState.from_webhook_event`, which takes both spellings the
@@ -52,6 +61,10 @@ and says which file holds each § number used here.
   answer; in that case the parcel is also recorded under
   `metadata["orphan_delivery_requests"]` and an ERROR is logged, for ops
   to reconcile. The same holds for a parcel taken over after `P410`.
+  While an entry has no outcome and is younger than
+  `_MINT_CLAIM_TTL_SECONDS`, "Create BoxNow parcel now" refuses to reset
+  the row (`_cancel_at_boxnow_in_flight`): the new creation would answer
+  `P410` and take over the parcel that cancel is about to cancel.
 - **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
   the tenant's keys are BoxNow production keys (on) or stage keys (off,
   the default). `BoxNowClient` maps it to the platform's
@@ -102,9 +115,10 @@ and says which file holds each § number used here.
   `metadata["last_error"]`: an unpaid order, a store without credentials)
   cancels locally with no API call. One that was sent may have created a
   parcel whose answer was lost, so `cancel_shipment` first looks the
-  order up by `orderNumber`, with no row lock held, and then: nothing live
-  there cancels locally; exactly one live `new` parcel is cancelled at
-  BoxNow by its id (`POST /api/v1/parcels/{id}:cancel`, the only cancel the
+  order up by `orderNumber` (every payment mode, every page), with no row
+  lock held, and then: nothing live there (none, or only `canceled` ones)
+  cancels locally; a parcel whose cancel was only requested counts as
+  live; exactly one live `new` parcel is cancelled at BoxNow by its id (`POST /api/v1/parcels/{id}:cancel`, the only cancel the
   manual has, §3.7 and §6.5.2) and its id is saved on the row; one live
   parcel past `new`, or several, is refused (`BoxNowAPIError`). A lookup
   that fails refuses the cancel as the error it is (a

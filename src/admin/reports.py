@@ -34,7 +34,13 @@ from unfold.widgets import (
 from admin.dashboard.base import percent_text
 from admin.displays import money
 from order.enum.attribution import OrderSourceType
-from order.turnover import Bucket, GroupBy, GroupKey, buckets, first_year
+from order.reporting.turnover import (
+    Bucket,
+    GroupBy,
+    GroupKey,
+    buckets,
+    first_year,
+)
 from pay_way.enum.pay_way import PayWayEnum
 
 # A spreadsheet opens a UTF-8 file without a byte-order mark as Latin-1,

@@ -28,7 +28,7 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from core.store_settings import store_setting
-from order.discounts import allocate_capped
+from order.checkout.discounts import allocate_capped
 from promotion.enum import (
     BenefitType,
     CouponRejectionReason,

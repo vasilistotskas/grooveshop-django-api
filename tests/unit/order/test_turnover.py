@@ -24,7 +24,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.factories.payment_transaction import PaymentTransactionFactory
 from order.models import ChargebackDecision, Order, PaymentTransaction
-from order.turnover import (
+from order.reporting.turnover import (
     Bucket,
     GroupBy,
     a_year_earlier,

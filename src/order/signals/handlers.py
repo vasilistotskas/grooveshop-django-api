@@ -12,6 +12,13 @@ from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
 from emails.send import send_email
+from order.communications.notifications import (
+    notify_order_created_live,
+    notify_order_refunded_live,
+    notify_order_status_changed_live,
+    notify_payment_confirmed_live,
+    notify_payment_failed_live,
+)
 from order.credit_documents import request_credit_documents
 from order.disputes import announce_chargeback
 from order.emails import RefundFailed
@@ -28,13 +35,6 @@ from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import RefundAttempt
 from order.mydata.config import load_config as load_mydata_config
-from order.notifications import (
-    notify_order_created_live,
-    notify_order_refunded_live,
-    notify_order_status_changed_live,
-    notify_payment_confirmed_live,
-    notify_payment_failed_live,
-)
 from order.payment import StripePaymentProvider, money_from_minor_units
 from order.payment_fees import (
     record_stripe_charge_fee,
@@ -363,7 +363,7 @@ def handle_order_status_changed(
     # filters internally for statuses we actually want to surface in the
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
-    # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
+    # one place (``order/communications/notifications.py::_ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
         dispatch_on_commit(
             notify_order_status_changed_live, [order.id, new_status]

@@ -3,7 +3,7 @@
 Custom pages of the store admin (``MyAdminSite.get_urls``), behind
 ``order.view_turnover_report``: store ADMIN and OWNER and platform
 superusers, not STAFF (``tenant.auth_backends``). Every figure comes from
-``order.turnover``, which holds the definition; this module picks the
+``order.reporting.turnover``, which holds the definition; this module picks the
 range, the bucket, the comparison and the breakdown, and lays the rows
 out. The page, the CSV and the XLSX read one list of columns, so they can
 not disagree about what a column is.
@@ -51,7 +51,7 @@ from admin.reports import (
     xlsx_response,
     years,
 )
-from order.turnover import (
+from order.reporting.turnover import (
     Bucket,
     GroupBy,
     GroupKey,

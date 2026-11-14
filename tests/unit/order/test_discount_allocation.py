@@ -15,12 +15,12 @@ import pytest
 from django.apps import apps
 from djmoney.money import Money
 
-from order.discount_snapshot import heal_discount_allocation
-from order.discounts import (
+from order.checkout.discounts import (
     allocate_capped,
     discounted_line_gross,
     order_discount_total,
 )
+from order.discount_snapshot import heal_discount_allocation
 from tests.utils.discounts import snapshot_discounts
 from vat.factories import VatFactory
 

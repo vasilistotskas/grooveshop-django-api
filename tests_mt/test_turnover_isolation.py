@@ -15,7 +15,7 @@ import pytest
 from django_tenants.utils import schema_context
 from djmoney.money import Money
 
-from order.turnover import figures
+from order.reporting.turnover import figures
 
 pytestmark = pytest.mark.django_db
 
@@ -65,7 +65,7 @@ def test_a_sale_is_in_its_own_stores_figures(mt_tenant, sale):
 
 
 def test_a_sale_is_not_in_another_stores_figures(mt_tenant, mt_tenant_b, sale):
-    from order.turnover import first_year
+    from order.reporting.turnover import first_year
 
     with schema_context(mt_tenant_b.schema_name):
         [year] = figures(date(YEAR, 1, 1), date(YEAR, 12, 31), None)

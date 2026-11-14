@@ -12,7 +12,7 @@ from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from core.validators import address as address_rules
 from country.models import Country
-from order.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
+from order.checkout.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
@@ -52,7 +52,7 @@ CARRIER_TRACKING_URLS: dict[str, str] = {
 
 
 class OrderAttributionSerializer(serializers.ModelSerializer[OrderAttribution]):
-    """Where the order came from, as ``order.attribution.classify`` named it."""
+    """Where the order came from, as its attribution was classified."""
 
     class Meta:
         model = OrderAttribution
@@ -66,8 +66,9 @@ class OrderAttributionInputSerializer(serializers.Serializer):
     Untrusted analytics — anyone can type a UTM — so nothing here is
     rejected for its content, only for its shape: a checkout must never
     fail over a strange referrer. Overlong strings are cut to their
-    column in ``order.attribution.classify``, the referrer is reduced to
-    its host there, and click ids are parameter NAMES, never values.
+    column when the order's attribution is classified, the referrer is
+    reduced to its host there, and click ids are parameter NAMES, never
+    values.
     """
 
     utm_source = serializers.CharField(required=False, allow_blank=True)

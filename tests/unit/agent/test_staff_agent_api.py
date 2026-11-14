@@ -334,7 +334,7 @@ class StaffAgentAPITestCase(APITestCase):
         )
 
     def test_the_sales_report_is_the_admins_turnover(self) -> None:
-        from order import turnover
+        from order.reporting import turnover
 
         admin = self._member(TenantMembershipRole.ADMIN)
         self._bearer(admin, ["admin:sales:read"])

@@ -97,8 +97,8 @@ from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from order import credit_allocation, refund_reconciliation
 from order.chargebacks import ChargebackDecisionError, decide_chargebacks
+from order.checkout.discounts import discounted_line_gross
 from order.credit_documents import create_pending_credits
-from order.discounts import discounted_line_gross
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.exceptions import PaymentError

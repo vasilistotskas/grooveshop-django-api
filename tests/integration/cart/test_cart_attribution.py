@@ -25,7 +25,7 @@ from cart.agent_token import mint_cart_token
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart, CartAttribution
 from cart.services import CartAttributionService, CartService
-from order.attribution import ClassifiedAttribution
+from order.checkout.attribution import ClassifiedAttribution
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory

@@ -1,4 +1,4 @@
-"""``order.attribution.classify`` — which signal names an order's source.
+"""``order.checkout.attribution.classify`` — which signal names an order's source.
 
 A table of one visit per row, so the precedence order (agent, UTM,
 click id, known referrer, in-app User-Agent, other referrer, direct) is
@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from django.utils import translation
 
-from order.attribution import (
+from order.checkout.attribution import (
     CAMPAIGN_MAX_LENGTH,
     SOURCE_MAX_LENGTH,
     AttributionInput,

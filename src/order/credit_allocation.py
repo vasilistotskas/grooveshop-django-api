@@ -45,7 +45,7 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from djmoney.money import Money
 
-from order.discounts import allocate_capped, proportional_shares
+from order.checkout.discounts import allocate_capped, proportional_shares
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.models import (
     ChargebackDecision,

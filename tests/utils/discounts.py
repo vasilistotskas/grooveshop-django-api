@@ -2,7 +2,7 @@
 
 An order built by hand with ``discount_amount`` / ``loyalty_discount`` has
 no snapshot on its lines, and the tax documents refuse it
-(``order.discounts.discounted_line_gross``). ``snapshot_discounts`` gives
+(``order.checkout.discounts.discounted_line_gross``). ``snapshot_discounts`` gives
 its lines what ``OrderService`` would have written.
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal
 
-from order.discounts import (
+from order.checkout.discounts import (
     add_line_discounts,
     spread_by_remaining_value,
 )

@@ -14,7 +14,7 @@ from cart.agent_token import (
     resolve_cart_token,
 )
 from cart.models import Cart, CartAttribution, CartItem
-from order.attribution import ClassifiedAttribution
+from order.checkout.attribution import ClassifiedAttribution
 from order.models.stock_reservation import StockReservation
 
 logger = logging.getLogger(__name__)

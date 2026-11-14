@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
-from order.attribution import (
+from order.checkout.attribution import (
     CAMPAIGN_MAX_LENGTH,
     LANDING_PATH_MAX_LENGTH,
     MEDIUM_MAX_LENGTH,
@@ -18,7 +18,7 @@ class AcquisitionSourceModel(TimeStampMixinModel):
     """The columns that name a channel, shared by every row that records
     where a shopper came from (``OrderAttribution``, ``CartAttribution``).
 
-    Always the output of ``order.attribution.classify``: a UTM can be
+    Always the output of ``order.checkout.attribution.classify``: a UTM can be
     typed by hand, so nothing here is ever an authorisation signal. Only
     the referrer's host is kept and click-id values never reach the
     server.
@@ -73,7 +73,7 @@ class OrderAttribution(AcquisitionSourceModel):
     """Where the shopper behind an order came from.
 
     Written once, in the order's creation transaction, by
-    ``OrderAttributionService.record`` from ``order.attribution.classify``.
+    ``OrderAttributionService.record`` from ``order.checkout.attribution.classify``.
     Its own table rather than columns on ``Order`` so the order row
     stays about the sale, and so later attribution data (device,
     session count) has somewhere to go. Orders placed before it existed

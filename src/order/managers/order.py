@@ -107,8 +107,8 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def needing_follow_up(self, now=None) -> Self:
         """Orders that need follow-up (waited ``ORDER_FOLLOW_UP_DAYS``
         days, or open behind a canceled parcel): the one rule behind the
-        admin badge, filter and counter (``order.follow_up``)."""
-        from order.follow_up import follow_up_q
+        admin badge, filter and counter (``order.lifecycle.follow_up``)."""
+        from order.lifecycle.follow_up import follow_up_q
 
         rule = follow_up_q(now)
         return self.none() if rule is None else self.filter(rule)
@@ -116,7 +116,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def with_follow_up(self, now=None) -> Self:
         """Annotate ``needs_follow_up`` with the same rule, for a list
         that shows the flag without a query per row."""
-        from order.follow_up import follow_up_q
+        from order.lifecycle.follow_up import follow_up_q
 
         rule = follow_up_q(now)
         # ``Case`` rather than the bare ``Q``: the rule joins the carrier

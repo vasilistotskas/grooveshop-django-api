@@ -6,9 +6,6 @@ from django.core.exceptions import ImproperlyConfigured
 
 from settings.env import PRODUCTION_PROFILE, SYSTEM_ENV
 
-CONN_HEALTH_CHECKS = True
-ATOMIC_REQUESTS = False
-
 # Use psycopg connection pool to bound DB connections per process. Each
 # process maintains a pool of <DB_POOL_MAX_SIZE> connections regardless of
 # the number of threads opened by the ASGI handler. Without this, asgiref's

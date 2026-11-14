@@ -3,6 +3,20 @@
 
 
 
+## v3.245.12 (2026-11-14)
+
+### Refactoring
+
+* refactor(order): a permanent address for the validators that store settings name (#703)
+
+order.setting_validators names the four validators store settings point at
+(stock, review_request, payment_hold x2), so the stored dotted paths can
+move to it in the next release while the defining modules move freely
+(#566). This release changes no stored path. A test checks that every
+validator path in EXTRA_SETTINGS_DEFAULTS imports.
+
+Part of #566 ([`7d94985`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d94985fd97233f800ed5a1a38fed435f77dd73c))
+
 ## v3.245.11 (2026-11-14)
 
 ### Refactoring

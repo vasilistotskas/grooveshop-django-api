@@ -3,6 +3,33 @@
 
 
 
+## v3.245.6 (2026-11-14)
+
+### Bug fixes
+
+* fix(notification): give the WebSocket push a deadline of its own, and send force-logout after the change (#671)
+
+A channel layer that stops answering held a notification task, or a
+request, for as long as it took; one that never returns had no bound at
+all.
+
+- notification.groups.send_to_user_group wraps every push in
+  asyncio.timeout(NOTIFICATION_PUSH_TIMEOUT_SECONDS) (env, default 5) and
+  raises TimeoutError, which the tasks retry as transient.
+  send_notification_task gets soft and hard limits of 2x and 3x the
+  deadline.
+- The force-logout push after a password change, password reset, email
+  change or account deletion no longer runs in the request: it is the
+  task user.tasks.push_force_logout, queued after the commit. A failed or
+  slow channel layer no longer turns the saved change into a 500 (#673).
+- The event carries the revocation time, and a socket that authenticated
+  after it (a later sign-in) ignores it.
+- The in-memory channel layer moved to tests/settings.py, so tests_mt
+  uses it too.
+
+Closes #648
+Closes #673 ([`05b1e6e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05b1e6e87167fd1521da3f8ab140aa56c680cfcf))
+
 ## v3.245.5 (2026-11-14)
 
 ### Bug fixes

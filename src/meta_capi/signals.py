@@ -23,6 +23,7 @@ from allauth.account.signals import user_signed_up
 from django.dispatch import receiver
 from djmoney.money import Money
 
+from core.client_ip import edge_client_ip
 from meta_capi.tasks import (
     dispatch_complete_registration_event,
     schedule_initiate_checkout,
@@ -74,10 +75,11 @@ def _on_user_signed_up(
 ) -> None:
     """allauth fires this for every signup path (email, social).
 
-    The request gives us the IP/UA + the _fbp / _fbc cookies we need
-    for accurate matching. Without those, EMQ on registration drops
-    enough that the event is barely useful — so we read them here
-    rather than letting the Celery task figure it out cold.
+    The request gives us the UA, the IP when our edge vouched for it, and
+    the _fbp / _fbc cookies we need for accurate matching. Without
+    those, EMQ on registration drops enough that the event is barely
+    useful — so we read them here rather than letting the Celery task
+    figure it out cold.
     """
     # Gate on ad-storage consent: without an explicit "granted" signal from
     # the signup request we must NOT send the registrant's PII to Meta
@@ -97,20 +99,12 @@ def _on_user_signed_up(
     fbc = cookies.get("_fbc", "") or ""
 
     meta = getattr(request, "META", {}) or {}
-    # Production: Cloudflare → Traefik → Nuxt → Django. The Nuxt
-    # ``createHeaders`` helper resolves the real client IP from
-    # ``CF-Connecting-IP`` and forwards it on ``X-Real-IP`` (the same header
-    # allauth uses via ``ALLAUTH_TRUSTED_CLIENT_IP_HEADER``). Trusting
-    # X-Real-IP from any other path would be spoofable, but the Nuxt internal
-    # cluster call is the only ingress that reaches Django at this stage of
-    # the signup flow, and ``USE_X_FORWARDED_HOST`` already pins the trust
-    # boundary at the proxy. The leftmost ``X-Forwarded-For`` entry is
-    # client-supplied and trivially spoofable to poison Meta's match quality
-    # or attribute the registration to a victim's IP. If no proxy header is
-    # present we fall back to ``REMOTE_ADDR`` so dev/CI still get something.
-    ip_addr = (meta.get("HTTP_X_REAL_IP") or "").strip()
-    if not ip_addr:
-        ip_addr = meta.get("REMOTE_ADDR", "") or ""
+    # The visitor our Cloudflare edge vouched for, or no IP at all. Without
+    # ``X-Origin-Verify`` the address is the caller's choice (Nuxt relays
+    # its ``CF-Connecting-IP`` as ``X-Real-IP``), and the peer
+    # ``client_ip_or_peer`` would fall back to is a proxy. Meta asks for the
+    # browser's real address and does not require one, so it is omitted.
+    ip_addr = edge_client_ip(request)
     ua = meta.get("HTTP_USER_AGENT", "") or ""
     # ``HTTP_REFERER`` is the storefront page that submitted the signup
     # form — Meta uses it for content matching.
@@ -128,7 +122,7 @@ def _on_user_signed_up(
         {
             "fbp": fbp or None,
             "fbc": fbc or None,
-            "client_ip_address": ip_addr or None,
+            "client_ip_address": ip_addr,
             "client_user_agent": ua or None,
             "event_source_url": event_source_url or None,
         },

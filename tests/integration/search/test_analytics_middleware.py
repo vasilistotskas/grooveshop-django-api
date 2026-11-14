@@ -537,3 +537,94 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
             middleware(request)
 
         assert delay.call_args.kwargs["query_uuid"]
+
+
+@pytest.mark.django_db
+class TestSearchAnalyticsClientIp:
+    """``SearchQuery.ip_address`` is ``core.client_ip.client_ip_or_peer``.
+
+    One rule for every caller (#639): the edge-proven visitor, else the
+    rightmost ``X-Forwarded-For`` hop when it is an address, else
+    ``REMOTE_ADDR``. Nothing a caller chooses, and nothing that is not an
+    address, reaches the ``GenericIPAddressField``.
+    """
+
+    SECRET = "s3cret-edge-token"
+    VISITOR = "203.0.113.9"
+    FORGED = "198.51.100.66"
+
+    def _stored_ip(self, request_factory, middleware, query, **meta):
+        request = request_factory.get(
+            "/api/v1/search/product", {"query": query}, **meta
+        )
+        request.user = Mock(is_authenticated=False)
+        request.session = Mock(session_key="")
+
+        middleware(request)
+
+        return SearchQuery.objects.get(query=query).ip_address
+
+    def test_a_garbage_forwarded_hop_is_not_stored(
+        self, request_factory, middleware
+    ):
+        assert (
+            self._stored_ip(
+                request_factory,
+                middleware,
+                "garbage-hop",
+                REMOTE_ADDR="10.42.1.0",
+                HTTP_X_FORWARDED_FOR="203.0.113.1, not-an-ip",
+            )
+            == "10.42.1.0"
+        )
+
+    def test_forged_headers_without_the_edge_proof_are_not_stored(
+        self, request_factory, middleware, settings
+    ):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert (
+            self._stored_ip(
+                request_factory,
+                middleware,
+                "forged",
+                REMOTE_ADDR="10.42.1.0",
+                HTTP_X_ORIGIN_VERIFY="not-the-secret",
+                HTTP_CF_CONNECTING_IP=self.FORGED,
+                HTTP_X_REAL_IP=self.FORGED,
+                HTTP_X_FORWARDED_FOR=f"{self.FORGED}, 162.158.1.1",
+            )
+            == "162.158.1.1"
+        )
+
+    def test_the_peer_is_the_rightmost_hop_whatever_remote_addr_is(
+        self, request_factory, middleware
+    ):
+        """The same peer ``client_ip_or_peer`` gives every other caller:
+        no second rule for a public ``REMOTE_ADDR``."""
+        assert (
+            self._stored_ip(
+                request_factory,
+                middleware,
+                "public-remote-addr",
+                REMOTE_ADDR="9.9.9.9",
+                HTTP_X_FORWARDED_FOR="162.158.1.1",
+            )
+            == "162.158.1.1"
+        )
+
+    def test_the_edge_proven_visitor_is_stored(
+        self, request_factory, middleware, settings
+    ):
+        settings.ORIGIN_VERIFY_SECRET = self.SECRET
+        assert (
+            self._stored_ip(
+                request_factory,
+                middleware,
+                "edge-proven",
+                REMOTE_ADDR="10.42.1.0",
+                HTTP_X_ORIGIN_VERIFY=self.SECRET,
+                HTTP_CF_CONNECTING_IP=self.VISITOR,
+                HTTP_X_FORWARDED_FOR="162.158.1.1",
+            )
+            == self.VISITOR
+        )

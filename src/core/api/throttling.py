@@ -41,7 +41,7 @@ from rest_framework.throttling import (
 
 from cart.agent_token import cart_token_from_request, hash_cart_token
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
-from core.client_ip import edge_client_ip
+from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +141,9 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
     2026-09-16). Keying on it puts everyone behind that address in one
     bucket, which turns a per-caller budget into a shared one: at
     ``order_create_anon`` 10/minute, a single client could lock all guests
-    out of checkout. ``get_ident`` remains the fallback for requests whose
-    provenance cannot be proven, because it is coarse but cannot be forged.
+    out of checkout. ``client_ip_or_peer`` falls back to that peer for
+    requests whose provenance cannot be proven, because it is coarse but
+    cannot be forged.
     """
 
     def get_cache_key(self, request, view):
@@ -150,7 +151,7 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
         if user is not None and user.is_authenticated:
             ident = f"user:{user.pk}"
         else:
-            ident = edge_client_ip(request) or self.get_ident(request)
+            ident = client_ip_or_peer(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
@@ -218,7 +219,7 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
             return None
-        ident = edge_client_ip(request) or self.get_ident(request)
+        ident = client_ip_or_peer(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 

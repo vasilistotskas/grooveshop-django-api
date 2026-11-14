@@ -21,7 +21,10 @@ returns `None`; DRF throttles then fall back to `get_ident()`, and
 everything else uses `client_ip_or_peer(request)` (the proven visitor,
 else the rightmost `X-Forwarded-For` hop Traefik appended, else
 `REMOTE_ADDR`). `edge_client_ip` itself never falls back to
-`REMOTE_ADDR`. It is named for where the proof comes from: CodeQL treats
+`REMOTE_ADDR`. An address handed on as the visitor's own, such as the
+`client_ip_address` of a Meta Conversions API event
+(`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is
+a proxy, not the visitor. It is named for where the proof comes from: CodeQL treats
 any function whose name says `trusted` or `secret` as a source of
 secrets, so under its old name every log line carrying an address was a
 clear-text-logging alert. Operator-side detail, including the fact that the secret

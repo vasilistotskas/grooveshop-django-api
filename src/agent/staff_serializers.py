@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from order.turnover import Bucket
+from order.reporting.turnover import Bucket
 
 
 class StaffScopeSerializer(serializers.Serializer):

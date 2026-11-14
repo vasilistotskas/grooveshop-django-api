@@ -34,12 +34,12 @@ from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
+from order.communications.notifications import notify_order_created_live
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.models.stock_reservation import StockReservation
-from order.notifications import notify_order_created_live
 from order.tasks import (
     send_checkout_abandonment_emails,
     send_invoice_email,

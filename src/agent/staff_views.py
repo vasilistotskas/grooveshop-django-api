@@ -4,7 +4,7 @@ Read-only views behind the staff MCP server (``/mcp/admin``). Each view
 names one scope (``agent/staff.py``), and ``HasStaffScope`` requires both
 the scope on the token and the permission behind it on the caller's role.
 The figures come from the modules the admin's own pages use
-(``order/turnover.py``, ``order/profit.py``), so an AI app and the admin
+(``order/reporting/turnover.py``, ``order/reporting/profit.py``), so an AI app and the admin
 can never disagree.
 """
 
@@ -58,9 +58,9 @@ from agent.staff_serializers import (
 from contact.models import Contact
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import StaffAgentThrottle
-from order import profit, turnover
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
+from order.reporting import profit, turnover
 from product.enum.review import ReviewStatus
 from product.enum.stock import RESTOCK_STATES
 from product.models.product import Product

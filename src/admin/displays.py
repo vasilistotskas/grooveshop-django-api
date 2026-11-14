@@ -52,7 +52,7 @@ from django.utils.translation import (
 from django_stubs_ext import StrOrPromise
 from unfold.decorators import display
 
-from order.attribution import source_label
+from order.checkout.attribution import source_label
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from product.enum.review import ReviewStatus

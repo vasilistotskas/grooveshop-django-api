@@ -206,7 +206,7 @@ cancel, refund), `src/order/stock.py` (`StockManager`),
 `src/order/payment.py` (the payment providers),
 `src/order/payment_ledger.py` (`PaymentLedger`),
 `src/order/signals/handlers.py` (the side effects of a change),
-`src/order/tasks.py`, `src/order/emails.py`, `src/order/notifications.py`
+`src/order/tasks.py`, `src/order/emails.py`, `src/order/communications/notifications.py`
 (live toasts), `src/order/mydata/` and `src/order/views/`.
 
 ### `cart/`

@@ -56,7 +56,7 @@ from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
 from order import credit_allocation
-from order.discounts import order_discount_total
+from order.checkout.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
 from order.models.invoice import Invoice, InvoiceCounter
@@ -184,7 +184,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
-    Gift-card amounts are payment, never allocated (order/discounts.py).
+    Gift-card amounts are payment, never allocated (order/checkout/discounts.py).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
     allocation = _returned_before_receipt(order)

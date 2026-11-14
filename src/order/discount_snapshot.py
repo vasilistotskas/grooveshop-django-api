@@ -4,7 +4,7 @@
 Two kinds of order do not have it: those that predate the column, and
 those the previous release creates while it still serves the rollout (its
 INSERTs do not name the column, so every line holds the ``db_default`` 0).
-The tax documents refuse such an order (``order.discounts``) rather than
+The tax documents refuse such an order (``order.checkout.discounts``) rather than
 bill a total the customer never owed, so this fills them in.
 
 The only information that exists for them is the order's discount total:
@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from django.db.models import Exists, OuterRef, Q
 
-from order.discounts import CENT, allocate_capped
+from order.checkout.discounts import CENT, allocate_capped
 
 
 def heal_discount_allocation(apps) -> int:

@@ -3,7 +3,7 @@
 A price discount granted at the time of sale (coupon, automatic
 promotion, redeemed loyalty points) reduces the taxable base; a gift card
 is a means of payment and does not. The cart preview and the invoice
-share ``order.discounts`` so the VAT line the shopper sees is the VAT the
+share ``order.checkout.discounts`` so the VAT line the shopper sees is the VAT the
 invoice carries.
 """
 
@@ -16,7 +16,7 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
-from order.discounts import allocate_capped
+from order.checkout.discounts import allocate_capped
 from order.factories.order import OrderFactory
 from order.invoicing import _compute_vat_breakdown
 from order.taxation import split_gross

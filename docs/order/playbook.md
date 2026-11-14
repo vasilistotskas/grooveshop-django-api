@@ -38,7 +38,7 @@ and says which file holds each § number used here.
    service method instead of a row.
 3. Add a Greek translation in `src/locale/el/LC_MESSAGES/django.po`, run
    `compilemessages`.
-4. Add the matching `_ORDER_STATUS_COPY` entry in `src/order/notifications.py`
+4. Add the matching `_ORDER_STATUS_COPY` entry in `src/order/communications/notifications.py`
    for the WS toast.
 5. Create email templates under
    `src/core/templates/emails/order/order_<status>.{html,txt}`.

@@ -39,7 +39,7 @@ from rest_framework.test import APIClient
 from cart.models.cart import Cart
 from cart.models.item import CartItem
 from country.factories import CountryFactory
-from order.attribution import AttributionInput
+from order.checkout.attribution import AttributionInput
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import CartHasUnpaidOrderError, InvalidOrderDataError

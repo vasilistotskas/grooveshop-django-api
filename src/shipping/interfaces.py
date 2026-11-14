@@ -91,7 +91,7 @@ class ShippingCarrierInterface(ABC):
         on ``Order``, for a carrier that leaves the order open behind it.
 
         Such an order ships nothing until staff create a new shipment or
-        cancel the order, so it needs follow-up (``order.follow_up``).
+        cancel the order, so it needs follow-up (``order.lifecycle.follow_up``).
         Default ``None``: a carrier that cancels the order together with
         its canceled shipment (ACS, ``cancel_for_dead_shipment``) never
         leaves one waiting.

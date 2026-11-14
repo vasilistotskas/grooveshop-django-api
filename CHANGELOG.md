@@ -3,6 +3,38 @@
 
 
 
+## v3.245.5 (2026-11-14)
+
+### Bug fixes
+
+* fix(shipping_boxnow): look a parcel up by orderNumber after P410 and before a blind cancel (#675)
+
+A BoxNow creation can reach BoxNow and lose its answer. Until now the
+shop then either refused every retry with P410 (duplicate orderNumber) or
+cancelled the shipment locally while BoxNow kept a live parcel.
+
+- P410 on creation: the order is looked up by orderNumber and one live
+  `new` parcel is taken over, only when its locker, paymentMode and (COD)
+  amountToBeCollected match this request; anything else is refused with
+  the reason.
+- A cancel with no parcel id after an attempted creation looks the parcel
+  up and cancels it at BoxNow by id, or refuses (lookup failed, a parcel
+  past `new`, several live). Only "nothing live" is a local cancel.
+- The lookup asks once per paymentMode (it defaults to prepaid), reads
+  every page, and keeps parcels whose cancel was only requested.
+- A parcel created after a local cancel is cancelled at BoxNow and
+  recorded; a reissue waits while that cancel has no outcome.
+- A cancel that read the row before a reset for reissue never writes over
+  the reset.
+- BoxNowShipment.has_parcel is the one "has a parcel" rule, so "Create
+  BoxNow parcel now" no longer dispatches a no-op for a parcel taken over.
+- update_delivery_request and get_parcel_info's forbidden `q` are removed.
+
+Follow-ups: #690 (an uncertain creation must not allow a local-only
+cancel), #691 (the status poll and COD parcels).
+
+Closes #606 ([`2cc891d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cc891df55c4a609b31727ce100088fa466e50d2))
+
 ## v3.245.4 (2026-11-14)
 
 ### Bug fixes

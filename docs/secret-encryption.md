@@ -27,7 +27,7 @@ them either.
 ## The key
 
 `FIELD_ENCRYPTION_KEYS` is a comma-separated list of Fernet keys, read in
-`src/settings.py`. The first key encrypts; every key decrypts. It is never
+`src/settings/env.py`. The first key encrypts; every key decrypts. It is never
 derived from `SECRET_KEY`, so rotating one does not touch the other.
 
 - Production and staging refuse to start without it, and refuse an entry

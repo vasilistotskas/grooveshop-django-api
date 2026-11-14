@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from celery import Celery
 
-import settings as settings_module
+import settings.schedule as settings_module
 from scheduler import beat
 from scheduler.beat import CodeOwnedScheduler
 

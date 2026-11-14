@@ -116,7 +116,7 @@ consumed by tasks and integrations.
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |
 
 `ACCOUNT_LOGIN_BY_CODE_ENABLED`, `MFA_*_ENABLED`, `DB_POOL_ENABLED` and the
-other `src/settings.py` constants are deployment configuration, not store
+other constants of `src/settings/` are deployment configuration, not store
 settings.
 
 ## Features, gates and dependencies

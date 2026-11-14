@@ -9,14 +9,14 @@ named here, and when a path named here does not exist.
 
 ## Layout
 
-- **Source lives in `src/`.** Every app, `src/settings.py` and the `asgi`
+- **Source lives in `src/`.** Every app, `src/settings/` and the `asgi`
   package are in `src/`, and `src/` is on the Python path, so an import
   names the app and never `src` (`from order.services import ...`). A file
   is named by its path (`src/order/services.py`), a module by its dotted
   name (`order.services`). Apps are flat: one folder per app, no nesting.
 - **Two app lists.** `SHARED_APPS` migrate into the `public` schema,
   `TENANT_APPS` into every store's own schema, and `INSTALLED_APPS` is
-  their union (`src/settings.py`). The list an app is in decides where its
+  their union (`src/settings/application.py`). The list an app is in decides where its
   tables live, and so which host can serve it. The headings below follow
   the lists. The cross-service view is
   `grooveshop-docs/src/dev/platform/multi-tenancy.md`.
@@ -38,9 +38,11 @@ named here, and when a path named here does not exist.
 
 ## Settings, URLs and ASGI
 
-- **`src/settings.py`** is one file, and `DJANGO_SETTINGS_MODULE` is
-  `settings`. `SYSTEM_ENV` (`dev`, `ci`, `staging`, `production`) switches
-  the environment-specific behaviour. Everything else comes from `.env`
+- **`src/settings/`** is one package, one module per concern, and
+  `DJANGO_SETTINGS_MODULE` is `settings`: `src/settings/__init__.py`
+  star-imports the modules in the order the settings are evaluated in.
+  `SYSTEM_ENV` (`dev`, `ci`, `staging`, `production`) switches the
+  environment-specific behaviour. Everything else comes from `.env`
   through python-dotenv.
 - **`src/core/urls.py`** is `ROOT_URLCONF` and mounts every app under
   `api/v1/`. It is built from named groups so two hosts can serve
@@ -119,7 +121,7 @@ Read `docs/api-staff-identity.md`, `docs/secret-encryption.md`,
 ### `scheduler/`
 
 The periodic schedule's state. `CELERY_BEAT_SCHEDULE` in
-`src/settings.py` is the whole schedule; `PeriodicTask` holds only state
+`src/settings/schedule.py` is the whole schedule; `PeriodicTask` holds only state
 (enabled, last run, run count), and `scheduler.beat.CodeOwnedScheduler`
 (`src/scheduler/beat.py`) reads the settings and deletes any row they do
 not declare. Read `docs/scheduler.md`.

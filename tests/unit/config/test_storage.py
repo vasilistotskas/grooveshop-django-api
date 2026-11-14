@@ -4,11 +4,11 @@ import unittest
 from importlib import reload
 from unittest.mock import patch
 
-# Each test reloads the ``settings`` module inside an
-# ``os.environ`` patch and re-imports the URL constants — the
-# module-level re-import is intentionally avoided so the values
-# reflect the patched env, not whatever was first loaded at
-# pytest collection time.
+# Each test reloads ``settings.storage``, the settings module that owns
+# these values, inside an ``os.environ`` patch and re-imports the URL
+# constants — the module-level re-import is intentionally avoided so the
+# values reflect the patched env, not whatever was first loaded at pytest
+# collection time.
 
 
 class TestStorage(unittest.TestCase):
@@ -17,8 +17,8 @@ class TestStorage(unittest.TestCase):
     )
     @patch.dict(os.environ, {"SYSTEM_ENV": "dev"})
     def test_dev(self):
-        reload(sys.modules["settings"])
-        from settings import MEDIA_URL, STATIC_BASE_URL, STATIC_URL
+        reload(sys.modules["settings.storage"])
+        from settings.storage import MEDIA_URL, STATIC_BASE_URL, STATIC_URL
 
         # ``STATIC_URL`` stays relative — Django's static-asset
         # pipeline doesn't surface URLs through DRF, so no Zod check

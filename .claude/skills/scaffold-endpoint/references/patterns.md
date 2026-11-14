@@ -941,9 +941,9 @@ def get_or_create_category():
 
 ## 9. App Registration
 
-### src/settings.py
+### src/settings/application.py
 
-Add the app to `TENANT_APPS` in `src/settings.py` if its rows are per-store, or
+Add the app to `TENANT_APPS` in `src/settings/application.py` if its rows are per-store, or
 to `SHARED_APPS` if they live in the public schema:
 
 ```python

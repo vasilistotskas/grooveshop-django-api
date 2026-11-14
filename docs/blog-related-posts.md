@@ -8,7 +8,7 @@ and post (`server/api/blog/posts/[id]/related-posts.get.ts`, `BlogPostRelatedPos
 
 ## The chain
 
-`RELATED_POSTS_STRATEGIES` (src/settings.py) lists the strategies, the closest match
+`RELATED_POSTS_STRATEGIES` (`src/settings/domain.py`) lists the strategies, the closest match
 first, each with a weight:
 
 | Order | Strategy | Weight | Finds |

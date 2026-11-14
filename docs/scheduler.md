@@ -9,7 +9,7 @@ blocked every Django upgrade until it published a release.
 
 | What | Where |
 |---|---|
-| What runs and when | `CELERY_BEAT_SCHEDULE` (`src/settings.py: get_celery_beat_schedule()`) |
+| What runs and when | `CELERY_BEAT_SCHEDULE` (`src/settings/schedule.py: get_celery_beat_schedule()`) |
 | Whether a slot is due | Celery's `crontab` |
 | Switched on or off, last run, run count | `scheduler.PeriodicTask`, one row per entry, in `public` |
 
@@ -90,5 +90,6 @@ that way locally too.
 | `src/scheduler/beat.py` | The scheduler |
 | `src/scheduler/models.py` | `PeriodicTask`, `switch_on`, `switch_off` |
 | `src/scheduler/admin.py` | The console screen and its actions |
-| `src/settings.py` | `CELERY_BEAT_SCHEDULE`, `CELERY_BEAT_SCHEDULER` |
+| `src/settings/schedule.py` | `CELERY_BEAT_SCHEDULE` |
+| `src/settings/celery.py` | `CELERY_BEAT_SCHEDULER` |
 | `tests/integration/scheduler/` | Tick-by-tick behaviour on a clock the test owns |

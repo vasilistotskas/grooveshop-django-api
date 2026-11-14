@@ -27,6 +27,7 @@ and the class decides what an outage means with ONE attribute,
   messages to the store's own inbox).
 """
 
+import hashlib
 import hmac
 import logging
 from typing import ClassVar
@@ -87,13 +88,15 @@ class ResilientThrottleMixin:
             return True
 
 
-def _gateway_cart_ident(request) -> str | None:
-    """Cart UUID to throttle on when the request is from the agent gateway.
+def _gateway_ident(request) -> str | None:
+    """The cart or order to throttle on when the agent gateway calls.
 
     The gateway authenticates itself with the ``X-Internal-Gateway``
     shared secret (its ``INTERNAL_EVENTS_SECRET``). Returns ``None`` —
     meaning "throttle normally" — unless the secret is configured,
-    matches, and the request carries a cart UUID.
+    matches, and the request names a cart (cart writes, order creation)
+    or an order (``?uuid=``, the payment-link calls). A cart token and an
+    order uuid both open what they name, so each is keyed by its hash.
     """
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
     provided = request.headers.get("X-Internal-Gateway", "")
@@ -111,7 +114,11 @@ def _gateway_cart_ident(request) -> str | None:
     if token:
         # The token names the cart; key on its hash, never the token.
         return hash_cart_token(token)
-    return request.headers.get("X-Cart-Id") or None
+    if cart_id := request.headers.get("X-Cart-Id"):
+        return cart_id
+    if order_uuid := request.GET.get("uuid"):
+        return "order:" + hashlib.sha256(order_uuid.encode()).hexdigest()
+    return None
 
 
 class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
@@ -223,12 +230,41 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
+class GatewayAnonThrottle(AnonIpRateThrottle):
+    """Key a request the agent gateway authenticates on its cart or order.
+
+    Every buyer an AI platform serves reaches Django through the gateway
+    from the platform's address, so the per-address key would put them
+    all in one budget. A request carrying the gateway's secret and a cart
+    or an order is keyed on it instead (``_gateway_ident``); one cart or
+    order still cannot exceed the rate. Everyone else keeps the
+    per-address key.
+    """
+
+    def get_cache_key(self, request, view):
+        # Anonymous only, as the parent: a gateway request signed in as an
+        # account (a linked agent) is throttled by the user budget alone.
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return None
+        ident = _gateway_ident(request)
+        if ident:
+            return self.cache_format % {
+                "scope": self.scope,
+                "ident": f"gw:{ident}",
+            }
+        return super().get_cache_key(request, view)
+
+
 class PaymentAttemptThrottle(ResilientThrottleMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
 
 
-class PaymentAttemptAnonThrottle(AnonIpRateThrottle):
+class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
+    """Starting a payment, keyed per order when the agent gateway asks for
+    the link it needs right after placing an online order."""
+
     scope = "payment_anon"
     fail_closed = True
 
@@ -238,13 +274,14 @@ class OrderCreateThrottle(ResilientThrottleMixin, UserRateThrottle):
     fail_closed = True
 
 
-class OrderCreateAnonThrottle(AnonIpRateThrottle):
+class OrderCreateAnonThrottle(GatewayAnonThrottle):
     """Anonymous checkout is a stock- and money-moving endpoint.
 
     Creating an order reserves or decrements stock, can mint a courier
     voucher and can open a provider payment session, all before anyone
     has authenticated. The global anon budget is a day-scale ceiling and
-    does not bound a burst.
+    does not bound a burst. An order the agent gateway places is
+    budgeted per cart (``GatewayAnonThrottle``), like its cart writes.
     """
 
     scope = "order_create_anon"
@@ -273,21 +310,8 @@ class StaffAgentThrottle(UserOrIpRateThrottle):
     scope = "agent_staff"
 
 
-class CartMutationAnonThrottle(AnonIpRateThrottle):
+class CartMutationAnonThrottle(GatewayAnonThrottle):
     scope = "cart_mutation_anon"
-
-    def get_cache_key(self, request, view):
-        # All AI-agent traffic egresses from agent-gateway pods, so the
-        # default REMOTE_ADDR key would put every agent in one shared
-        # 30/min bucket. Authenticated gateway requests are keyed on the
-        # cart UUID instead; everyone else keeps the per-IP key.
-        ident = _gateway_cart_ident(request)
-        if ident:
-            return self.cache_format % {
-                "scope": self.scope,
-                "ident": f"gw:{ident}",
-            }
-        return super().get_cache_key(request, view)
 
 
 class CouponApplyThrottle(UserOrIpRateThrottle):

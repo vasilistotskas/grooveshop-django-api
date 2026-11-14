@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from allauth.account.models import EmailAddress
@@ -119,7 +120,7 @@ def _broadcast_force_logout(user) -> None:
     from tenant.celery import dispatch_on_commit
     from user.tasks import push_force_logout
 
-    dispatch_on_commit(push_force_logout, [user.pk])
+    dispatch_on_commit(push_force_logout, [user.pk, time.time()])
 
 
 @receiver(

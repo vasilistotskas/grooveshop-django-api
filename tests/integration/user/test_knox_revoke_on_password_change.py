@@ -162,7 +162,10 @@ class TestRevokeKnoxTokensOnPasswordChange:
             password_changed.send(sender=User, request=None, user=user)
 
         assert AuthToken.objects.filter(user=user).count() == 0
-        assert_published_once(push, [user.pk])
+        assert_published_once(push)
+        user_id, revoked_at = push.call_args.kwargs["args"]
+        assert user_id == user.pk
+        assert isinstance(revoked_at, float)
         layer.group_send.assert_not_awaited()
 
     def test_the_force_logout_task_reaches_the_users_sockets(self):
@@ -181,9 +184,12 @@ class TestRevokeKnoxTokensOnPasswordChange:
         async_to_sync(layer.group_add)(user_group("public", user.pk), channel)
 
         with patch("channels.layers.get_channel_layer", return_value=layer):
-            push_force_logout.apply(args=[user.pk]).get()
+            push_force_logout.apply(args=[user.pk, 1_800_000_000.0]).get()
 
-        assert async_to_sync(layer.receive)(channel) == {"type": "force.logout"}
+        assert async_to_sync(layer.receive)(channel) == {
+            "type": "force.logout",
+            "revoked_at": 1_800_000_000.0,
+        }
 
 
 class TestRevocationSignalHandlerRegistration:

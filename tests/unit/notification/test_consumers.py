@@ -1,4 +1,5 @@
 import json
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -230,3 +231,43 @@ class TestNotificationConsumer(SimpleTestCase):
             "Client message received and discarded (server-push only)"
         )
         consumer.send.assert_not_called()
+
+
+class TestForceLogoutKeepsALaterSignIn(SimpleTestCase):
+    """The force.logout push follows the change on Celery, so it can arrive
+    after the user signed in again. A socket that authenticated after the
+    revocation is the new sign-in, not a revoked session."""
+
+    async def _connected(self):
+        consumer = NotificationConsumer()
+        consumer.scope = {"user": _user()}
+        consumer.channel_layer = MagicMock()
+        consumer.channel_layer.group_add = AsyncMock()
+        consumer.channel_layer.group_discard = AsyncMock()
+        consumer.channel_name = "test_channel"
+        consumer.accept = AsyncMock()
+        consumer.close = AsyncMock()
+        await consumer.connect()
+        return consumer
+
+    async def test_a_logout_revoked_before_the_socket_signed_in_is_ignored(
+        self,
+    ):
+        consumer = await self._connected()
+
+        await consumer.force_logout(
+            {"type": "force.logout", "revoked_at": time.time() - 60}
+        )
+
+        consumer.close.assert_not_called()
+
+    async def test_a_logout_revoked_after_the_socket_signed_in_closes_it(
+        self,
+    ):
+        consumer = await self._connected()
+
+        await consumer.force_logout(
+            {"type": "force.logout", "revoked_at": time.time() + 60}
+        )
+
+        consumer.close.assert_awaited_once_with(code=4003)

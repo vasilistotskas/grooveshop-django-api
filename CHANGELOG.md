@@ -3,6 +3,26 @@
 
 
 
+## v3.245.9 (2026-11-14)
+
+### Bug fixes
+
+* fix(order): the unpaid-order limit counts every pending order awaiting its online payment, and says why it refused (#696)
+
+The per-customer limit on unpaid online orders (ORDER_MAX_UNPAID_ONLINE_ORDERS)
+counted only orders whose payment was still PENDING. A PENDING online order
+whose payment failed or is processing also holds its stock, so it counts now.
+
+- Order.objects.holding_stock_for_online_payment() is the one definition, used
+  by the limit and by the unpaid-order pile-up alert, which also missed failed
+  attempts.
+- The refusal is UnpaidOrderLimitError, answered on pay_way_id with the code
+  unpaid_order_limit and the sentence the shopper reads ("You already have N
+  orders waiting for their payment ..."); before, it went out as the generic
+  "Invalid order data".
+docs/order/cancel.md says what counts, and that a processing payment waits
+  for its webhook or a cancel by the customer. ([`5cd2fc8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cd2fc828e357e2193bbef8dac7beefabf155959))
+
 ## v3.245.8 (2026-11-14)
 
 ### Refactoring

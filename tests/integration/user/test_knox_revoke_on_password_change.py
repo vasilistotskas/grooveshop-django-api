@@ -34,6 +34,7 @@ from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 AuthToken = get_token_model()
+PUSH = "user.tasks.push_force_logout.apply_async"
 
 pytestmark = pytest.mark.django_db
 
@@ -136,17 +137,42 @@ class TestRevokeKnoxTokensOnPasswordChange:
         assert AuthToken.objects.filter(user=user_b).count() == 0
         assert AuthToken.objects.filter(user=user_c).count() == 2
 
-    def test_force_logout_broadcast_is_attempted_after_token_revocation(self):
-        """_broadcast_force_logout is called even when the channel layer is
-        available; here we verify it is invoked with the correct user group."""
+    def test_the_force_logout_push_is_queued_not_sent_in_the_request(self):
+        """A channel layer that fails never turns the saved change into an error.
+
+        The push follows the change on Celery (#673): the request revokes the
+        tokens, queues the push and never waits on the channel layer.
+        """
+        from unittest.mock import AsyncMock, MagicMock
+
+        from django.test import TestCase
+
+        from tests.utils.dispatch import assert_published_once
+
+        user = UserAccountFactory()
+        _create_tokens(user, 2)
+        layer = MagicMock()
+        layer.group_send = AsyncMock(side_effect=TimeoutError)
+
+        with (
+            patch("channels.layers.get_channel_layer", return_value=layer),
+            patch(PUSH) as push,
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            password_changed.send(sender=User, request=None, user=user)
+
+        assert AuthToken.objects.filter(user=user).count() == 0
+        assert_published_once(push, [user.pk])
+        layer.group_send.assert_not_awaited()
+
+    def test_the_force_logout_task_reaches_the_users_sockets(self):
         from asgiref.sync import async_to_sync
         from channels.layers import InMemoryChannelLayer
 
         from notification.groups import user_group
+        from user.tasks import push_force_logout
 
         user = UserAccountFactory()
-        _create_tokens(user, 1)
-
         # A socket of the user's, joined to their tenant-scoped personal
         # group. Tests run in the public schema (DATABASE_ROUTERS disabled
         # in conftest), so the group prefix is "tenant_public".
@@ -155,15 +181,8 @@ class TestRevokeKnoxTokensOnPasswordChange:
         async_to_sync(layer.group_add)(user_group("public", user.pk), channel)
 
         with patch("channels.layers.get_channel_layer", return_value=layer):
-            password_changed.send(
-                sender=User,
-                request=None,
-                user=user,
-            )
+            push_force_logout.apply(args=[user.pk]).get()
 
-        # Tokens revoked.
-        assert AuthToken.objects.filter(user=user).count() == 0
-        # The socket received the force logout.
         assert async_to_sync(layer.receive)(channel) == {"type": "force.logout"}
 
 

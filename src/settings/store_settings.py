@@ -631,6 +631,22 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "CUSTOMER_ACCOUNTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Let shoppers have an account: sign-up, sign-in (password, "
+            "code, passkey, social), password reset, the account pages "
+            "and linking an AI agent to an account. OFF makes every one "
+            "of them 404 on the store's hosts and stops accepting a "
+            "sign-in a shopper already has, for a store that sells to "
+            "guests or sells nothing. Favourites, product reviews, blog "
+            "comments, loyalty and wholesale need an account, so they "
+            "are off with it. Guest checkout and the store team's own "
+            "sign-in are not affected."
+        ),
+    },
+    {
         "name": "STICKY_ADD_TO_CART_ENABLED",
         "type": "bool",
         "value": True,

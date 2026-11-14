@@ -31,6 +31,7 @@ from b2b.vies import ViesClient, ViesUnavailableError
 from core.store_settings import store_setting
 from product.models.product import _quantize_cents
 from tenant.celery import dispatch_on_commit
+from tenant.features import feature_on
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +76,11 @@ class B2BService:
         The plan half is checked HERE rather than only on the b2b
         endpoints because cart resolution and order create run for
         everyone (guest checkout has no permission classes), so pricing
-        would bypass an endpoint-only gate entirely. See
-        tenant.membership.tenant_plan_allows.
+        would bypass an endpoint-only gate entirely. Read from the
+        feature's row (``tenant.features``), so whatever else wholesale
+        needs (customer accounts) is honoured here too.
         """
-        from tenant.membership import tenant_plan_allows
-
-        if not tenant_plan_allows("b2b_enabled"):
-            return False
-        return bool(store_setting("B2B_WHOLESALE_ENABLED"))
+        return feature_on("wholesale")
 
     @classmethod
     def promotions_allowed(cls) -> bool:

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 from urllib.parse import urlsplit
 
 from allauth.idp.oidc import views as oidc_views
@@ -6,7 +7,7 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.urls import include, path, re_path
+from django.urls import URLPattern, URLResolver, include, path, re_path
 from django.utils.translation import gettext_lazy as _
 from django.views.static import serve as serve_media
 from drf_spectacular.views import (
@@ -56,6 +57,74 @@ app_name = "core"
 # same shape as before.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# A store's CUSTOMER identity: every route that signs a shopper up, in or
+# out, manages their account's sign-in, or links the account to an AI
+# agent. While a store has customer accounts off
+# (``CUSTOMER_ACCOUNTS_ENABLED``) ``tenant.middleware.
+# CustomerAccountsMiddleware`` answers 404 for every view mounted by these
+# three groups (``CUSTOMER_IDENTITY_VIEWS``, below), so a route allauth adds
+# in an upgrade is refused with them. Each group is spliced into the host
+# groups that follow, where it always was.
+# ---------------------------------------------------------------------------
+
+# allauth headless endpoints must be at the root (not inside i18n_patterns)
+# so non-default locales don't get a /{lang}/_allauth/ prefix that the Nuxt
+# proxy never sends.
+_customer_identity_root_patterns = [
+    path("_allauth/", include("allauth.headless.urls")),
+    path(
+        "_allauth/app/v1/account/authenticators/totp/svg",
+        ManageTOTPSvgView.as_api_view(client="app"),
+        name="manage_totp_svg",
+    ),
+]
+
+# The store's OIDC identity provider (allauth.idp), which links the store's
+# CUSTOMERS to an AI agent: /.well-known/openid-configuration + /identity/o/*
+# (authorize, token, DCR, …). Root-mounted — OAuth clients (AI agents)
+# construct these URLs from the issuer, never with a locale prefix. Store
+# hosts only: on the public schema the same provider is the STAFF issuer,
+# served by the staff connect host alone (``agent.urls_connect``), never
+# the platform host.
+_customer_identity_storefront_patterns = [
+    path("", include("allauth.idp.urls")),
+    # RFC 8414 alias: plain-OAuth clients look for
+    # /.well-known/oauth-authorization-server; serve the same metadata
+    # document as the OIDC discovery endpoint.
+    path(
+        ".well-known/oauth-authorization-server",
+        oidc_views.configuration,
+        name="oauth_authorization_server_metadata",
+    ),
+]
+
+# allauth's pages: the sign-in the IdP's authorize step sends a shopper to,
+# and the social providers' callbacks. Locale-prefixed. The platform host
+# serves them too, for the platform's own sign-in, which no store switch
+# reaches.
+_customer_identity_i18n_patterns = [
+    path("accounts/", include("allauth.urls")),
+]
+
+
+def _views(patterns) -> Iterator:
+    for pattern in patterns:
+        if isinstance(pattern, URLResolver):
+            yield from _views(pattern.url_patterns)
+        elif isinstance(pattern, URLPattern):
+            yield pattern.callback
+
+
+#: Every view of a store's customer identity, as ``resolve`` returns it.
+CUSTOMER_IDENTITY_VIEWS = frozenset(
+    _views(
+        _customer_identity_root_patterns
+        + _customer_identity_storefront_patterns
+        + _customer_identity_i18n_patterns
+    )
+)
+
 # Root-mounted (outside i18n_patterns), served on BOTH hosts: locale
 # machinery, payment/shipping webhook receivers (POST-only, no data
 # exposure; the sender targets whichever host the webhook was registered
@@ -80,15 +149,7 @@ _root_shared_patterns = [
         ResendWebhookView.as_view(),
         name="resend-webhook",
     ),
-    # allauth headless endpoints must be at the root (not inside i18n_patterns)
-    # so non-default locales don't get a /{lang}/_allauth/ prefix that
-    # the Nuxt proxy never sends.
-    path("_allauth/", include("allauth.headless.urls")),
-    path(
-        "_allauth/app/v1/account/authenticators/totp/svg",
-        ManageTOTPSvgView.as_api_view(client="app"),
-        name="manage_totp_svg",
-    ),
+    *_customer_identity_root_patterns,
 ]
 
 # Root-mounted, STOREFRONT only: agent-facing scoped resources (a store's
@@ -96,22 +157,7 @@ _root_shared_patterns = [
 # the same reason as the IdP endpoints.
 _root_storefront_patterns = [
     path("api/v1/", include("agent.urls")),
-    # The store's OIDC identity provider (allauth.idp), which links the
-    # store's CUSTOMERS to an AI agent: /.well-known/openid-configuration
-    # + /identity/o/* (authorize, token, DCR, …). Root-mounted — OAuth
-    # clients (AI agents) construct these URLs from the issuer, never with
-    # a locale prefix. Store hosts only: on the public schema the same
-    # provider is the STAFF issuer, served by the staff connect host alone
-    # (``agent.urls_connect``), never the platform host.
-    path("", include("allauth.idp.urls")),
-    # RFC 8414 alias: plain-OAuth clients look for
-    # /.well-known/oauth-authorization-server; serve the same metadata
-    # document as the OIDC discovery endpoint.
-    path(
-        ".well-known/oauth-authorization-server",
-        oidc_views.configuration,
-        name="oauth_authorization_server_metadata",
-    ),
+    *_customer_identity_storefront_patterns,
 ]
 
 # Locale-prefixed, served on BOTH hosts: admin + editor infra (the platform
@@ -121,7 +167,7 @@ _root_storefront_patterns = [
 _shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
     path("upload_image", upload_image, name="upload_image"),
-    path("accounts/", include("allauth.urls")),
+    *_customer_identity_i18n_patterns,
     # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
     # registers for the translation form; Django resolves the first match
     # so this override takes priority over the default `TranslationFormView`.

@@ -26,7 +26,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from tenant.permissions import IsB2BEnabled, IsB2BWholesaleEnabled
+from tenant.features import feature_gates
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class B2BViewSet(BaseModelViewSet):
 
     queryset = BusinessProfile.objects.none()
     serializers_config = serializers_config
-    permission_classes = [IsB2BEnabled, IsB2BWholesaleEnabled, IsAuthenticated]
+    permission_classes = [*feature_gates("wholesale"), IsAuthenticated]
 
     def get_throttles(self):
         if self.action == "submit_profile":

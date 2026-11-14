@@ -3956,6 +3956,9 @@ msgstr "Σημειώσεις Πελάτη"
 msgid "Customer accounts"
 msgstr "Λογαριασμοί πελατών"
 
+msgid "Customer accounts feature"
+msgstr "Λειτουργία λογαριασμών πελατών"
+
 msgid "Customer charged more than the order is for"
 msgstr "Ο πελάτης χρεώθηκε περισσότερα από όσα αξίζει η παραγγελία"
 

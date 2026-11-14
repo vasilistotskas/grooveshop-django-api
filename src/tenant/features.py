@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django_tenants.utils import get_public_schema_name, schema_context
+from rest_framework.permissions import BasePermission
 
 from tenant.permissions import (
     IsAccountReviewsEnabled,
@@ -31,6 +32,7 @@ from tenant.permissions import (
     IsCatalogueEnabled,
     IsChatWidgetEnabled,
     IsContactAttachmentsEnabled,
+    IsCustomerAccountsEnabled,
     IsFavouritesEnabled,
     IsFeedbackEnabled,
     IsGiftCardsEnabled,
@@ -61,25 +63,46 @@ class StoreFeature:
 
 
 STORE_FEATURES: dict[str, StoreFeature] = {
+    # Sign-in, sign-up and the account itself. What is written by a shopper
+    # under their name (reviews, comments), kept for them (favourites,
+    # points) or priced for them (wholesale) needs an account, so each of
+    # those lists this switch first.
+    "customer_accounts": StoreFeature(None, (IsCustomerAccountsEnabled,)),
     "blog": StoreFeature(IsBlogEnabled),
-    "blog_comments": StoreFeature(IsBlogEnabled, (IsBlogCommentsEnabled,)),
-    "product_reviews": StoreFeature(None, (IsProductReviewsEnabled,)),
+    "blog_comments": StoreFeature(
+        IsBlogEnabled, (IsCustomerAccountsEnabled, IsBlogCommentsEnabled)
+    ),
+    "product_reviews": StoreFeature(
+        None, (IsCustomerAccountsEnabled, IsProductReviewsEnabled)
+    ),
     "account_reviews": StoreFeature(
-        None, (IsProductReviewsEnabled, IsAccountReviewsEnabled)
+        None,
+        (
+            IsCustomerAccountsEnabled,
+            IsProductReviewsEnabled,
+            IsAccountReviewsEnabled,
+        ),
     ),
     # Saved products, alerts, gift cards and suggestions only exist with the
-    # catalogue they point at, so each lists it first.
-    "favourites": StoreFeature(None, (IsCatalogueEnabled, IsFavouritesEnabled)),
+    # catalogue they point at, so each lists it.
+    "favourites": StoreFeature(
+        None,
+        (IsCustomerAccountsEnabled, IsCatalogueEnabled, IsFavouritesEnabled),
+    ),
     "newsletter": StoreFeature(None, (IsNewsletterEnabled,)),
     "feedback": StoreFeature(None, (IsFeedbackEnabled,)),
-    "loyalty": StoreFeature(IsLoyaltyEnabled, (IsLoyaltyRuntimeEnabled,)),
+    "loyalty": StoreFeature(
+        IsLoyaltyEnabled, (IsCustomerAccountsEnabled, IsLoyaltyRuntimeEnabled)
+    ),
     "promotions": StoreFeature(
         IsPromotionsEnabled, (IsPromotionsRuntimeEnabled,)
     ),
     "gift_cards": StoreFeature(
         IsGiftCardsEnabled, (IsCatalogueEnabled, IsGiftCardsRuntimeEnabled)
     ),
-    "wholesale": StoreFeature(IsB2BEnabled, (IsB2BWholesaleEnabled,)),
+    "wholesale": StoreFeature(
+        IsB2BEnabled, (IsCustomerAccountsEnabled, IsB2BWholesaleEnabled)
+    ),
     "product_suggestions": StoreFeature(
         IsRecommendationsEnabled,
         (IsCatalogueEnabled, IsRecommendationsRuntimeEnabled),
@@ -116,6 +139,20 @@ STORE_PREFERENCES: dict[str, str] = {
     "demo_account": "DEMO_ACCOUNT_ENABLED",
     "external_links_new_tab": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
 }
+
+
+def feature_gates(name: str) -> tuple[type[BasePermission], ...]:
+    """The permission classes that answer 404 while ``name`` is off: its
+    plan flag's, then each setting's, in the table's order.
+
+    A view gates a feature through this rather than naming the classes,
+    so a dependency added to the feature's row (``customer_accounts``
+    under favourites) is refused on every route serving it, and each
+    refusal still logs the switch that caused it.
+    """
+    feature = STORE_FEATURES[name]
+    plan = () if feature.plan is None else (feature.plan,)
+    return (*plan, *feature.settings)
 
 
 def feature_setting_gates() -> tuple[type[IsSettingEnabled], ...]:
@@ -198,14 +235,11 @@ def feature_on(name: str) -> bool:
     needs, read in the active schema.
     """
     from core.store_settings import store_setting
-    from tenant.membership import get_current_tenant
+    from tenant.membership import tenant_plan_allows
 
     feature = STORE_FEATURES[name]
-    tenant = get_current_tenant()
-    return not (
-        feature.plan is not None
-        and tenant is not None
-        and not getattr(tenant, feature.plan.feature_flag, True)
+    return (
+        feature.plan is None or tenant_plan_allows(feature.plan.feature_flag)
     ) and all(
         bool(store_setting(gate.setting_key)) for gate in feature.settings
     )

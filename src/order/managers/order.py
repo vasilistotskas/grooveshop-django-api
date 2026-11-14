@@ -58,6 +58,20 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         :func:`awaiting_online_payment_q`)."""
         return self.filter(awaiting_online_payment_q())
 
+    def holding_stock_for_online_payment(self) -> Self:
+        """PENDING orders still owed through a hosted flow.
+
+        Each one holds its stock until it is paid or closed, whatever its
+        last attempt did. ``auto_cancel_stuck_pending_orders`` cancels one
+        whose payment is pending past its hold or failed; one whose payment
+        is processing waits for its final webhook or a cancel by the
+        customer, and holds its stock until then.
+        What the per-customer limit and the pile-up alert count. A canceled
+        order is not PENDING, and its payment is settled on the way out
+        (``Order.settle_unpaid_payment``).
+        """
+        return self.awaiting_online_payment().pending()
+
     def refund_owed(self) -> Self:
         """Canceled orders whose payment was not (fully) returned.
 

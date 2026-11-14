@@ -821,6 +821,21 @@ class TestAnUnpaidPileUpIsLogged:
         assert record.levelname == "WARNING"
         assert record.fields == {"unpaid_online_orders": 2, "threshold": 2}
 
+    def test_an_order_whose_payment_failed_is_still_held(self, caplog):
+        """A failed attempt keeps the stock until the sweep cancels the
+        order, so it is part of the pile-up."""
+        _set(ALERT, 2)
+        _unpaid()
+        _unpaid(payment_status=PaymentStatus.FAILED)
+
+        with caplog.at_level("WARNING", logger="order.tasks"):
+            auto_cancel_stuck_pending_orders()
+
+        record = next(
+            r for r in caplog.records if r.msg == payment_hold.SPIKE_MESSAGE
+        )
+        assert record.fields == {"unpaid_online_orders": 2, "threshold": 2}
+
     def test_silent_below_the_threshold(self, caplog):
         _set(ALERT, 3)
         for _ in range(2):

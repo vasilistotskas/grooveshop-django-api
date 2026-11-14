@@ -229,6 +229,27 @@ class CartHasUnpaidOrderError(InvalidOrderDataError):
         super().__init__("an order of this cart awaits its online payment")
 
 
+class UnpaidOrderLimitError(InvalidOrderDataError):
+    """Raised when a customer already has ``limit`` online-payment orders
+    waiting for their payment (``ORDER_MAX_UNPAID_ONLINE_ORDERS``).
+
+    Nothing was created. The API answers it with the code
+    ``unpaid_order_limit`` on ``pay_way_id``: the customer pays for or
+    cancels one of them, or chooses an offline method.
+
+    A subclass of ``InvalidOrderDataError`` so order creation passes it on
+    as it passes its other refusals. Its own message is for logs; the
+    sentence a client reads is the view's.
+    """
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        super().__init__(
+            f"the customer already has {limit} orders awaiting an online "
+            "payment"
+        )
+
+
 class InvalidCouponError(OrderServiceError):
     """
     Raised when a coupon attached to the cart is refused at order

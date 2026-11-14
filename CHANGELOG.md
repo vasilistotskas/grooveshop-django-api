@@ -3,6 +3,28 @@
 
 
 
+## v3.245.11 (2026-11-14)
+
+### Refactoring
+
+* refactor(order): move the reporting, checkout, lifecycle and live-notification modules into subpackages (#702)
+
+Pure moves (first of #566's PRs): turnover and profit into
+order/reporting/, attribution and discounts into order/checkout/,
+follow_up into order/lifecycle/, notifications into
+order/communications/. Every importer, test patch and doc moves with them;
+no re-export shims. The live-notification tasks keep their pinned names.
+
+Not moved on purpose: emails (the app's autodiscovered declaration
+module); discount_snapshot and line_snapshot (imported by migrations);
+stock and review_request (their validator paths are stored data, so they
+move by an expand/contract pair of releases).
+
+Four API descriptions that named module paths describe behaviour instead
+(description text only in schema.yml).
+
+Part of #566 ([`a967d36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a967d361d51fa3eb00a4351198b61bd7ce5f9506))
+
 ## v3.245.10 (2026-11-14)
 
 ### Bug fixes

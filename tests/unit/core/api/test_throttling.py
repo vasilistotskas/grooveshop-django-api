@@ -32,11 +32,18 @@ def _anon_request(factory: APIRequestFactory, **headers):
     return request
 
 
-@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
-class CartMutationAnonThrottleTestCase(TestCase):
+class _GatewayCartKeyTests:
+    """A request the agent gateway authenticates is keyed on its cart.
+
+    Every buyer an AI platform serves reaches Django from the platform's
+    address; keyed on it, they would all share one budget.
+    """
+
+    throttle_class: type
+
     def setUp(self) -> None:
         self.factory = APIRequestFactory()
-        self.throttle = CartMutationAnonThrottle()
+        self.throttle = self.throttle_class()
 
     def test_gateway_request_keys_on_cart_uuid(self) -> None:
         request = _anon_request(
@@ -104,6 +111,18 @@ class CartMutationAnonThrottleTestCase(TestCase):
         )
         key = self.throttle.get_cache_key(request, view=None)
         self.assertNotIn(CART_UUID, key)
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class CartMutationAnonThrottleTestCase(_GatewayCartKeyTests, TestCase):
+    throttle_class = CartMutationAnonThrottle
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class OrderCreateAnonThrottleTestCase(_GatewayCartKeyTests, TestCase):
+    """Order creation from the gateway is budgeted per cart (#699)."""
+
+    throttle_class = OrderCreateAnonThrottle
 
 
 EDGE_SECRET = "edge-shared-secret"

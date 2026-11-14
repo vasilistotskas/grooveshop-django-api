@@ -54,6 +54,7 @@ FAIL_CLOSED = {
 FAIL_OPEN = {
     "UserOrIpRateThrottle",
     "AnonIpRateThrottle",
+    "GatewayCartAnonThrottle",
     "ContactCreateThrottle",
     "FeedbackCreateThrottle",
     "CartMutationThrottle",

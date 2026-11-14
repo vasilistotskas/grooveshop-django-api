@@ -223,6 +223,26 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
+class GatewayCartAnonThrottle(AnonIpRateThrottle):
+    """Key a request the agent gateway authenticates on its cart.
+
+    Every buyer an AI platform serves reaches Django through the gateway
+    from the platform's address, so the per-address key would put them
+    all in one budget. A request carrying the gateway's secret and a cart
+    is keyed on that cart instead (``_gateway_cart_ident``); one cart
+    still cannot exceed the rate. Everyone else keeps the per-address key.
+    """
+
+    def get_cache_key(self, request, view):
+        ident = _gateway_cart_ident(request)
+        if ident:
+            return self.cache_format % {
+                "scope": self.scope,
+                "ident": f"gw:{ident}",
+            }
+        return super().get_cache_key(request, view)
+
+
 class PaymentAttemptThrottle(ResilientThrottleMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
@@ -238,13 +258,14 @@ class OrderCreateThrottle(ResilientThrottleMixin, UserRateThrottle):
     fail_closed = True
 
 
-class OrderCreateAnonThrottle(AnonIpRateThrottle):
+class OrderCreateAnonThrottle(GatewayCartAnonThrottle):
     """Anonymous checkout is a stock- and money-moving endpoint.
 
     Creating an order reserves or decrements stock, can mint a courier
     voucher and can open a provider payment session, all before anyone
     has authenticated. The global anon budget is a day-scale ceiling and
-    does not bound a burst.
+    does not bound a burst. An order the agent gateway places is
+    budgeted per cart (``GatewayCartAnonThrottle``), like its cart writes.
     """
 
     scope = "order_create_anon"
@@ -273,21 +294,8 @@ class StaffAgentThrottle(UserOrIpRateThrottle):
     scope = "agent_staff"
 
 
-class CartMutationAnonThrottle(AnonIpRateThrottle):
+class CartMutationAnonThrottle(GatewayCartAnonThrottle):
     scope = "cart_mutation_anon"
-
-    def get_cache_key(self, request, view):
-        # All AI-agent traffic egresses from agent-gateway pods, so the
-        # default REMOTE_ADDR key would put every agent in one shared
-        # 30/min bucket. Authenticated gateway requests are keyed on the
-        # cart UUID instead; everyone else keeps the per-IP key.
-        ident = _gateway_cart_ident(request)
-        if ident:
-            return self.cache_format % {
-                "scope": self.scope,
-                "ident": f"gw:{ident}",
-            }
-        return super().get_cache_key(request, view)
 
 
 class CouponApplyThrottle(UserOrIpRateThrottle):

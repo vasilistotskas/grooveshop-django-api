@@ -178,9 +178,10 @@ class TestOnlyWhatIsStillWaitingCounts:
         "payment_status", [PaymentStatus.FAILED, PaymentStatus.PROCESSING]
     )
     def test_a_failed_or_processing_payment_still_counts(self, payment_status):
-        """A PENDING order whose payment failed or is being processed keeps
-        its stock until it is paid or the sweep cancels it, so it is still
-        waiting for its payment."""
+        """A PENDING order whose payment failed keeps its stock until it is
+        paid or the sweep cancels it; one whose payment is processing keeps
+        it until its final webhook lands or the customer cancels it. Either
+        is still waiting for its payment."""
         _waiting(payment_status=payment_status)
 
         with _limit(1), pytest.raises(InvalidOrderDataError):

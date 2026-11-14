@@ -61,9 +61,11 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def holding_stock_for_online_payment(self) -> Self:
         """PENDING orders still owed through a hosted flow.
 
-        Each one holds its stock until it is paid or
-        ``auto_cancel_stuck_pending_orders`` cancels it, whatever its last
-        attempt did: a payment that failed or is processing holds it too.
+        Each one holds its stock until it is paid or closed, whatever its
+        last attempt did. ``auto_cancel_stuck_pending_orders`` cancels one
+        whose payment is pending past its hold or failed; one whose payment
+        is processing waits for its final webhook or a cancel by the
+        customer, and holds its stock until then.
         What the per-customer limit and the pile-up alert count. A canceled
         order is not PENDING, and its payment is settled on the way out
         (``Order.settle_unpaid_payment``).

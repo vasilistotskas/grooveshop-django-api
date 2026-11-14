@@ -57,6 +57,7 @@ from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
+    CartHasUnpaidOrderError,
     CartNotReadyError,
     CourierUnreachableError,
     InsufficientStockError,
@@ -973,6 +974,14 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        except CartHasUnpaidOrderError as e:
+            # Before InvalidOrderDataError, which it subclasses. Answered
+            # like the cart refusals of ``_get_cart_and_user``: the API
+            # handler adds ``code`` and ``fields``. No order is named.
+            raise ValidationError(
+                {"cart": [str(e)]}, code="cart_has_unpaid_order"
+            ) from e
 
         except InvalidOrderDataError as e:
             logger.warning("Invalid order data: %s", e)

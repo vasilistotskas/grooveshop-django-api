@@ -1754,6 +1754,9 @@ msgstr "Μια παραγγελία είναι πώληση στην περίο�
 msgid "An order is canceled through its cancel action, which releases its stock and refunds its payment."
 msgstr "Μια παραγγελία ακυρώνεται μέσω της ενέργειας ακύρωσης, η οποία αποδεσμεύει το απόθεμά της και επιστρέφει την πληρωμή της."
 
+msgid "An order placed from this cart is already waiting for its payment. Pay for it or cancel it before placing another."
+msgstr "Μια παραγγελία από αυτό το καλάθι περιμένει ήδη την πληρωμή της. Πληρώστε την ή ακυρώστε την πριν κάνετε άλλη."
+
 msgid "An unexpected error occurred"
 msgstr "Παρουσιάστηκε απρόσμενο σφάλμα"
 

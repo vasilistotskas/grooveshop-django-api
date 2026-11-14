@@ -37,6 +37,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import (
+    CartHasUnpaidOrderError,
     CartNotReadyError,
     CourierUnreachableError,
     DisputeOpenError,
@@ -1040,6 +1041,8 @@ class OrderService:
             if existing_order is not None:
                 return existing_order
 
+            cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -1701,6 +1704,57 @@ class OrderService:
                 )
             )
 
+    @staticmethod
+    def _refuse_agent_order_on_unpaid_cart(
+        cart, attribution: AttributionInput | None
+    ) -> None:
+        """Refuse an agent gateway order from a cart whose earlier order
+        still awaits its online payment.
+
+        Such an order keeps its cart until the payment lands
+        (``Order.awaits_online_payment``), so the same lines can be
+        ordered again. A person does that on purpose ("Back, then order
+        again"), and an order without a believed agent protocol is not
+        looked at here. Through the gateway it is a platform that lost
+        its checkout or sent it twice: a second order for the same goods
+        the buyer never asked for, whatever its own pay way.
+
+        The earlier order is any order of this cart that still awaits its
+        online payment (``OrderQuerySet.awaiting_online_payment``), an
+        agent's or not. Both creation paths call this under the cart row
+        lock, so two agent orders racing for one cart are judged one
+        after the other and the second finds the first's committed order.
+        """
+        if attribution is None or not attribution.from_agent:
+            return
+        waiting_id = (
+            Order.objects.awaiting_online_payment()
+            .filter(
+                metadata__contains={
+                    "cart_snapshot": {"cart_uuid": str(cart.uuid)}
+                }
+            )
+            .values_list("id", flat=True)
+            .first()
+        )
+        if waiting_id is None:
+            return
+        logger.warning(
+            "Refused an agent order on cart %s: order %s awaits its "
+            "online payment",
+            cart.uuid,
+            waiting_id,
+        )
+        raise CartHasUnpaidOrderError(
+            str(
+                _(
+                    "An order placed from this cart is already waiting "
+                    "for its payment. Pay for it or cancel it before "
+                    "placing another."
+                )
+            )
+        )
+
     @classmethod
     @transaction.atomic
     def create_order_from_cart_offline(
@@ -1773,6 +1827,8 @@ class OrderService:
             # same cart are serialised.  Must happen before any reads so
             # validate_cart_for_checkout sees the locked snapshot.
             cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
+            cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
 
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)

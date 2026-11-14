@@ -31,8 +31,8 @@ logger = logging.getLogger("shipping_boxnow.client")
 #   on ``BoxNowRetryableError``, and ``create_shipment_for_order``
 #   releases its mint claim on any error, so the re-run sends the same
 #   ``orderNumber`` again. If the first request did create the parcel,
-#   BoxNow answers P410 and the task reports a business error; finding
-#   the parcel in that case is issue #606.
+#   BoxNow answers P410 and ``BoxNowService._take_over_existing_parcel``
+#   finds it by ``orderNumber`` and saves it.
 #
 # Why, from the BoxNow API Manual v7.2 (Partner API 1.65):
 #
@@ -48,10 +48,9 @@ logger = logging.getLogger("shipping_boxnow.client")
 # - ``POST /parcels/{id}:cancel``: "Canceling a canceled parcel has no
 #   effect" (§3.7, p. 15; §6.5.2, p. 44). Sending it again would be
 #   safe; it follows the rule for its method all the same.
-# - ``POST /auth-sessions``, ``POST
-#   /api/v2/delivery-requests:checkAddressDelivery`` (a lookup) and
-#   ``PUT /delivery-requests/{id}``: the manual does not say whether
-#   they may be repeated.
+# - ``POST /auth-sessions`` and ``POST
+#   /api/v2/delivery-requests:checkAddressDelivery`` (a lookup): the
+#   manual does not say whether they may be repeated.
 # - The manual has no retry guidance, no idempotency key and no 5xx
 #   semantics for any of these.
 #
@@ -566,32 +565,6 @@ class BoxNowClient:
         )
         return self._json(response)
 
-    def update_delivery_request(
-        self,
-        delivery_request_id: str,
-        *,
-        allow_return: bool,
-    ) -> dict:
-        """
-        Update a delivery request.
-
-        Per the BoxNow API only ``allowReturn`` is mutable after creation.
-        Calls ``PUT /api/v1/delivery-requests/{delivery_request_id}``.
-
-        Args:
-            delivery_request_id: BoxNow delivery request ID (numeric string).
-            allow_return:        New value for the ``allowReturn`` flag.
-
-        Returns:
-            Response dict ``{"id": "..."}``.
-        """
-        response = self._request(
-            "PUT",
-            f"/api/v1/delivery-requests/{delivery_request_id}",
-            json={"allowReturn": allow_return},
-        )
-        return self._json(response)
-
     # ------------------------------------------------------------------
     # Parcels
     # ------------------------------------------------------------------
@@ -684,7 +657,6 @@ class BoxNowClient:
         *,
         parcel_id: str | None = None,
         order_number: str | None = None,
-        q: str | None = None,
         payment_state: str | None = None,
         payment_mode: str | None = None,
         state: str | list[str] | None = None,
@@ -699,8 +671,6 @@ class BoxNowClient:
         Args:
             parcel_id:     Return only the parcel with this BoxNow ID.
             order_number:  Return only parcels belonging to this order.
-            q:             Free-text search across order ID, parcel ID,
-                           customer name, email, and phone.
             payment_state: Filter by payment state: ``pending``,
                            ``paid-by-customer``, ``transferred-to-partner``.
             payment_mode:  Filter by payment mode: ``prepaid`` or ``cod``.
@@ -718,8 +688,6 @@ class BoxNowClient:
             params["parcelId"] = parcel_id
         if order_number is not None:
             params["orderNumber"] = order_number
-        if q is not None:
-            params["q"] = q
         if payment_state is not None:
             params["paymentState"] = payment_state
         if payment_mode is not None:

@@ -58,8 +58,8 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
     """Create a BoxNow delivery-request for an order.
 
     Idempotent: BoxNowService.create_shipment_for_order returns the
-    existing shipment unchanged when delivery_request_id is already set,
-    so retrying this task is safe.
+    existing shipment unchanged when it already has a parcel
+    (``BoxNowShipment.has_parcel``), so retrying this task is safe.
 
     Returns a status dict that Celery stores as the task result.
     Transient (BoxNowRetryableError) failures are automatically retried

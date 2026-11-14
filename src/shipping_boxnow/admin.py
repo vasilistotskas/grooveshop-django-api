@@ -586,7 +586,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             return redirect(change_url)
 
         reissue = shipment.parcel_state == BoxNowParcelState.CANCELED
-        if shipment.delivery_request_id and not reissue:
+        if shipment.has_parcel and not reissue:
             messages.warning(
                 request,
                 _("This shipment already has a BoxNow parcel."),

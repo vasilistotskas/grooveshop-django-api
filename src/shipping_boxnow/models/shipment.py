@@ -230,6 +230,16 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
         }
 
     @property
+    def has_parcel(self) -> bool:
+        """Whether BoxNow already holds a parcel for this shipment.
+
+        Either identifier counts: a parcel taken over after a P410 has a
+        ``parcel_id`` and no ``delivery_request_id``, because BoxNow's
+        parcel listing does not carry one.
+        """
+        return bool(self.delivery_request_id or self.parcel_id)
+
+    @property
     def is_active(self) -> bool:
         """Return True if the shipment has not reached a terminal state."""
         return self.parcel_state not in TERMINAL_STATES

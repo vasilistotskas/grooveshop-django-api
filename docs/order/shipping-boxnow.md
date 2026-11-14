@@ -14,13 +14,57 @@ and says which file holds each § number used here.
   write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
   a second creation for one `orderNumber` with `P410` (manual v7.2, §3.4
   and §5), so a re-sent creation could only turn a parcel that exists into
-  a reported refusal. Today the caller for the creation is the Celery task
+  a reported refusal. The caller for the creation is the Celery task
   `create_boxnow_shipment_for_order`: it runs again on
   `BoxNowRetryableError`, `create_shipment_for_order` has released its
-  claim, and the same `orderNumber` is sent again. A parcel that the first
-  request did create answers `P410` and the task reports a business error;
-  recovering that parcel is issue #606. A GET also gets no retry after an
-  error of unknown timing (`other=0`).
+  claim, and the same `orderNumber` is sent again. A GET also gets no retry
+  after an error of unknown timing (`other=0`).
+- **A `P410` on creation takes over the parcel BoxNow already holds**
+  (`BoxNowService._take_over_existing_parcel`, #606). The first request of
+  a creation whose answer was lost (a read timeout, a 5xx, a worker that
+  died before phase 3) did create the parcel, so the retry's `P410` is
+  answered by looking the order up: `GET /api/v1/parcels?orderNumber=`
+  ("Return only parcels related to this order number", manual v7.2,
+  §6.5.3, p. 45; `BoxNowClient.get_parcel_info(order_number=...)`; never
+  `q`, which is P417 for a server account, §5, p. 22). The lookup asks
+  once per payment mode, because `paymentMode` has "Default value:
+  prepaid" (§6.5.3; the OpenAPI file's `PaymentMode`), and reads every
+  page through `pagination.next` ("Token to use to get to the next
+  page"). Exactly one parcel that is not `canceled`, has no cancel
+  requested (`cancelationRequested`) and is `new` is taken over, and only
+  when it was created for this shipment's terms: the same locker
+  (`destination.locationId`), `paymentMode` and, for `cod`,
+  `amountToBeCollected`. Staff may change the locker and dispatch again,
+  and BoxNow's parcel still goes to the old one. Its id is saved as
+  `parcel_id`, the state `new`, the order gets the tracking number, and
+  `metadata["adopted_parcel"]` records it (id and state only: the row also
+  carries the recipient's contact details, which stay out of
+  `metadata`). The documented row has no delivery-request id
+  (the OpenAPI file's `DeliveryRequest` schema has none), so
+  `delivery_request_id` stays empty and phase 1 treats a `parcel_id` as
+  "already created". No such parcel (none listed, only canceled ones, one
+  past `new`, more than one live, one whose cancel was requested, one
+  created for other terms) is the usual `P410` refusal and creation alert,
+  its message naming what the lookup found. A lookup that fails is
+  that failure: a `BoxNowRetryableError` retries the task, a refusal or an
+  answer with no parcel list alerts. A row's `state` is read through
+  `BoxNowParcelState.from_webhook_event`, which takes both spellings the
+  sources give (the OpenAPI file's `canceled`, the manual's `cancelled`).
+- **A parcel created for a shipment cancelled meanwhile is cancelled at
+  BoxNow** (`BoxNowService._persist_parcel`). A cancel made once the
+  claim's TTL ran out can land while BoxNow is still answering the
+  creation. Phase 3 then keeps the row CANCELED (no `parcel_id`, no
+  tracking number), records the parcel under
+  `metadata["minted_after_cancel"]`, releases the lock and cancels it at
+  BoxNow by id (`_cancel_parcel_minted_after_cancel`). The entry gets
+  `canceled_at_boxnow`, or `cancel_error` when BoxNow refuses or does not
+  answer; in that case the parcel is also recorded under
+  `metadata["orphan_delivery_requests"]` and an ERROR is logged, for ops
+  to reconcile. The same holds for a parcel taken over after `P410`.
+  While an entry has no outcome and is younger than
+  `_MINT_CLAIM_TTL_SECONDS`, "Create BoxNow parcel now" refuses to reset
+  the row (`_cancel_at_boxnow_in_flight`): the new creation would answer
+  `P410` and take over the parcel that cancel is about to cancel.
 - **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
   the tenant's keys are BoxNow production keys (on) or stage keys (off,
   the default). `BoxNowClient` maps it to the platform's
@@ -48,12 +92,13 @@ and says which file holds each § number used here.
   keeps its `delivery_request_id` and creation returns an existing
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
-  new request with `P410` (duplicate) raises the usual creation alert.
-  The manual says it will: `orderNumber` "must be unique for each
-  request" (API Manual v7.2, §3.4, p. 10), and P410 is "Order number
-  conflict. You are trying to create a delivery request for order ID that
-  has already been created. Choose another order ID." (§5, p. 21), with
-  no exception for a canceled request. Not yet tried on stage (#606).
+  new request with `P410` (duplicate) raises the usual creation alert: the
+  lookup that follows a `P410` finds only the canceled parcel, which is
+  never taken over. The manual says it will: `orderNumber` "must be unique
+  for each request" (API Manual v7.2, §3.4, p. 10), and P410 is "Order
+  number conflict. You are trying to create a delivery request for order
+  ID that has already been created. Choose another order ID." (§5, p. 21),
+  with no exception for a canceled request. Not yet tried on stage.
 - **A `canceled` parcel event leaves the order alone**
   ([§2.1](state-machines.md)): the
   shipment is recorded CANCELED, and an order still PENDING / PROCESSING
@@ -65,9 +110,30 @@ and says which file holds each § number used here.
   p. 15); the webhook guide says partners "receive notifications for all
   parcel status changes and events" (p. 1), so a cancel made through the
   API is expected to arrive as one too (not yet verified on stage).
+- **A shipment with no `parcel_id` is asked about before it cancels**
+  (#606). A creation never sent (no `metadata["mint_started_at"]` and no
+  `metadata["last_error"]`: an unpaid order, a store without credentials)
+  cancels locally with no API call. One that was sent may have created a
+  parcel whose answer was lost, so `cancel_shipment` first looks the
+  order up by `orderNumber` (every payment mode, every page), with no row
+  lock held, and then: nothing live there (none, or only `canceled` ones)
+  cancels locally; a parcel whose cancel was only requested counts as
+  live; exactly one live `new` parcel is cancelled at BoxNow by its id (`POST /api/v1/parcels/{id}:cancel`, the only cancel the
+  manual has, §3.7 and §6.5.2) and its id is saved on the row; one live
+  parcel past `new`, or several, is refused (`BoxNowAPIError`). A lookup
+  that fails refuses the cancel as the error it is (a
+  `BoxNowRetryableError` for no answer), never as "nothing there": a
+  customer is told to try again or to contact the store, and a staff
+  cancel goes on with the order and leaves the error in
+  `shipment_cancel` and the order's history note
+  ([§7.1](cancel.md)). A creation in flight (a claim younger than
+  `_MINT_CLAIM_TTL_SECONDS`) refuses at once with a
+  `BoxNowRetryableError`. The row is read again under its lock after the
+  lookup: a creation that saved a parcel meanwhile sends the cancel down
+  the usual path, and a claim taken meanwhile refuses.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
-  BoxNow never received (no `parcel_id`) cancels locally with no API
-  call; a parcel cancels only while it is `new` (BoxNow answers P420
+  with no `parcel_id` can cancel (the paragraph above says how); a parcel
+  cancels only while it is `new` (BoxNow answers P420
   otherwise); an already `canceled` one, sent to BoxNow or not, is a no-op
   that changes nothing, `cancel_requested_at` and the
   `metadata["cancellations"]` log included (BoxNow: "Canceling a canceled

@@ -36,7 +36,11 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-10 (a BoxNow `canceled` parcel event no longer cancels
+Last refresh: 2026-11-11 (a BoxNow `P410` on creation takes over the parcel
+BoxNow holds under the `orderNumber`, and a cancel of a shipment with no
+parcel number whose creation was sent looks it up and cancels it there,
+[§5.2](shipping-boxnow.md) / [§7.1](cancel.md); before that 2026-11-10: a
+BoxNow `canceled` parcel event no longer cancels
 the order: it records the shipment CANCELED and an open order behind it needs
 follow-up, [§2.1](state-machines.md) / [§2.3](state-machines.md) /
 [§5.2](shipping-boxnow.md) / [§7.1](cancel.md); a repeat cancel of a canceled

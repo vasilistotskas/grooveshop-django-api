@@ -376,7 +376,7 @@ class StaffAgentSalesView(StaffAgentAPIView):
         responses={200: StaffSalesReportSerializer, **_UNAUTHORIZED},
         summary="Sales and turnover (store-admin agent surface)",
         description=(
-            "The admin's turnover report (`order/turnover.py`): goods, "
+            "The admin's turnover report: goods, "
             "shipping and fees net of VAT, counted when an order shipped, "
             "less returns. Requires `admin:sales:read` and a role with "
             "`order.view_turnover_report`."
@@ -422,7 +422,7 @@ class StaffAgentProfitView(StaffAgentAPIView):
         responses={200: StaffProfitReportSerializer, **_UNAUTHORIZED},
         summary="Profit (store-admin agent surface, owner only)",
         description=(
-            "The admin's profit report (`order/profit.py`) with its cost "
+            "The admin's profit report with its cost "
             "and fee coverage. Requires `admin:profit:read` and a role "
             "with `order.view_profit_report`, which only the OWNER holds."
         ),

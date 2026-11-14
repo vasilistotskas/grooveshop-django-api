@@ -21,7 +21,11 @@ ADMIN_FILES = (
     sorted(
         p
         for p in SRC_DIR.glob("*/admin.py")
-        if ".venv" not in p.parts and "node_modules" not in p.parts
+        if ".venv" not in p.parts
+        and "node_modules" not in p.parts
+        # ``settings/admin.py`` is the Unfold and TinyMCE configuration,
+        # not an app's admin: its colours and styles are settings.
+        and p.parent.name != "settings"
     )
     + sorted((SRC_DIR / "admin").rglob("*.py"))
     # Every admin template: pages are built from Unfold's components,

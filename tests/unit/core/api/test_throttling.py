@@ -228,3 +228,42 @@ def test_an_unproven_request_keys_on_the_peer_rule_of_client_ip(
 
     assert "not-an-address" not in key
     assert key.endswith("10.42.0.9")
+
+
+ORDER_UUID = "7f9c2b1e-3a4d-4e5f-8a6b-1c2d3e4f5a6b"
+
+
+def _payment_request(*, order_uuid=ORDER_UUID, **headers):
+    request = APIRequestFactory().post(
+        f"/api/v1/order/1/create_checkout_session?uuid={order_uuid}",
+        headers=headers,
+    )
+    request.user = AnonymousUser()
+    return PaymentAttemptAnonThrottle().get_cache_key(request, view=None)
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class PaymentAttemptAnonThrottleTestCase(TestCase):
+    """The gateway asks for a payment link right after placing an online
+    order; keyed on the platform's address, the sixth agent order in a
+    minute would be placed with no link. Keyed on the order instead."""
+
+    def test_a_gateway_request_keys_on_the_orders_hash(self) -> None:
+        key = _payment_request(**{"X-Internal-Gateway": SECRET})
+        self.assertIn("gw:order:", key)
+        # The uuid opens a guest order: never kept in a cache key.
+        self.assertNotIn(ORDER_UUID, key)
+
+    def test_two_orders_get_distinct_buckets(self) -> None:
+        other = "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"
+        self.assertNotEqual(
+            _payment_request(**{"X-Internal-Gateway": SECRET}),
+            _payment_request(
+                order_uuid=other, **{"X-Internal-Gateway": SECRET}
+            ),
+        )
+
+    def test_without_the_secret_it_keys_on_the_address(self) -> None:
+        key = _payment_request(**{"X-Internal-Gateway": "not-the-secret"})
+        self.assertNotIn("gw:", key)
+        self.assertNotIn(ORDER_UUID, key)

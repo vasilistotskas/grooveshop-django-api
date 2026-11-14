@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from django.test import RequestFactory, override_settings
 
-from core.api.throttling import _gateway_cart_ident
+from core.api.throttling import _gateway_ident
 from tenant.internal import is_internal_caller
 from tenant.views import _is_gateway
 
@@ -52,7 +52,7 @@ def test_throttle_bypass_refuses_a_non_ascii_header():
         HTTP_X_INTERNAL_GATEWAY=HIGH_BYTE,
         HTTP_X_CART_ID="abc",
     )
-    assert _gateway_cart_ident(request) is None
+    assert _gateway_ident(request) is None
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
@@ -62,4 +62,4 @@ def test_throttle_bypass_still_works_for_the_real_secret():
         HTTP_X_INTERNAL_GATEWAY="s3cret",
         HTTP_X_CART_ID="abc",
     )
-    assert _gateway_cart_ident(request) == "abc"
+    assert _gateway_ident(request) == "abc"

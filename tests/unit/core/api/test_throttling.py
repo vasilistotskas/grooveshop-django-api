@@ -185,3 +185,27 @@ def test_anon_halves_key_on_the_proven_visitor(throttle_class):
     assert first != second
     assert "203.0.113.9" in first
     assert "198.51.100.77" in second
+
+
+@pytest.mark.parametrize(
+    "throttle_class", [SearchThrottle, OrderCreateAnonThrottle]
+)
+def test_an_unproven_request_keys_on_the_peer_rule_of_client_ip(
+    throttle_class,
+):
+    """Without the edge proof the bucket is ``client_ip_or_peer``'s peer.
+
+    A last ``X-Forwarded-For`` hop that is not an address is never a key:
+    DRF's ``get_ident`` took it as it stood.
+    """
+    request = APIRequestFactory().post(
+        "/api/v1/order",
+        headers={"x-forwarded-for": "198.51.100.7, not-an-address"},
+        REMOTE_ADDR="10.42.0.9",
+    )
+    request.user = AnonymousUser()
+
+    key = throttle_class().get_cache_key(request, view=None)
+
+    assert "not-an-address" not in key
+    assert key.endswith("10.42.0.9")

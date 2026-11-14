@@ -14,8 +14,8 @@ module-level ``NAME = "..."`` constant.
 
 It is not complete. It does NOT catch a header name computed at runtime
 (``getattr``, an f-string, a loop over a tuple of names), a read through a
-third-party helper such as DRF's ``get_ident`` (``core/api/throttling.py``
-uses it on purpose), or a header named in another module's constant.
+third-party helper such as DRF's ``get_ident``, or a header named in
+another module's constant.
 """
 
 from __future__ import annotations

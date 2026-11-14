@@ -222,7 +222,7 @@ handler runs. Only user-visible dispatches are skipped.
 - `notify_payment_confirmed_live` / `notify_payment_failed_live` — payment
   webhooks.
 - `notify_order_status_changed_live` — meaningful status transitions only.
-  Policy lives in `_ORDER_STATUS_COPY` (`src/order/notifications.py`): SHIPPED,
+  Policy lives in `_ORDER_STATUS_COPY` (`src/order/communications/notifications.py`): SHIPPED,
   DELIVERED, COMPLETED, CANCELED. **PENDING and PROCESSING are intentionally
   absent** — they're covered by the order-created / payment-confirmed toasts,
   so surfacing them again would be redundant.

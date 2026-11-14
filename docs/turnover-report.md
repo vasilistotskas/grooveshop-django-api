@@ -4,7 +4,7 @@ A store's turnover for any range of days: the goods **and** the shipping and
 payment-method fee it invoices, net of VAT, an order counted when it left the
 store, less what went back. One definition serves the turnover page, its CSV and
 XLSX, and the store dashboard's revenue and best sellers. Source:
-`src/order/turnover.py` (the definition and every query), `src/order/vat_snapshot.py`
+`src/order/reporting/turnover.py` (the definition and every query), `src/order/vat_snapshot.py`
 (what it reads and how existing orders are filled in), `src/order/models/vat_line.py`
 (`OrderVatLine`), `src/order/models/order.py` (`Order.shipped_at`, stamped in
 `Order.save`), `src/admin/turnover.py` (the page and the two exports),
@@ -74,7 +74,7 @@ later change to a product, a VAT row or a promotion rewrites nothing.
 - **Promotions, coupons and the loyalty redemption** reduce the net on the lines
   they were granted on (`OrderItem.discount_allocation`).
 - **A gift card** is a payment instrument, never an allocation
-  (`order.discounts`): an order paid by gift card is turnover in full when it
+  (`order.checkout.discounts`): an order paid by gift card is turnover in full when it
   ships. Selling the card is not an `Order` and is not turnover.
 - A manual edit of an order's lines in the admin after creation does not rewrite
   its rows, like it does not rewrite `amount_due`.
@@ -103,7 +103,7 @@ credit document and takes no room on the receipt (`order.credit_allocation`,
 `docs/order/fiscal-credit-vat-split.md`). Turnover reads each refund's goods from
 `CreditAllocation.goods_claimed`, which is written once when the money is claimed
 or booked and never scaled afterwards, capped to what the refund really moved
-(`order.turnover._ledger_goods`). A refund with no allocation at all (not decided
+(`order.reporting.turnover._ledger_goods`). A refund with no allocation at all (not decided
 yet, or older than allocations) counts whole. A provider reversal takes the
 duplicate part back first and then the goods, as `credit_allocation.goods_returned`
 does: after reversing `c` the refund stands for `max(min(goods, paid - c), 0)`, and
@@ -165,7 +165,7 @@ parameters, validated by `admin.reports.FilterForm` (`src/admin/reports.py`): `s
 `bucket`, `compare` (`year` or empty), `group`. Absent parameters take their
 defaults (this year to date, by month, against last year, no breakdown); a
 parameter that is present and empty is kept. The page shows eight totals, a bar
-chart (`order.turnover` rows through `admin.dashboard.base.bar_chart`, Unfold's
+chart (`order.reporting.turnover` rows through `admin.dashboard.base.bar_chart`, Unfold's
 `chart/bar.html`), the period table and the breakdown table. An invalid request
 renders the form with its errors; a range that would draw more than
 `MAX_PAGE_ROWS` rows is refused on the page only.

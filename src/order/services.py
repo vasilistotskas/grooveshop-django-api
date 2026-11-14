@@ -18,12 +18,12 @@ from djmoney.money import Money
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
 from order import credit_allocation
-from order.attribution import (
+from order.checkout.attribution import (
     AttributionInput,
     ClassifiedAttribution,
     classify,
 )
-from order.discounts import (
+from order.checkout.discounts import (
     add_line_discounts,
     spread_by_remaining_value,
 )
@@ -662,7 +662,7 @@ class OrderService:
         covers (``CartDiscountResult.line_discounts``, keyed by cart item
         pk); the loyalty redemption is order-wide and is spread over the
         value that is left on every line. The invoice and the myDATA
-        payload read these snapshots (``order.discounts``), so a coupon
+        payload read these snapshots (``order.checkout.discounts``), so a coupon
         for one category can never lower the taxable value of a line of
         another. The gift-card amount is payment and is not allocated.
         """
@@ -4721,7 +4721,7 @@ class OrderService:
 
         A carrier sync that finds the shipment CANCELED (ACS: the admin
         retire action or a voucher cancel; a BoxNow ``canceled`` parcel
-        leaves its order open, ``order.follow_up``) is looking at a
+        leaves its order open, ``order.lifecycle.follow_up``) is looking at a
         parcel that never shipped. Such an order
         is not "status CANCELED", it is a cancellation: stock goes back
         on the shelf, the reservation is released, the payment settled,

@@ -25,13 +25,13 @@ from order.factories.expense import ExpenseFactory
 from order.factories.order import OrderFactory
 from order.factories.payment_transaction import PaymentTransactionFactory
 from order.models import Order, PaymentTransaction, StockLog
-from order.profit import (
+from order.reporting.profit import (
     figures,
     figures_by_group,
     figures_with_prior_year,
     total,
 )
-from order.turnover import Bucket, GroupBy
+from order.reporting.turnover import Bucket, GroupBy
 from product.factories import ProductFactory
 from tests.utils.turnover import snapshot_sale
 from vat.factories import VatFactory

@@ -8,7 +8,7 @@ not two computations that happen to agree.
 Goods
     One line per ``OrderItem``: its VAT-inclusive gross, less the part of
     the order's discount **snapshotted on the line at checkout**
-    (``OrderItem.discount_allocation``, see ``order.discounts``: a promotion
+    (``OrderItem.discount_allocation``, see ``order.checkout.discounts``: a promotion
     lands on the lines it covers), split at the rate **snapshotted on the
     line at checkout** (``OrderItem.vat_rate``). The catalogue is never
     consulted: editing or deleting a ``Vat`` row later must not rewrite a
@@ -50,7 +50,11 @@ from typing import Any
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from order.discounts import CENT, discounted_line_gross, proportional_shares
+from order.checkout.discounts import (
+    CENT,
+    discounted_line_gross,
+    proportional_shares,
+)
 
 
 class ChargeKind(models.TextChoices):

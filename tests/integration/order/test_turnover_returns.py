@@ -18,7 +18,7 @@ import pytest
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.models import PaymentTransaction
 from order.payment_ledger import PaymentLedger
-from order.turnover import Bucket, figures
+from order.reporting.turnover import Bucket, figures
 from tests.integration.order.test_mydata_lifecycle import _eur, _order
 from tests.utils.turnover import snapshot_sale
 

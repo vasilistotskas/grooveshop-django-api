@@ -57,12 +57,12 @@ from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
 from core.forms.choices import BLANK_CHOICE_LABEL
 from order import credit_allocation, refund_reconciliation
-from order.attribution import source_label
 from order.chargebacks import (
     ChargebackDecisionError,
     decide_chargebacks,
 )
-from order.discounts import discounted_line_gross
+from order.checkout.attribution import source_label
+from order.checkout.discounts import discounted_line_gross
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
@@ -71,16 +71,16 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import PaymentError, RefundOutstandingError
-from order.follow_up import (
-    follow_up_days,
-    follow_up_reason,
-    has_canceled_shipment,
-    last_carrier_event_at,
-)
 from order.invoicing import (
     ReceiptNotIssuable,
     generate_invoice,
     receipt_issuable,
+)
+from order.lifecycle.follow_up import (
+    follow_up_days,
+    follow_up_reason,
+    has_canceled_shipment,
+    last_carrier_event_at,
 )
 from order.models.attribution import OrderAttribution
 from order.models.expense import Expense
@@ -306,7 +306,7 @@ class ChargebackDecisionFilter(DropdownFilter):
 
 
 class FollowUpFilter(DropdownFilter):
-    """Orders that need follow-up (``order.follow_up``: waited the
+    """Orders that need follow-up (``order.lifecycle.follow_up``: waited the
     store's ``ORDER_FOLLOW_UP_DAYS``, or open behind a canceled parcel);
     the rule is ``OrderQuerySet.needing_follow_up``, the same one behind
     the badge and the dashboard counter."""
@@ -3263,7 +3263,7 @@ class OrderItemAdmin(BaseModelAdmin):
         "updated_at",
         "total_price",
         # Stamped at checkout, like the order's own discounts: the tax
-        # documents read it (order.discounts).
+        # documents read it (order.checkout.discounts).
         "discount_allocation",
         "refunded_amount",
         "net_price",

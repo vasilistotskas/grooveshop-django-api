@@ -3,7 +3,7 @@
 Custom pages of the store admin (``MyAdminSite.get_urls``), behind
 ``order.view_profit_report``: the store OWNER and platform superusers, not
 ADMIN or STAFF (``tenant.role_scopes.OWNER_ONLY_PERMISSIONS``). Every figure
-comes from ``order.profit``, which holds the definition; this module picks
+comes from ``order.reporting.profit``, which holds the definition; this module picks
 the range, the bucket, the comparison and the breakdown, and lays the rows
 out with the filters, columns and files the turnover page shares
 (``admin.reports``).
@@ -50,7 +50,7 @@ from admin.reports import (
     years,
 )
 from order.enum.expense import DELIVERY_EXPENSE_CATEGORIES, ExpenseCategory
-from order.profit import (
+from order.reporting.profit import (
     GroupProfit,
     Profit,
     figures,
@@ -58,7 +58,7 @@ from order.profit import (
     figures_with_prior_year,
     total,
 )
-from order.turnover import Bucket, GroupBy, GroupKey, a_year_earlier
+from order.reporting.turnover import Bucket, GroupBy, GroupKey, a_year_earlier
 
 PERMISSION = "order.view_profit_report"
 

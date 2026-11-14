@@ -18,7 +18,7 @@ Every input is the store's own record, never an estimate, and what is not
 recorded stays visible instead of reading as zero:
 
 Net revenue
-    ``order.turnover``: the same sales, returns, shipping and fees, in the
+    ``order.reporting.turnover``: the same sales, returns, shipping and fees, in the
     same periods, so the two reports cannot disagree.
 
 Cost of goods sold
@@ -68,8 +68,7 @@ from django.db.models import (
 
 from order.enum.expense import DELIVERY_EXPENSE_CATEGORIES, ExpenseCategory
 from order.enum.payment_transaction import PaymentTransactionKind
-from order.taxation import ChargeKind
-from order.turnover import (
+from order.reporting.turnover import (
     TRUNC,
     Bucket,
     GroupBy,
@@ -81,6 +80,7 @@ from order.turnover import (
     sold_lines,
     window,
 )
+from order.taxation import ChargeKind
 
 _ZERO = Decimal(0)
 _MONEY = DecimalField(max_digits=14, decimal_places=2)

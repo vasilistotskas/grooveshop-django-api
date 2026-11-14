@@ -3,7 +3,7 @@
 Part of the order reference. [`docs/order/index.md`](index.md) lists every file
 and says which file holds each § number used here.
 
-## 3.4 Acquisition source (`src/order/attribution.py`)
+## 3.4 Acquisition source (`src/order/checkout/attribution.py`)
 
 Every order created by either checkout path gets exactly one
 `OrderAttribution` row (`src/order/models/attribution.py`, one-to-one,
@@ -167,7 +167,7 @@ catalogue can no longer change.
   `PromotionEngine._clamp` splits each applied promotion over the cart
   lines it covers (`_covered_weights`: the lines `_matching_items` counts,
   by value, or the units a buy-X-get-Y actually discounts, by price) with
-  `order.discounts.allocate_capped`, the one largest-remainder rule (cent
+  `order.checkout.discounts.allocate_capped`, the one largest-remainder rule (cent
   exact, no line pushed below what is left of it), and exposes the result
   as `AppliedPromotion.line_amounts` / `CartDiscountResult.line_discounts`
   (cart item pk -> amount). The cart preview (`Cart.vat_after_discount`),
@@ -180,7 +180,7 @@ catalogue can no longer change.
   `/loyalty/redeem` endpoint does the same on an existing pending
   order). Gift-card amounts are payment and never allocated; a staff-added
   line carries none; a free gift has no value to carry any.
-  `order.discounts.discounted_line_gross` reads the snapshots and raises
+  `order.checkout.discounts.discounted_line_gross` reads the snapshots and raises
   when they do not add up to the order's discount (capped at its goods): a
   document on such lines would bill a total the customer never owed. That
   is the state of an order created by the previous release during the

@@ -147,7 +147,7 @@ order page's "Payment Transactions" tab.
 `refund_order(order, lines=[(item, units)], include_shipping=True, reason_code=..., reason=<note>)`
 derives the amount from the figures the order froze, never from the catalogue:
 a unit is worth its line's `price` x `quantity` less the line's
-`discount_allocation` (`order.discounts.discounted_line_gross`) over the
+`discount_allocation` (`order.checkout.discounts.discounted_line_gross`) over the
 quantity, at the line's own `vat_rate`. Units are priced cumulatively (the
 first *k* units are worth `gross * k / n`, half-up to the cent, the last taking
 the remainder), so a line refunded in several steps adds up to exactly its

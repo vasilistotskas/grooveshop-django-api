@@ -274,7 +274,7 @@ class LoyaltyViewSet(BaseModelViewSet):
         from django.db import transaction
         from djmoney.money import Money
 
-        from order.discounts import (
+        from order.checkout.discounts import (
             add_line_discounts,
             spread_by_remaining_value,
         )
@@ -291,7 +291,7 @@ class LoyaltyViewSet(BaseModelViewSet):
                 ]
             )
             # The tax documents read where the discount landed per line
-            # (order.discounts): the redemption is order-wide, so it is
+            # (order.checkout.discounts): the redemption is order-wide, so it is
             # spread over the value the lines still carry.
             items = list(order.items.all())
             add_line_discounts(

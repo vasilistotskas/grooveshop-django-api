@@ -16,7 +16,7 @@ from decimal import Decimal
 import pytest
 from djmoney.money import Money
 
-from order.discounts import proportional_shares
+from order.checkout.discounts import proportional_shares
 from order.factories.order import OrderFactory
 from order.taxation import (
     ChargeKind,

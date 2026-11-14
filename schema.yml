@@ -390,9 +390,9 @@ paths:
   /api/v1/agent/staff/profit:
     get:
       operationId: getAgentStaffProfitReport
-      description: The admin's profit report (`order/profit.py`) with its cost and
-        fee coverage. Requires `admin:profit:read` and a role with `order.view_profit_report`,
-        which only the OWNER holds.
+      description: The admin's profit report with its cost and fee coverage. Requires
+        `admin:profit:read` and a role with `order.view_profit_report`, which only
+        the OWNER holds.
       summary: Profit (store-admin agent surface, owner only)
       parameters:
       - in: query
@@ -488,9 +488,9 @@ paths:
   /api/v1/agent/staff/sales:
     get:
       operationId: getAgentStaffSalesReport
-      description: 'The admin''s turnover report (`order/turnover.py`): goods, shipping
-        and fees net of VAT, counted when an order shipped, less returns. Requires
-        `admin:sales:read` and a role with `order.view_turnover_report`.'
+      description: 'The admin''s turnover report: goods, shipping and fees net of
+        VAT, counted when an order shipped, less returns. Requires `admin:sales:read`
+        and a role with `order.view_turnover_report`.'
       summary: Sales and turnover (store-admin agent surface)
       parameters:
       - in: query
@@ -42329,8 +42329,7 @@ components:
       - zipcode
     OrderAttribution:
       type: object
-      description: Where the order came from, as ``order.attribution.classify`` named
-        it.
+      description: Where the order came from, as its attribution was classified.
       properties:
         sourceType:
           allOf:
@@ -42364,8 +42363,9 @@ components:
         Untrusted analytics — anyone can type a UTM — so nothing here is
         rejected for its content, only for its shape: a checkout must never
         fail over a strange referrer. Overlong strings are cut to their
-        column in ``order.attribution.classify``, the referrer is reduced to
-        its host there, and click ids are parameter NAMES, never values.
+        column when the order's attribution is classified, the referrer is
+        reduced to its host there, and click ids are parameter NAMES, never
+        values.
       properties:
         utmSource:
           type: string

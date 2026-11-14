@@ -150,7 +150,7 @@ unless deductions cover the whole total (`Order._payment_consistency_errors`)
 — the admin form edits both fields. It is not a `CheckConstraint`: the
 total is a sum over the order's lines.
 
-### 2.3 The follow-up flag (`src/order/follow_up.py`)
+### 2.3 The follow-up flag (`src/order/lifecycle/follow_up.py`)
 
 A shopper who ordered N calendar days ago and still has no parcel is about
 to write in, and an open order whose parcel was canceled ships nothing

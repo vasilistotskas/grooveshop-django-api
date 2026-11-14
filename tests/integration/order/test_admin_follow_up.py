@@ -23,7 +23,7 @@ from extra_settings.models import Setting
 from admin.dashboard.store import queries
 from order.enum.status import OrderStatus
 from order.factories import OrderFactory
-from order.follow_up import FOLLOW_UP_DAYS_SETTING
+from order.lifecycle.follow_up import FOLLOW_UP_DAYS_SETTING
 from order.models.order import Order
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState

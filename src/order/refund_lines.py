@@ -2,7 +2,7 @@
 at the figures the order froze, split by VAT rate.
 
 A goods line is worth its ``price`` x ``quantity`` less its snapshotted
-``discount_allocation`` (``order.discounts.discounted_line_gross``), at its
+``discount_allocation`` (``order.checkout.discounts.discounted_line_gross``), at its
 snapshotted ``vat_rate``: the same number the receipt was built from, so a
 credit of it lands on the rate the receipt holds it under. Units are priced
 cumulatively (the value of the first *k* units is the line's value x k / n,
@@ -39,8 +39,8 @@ from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
 
+from order.checkout.discounts import CENT, discounted_line_gross
 from order.credit_allocation import Piece
-from order.discounts import CENT, discounted_line_gross
 from order.exceptions import PaymentError
 from order.models import CreditAllocation, Order, OrderItem
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus

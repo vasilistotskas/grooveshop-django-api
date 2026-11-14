@@ -1,7 +1,7 @@
 """The store dashboard's cached queries.
 
 Each returns plain data (see ``admin.dashboard.cache``). Revenue is the
-turnover of ``order.turnover``, the one definition behind the turnover
+turnover of ``order.reporting.turnover``, the one definition behind the turnover
 report: net of VAT, shipping and fees included, an order counted when it
 left the store, returns in the month they happened. The dashboard never
 adds its own.
@@ -26,7 +26,7 @@ from django.db.models.functions import Length, TruncDay, TruncMonth, TruncWeek
 from django.utils import timezone
 
 from admin.dashboard.cache import dashboard_query
-from order.turnover import Bucket, figures_between
+from order.reporting.turnover import Bucket, figures_between
 
 
 @dataclass(frozen=True)
@@ -245,7 +245,7 @@ def sales_series(key: str) -> list[dict[str, Any]]:
 )
 def best_sellers(key: str) -> list[dict[str, Any]]:
     """The products most units of left the store in the period, net of
-    refunded units: the same moment ``order.turnover`` counts a sale."""
+    refunded units: the same moment ``order.reporting.turnover`` counts a sale."""
     _prior_start, start, _now = PERIODS_BY_KEY[key].window()
     OrderItem = apps.get_model("order", "OrderItem")
     Product = apps.get_model("product", "Product")

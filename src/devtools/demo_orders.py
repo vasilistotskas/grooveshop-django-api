@@ -88,7 +88,7 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
 
     Returns the orders in the order given, each with its primary key.
     """
-    from order.discounts import (
+    from order.checkout.discounts import (
         add_line_discounts,
         order_discount_total,
         spread_by_remaining_value,

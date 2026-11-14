@@ -4,7 +4,7 @@ What the store earned after what it cost to earn it, for the store OWNER only.
 It is **management profit**, not the statutory or tax profit (ν.4308/2014): that
 comes from the books (opening stock plus purchases less closing stock, payroll,
 depreciation, financial items), none of which the platform records. Source:
-`src/order/profit.py` (the definition and every query), `src/admin/profit.py` (the page
+`src/order/reporting/profit.py` (the definition and every query), `src/admin/profit.py` (the page
 and the two exports), `src/core/templates/admin/profit.html`,
 `src/order/models/expense.py` and `src/order/models/item.py` / `payment_transaction.py`
 (the inputs), `src/order/payment_fees.py` and `src/order/views/viva_webhook.py` (the
@@ -14,7 +14,7 @@ this page.
 ## The definition
 
 ```
-  net revenue                      order.turnover: sales less returns, net of VAT
+  net revenue                      order.reporting.turnover: sales less returns, net of VAT
 - cost of goods sold               units that shipped, less units restocked
 = gross profit
 - payment fees                     what the providers charged
@@ -29,7 +29,7 @@ recorded stays visible instead of reading as zero.
 
 ### Net revenue
 
-`order.turnover` (`docs/turnover-report.md`): the same sales, returns, shipping
+`order.reporting.turnover` (`docs/turnover-report.md`): the same sales, returns, shipping
 and fees in the same periods, so the two reports cannot disagree. A sale is
 earned when the order leaves the store (`Order.shipped_at`).
 

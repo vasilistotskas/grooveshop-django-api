@@ -26,7 +26,7 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter as UnfoldRelatedDropdownFilter,
 )
 
-from order.attribution import KNOWN_SOURCES, source_label
+from order.checkout.attribution import KNOWN_SOURCES, source_label
 
 ACQUISITION_SOURCE_MAX_CHOICES = 30
 """How many sources an acquisition filter offers: an unrecognised

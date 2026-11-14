@@ -658,7 +658,7 @@ class StoreOrderSources(StorePeriodWidget):
     query = queries.order_sources
 
     def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        from order.attribution import source_label
+        from order.checkout.attribution import source_label
 
         total = data["total"]
         rows = [

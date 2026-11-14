@@ -15,7 +15,7 @@ import pytest
 from django_tenants.utils import schema_context
 from djmoney.money import Money
 
-from order.profit import figures
+from order.reporting.profit import figures
 
 pytestmark = pytest.mark.django_db
 

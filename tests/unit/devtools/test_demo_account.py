@@ -1108,7 +1108,7 @@ class TestARefundedOrderHasItsLedger:
 
         from order.models.order import Order
         from order.models.payment_transaction import PaymentTransaction
-        from order.turnover import figures
+        from order.reporting.turnover import figures
 
         _prepare_store()
         demo_account.seed_demo_account()

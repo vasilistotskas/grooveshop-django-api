@@ -114,7 +114,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         each line's gross is reduced by its own share
         (``CartDiscountResult.line_discounts``, cart item pk -> amount)
         exactly as the invoice reads it from the order's snapshots — see
-        ``order.discounts`` and ``order.taxation``, whose per-line rounding
+        ``order.checkout.discounts`` and ``order.taxation``, whose per-line rounding
         this shares. Never pass a gift card here: it is a means of payment
         and leaves VAT untouched.
         """

@@ -2473,7 +2473,7 @@ class BoxNowService:
         parcel canceled while the order is open was canceled on purpose
         (a wrong locker, a re-issue). The shipment is recorded CANCELED
         by the caller, and the open order behind it needs follow-up
-        (``order.follow_up``) until staff re-issue the parcel or cancel
+        (``order.lifecycle.follow_up``) until staff re-issue the parcel or cancel
         the order.
 
         Safety rules:

@@ -17,7 +17,7 @@ from extra_settings.models import Setting
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
-from order.follow_up import (
+from order.lifecycle.follow_up import (
     FOLLOW_UP_DAYS_SETTING,
     follow_up_reason,
     has_canceled_shipment,

@@ -110,7 +110,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     # created. A promotion lands on the lines it covers, so a coupon for
     # one category never reduces a line of another (which may carry a
     # different VAT rate); the invoice and myDATA read this and never
-    # re-derive it (``order.discounts``). ``db_default`` is for the
+    # re-derive it (``order.checkout.discounts``). ``db_default`` is for the
     # rolling deploy: the previous release still INSERTs without the
     # column, and ``heal_discount_allocation`` fills those orders in.
     discount_allocation = MoneyField(

@@ -3,6 +3,14 @@
 
 
 
+## v3.245.7 (2026-11-14)
+
+### Bug fixes
+
+* fix(order): an agent order is refused while its cart's earlier order awaits its online payment (#693)
+
+Closes #692. ([`b7fa460`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7fa4606435a593e123cf45e8dcfc9a3e03a78b5))
+
 ## v3.245.6 (2026-11-14)
 
 ### Bug fixes

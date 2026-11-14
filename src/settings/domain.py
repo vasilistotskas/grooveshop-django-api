@@ -73,7 +73,6 @@ BUILDER_PRESENCE_TTL_SECONDS = int(getenv("BUILDER_PRESENCE_TTL_SECONDS", "45"))
 BUILDER_PRESENCE_MAX_DOCUMENTS = int(
     getenv("BUILDER_PRESENCE_MAX_DOCUMENTS", "20")
 )
-# Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 # A contact attachment still PENDING after this many minutes had its scan
 # lost (``contact.tasks.rescan_pending_attachments``); the sweep queues at
 # most this many per store and run.
@@ -90,6 +89,7 @@ REVIEW_REQUEST_CATCH_UP_DAYS = int(getenv("REVIEW_REQUEST_CATCH_UP_DAYS", "3"))
 # signed-in owner are not limited by it.
 GUEST_ORDER_ACCESS_DAYS = int(getenv("GUEST_ORDER_ACCESS_DAYS", "14"))
 
+# Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
     getenv("BUILDER_MAX_DOCUMENT_BYTES", str(256 * 1024))

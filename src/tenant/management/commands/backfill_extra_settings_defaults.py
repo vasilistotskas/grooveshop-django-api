@@ -3,7 +3,8 @@
 Iterates all active non-public tenants and calls
 ``Setting.set_defaults_from_settings()`` inside each tenant's schema
 context.  This backfills any entries added to ``EXTRA_SETTINGS_DEFAULTS``
-in settings.py that are not yet present in existing tenant databases.
+in settings/store_settings.py that are not yet present in existing tenant
+databases.
 
 Usage:
     uv run python manage.py backfill_extra_settings_defaults
@@ -14,8 +15,9 @@ Safe to re-run:``set_defaults_from_settings`` is idempotent — it only
 creates missing rows and leaves existing values untouched.
 
 It also brings every existing row's description and validator in line
-with settings.py (``tenant.settings_metadata.sync_setting_metadata``, which
-``migrate`` runs too), never its value.
+with settings/store_settings.py
+(``tenant.settings_metadata.sync_setting_metadata``, which ``migrate``
+runs too), never its value.
 """
 
 from __future__ import annotations
@@ -31,9 +33,10 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     """Backfill EXTRA_SETTINGS_DEFAULTS entries across all active tenants.
 
-    Useful after adding new rows to EXTRA_SETTINGS_DEFAULTS in settings.py:
-    running this command propagates the defaults into every tenant that was
-    created before the new entry was added, without touching existing values.
+    Useful after adding new rows to EXTRA_SETTINGS_DEFAULTS in
+    settings/store_settings.py: running this command propagates the
+    defaults into every tenant that was created before the new entry was
+    added, without touching existing values.
     """
 
     help = (

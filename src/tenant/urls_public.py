@@ -1,7 +1,7 @@
 """URL conf that always runs in public schema context.
 
-Mounted via PUBLIC_SCHEMA_URLCONF in settings.py — i.e. served only on
-the platform control-plane host (``platform.grooveshop.space``).
+Mounted via PUBLIC_SCHEMA_URLCONF in settings/database.py — i.e. served
+only on the platform control-plane host (``platform.grooveshop.space``).
 
 Tenant admin + platform-staff endpoints run here (public schema only).
 Everything else is ``core.urls.public_shared_urlpatterns`` — the SHARED

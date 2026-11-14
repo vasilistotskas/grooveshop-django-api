@@ -7,7 +7,7 @@ and writes plain strings. A database dump, a replica or a backup that
 leaves the cluster carries ciphertext only.
 
 Keys come from ``settings.FIELD_ENCRYPTION_KEYS`` (an ordered list, read
-from the environment in ``settings.py``): the FIRST key encrypts, every
+from the environment in ``settings/env.py``): the FIRST key encrypts, every
 key decrypts, which is ``MultiFernet``'s rotation model. The key is never
 derived from ``SECRET_KEY``: rotating one must not silently orphan the
 other. The rotation runbook is ``docs/secret-encryption.md``.

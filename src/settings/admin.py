@@ -21,7 +21,7 @@ DJANGO_ADMIN_FORCE_ALLAUTH = (
 # stock Unfold install are declared here — everything absent falls back
 # to Unfold's own defaults.
 #
-# Deliberately does NOT reuse UNFOLD above: that block carries tenant
+# Deliberately does NOT reuse UNFOLD below: that block carries tenant
 # #1's branding and a sidebar of per-store sections, neither of which
 # belongs on the control plane.
 # ─────────────────────────────────────────────────────────────────────

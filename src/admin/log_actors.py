@@ -12,7 +12,7 @@ can be real:
     webside's ``product.product`` content type is
     ``notification.notificationuser`` in public. This is why
     ``django.contrib.admin`` is dual-listed into ``TENANT_APPS``
-    (see the comment on that entry in ``settings.py``).
+    (see the comment on that entry in ``settings/application.py``).
 
 ``user_id``
     Is necessarily a PUBLIC pk: on a tenant host every admin session is

@@ -229,12 +229,12 @@ urlpatterns = (
 )
 
 if bool(settings.ENABLE_DEBUG_TOOLBAR):
-    # No import guard: under the same flag, ``settings.py`` does an
+    # No import guard: under the same flag, ``settings/application.py`` does an
     # unconditional ``INSTALLED_APPS += ["debug_toolbar"]``, so a missing
     # package raises during ``apps.populate()`` — long before this module
     # is imported. The guard that stood here could not fire, and its
     # warning claimed settings.py "should already have warned the user",
-    # which settings.py does not do.
+    # which the settings package does not do.
     import debug_toolbar
 
     urlpatterns += [

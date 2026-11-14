@@ -9,7 +9,7 @@ kept accepting what the validator refuses: ``STORE_GEO_LAT`` took any string
 in every store that existed when its validator arrived.
 
 Both are the platform's metadata, never the merchant's, so they follow
-``settings.py`` on every ``migrate`` (each deploy's PreSync runs
+``settings/store_settings.py`` on every ``migrate`` (each deploy's PreSync runs
 ``migrate_schemas``, which migrates every store's schema). The value is
 never touched: a row whose current value a newly attached validator refuses
 keeps it, is reported in the log, and the admin asks for a valid one at the

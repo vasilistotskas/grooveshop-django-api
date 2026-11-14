@@ -3,7 +3,7 @@
 Directive 98/6/EC art. 6a as transposed in Greece (art. 9ι of Law
 2251/1994) and Cyprus (art. 45 of Law 112(I)/2021). They are statutory
 numbers, not deployment settings: a tenant must not be able to shorten
-them, so they live here rather than in ``settings.py``.
+them, so they live here rather than in the settings package.
 """
 
 from __future__ import annotations

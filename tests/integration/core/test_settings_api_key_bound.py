@@ -27,7 +27,7 @@ from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
 
-# Names that exist in `settings.py` and must never be reachable.
+# Names that exist in the settings package and must never be reachable.
 FORBIDDEN = [
     "SECRET_KEY",
     "MAILERS",

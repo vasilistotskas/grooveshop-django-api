@@ -8,7 +8,7 @@ Two regressions, both invisible in any single run:
   ``CoreConfig.ready()`` had already decided whether to connect the
   cache-invalidation receivers. CI ran with them, local runs without.
   ``tests/settings.py`` now pins it, and the other switches ``.env``
-  flipped, before ``settings.py`` is even imported.
+  flipped, before the settings package is even imported.
 
 * ``tests/conftest.py`` pointed ``settings.CACHES`` at LocMem while the
   materialised backend was Redis. Whenever Django rebuilt the cache
@@ -60,7 +60,7 @@ def test_the_suite_runs_on_the_test_settings_module():
 
 def test_environment_switches_are_pinned_before_settings_load():
     """Each of these came from the developer's ``.env`` and differed
-    from CI. They are read when ``settings.py`` is imported, so what
+    from CI. They are read when the settings package is imported, so what
     they derive is checked too, not just the flag."""
     assert settings.DISABLE_CACHE is True
     assert settings.ENABLE_DEBUG_TOOLBAR is False

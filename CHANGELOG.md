@@ -3,6 +3,36 @@
 
 
 
+## v3.245.10 (2026-11-14)
+
+### Bug fixes
+
+* fix(core): the agent gateway's orders and payment links are budgeted per cart and per order (#700)
+
+Through the agent gateway the caller's address is the AI platform's, so
+every buyer behind one platform address shared one anonymous budget:
+ten order attempts a minute (order_create_anon) and five payment-link
+calls (payment_anon), the sixth of which left an online order placed
+with no payment link.
+
+GatewayAnonThrottle keys a request that carries the gateway's
+X-Internal-Gateway secret on the cart it names (X-Cart-Id, or the hash
+of an X-Cart-Token) or on the order (?uuid=, by its hash, since it opens
+a guest order). CartMutationAnonThrottle, OrderCreateAnonThrottle and
+PaymentAttemptAnonThrottle derive from it. A signed-in request is not
+counted against an anonymous budget, and every other caller keeps the
+per-address key.
+
+Closes #699 ([`9368d53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9368d53bffc1e60038218920ef033607ffcb8ea4))
+
+### Chores
+
+* chore(settings): drop the top-level CONN_HEALTH_CHECKS and ATOMIC_REQUESTS, which nothing reads (#701)
+
+Django reads both only as keys of a DATABASES entry, and DATABASES["default"]
+sets both itself with the same values. Found while splitting the settings
+(#695). ([`03523ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03523ee11789ca02408497ec2bbd176241e6fce7))
+
 ## v3.245.9 (2026-11-14)
 
 ### Bug fixes

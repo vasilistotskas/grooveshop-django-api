@@ -1749,15 +1749,7 @@ class OrderService:
             cart.uuid,
             waiting_id,
         )
-        raise CartHasUnpaidOrderError(
-            str(
-                _(
-                    "An order placed from this cart is already waiting "
-                    "for its payment. Pay for it or cancel it before "
-                    "placing another."
-                )
-            )
-        )
+        raise CartHasUnpaidOrderError
 
     @classmethod
     @transaction.atomic

@@ -978,9 +978,19 @@ class OrderViewSet(BaseModelViewSet):
         except CartHasUnpaidOrderError as e:
             # Before InvalidOrderDataError, which it subclasses. Answered
             # like the cart refusals of ``_get_cart_and_user``: the API
-            # handler adds ``code`` and ``fields``. No order is named.
+            # handler adds ``code`` and ``fields``. The sentence is
+            # written here and names no order.
             raise ValidationError(
-                {"cart": [str(e)]}, code="cart_has_unpaid_order"
+                {
+                    "cart": [
+                        _(
+                            "An order placed from this cart is already "
+                            "waiting for its payment. Pay for it or "
+                            "cancel it before placing another."
+                        )
+                    ]
+                },
+                code="cart_has_unpaid_order",
             ) from e
 
         except InvalidOrderDataError as e:

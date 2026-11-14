@@ -163,7 +163,7 @@ class TestAnAgentOrderIsRefused:
         with pytest.raises(CartHasUnpaidOrderError) as excinfo:
             checkout.order(attribution=AGENT)
 
-        assert "already waiting for its payment" in str(excinfo.value)
+        assert "awaits its online payment" in str(excinfo.value)
         assert list(Order.objects.values_list("pk", flat=True)) == [earlier.pk]
         assert (_state(earlier), checkout.stock(), checkout.lines()) == before
 

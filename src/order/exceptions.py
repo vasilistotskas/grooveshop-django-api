@@ -219,7 +219,14 @@ class CartHasUnpaidOrderError(InvalidOrderDataError):
 
     A subclass of ``InvalidOrderDataError`` so order creation passes it on
     as it passes its other refusals.
+
+    Its own message is for logs. The sentence a client reads is the
+    view's, as for the view's other cart refusals: what a caught
+    exception carries is never sent to a client.
     """
+
+    def __init__(self) -> None:
+        super().__init__("an order of this cart awaits its online payment")
 
 
 class InvalidCouponError(OrderServiceError):

@@ -3,6 +3,36 @@
 
 
 
+## v3.245.4 (2026-11-14)
+
+### Bug fixes
+
+* fix(core): read the client IP through core.client_ip in Meta CAPI signup, search analytics and the throttles (#672)
+
+One rule for the client IP, core.client_ip, everywhere a request's address
+is read:
+
+- Meta CAPI signup sends the address our edge vouched for
+  (edge_client_ip) or none. X-Real-IP and REMOTE_ADDR were the caller's
+  choice or a proxy; Meta does not require the field.
+- Search analytics drops its own copy of the rule and uses
+  client_ip_or_peer, which records the same values and refuses a hop that
+  is not an address.
+- UserOrIpRateThrottle and AnonIpRateThrottle use client_ip_or_peer instead
+  of edge_client_ip or DRF's get_ident, which keyed on a last
+  X-Forwarded-For hop that was not an address.
+
+Both callers are off the guard test's allowlist.
+
+Closes #638
+Closes #639 ([`44fedb4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/44fedb44f8df3649f8d1a1f4f19d69ff7a211d80))
+
+### Chores
+
+* chore(api-contract): drop the reply schema entries, storefront v3.341.3 regenerates (#689)
+
+Removes the 170 dated ignore entries added in #680; storefront v3.341.3, live in staging and production, parses the reply's author objects as UserPublic. ([`bb5a069`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb5a0694bd5c4757e5a2e2b571afcaf4baa76f74))
+
 ## v3.245.3 (2026-11-13)
 
 ### Bug fixes

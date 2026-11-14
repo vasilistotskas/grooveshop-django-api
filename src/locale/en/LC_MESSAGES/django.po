@@ -1749,6 +1749,9 @@ msgstr "An order is a sale in the period it left the store, whatever the payment
 msgid "An order is canceled through its cancel action, which releases its stock and refunds its payment."
 msgstr "An order is canceled through its cancel action, which releases its stock and refunds its payment."
 
+msgid "An order placed from this cart is already waiting for its payment. Pay for it or cancel it before placing another."
+msgstr "An order placed from this cart is already waiting for its payment. Pay for it or cancel it before placing another."
+
 msgid "An unexpected error occurred"
 msgstr "An unexpected error occurred"
 

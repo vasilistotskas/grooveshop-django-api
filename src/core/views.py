@@ -156,7 +156,7 @@ def upload_image(request):
     # Windows.
     saved_path = storage.save(f"uploads/tinymce/{sanitized_name}", file_obj)
 
-    # MEDIA_URL is absolute in every environment (settings.py), so the
+    # MEDIA_URL is absolute in every environment (settings/storage.py), so the
     # storage URL is the editor's image location as is.
     return JsonResponse(
         {

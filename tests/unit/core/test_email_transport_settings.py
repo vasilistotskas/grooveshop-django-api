@@ -3,8 +3,9 @@
 Django raises on ``use_tls`` and ``use_ssl`` both set, but only when a
 message is first sent, which on this platform means a customer's order
 confirmation is the thing that discovers the misconfiguration.
-settings.py fails at boot instead. The EMAIL_* environment variables are
-the same as before Django 6.1; they now fill MAILERS["relay"]["OPTIONS"].
+The settings fail at boot instead (``settings/email.py``). The EMAIL_*
+environment variables are the same as before Django 6.1; they now fill
+MAILERS["relay"]["OPTIONS"].
 """
 
 import importlib
@@ -19,7 +20,7 @@ def _reload_settings(monkeypatch, **env):
     env.setdefault("EMAIL_BACKEND", SMTP)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    import settings as settings_module
+    import settings.email as settings_module
 
     return importlib.reload(settings_module)
 

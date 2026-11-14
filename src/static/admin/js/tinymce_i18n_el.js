@@ -7,7 +7,7 @@
  * saw a blank entry in Insert and a blank tooltip where the FAQ
  * (accordion) item is. Measured on staging, 2026-09-28.
  *
- * Load order matters, and ``TINYMCE_EXTRA_MEDIA`` (settings.py) sets
+ * Load order matters, and ``TINYMCE_EXTRA_MEDIA`` (settings/admin.py) sets
  * it: django-tinymce puts those scripts between ``tinymce.min.js`` and
  * ``init_tinymce.js``. The pack is loaded first, so these values merge
  * over its empty ones; the editor then finds ``el`` already registered

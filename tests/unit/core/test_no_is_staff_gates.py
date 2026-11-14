@@ -56,7 +56,7 @@ def _app_modules():
         rel = path.relative_to(root).as_posix()
         if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
             continue
-        if rel in {"src/settings.py", "manage.py"}:
+        if rel == "manage.py" or rel.startswith("src/settings/"):
             continue
         yield rel, path
 

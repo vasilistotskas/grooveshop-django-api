@@ -1,8 +1,9 @@
 """Public-schema-only authentication backend for platform staff.
 
 ``UserAccount`` is mirrored per-schema (in both ``SHARED_APPS`` and
-``TENANT_APPS`` — see settings.py), so the *same table name* exists in
-the public schema AND in every tenant schema, distinguished only by
+``TENANT_APPS`` — see settings/application.py), so the *same table name*
+exists in the public schema AND in every tenant schema, distinguished only
+by
 Postgres search_path. Platform staff/superusers are platform
 identities that live in the PUBLIC schema row; this backend always
 resolves against that row regardless of which schema the connection

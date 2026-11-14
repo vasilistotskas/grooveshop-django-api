@@ -1,5 +1,5 @@
 [project]
-version = "3.245.7"
+version = "3.245.8"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -445,6 +445,10 @@ ignore = [
 # deploy gate and from a developer's shell, the same way: its stdout and
 # stderr are the verdict an operator reads.
 "api-contract/**" = ["T201"]
+# The settings package exports every module's names (F403, F405), and
+# the order of its imports is the order the settings are evaluated in,
+# which sorting them would change (I001).
+"src/settings/__init__.py" = ["F403", "F405", "I001"]
 
 [tool.ruff.lint.pylint]
 max-positional-args = 6

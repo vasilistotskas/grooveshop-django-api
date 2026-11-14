@@ -22,7 +22,8 @@ class TenantConfig(AppConfig):
         from tenant.settings_metadata import sync_setting_metadata
 
         # After every migrate of a schema, the setting rows describe and
-        # validate the settings as settings.py defines them now.
+        # validate the settings as settings/store_settings.py defines
+        # them now.
         post_migrate.connect(
             sync_setting_metadata,
             sender=apps.get_app_config("extra_settings"),

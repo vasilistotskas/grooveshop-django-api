@@ -1,7 +1,7 @@
 # Celery task results
 
 What the result backend stores, where, and what to ask it. Source:
-`src/settings.py` (the `CELERY_*` result settings), `src/core/result_backend.py`
+`src/settings/celery.py` (the `CELERY_*` result settings), `src/core/result_backend.py`
 (`TenantDatabaseBackend`), `src/core/admin.py` (`TaskResultAdmin`),
 `tests/settings.py`. The code wins over this page.
 

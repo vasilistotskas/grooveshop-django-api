@@ -208,9 +208,9 @@ class TestProductionWiring:
     def _settings_source() -> str:
         from pathlib import Path
 
-        import settings
+        import settings.logging
 
-        return Path(settings.__file__).read_text(encoding="utf-8")
+        return Path(settings.logging.__file__).read_text(encoding="utf-8")
 
     def test_the_json_formatter_is_the_class(self):
         assert '"()": "core.logging.JsonFormatter"' in self._settings_source()

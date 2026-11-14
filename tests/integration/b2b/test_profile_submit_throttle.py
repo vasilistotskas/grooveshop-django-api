@@ -45,7 +45,7 @@ def throttled_rate(monkeypatch):
     Set on the class rather than through the ``settings`` fixture.
     ``SimpleRateThrottle.THROTTLE_RATES`` is bound to the settings dict
     **at import time**, and every rate resolves to ``None`` under
-    ``DEBUG`` — which is what settings.py asks for and what the suite
+    ``DEBUG`` — which is what settings/api.py asks for and what the suite
     runs under. Overriding ``REST_FRAMEWORK`` afterwards therefore
     reaches the throttle only depending on what else has already
     touched ``api_settings``, which made this test pass alone and fail

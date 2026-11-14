@@ -16,12 +16,12 @@ assigns a setting every ``AppConfig.ready()`` has already read it and
 the cache registry has already been built. Settings that are only read
 at request time stay in the conftests.
 
-``settings.py`` reads its values from the environment, filled from
+The settings package reads its values from the environment, filled from
 ``.env`` by ``dotenv.load_dotenv`` — which never overrides a variable
 that is already set (python-dotenv's ``override=False`` default). So
 the switches the suite depends on are put in the environment BEFORE
-``settings.py`` is imported: ``.env`` then cannot change them, and
-everything ``settings.py`` derives from them (``INSTALLED_APPS``,
+the settings package is imported: ``.env`` then cannot change them, and
+everything it derives from them (``INSTALLED_APPS``,
 ``MIDDLEWARE``, throttle rates) follows. Each one differed between a
 developer machine and CI.
 """
@@ -103,8 +103,8 @@ CACHES = {
     },
 }
 
-# No shared log file. ``DEBUG`` is pinned True above, so ``settings.py``
-# takes its development branch and adds ``app_file``, a
+# No shared log file. ``DEBUG`` is pinned True above, so
+# ``settings/logging.py`` takes its development branch and adds ``app_file``, a
 # ``RotatingFileHandler`` on ``logs/grooveshop_<host>.log`` that every xdist
 # worker opens. Once it reaches ``maxBytes`` one worker renames it while the
 # others hold it open; Windows refuses the rename and ``logging`` prints the
@@ -117,7 +117,7 @@ LOGGING = {
 }
 
 # Uploads go to a per-worker tree under the OS temp directory, emptied
-# whenever a worker starts. ``settings.py`` points MEDIA_ROOT at the
+# whenever a worker starts. ``settings/storage.py`` points MEDIA_ROOT at the
 # repository's ``mediafiles/``, the tree the development server serves,
 # and the suite never deletes what it uploads: every run added its
 # images there, 4.5 million files by 2026-09-26, and a test that walks

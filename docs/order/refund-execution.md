@@ -24,7 +24,7 @@ refunded, payment by payment) and:
   with no provider call, see above);
 - works in **three steps, so no transaction is open while a provider answers**.
   Every connection kills a session idle in a transaction after ten seconds
-  (`idle_in_transaction_session_timeout`, `src/settings.py`), and
+  (`idle_in_transaction_session_timeout`, `src/settings/database.py`), and
   `refund_order` used to hold its transaction and the order lock across the
   provider's HTTP call: a slow provider meant a refund made there and lost here
   (and, inside `cancel_order`, a whole cancel rolled back). Now: **(1) claim**:

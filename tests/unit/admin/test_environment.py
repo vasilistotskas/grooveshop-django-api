@@ -26,7 +26,8 @@ from admin.environment import (
     environment_title_prefix_callback,
 )
 
-SETTINGS_FILE = Path(__file__).resolve().parents[3] / "src" / "settings.py"
+SRC_DIR = Path(__file__).resolve().parents[3] / "src"
+SETTINGS_PACKAGE = SRC_DIR / "settings"
 
 
 @pytest.mark.parametrize(
@@ -73,9 +74,9 @@ def _platform_superuser():
 
 
 def test_staging_runs_the_production_profile():
-    """The rule itself, read from settings.py: a deployment that is not
+    """The rule itself, read from the settings: a deployment that is not
     development or CI gets every production check."""
-    source = SETTINGS_FILE.read_text(encoding="utf-8")
+    source = (SETTINGS_PACKAGE / "env.py").read_text(encoding="utf-8")
 
     assert (
         'PRODUCTION_PROFILE = SYSTEM_ENV in ("production", "staging")' in source
@@ -85,7 +86,10 @@ def test_staging_runs_the_production_profile():
 def test_no_hardening_check_keys_on_the_deployment_name():
     """A check written ``SYSTEM_ENV == "production"`` would switch off on
     staging, which is exactly the drift staging exists to catch."""
-    source = SETTINGS_FILE.read_text(encoding="utf-8")
+    source = "\n".join(
+        module.read_text(encoding="utf-8")
+        for module in sorted(SETTINGS_PACKAGE.glob("*.py"))
+    )
 
     assert not re.search(r'SYSTEM_ENV\s*==\s*"production"', source)
 
@@ -93,7 +97,7 @@ def test_no_hardening_check_keys_on_the_deployment_name():
 # A well-formed Fernet key (32 url-safe base64 bytes); not used anywhere.
 _VALID_FERNET_KEY = "ZGV2LW9ubHktaW5zZWN1cmUta2V5LW5vdC1zZWNyZXQ="
 
-# What settings.py refuses to start without under the production profile.
+# What the settings refuse to start without under the production profile.
 _PRODUCTION_SECRETS = {
     "SECRET_KEY": "not-the-default",
     "DB_PASSWORD": "not-the-default",
@@ -109,7 +113,7 @@ _PRODUCTION_SECRETS = {
 
 
 def _import_settings(**env):
-    """Import settings.py in a fresh interpreter: its checks run at
+    """Import the settings in a fresh interpreter: their checks run at
     import time, which an in-process test cannot repeat.
 
     Every value the production profile requires is given here, so the
@@ -118,7 +122,7 @@ def _import_settings(**env):
     """
     return subprocess.run(
         [sys.executable, "-c", "import settings"],
-        cwd=SETTINGS_FILE.parent,
+        cwd=SRC_DIR,
         env={
             **os.environ,
             **_PRODUCTION_SECRETS,

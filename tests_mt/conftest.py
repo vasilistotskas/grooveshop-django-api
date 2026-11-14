@@ -66,7 +66,7 @@ settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False
 
-# Everything below is left at the settings.py default on purpose:
+# Everything below is left at the settings package's default on purpose:
 # DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"] and
 # TenantMainMiddleware present. CACHES and DISABLE_CACHE come from
 # ``tests/settings.py`` (``--ds`` in pyproject.toml, shared by both

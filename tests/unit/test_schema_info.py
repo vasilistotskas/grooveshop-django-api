@@ -17,7 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_FILE = ROOT / "schema.yml"
-SETTINGS_FILE = ROOT / "src" / "settings.py"
+SETTINGS_FILE = ROOT / "src" / "settings" / "api.py"
 
 
 def test_the_committed_schema_info_is_what_the_code_generates(openapi_schema):
@@ -27,7 +27,7 @@ def test_the_committed_schema_info_is_what_the_code_generates(openapi_schema):
 
 
 def test_the_info_is_written_in_settings_not_read_from_the_environment():
-    """``TITLE`` and ``DESCRIPTION`` are literals in ``settings.py``: a call
+    """``TITLE`` and ``DESCRIPTION`` are literals in ``settings/api.py``: a call
     (``getenv`` and the like) would make the generated file depend on the
     machine it is generated on."""
     tree = ast.parse(SETTINGS_FILE.read_text(encoding="utf-8"))

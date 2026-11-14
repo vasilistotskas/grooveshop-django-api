@@ -148,7 +148,7 @@ def test_results_are_kept_long_enough_to_investigate_a_late_complaint():
     """Retention must be set under its post-4.0 name: the pre-4.0
     ``task_result_expires`` spelling is ignored under the ``CELERY_``
     namespace, which is how this ran on celery's 1-day default while
-    settings.py claimed one hour. It is also what makes beat install
+    the settings claimed one hour. It is also what makes beat install
     ``celery.backend_cleanup``."""
     assert celery_app.conf.result_expires.days == 30
 

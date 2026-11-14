@@ -44,7 +44,7 @@ the linked section or the originating commit's message.
 These invariants need more than a table row. Each ends with its anchor.
 
 - The backend uses the `psycopg` pool with `CONN_MAX_AGE=0` under ASGI
-  (`DB_POOL_*` in `src/settings.py`). With persistent connections, asgiref's
+  (`DB_POOL_*` in `src/settings/database.py`). With persistent connections, asgiref's
   per-request thread executor leaves each thread's connection open until the
   thread is collected, which exhausts Postgres `max_connections` under load.
   The pool bounds the connections of a process, and Django refuses a pool

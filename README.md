@@ -126,7 +126,7 @@ settings, seeds or the cache.
 
 ## Project layout
 
-Every Django app, the settings module (`src/settings.py`) and the `asgi`
+Every Django app, the settings package (`src/settings/`) and the `asgi`
 package are in `src/`, which is on the Python path: an import names the app,
 never `src`
 (`from order.services import ...`). `manage.py`, the Dockerfiles, the tooling

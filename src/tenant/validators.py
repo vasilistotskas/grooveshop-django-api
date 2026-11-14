@@ -39,9 +39,9 @@ def generate_indexnow_key() -> str:
 # ANNOUNCEMENT_BAR, AUTH_PANEL, FUNDING_BANNER, STORE_OFFICES and
 # BUSINESS_HOURS are each a serializer in ``core/store_setting_shapes.py``:
 # the same class validates the save here and describes the value in the
-# OpenAPI schema. These are the dotted paths ``settings.py`` names; a
-# validator returns a BOOLEAN (``Setting.validate()`` wraps a falsy result
-# in its own ``ValidationError``).
+# OpenAPI schema. These are the dotted paths ``settings/store_settings.py``
+# names; a validator returns a BOOLEAN (``Setting.validate()`` wraps a
+# falsy result in its own ``ValidationError``).
 
 
 def validate_announcement_bar_setting(value: object) -> bool:

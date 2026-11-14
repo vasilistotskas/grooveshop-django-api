@@ -28,7 +28,8 @@ def config_loggers(*args, **kwargs):
 def create_celery_app():
     tasker = Celery("core")
 
-    # Every Celery option lives in settings.py under the CELERY_ namespace.
+    # Every Celery option lives in settings/celery.py under the CELERY_
+    # namespace.
     #
     # A ``conf.update()`` here does NOT win, whatever the call order: a key
     # supplied by ``config_from_object`` is resolved from that source each
@@ -36,7 +37,7 @@ def create_celery_app():
     # This block used to carry a comment claiming the opposite, and with it
     # ``task_ignore_result=False``, ``task_soft_time_limit=300`` and
     # ``task_time_limit=600`` — none of which were ever in effect (the real
-    # values are True, 1500 and 1800). Add options to settings.py and
+    # values are True, 1500 and 1800). Add options to settings/celery.py and
     # resolve ``celery_app.conf[...]`` to check one, never infer from here.
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
 

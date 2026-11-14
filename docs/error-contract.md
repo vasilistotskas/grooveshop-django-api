@@ -2,7 +2,7 @@
 
 What an API error looks like on the wire, and how to raise one. Source:
 `src/core/api/exception_handler.py` (the handler),
-`REST_FRAMEWORK["EXCEPTION_HANDLER"]` in `src/settings.py`, and the guards in
+`REST_FRAMEWORK["EXCEPTION_HANDLER"]` in `src/settings/api.py`, and the guards in
 `tests/unit/core/api/test_error_code_guards.py`. The code wins over this
 page.
 

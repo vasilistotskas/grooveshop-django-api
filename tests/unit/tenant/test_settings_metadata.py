@@ -1,5 +1,5 @@
-"""Setting rows follow settings.py's description and validator
-(tenant/settings_metadata.py).
+"""Setting rows follow settings/store_settings.py's description and
+validator (tenant/settings_metadata.py).
 
 django-extra-settings copies both into a row only when it creates it, and
 validates against the stored path, so a store provisioned before a

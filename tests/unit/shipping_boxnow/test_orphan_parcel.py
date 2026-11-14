@@ -46,6 +46,7 @@ from shipping_boxnow.exceptions import (
     BoxNowRetryableError,
 )
 from shipping_boxnow.factories import BoxNowShipmentFactory
+from shipping_boxnow.models import BoxNowShipment
 from shipping_boxnow.services import BoxNowService
 from shipping_boxnow.tasks import create_boxnow_shipment_for_order
 from tests.unit.shipping_boxnow.test_client_error_mapping import (
@@ -536,6 +537,38 @@ class TestCancellingAShipmentWithNoParcelNumber:
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
         assert shipment.parcel_id == "9219709201"
+
+    def test_a_shipment_reset_for_reissue_meanwhile_is_left_as_it_is(
+        self, http
+    ):
+        """A reset that lands while BoxNow is asked keeps its pending row.
+
+        Another cancel recorded the shipment and staff reset it for a new
+        parcel while this cancel was asking BoxNow. Writing the parcel it
+        found and CANCELED would undo the reset, and the queued creation
+        would then return the dead parcel instead of a new one.
+        """
+        shipment = _after_a_lost_answer()
+
+        def reset_meanwhile():
+            BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                parcel_state=BoxNowParcelState.CANCELED,
+                cancel_requested_at=timezone.now(),
+            )
+            BoxNowService.reset_shipment_for_reissue(
+                BoxNowShipment.objects.get(pk=shipment.pk)
+            )
+            return _response(200, {})
+
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), reset_meanwhile)
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.parcel_id is None
 
     def test_a_parcel_whose_cancel_was_only_requested_is_canceled(self, http):
         """``cancelationRequested`` is not ``canceled``.

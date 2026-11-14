@@ -1202,6 +1202,7 @@ class BoxNowService:
                 BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
             )
             parcel_id = locked.parcel_id
+            reset_mark = (locked.metadata or {}).get("reset_for_reissue_at")
 
             # Already canceled (a webhook, an earlier cancel that the
             # caller then failed to finish, a retried order cancel):
@@ -1274,7 +1275,10 @@ class BoxNowService:
 
         if not parcel_id:
             cls._cancel_unrecorded_parcel(
-                shipment, order_id=order_id, reason=reason
+                shipment,
+                order_id=order_id,
+                reason=reason,
+                reset_mark=reset_mark,
             )
             return
 
@@ -1311,7 +1315,12 @@ class BoxNowService:
 
     @classmethod
     def _cancel_unrecorded_parcel(
-        cls, shipment: BoxNowShipment, *, order_id: int, reason: str
+        cls,
+        shipment: BoxNowShipment,
+        *,
+        order_id: int,
+        reason: str,
+        reset_mark: str | None,
     ) -> None:
         """Cancel a shipment whose creation was sent but left no parcel_id.
 
@@ -1403,6 +1412,21 @@ class BoxNowService:
             )
             if locked.parcel_state == BoxNowParcelState.CANCELED:
                 return
+            # Staff reset the shipment for a new parcel while BoxNow was
+            # asked (another cancel recorded it first). Writing the parcel
+            # found here and CANCELED would undo that reset.
+            if (locked.metadata or {}).get(
+                "reset_for_reissue_at"
+            ) != reset_mark:
+                raise BoxNowRetryableError(
+                    409,
+                    message=(
+                        f"BoxNow shipment {shipment.pk} was reset for a new "
+                        "parcel while BoxNow was being asked, so it was left "
+                        "as it is. Cancel again if the order is still to be "
+                        "cancelled."
+                    ),
+                )
             stored_meanwhile = bool(locked.parcel_id) and (
                 locked.parcel_id != found
             )
@@ -1546,6 +1570,9 @@ class BoxNowService:
                     }
                 )
             metadata.pop("mint_started_at", None)
+            # A cancel that read the row before this reset must not write
+            # its result over it (see ``_cancel_unrecorded_parcel``).
+            metadata["reset_for_reissue_at"] = timezone.now().isoformat()
 
             previous = locked.parcel_id
             locked.delivery_request_id = None

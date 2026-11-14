@@ -242,6 +242,11 @@ class GatewayAnonThrottle(AnonIpRateThrottle):
     """
 
     def get_cache_key(self, request, view):
+        # Anonymous only, as the parent: a gateway request signed in as an
+        # account (a linked agent) is throttled by the user budget alone.
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return None
         ident = _gateway_ident(request)
         if ident:
             return self.cache_format % {

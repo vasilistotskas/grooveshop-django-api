@@ -45,6 +45,18 @@ class _GatewayCartKeyTests:
         self.factory = APIRequestFactory()
         self.throttle = self.throttle_class()
 
+    def test_a_signed_in_gateway_request_is_not_an_anonymous_one(self) -> None:
+        """An agent linked to an account is throttled by the user budget;
+        the anonymous one does not count it too."""
+        request = self.factory.post(
+            "/api/v1/cart/item",
+            headers={"X-Internal-Gateway": SECRET, "X-Cart-Id": CART_UUID},
+        )
+        request.user = type(
+            "SignedIn", (), {"is_authenticated": True, "pk": 7}
+        )()
+        self.assertIsNone(self.throttle.get_cache_key(request, view=None))
+
     def test_gateway_request_keys_on_cart_uuid(self) -> None:
         request = _anon_request(
             self.factory,
@@ -261,6 +273,18 @@ class PaymentAttemptAnonThrottleTestCase(TestCase):
             _payment_request(
                 order_uuid=other, **{"X-Internal-Gateway": SECRET}
             ),
+        )
+
+    def test_a_signed_in_gateway_request_is_not_counted(self) -> None:
+        request = APIRequestFactory().post(
+            f"/api/v1/order/1/create_checkout_session?uuid={ORDER_UUID}",
+            headers={"X-Internal-Gateway": SECRET},
+        )
+        request.user = type(
+            "SignedIn", (), {"is_authenticated": True, "pk": 7}
+        )()
+        self.assertIsNone(
+            PaymentAttemptAnonThrottle().get_cache_key(request, view=None)
         )
 
     def test_without_the_secret_it_keys_on_the_address(self) -> None:

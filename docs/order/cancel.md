@@ -40,8 +40,11 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   can have waiting is bounded per store: `ORDER_MAX_UNPAID_ONLINE_ORDERS`
   (default 5, `0` = off; `OrderService._enforce_unpaid_order_limit`, checked in
   `create_order_from_cart_offline` for online methods only). The customer is
-  the account, or the email (case-insensitive) for a guest; PENDING+PENDING
-  online orders count, offline (COD) and paid ones do not. An order over the
+  the account, or the email (case-insensitive) for a guest. Every PENDING order
+  still awaiting its online payment counts
+  (`Order.objects.awaiting_online_payment()`: payment pending, processing or
+  failed, since a failed attempt keeps its stock until the sweep); offline
+  (COD), paid and canceled ones do not. An order over the
   limit is refused with a plain message. Counted under the cart lock, so two
   carts of one customer racing can overshoot by the number in flight.
   An order the agent gateway places has a second bound, per cart: none while

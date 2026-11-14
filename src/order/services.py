@@ -1680,10 +1680,11 @@ class OrderService:
         limit = int(store_setting("ORDER_MAX_UNPAID_ONLINE_ORDERS"))
         if limit <= 0:
             return
-        waiting = Order.objects.filter(
-            status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.PENDING,
-            pay_way__settlement=PaySettlement.ONLINE,
+        # Every PENDING order still owed through a hosted flow, whatever
+        # its last attempt did: one whose payment failed or is processing
+        # keeps its stock until it is paid or the sweep cancels it.
+        waiting = Order.objects.awaiting_online_payment().filter(
+            status=OrderStatus.PENDING
         )
         if user is not None and user.is_authenticated:
             waiting = waiting.filter(user=user)

@@ -160,14 +160,25 @@ class TestOnlyWhatIsStillWaitingCounts:
             {"status": OrderStatus.CANCELED},
             {"payment_status": PaymentStatus.COMPLETED},
             {"status": OrderStatus.PROCESSING},
-            {"payment_status": PaymentStatus.FAILED},
         ],
     )
-    def test_a_paid_canceled_or_failed_order_does_not(self, state):
+    def test_a_paid_canceled_or_processing_order_does_not(self, state):
         _waiting(**state)
 
         with _limit(1):
             assert _place().status == OrderStatus.PENDING
+
+    @pytest.mark.parametrize(
+        "payment_status", [PaymentStatus.FAILED, PaymentStatus.PROCESSING]
+    )
+    def test_a_failed_or_processing_payment_still_counts(self, payment_status):
+        """A PENDING order whose payment failed or is being processed keeps
+        its stock until it is paid or the sweep cancels it, so it is still
+        waiting for its payment."""
+        _waiting(payment_status=payment_status)
+
+        with _limit(1), pytest.raises(InvalidOrderDataError):
+            _place()
 
     def test_an_offline_order_does_not(self):
         _waiting(pay_way=_cod())

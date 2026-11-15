@@ -3,6 +3,20 @@
 
 
 
+## v3.245.13 (2026-11-15)
+
+### Refactoring
+
+* refactor(order): store settings name their order validators at order.setting_validators (#706)
+
+The four order validator paths in EXTRA_SETTINGS_DEFAULTS move to the
+permanent address #703 added. sync_setting_metadata writes them into every
+store's rows on migrate; the release still serving during the rollout
+(v3.245.12 or later in production and staging) already has that module.
+After this, order.stock, order.review_request and order.payment_hold can
+move with #566. A test keeps every stored order validator at the
+permanent address. ([`00c72f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00c72f993c17e711e1e572026ecd044183fd78f9))
+
 ## v3.245.12 (2026-11-14)
 
 ### Refactoring

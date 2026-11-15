@@ -1684,3 +1684,44 @@ class TestNoAnswerKeepsTheUncertainty:
         alert.assert_not_called()
         shipment.refresh_from_db()
         assert shipment.metadata["creation_uncertain_at"]
+
+
+class TestANewAttemptIsAlertedAgain:
+    def test_a_new_claim_drops_the_old_alert_record(self, http):
+        """Staff were alerted about a refusal; a later attempt whose
+        answer is cut off must not inherit that record, or neither the task
+        nor the sweep tells anyone about it."""
+        order = _paid_order()
+        shipment = _pending_shipment(
+            order,
+            mint_started_at=None,
+            last_error={
+                "type": "BoxNowAPIError",
+                "code": "P401",
+                "message": "Invalid locker",
+                "status_code": 400,
+                "response_text": "",
+                "staff_alerted": True,
+            },
+        )
+        http.answer(_CREATE, requests.exceptions.ChunkedEncodingError("cut"))
+        with pytest.raises(requests.exceptions.ChunkedEncodingError):
+            BoxNowService.create_shipment_for_order(order)
+        assert (
+            "staff_alerted"
+            not in (
+                BoxNowShipment.objects.get(pk=shipment.pk).metadata[
+                    "last_error"
+                ]
+            )
+        )
+        _age_the_stamp(shipment)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_called_once()

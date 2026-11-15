@@ -204,7 +204,7 @@ and says which file holds each § number used here.
     the stamp is cleared and staff get the creation alert ("Create BoxNow
     parcel now"), unless the creation task already alerted them about the
     last failure (`last_error["staff_alerted"]`, written by
-    `record_staff_alerted`); anything else is handed to staff with what
+    `record_staff_alerted` and dropped when a new attempt takes the claim); anything else is handed to staff with what
     BoxNow lists. A lookup BoxNow refuses (a deterministic answer) ends
     the uncertainty and alerts staff at once; one BoxNow does not answer is
     left for the next run, with no escalation after N runs: an outage

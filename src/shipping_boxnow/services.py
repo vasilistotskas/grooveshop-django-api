@@ -444,10 +444,20 @@ class BoxNowService:
                     },
                 )
 
-            shipment.metadata = {
+            claimed = {
                 **metadata,
                 "mint_started_at": timezone.now().isoformat(),
             }
+            last_error = metadata.get("last_error")
+            if isinstance(last_error, dict) and "staff_alerted" in last_error:
+                # A new attempt: if it fails too, staff hear about that
+                # failure, from the task or the sweep.
+                claimed["last_error"] = {
+                    key: value
+                    for key, value in last_error.items()
+                    if key != "staff_alerted"
+                }
+            shipment.metadata = claimed
             update_fields = ["metadata", "updated_at"]
 
             # COD collects the customer's ACTUAL payable at the locker,

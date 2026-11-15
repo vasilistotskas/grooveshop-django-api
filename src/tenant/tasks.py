@@ -207,8 +207,11 @@ def fanout_poll_boxnow_tracking_batch():
 
 @celery_app.task(base=TenantTask)
 def fanout_settle_uncertain_boxnow_creations():
+    # Suspended stores too: a canceled order's parcel may be live at
+    # BoxNow whatever the store's status.
     return run_for_all_tenants(
-        "shipping_boxnow.tasks.settle_uncertain_boxnow_creations"
+        "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        include_suspended=True,
     )
 
 

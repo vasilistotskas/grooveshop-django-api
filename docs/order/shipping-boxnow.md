@@ -186,7 +186,8 @@ and says which file holds each § number used here.
   `BOXNOW_CREATION_SETTLE_SECONDS`, and the tracking poll only reads
   shipments with a `parcel_id`, so nothing else asks BoxNow again.
   `settle_uncertain_boxnow_creations` (every 15 minutes, fanned out per
-  tenant by `tenant.tasks.fanout_settle_uncertain_boxnow_creations`) runs
+  tenant by `tenant.tasks.fanout_settle_uncertain_boxnow_creations`,
+  suspended stores included) runs
   `BoxNowService.settle_uncertain_creation` for each shipment with no
   parcel whose `creation_uncertain_at` is older than the settle time and
   whose creation is not in flight:

@@ -1540,6 +1540,19 @@ class TestTheThirdReview:
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
 
+    def test_the_fanout_includes_suspended_stores(self):
+        """A canceled order's parcel may be live at BoxNow whether
+        or not its store is suspended."""
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_settle_uncertain_boxnow_creations()
+
+        run.assert_called_once_with(
+            "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+            include_suspended=True,
+        )
+
 
 def _age_the_stamp(shipment) -> None:
     """Move a stamp the creation wrote past the settle time."""

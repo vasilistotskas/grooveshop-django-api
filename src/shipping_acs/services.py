@@ -38,6 +38,7 @@ from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import (
     AcsAPIError,
+    AcsBusyError,
     AcsError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
@@ -423,9 +424,13 @@ class AcsService:
            longer roll back the local save.
         3. **Persist** — fresh atomic + ``select_for_update`` race
            check. If another worker has already saved a voucher, our
-           voucher becomes the duplicate; we attempt
-           ``ACS_Delete_Voucher`` and return the row the other worker
-           saved.
+           voucher becomes the duplicate: its number is recorded in
+           ``metadata['orphan_vouchers']`` and the transaction commits.
+        4. **Delete an unused answer** — no DB lock, no open transaction
+           (#640): ``ACS_Delete_Voucher`` for that duplicate, then the
+           number comes off the orphan list, or stays there when the
+           delete fails (:meth:`_delete_unused_voucher`). Returns the
+           row the other worker saved.
 
         **A voucher request of unknown outcome is never sent again**
         (#622). ``ACS_Create_Voucher`` has no idempotency key and no
@@ -680,7 +685,6 @@ class AcsService:
 
         # ----- Phase 3: persist (fresh atomic, race-checked) -----
         unused_answer = False
-        refused_delete = False
         with transaction.atomic():
             shipment = (
                 AcsShipment.objects.select_for_update()
@@ -752,30 +756,18 @@ class AcsService:
                         voucher_no,
                         extra={**extra, "phase": "phase3_stale_answer"},
                     )
-                try:
-                    client.delete_voucher(voucher_no)
-                    cls._settle_unrecognised_vouchers(
-                        [voucher_no],
-                        AcsUnrecognisedVoucherResolution.DELETED,
-                        note="Deleted at ACS by the voucher mint: an "
-                        "answer no shipment uses.",
-                    )
-                except AcsAPIError as exc:
-                    logger.error(
-                        "Failed to cancel duplicate voucher %s for order=%s: %s "
-                        "— flag in shipment.metadata['orphan_vouchers'] for "
-                        "manual reconciliation.",
-                        voucher_no,
-                        order.id,
-                        exc,
-                    )
-                    metadata = shipment.metadata or {}
-                    orphans = list(metadata.get("orphan_vouchers") or [])
-                    orphans.append(voucher_no)
-                    metadata["orphan_vouchers"] = orphans
-                    shipment.metadata = metadata
-                    shipment.save(update_fields=["metadata"])
-                    refused_delete = True
+                # The number is recorded on the row before ACS is asked to
+                # delete it, and the delete runs after this transaction
+                # commits (#640): no staff action waits on the row for an
+                # ACS call, and no outcome of the delete (a refusal, a lost
+                # answer, a crash) can lose the number.
+                # ``_delete_unused_voucher`` takes it off once ACS confirms.
+                metadata = shipment.metadata or {}
+                orphans = list(metadata.get("orphan_vouchers") or [])
+                orphans.append(voucher_no)
+                metadata["orphan_vouchers"] = orphans
+                shipment.metadata = metadata
+                shipment.save(update_fields=["metadata"])
                 unused_answer = True
 
             else:
@@ -824,38 +816,9 @@ class AcsService:
                 )
 
         if unused_answer:
-            if refused_delete:
-                # A live (maybe billed) voucher ACS would not delete is
-                # recorded where staff already look, at once, not only
-                # if a later refused pickup list happens to name it. Phase
-                # 3 has committed: this runs in its own transaction
-                # (``_keep_unrecognised_vouchers``), best effort like the
-                # pickup-list path, so a failure here never fails a mint
-                # whose outcome is already saved; the ERROR line keeps the
-                # number (it is also in ``metadata["orphan_vouchers"]``).
-                try:
-                    cls._keep_unrecognised_vouchers(
-                        [voucher_no],
-                        _voucher_pickup_date(params),
-                        source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
-                        duplicate_of=shipment,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Voucher %s that ACS would not delete (order=%s) "
-                        "could not be recorded as a voucher matching no "
-                        "order; delete it at ACS by hand.",
-                        voucher_no,
-                        order.id,
-                        extra={
-                            "order_id": order.id,
-                            "shipment_pk": shipment.pk,
-                            "carrier": "acs",
-                            "voucher_no": voucher_no,
-                            "phase": "phase3_unused_record_failed",
-                        },
-                    )
-            return shipment
+            return cls._delete_unused_voucher(
+                client, shipment, voucher_no, _voucher_pickup_date(params)
+            )
 
         if late_answer:
             from order.models.history import OrderHistory
@@ -900,6 +863,90 @@ class AcsService:
         order.add_tracking_info(voucher_no, "acs")
         cls._advance_pending_order_to_processing(order)
         return shipment
+
+    @classmethod
+    def _delete_unused_voucher(
+        cls,
+        client: AcsClient,
+        shipment: AcsShipment,
+        voucher_no: str,
+        pickup_date: date,
+    ) -> AcsShipment:
+        """Phase 4 of a mint whose answer no shipment uses: delete that
+        voucher at ACS, with no lock held and no transaction open.
+
+        Phase 3 has already recorded the number in
+        ``metadata["orphan_vouchers"]`` and committed. Deleted: the number
+        comes off that list under a short lock, and an open row ACS named
+        for it is resolved as deleted. Not deleted, whatever the reason
+        (ACS refused, its answer was lost, an error of ours): the number
+        stays on the list and is recorded at once where staff look
+        (``_keep_unrecognised_vouchers``), not only if a later refused
+        pickup list happens to name it. A live, maybe billed, voucher is
+        never forgotten either way.
+        """
+        extra = {
+            "order_id": shipment.order_id,
+            "shipment_pk": shipment.pk,
+            "carrier": "acs",
+            "voucher_no": voucher_no,
+        }
+        try:
+            client.delete_voucher(voucher_no)
+        except Exception as exc:
+            # Not an ``AcsError``: ours to fix, so the traceback is kept.
+            logger.error(
+                "Failed to delete unused voucher %s for order=%s: %s — kept "
+                "in shipment.metadata['orphan_vouchers'] for manual "
+                "reconciliation.",
+                voucher_no,
+                shipment.order_id,
+                exc,
+                exc_info=not isinstance(exc, AcsError),
+                extra={**extra, "phase": "phase4_delete_failed"},
+            )
+            # Best effort, like the pickup-list path: the number is
+            # already on the shipment, so a failure here never fails a
+            # mint whose outcome is saved.
+            try:
+                cls._keep_unrecognised_vouchers(
+                    [voucher_no],
+                    pickup_date,
+                    source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
+                    duplicate_of=shipment,
+                )
+            except Exception:
+                logger.exception(
+                    "Voucher %s that ACS did not delete (order=%s) could "
+                    "not be recorded as a voucher matching no order; "
+                    "delete it at ACS by hand.",
+                    voucher_no,
+                    shipment.order_id,
+                    extra={**extra, "phase": "phase4_unused_record_failed"},
+                )
+            return AcsShipment.objects.get(pk=shipment.pk)
+
+        with transaction.atomic():
+            fresh = AcsShipment.objects.select_for_update().get(pk=shipment.pk)
+            metadata = fresh.metadata or {}
+            orphans = [
+                number
+                for number in metadata.get("orphan_vouchers") or []
+                if number != voucher_no
+            ]
+            if orphans:
+                metadata["orphan_vouchers"] = orphans
+            else:
+                metadata.pop("orphan_vouchers", None)
+            fresh.metadata = metadata
+            fresh.save(update_fields=["metadata"])
+        cls._settle_unrecognised_vouchers(
+            [voucher_no],
+            AcsUnrecognisedVoucherResolution.DELETED,
+            note="Deleted at ACS by the voucher mint: an answer no shipment "
+            "uses.",
+        )
+        return fresh
 
     @classmethod
     def _record_last_error(
@@ -1058,7 +1105,7 @@ class AcsService:
     ) -> float | None:
         """Age in seconds of an expired mint claim, None without a claim.
 
-        Raises :class:`AcsRetryableError` while a claim is inside its TTL:
+        Raises :class:`AcsBusyError` while a claim is inside its TTL:
         another worker is minting, so Celery backs off instead of racing
         in.
         """
@@ -1066,7 +1113,7 @@ class AcsService:
         if age is None:
             return None
         if age < cls._MINT_CLAIM_TTL_SECONDS:
-            raise AcsRetryableError(
+            raise AcsBusyError(
                 alias="ACS_Create_Voucher",
                 error_message=(
                     f"Voucher mint already in progress for "
@@ -1533,9 +1580,7 @@ class AcsService:
                         started = timezone.make_aware(started)
                     age = (timezone.now() - started).total_seconds()
                     if age < cls._MINT_CLAIM_TTL_SECONDS:
-                        from shipping_acs.exceptions import AcsRetryableError
-
-                        raise AcsRetryableError(
+                        raise AcsBusyError(
                             alias="ACS_Delete_Voucher",
                             error_message=(
                                 f"Voucher cancel already in progress for "

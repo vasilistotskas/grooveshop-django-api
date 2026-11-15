@@ -91,6 +91,30 @@ BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+# Seconds after a parcel creation whose outcome is uncertain (a timeout, a
+# 5xx: the request may have reached BoxNow) during which an empty lookup by
+# ``orderNumber`` does not prove that no parcel exists: BoxNow may still be
+# processing the request, or not list its parcel yet. A cancel then refuses
+# retryably instead of cancelling locally (#690). On BoxNow's stage a parcel is
+# listed at once (docs/order/shipping-boxnow.md); the bound is for a request
+# BoxNow goes on with after its answer was given up on, so generous.
+BOXNOW_CREATION_SETTLE_SECONDS = int(
+    getenv("BOXNOW_CREATION_SETTLE_SECONDS", "600")
+)
+# How often staff hear, at most, that BoxNow refuses a store's credentials
+# while uncertain creations wait for the settle sweep (#712): one alert
+# per store per interval, never one per shipment or per run.
+BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS = int(
+    getenv("BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS", "86400")
+)
+# A BoxNow 429: how long the store's BoxNow work waits when BoxNow sends no
+# usable Retry-After, and the longest wait any Retry-After is held to.
+BOXNOW_RATE_LIMIT_DEFAULT_SECONDS = int(
+    getenv("BOXNOW_RATE_LIMIT_DEFAULT_SECONDS", "60")
+)
+BOXNOW_RETRY_AFTER_MAX_SECONDS = int(
+    getenv("BOXNOW_RETRY_AFTER_MAX_SECONDS", "900")
+)
 
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing

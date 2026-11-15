@@ -28,6 +28,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.throttling import AcsAddressValidationThrottle
+from shipping.api_errors import CarrierUnavailable
+from shipping.exceptions import CarrierUnavailableError
 from shipping_acs.exceptions import AcsAPIError, AcsConfigError
 
 logger = logging.getLogger(__name__)
@@ -119,6 +121,7 @@ class AcsAddressValidationView(APIView):
             200: AcsAddressValidationResponseSerializer,
             400: None,
             502: None,
+            503: None,
         },
         tags=["ACS shipments"],
     )
@@ -156,6 +159,11 @@ class AcsAddressValidationView(APIView):
                 },
                 status=503,
             )
+        except CarrierUnavailableError as exc:
+            # ACS gave no answer (a 5xx, a timeout, a connection or auth
+            # failure): an outage, whose text is ours, not the client's.
+            logger.warning("ACS address validation unavailable: %s", exc)
+            raise CarrierUnavailable from exc
         except AcsAPIError as exc:
             logger.warning("ACS address validation failed: %s", exc)
             # ``exc.error_message`` is the verbatim ACS business message —

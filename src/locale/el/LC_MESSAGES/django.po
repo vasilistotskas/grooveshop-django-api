@@ -14591,6 +14591,9 @@ msgstr "Ο κωδικός κουπονιού δεν μπορεί πλέον να
 msgid "The coupon code to apply."
 msgstr "Ο κωδικός κουπονιού προς εφαρμογή."
 
+msgid "The courier cannot be reached right now. Try again in a moment."
+msgstr "Δεν είναι δυνατή η επικοινωνία με τον courier αυτή τη στιγμή. Δοκίμασε ξανά σε λίγο."
+
 msgid "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 msgstr "Ο πελάτης έχει ήδη ολοκληρώσει την παραγγελία και περιμένει. Μπορείτε επίσης να ακυρώσετε την παραγγελία και να επικοινωνήσετε μαζί του."
 
@@ -15438,6 +15441,9 @@ msgstr "Αυτή η ρύθμιση είναι ίδια σε όλες τις γλ
 
 msgid "This shipment already has a BoxNow parcel."
 msgstr "Αυτή η αποστολή έχει ήδη δέμα BoxNow."
+
+msgid "This shipment is already being worked on. Try again in a few minutes."
+msgstr "Γίνεται ήδη εργασία σε αυτή την αποστολή. Δοκίμασε ξανά σε λίγα λεπτά."
 
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "Αυτή η αποστολή έχει ήδη καταγραφεί ως εισπραγμένη εκτός ACS."

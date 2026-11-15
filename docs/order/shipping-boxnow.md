@@ -128,9 +128,148 @@ and says which file holds each § number used here.
   `shipment_cancel` and the order's history note
   ([§7.1](cancel.md)). A creation in flight (a claim younger than
   `_MINT_CLAIM_TTL_SECONDS`) refuses at once with a
-  `BoxNowRetryableError`. The row is read again under its lock after the
+  `BoxNowBusyError`. The row is read again under its lock after the
   lookup: a creation that saved a parcel meanwhile sends the cancel down
   the usual path, and a claim taken meanwhile refuses.
+- **An empty lookup is trusted only once an uncertain creation has
+  settled** (#690). A creation that fails after its request may have
+  reached BoxNow (a `BoxNowRetryableError`: a read timeout, a dropped
+  connection, a 5xx; or an error the client does not classify) stamps
+  `metadata["creation_uncertain_at"]` when it releases its claim, so the
+  evidence outlives the claim. So does a `P410` whose take-over saves no
+  parcel (nothing listed yet, only canceled ones, a lookup that fails):
+  it proves BoxNow holds a request under the `orderNumber`, possibly from
+  a worker that died between the POST and phase 3 and left no stamp. Not
+  when everything BoxNow lists is a canceled parcel this shipment recorded
+  before "Create BoxNow parcel now" reset it (`previous_parcels`): that is
+  the documented reissue conflict, with a known cause, and stamping it
+  would block a cancel of a shipment that was never created
+  (`_conflict_is_a_reissue`). A canceled parcel the shipment never
+  recorded still stamps. Only a parcel ends it: one saved
+  (`_persist_parcel`, every branch) or one the cancel finds by
+  `orderNumber`. A refusal of a later request does not: it proves only
+  that this request created nothing, not that the earlier one whose
+  answer was lost did not, and nothing documents that BoxNow checks `P410`
+  before an auth or a validation answer (the token call even answers a 5xx
+  with `BoxNowAuthError`). Otherwise the stamp simply ages out. While the
+  stamp is younger than
+  `BOXNOW_CREATION_SETTLE_SECONDS` (settings/env, default 600), a cancel
+  whose lookup lists nothing live refuses with a `BoxNowBusyError`
+  (a customer is told to try again; a staff cancel goes on with the order
+  and leaves the error in `shipment_cancel`) instead of a local cancel;
+  after it, the lookup is authoritative. The creation task's own retries
+  refresh the stamp, and their `P410` take-over usually saves the parcel
+  first. **Measured on BoxNow's stage environment (2026-11-15):** a parcel
+  is listed by `GET /api/v1/parcels?orderNumber=` in the first lookup,
+  under 0.1 s after `POST /api/v1/delivery-requests` answers (4 of 4;
+  the POST itself took 0.2 to 0.5 s). So the listing adds no delay of its
+  own. What the settle time still has to cover cannot be measured from
+  outside: how long BoxNow may go on with a request whose answer we gave
+  up on (`BOXNOW_HTTP_TIMEOUT`). The 600 s default, twice the mint claim's
+  TTL, is kept as a generous bound on that; the sweep below settles the
+  rest.
+- **A canceled order never gets a live parcel.** A staff or system order
+  cancel goes on when the courier step is refused
+  (`OrderService.cancel_attached_shipment` never raises): while a creation
+  of uncertain outcome settles, or one is in flight. The order's status is
+  that cancel's durable record, and the creation reads it at both ends.
+  Before phase 1, a canceled order's shipment with no parcel is not
+  created: `create_shipment_for_order` runs `cancel_shipment` instead
+  (`_cancel_for_a_canceled_order`), which cancels a parcel BoxNow lists,
+  refuses with a `BoxNowBusyError` while the creation settles (the task
+  retries) and cancels locally once the lookup is authoritative or when no
+  creation was sent. In phase 3, `_persist_parcel` treats an order canceled
+  meanwhile like a shipment canceled meanwhile: the row is recorded
+  CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
+  cancelled at BoxNow. Its locked `select_related` join takes the order
+  row too, so an order cancel still in its transaction is waited for and
+  then seen.
+- **A sweep settles creations that stayed uncertain** (#712). The
+  creation task's retries back off for about 30 seconds, far inside
+  `BOXNOW_CREATION_SETTLE_SECONDS`, and the tracking poll only reads
+  shipments with a `parcel_id`, so nothing else asks BoxNow again.
+  `settle_uncertain_boxnow_creations` (every 15 minutes, fanned out per
+  tenant by `tenant.tasks.fanout_settle_uncertain_boxnow_creations`,
+  suspended stores included) runs
+  `BoxNowService.settle_uncertain_creation` for each shipment with no
+  parcel whose `creation_uncertain_at` is older than the settle time and
+  whose creation is not in flight:
+  - a canceled order: its cancel is finished as the creation would
+    (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
+    there and recorded, none is a local cancel. A refusal is reported
+    (`report_cancel_refused`: an ERROR line and a staff note on the order)
+    and ends the uncertainty wherever it is met, by the sweep or by the
+    creation task (`_cancel_for_a_canceled_order` ends it), so it is
+    reported once;
+  - a live order: under the creation's own claim, the order is looked up by
+    `orderNumber`. One live `new` parcel created for this shipment's terms
+    is saved (`_persist_parcel`); nothing listed settles it as not created,
+    the stamp is cleared and staff get the creation alert ("Create BoxNow
+    parcel now"), unless the creation task already alerted them about the
+    last failure (`last_error["staff_alerted"]`, written by
+    `record_staff_alerted` and dropped when a new attempt takes the claim); anything else is handed to staff with what
+    BoxNow lists. A lookup BoxNow refuses (a deterministic answer) ends
+    the uncertainty and alerts staff at once; one BoxNow does not answer is
+    left for the next run, with no escalation after N runs: an outage
+    resolves by itself and every BoxNow task meets it. The client counts as
+    no answer a 5xx, a timeout and a 429 from the token endpoint as well as
+    from the API (`BoxNowRetryableError`); only a real refusal of the
+    credentials (401, 403, 400 `invalid_client`) is a `BoxNowAuthError`.
+    That one says nothing about a parcel either: the shipment keeps its
+    stamp, the run stops (the store's other shipments would fail the same
+    way) and staff hear once per `BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS`
+    (`alert_credentials_refused`); the shipments settle by themselves once
+    the credentials work again. A canceled order's cancel that meets it in
+    the creation task is reported as that cancel and keeps its stamp.
+    Before acting on anything but a take-over (which re-reads the order
+    itself), the order is read again under its lock, and the decision and
+    the settle (claim and stamp cleared) are one locked step
+    (`_settle_unless_canceled`), so no cancel lands between them: one
+    canceled while BoxNow answered goes to the canceled-order branch.
+  The creation task names a canceled order's outcome as a cancel: status
+  `order_canceled` (or `shipment_canceled`) instead of "created", and a
+  refused cancel (`BoxNowCancelRefusedError`) is reported as the cancel it
+  is, never with the creation alert, whose remedy would be wrong. ACS does
+  not have this case: a voucher request of unknown outcome is never
+  cancelled or re-sent automatically, it waits for staff (§5.1 of
+  `shipping-acs.md`).
+- **A rate limit is waited out, not multiplied.** A 429 from BoxNow
+  (the token endpoint or the API) is a `BoxNowRetryableError` carrying
+  `retry_after`: BoxNow's `Retry-After` (seconds or an HTTP-date), or
+  `BOXNOW_RATE_LIMIT_DEFAULT_SECONDS` without one, at most
+  `BOXNOW_RETRY_AFTER_MAX_SECONDS`. Every BoxNow task's retry
+  (`tasks.BoxNowTask`, for `autoretry_for` and `self.retry` alike) waits at
+  least that long. The client also records the wait for the store
+  (`BoxNowClient.rate_limited_for`): until it is over the tracking poll
+  dispatches nothing, a poll already dispatched makes no call (the next
+  batch polls it again), and the settle sweep skips its run; a sweep run
+  that meets a 429 stops there.
+- **Lock order: the order, then the shipment.** An order cancel locks
+  the order and then cancels the shipment (`OrderService._cancel_order_locked`
+  → `cancel_shipment`). Every BoxNow path that locks both takes them in
+  that order (`BoxNowService._lock_with_order`: the creation's phase 1,
+  `_persist_parcel`, the settle sweep, the webhook and the tracking poll),
+  so no two of them wait on each other the other way round
+  (`TestEveryPathLocksTheOrderFirst` and `TestTheSweepLocksTheOrderFirst`
+  fail for any path that goes back to a joined
+  `select_for_update().select_related("order")`). #713 (the order cancel
+  calls the courier inside its own transaction) keeps this order when it
+  moves that call out.
+- **The tracking poll asks in the shipment's payment mode** (#691).
+  `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
+  `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources
+  give the parameter a default of `prepaid` (the OpenAPI file's
+  `PaymentMode` schema, which the query parameter references; API Manual
+  v7.2, §6.5.3) and neither exempts a `parcelId` query, so a call naming
+  no mode would, as documented, not list a cash-on-delivery parcel: its
+  states would never reach the shop. Naming the mode the parcel was
+  created with is right either way. **Tried on stage (2026-11-15):** for
+  a COD parcel, `parcelId` and `orderNumber` lookups naming no mode both
+  listed it, `paymentMode=cod` listed it, and `paymentMode=prepaid` did
+  not. So stage does not apply the documented default, the filter itself
+  works, and the poll before this change was not shown to miss COD
+  parcels; the documents still say otherwise, and production was not
+  tried.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   with no `parcel_id` can cancel (the paragraph above says how); a parcel
   cancels only while it is `new` (BoxNow answers P420
@@ -196,8 +335,28 @@ and says which file holds each § number used here.
   derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
   (the store default when there is none) and refuses a cart that fits no
   compartment with 400 `parcel_too_large`; the old `compartment_size` body
-  field is gone. The storefront's locker picker is BoxNow's own iframe
-  widget, which this API does not drive.
+  field is gone. BoxNow's own refusal (P422 address not found, P423 no
+  locker near it) is a 400 with BoxNow's `code`. BoxNow giving no answer
+  (a `CarrierUnavailableError`: a 5xx, a timeout, a connection or auth
+  failure, no credentials) is a 503 `carrier_unavailable`
+  (`shipping.api_errors.CarrierUnavailable`) whose `detail` is written for
+  a client; the error text goes to the log (#650). The agent gateway reads
+  only the status, so an outage is no longer "no locker nearby". The
+  storefront's locker picker is BoxNow's own iframe widget, which this API
+  does not drive. The same 503 answers an outage on ACS address
+  validation and on every staff cancel endpoint: the carriers' own
+  (`cancelBoxNowShipment`, `cancelAcsShipment`) and the order's
+  (`boxnow_cancel`, `acs_cancel`, `shipment_cancel` in
+  `src/order/views/order.py`), all through
+  `shipping.api_errors.unanswered`.
+  A refusal raised here with no carrier call because the same work is
+  already running (`shipping.exceptions.CarrierBusyError`: `BoxNowBusyError`
+  for a creation or cancel in flight or a creation still settling,
+  `AcsBusyError` for a voucher mint or cancel in progress) is a 409
+  `carrier_request_in_progress` (`shipping.api_errors.CarrierBusy`) whose
+  `detail` is the refusal's own text, which says what to wait for.
+  `CarrierBusyError` is a `CarrierUnavailableError`, so Celery retries it
+  and a customer cancel still answers `courier_unreachable`.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

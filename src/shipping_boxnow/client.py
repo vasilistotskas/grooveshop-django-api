@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import logging
+import time
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from math import ceil
 from typing import Any
 
 import requests
@@ -72,6 +76,33 @@ _RETRY_CONFIG = Retry(
     allowed_methods=["GET"],
     raise_on_status=False,  # we inspect status ourselves
 )
+
+
+#: The store's rate-limit marker (cache keys are per tenant): the epoch
+#: time until which BoxNow asked us to wait after a 429.
+_RATE_LIMIT_KEY = "boxnow:rate_limited_until"
+
+
+def _retry_after(response: requests.Response) -> float | None:
+    """BoxNow's ``Retry-After``, in seconds: delay-seconds or an HTTP-date
+    (RFC 9110, §10.2.3), never more than ``BOXNOW_RETRY_AFTER_MAX_SECONDS``
+    whatever the answer's status. None when absent or unreadable."""
+    headers = getattr(response, "headers", None)
+    value = headers.get("Retry-After") if headers is not None else None
+    if not isinstance(value, str) or not value.strip():
+        return None
+    value = value.strip()
+    if value.isdigit():
+        seconds = float(value)
+    else:
+        try:
+            when = parsedate_to_datetime(value)
+        except TypeError, ValueError:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        seconds = max(0.0, (when - datetime.now(UTC)).total_seconds())
+    return min(seconds, float(settings.BOXNOW_RETRY_AFTER_MAX_SECONDS))
 
 
 class BoxNowClient:
@@ -173,7 +204,11 @@ class BoxNowClient:
             force_refresh: Bypass the cache and always fetch a fresh token.
 
         Raises:
-            BoxNowAuthError: If BoxNow returns a non-200 response.
+            BoxNowRetryableError: No answer to act on: a connection error,
+                a timeout, a 5xx or a 429 (a rate limit refuses the call
+                before judging the credentials).
+            BoxNowAuthError: Any other non-200 response: BoxNow refused the
+                credentials.
         """
         from django.core.cache import cache
 
@@ -209,6 +244,20 @@ class BoxNowClient:
                 message=f"Timeout fetching BoxNow token: {exc}",
             ) from exc
 
+        if response.status_code >= 500 or response.status_code == 429:
+            # An outage or a rate limit: nothing was said about the
+            # credentials, so every caller retries it like a lost answer.
+            retry_after = _retry_after(response)
+            if response.status_code == 429:
+                retry_after = self._note_rate_limit(retry_after)
+            raise BoxNowRetryableError(
+                status_code=response.status_code,
+                message=(
+                    f"BoxNow token endpoint answered {response.status_code}"
+                ),
+                response_text=response.text,
+                retry_after=retry_after,
+            )
         if response.status_code != 200:
             raise BoxNowAuthError(
                 status_code=response.status_code,
@@ -263,7 +312,7 @@ class BoxNowClient:
 
         Raises:
             BoxNowAuthError:      HTTP 401 / 403.
-            BoxNowRetryableError: HTTP 5xx or connection error.
+            BoxNowRetryableError: HTTP 5xx, 429 or connection error.
             BoxNowAPIError:       Other non-2xx HTTP response.
         """
         effective_base = (base_url or self.api_base_url).rstrip("/")
@@ -326,6 +375,23 @@ class BoxNowClient:
                 status_code=response.status_code,
                 message=f"BoxNow server error {response.status_code}",
                 response_text=response.text,
+                retry_after=_retry_after(response),
+            )
+
+        if response.status_code == 429:
+            # A rate limit refuses the call before BoxNow processes it:
+            # no answer about the request, so it is retried later.
+            logger.warning(
+                "BoxNow %s %s → 429: %s",
+                method.upper(),
+                path,
+                response.text[:500],
+            )
+            raise BoxNowRetryableError(
+                status_code=429,
+                message="BoxNow rate limit (HTTP 429)",
+                response_text=response.text,
+                retry_after=self._note_rate_limit(_retry_after(response)),
             )
 
         if not response.ok:
@@ -339,6 +405,40 @@ class BoxNowClient:
             self._raise_api_error(response)
 
         return response
+
+    @staticmethod
+    def _note_rate_limit(retry_after: float | None) -> float:
+        """Record that BoxNow rate-limits this store, and return how long.
+
+        ``Retry-After`` when BoxNow sent one, else
+        ``BOXNOW_RATE_LIMIT_DEFAULT_SECONDS``, at most
+        ``BOXNOW_RETRY_AFTER_MAX_SECONDS``. The store's other BoxNow work
+        (the tracking poll, the settle sweep) reads it through
+        :meth:`rate_limited_for` and waits instead of adding calls.
+        """
+        from django.core.cache import cache
+
+        wait = min(
+            retry_after
+            if retry_after is not None
+            else float(settings.BOXNOW_RATE_LIMIT_DEFAULT_SECONDS),
+            float(settings.BOXNOW_RETRY_AFTER_MAX_SECONDS),
+        )
+        cache.set(
+            _RATE_LIMIT_KEY, time.time() + wait, timeout=max(1, ceil(wait))
+        )
+        return wait
+
+    @staticmethod
+    def rate_limited_for() -> float | None:
+        """Seconds BoxNow still rate-limits this store for, or None."""
+        from django.core.cache import cache
+
+        until = cache.get(_RATE_LIMIT_KEY)
+        if until is None:
+            return None
+        remaining = float(until) - time.time()
+        return remaining if remaining > 0 else None
 
     def _raise_api_error(self, response: requests.Response) -> None:
         """Parse the BoxNow error envelope and raise the appropriate error."""

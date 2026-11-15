@@ -14589,6 +14589,9 @@ msgstr "The coupon code can no longer be used."
 msgid "The coupon code to apply."
 msgstr "The coupon code to apply."
 
+msgid "The courier cannot be reached right now. Try again in a moment."
+msgstr "The courier cannot be reached right now. Try again in a moment."
+
 msgid "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 msgstr "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 
@@ -15436,6 +15439,9 @@ msgstr "This setting is the same in every language."
 
 msgid "This shipment already has a BoxNow parcel."
 msgstr "This shipment already has a BoxNow parcel."
+
+msgid "This shipment is already being worked on. Try again in a few minutes."
+msgstr "This shipment is already being worked on. Try again in a few minutes."
 
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "This shipment is already recorded as received outside ACS."

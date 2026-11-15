@@ -1440,20 +1440,18 @@ class TestTheSweepSettlesUncertainCreations:
         assert shipment.metadata["mint_started_at"] is None
 
     @pytest.mark.parametrize(
-        "metadata",
+        "fresh_key",
         [
-            pytest.param(
-                {"creation_uncertain_at": timezone.now().isoformat()},
-                id="still-settling",
-            ),
-            pytest.param(
-                {"mint_started_at": timezone.now().isoformat()},
-                id="creation-in-flight",
-            ),
+            pytest.param("creation_uncertain_at", id="still-settling"),
+            pytest.param("mint_started_at", id="creation-in-flight"),
         ],
     )
-    def test_nothing_is_asked_before_it_is_due(self, http, metadata):
-        shipment = _settled(_paid_order(), **metadata)
+    def test_nothing_is_asked_before_it_is_due(self, http, fresh_key):
+        # Stamped when the test runs, never at collection: a run that
+        # starts minutes after collection would find them stale.
+        shipment = _settled(
+            _paid_order(), **{fresh_key: timezone.now().isoformat()}
+        )
 
         outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
 

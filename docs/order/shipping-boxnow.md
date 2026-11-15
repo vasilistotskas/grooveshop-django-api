@@ -199,8 +199,9 @@ and says which file holds each § number used here.
     `orderNumber`. One live `new` parcel created for this shipment's terms
     is saved (`_persist_parcel`); nothing listed settles it as not created,
     the stamp is cleared and staff get the creation alert ("Create BoxNow
-    parcel now"), unless the last failure was a refusal they were already
-    told about; anything else is handed to staff with what BoxNow lists. A
+    parcel now"), unless the creation task already alerted them about the
+    last failure (`last_error["staff_alerted"]`, written by
+    `record_staff_alerted`); anything else is handed to staff with what BoxNow lists. A
     lookup that fails is left for the next run.
   The creation task names a canceled order's outcome as a cancel: status
   `order_canceled` (or `shipment_canceled`) instead of "created", and a

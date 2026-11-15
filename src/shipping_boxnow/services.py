@@ -939,16 +939,37 @@ class BoxNowService:
 
     @staticmethod
     def _staff_told_of_the_failure(metadata: dict) -> bool:
-        """Whether the last creation failure was a refusal, which the
-        creation task already alerted staff about (a 4xx); a lost answer
-        (status 0) or a 5xx was retried and never alerted."""
+        """Whether staff were alerted about the last creation failure, as
+        :meth:`record_staff_alerted` recorded it. Read from the record,
+        never from a status range: the creation task alerts on every
+        ``BoxNowAPIError`` it does not retry, an unreadable answer (status
+        200) and an auth failure with a 5xx included."""
         last_error = metadata.get("last_error")
-        status_code = (
-            last_error.get("status_code")
-            if isinstance(last_error, dict)
-            else None
+        return (
+            isinstance(last_error, dict)
+            and last_error.get("staff_alerted") is True
         )
-        return isinstance(status_code, int) and 400 <= status_code < 500
+
+    @staticmethod
+    def record_staff_alerted(order_id: int) -> None:
+        """Mark the order's shipment's ``last_error`` as one staff were
+        alerted about, so the sweep does not alert about it again."""
+        with transaction.atomic():
+            shipment = (
+                BoxNowShipment.objects.select_for_update()
+                .filter(order_id=order_id)
+                .first()
+            )
+            if shipment is None:
+                return
+            last_error = (shipment.metadata or {}).get("last_error")
+            if not isinstance(last_error, dict):
+                return
+            shipment.metadata = {
+                **shipment.metadata,
+                "last_error": {**last_error, "staff_alerted": True},
+            }
+            shipment.save(update_fields=["metadata", "updated_at"])
 
     @staticmethod
     def _end_uncertainty(shipment_pk: int) -> None:

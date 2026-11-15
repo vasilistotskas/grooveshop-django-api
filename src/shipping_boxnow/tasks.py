@@ -186,6 +186,8 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
                 "now” on that shipment."
             ),
         )
+        # What the sweep reads before alerting about the same failure.
+        BoxNowService.record_staff_alerted(order_id)
         return {
             "status": "boxnow_api_error",
             "order_id": order_id,

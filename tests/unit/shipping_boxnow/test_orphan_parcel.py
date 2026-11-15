@@ -1391,6 +1391,7 @@ class TestTheSweepSettlesUncertainCreations:
                 "message": "Invalid locker",
                 "status_code": 400,
                 "response_text": "",
+                "staff_alerted": True,
             },
         )
         http.answer(_LOOKUP, _lookup())
@@ -1472,3 +1473,43 @@ class TestTheSweepSettlesUncertainCreations:
         assert result == {"canceled": 1, "not_due": 1}
         due.refresh_from_db()
         assert due.parcel_state == BoxNowParcelState.CANCELED
+
+
+class TestTheThirdReview:
+    """What the sweep and the creation task decide at the edges."""
+
+    def test_staff_alerted_of_a_non_4xx_refusal_are_not_told_again(self, http):
+        """The creation task alerts on every BoxNowAPIError it does
+        not retry, an unreadable lookup (status 200) included, so the
+        sweep reads what was alerted, never a status range."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, _response(200, text="<html>maintenance</html>"))
+        with patch("shipping.alerts.alert_admins_shipment_creation_failed"):
+            result = create_boxnow_shipment_for_order.run(order.id)
+        assert result["status"] == "boxnow_api_error"
+        _age_the_stamp(shipment)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_not_called()
+
+
+def _age_the_stamp(shipment) -> None:
+    """Move a stamp the creation wrote past the settle time."""
+    from django.conf import settings as django_settings
+
+    metadata = BoxNowShipment.objects.get(pk=shipment.pk).metadata
+    assert metadata["creation_uncertain_at"]
+    stamp = timezone.now() - timedelta(
+        seconds=django_settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+    )
+    BoxNowShipment.objects.filter(pk=shipment.pk).update(
+        metadata={**metadata, "creation_uncertain_at": stamp.isoformat()}
+    )

@@ -363,7 +363,7 @@ def _payment_failed(order: Order, env: RenderEnv) -> dict[str, Any]:
         return {
             "order_id": order.id,
             "order": order,
-            "retry_url": order_page_url(order, language=env.language),
+            "order_url": order_page_url(order, language=env.language),
         }
 
 
@@ -793,7 +793,9 @@ _customer_email(
 _customer_email(
     "order.payment_failed",
     title=_("Payment failed"),
-    description=_("Sent when an order's payment fails, with a link to retry."),
+    description=_(
+        "Sent when an order's payment fails, with a link to the order."
+    ),
     templates="payment_failed",
     subject=gettext_noop("Payment Failed - Order #{order_id}"),
     build_context=_payment_failed,

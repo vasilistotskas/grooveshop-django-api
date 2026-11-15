@@ -2639,6 +2639,9 @@ msgstr "Στάλθηκε η εργασία συμφωνίας αντικαταβ
 msgid "COD recorded as received outside ACS."
 msgstr "Η αντικαταβολή καταγράφηκε ως εισπραγμένη εκτός ACS."
 
+msgid "COMPLETE YOUR PAYMENT"
+msgstr "ΟΛΟΚΛΗΡΩΣΤΕ ΤΗΝ ΠΛΗΡΩΜΗ ΣΑΣ"
+
 msgid "CONFIRM HERE"
 msgstr "ΕΠΙΒΕΒΑΙΩΣΗ ΕΔΩ"
 
@@ -3283,12 +3286,6 @@ msgstr "Κλικ"
 msgid "Click Score"
 msgstr "Βαθμολογία κλικ"
 
-msgid "Click the button below to retry your payment with a different card or method."
-msgstr "Πατήστε το παρακάτω κουμπί για να επαναλάβετε την πληρωμή σας με διαφορετική κάρτα ή μέθοδο."
-
-msgid "Click the link below to retry your payment:"
-msgstr "Πατήστε τον παρακάτω σύνδεσμο για να επαναλάβετε την πληρωμή σας:"
-
 msgid "Clicked a result"
 msgstr "Πάτησαν σε αποτέλεσμα"
 
@@ -3440,6 +3437,9 @@ msgstr "Συμπλήρωση προφίλ"
 
 msgid "Complete payment with an agent-granted Stripe token"
 msgstr "Ολοκλήρωση πληρωμής με token Stripe που παραχωρήθηκε από AI πράκτορα"
+
+msgid "Complete your payment"
+msgstr "Ολοκληρώστε την πληρωμή σας"
 
 msgid "Completed"
 msgstr "Ολοκληρώθηκε"
@@ -7469,9 +7469,6 @@ msgstr "Αν η διεύθυνση ανήκει σε λογαριασμό προ
 msgid "If the button doesn't work, copy and paste this link into your browser:"
 msgstr "Αν το κουμπί δεν λειτουργεί, αντιγράψτε και επικολλήστε αυτόν τον σύνδεσμο στο πρόγραμμα περιήγησής σας:"
 
-msgid "If the problem persists, please contact our customer service."
-msgstr "Αν το πρόβλημα παραμένει, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
-
 #, python-format
 msgid "If the term lapses, your store keeps running for a grace period of %(grace)s days before it is suspended."
 msgstr "Αν η περίοδος εκπνεύσει, το κατάστημά σας συνεχίζει να λειτουργεί για περίοδο χάριτος %(grace)s ημερών πριν ανασταλεί."
@@ -9404,6 +9401,9 @@ msgstr "Δεν διατηρήθηκε τίποτα"
 
 msgid "Nothing to issue"
 msgstr "Τίποτα προς έκδοση"
+
+msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+msgstr "Δεν έγινε καμία χρέωση. Η παραγγελία σας καταχωρήθηκε απλήρωτη — επικοινωνήστε μαζί μας για να ολοκληρώσετε την πληρωμή."
 
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Δεν αποθηκεύτηκε τίποτα. Διορθώστε τα κείμενα που επισημαίνονται."
@@ -12405,9 +12405,6 @@ msgstr "Ανάκτηση όλων των ρυθμίσεων καταστήματ
 msgid "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 msgstr "Ανάκτηση της τρέχουσας κατάστασης πληρωμής από τον πάροχο πληρωμών. Αυτό λαμβάνει την πιο πρόσφατη κατάσταση απευθείας από το Stripe/PayPal."
 
-msgid "Retry Payment"
-msgstr "Επανάληψη πληρωμής"
-
 msgid "Retry is only supported for Stripe payments."
 msgstr "Η επανάληψη υποστηρίζεται μόνο για πληρωμές Stripe."
 
@@ -13084,8 +13081,8 @@ msgstr "Αποστέλλεται όταν καταχωρίζεται μια πα
 msgid "Sent when an order is returned to the store."
 msgstr "Αποστέλλεται όταν μια παραγγελία επιστρέφεται στο κατάστημα."
 
-msgid "Sent when an order's payment fails, with a link to retry."
-msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο για νέα προσπάθεια."
+msgid "Sent when an order's payment fails, with a link to the order."
+msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο στην παραγγελία."
 
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Αποστέλλεται όταν κάποιος κάνει εγγραφή με διεύθυνση που έχει ήδη λογαριασμό."
@@ -14198,9 +14195,6 @@ msgstr "ΤΟ ΠΡΟΪΟΝ"
 
 msgid "TOTP Issuer"
 msgstr "Εκδότης TOTP"
-
-msgid "TRY AGAIN"
-msgstr "ΔΟΚΙΜΑΣΤΕ ΞΑΝΑ"
 
 msgid "Tag"
 msgstr "Ετικέτα"
@@ -15808,9 +15802,6 @@ msgstr "Αληθές όταν το καλάθι του καλούντος (πο�
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True όταν το κατάστημα έχει προεπιλεγμένο θέμα newsletter, δηλαδή όταν μια υποβολή της φόρμας newsletter μπορεί να εξυπηρετηθεί."
-
-msgid "Try again"
-msgstr "Δοκιμάστε ξανά"
 
 msgid "Try using a different email address."
 msgstr "Δοκιμάστε μια διαφορετική διεύθυνση email."
@@ -18231,6 +18222,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Clear search"
 #~ msgstr "Καθαρισμός αναζήτησης"
 
+#~ msgid "Click the button below to retry your payment with a different card or method."
+#~ msgstr "Πατήστε το παρακάτω κουμπί για να επαναλάβετε την πληρωμή σας με διαφορετική κάρτα ή μέθοδο."
+
+#~ msgid "Click the link below to retry your payment:"
+#~ msgstr "Πατήστε τον παρακάτω σύνδεσμο για να επαναλάβετε την πληρωμή σας:"
+
 #~ msgid "Clocked Schedules"
 #~ msgstr "Προγραμματισμοί με Ώρα"
 
@@ -18530,6 +18527,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Idle"
 #~ msgstr "Αδρανής"
+
+#~ msgid "If the problem persists, please contact our customer service."
+#~ msgstr "Αν το πρόβλημα παραμένει, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
 
 #~ msgid "If you have any questions about your order, please contact our customer service."
 #~ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
@@ -19119,6 +19119,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"
 
+#~ msgid "Retry Payment"
+#~ msgstr "Επανάληψη πληρωμής"
+
 #~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 #~ msgstr "Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής."
 
@@ -19292,6 +19295,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Επιτυχής απεγγραφή"
 
+#~ msgid "TRY AGAIN"
+#~ msgstr "ΔΟΚΙΜΑΣΤΕ ΞΑΝΑ"
+
 #~ msgid "Tag Analytics"
 #~ msgstr "Αναλυτικά ετικετών"
 
@@ -19391,6 +19397,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Σήματα εμπιστοσύνης"
+
+#~ msgid "Try again"
+#~ msgstr "Δοκιμάστε ξανά"
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"

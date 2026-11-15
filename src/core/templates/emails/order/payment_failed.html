@@ -19,17 +19,17 @@
     <p class="text-bold"><strong>{% trans "Total" %}:</strong> {{ order.total_price }}</p>
 </div>
 
-{% if retry_url %}
 <div class="email-card" style="border-left: 4px solid #2563eb;">
-    <h3>{% trans "Try again" %}</h3>
-    <p>{% trans "Click the button below to retry your payment with a different card or method." %}</p>
+    <h3>{% trans "Complete your payment" %}</h3>
+    <p>{% trans "Nothing was charged. Your order is registered unpaid — contact us to complete the payment." %}</p>
+    {% if order_url %}
     <p>
-        <a href="{{ retry_url }}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: bold;">
-            {% trans "Retry Payment" %}
+        <a href="{{ order_url }}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            {% trans "View your order" %}
         </a>
     </p>
+    {% endif %}
 </div>
-{% endif %}
 
 <p class="mt-3">{% trans "Common reasons for failed payments:" %}</p>
 <ul>
@@ -38,6 +38,4 @@
     <li>{% trans "Card not authorized for online payments" %}</li>
     <li>{% trans "3D Secure verification was not completed" %}</li>
 </ul>
-
-<p class="mt-3">{% trans "If the problem persists, please contact our customer service." %}</p>
 {% endblock %}

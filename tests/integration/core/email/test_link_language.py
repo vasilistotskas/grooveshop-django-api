@@ -106,7 +106,7 @@ def _assert_links(body: str, url: str, language: str) -> None:
 @pytest.mark.django_db
 class TestOrderEmails:
     @LANGUAGES
-    def test_payment_failed_retry_link(self, language, prefix):
+    def test_payment_failed_order_link(self, language, prefix):
         order = OrderFactory(num_order_items=0, language_code=language)
 
         assert send_payment_failed_email(order.id) is True

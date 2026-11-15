@@ -235,8 +235,9 @@ calls ACS, so a lone orphan surfaces on the next day that has one.
   nothing and the next run decides.
 - A shipment that saves a number (the mint, or an adopt) resolves the open
   row for it, children included.
-- When ACS refuses to delete one of our own unused answers (a duplicate,
-  or a late answer after the check was resolved), the voucher is recorded
+- When ACS does not delete one of our own unused answers (a duplicate,
+  or a late answer after the check was resolved: it refused, its answer
+  was lost, or the call failed on our side), the voucher is recorded
   at once as a row with "Found by" = our own unused voucher and the
   shipment it came from (`source = refused_delete`, `duplicate_of`); it
   is counted like the rest, with no email. A later refused pickup list

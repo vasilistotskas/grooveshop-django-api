@@ -2339,10 +2339,8 @@ class BoxNowService:
         # racy under two concurrent webhooks for the same parcel.
         with transaction.atomic():
             try:
-                shipment: BoxNowShipment = (
-                    BoxNowShipment.objects.select_for_update()
-                    .select_related("order")
-                    .get(parcel_id=parcel_id)
+                shipment: BoxNowShipment = cls._lock_with_order(
+                    parcel_id=parcel_id
                 )
             except BoxNowShipment.DoesNotExist:
                 # Disappeared between the pre-check and the lock — same
@@ -2696,11 +2694,7 @@ class BoxNowService:
         event_time = parse_datetime(event_time_raw)
 
         with transaction.atomic():
-            locked = (
-                BoxNowShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
-            )
+            locked = cls._lock_with_order(pk=shipment.pk)
 
             # Two-stage dedup so the poll never duplicates a webhook
             # row that arrived with BoxNow's own CloudEvents id.

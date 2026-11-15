@@ -1767,3 +1767,83 @@ class TestTheSweepLocksTheOrderFirst:
             "order_order",
             "shipping_boxnow_boxnowshipment",
         ]
+
+
+class TestEveryPathLocksTheOrderFirst:
+    """Order, then shipment, on every BoxNow path that locks both, as an
+    order cancel takes them. Reverting any path to the joined
+    ``select_for_update().select_related("order")`` fails here."""
+
+    @staticmethod
+    def _locks(run) -> list[str]:
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as captured:
+            run()
+        return _locked_tables(captured.captured_queries)
+
+    def test_the_creation_phase_1_and_phase_3(self, http):
+        order = _paid_order()
+        _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            _response(200, {"id": "42224", "parcels": [{"id": "9219709201"}]}),
+        )
+
+        locks = self._locks(
+            lambda: BoxNowService.create_shipment_for_order(order)
+        )
+
+        assert locks[:4] == [
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+        ]
+
+    def test_the_webhook(self):
+        from tests.unit.shipping_boxnow.test_service import _build_envelope
+
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id, event="in-depot"
+        )
+
+        locks = self._locks(lambda: BoxNowService.apply_webhook_event(envelope))
+
+        assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]
+
+    def test_the_tracking_poll(self):
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        client = MagicMock()
+        client.return_value.get_parcel_info.return_value = {
+            "data": [
+                {
+                    "id": shipment.parcel_id,
+                    "state": "in-depot",
+                    "events": [
+                        {
+                            "type": "in-depot",
+                            "createTime": "2026-05-12T20:00:00Z",
+                        }
+                    ],
+                }
+            ],
+            "pagination": {},
+        }
+
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            locks = self._locks(
+                lambda: BoxNowService.sync_shipment_state(shipment)
+            )
+
+        assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]

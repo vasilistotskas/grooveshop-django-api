@@ -234,11 +234,13 @@ and says which file holds each § number used here.
   the order and then cancels the shipment (`OrderService._cancel_order_locked`
   → `cancel_shipment`). Every BoxNow path that locks both takes them in
   that order (`BoxNowService._lock_with_order`: the creation's phase 1,
-  `_persist_parcel`, the settle sweep), so the two never wait on each
-  other the other way round. #713 (the order cancel calls the courier
-  inside its own transaction) keeps this order when it moves that call
-  out. The webhook and the tracking poll still lock the shipment with its
-  order in one statement; they decide nothing about a cancel.
+  `_persist_parcel`, the settle sweep, the webhook and the tracking poll),
+  so no two of them wait on each other the other way round
+  (`TestEveryPathLocksTheOrderFirst` and `TestTheSweepLocksTheOrderFirst`
+  fail for any path that goes back to a joined
+  `select_for_update().select_related("order")`). #713 (the order cancel
+  calls the courier inside its own transaction) keeps this order when it
+  moves that call out.
 - **The tracking poll asks in the shipment's payment mode** (#691).
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources

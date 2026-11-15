@@ -3,6 +3,40 @@
 
 
 
+## v3.246.2 (2026-11-15)
+
+### Bug fixes
+
+* fix(order): the credit email preview reads the order's credit documents again
+
+The module move rewrote the reverse relation order.credit_documents into
+order.accounting.credit_documents, so previewing order.credit_issued from a
+real order raised AttributeError. Part of #566. ([`1bd1d2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bd1d2c78afe112e99fd7d637db708708243ce69))
+
+### Refactoring
+
+* refactor(order): move the accounting and refund modules into subpackages (#711) ([`1bd1d2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bd1d2c78afe112e99fd7d637db708708243ce69))
+
+* refactor(order): move the accounting and refund modules into subpackages
+
+Pure moves (second of #566's PRs): invoicing, taxation, credit_allocation,
+credit_allocation_backfill, credit_documents and the mydata package into
+order/accounting/; refund_lines and refund_reconciliation into
+order/refunds/. Every importer, test patch string and doc moves with them;
+no re-export shims. None of the moved modules defines a Celery task, so
+the task-name lock is unchanged.
+
+Not moved on purpose: vat_snapshot and order.models.invoice (imported by
+migrations). No migration imports a moved module.
+
+A layers contract now holds reporting and refunds over accounting over
+checkout, with the two indirect chains that exist today ignored.
+
+The invoice admin's myDATA fieldset description named the module path; it
+now reads without it (el and en catalogues updated).
+
+Part of #566 ([`1bd1d2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bd1d2c78afe112e99fd7d637db708708243ce69))
+
 ## v3.246.1 (2026-11-15)
 
 ### Bug fixes

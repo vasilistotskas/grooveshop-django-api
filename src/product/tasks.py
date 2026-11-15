@@ -40,9 +40,9 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
     who are in both sets will see the live notification + receive the
     email; the two channels are intentionally independent.
     """
-    from core.store_settings import store_setting
+    from tenant.features import feature_on
 
-    if not bool(store_setting("FAVOURITES_ENABLED")):
+    if not feature_on("favourites"):
         return {"status": "skipped", "reason": "favourites_disabled"}
 
     from notification.enum import (
@@ -136,9 +136,9 @@ def send_price_drop_notifications(
     Processes favourite users in batches via iterator() to avoid loading
     the full queryset into memory, and dispatches one notification per user.
     """
-    from core.store_settings import store_setting
+    from tenant.features import feature_on
 
-    if not bool(store_setting("FAVOURITES_ENABLED")):
+    if not feature_on("favourites"):
         return {"status": "skipped", "reason": "favourites_disabled"}
 
     from notification.enum import (

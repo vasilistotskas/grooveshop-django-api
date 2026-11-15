@@ -34,7 +34,7 @@ from loyalty.serializers.loyalty import (
 from loyalty.serializers.tier import LoyaltyTierSerializer
 from loyalty.services import LoyaltyService
 from product.models.product import Product
-from tenant.permissions import IsLoyaltyEnabled, IsLoyaltyRuntimeEnabled
+from tenant.features import feature_gates
 
 logger = logging.getLogger(__name__)
 
@@ -127,17 +127,14 @@ class LoyaltyViewSet(BaseModelViewSet):
     """
 
     queryset = PointsTransaction.objects.none()
-    # The plan flag and the merchant's runtime switch fire first, each
+    # The feature's gates (the plan flag, then the store's switches it
+    # needs: customer accounts and the programme's own) fire first, each
     # raising 404, so a store with the programme off serves no points,
     # history or redemption. IsAuthenticated covers the rest: the
     # queryset filters by request.user and lives in the tenant schema,
     # so an authenticated caller here is by construction a customer of
     # THIS store (see tenant/membership.py).
-    permission_classes = [
-        IsLoyaltyEnabled,
-        IsLoyaltyRuntimeEnabled,
-        IsAuthenticated,
-    ]
+    permission_classes = [*feature_gates("loyalty"), IsAuthenticated]
     serializers_config = serializers_config
 
     def get_permissions(self):
@@ -150,15 +147,14 @@ class LoyaltyViewSet(BaseModelViewSet):
         a signed-in shopper, so the page that exists to SELL the
         programme showed nothing to the people it is aimed at.
 
-        Both gates stay: the plan flag and the merchant's runtime
-        switch, each 404ing, so a store with the programme off does not
+        The feature's gates stay, each 404ing, so a store with the
+        programme off (or with no accounts to earn points on) does not
         keep an indexable page advertising it.
         """
         if self.action == "tiers":
             return [
                 AllowAny(),
-                IsLoyaltyEnabled(),
-                IsLoyaltyRuntimeEnabled(),
+                *(gate() for gate in feature_gates("loyalty")),
             ]
         return super().get_permissions()
 

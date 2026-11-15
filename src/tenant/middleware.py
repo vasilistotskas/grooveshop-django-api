@@ -5,7 +5,7 @@ import logging
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware
 from django.urls import set_urlconf
 from django.utils.translation import gettext_lazy as _
@@ -145,6 +145,46 @@ class SuspendedTenantMiddleware:
                 status=503,
             )
         return self.get_response(request)
+
+
+class CustomerAccountsMiddleware:
+    """404 for a store's customer identity while its accounts are off.
+
+    Every view of ``core.urls.CUSTOMER_IDENTITY_VIEWS`` (allauth's headless
+    API and pages, the social callbacks, the store's OIDC provider and its
+    metadata) is refused on a store with ``CUSTOMER_ACCOUNTS_ENABLED`` off,
+    with the bare 404 an unknown route gets and the ``feature_gate:refused``
+    log line of every other feature gate.
+
+    One gate on the resolved view, rather than allauth's hooks: its
+    adapter's ``is_open_for_signup`` closes sign-up only, and sign-in, code
+    login, password reset, passkeys, MFA and the provider's flows would each
+    need a hook of their own, with a flow a future allauth adds open by
+    default. ``process_view`` runs after URL resolution and before any view,
+    so it sees exactly the view about to answer, and none of these is a DRF
+    view a permission class could reach. The platform host is not a store
+    and is never gated (``tenant.customer_accounts``).
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        from core.urls import CUSTOMER_IDENTITY_VIEWS
+        from tenant.customer_accounts import customer_accounts_on
+        from tenant.permissions import IsCustomerAccountsEnabled, log_refusal
+
+        if view_func not in CUSTOMER_IDENTITY_VIEWS or customer_accounts_on():
+            return
+        log_refusal(
+            request,
+            type(self).__name__,
+            IsCustomerAccountsEnabled.setting_key,
+        )
+        raise Http404
 
 
 class TenantCookieDomainMiddleware:

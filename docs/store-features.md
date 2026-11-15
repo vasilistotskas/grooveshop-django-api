@@ -5,7 +5,10 @@ Source: `src/tenant/features.py` (`STORE_FEATURES`, `feature_on`,
 `effective_features`), `src/tenant/permissions.py` (the gates),
 `src/tenant/serializers.py` (`StoreFeaturesSerializer`), `src/admin/features.py`
 (the admin's registry), `src/admin/mixins.py` (`FeatureGatedModelAdmin`,
-`FeatureInline`), `src/admin/navigation.py`. The code wins over this page.
+`FeatureInline`), `src/admin/navigation.py`; for customer accounts also
+`src/tenant/customer_accounts.py`, `src/tenant/middleware.py`
+(`CustomerAccountsMiddleware`) and `src/core/urls.py`
+(`CUSTOMER_IDENTITY_VIEWS`). The code wins over this page.
 
 ## The rule
 
@@ -22,8 +25,12 @@ fallback for a setting it could not fetch.
 - The platform host is not a store: `effective_features` is all `false`
   there, and the gates never refuse (`feature_on` answers as the gates do).
 - A dependency is expressed by listing the parent's gates in the child's
-  entry (`account_reviews` lists `IsProductReviewsEnabled` and its own
-  switch), so one table row carries the whole chain.
+  entry (`account_reviews` lists `IsCustomerAccountsEnabled`,
+  `IsProductReviewsEnabled` and its own switch), so one table row carries
+  the whole chain. A view gates a feature through
+  `tenant.features.feature_gates(name)`, never by naming the classes, and a
+  service or job asks `feature_on(name)`, so a dependency added to a row is
+  refused everywhere the feature is served.
 - Server code reads a store setting only through
   `core.store_settings.store_setting` (or `store_settings` for several at
   once). A store with no row for a setting reads the value it is declared
@@ -63,7 +70,8 @@ fallback for a setting it could not fetch.
   field there raises at import. Only the exceptions are written down
   (`_FIELD_OVERRIDES`: coordinates, return fees).
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
-  `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
+  `StoreFeaturesSerializer` and on the builder's
+  `StoreFeatureStatesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.
   Removing or loosening a field of `features` is a two-release change,
   storefront first.
@@ -86,16 +94,17 @@ consumed by tasks and integrations.
 
 | Setting | Class | Notes |
 |---|---|---|
-| `PRODUCT_REVIEWS_ENABLED` | (a) `product_reviews` | |
+| `CUSTOMER_ACCOUNTS_ENABLED` | (a) `customer_accounts` | default on; `favourites`, `product_reviews`, `account_reviews`, `blog_comments`, `loyalty` and `wholesale` need it ("Customer accounts" below) |
+| `PRODUCT_REVIEWS_ENABLED` | (a) `product_reviews` | needs `customer_accounts` |
 | `ACCOUNT_REVIEWS_ENABLED` | (a) `account_reviews` | needs `product_reviews` |
-| `BLOG_COMMENTS_ENABLED` | (a) `blog_comments` | needs the `blog` plan flag |
-| `FAVOURITES_ENABLED` | (a) `favourites` | needs `catalogue` |
+| `BLOG_COMMENTS_ENABLED` | (a) `blog_comments` | needs the `blog` plan flag and `customer_accounts` |
+| `FAVOURITES_ENABLED` | (a) `favourites` | needs `customer_accounts` and `catalogue` |
 | `NEWSLETTER_ENABLED` | (a) `newsletter` | |
 | `FEEDBACK_ENABLED` | (a) `feedback` | |
-| `LOYALTY_ENABLED` | (a) `loyalty` | needs the `loyalty` plan flag |
+| `LOYALTY_ENABLED` | (a) `loyalty` | needs the `loyalty` plan flag and `customer_accounts` |
 | `PROMOTIONS_ENABLED` | (a) `promotions` | needs the `promotions` plan flag |
 | `GIFT_CARDS_ENABLED` | (a) `gift_cards` | needs the `gift_cards` plan flag and `catalogue` |
-| `B2B_WHOLESALE_ENABLED` | (a) `wholesale` | needs the `b2b` plan flag |
+| `B2B_WHOLESALE_ENABLED` | (a) `wholesale` | needs the `b2b` plan flag and `customer_accounts` |
 | `PRODUCT_SUGGESTIONS_ENABLED` | (a) `product_suggestions` | needs the `recommendations` plan flag and `catalogue` |
 | `PRODUCT_ALERTS_ENABLED` | (a) `product_alerts` | needs `catalogue` |
 | `PRICE_HISTORY_ENABLED` | (a) `price_history` | default on: it shows prices the store already published |
@@ -123,17 +132,18 @@ settings.
 
 | Feature | Plan flag | Settings (all on) | Gated in |
 |---|---|---|---|
+| `customer_accounts` | | `CUSTOMER_ACCOUNTS_ENABLED` | the identity routes by `src/tenant/middleware.py` (`CustomerAccountsMiddleware`), `src/agent/views.py` (`AgentAPIView`), a sign-in already held by the authenticators ("Customer accounts" below); the account mail (`src/user/emails.py`) and the abandoned-checkout reminder (`src/cart/emails.py`) |
 | `blog` | `blog_enabled` | | `src/blog/views/` (posts, categories, authors, tags) |
-| `blog_comments` | `blog_enabled` | `BLOG_COMMENTS_ENABLED` | `src/blog/views/comment.py`, `src/blog/views/post.py` |
-| `product_reviews` | | `PRODUCT_REVIEWS_ENABLED` | `src/product/views/review.py`, `src/product/views/product.py` |
-| `account_reviews` | | `PRODUCT_REVIEWS_ENABLED`, `ACCOUNT_REVIEWS_ENABLED` | `src/user/views/account.py` |
-| `favourites` | | `CATALOGUE_ENABLED`, `FAVOURITES_ENABLED` | `src/product/views/favourite.py`, `src/user/views/account.py` (`favourite_products`), `src/agent/views.py` |
+| `blog_comments` | `blog_enabled` | `CUSTOMER_ACCOUNTS_ENABLED`, `BLOG_COMMENTS_ENABLED` | `src/blog/views/comment.py`, `src/blog/views/post.py` |
+| `product_reviews` | | `CUSTOMER_ACCOUNTS_ENABLED`, `PRODUCT_REVIEWS_ENABLED` | `src/product/views/review.py`, `src/product/views/product.py` |
+| `account_reviews` | | `CUSTOMER_ACCOUNTS_ENABLED`, `PRODUCT_REVIEWS_ENABLED`, `ACCOUNT_REVIEWS_ENABLED` | `src/user/views/account.py` |
+| `favourites` | | `CUSTOMER_ACCOUNTS_ENABLED`, `CATALOGUE_ENABLED`, `FAVOURITES_ENABLED` | `src/product/views/favourite.py`, `src/user/views/account.py` (`favourite_products`), `src/agent/views.py`; the favourites notifications (`src/product/tasks.py`) |
 | `newsletter` | | `NEWSLETTER_ENABLED` | `src/user/views/` subscription views (token links in sent emails stay open) |
 | `feedback` | | `FEEDBACK_ENABLED` | `src/contact/views.py` |
-| `loyalty` | `loyalty_enabled` | `LOYALTY_ENABLED` | `src/loyalty/views/loyalty.py` |
+| `loyalty` | `loyalty_enabled` | `CUSTOMER_ACCOUNTS_ENABLED`, `LOYALTY_ENABLED` | `src/loyalty/views/loyalty.py`, `src/agent/views.py`; earning, redeeming and the pause through `LoyaltyService.is_enabled` |
 | `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `src/promotion/views.py`, cart coupon actions |
 | `gift_cards` | `gift_cards_enabled` | `CATALOGUE_ENABLED`, `GIFT_CARDS_ENABLED` | `src/giftcard/views.py` (a purchase's status stays open) |
-| `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `src/b2b/views.py` |
+| `wholesale` | `b2b_enabled` | `CUSTOMER_ACCOUNTS_ENABLED`, `B2B_WHOLESALE_ENABLED` | `src/b2b/views.py`; pricing through `B2BService.is_enabled` |
 | `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `src/order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
 | `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `src/recommendation/views.py`, `src/search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
 | `product_alerts` | | `CATALOGUE_ENABLED`, `PRODUCT_ALERTS_ENABLED` | `src/product/views/alert.py` |
@@ -150,10 +160,73 @@ commerce is off. Django states the widget's own switch in `features`; the
 gateway does not read `CHAT_WIDGET_ENABLED`, so a store that hides the
 widget still has a live `/chat` (flipping it back needs no deploy).
 
+## Customer accounts
+
+`CUSTOMER_ACCOUNTS_ENABLED` (default on) lets a store run without customer
+accounts: a store that sells to guests only, or sells nothing. Owner
+decisions on #198 (2026-10-14): a store setting the store's own admin
+edits, not a plan flag; a sign-in a shopper already holds is left to
+expire, never revoked; the customers' data is kept; reviews and comments
+need accounts. Off, on that store's hosts:
+
+- **The identity routes answer 404.** Every view `src/core/urls.py` mounts
+  in its three customer identity groups (`CUSTOMER_IDENTITY_VIEWS`):
+  allauth's headless API (`/_allauth/**`: config, session, sign-in,
+  sign-up, login by code, password reset, email verification, the
+  provider redirect and token, MFA, WebAuthn and passkeys, sessions, token
+  refresh) and the TOTP image; allauth's pages and the social providers'
+  callbacks (`/accounts/**`, with or without a language prefix); and the
+  store's OIDC provider (`/.well-known/openid-configuration`,
+  `/.well-known/jwks.json`, `/.well-known/oauth-authorization-server`,
+  `/identity/o/**`). `tenant.middleware.CustomerAccountsMiddleware` refuses
+  them on the resolved view with the `feature_gate:refused` log line, so a
+  route an allauth upgrade adds inside those groups is refused with them,
+  and `tests/integration/tenant/test_customer_accounts.py` fails for an
+  identity route mounted outside them. allauth's own hooks would not do:
+  `is_open_for_signup` closes sign-up only. The agent routes acting for a
+  linked shopper (`/api/v1/agent/me`, `/me/orders`, `/me/loyalty`,
+  `/me/favourites`) refuse through `AgentAPIView`; the gateway's internal
+  order read and the store team's `/api/v1/agent/staff/*` are not a
+  shopper's and stay.
+- **A sign-in a shopper already holds is none.** Every authenticator that
+  can return a customer answers as if no credential had been sent: the
+  Knox token (`BoundedTokenAuthentication`, before the lookup, so it is not
+  renewed either), the session (`StoreSessionAuthentication`), the OIDC
+  access token (`AgentTokenAuthentication`), the cart agent token
+  (`is_auth_token_live`) and a WebSocket ticket. An account endpoint
+  refuses the request as it refuses a guest's (401, or the 404 of a
+  feature gate that answers first), and no WebSocket ticket can be minted.
+  A page a guest may use serves it as a guest's: a stale token riding
+  along a checkout makes a guest order, not an error.
+- **What needs an account is off.** `favourites`, `product_reviews` (with
+  the star average and count, below), `account_reviews`, `blog_comments`,
+  `loyalty` (a `LoyaltyPause` opens, as it does for `LOYALTY_ENABLED`) and
+  `wholesale` list the switch in their rows. The account mail (allauth's,
+  the data export, re-engagement) and the abandoned-checkout reminder are
+  skipped as "Off: Customer accounts feature".
+
+What stays: guest checkout and guest orders by UUID, the newsletter form,
+product alerts, the contact and feedback forms, gift-card purchase and
+promotions, all anonymous already. The store team signs in at the store's
+`/admin/` (`PlatformStaffBackend`, never allauth), and a `StaffBearer`
+token or a staff session is a platform identity, never a customer: both
+keep working, which support and GDPR requests need. Customers, their
+orders and addresses are kept; switching accounts back on restores every
+dependent feature as the store left it, and shoppers sign in again. The
+platform host is not a store: its `/accounts/` and `/_allauth/` are never
+gated.
+
+A client reads `features.customerAccounts`. The storefront stops asking
+for anything account-related and clears a stale session, and the agent
+gateway stops offering its `my_*` tools and serves a stale bearer
+anonymously; both ship before a store switches its accounts off, because a
+gated route a live client still calls is not something the contract check
+can catch.
+
 ## Reviews and the star average
 
-A store whose reviews are hidden also hides the star average and the
-review count. While `product_reviews` is off, the product serializers
+A store whose reviews are hidden (by their own switch, or with no
+customer accounts) also hides the star average and the review count. While `product_reviews` is off, the product serializers
 (`ProductSerializer` and its detail tiers) serve `reviewAverage: 0.0` and
 `reviewCount: 0`, and the product page's `ratingDistribution` all zeros, what a product without reviews serves, and the search hit
 serializer serves `reviewCount: 0` and `reviewAverage: null`. The fields
@@ -182,7 +255,7 @@ What refuses when `catalogue` is off: the public product routes, their
 actions, categories, category images, product images, brands, attributes,
 attribute values, `search/product` and the product `search/trending`, plus
 what only exists with a catalogue (favourites, gift cards, product alerts,
-suggestions, each listing `IsCatalogueEnabled` first in its entry). What
+suggestions, each listing `IsCatalogueEnabled` in its entry). What
 refuses when `cart` is off: the cart and cart-item actions and order
 create. A store without a catalogue has no cart either.
 

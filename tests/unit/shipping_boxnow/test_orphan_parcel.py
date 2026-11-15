@@ -1725,3 +1725,45 @@ class TestANewAttemptIsAlertedAgain:
 
         assert outcome == "not_created"
         alert.assert_called_once()
+
+
+def _locked_tables(queries) -> list[str]:
+    """The table each ``SELECT ... FOR UPDATE`` names first, in order."""
+    import re
+
+    tables = []
+    for query in queries:
+        sql = query["sql"]
+        if "FOR UPDATE" in sql:
+            match = re.search(r'FROM "(\w+)"', sql)
+            tables.append(match.group(1) if match else sql[:40])
+    return tables
+
+
+class TestTheSweepLocksTheOrderFirst:
+    """An order cancel locks the order, then the shipment
+    (``OrderService._cancel_order_locked`` → ``cancel_shipment``). The
+    sweep takes them in that order too, and decides on a live order's
+    empty lookup and clears its stamp in one locked step, so a cancel
+    cannot slip in between."""
+
+    def test_order_then_shipment_and_one_step_to_settle(self, http):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _lookup())
+
+        with (
+            patch("shipping.alerts.alert_admins_shipment_creation_failed"),
+            CaptureQueriesContext(connection) as captured,
+        ):
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        assert _locked_tables(captured.captured_queries) == [
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+        ]

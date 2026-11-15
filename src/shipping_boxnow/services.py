@@ -368,10 +368,8 @@ class BoxNowService:
         # ---- Phase 1: claim ----------------------------------------------
         with transaction.atomic():
             try:
-                shipment: BoxNowShipment = (
-                    BoxNowShipment.objects.select_for_update()
-                    .select_related("order")
-                    .get(order=order)
+                shipment: BoxNowShipment = cls._lock_with_order(
+                    order_id=order.pk
                 )
             except BoxNowShipment.DoesNotExist as exc:
                 raise ValueError(
@@ -869,11 +867,7 @@ class BoxNowService:
         ``lookup_refused``.
         """
         with transaction.atomic():
-            shipment = (
-                BoxNowShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment_pk)
-            )
+            shipment = cls._lock_with_order(pk=shipment_pk)
             metadata = shipment.metadata or {}
             age = cls._seconds_since(metadata.get("creation_uncertain_at"))
             if (
@@ -908,25 +902,54 @@ class BoxNowService:
             return "cancel_refused"
         return "canceled"
 
-    @staticmethod
-    def _order_canceled_meanwhile(shipment_pk: int) -> bool:
-        """Whether the order was canceled while the sweep asked BoxNow,
-        read under the row lock (with the order's); if so the sweep's
-        claim is released for the cancel to run."""
+    @classmethod
+    def _settle_unless_canceled(cls, shipment_pk: int) -> tuple[bool, bool]:
+        """Settle a live order's creation as not taken over, in one step
+        under the order's and the shipment's locks, unless the order was
+        canceled while the sweep asked BoxNow.
+
+        Returns ``(order_canceled, staff_told)``. Canceled: only the
+        sweep's claim is released, for the cancel to run. Live: the claim
+        and the stamp are cleared in the same step that saw the order live,
+        so no cancel can land between the decision and the settle; the
+        caller sends its alert after this commits.
+        """
         with transaction.atomic():
-            shipment = (
-                BoxNowShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment_pk)
-            )
-            if shipment.order.status != _CANCELED_ORDER_STATUS:
-                return False
+            shipment = cls._lock_with_order(pk=shipment_pk)
+            metadata = shipment.metadata or {}
+            if shipment.order.status == _CANCELED_ORDER_STATUS:
+                shipment.metadata = {**metadata, "mint_started_at": None}
+                shipment.save(update_fields=["metadata", "updated_at"])
+                return True, False
+            told = cls._staff_told_of_the_failure(metadata)
             shipment.metadata = {
-                **(shipment.metadata or {}),
+                **metadata,
                 "mint_started_at": None,
+                "creation_uncertain_at": None,
             }
             shipment.save(update_fields=["metadata", "updated_at"])
-            return True
+            return False, told
+
+    @staticmethod
+    def _lock_with_order(**lookup: Any) -> BoxNowShipment:
+        """Lock a shipment and its order, the order first.
+
+        The order an order cancel takes them in
+        (``OrderService._cancel_order_locked`` locks the order, then
+        ``cancel_shipment`` the shipment), so the two never wait on each
+        other in opposite orders. Call inside ``transaction.atomic()``.
+        ``lookup`` names the shipment (``pk=`` or ``order_id=``);
+        ``shipment.order`` is the locked row. Raises
+        ``BoxNowShipment.DoesNotExist`` when there is no shipment.
+        """
+        from order.models.order import Order
+
+        shipments = BoxNowShipment.objects.filter(**lookup)
+        order_id = shipments.values_list("order_id", flat=True).get()
+        locked_order = Order.objects.select_for_update().get(pk=order_id)
+        shipment = shipments.select_for_update().get()
+        shipment.order = locked_order
+        return shipment
 
     @classmethod
     def _settle_for_a_live_order(cls, shipment: BoxNowShipment) -> str:
@@ -992,15 +1015,14 @@ class BoxNowService:
 
         # A take-over above re-reads the order itself (_persist_parcel);
         # anything else is decided for an order that may have been
-        # canceled while BoxNow answered.
-        if cls._order_canceled_meanwhile(shipment.pk):
+        # canceled while BoxNow answered, in one locked step.
+        canceled, told = cls._settle_unless_canceled(shipment.pk)
+        if canceled:
             shipment.refresh_from_db()
             return cls._settle_for_a_canceled_order(shipment)
 
         match live:
             case []:
-                told = cls._staff_told_of_the_failure(shipment.metadata)
-                cls._end_uncertainty(shipment.pk)
                 if not told:
                     alert_admins_shipment_creation_failed(
                         order_id=order.id,
@@ -1017,7 +1039,6 @@ class BoxNowService:
                     )
                 return "not_created"
             case _:
-                cls._end_uncertainty(shipment.pk)
                 listed = ", ".join(
                     f"{parcel.parcel_id} ({parcel.state})" for parcel in live
                 )
@@ -1210,11 +1231,7 @@ class BoxNowService:
         ``metadata['creation_uncertain_at']`` (#690).
         """
         with transaction.atomic():
-            shipment = (
-                BoxNowShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment_pk)
-            )
+            shipment = cls._lock_with_order(pk=shipment_pk)
             if shipment.parcel_id == parcel_id:
                 # Saved already (another path got there first): the
                 # outcome is known here too, so the claim and any
@@ -1231,9 +1248,9 @@ class BoxNowService:
                     shipment.save(update_fields=["metadata", "updated_at"])
                 return shipment
 
-            # The order row is locked with the shipment's (the join of
-            # ``select_related``), so an order cancel still in its
-            # transaction is waited for and then seen.
+            # The order row is locked first (_lock_with_order), so an
+            # order cancel still in its transaction is waited for and then
+            # seen.
             order_canceled = shipment.order.status == _CANCELED_ORDER_STATUS
             canceled_meanwhile = (
                 shipment.parcel_state == BoxNowParcelState.CANCELED

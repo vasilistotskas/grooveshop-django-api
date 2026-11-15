@@ -219,8 +219,10 @@ and says which file holds each § number used here.
     the credentials work again. A canceled order's cancel that meets it in
     the creation task is reported as that cancel and keeps its stamp.
     Before acting on anything but a take-over (which re-reads the order
-    itself), the order is read again under the row lock: one canceled while
-    BoxNow answered goes to the canceled-order branch.
+    itself), the order is read again under its lock, and the decision and
+    the settle (claim and stamp cleared) are one locked step
+    (`_settle_unless_canceled`), so no cancel lands between them: one
+    canceled while BoxNow answered goes to the canceled-order branch.
   The creation task names a canceled order's outcome as a cancel: status
   `order_canceled` (or `shipment_canceled`) instead of "created", and a
   refused cancel (`BoxNowCancelRefusedError`) is reported as the cancel it
@@ -228,6 +230,15 @@ and says which file holds each § number used here.
   not have this case: a voucher request of unknown outcome is never
   cancelled or re-sent automatically, it waits for staff (§5.1 of
   `shipping-acs.md`).
+- **Lock order: the order, then the shipment.** An order cancel locks
+  the order and then cancels the shipment (`OrderService._cancel_order_locked`
+  → `cancel_shipment`). Every BoxNow path that locks both takes them in
+  that order (`BoxNowService._lock_with_order`: the creation's phase 1,
+  `_persist_parcel`, the settle sweep), so the two never wait on each
+  other the other way round. #713 (the order cancel calls the courier
+  inside its own transaction) keeps this order when it moves that call
+  out. The webhook and the tracking poll still lock the shipment with its
+  order in one statement; they decide nothing about a cancel.
 - **The tracking poll asks in the shipment's payment mode** (#691).
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources

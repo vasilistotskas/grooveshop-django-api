@@ -243,8 +243,12 @@ and says which file holds each § number used here.
   a client; the error text goes to the log (#650). The agent gateway reads
   only the status, so an outage is no longer "no locker nearby". The
   storefront's locker picker is BoxNow's own iframe widget, which this API
-  does not drive. The same 503 answers an outage on the staff cancel
-  endpoints of both carriers and on ACS address validation.
+  does not drive. The same 503 answers an outage on ACS address
+  validation and on every staff cancel endpoint: the carriers' own
+  (`cancelBoxNowShipment`, `cancelAcsShipment`) and the order's
+  (`boxnow_cancel`, `acs_cancel`, `shipment_cancel` in
+  `src/order/views/order.py`), all through
+  `shipping.api_errors.unanswered`.
   A refusal raised here with no carrier call because the same work is
   already running (`shipping.exceptions.CarrierBusyError`: `BoxNowBusyError`
   for a creation or cancel in flight or a creation still settling,

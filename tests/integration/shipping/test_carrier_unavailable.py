@@ -237,3 +237,92 @@ class TestARequestAlreadyInProgress:
         body = response.json()
         assert body["code"] == "carrier_request_in_progress"
         assert "already in progress" in body["detail"]
+
+
+def _order_with(provider: str):
+    from order.factories.order import OrderFactory
+    from shipping.models import ShippingProvider
+
+    order = OrderFactory(num_order_items=0)
+    order.shipping_provider = ShippingProvider.objects.get(code=provider)
+    order.shipping_kind = (
+        "pickup_point" if provider == "boxnow" else "home_delivery"
+    )
+    order.save(update_fields=["shipping_provider", "shipping_kind"])
+    return order
+
+
+class TestOrderScopedStaffCancels:
+    """The order's own cancel actions (``boxnow_cancel``, ``acs_cancel``,
+    ``shipment_cancel``) answer as the carrier endpoints do."""
+
+    @pytest.mark.parametrize("error", BOXNOW_OUTAGES)
+    @pytest.mark.parametrize(
+        "route", ["order-boxnow-cancel", "order-shipment-cancel"]
+    )
+    def test_a_boxnow_outage_is_a_503(self, staff_client, route, error):
+        order = _order_with("boxnow")
+        BoxNowShipmentFactory(order=order, parcel_id="1234567890")
+        with patch(
+            "shipping_boxnow.services.BoxNowService.cancel_shipment",
+            side_effect=error,
+        ):
+            response = staff_client.post(
+                reverse(route, kwargs={"pk": order.pk})
+            )
+
+        _assert_unavailable(response)
+
+    @pytest.mark.parametrize("error", ACS_OUTAGES)
+    @pytest.mark.parametrize(
+        "route", ["order-acs-cancel", "order-shipment-cancel"]
+    )
+    def test_an_acs_outage_is_a_503(self, staff_client, route, error):
+        order = _order_with("acs")
+        AcsShipmentFactory(order=order, voucher_no="9001999001")
+        with patch(
+            "shipping_acs.services.AcsService.cancel_voucher",
+            side_effect=error,
+        ):
+            response = staff_client.post(
+                reverse(route, kwargs={"pk": order.pk})
+            )
+
+        _assert_unavailable(response)
+
+    def test_a_creation_in_flight_is_a_409_with_its_text(self, staff_client):
+        from django.utils import timezone
+
+        from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+
+        order = _order_with("boxnow")
+        BoxNowShipmentFactory(
+            order=order,
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+            metadata={"mint_started_at": timezone.now().isoformat()},
+        )
+
+        response = staff_client.post(
+            reverse("order-boxnow-cancel", kwargs={"pk": order.pk})
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        body = response.json()
+        assert body["code"] == "carrier_request_in_progress"
+        assert "being created right now" in body["detail"]
+
+    def test_a_refusal_keeps_its_400(self, staff_client):
+        order = _order_with("boxnow")
+        BoxNowShipmentFactory(order=order, parcel_id="1234567890")
+        with patch(
+            "shipping_boxnow.services.BoxNowService.cancel_shipment",
+            side_effect=BoxNowAPIError(409, code="P420", message="Not new."),
+        ):
+            response = staff_client.post(
+                reverse("order-boxnow-cancel", kwargs={"pk": order.pk})
+            )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "P420"

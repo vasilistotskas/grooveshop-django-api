@@ -389,6 +389,10 @@ serializers_config: SerializersConfig = {
             "request body."
         ),
         tags=["Orders"],
+        responses={
+            409: ErrorResponseSerializer,
+            503: ErrorResponseSerializer,
+        },
     ),
     "boxnow_label": ActionConfig(
         # Same (status, media_type) key as ``shipment_label`` above:
@@ -415,6 +419,10 @@ serializers_config: SerializersConfig = {
             "the voucher is finalised in a pickup list."
         ),
         tags=["Orders"],
+        responses={
+            409: ErrorResponseSerializer,
+            503: ErrorResponseSerializer,
+        },
     ),
     "acs_label": ActionConfig(
         # Same (status, media_type) key as ``shipment_label`` above:
@@ -463,6 +471,10 @@ serializers_config: SerializersConfig = {
             "not yet finalised in a pickup list)."
         ),
         tags=["Orders"],
+        responses={
+            409: ErrorResponseSerializer,
+            503: ErrorResponseSerializer,
+        },
     ),
 }
 
@@ -2638,6 +2650,8 @@ class OrderViewSet(BaseModelViewSet):
     )
     def boxnow_cancel(self, request, pk=None):
         """Cancel the BoxNow shipment for an order (admin-only)."""
+        from shipping.api_errors import unanswered
+        from shipping.exceptions import CarrierUnavailableError
         from shipping_boxnow.exceptions import BoxNowAPIError
         from shipping_boxnow.services import BoxNowService
 
@@ -2654,6 +2668,15 @@ class OrderViewSet(BaseModelViewSet):
 
         try:
             BoxNowService.cancel_shipment(shipment, reason=reason)
+        except CarrierUnavailableError as exc:
+            # No answer from BoxNow, or the work is already running here:
+            # a 503 or a 409, never a refusal (#650).
+            logger.warning(
+                "BoxNow cancel (order-action) not answered | order=%s | %s",
+                order.id,
+                exc,
+            )
+            raise unanswered(exc) from exc
         except BoxNowAPIError as exc:
             logger.warning(
                 "BoxNow cancel (order-action) failed | order=%s"
@@ -2718,6 +2741,8 @@ class OrderViewSet(BaseModelViewSet):
     )
     def acs_cancel(self, request, pk=None):
         """Cancel the ACS shipment for an order (admin-only)."""
+        from shipping.api_errors import unanswered
+        from shipping.exceptions import CarrierUnavailableError
         from shipping_acs.exceptions import AcsAPIError
         from shipping_acs.services import AcsService
 
@@ -2733,6 +2758,15 @@ class OrderViewSet(BaseModelViewSet):
         reason: str = request.data.get("reason", "")
         try:
             AcsService.cancel_voucher(shipment, reason=reason)
+        except CarrierUnavailableError as exc:
+            # No answer from ACS, or the work is already running here: a
+            # 503 or a 409, never a refusal (#650).
+            logger.warning(
+                "ACS cancel (order-action) not answered | order=%s | %s",
+                order.id,
+                exc,
+            )
+            raise unanswered(exc) from exc
         except AcsAPIError as exc:
             logger.warning(
                 "ACS cancel (order-action) failed | order=%s | "
@@ -2836,6 +2870,8 @@ class OrderViewSet(BaseModelViewSet):
         already-shipped parcels with P420; ACS rejects vouchers
         already in a pickup list).
         """
+        from shipping.api_errors import unanswered
+        from shipping.exceptions import CarrierUnavailableError
         from shipping.services import ShippingService
         from shipping_acs.exceptions import AcsAPIError
         from shipping_boxnow.exceptions import BoxNowAPIError
@@ -2858,6 +2894,17 @@ class OrderViewSet(BaseModelViewSet):
         reason: str = request.data.get("reason", "")
         try:
             adapter.cancel_shipment(shipment, reason=reason)
+        except CarrierUnavailableError as exc:
+            # No answer from the carrier, or the work is already running
+            # here: a 503 or a 409, never a refusal (#650).
+            logger.warning(
+                "Shipment cancel (generic) not answered | order=%s | "
+                "provider=%s | %s",
+                order.id,
+                order.shipping_provider.code,
+                exc,
+            )
+            raise unanswered(exc) from exc
         except (BoxNowAPIError, AcsAPIError) as exc:
             logger.warning(
                 "Shipment cancel (generic) failed | order=%s | "

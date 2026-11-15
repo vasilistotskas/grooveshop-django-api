@@ -89,7 +89,7 @@ key for up to 24 hours: refund it in the dashboard instead, and the webhook
 records it.
 
 **Resolving an attempt whose outcome stays unknown**
-(`src/order/refund_reconciliation.py`). A provider attempt still `PENDING`
+(`src/order/refunds/refund_reconciliation.py`). A provider attempt still `PENDING`
 after `REFUND_RECONCILE_AFTER_MINUTES` (default 60, an env setting that must
 stay under the 24 hours Stripe remembers a key) is *overdue*
 (`RefundAttempt.objects.overdue()`, `RefundAttempt.is_overdue`). An overdue

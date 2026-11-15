@@ -35,7 +35,7 @@ def validate_invoice_doc(xml_bytes: bytes) -> None:
     if not schema_path.is_file():
         logger.info(
             "Skipping myDATA XSD pre-validation — schema not found at %s. "
-            "Drop the official AADE XSDs into order/mydata/xsd/ to enable.",
+            "Drop the official AADE XSDs into order/accounting/mydata/xsd/ to enable.",
             schema_path,
         )
         return

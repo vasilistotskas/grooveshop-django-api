@@ -4,7 +4,7 @@ This is one set of facts serving two obligations that are easy to treat
 as unrelated:
 
 1. **Invoices.** Greek tax law requires the seller's ΑΦΜ, ΔΟΥ, ΓΕΜΗ and
-   registered address on every issued invoice (``order.invoicing``).
+   registered address on every issued invoice (``order.accounting.invoicing``).
 2. **The storefront.** The identity must ALSO be published on the site
    itself, which is a separate obligation with a separate legal basis:
 
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 #: Field name on the returned identity -> ``extra_settings`` key.
-#: ``order.invoicing`` imports this: invoicing is a CONSUMER of the
+#: ``order.accounting.invoicing`` imports this: invoicing is a CONSUMER of the
 #: merchant's identity, so the definition belongs here and the
 #: dependency points this way, not the reverse.
 SELLER_SETTING_KEYS: Mapping[str, str] = {
@@ -90,7 +90,7 @@ REQUIRED_DISCLOSURE_FIELDS: tuple[str, ...] = (
 
 #: What a tax document needs about the seller. Greek law puts the ΑΦΜ and
 #: ΔΟΥ on every document the seller issues, and myDATA refuses to take a
-#: submission without the ΑΦΜ (``order.mydata.service``). Unlike
+#: submission without the ΑΦΜ (``order.accounting.mydata.service``). Unlike
 #: ``REQUIRED_DISCLOSURE_FIELDS`` this only matters to a store that
 #: actually issues tax documents (``MYDATA_ENABLED``).
 REQUIRED_TAX_DOCUMENT_FIELDS: tuple[str, ...] = (

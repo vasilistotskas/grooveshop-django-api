@@ -76,13 +76,13 @@ def _rendered_receipt(
     given AADE state. Issued by a store that issues through the platform,
     by hand, so no signal issues anything on its own. Only a registered
     (CONFIRMED) or cancelled receipt carries a MARK."""
-    from order.invoicing import generate_invoice
+    from order.accounting.invoicing import generate_invoice
 
     order = issuable(OrderFactory(user=user))
     with (
         mydata_enabled(auto_submit=False),
         patch(
-            "order.invoicing._render_pdf_bytes",
+            "order.accounting.invoicing._render_pdf_bytes",
             return_value=b"%PDF-1.4\n%FAKE\n%EOF",
         ),
     ):

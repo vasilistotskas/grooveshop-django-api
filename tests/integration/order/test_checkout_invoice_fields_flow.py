@@ -11,7 +11,7 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
-from order.invoicing import _buyer_snapshot
+from order.accounting.invoicing import _buyer_snapshot
 from order.serializers.order import OrderSerializer
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement

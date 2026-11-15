@@ -32,17 +32,21 @@ from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
-from order import credit_allocation
+from order.accounting import credit_allocation
+from order.accounting.credit_allocation import Piece, split_over_shares
+from order.accounting.credit_documents import (
+    CreditExceedsReceiptError,
+    credit_breakdown,
+)
+from order.accounting.invoicing import generate_invoice
+from order.accounting.taxation import ChargeKind
 from order.admin import OrderAdmin, ReturnOrderForm
-from order.credit_allocation import Piece, split_over_shares
-from order.credit_documents import CreditExceedsReceiptError, credit_breakdown
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
-from order.invoicing import generate_invoice
 from order.models import (
     CreditAllocation,
     Invoice,
@@ -57,10 +61,9 @@ from order.models.refund_attempt import (
     RefundReason,
 )
 from order.payment_ledger import PaymentLedger
-from order.refund_lines import held_values, plan_pieces
+from order.refunds.refund_lines import held_values, plan_pieces
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
-from order.taxation import ChargeKind
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.mydata import FakeAade, mydata_enabled
@@ -84,7 +87,8 @@ def _render_and_site(settings):
     settings.STATIC_BASE_URL = "http://example.com"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
     ):
         yield
 
@@ -1093,7 +1097,7 @@ class TestAValueIsHeldNotACountOfUnits:
         order = _order(shipping="10.00")
         _two_charges(order, "5.00", "105.00")
 
-        from order.refund_lines import held_values, plan_pieces
+        from order.refunds.refund_lines import held_values, plan_pieces
 
         with _SecondCallRefused() as api:
             OrderService.refund_order(order, include_shipping=True)

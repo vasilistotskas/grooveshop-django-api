@@ -1,5 +1,5 @@
 """The retail credit document (11.4) payload, from
-:func:`order.mydata.builder.build_credit_xml`.
+:func:`order.accounting.mydata.builder.build_credit_xml`.
 
 AADE's classification combinations sheet for 11.4 allows ``category1_1``
 with ``E3_561_003``, like the receipt. AADE forbids ``correlatedInvoices`` on
@@ -16,7 +16,7 @@ from xml.etree.ElementTree import fromstring
 
 from djmoney.money import Money
 
-from order.mydata.builder import build_credit_xml
+from order.accounting.mydata.builder import build_credit_xml
 
 AADE_NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
 CLS_NS = "{https://www.aade.gr/myDATA/incomeClassificaton/v1.0}"

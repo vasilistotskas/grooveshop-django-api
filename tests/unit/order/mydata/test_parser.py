@@ -1,4 +1,4 @@
-"""Unit tests for :func:`order.mydata.parser.parse_response_doc`.
+"""Unit tests for :func:`order.accounting.mydata.parser.parse_response_doc`.
 
 Pins the parser's handling of success, partial success (multiple
 rows), ``ValidationError`` with errors list, and namespace-tagged
@@ -11,7 +11,10 @@ from __future__ import annotations
 import pytest
 from django.test import SimpleTestCase
 
-from order.mydata.parser import parse_requested_doc, parse_response_doc
+from order.accounting.mydata.parser import (
+    parse_requested_doc,
+    parse_response_doc,
+)
 
 _SUCCESS_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ResponseDoc>

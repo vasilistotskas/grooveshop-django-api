@@ -18,7 +18,7 @@ from typing import Self
 from unittest import mock
 from xml.etree.ElementTree import fromstring
 
-from order.mydata.config import MyDataConfig
+from order.accounting.mydata.config import MyDataConfig
 
 AADE_NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
 FIRST_MARK = 400000000000001
@@ -54,10 +54,10 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
     )
     # Every module holds its own bound reference to the loader.
     targets = (
-        "order.mydata.config.load_config",
-        "order.mydata.service.load_config",
+        "order.accounting.mydata.config.load_config",
+        "order.accounting.mydata.service.load_config",
         "order.signals.handlers.load_mydata_config",
-        "order.invoicing.load_mydata_config",
+        "order.accounting.invoicing.load_mydata_config",
     )
     from emails import gates
 
@@ -77,7 +77,7 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         )
         stack.enter_context(
             mock.patch(
-                "order.mydata.service._resolve_issuer_vat",
+                "order.accounting.mydata.service._resolve_issuer_vat",
                 return_value="123456789",
             )
         )
@@ -85,7 +85,7 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
 
 
 def issuable(order):
-    """``order`` as ``order.invoicing.generate_invoice`` issues a receipt
+    """``order`` as ``order.accounting.invoicing.generate_invoice`` issues a receipt
     for it: a receipt order that has shipped (``receipt_issuable``).
 
     Written with ``update()``: shipping it through the state machine would
@@ -148,11 +148,11 @@ class FakeAade:
         self._next = FIRST_MARK
         self._patches = [
             mock.patch(
-                "order.mydata.client.MyDataClient.send_invoices",
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
                 side_effect=self._send,
             ),
             mock.patch(
-                "order.mydata.client.MyDataClient.cancel_invoice",
+                "order.accounting.mydata.client.MyDataClient.cancel_invoice",
                 side_effect=self._cancel,
             ),
         ]

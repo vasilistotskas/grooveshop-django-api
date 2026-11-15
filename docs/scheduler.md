@@ -45,14 +45,14 @@ not in the settings, because Celery installs it while
 `tenant.tasks.fanout_reconcile_pending_refunds` (one run per store, suspended stores included: their PENDING refunds hold the customer's money too). It asks the
 payment provider what became of each refund attempt still `PENDING` after
 `REFUND_RECONCILE_AFTER_MINUTES`, and settles or declines only on an
-unambiguous answer (`src/order/refund_reconciliation.py`,
+unambiguous answer (`src/order/refunds/refund_reconciliation.py`,
 `docs/order/refund-execution.md` §7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
 caught by the next hour. An attempt it cannot decide stays `PENDING`, holds its
 money and shows on the store dashboard until staff record its outcome.
 
 `allocate-credit-sources` runs every five minutes through
 `tenant.tasks.fanout_allocate_credit_sources` (one run per store, suspended
-stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`src/order/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
+stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`src/order/accounting/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
 
 ## Time zones
 

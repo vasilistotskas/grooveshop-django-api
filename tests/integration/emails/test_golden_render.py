@@ -394,7 +394,8 @@ class TestCustomerOrderEmails:
         credit.document_file.save("credit.pdf", ContentFile(b"%PDF-1.4"))
 
         with patch(
-            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+            "order.accounting.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4",
         ):
             assert send_credit_email.run(credit.id) is True
 

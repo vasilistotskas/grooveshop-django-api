@@ -56,7 +56,13 @@ from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
 from core.forms.choices import BLANK_CHOICE_LABEL
-from order import credit_allocation, refund_reconciliation
+from order.accounting import credit_allocation
+from order.accounting.invoicing import (
+    ReceiptNotIssuable,
+    generate_invoice,
+    receipt_issuable,
+)
+from order.accounting.taxation import breakdown_by_rate, order_vat_lines
 from order.chargebacks import (
     ChargebackDecisionError,
     decide_chargebacks,
@@ -71,11 +77,6 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import PaymentError, RefundOutstandingError
-from order.invoicing import (
-    ReceiptNotIssuable,
-    generate_invoice,
-    receipt_issuable,
-)
 from order.lifecycle.follow_up import (
     follow_up_days,
     follow_up_reason,
@@ -100,14 +101,14 @@ from order.payment_ledger import (
     PaymentLedger,
     is_cash_collection,
 )
-from order.refund_lines import (
+from order.refunds import refund_reconciliation
+from order.refunds.refund_lines import (
     covered_units,
     held_values,
     pending_request,
     plan_pieces,
 )
 from order.services import OrderService
-from order.taxation import breakdown_by_rate, order_vat_lines
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
@@ -769,7 +770,7 @@ class RecordRefundOutcomeForm(BaseDialogForm):
     lookup could not decide (``RefundAttempt.objects.awaiting_staff()``): the
     provider was asked about them and could not decide, so staff look at the
     provider's dashboard and say what became of each. The service
-    (``order.refund_reconciliation.record_outcome``) checks it all again
+    (``order.refunds.refund_reconciliation.record_outcome``) checks it all again
     under the order lock.
     """
 
@@ -1866,7 +1867,7 @@ class OrderAdmin(BaseModelAdmin):
     def timologio_summary(self, obj):
         """What staff need to issue the invoice in timologio: the buyer's
         identity and the VAT rows of the order, the figures the platform
-        itself would have used (``order.taxation``)."""
+        itself would have used (``order.accounting.taxation``)."""
         if (
             not obj
             or not obj.pk
@@ -2627,7 +2628,7 @@ class OrderAdmin(BaseModelAdmin):
         (``MyDataConfig.is_ready``), read once per request: Unfold asks the
         permission once per action, and the order page also needs it for
         its Receipt card."""
-        from order.mydata.config import load_config
+        from order.accounting.mydata.config import load_config
 
         issues = getattr(request, "_platform_issues_receipts", None)
         if issues is None:
@@ -3645,7 +3646,7 @@ class InvoiceAdmin(BaseModelAdmin):
     ``OrderAdmin``'s "Issue receipt (myDATA)" creates one; its
     "Regenerate receipt" re-renders the PDF and snapshots of an existing
     receipt in place, keeping the number and issue date
-    (``order.invoicing.generate_invoice(force=True)``), and never creates
+    (``order.accounting.invoicing.generate_invoice(force=True)``), and never creates
     one.
     """
 
@@ -3763,8 +3764,8 @@ class InvoiceAdmin(BaseModelAdmin):
                 ),
                 "classes": ("collapse",),
                 "description": _(
-                    "Populated by the automated submission pipeline "
-                    "(``order.mydata``). Read-only — edit master data "
+                    "Populated by the automated submission pipeline. "
+                    "Read-only — edit master data "
                     "(seller / buyer) and use the Order admin's 'Send to "
                     "myDATA' action to regenerate. VAT rates are fixed on "
                     "each order line at checkout and do not follow later "

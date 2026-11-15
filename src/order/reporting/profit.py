@@ -66,6 +66,7 @@ from django.db.models import (
     Value,
 )
 
+from order.accounting.taxation import ChargeKind
 from order.enum.expense import DELIVERY_EXPENSE_CATEGORIES, ExpenseCategory
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.reporting.turnover import (
@@ -80,7 +81,6 @@ from order.reporting.turnover import (
     sold_lines,
     window,
 )
-from order.taxation import ChargeKind
 
 _ZERO = Decimal(0)
 _MONEY = DecimalField(max_digits=14, decimal_places=2)

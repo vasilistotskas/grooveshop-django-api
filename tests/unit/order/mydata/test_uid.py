@@ -1,4 +1,4 @@
-"""Unit tests for :func:`order.mydata.uid.build_uid`.
+"""Unit tests for :func:`order.accounting.mydata.uid.build_uid`.
 
 The UID function is the idempotency anchor of the whole integration —
 retries MUST produce the same hash for the same logical invoice, and
@@ -14,7 +14,7 @@ from datetime import date
 
 from django.test import SimpleTestCase
 
-from order.mydata.uid import build_uid
+from order.accounting.mydata.uid import build_uid
 
 
 class BuildUidTestCase(SimpleTestCase):

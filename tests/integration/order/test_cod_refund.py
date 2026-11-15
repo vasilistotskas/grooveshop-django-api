@@ -22,6 +22,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory
 from djmoney.money import Money
 
+from order.accounting.invoicing import generate_invoice
 from order.admin import OrderAdmin, ReturnOrderForm
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -29,7 +30,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
-from order.invoicing import generate_invoice
 from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
@@ -367,7 +367,7 @@ class TestTheCreditNote:
     def test_a_refund_of_cash_issues_one_credit_note_per_refund(self):
         with (
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 return_value=b"%PDF-1.4 test",
             ),
             mydata_enabled(),

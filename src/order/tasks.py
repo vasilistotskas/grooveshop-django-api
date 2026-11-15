@@ -21,7 +21,7 @@ from core.store_settings import store_setting
 from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 from emails.transport import Attachment
-from order import payment_hold, refund_reconciliation
+from order import payment_hold
 from order.emails import (
     STATUS_EMAIL_KEYS,
     OrderDispute,
@@ -43,6 +43,7 @@ from order.models.order import (
     status_update_reservation_key,
 )
 from order.payment import get_payment_provider_class
+from order.refunds import refund_reconciliation
 from order.review_request import awaiting_review_request, delivery_window
 from order.services import OrderService
 from recommendation.order_email import record_impression
@@ -976,7 +977,7 @@ RECEIPT_DEFERRED_FLAG = "receipt_deferred"
 
 def set_receipt_deferred(order_id: int, deferred: bool) -> None:
     """Record, or clear, that the order's receipt waits for a refund claim
-    still PENDING (``order.invoicing.ReceiptDeferred``)."""
+    still PENDING (``order.accounting.invoicing.ReceiptDeferred``)."""
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(pk=order_id).first()
         if (
@@ -1003,7 +1004,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
 
     Dispatched when the order ships (``handle_order_shipped``, while
     ``MyDataConfig.issues_automatically``) or by staff from the order.
-    Exactly once per order: ``order.invoicing.generate_invoice`` returns
+    Exactly once per order: ``order.accounting.invoicing.generate_invoice`` returns
     the existing row, and an order whose receipt already carries a MARK
     has nothing left to issue. ``generate_invoice`` refuses an order that
     is not a shipped receipt order (an invoice order is issued by hand in
@@ -1013,7 +1014,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
     ``ReceiptDeferred``) is flagged ``receipt_deferred``; the periodic
     ``allocate_credit_sources`` asks for the receipt again once they are.
     """
-    from order.invoicing import (
+    from order.accounting.invoicing import (
         ReceiptDeferred,
         ReceiptNotIssuable,
         generate_invoice,
@@ -1246,7 +1247,7 @@ def _submit_document_to_mydata(task, order: Order, document):
     as a staff note. Nothing here ever reaches the customer: a document
     AADE has not registered is not issued.
     """
-    from order.mydata import (
+    from order.accounting.mydata import (
         MyDataAuthError,
         MyDataDuplicateError,
         MyDataError,
@@ -1325,7 +1326,7 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     QR code), emails it, and releases the credit documents that were
     waiting for this MARK (:func:`issue_pending_credits`).
     """
-    from order.invoicing import generate_invoice
+    from order.accounting.invoicing import generate_invoice
 
     try:
         order = Order.objects.select_related(
@@ -1377,7 +1378,7 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
 def issue_pending_credits(self, order_id: int) -> list[int]:
     """Issue every retail credit document the order owes.
 
-    Creates the missing ones (``order.credit_documents``: one per ledger
+    Creates the missing ones (``order.accounting.credit_documents``: one per ledger
     refund, one settlement for an order closed without a sale) and submits
     each credit that is not yet registered (one a run died before
     submitting, or AADE refused, is simply sent again). Dispatched by every
@@ -1385,7 +1386,7 @@ def issue_pending_credits(self, order_id: int) -> list[int]:
     staff) and idempotent: with nothing owed and everything registered it
     does nothing.
     """
-    from order.credit_documents import create_pending_credits
+    from order.accounting.credit_documents import create_pending_credits
     from order.models import RetailCredit
     from order.models.invoice import MyDataStatus
 
@@ -1459,7 +1460,7 @@ def send_credit_email(self, credit_id: int) -> bool:
     Idempotent per credit through a flag in ``Order.metadata``, released on
     permanent failure so staff can resend.
     """
-    from order.invoicing import render_credit_pdf
+    from order.accounting.invoicing import render_credit_pdf
     from order.models import RetailCredit
 
     credit = (
@@ -1513,11 +1514,11 @@ def send_credit_email(self, credit_id: int) -> bool:
 
 def _cancel_registered_document(task, order: Order, document) -> bool:
     """Send ``CancelInvoice`` for a registered document issued in error."""
-    from order.mydata import (
+    from order.accounting.mydata import (
         MyDataError,
         MyDataTransportError,
     )
-    from order.mydata import (
+    from order.accounting.mydata import (
         cancel_document as _cancel,
     )
 
@@ -1719,7 +1720,7 @@ def reconcile_pending_refunds() -> dict[str, int]:
 
     A provider call that ended without an answer leaves its attempt PENDING,
     holding its money until something resolves it
-    (``order.refund_reconciliation``). A refund found at the provider is
+    (``order.refunds.refund_reconciliation``). A refund found at the provider is
     recorded, one the provider reports failed is declined, and one the
     lookup cannot decide (nothing found, several candidates, the provider
     unreadable) stays PENDING for staff: the dashboard counts it. Safe to
@@ -1740,7 +1741,7 @@ def reconcile_pending_refunds() -> dict[str, int]:
 )
 def allocate_credit_sources() -> int:
     """Decide every refund, refund attempt and returned chargeback that owes
-    a credit and has no allocation (``order.credit_allocation_backfill``),
+    a credit and has no allocation (``order.accounting.credit_allocation_backfill``),
     and ask again for the receipts that were waiting on them.
 
     The write paths decide an order's unallocated sources before they read
@@ -1754,8 +1755,10 @@ def allocate_credit_sources() -> int:
     receipt now (``generate_order_invoice``). Idempotent; each order is
     handled under its lock. Returns how many sources it decided.
     """
-    from order import credit_allocation
-    from order.credit_allocation_backfill import backfill_credit_allocations
+    from order.accounting import credit_allocation
+    from order.accounting.credit_allocation_backfill import (
+        backfill_credit_allocations,
+    )
 
     done = backfill_credit_allocations()
     if done:

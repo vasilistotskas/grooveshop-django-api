@@ -25,18 +25,18 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory
 from djmoney.money import Money
 
-from order.admin import OrderAdmin
-from order.credit_documents import (
+from order.accounting.credit_documents import (
     CreditExceedsReceiptError,
     create_pending_credits,
     credit_breakdown,
 )
+from order.accounting.invoicing import generate_invoice, render_credit_pdf
+from order.admin import OrderAdmin
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
-from order.invoicing import generate_invoice, render_credit_pdf
 from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
@@ -71,7 +71,8 @@ def _render_and_site(settings):
     settings.STATIC_BASE_URL = "http://example.com"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
     ):
         yield
 
@@ -630,7 +631,8 @@ class TestDocuments:
             OrderService.refund_order(order, amount=_eur("40.00"))
             credit = _credits(order).get()
             with patch(
-                "order.invoicing._render_pdf_bytes", side_effect=fake_render
+                "order.accounting.invoicing._render_pdf_bytes",
+                side_effect=fake_render,
             ):
                 render_credit_pdf(credit)
 
@@ -654,7 +656,10 @@ class TestDocuments:
         _mark_shipped(order)
         with (
             mydata_enabled(auto_submit=False),
-            patch("order.invoicing._render_pdf_bytes", side_effect=fake_render),
+            patch(
+                "order.accounting.invoicing._render_pdf_bytes",
+                side_effect=fake_render,
+            ),
         ):
             generate_invoice(order)
 
@@ -851,7 +856,7 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         # 60 card + 40 gift card; a EUR 100 return gives both back.
         self._refund(order, "70.00")
 
-        from order.invoicing import refunded_before_receipt
+        from order.accounting.invoicing import refunded_before_receipt
 
         assert refunded_before_receipt(order) == Decimal("70.00")
         with mydata_enabled(), FakeAade() as aade:
@@ -896,7 +901,7 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         assert receipt.gross == Decimal("100.00")
 
     def test_everything_refunded_before_it_means_no_receipt(self):
-        from order.invoicing import ReceiptNotIssuable
+        from order.accounting.invoicing import ReceiptNotIssuable
 
         order = _order(lines=(("24", "100.00"),))
         self._refund(order)
@@ -937,7 +942,7 @@ class TestTheReceiptRowIsTheCutOff:
         with (
             mydata_enabled(),
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 side_effect=RuntimeError("x"),
             ),
             pytest.raises(RuntimeError),
@@ -983,7 +988,7 @@ class TestTheReceiptRowIsTheCutOff:
     def test_a_full_refund_before_a_retried_row_is_refused(self):
         """A row left by an older release, issued for the full total, whose
         order was then refunded in full before the retry: no zero receipt."""
-        from order.invoicing import ReceiptNotIssuable
+        from order.accounting.invoicing import ReceiptNotIssuable
 
         order = _order(lines=(("24", "100.00"),))
         invoice = self._failed_render(order)
@@ -1166,7 +1171,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
                 status=RefundAttemptStatus.SETTLED,
             )
             # The claim fixed its share of the receipt's rates.
-            from order import credit_allocation
+            from order.accounting import credit_allocation
 
             credit_allocation.store(
                 order,

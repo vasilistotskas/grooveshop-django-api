@@ -16,10 +16,10 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
+from order.accounting.invoicing import _compute_vat_breakdown
+from order.accounting.taxation import split_gross
 from order.checkout.discounts import allocate_capped
 from order.factories.order import OrderFactory
-from order.invoicing import _compute_vat_breakdown
-from order.taxation import split_gross
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory

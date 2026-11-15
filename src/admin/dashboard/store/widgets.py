@@ -966,7 +966,7 @@ class StoreAlerts(DashboardWidget):
         failed. The document stands (it records what was sent to AADE), so
         an accountant has to decide whether to cancel it; cancelling takes
         the alert away."""
-        from order.credit_allocation import reversed_credits
+        from order.accounting.credit_allocation import reversed_credits
 
         documents = list(reversed_credits().select_related("order")[:5])
         if not documents:
@@ -1003,7 +1003,7 @@ class StoreAlerts(DashboardWidget):
         accountant has to look at each. The order's history says how much."""
         from django.db.models import Max
 
-        from order.credit_allocation import beyond_receipt_orders
+        from order.accounting.credit_allocation import beyond_receipt_orders
 
         order_ids = [
             row["order_id"]
@@ -1044,7 +1044,7 @@ class StoreAlerts(DashboardWidget):
         has to correct the receipt."""
         from django.db.models import Max
 
-        from order.credit_allocation import understated_orders
+        from order.accounting.credit_allocation import understated_orders
 
         order_ids = [
             row["order_id"]
@@ -1123,10 +1123,10 @@ class StoreAlerts(DashboardWidget):
 
     def _deferred_receipts(self) -> list[dict[str, Any]]:
         """Receipts waiting for a refund claim to resolve
-        (``order.invoicing.ReceiptDeferred``). A receipt is due when the
+        (``order.accounting.invoicing.ReceiptDeferred``). A receipt is due when the
         goods are dispatched, so each order is listed with what it waits
         for."""
-        from order.credit_allocation import describe_blockers
+        from order.accounting.credit_allocation import describe_blockers
         from order.models import Order
 
         waiting = list(
@@ -1210,7 +1210,7 @@ class StoreAlerts(DashboardWidget):
         ]
 
     def _mydata(self) -> list[dict[str, Any]]:
-        from order.mydata.config import load_config
+        from order.accounting.mydata.config import load_config
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.

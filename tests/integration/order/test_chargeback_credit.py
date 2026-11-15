@@ -23,6 +23,8 @@ from django.test import RequestFactory
 from djmoney.money import Money
 
 from admin.dashboard.store import queries
+from order.accounting.credit_documents import create_pending_credits
+from order.accounting.invoicing import ReceiptNotIssuable, generate_invoice
 from order.admin import (
     ChargebackDecisionFilter,
     OrderAdmin,
@@ -32,11 +34,9 @@ from order.chargebacks import (
     ChargebackDecisionError,
     decide_chargebacks,
 )
-from order.credit_documents import create_pending_credits
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus
 from order.factories import PaymentTransactionFactory
-from order.invoicing import ReceiptNotIssuable, generate_invoice
 from order.models import (
     ChargebackDecision,
     Invoice,
@@ -68,7 +68,8 @@ def _render_and_site(settings):
     settings.STATIC_BASE_URL = "http://example.com"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
     ):
         yield
 

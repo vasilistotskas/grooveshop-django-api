@@ -46,7 +46,7 @@ PRODUCTION_PROFILE = SYSTEM_ENV in ("production", "staging")
 # sell; anything else, production or a SYSTEM_ENV this file does not
 # know, is taken to, so a store there needs what a real sale requires (a
 # recorded ΦΗΜ exemption before myDATA issues a receipt,
-# ``order.mydata.config``). Listed as the exceptions, so an unknown name
+# ``order.accounting.mydata.config``). Listed as the exceptions, so an unknown name
 # fails closed.
 REAL_ORDERS_DEPLOYMENT = SYSTEM_ENV not in ("staging", "dev", "ci")
 

@@ -665,7 +665,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_logger.assert_called_once()
 
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     def test_generate_order_invoice_success(self, mock_render_pdf, mock_submit):
         _ship_a_receipt_order(self.order)
         _sell_something(self.order)
@@ -681,7 +684,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         # customer's email follows the MARK, not the PDF.
         assert_published_once(mock_submit, [self.order.id])
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     def test_generate_order_invoice_gives_up_on_an_order_with_no_goods(
         self, mock_render_pdf
     ):
@@ -708,7 +714,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -722,7 +731,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         a second send."""
         from django.core import mail
 
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
 
         _sell_something(self.order)
         with mydata_enabled(auto_submit=False):
@@ -839,7 +848,10 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
 
         self.assertEqual(mock_email_instance.send.call_count, 3)
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     def test_database_operations_integrity(self, mock_render_pdf):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 

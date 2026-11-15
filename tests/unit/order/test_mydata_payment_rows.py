@@ -13,8 +13,11 @@ from unittest.mock import patch
 import pytest
 from djmoney.money import Money
 
-from order.mydata.builder import _payment_rows, _pick_payment_type
-from order.mydata.types import PAYMENT_METHOD_CASH, PAYMENT_METHOD_POS_CARD
+from order.accounting.mydata.builder import _payment_rows, _pick_payment_type
+from order.accounting.mydata.types import (
+    PAYMENT_METHOD_CASH,
+    PAYMENT_METHOD_POS_CARD,
+)
 
 pytestmark = pytest.mark.django_db
 

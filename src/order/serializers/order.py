@@ -12,12 +12,12 @@ from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from core.validators import address as address_rules
 from country.models import Country
+from order.accounting.invoicing import specimen_available
 from order.checkout.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
-from order.invoicing import specimen_available
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.serializers.item import (

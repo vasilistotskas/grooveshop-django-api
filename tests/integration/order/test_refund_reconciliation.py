@@ -32,7 +32,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payment_ledger import PaymentLedger
-from order.refund_reconciliation import record_outcome
+from order.refunds.refund_reconciliation import record_outcome
 from order.services import OrderService
 from order.tasks import reconcile_pending_refunds
 from pay_way.factories import PayWayFactory
@@ -659,7 +659,7 @@ class TestRecordRefundOutcomeAction:
         _age(order, hours=1.5)
 
         with mock.patch(
-            "order.refund_reconciliation._found",
+            "order.refunds.refund_reconciliation._found",
             side_effect=RuntimeError("cannot read the credential"),
         ):
             counts = reconcile_pending_refunds()

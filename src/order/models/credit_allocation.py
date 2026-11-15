@@ -19,8 +19,8 @@ order lock. Every source of a credit owns its rows here:
   spread over the headroom at the decision, capped to it.
 
 The credit document is issued from these rows only, so the order credits are
-issued in cannot change them (``order.credit_documents``), and the headroom
-a new claim must fit in is a plain sum (``order.credit_allocation``).
+issued in cannot change them (``order.accounting.credit_documents``), and the headroom
+a new claim must fit in is a plain sum (``order.accounting.credit_allocation``).
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
-from order.taxation import ChargeKind
+from order.accounting.taxation import ChargeKind
 
 
 class CreditAllocationQuerySet(models.QuerySet["CreditAllocation"]):

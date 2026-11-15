@@ -1,7 +1,7 @@
 """HTTP client for the AADE myDATA REST API.
 
 Thin wrapper around :mod:`requests`. The retry policy is NOT in this
-client — it's the caller's job (``order.mydata.service`` /
+client — it's the caller's job (``order.accounting.mydata.service`` /
 Celery task) to classify exceptions and retry, because retries need
 to persist state (``mydata_status``, ``mydata_error_*``) between
 attempts which the client shouldn't know about.
@@ -23,8 +23,8 @@ from datetime import date
 
 import requests
 
-from order.mydata.config import MyDataConfig
-from order.mydata.exceptions import (
+from order.accounting.mydata.config import MyDataConfig
+from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataTransportError,
 )
@@ -48,7 +48,7 @@ class MyDataClient:
         """POST the ``InvoicesDoc`` payload to ``/SendInvoices``.
 
         Returns the raw response XML bytes — caller parses via
-        :func:`order.mydata.parser.parse_response_doc`.
+        :func:`order.accounting.mydata.parser.parse_response_doc`.
         """
         return self._post("/SendInvoices", xml_bytes)
 

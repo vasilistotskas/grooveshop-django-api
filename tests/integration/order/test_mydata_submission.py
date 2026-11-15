@@ -27,14 +27,14 @@ from django.test import TestCase, override_settings
 from djmoney.money import Money
 from kombu.exceptions import OperationalError
 
+from order.accounting.invoicing import generate_invoice
+from order.accounting.mydata.exceptions import MyDataTransportError
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
-from order.invoicing import generate_invoice
 from order.models import RetailCredit
 from order.models.invoice import Invoice, MyDataStatus
 from order.models.retail_credit import CreditReason
-from order.mydata.exceptions import MyDataTransportError
 from order.tasks import (
     cancel_mydata_invoice,
     generate_order_invoice,
@@ -87,7 +87,7 @@ def _make_invoice():
         quantity=1,
     )
     with patch(
-        "order.invoicing._render_pdf_bytes",
+        "order.accounting.invoicing._render_pdf_bytes",
         return_value=b"%PDF-1.4 test",
     ):
         invoice = generate_invoice(issuable(order))
@@ -171,7 +171,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         )
         return order
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_issues_nothing_when_mydata_is_disabled(
@@ -184,7 +187,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         mock_submit.assert_not_called()
         self.assertFalse(hasattr(order, "invoice"))
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_routes_to_mydata_when_enabled(
@@ -199,7 +205,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         # directly from ``generate_order_invoice``.
         mock_email.assert_not_called()
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     def test_the_receipt_is_kept_for_mydata_when_the_broker_is_down(
         self, _mock_render
     ):
@@ -221,7 +230,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self.assertEqual(row.task_name, send_invoice_to_mydata.name)
         self.assertEqual(row.args, [order.id])
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_an_invoice_order_gets_no_document(self, mock_submit, mock_render):
         """Invoices are issued by hand in timologio (AADE decision
@@ -238,7 +250,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         mock_render.assert_not_called()
         self.assertFalse(Invoice.objects.filter(order=order).exists())
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_an_order_that_has_not_shipped_gets_no_receipt(
         self, mock_submit, mock_render
@@ -254,7 +269,10 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         mock_submit.assert_not_called()
         self.assertFalse(Invoice.objects.exists())
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
     @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_a_registered_receipt_is_not_issued_again(
         self, mock_submit, _mock_render
@@ -279,15 +297,18 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     DEFAULT_FROM_EMAIL="no-reply@example.com",
 )
 class SendInvoiceToMydataTestCase(TestCase):
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     def test_already_confirmed_invoice_short_circuits(
         self, mock_send, _mock_render
     ):
         """An invoice that already has a MARK must NOT be re-submitted —
         a re-submit could fail and flip CONFIRMED→REJECTED. submit_document
         returns a synthetic Success without calling AADE (G0262)."""
-        from order.mydata.service import submit_document
+        from order.accounting.mydata.service import submit_document
 
         self.enterContext(mydata_enabled())
         _order, invoice = _make_invoice()
@@ -301,8 +322,11 @@ class SendInvoiceToMydataTestCase(TestCase):
         self.assertEqual(row.invoice_mark, 800000165789545)
         mock_send.assert_not_called()
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.issue_pending_credits.apply_async")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_success_persists_mark_and_chains_email(
@@ -329,8 +353,11 @@ class SendInvoiceToMydataTestCase(TestCase):
         # Credit documents that waited for this MARK are released.
         assert_published_once(mock_credits, [order.id])
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_a_refused_receipt_is_not_emailed(
         self, mock_email, mock_send, _mock_render
@@ -350,8 +377,11 @@ class SendInvoiceToMydataTestCase(TestCase):
         self.assertEqual(invoice.mydata_error_code, "216")
         mock_email.assert_not_called()
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_transport_error_retries_then_waits_for_staff(
         self, mock_email, mock_send, _mock_render
@@ -376,8 +406,11 @@ class SendInvoiceToMydataTestCase(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.mydata_status, MyDataStatus.SUBMITTED)
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_technical_error_is_retryable_not_terminal(
         self, mock_email, mock_send, _mock_render
@@ -402,12 +435,15 @@ class SendInvoiceToMydataTestCase(TestCase):
         self.assertNotEqual(invoice.mydata_status, MyDataStatus.REJECTED)
         mock_email.assert_not_called()
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch(
-        "order.mydata.client.MyDataClient.request_transmitted_docs",
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch(
+        "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
         return_value=b"<RequestedDoc><invoicesDoc/></RequestedDoc>",
     )
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_duplicate_uid_is_terminal_not_retried(
         self, mock_email, mock_send, mock_lookup, _mock_render
@@ -481,8 +517,11 @@ class BrokerFailureInTheMydataChainTestCase(TestCase):
     def _names(self):
         return set(DeferredDispatch.objects.values_list("task_name", flat=True))
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     def test_the_mark_stays_when_the_email_and_credits_cannot_be_published(
         self, mock_send, _mock_render
     ):
@@ -523,7 +562,7 @@ class BrokerFailureInTheMydataChainTestCase(TestCase):
         broker_down = OperationalError("broker unreachable")
 
         with (
-            patch("order.credit_documents.create_pending_credits"),
+            patch("order.accounting.credit_documents.create_pending_credits"),
             patch.object(
                 send_credit_to_mydata, "apply_async", side_effect=broker_down
             ),
@@ -578,9 +617,12 @@ class BrokerFailureInTheMydataChainTestCase(TestCase):
     DEFAULT_FROM_EMAIL="no-reply@example.com",
 )
 class CancelMydataInvoiceTestCase(TestCase):
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.mydata.client.MyDataClient.cancel_invoice")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.cancel_invoice")
     @patch("order.tasks.issue_pending_credits.apply_async")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_persists_cancellation_mark_on_success(
@@ -613,7 +655,9 @@ class CancelMydataInvoiceTestCase(TestCase):
             quantity=1,
         )
         # No submission — invoice has no MARK.
-        with patch("order.invoicing._render_pdf_bytes", return_value=b"x"):
+        with patch(
+            "order.accounting.invoicing._render_pdf_bytes", return_value=b"x"
+        ):
             generate_invoice(issuable(order))
 
         result = cancel_mydata_invoice(order.id)
@@ -633,7 +677,7 @@ class MydataEmailWithMarkTestCase(TestCase):
     Pins the regeneration-after-MARK step that completes the happy
     path — if we skip it, the customer's invoice is non-compliant."""
 
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     def test_email_attachment_has_mark_embedded(self, mock_send):
         self.enterContext(mydata_enabled())
         mock_send.return_value = _SUCCESS_XML
@@ -649,7 +693,8 @@ class MydataEmailWithMarkTestCase(TestCase):
             return b"%PDF-1.4 fake"
 
         with patch(
-            "order.invoicing._render_pdf_bytes", side_effect=fake_render
+            "order.accounting.invoicing._render_pdf_bytes",
+            side_effect=fake_render,
         ):
             from order.enum.document_type import OrderDocumentTypeEnum
 

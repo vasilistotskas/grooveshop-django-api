@@ -58,12 +58,12 @@ class TestFreshTenantSeeding:
     def test_every_seeded_rate_is_accepted_by_mydata(self, seed):
         """An unlisted rate raises when an invoice is submitted.
 
-        ``order/mydata/builder.py`` maps rate -> AADE vatCategory and
+        ``order/accounting/mydata/builder.py`` maps rate -> AADE vatCategory and
         treats anything missing as bad master data, so seeding a rate it
         does not know would plant a failure that only surfaces once a
         merchant enables myDATA.
         """
-        from order.mydata.builder import _vat_category
+        from order.accounting.mydata.builder import _vat_category
 
         Vat.objects.all().delete()
         seed()

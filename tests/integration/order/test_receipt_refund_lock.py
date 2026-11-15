@@ -18,12 +18,12 @@ import pytest
 from django.db import connection, transaction
 from djmoney.money import Money
 
+from order.accounting.invoicing import ReceiptNotIssuable, generate_invoice
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
-from order.invoicing import ReceiptNotIssuable, generate_invoice
 from order.models import Invoice, Order
 from order.payment_ledger import PaymentLedger
 from pay_way.factories import PayWayFactory
@@ -133,7 +133,8 @@ def _issue_in_thread(order: Order, outcome: list) -> threading.Thread:
 @pytest.fixture(autouse=True)
 def _render():
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
     ):
         yield
 

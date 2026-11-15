@@ -20,28 +20,28 @@ document, 11.4):
 
 Internals:
 
-- :mod:`order.mydata.config` — resolves runtime config from
+- :mod:`order.accounting.mydata.config` — resolves runtime config from
   ``extra_settings``.
-- :mod:`order.mydata.uid` — deterministic request UID generation.
-- :mod:`order.mydata.builder` — ``Invoice`` → ``InvoicesDoc`` XML.
-- :mod:`order.mydata.client` — HTTP layer with retry/backoff.
-- :mod:`order.mydata.parser` — ``ResponseDoc`` / ``RequestedDoc`` →
+- :mod:`order.accounting.mydata.uid` — deterministic request UID generation.
+- :mod:`order.accounting.mydata.builder` — ``Invoice`` → ``InvoicesDoc`` XML.
+- :mod:`order.accounting.mydata.client` — HTTP layer with retry/backoff.
+- :mod:`order.accounting.mydata.parser` — ``ResponseDoc`` / ``RequestedDoc`` →
   Python dataclasses.
-- :mod:`order.mydata.validator` — optional XSD pre-validation.
+- :mod:`order.accounting.mydata.validator` — optional XSD pre-validation.
 
 Pinned schema: AADE ``myDATA v1.0.12`` (under ``xsd/``). Schema bumps
 are mechanical — drop the new XSDs in and update
 ``DEFAULT_XSD_VERSION``.
 """
 
-from order.mydata.exceptions import (
+from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
     MyDataError,
     MyDataTransportError,
     MyDataValidationError,
 )
-from order.mydata.service import (
+from order.accounting.mydata.service import (
     cancel_document,
     recover_mark_for_document,
     submit_document,

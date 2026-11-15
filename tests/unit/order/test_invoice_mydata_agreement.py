@@ -1,6 +1,6 @@
 """The PDF invoice and the myDATA payload report the same money.
 
-Both documents derive their lines from ``order.taxation``, so for ANY
+Both documents derive their lines from ``order.accounting.taxation``, so for ANY
 order the ``Invoice`` row (and the VAT table printed from it) must equal
 the payload's ``invoiceSummary`` to the cent: net, VAT and gross. Before,
 the PDF added shipping and the payment fee on top with no VAT while
@@ -18,16 +18,16 @@ from xml.etree.ElementTree import fromstring
 import pytest
 from djmoney.money import Money
 
-from order.factories.order import OrderFactory
-from order.invoicing import generate_invoice
-from order.mydata.builder import build_receipt_xml
-from order.mydata.types import (
+from order.accounting.invoicing import generate_invoice
+from order.accounting.mydata.builder import build_receipt_xml
+from order.accounting.mydata.types import (
     VAT_CATEGORY_0,
     VAT_CATEGORY_4,
     VAT_CATEGORY_6,
     VAT_CATEGORY_13,
     VAT_CATEGORY_24,
 )
+from order.factories.order import OrderFactory
 from product.factories import ProductFactory
 from tests.utils.discounts import snapshot_discounts
 from tests.utils.mydata import issuable, mydata_enabled
@@ -75,7 +75,8 @@ def _documents(order):
     with (
         mydata_enabled(auto_submit=False),
         patch(
-            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+            "order.accounting.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 test",
         ),
     ):
         invoice = generate_invoice(issuable(order))

@@ -479,7 +479,7 @@ def mydata_credentials() -> dict[str, str]:
 
     Tenant-only — NO platform-wide fallback: each store invoices under its
     own TAXISnet account. Empty means myDATA is not configured for this
-    tenant (``order.mydata.config.MyDataConfig.is_ready`` is False). The
+    tenant (``order.accounting.mydata.config.MyDataConfig.is_ready`` is False). The
     on/off switch, environment and series settings are not credentials
     and stay ``extra_settings`` rows.
 

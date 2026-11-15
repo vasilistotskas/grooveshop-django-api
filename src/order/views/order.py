@@ -53,6 +53,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order import payment_hold
+from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
@@ -77,7 +78,6 @@ from order.exceptions import (
     UnpaidOrderLimitError,
 )
 from order.filters import OrderFilter
-from order.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment import (

@@ -1,7 +1,7 @@
 """Typed exceptions for the myDATA integration.
 
 The distinction between transport / auth / validation / duplicate
-errors drives the retry policy in :func:`order.mydata.service.submit_invoice`
+errors drives the retry policy in :func:`order.accounting.mydata.service.submit_invoice`
 and the UI copy in the admin action — so every error path must land
 on one of these classes.
 

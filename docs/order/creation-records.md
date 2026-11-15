@@ -128,7 +128,7 @@ click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the
 generated `ClickIdsEnum` the storefront's capture is typed against —
 regenerate the schema on both sides).
 
-## 3.5 VAT on an order (`OrderItem.vat_rate`, `src/order/taxation.py`)
+## 3.5 VAT on an order (`OrderItem.vat_rate`, `src/order/accounting/taxation.py`)
 
 Prices on an order are VAT-inclusive. The VAT inside them is backed out
 at **the rate the line was sold at**, which the order records and the
@@ -151,9 +151,9 @@ catalogue can no longer change.
   document can no longer change. A correction rewrites the order's
   `OrderVatLine` rows (`write_vat_lines`), which the turnover report
   reads.
-- **Nothing reads `product.vat` for an order again.** `src/order/invoicing.py`
-  and `src/order/mydata/builder.py` get their lines from
-  `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
+- **Nothing reads `product.vat` for an order again.** `src/order/accounting/invoicing.py`
+  and `src/order/accounting/mydata/builder.py` get their lines from
+  `order.accounting.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
   a `Vat` row, or moving the product to another, changes neither the PDF nor
   the myDATA payload of an
   existing order. Regenerating a not-yet-registered invoice therefore
@@ -223,7 +223,7 @@ catalogue can no longer change.
 - **One computation, two documents.** Every line is split into a net
   rounded half-up to the cent and the VAT left of its gross, so each line
   adds up to what was charged, then summed
-  (`order.taxation.split_gross`). `Invoice.subtotal`, `.total_vat`,
+  (`order.accounting.taxation.split_gross`). `Invoice.subtotal`, `.total_vat`,
   `.total` and the PDF's VAT breakdown are sums of those lines, and the
   myDATA `invoiceDetails` / `invoiceSummary` are the same lines, so they
   agree to the cent for any order
@@ -308,7 +308,7 @@ those when a line is edited, so no admin surface edits one:
   and `OrderItem.sku` are written when the line is created, like `vat_rate`
   and `unit_cost` (`OrderItem.save()` fills them for every writer that does
   not state them; `bulk_create` skips `save()`, so it passes them itself).
-  The invoice (`order.invoicing._render_items`), the order emails
+  The invoice (`order.accounting.invoicing._render_items`), the order emails
   (`{{ item.product_name }}`), the admin, the order-item API
   (`productName`, `sku`) and its `product__name` / `product__sku` filters
   read the snapshot, never the product, so renaming or re-coding a product

@@ -14,7 +14,7 @@ So the discount is spread proportionally over the lines by value, the rule
 every one of their documents was issued under. That keeps the figures of an
 order that already has an invoice what they were; ``Invoice`` rows are
 never touched here, and one registered with myDATA is frozen anyway
-(``order.invoicing``).
+(``order.accounting.invoicing``).
 
 It takes the migration registry rather than the models so the one function
 serves both the data migration (the historical models of its point in the

@@ -143,7 +143,7 @@ class MyDataRegistration(models.Model):
     (:class:`RetailCredit`, 11.4).
 
     Populated after transmission to AADE. All fields are read-only; the
-    write paths live exclusively in ``order.mydata`` (submit / cancel).
+    write paths live exclusively in ``order.accounting.mydata`` (submit / cancel).
     """
 
     mydata_status = models.CharField(
@@ -283,7 +283,7 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
     """The order's retail receipt (myDATA 11.1), linked 1:1 to an Order.
 
     The class keeps its name from when it also carried B2B invoices; the
-    platform no longer issues those (``order.mydata.types``).
+    platform no longer issues those (``order.accounting.mydata.types``).
 
     Once ``document_file`` is populated we treat this row as final —
     regenerating requires deleting the Invoice and its counter entry,

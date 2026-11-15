@@ -206,7 +206,7 @@ class TestWhatASaleIsWorth:
         assert _march().goods == D("100.00")
 
     def test_the_figure_is_the_receipts_own_split(self):
-        from order.taxation import order_vat_lines
+        from order.accounting.taxation import order_vat_lines
 
         order = _order(
             [(D("124.00"), D("24"), 1), (D("56.50"), D("13"), 2)],

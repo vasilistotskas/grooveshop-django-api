@@ -1,7 +1,7 @@
 """The one VAT rule behind every figure an order bills.
 
-The PDF invoice (``order.invoicing``), the ``Invoice`` row it persists and
-the myDATA payload (``order.mydata.builder``) all derive their lines here,
+The PDF invoice (``order.accounting.invoicing``), the ``Invoice`` row it persists and
+the myDATA payload (``order.accounting.mydata.builder``) all derive their lines here,
 so their net, VAT and gross totals are the same numbers by construction —
 not two computations that happen to agree.
 

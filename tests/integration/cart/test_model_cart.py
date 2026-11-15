@@ -9,7 +9,7 @@ from django.utils import timezone
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
-from order.taxation import split_gross
+from order.accounting.taxation import split_gross
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
@@ -82,7 +82,7 @@ class CartModelTestCase(TestCase):
         """VAT is the tax inside ``total_price`` — markdown included.
 
         The invoice backs VAT out of each (marked-down) line gross and
-        rounds it to the cent line by line (``order.taxation``); the cart
+        rounds it to the cent line by line (``order.accounting.taxation``); the cart
         must report the same figure, and it must scale with quantity like
         every other cart total.
         """

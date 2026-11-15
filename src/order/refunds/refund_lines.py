@@ -11,7 +11,7 @@ several steps adds up to exactly the line and never a cent more.
 
 **What a line has had back is measured in VALUE, never in units**, and is
 read from the credit allocations the lines' own claims stored
-(``order.credit_allocation``: rows with an ``item``, or of kind shipping).
+(``order.accounting.credit_allocation``: rows with an ``item``, or of kind shipping).
 A source that holds room holds its lines too: a claim still PENDING (however
 old), a settled one; a declined one frees them (``CreditAllocation.holding``,
 no timer). A line split over two refund shares (two charges, or a card and a
@@ -21,7 +21,7 @@ offer are the ones that value has not covered. Shipping is measured the same
 way, per VAT rate.
 
 Shipping is split over the rates the way the receipt splits it
-(``order.taxation.order_vat_lines``: value apportionment, largest
+(``order.accounting.taxation.order_vat_lines``: value apportionment, largest
 remainder), one piece per rate.
 
 :func:`plan_pieces` returns the *pieces* (``credit_allocation.Piece``: one
@@ -39,12 +39,12 @@ from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
 
+from order.accounting.credit_allocation import Piece
+from order.accounting.taxation import ChargeKind, order_vat_lines
 from order.checkout.discounts import CENT, discounted_line_gross
-from order.credit_allocation import Piece
 from order.exceptions import PaymentError
 from order.models import CreditAllocation, Order, OrderItem
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
-from order.taxation import ChargeKind, order_vat_lines
 
 
 @dataclass(frozen=True)

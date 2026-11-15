@@ -5,7 +5,7 @@ sale was reversed (the goods came back or never arrived: a retail credit
 document, ν.4308/2014 art. 12(4)) or stands (the customer kept them) is a
 fact only staff know, so they record it once per order here.
 :func:`decide_chargebacks` is the one writer; the credit itself is created by
-``order.credit_documents.create_pending_credits``, as for any refund.
+``order.accounting.credit_documents.create_pending_credits``, as for any refund.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 
-from order import credit_allocation
-from order.credit_documents import request_credit_documents
+from order.accounting import credit_allocation
+from order.accounting.credit_documents import request_credit_documents
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.exceptions import OrderServiceError
 from order.models import (

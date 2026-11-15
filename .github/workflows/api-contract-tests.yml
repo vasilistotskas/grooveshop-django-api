@@ -1,5 +1,6 @@
 # The tests of the API contract tooling (api-contract/): the live-state
-# reader and the `until` expiry against fakes, and the 2026-11-03 deadlock
+# reader and the `until` expiry against fakes, the fixture pairings
+# (tests/compare.sh: nullability beside allOf, #710), and the 2026-11-03 deadlock
 # (Django #442 / storefront #347) replayed through the PR entry point
 # against the real released documents. Only when the tooling changes.
 name: API contract tooling
@@ -22,7 +23,7 @@ permissions:
 
 jobs:
   tooling:
-    name: Tooling tests and the #442 / #347 replay
+    name: Tooling tests, fixture pairings and the #442 / #347 replay
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -35,7 +36,11 @@ jobs:
       - name: Shell syntax
         run: |
           sh -n api-contract/api-contract.sh
+          bash -n api-contract/tests/compare.sh
           bash -n api-contract/tests/replay.sh
+
+      - name: Fixture pairings
+        run: bash api-contract/tests/compare.sh
 
       - name: Replay #442 and #347
         run: bash api-contract/tests/replay.sh

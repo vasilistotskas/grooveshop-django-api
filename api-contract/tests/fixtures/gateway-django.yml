@@ -1,0 +1,38 @@
+# What Django serves for the gateway's fixture contract: the same fields,
+# with the nested serializer wrapped in allOf as drf-spectacular emits it.
+openapi: 3.0.3
+info: {title: fixture, version: "1"}
+paths:
+  /tenant/resolve:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantConfig'
+components:
+  schemas:
+    TenantConfig:
+      type: object
+      properties:
+        name:
+          type: string
+        features:
+          allOf:
+          - $ref: '#/components/schemas/StoreFeatures'
+          readOnly: true
+      required:
+      - name
+      - features
+    StoreFeatures:
+      type: object
+      properties:
+        cart:
+          type: boolean
+        customerAccounts:
+          type: boolean
+      required:
+      - cart
+      - customerAccounts

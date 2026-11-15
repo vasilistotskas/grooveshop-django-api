@@ -63,10 +63,11 @@ ORDERINGS = {
 }
 
 #: What a product rule does with stock (the optional ``stock`` key):
-#: ``any`` ignores it, ``inStockFirst`` puts products in stock before sold-out
-#: ones (each group in the chosen ordering), ``inStockOnly`` leaves sold-out
-#: products out.
-PRODUCT_STOCK = ("any", "inStockFirst", "inStockOnly")
+#: ``inStockFirst`` puts products in stock before sold-out ones (each group in
+#: the chosen ordering), ``inStockOnly`` leaves sold-out products out. A rule
+#: without the key is the list as ordered, which no value names: a choice never
+#: holds what leaving it out draws (``any`` went with it).
+PRODUCT_STOCK = ("inStockFirst", "inStockOnly")
 
 ANY = "*"
 

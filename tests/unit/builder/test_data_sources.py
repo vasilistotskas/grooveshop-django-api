@@ -135,7 +135,7 @@ class TestTheProductStockKey:
 
         assert outcome.deps == {("queryProduct", "category:3")}
 
-    @pytest.mark.parametrize("bad", ["soldOut", "", "INSTOCKONLY", None])
+    @pytest.mark.parametrize("bad", ["any", "soldOut", "", "INSTOCKONLY", None])
     def test_another_value_is_refused(self, bad):
         outcome = self._check(stock=bad)
 

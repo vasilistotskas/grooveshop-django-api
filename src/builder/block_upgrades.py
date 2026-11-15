@@ -222,37 +222,121 @@ def _title_into_heading(settings: Settings) -> Settings:
     return {**kept, "heading": text} if text else kept
 
 
+def _leave_out_defaults(defaults: dict[str, str]) -> Upgrade:
+    """A choice lost the value its section draws when the setting is left
+    out (the editor's "Default"): a stored setting that holds that value
+    goes, so the node draws what it drew. *defaults* names each setting by
+    pointer (``/surface``, ``/products/stock`` inside a data setting) with
+    that value; any other value stays. The storefront's
+    ``upgradeLeavingOutDefaults``."""
+
+    def upgrade(settings: Settings) -> Settings:
+        kept = copy.deepcopy(settings)
+        for pointer, value in defaults.items():
+            *path, key = pointer[1:].split("/")
+            holder: Any = kept
+            for part in path:
+                holder = holder.get(part) if isinstance(holder, dict) else None
+            if isinstance(holder, dict) and holder.get(key) == value:
+                del holder[key]
+        return kept
+
+    return upgrade
+
+
+_SURFACE = {"/surface": "default"}
+_RAIL = {"/surface": "default", "/products/stock": "any"}
+
+
 #: ``{block type: {version: the upgrade to the next one}}``, with the arguments
 #: of each block's ``upgrade`` in the storefront's ``app/blocks/*.block.ts``.
 UPGRADES: dict[str, dict[int, Upgrade | SchemaUpgrade]] = {
     "featured_products": {
         1: _product_rail("featured", 8, 24),
         2: _title_into_heading,
+        3: _leave_out_defaults(_RAIL),
     },
     "products_grid": {
         1: _product_rail("featured", 8, 24),
         2: _title_into_heading,
+        3: _leave_out_defaults(_RAIL),
     },
     "products_slider": {
         1: _product_rail("newest", 8, 24),
         2: _title_into_heading,
+        3: _leave_out_defaults(_RAIL),
     },
-    "blog_posts_grid": {1: _blog_rail(3, 24), 2: _ICON_ONTO_LIST},
-    "blog_posts_list": {1: _blog_rail(3, 24)},
-    "blog_posts_carousel": {1: _blog_rail(6, 12)},
-    "blog_categories": {1: _blog_categories(10)},
-    "product_categories": {1: _product_categories(8)},
-    "offers_preview": {1: _offers(3), 2: _title_into_heading},
+    "blog_posts_grid": {
+        1: _blog_rail(3, 24),
+        2: _ICON_ONTO_LIST,
+        3: _leave_out_defaults(_SURFACE),
+    },
+    "blog_posts_list": {
+        1: _blog_rail(3, 24),
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "blog_posts_carousel": {
+        1: _blog_rail(6, 12),
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "blog_categories": {
+        1: _blog_categories(10),
+        2: _leave_out_defaults({"/layout": "slider"}),
+    },
+    "product_categories": {
+        1: _product_categories(8),
+        2: _leave_out_defaults({**_SURFACE, "/layout": "tiles"}),
+    },
+    "offers_preview": {
+        1: _offers(3),
+        2: _title_into_heading,
+        3: _leave_out_defaults({"/surface": "ink"}),
+    },
     "hero_slide": {1: _hero_slide},
     "contact_panel": {1: _title_into_heading},
-    "cta_banner": {1: _title_into_heading},
-    "hero_banner": {1: _title_into_heading},
-    "media_text": {1: _title_into_heading},
-    "newsletter_signup": {1: _title_into_heading},
+    "cta_banner": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "hero_banner": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(
+            {"/decor": "none", "/align": "center", "/theme": "auto"}
+        ),
+    },
+    "media_text": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(
+            {**_SURFACE, "/imagePosition": "left", "/decor": "none"}
+        ),
+    },
+    "newsletter_signup": {
+        1: _title_into_heading,
+        2: _leave_out_defaults({"/surface": "muted"}),
+    },
     "recently_viewed": {1: _title_into_heading},
-    "story_timeline": {1: _title_into_heading},
-    "testimonials": {1: _title_into_heading},
-    "trust_badges": {1: _title_into_heading},
+    "story_timeline": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "testimonials": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "trust_badges": {
+        1: _title_into_heading,
+        2: _leave_out_defaults(_SURFACE),
+    },
+    "business_hours": {1: _leave_out_defaults(_SURFACE)},
+    "divider": {1: _leave_out_defaults({"/variant": "line"})},
+    "faq": {1: _leave_out_defaults(_SURFACE)},
+    "features_grid": {1: _leave_out_defaults({**_SURFACE, "/decor": "none"})},
+    "hero_carousel": {1: _leave_out_defaults({"/aspect": "wide"})},
+    "image_gallery": {1: _leave_out_defaults(_SURFACE)},
+    "location_map": {1: _leave_out_defaults(_SURFACE)},
+    "spacer": {1: _leave_out_defaults({"/height": "md"})},
+    "stats_strip": {1: _leave_out_defaults({"/surface": "muted"})},
+    "store_assurances": {1: _leave_out_defaults(_SURFACE)},
     "feature_item": {1: _ICON_ONTO_LIST},
     "footer_column": {1: _ICON_ONTO_LIST},
     "nav_link": {1: _ICON_ONTO_LIST},

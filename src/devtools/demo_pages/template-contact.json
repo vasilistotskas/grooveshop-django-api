@@ -9,19 +9,19 @@
     "sections": {
       "ad94f59e-2956-4c60-ba50-ae9cf58c977c": {
         "settings": {},
-        "type": "business_hours@1"
+        "type": "business_hours@2"
       },
       "e249752b-1a04-4cbb-a21b-efd576e5e266": {
         "settings": {
           "variant": "thread"
         },
-        "type": "divider@1"
+        "type": "divider@2"
       },
       "f6a53ef4-0605-459d-a110-a905660b92c4": {
         "settings": {
           "address": "Τσιμισκή 100, Θεσσαλονίκη 54622"
         },
-        "type": "location_map@1"
+        "type": "location_map@2"
       }
     }
   },

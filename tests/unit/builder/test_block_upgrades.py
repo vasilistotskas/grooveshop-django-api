@@ -20,6 +20,7 @@ from builder.block_upgrades import (
     UPGRADES,
     NoUpgradePath,
     SchemaUpgrade,
+    _leave_out_defaults,
     upgrade_document,
     upgrade_node,
     upgrade_translations,
@@ -108,7 +109,7 @@ def test_an_empty_translation_goes_as_the_editor_takes_it_out():
 
 
 def test_the_translations_of_a_node_already_current_stay_as_they_are():
-    node = {"type": "testimonials@2", "settings": {"heading": "Λένε"}}
+    node = {"type": "testimonials@3", "settings": {"heading": "Λένε"}}
     definition = seed_catalogue().get("testimonials")
     translations = {"/heading": "They say", "/stale": "kept"}
 
@@ -381,9 +382,9 @@ class TestIconOntoTheList:
         ],
     )
     def test_every_block_with_an_icon_setting_takes_the_step(self, name):
-        last = max(UPGRADES[name])
+        steps = UPGRADES[name].values()
 
-        assert isinstance(UPGRADES[name][last], SchemaUpgrade)
+        assert any(isinstance(step, SchemaUpgrade) for step in steps)
 
 
 class TestTrustBadgeKeepsAMark:
@@ -474,3 +475,43 @@ class TestTrustBadgeKeepsAMark:
             "label": "ACS",
             "icon": "i-heroicons-truck",
         }
+
+
+class TestLeavingOutDefaults:
+    """A choice lost the value its section draws when the setting is left
+    out; the shapes no real block's case reaches, as the storefront's
+    ``defaultUpgrades.spec.ts`` runs them."""
+
+    upgrade = staticmethod(
+        _leave_out_defaults({"/surface": "default", "/products/stock": "any"})
+    )
+
+    def test_a_default_goes_at_the_top_and_inside_a_data_setting(self):
+        settings = {
+            "surface": "default",
+            "heading": "Νέα",
+            "products": {"mode": "filter", "stock": "any", "limit": 8},
+        }
+
+        assert self.upgrade(settings) == {
+            "heading": "Νέα",
+            "products": {"mode": "filter", "limit": 8},
+        }
+
+    def test_any_other_value_stays(self):
+        settings = {
+            "surface": "muted",
+            "products": {"mode": "filter", "stock": "inStockOnly"},
+        }
+
+        assert self.upgrade(settings) == settings
+
+    def test_a_missing_setting_or_a_parent_that_is_no_object_passes(self):
+        assert self.upgrade({}) == {}
+        assert self.upgrade({"products": ["any"]}) == {"products": ["any"]}
+
+    def test_the_settings_it_was_given_are_not_touched(self):
+        settings = {"surface": "default", "products": {"stock": "any"}}
+
+        assert self.upgrade(settings) == {"products": {}}
+        assert settings == {"surface": "default", "products": {"stock": "any"}}

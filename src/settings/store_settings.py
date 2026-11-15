@@ -45,7 +45,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
         "value": 30,
-        "validator": "order.stock.validate_reservation_ttl_minutes_setting",
+        "validator": (
+            "order.setting_validators.validate_reservation_ttl_minutes_setting"
+        ),
     },
     {
         "name": "B2B_INVOICING_ENABLED",
@@ -88,7 +90,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "ORDER_ONLINE_PAYMENT_HOLD_MINUTES",
         "type": "int",
         "value": 30,
-        "validator": "order.payment_hold.validate_hold_minutes_setting",
+        "validator": "order.setting_validators.validate_hold_minutes_setting",
         "description": (
             "How long an online-payment order holds its stock while it "
             "waits for the payment. It is also how long the payment link "
@@ -103,7 +105,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES",
         "type": "int",
         "value": 60,
-        "validator": "order.payment_hold.validate_max_hold_minutes_setting",
+        "validator": (
+            "order.setting_validators.validate_max_hold_minutes_setting"
+        ),
         "description": (
             "The longest an online-payment order may hold its stock in "
             "total, counted from when it was placed. Opening a new "
@@ -196,7 +200,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "int",
         "value": 0,
         "validator": (
-            "order.review_request.validate_review_request_delay_days_setting"
+            "order.setting_validators.validate_review_request_delay_days_setting"
         ),
         "description": (
             "Send a customer one reminder email this many days after their "

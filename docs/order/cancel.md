@@ -14,7 +14,8 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
 
 - **Customer** (the owner, or a guest holding the order's uuid; a guest's uuid
   works for `GUEST_ORDER_ACCESS_DAYS` after the order, see
-  `Order.opens_for_guest`): `POST /api/v1/order/{id}/cancel` →
+  `Order.opens_for_guest`; on a store without customer accounts every order
+  is a guest's, `Order.served_as_guest`): `POST /api/v1/order/{id}/cancel` →
   `OrderService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`.
   The courier is asked first, see §7.1.1.
 - **Agent gateway:** `GET /api/v1/agent/internal/order/{uuid}`, with its shared

@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.utils.tenant_urls import storefront_path
+from order.storefront_links import account_order_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
@@ -456,7 +456,7 @@ def boxnow_send_arrival_notification(
             category=NotificationCategoryEnum.SHIPPING,
             priority=NotificationPriorityEnum.HIGH,
             notification_type=NotificationTypeEnum.BOXNOW_PARCEL_AT_LOCKER,
-            link=storefront_path(f"/account/orders/{order.id}"),
+            link=account_order_path(order),
         )
 
     return {

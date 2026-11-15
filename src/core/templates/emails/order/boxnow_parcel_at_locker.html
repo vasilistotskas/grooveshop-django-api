@@ -45,8 +45,8 @@ colour from the email tree.
 
 <p>{% trans "Your parcel is available for pickup 24 hours a day, 7 days a week." %}</p>
 
-{% if SITE_URL %}
-<a class="email-button" href="{{ SITE_URL }}/account/orders/{{ order.id }}">
+{% if order_url %}
+<a class="email-button" href="{{ order_url }}">
   {% trans "View Order" %}
 </a>
 {% endif %}

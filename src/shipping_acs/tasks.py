@@ -33,8 +33,8 @@ from django.utils import timezone
 
 from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.utils.tenant_urls import storefront_path
 from emails.send import send_email, was_sent
+from order.storefront_links import account_order_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_acs import voucher_hold
 from shipping_acs.attention import voucher_requests_held
@@ -1039,7 +1039,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
                     category=NotificationCategoryEnum.SHIPPING,
                     priority=NotificationPriorityEnum.HIGH,
                     notification_type=NotificationTypeEnum.ACS_OUT_FOR_DELIVERY,
-                    link=storefront_path(f"/account/orders/{order.id}"),
+                    link=account_order_path(order),
                 )
         except Exception as exc:
             logger.warning(

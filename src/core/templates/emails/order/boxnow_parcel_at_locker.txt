@@ -10,6 +10,6 @@
 
 {% blocktrans %}Your parcel is available for pickup 24 hours a day, 7 days a week.{% endblocktrans %}
 
-{% if SITE_URL %}{% blocktrans %}View your order{% endblocktrans %}: {{ SITE_URL }}/account/orders/{{ order.id }}
+{% if order_url %}{% blocktrans %}View your order{% endblocktrans %}: {{ order_url }}
 {% endif %}
 {% blocktrans with site_name=SITE_NAME %}This is an automated message from {{ site_name }}.{% endblocktrans %}

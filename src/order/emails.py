@@ -54,6 +54,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
+from order.storefront_links import order_page_url
 from pay_way.enum.settlement import PaySettlement
 from product.models.review import ProductReview
 from recommendation.order_email import EmailStrip, order_email_strip
@@ -362,9 +363,7 @@ def _payment_failed(order: Order, env: RenderEnv) -> dict[str, Any]:
         return {
             "order_id": order.id,
             "order": order,
-            "retry_url": get_tenant_frontend_url(
-                f"/account/orders/{order.id}", language=env.language
-            ),
+            "retry_url": order_page_url(order, language=env.language),
         }
 
 
@@ -427,6 +426,7 @@ def _acs_out_for_delivery(shipment: Any, env: RenderEnv) -> dict[str, Any]:
     with _email_language(shipment.order, env.language):
         return {
             "order": shipment.order,
+            "order_url": order_page_url(shipment.order, language=env.language),
             "shipment": shipment,
             "voucher_no": shipment.voucher_no,
         }
@@ -437,6 +437,7 @@ def _boxnow_parcel_at_locker(shipment: Any, env: RenderEnv) -> dict[str, Any]:
     with _email_language(shipment.order, env.language):
         return {
             "order": shipment.order,
+            "order_url": order_page_url(shipment.order, language=env.language),
             "shipment": shipment,
             "locker": locker,
             "locker_address": (

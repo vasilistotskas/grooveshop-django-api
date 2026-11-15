@@ -2062,7 +2062,13 @@ class BoxNowService:
             parcel_id,
         )
 
-        response = BoxNowClient().get_parcel_info(parcel_id=parcel_id)
+        # ``paymentMode`` has "Default value: prepaid" (API Manual v7.2,
+        # §6.5.3; partner-api-1.68.yaml, ``PaymentMode``), which would
+        # filter a cash-on-delivery parcel out of a call naming none, so
+        # the parcel is asked for in the mode it was created with (#691).
+        response = BoxNowClient().get_parcel_info(
+            parcel_id=parcel_id, payment_mode=shipment.payment_mode
+        )
         data_rows: list[dict] = (response or {}).get("data") or []
         if not data_rows:
             logger.warning(

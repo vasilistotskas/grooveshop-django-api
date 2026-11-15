@@ -154,6 +154,17 @@ and says which file holds each § number used here.
   /api/v1/parcels?orderNumber=` (with `paymentMode` for a COD parcel), and
   set the setting to that plus a margin. The 600 s default is twice the
   mint claim's TTL, chosen without that measurement.
+- **The tracking poll asks in the shipment's payment mode** (#691).
+  `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
+  `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources
+  give the parameter a default of `prepaid` (the OpenAPI file's
+  `PaymentMode` schema, which the query parameter references; API Manual
+  v7.2, §6.5.3) and neither exempts a `parcelId` query, so a call naming
+  no mode would, as documented, not list a cash-on-delivery parcel: its
+  states would never reach the shop. Naming the mode the parcel was
+  created with is right either way. Not tried on stage: create a COD
+  parcel there and call the endpoint with and without `paymentMode=cod`
+  to confirm the default applies to `parcelId`.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   with no `parcel_id` can cancel (the paragraph above says how); a parcel
   cancels only while it is `new` (BoxNow answers P420

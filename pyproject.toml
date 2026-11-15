@@ -755,9 +755,7 @@ ignore_imports = [
     "order.serializers.order -> shipping_acs.serializers.shipment",
     "order.serializers.order -> shipping_boxnow.serializers.shipment",
     "order.views.order -> shipping_acs.exceptions",
-    "order.views.order -> shipping_acs.services",
     "order.views.order -> shipping_boxnow.exceptions",
-    "order.views.order -> shipping_boxnow.services",
     "user.services.gdpr -> shipping_acs.models",
     "user.services.gdpr -> shipping_boxnow.models.shipment",
 ]

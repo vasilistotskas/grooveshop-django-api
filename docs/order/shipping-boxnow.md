@@ -346,8 +346,8 @@ and says which file holds each § number used here.
   does not drive. The same 503 answers an outage on ACS address
   validation and on every staff cancel endpoint: the carriers' own
   (`cancelBoxNowShipment`, `cancelAcsShipment`) and the order's
-  (`boxnow_cancel`, `acs_cancel`, `shipment_cancel` in
-  `src/order/views/order.py`), all through
+  provider-agnostic `shipment_cancel` (`src/order/views/order.py`), all
+  through
   `shipping.api_errors.unanswered`.
   A refusal raised here with no carrier call because the same work is
   already running (`shipping.exceptions.CarrierBusyError`: `BoxNowBusyError`

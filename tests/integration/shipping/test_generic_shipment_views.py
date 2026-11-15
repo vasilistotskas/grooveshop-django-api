@@ -4,9 +4,10 @@
   adapter and streams the label PDF.
 * ``POST /order/{id}/shipment_cancel`` — admin-only cancellation.
 
-Both endpoints exercise the registry dispatch path used by frontends
-that have migrated off the per-provider ``boxnow_*`` / ``acs_*``
-endpoints.
+Both endpoints exercise the registry dispatch path, and they are the
+only order-scoped label and cancel routes: the per-carrier
+``boxnow_label`` / ``acs_label`` / ``boxnow_cancel`` / ``acs_cancel``
+order actions were removed (#581).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -188,6 +189,56 @@ def test_shipment_cancel_dispatches_to_acs_adapter_for_admin():
 
     assert response.status_code == status.HTTP_200_OK
     assert mock_cancel.called
+
+
+def test_shipment_cancel_dispatches_to_boxnow_adapter_for_admin():
+    admin = UserAccountFactory(is_staff=True, is_superuser=True)
+    order = OrderFactory(user=admin, num_order_items=0)
+    shipment = _attach_boxnow_shipment(order, parcel_id="9200005631")
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    with patch(
+        "shipping_boxnow.services.BoxNowService.cancel_shipment"
+    ) as mock_cancel:
+        response = client.post(
+            reverse("order-shipment-cancel", kwargs={"pk": order.id}),
+            {"reason": "customer changed mind"},
+            format="json",
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    mock_cancel.assert_called_once_with(
+        shipment, reason="customer changed mind"
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "action"),
+    [
+        ("get", "boxnow_label"),
+        ("get", "acs_label"),
+        ("post", "boxnow_cancel"),
+        ("post", "acs_cancel"),
+    ],
+)
+def test_the_per_carrier_order_routes_are_gone(method, action):
+    """``shipment_label`` and ``shipment_cancel`` serve both carriers;
+    the per-carrier order actions no longer exist (#581)."""
+    admin = UserAccountFactory(is_staff=True, is_superuser=True)
+    order = OrderFactory(user=admin, num_order_items=0)
+    _attach_boxnow_shipment(order, parcel_id="9200005632")
+
+    with pytest.raises(NoReverseMatch):
+        reverse(f"order-{action.replace('_', '-')}", kwargs={"pk": order.id})
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+    detail = reverse("order-detail", kwargs={"pk": order.id})
+    response = getattr(client, method)(f"{detail}/{action}")
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_shipment_cancel_404_when_the_carrier_has_no_shipment():

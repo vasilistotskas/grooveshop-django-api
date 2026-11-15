@@ -85,21 +85,24 @@ _RATE_LIMIT_KEY = "boxnow:rate_limited_until"
 
 def _retry_after(response: requests.Response) -> float | None:
     """BoxNow's ``Retry-After``, in seconds: delay-seconds or an HTTP-date
-    (RFC 9110, §10.2.3). None when absent or unreadable."""
+    (RFC 9110, §10.2.3), never more than ``BOXNOW_RETRY_AFTER_MAX_SECONDS``
+    whatever the answer's status. None when absent or unreadable."""
     headers = getattr(response, "headers", None)
     value = headers.get("Retry-After") if headers is not None else None
     if not isinstance(value, str) or not value.strip():
         return None
     value = value.strip()
     if value.isdigit():
-        return float(value)
-    try:
-        when = parsedate_to_datetime(value)
-    except TypeError, ValueError:
-        return None
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=UTC)
-    return max(0.0, (when - datetime.now(UTC)).total_seconds())
+        seconds = float(value)
+    else:
+        try:
+            when = parsedate_to_datetime(value)
+        except TypeError, ValueError:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        seconds = max(0.0, (when - datetime.now(UTC)).total_seconds())
+    return min(seconds, float(settings.BOXNOW_RETRY_AFTER_MAX_SECONDS))
 
 
 class BoxNowClient:

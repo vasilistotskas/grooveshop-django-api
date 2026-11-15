@@ -1849,8 +1849,8 @@ class TestEveryPathLocksTheOrderFirst:
         assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]
 
 
-def _rate_limited(retry_after: str | None = None) -> Any:
-    response = _response(429, {"message": "Too many requests"})
+def _rate_limited(retry_after: str | None = None, status: int = 429) -> Any:
+    response = _response(status, {"message": "Too many requests"})
     response.headers = (
         {} if retry_after is None else {"Retry-After": retry_after}
     )
@@ -1889,6 +1889,24 @@ class TestBoxNowRateLimits:
             else wait["no-header" if header is None else "above-the-cap"]
         )
         assert BoxNowClient.rate_limited_for() > 0
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            pytest.param("21600", id="hours"),
+            pytest.param("99999999999999999999", id="beyond-a-countdown"),
+        ],
+    )
+    def test_an_outages_wait_is_capped_too(self, http, settings, header):
+        client = BoxNowClient(session=http)
+        http.answer(_LOOKUP, _rate_limited(header, status=503))
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        assert raised.value.retry_after == (
+            settings.BOXNOW_RETRY_AFTER_MAX_SECONDS
+        )
 
     def test_an_http_date_is_read_as_seconds_from_now(self, http):
         from email.utils import format_datetime

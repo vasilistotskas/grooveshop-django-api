@@ -27,9 +27,11 @@ pytestmark = pytest.mark.django_db
 # response computes product recommendations (the storefront asks the
 # recommendations endpoint for them), which was most of both. Each product
 # serializer reads the loyalty rates once, however many lines it draws: a query
-# here, where the rows are absent; one cache read in production.
-GET_CART_QUERIES = 25
-ADD_ITEM_QUERIES = 42
+# here, where the rows are absent; one cache read in production. Wholesale
+# pricing, loyalty and the reviews each read the customer accounts switch
+# they need as well (``tenant.features``): queries here, cache reads there.
+GET_CART_QUERIES = 32
+ADD_ITEM_QUERIES = 54
 
 
 def _product():

@@ -167,7 +167,9 @@ chain composes cleanly on shared viewsets.
 
 Subclass the project's `BoundedTokenAuthentication` so staff tokens
 inherit the absolute-age cap, overriding: the token model, the lookup
-(wrapped in `schema_context(public)`), and the keyword. Two additions
+(wrapped in `schema_context(public)`), the keyword, and
+`customer_tokens = False` (a staff token is not a customer's sign-in, so a
+store with customer accounts off still accepts it). Two additions
 the admin flow gets implicitly but a token flow must do explicitly:
 
 - **Stamp `PLATFORM_IDENTITY_ATTR`** on the returned user — this is

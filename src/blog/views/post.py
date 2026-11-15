@@ -46,8 +46,9 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
+from tenant.features import feature_gates
 from tenant.membership import is_store_staff
-from tenant.permissions import IsBlogCommentsEnabled, IsBlogEnabled
+from tenant.permissions import IsBlogEnabled
 
 if TYPE_CHECKING:
     from blog.strategies.related_posts_strategy import RelatedPostsStrategy
@@ -234,7 +235,10 @@ class BlogPostViewSet(BaseModelViewSet):
         if self.action == "comments":
             # A post's comments are the comments feature: with it off
             # they are gone here too, as on /blog/comment.
-            return [IsBlogEnabled(), IsBlogCommentsEnabled(), AllowAny()]
+            return [
+                *(gate() for gate in feature_gates("blog_comments")),
+                AllowAny(),
+            ]
         return [IsBlogEnabled(), AllowAny()]
 
     search_fields = [

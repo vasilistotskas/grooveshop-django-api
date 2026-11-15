@@ -30,8 +30,8 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from tenant.features import feature_gates
 from tenant.membership import is_store_staff
-from tenant.permissions import IsBlogEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -161,15 +161,10 @@ class BlogCommentViewSet(BaseModelViewSet):
         )
 
     def get_permissions(self):
-        from tenant.permissions import (
-            IsBlogCommentsEnabled,
-        )
-
-        # Feature gates always fire first (raise 404 when disabled):
-        # the blog plan flag, then the merchant's comments toggle.
+        # Feature gates always fire first (raise 404 when disabled): the
+        # blog plan flag, then the store's switches comments need.
         base: list[permissions.BasePermission] = [
-            IsBlogEnabled(),
-            IsBlogCommentsEnabled(),
+            gate() for gate in feature_gates("blog_comments")
         ]
         if self.action in [
             "create",

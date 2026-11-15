@@ -52453,6 +52453,10 @@ components:
       type: object
       description: Every ``TenantConfig.features`` name, with its state.
       properties:
+        customerAccounts:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
         blog:
           allOf:
           - $ref: '#/components/schemas/FeatureState'
@@ -52542,6 +52546,7 @@ components:
       - catalogue
       - chatWidget
       - contactAttachments
+      - customerAccounts
       - favourites
       - feedback
       - giftCards
@@ -52561,6 +52566,9 @@ components:
         flag AND its store settings (``tenant/features.py``), so a client reads
         one answer instead of combining the two tiers and copying defaults.
       properties:
+        customerAccounts:
+          type: boolean
+          readOnly: true
         blog:
           type: boolean
           readOnly: true
@@ -52630,6 +52638,7 @@ components:
       - catalogue
       - chatWidget
       - contactAttachments
+      - customerAccounts
       - favourites
       - feedback
       - giftCards

@@ -41,12 +41,9 @@ from product.serializers.review import ProductReviewSerializer
 from product.serializers.variant import ProductVariantsResponseSerializer
 from product.views.review import PRODUCT_REVIEW_ORDERING
 from tag.serializers.tag import TagSerializer
+from tenant.features import feature_gates
 from tenant.membership import is_store_staff
-from tenant.permissions import (
-    IsCatalogueEnabled,
-    IsPriceHistoryEnabled,
-    IsProductReviewsEnabled,
-)
+from tenant.permissions import IsCatalogueEnabled, IsPriceHistoryEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -236,7 +233,7 @@ class ProductViewSet(BaseModelViewSet):
             # they are gone here too, as on /product/review.
             return [
                 IsCatalogueEnabled(),
-                IsProductReviewsEnabled(),
+                *(gate() for gate in feature_gates("product_reviews")),
                 AllowAny(),
             ]
         if self.action == "price_history":

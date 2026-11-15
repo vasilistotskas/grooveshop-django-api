@@ -54,6 +54,7 @@ EVERY_SWITCH = {
     "CATALOGUE_ENABLED": True,
     "CART_ENABLED": True,
     "STAFF_AI_ACCESS_ENABLED": True,
+    "CUSTOMER_ACCOUNTS_ENABLED": True,
 }
 
 
@@ -119,6 +120,18 @@ def test_a_plan_without_the_feature_turns_it_off_whatever_the_store_says(
         ("CHAT_WIDGET_ENABLED", {"chat_widget"}),
         ("CART_ENABLED", {"cart"}),
         (
+            "CUSTOMER_ACCOUNTS_ENABLED",
+            {
+                "customer_accounts",
+                "favourites",
+                "product_reviews",
+                "account_reviews",
+                "blog_comments",
+                "loyalty",
+                "wholesale",
+            },
+        ),
+        (
             "CATALOGUE_ENABLED",
             {
                 "catalogue",
@@ -176,6 +189,9 @@ SERVED_BY = [
     # Off, the store-admin surface is a bare 404; on, an anonymous call
     # gets the 401 challenge.
     ("staff_ai_access", "agent-staff-orders", "get", False),
+    # Off, the linked shopper's agent surface is a bare 404 (the identity
+    # routes are refused by a middleware: ``test_customer_accounts.py``).
+    ("customer_accounts", "agent-me", "get", False),
 ]
 
 

@@ -663,7 +663,7 @@ def _invoice_of(order: Order) -> Any:
 
 
 def _credit_of(order: Order) -> Any:
-    credit = order.accounting.credit_documents.order_by("-pk").first()
+    credit = order.credit_documents.order_by("-pk").first()
     if credit is None:
         raise NothingToPreview(_("This order has no credit receipt to send."))
     return credit

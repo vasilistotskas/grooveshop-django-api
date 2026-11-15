@@ -131,6 +131,29 @@ and says which file holds each § number used here.
   `BoxNowRetryableError`. The row is read again under its lock after the
   lookup: a creation that saved a parcel meanwhile sends the cancel down
   the usual path, and a claim taken meanwhile refuses.
+- **An empty lookup is trusted only once an uncertain creation has
+  settled** (#690). A creation that fails after its request may have
+  reached BoxNow (a `BoxNowRetryableError`: a read timeout, a dropped
+  connection, a 5xx; or an error the client does not classify) stamps
+  `metadata["creation_uncertain_at"]` when it releases its claim, so the
+  evidence outlives the claim. The stamp is cleared when a parcel is saved
+  (`_persist_parcel`, every branch), when the cancel finds the parcel by
+  `orderNumber`, and when BoxNow refuses a later request with any other
+  answer (a 4xx, the auth errors included), which created nothing. A
+  `P410` leaves it as it is: it proves an earlier request created
+  something. While the stamp is younger than
+  `BOXNOW_CREATION_SETTLE_SECONDS` (settings/env, default 600), a cancel
+  whose lookup lists nothing live refuses with a `BoxNowRetryableError`
+  (a customer is told to try again; a staff cancel goes on with the order
+  and leaves the error in `shipment_cancel`) instead of a local cancel;
+  after it, the lookup is authoritative. The creation task's own retries
+  refresh the stamp, and their `P410` take-over usually saves the parcel
+  first. **The settle time is not measured yet**: on BoxNow's stage
+  environment, time how long after a successful `POST
+  /api/v1/delivery-requests` the parcel appears in `GET
+  /api/v1/parcels?orderNumber=` (with `paymentMode` for a COD parcel), and
+  set the setting to that plus a margin. The 600 s default is twice the
+  mint claim's TTL, chosen without that measurement.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   with no `parcel_id` can cancel (the paragraph above says how); a parcel
   cancels only while it is `new` (BoxNow answers P420

@@ -616,12 +616,20 @@ class BoxNowService:
                     "boxnow_locker_known_locally": bool(known),
                 },
             )
-            cls._release_mint_claim(shipment.pk, last_error=_last_error(exc))
+            # A 5xx or a lost answer may have created the parcel: the
+            # outcome stays uncertain (#690). Any other answer refused the
+            # request, which certainly created nothing.
+            cls._release_mint_claim(
+                shipment.pk,
+                last_error=_last_error(exc),
+                outcome_uncertain=isinstance(exc, BoxNowRetryableError),
+            )
             raise
         except Exception:
-            # Connection error / retryable — drop the claim so the
-            # next Celery retry can re-acquire after the TTL expires.
-            cls._release_mint_claim(shipment.pk)
+            # Not a classified answer: the request may have reached
+            # BoxNow. Drop the claim so the next Celery retry can
+            # re-acquire it, and keep the outcome uncertain.
+            cls._release_mint_claim(shipment.pk, outcome_uncertain=True)
             raise
 
         delivery_request_id: str = response["id"]
@@ -665,7 +673,11 @@ class BoxNowService:
 
     @classmethod
     def _release_mint_claim(
-        cls, shipment_pk: int, *, last_error: dict | None = None
+        cls,
+        shipment_pk: int,
+        *,
+        last_error: dict | None = None,
+        outcome_uncertain: bool | None = None,
     ) -> None:
         """Drop the mint claim after a Phase-2 failure.
 
@@ -673,6 +685,14 @@ class BoxNowService:
         worker that grabbed the lock between Phase 1 and Phase 3 isn't
         clobbered. ``last_error`` is stashed for ops diagnostics when
         the failure is a non-retryable BoxNow API error.
+
+        ``outcome_uncertain`` records what the failure says about a parcel
+        at BoxNow (#690): True stamps ``metadata['creation_uncertain_at']``
+        (the request may have created one), False clears it (BoxNow
+        refused the request, which created nothing), None leaves it as it
+        is (a P410: an earlier request did create something). While the
+        stamp is younger than ``BOXNOW_CREATION_SETTLE_SECONDS`` a cancel
+        does not trust an empty lookup (:meth:`_cancel_unrecorded_parcel`).
         """
         with transaction.atomic():
             shipment = (
@@ -685,6 +705,10 @@ class BoxNowService:
             update: dict[str, Any] = {"mint_started_at": None}
             if last_error is not None:
                 update["last_error"] = last_error
+            if outcome_uncertain is not None:
+                update["creation_uncertain_at"] = (
+                    timezone.now().isoformat() if outcome_uncertain else None
+                )
             shipment.metadata = {**shipment.metadata, **update}
             shipment.save(update_fields=["metadata", "updated_at"])
 
@@ -714,6 +738,17 @@ class BoxNowService:
         return None
 
     @classmethod
+    def _creation_unsettled(cls, metadata: dict) -> float | None:
+        """The age of a creation of uncertain outcome
+        (``metadata['creation_uncertain_at']``) still younger than
+        ``BOXNOW_CREATION_SETTLE_SECONDS``, else None. Past it, a lookup by
+        ``orderNumber`` is taken as BoxNow's answer (#690)."""
+        age = cls._seconds_since(metadata.get("creation_uncertain_at"))
+        if age is not None and age < settings.BOXNOW_CREATION_SETTLE_SECONDS:
+            return age
+        return None
+
+    @classmethod
     def _persist_parcel(
         cls,
         order: Order,
@@ -736,6 +771,9 @@ class BoxNowService:
         TTL ran out) stays CANCELED: the parcel is recorded under
         ``metadata['minted_after_cancel']`` and, with the lock released,
         cancelled at BoxNow (:meth:`_cancel_parcel_minted_after_cancel`).
+
+        Every branch knows the creation's outcome, so each clears
+        ``metadata['creation_uncertain_at']`` (#690).
         """
         with transaction.atomic():
             shipment = (
@@ -769,6 +807,7 @@ class BoxNowService:
                         },
                     ],
                     "mint_started_at": None,
+                    "creation_uncertain_at": None,
                 }
                 shipment.save(update_fields=["metadata", "updated_at"])
 
@@ -793,6 +832,7 @@ class BoxNowService:
                     **shipment.metadata,
                     "orphan_delivery_requests": orphans,
                     "mint_started_at": None,
+                    "creation_uncertain_at": None,
                 }
                 shipment.save(update_fields=["metadata", "updated_at"])
                 return shipment
@@ -807,6 +847,7 @@ class BoxNowService:
                     **record,
                     "last_error": None,
                     "mint_started_at": None,
+                    "creation_uncertain_at": None,
                 }
                 shipment.save(
                     update_fields=[
@@ -1341,6 +1382,12 @@ class BoxNowService:
         its lock afterwards, and the decision is re-checked against it: a
         creation that saved a parcel meanwhile sends the cancel down the
         usual path, and a claim taken meanwhile refuses.
+
+        Nothing live is a local cancel only once the creation has settled:
+        while a creation of uncertain outcome is younger than
+        ``BOXNOW_CREATION_SETTLE_SECONDS`` (:meth:`_creation_unsettled`),
+        BoxNow may hold a parcel it does not list yet, so the cancel is
+        refused retryably (#690).
         """
         # ---- Phase 2: ask BoxNow (no transaction, no lock) --------------
         try:
@@ -1441,8 +1488,27 @@ class BoxNowService:
                             "was being asked. Cancel again once it is done."
                         ),
                     )
+                # A creation of uncertain outcome may have made a parcel
+                # BoxNow does not list yet: until it settles, an empty
+                # lookup proves nothing (#690).
+                unsettled = cls._creation_unsettled(locked.metadata)
+                if found is None and unsettled is not None:
+                    raise BoxNowRetryableError(
+                        409,
+                        message=(
+                            f"A BoxNow parcel creation for order {order_id} "
+                            f"{unsettled:.0f}s ago has an uncertain outcome "
+                            "and BoxNow lists no parcel for it yet. The "
+                            "shipment was not canceled: cancel again in "
+                            "a few minutes."
+                        ),
+                    )
                 if found is not None:
                     locked.parcel_id = found
+                    locked.metadata = {
+                        **locked.metadata,
+                        "creation_uncertain_at": None,
+                    }
                 cls._record_cancel(
                     locked,
                     reason=reason,

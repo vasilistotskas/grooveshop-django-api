@@ -91,6 +91,15 @@ BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+# Seconds after a parcel creation whose outcome is uncertain (a timeout, a
+# 5xx: the request may have reached BoxNow) during which an empty lookup by
+# ``orderNumber`` does not prove that no parcel exists: BoxNow may still be
+# processing the request, or not list its parcel yet. A cancel then refuses
+# retryably instead of cancelling locally (#690). Not yet measured on
+# BoxNow's stage environment (docs/order/shipping-boxnow.md), so generous.
+BOXNOW_CREATION_SETTLE_SECONDS = int(
+    getenv("BOXNOW_CREATION_SETTLE_SECONDS", "600")
+)
 
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing

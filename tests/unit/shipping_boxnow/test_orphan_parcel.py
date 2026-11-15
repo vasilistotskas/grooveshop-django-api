@@ -703,6 +703,152 @@ class TestCancellingAShipmentWithNoParcelNumber:
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
 
 
+class TestACancelAfterACreationOfUncertainOutcome:
+    """#690: a creation that timed out may have made a parcel BoxNow does
+    not list yet. Until ``BOXNOW_CREATION_SETTLE_SECONDS`` have passed, an
+    empty lookup by ``orderNumber`` is not proof that none exists."""
+
+    def test_an_empty_lookup_refuses_the_cancel_while_it_is_fresh(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        assert "uncertain outcome" in raised.value.message
+        assert http.routes() == [_CREATE, *_LOOKUPS]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.cancel_requested_at is None
+        assert "cancellations" not in shipment.metadata
+
+    def test_after_the_settle_time_the_empty_lookup_is_authoritative(
+        self, http, settings
+    ):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, _response(503, text="busy"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        stamp = timezone.now() - timedelta(
+            seconds=settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+        )
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            metadata={
+                **BoxNowShipment.objects.get(pk=shipment.pk).metadata,
+                "creation_uncertain_at": stamp.isoformat(),
+            }
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+
+    def test_the_settle_time_is_a_setting(self, http, settings):
+        settings.BOXNOW_CREATION_SETTLE_SECONDS = 0
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+    def test_a_parcel_listed_meanwhile_is_canceled_at_boxnow(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.metadata["creation_uncertain_at"] is None
+
+    def test_a_refusal_by_boxnow_clears_it(self, http):
+        """The retry was refused: that request created nothing, and the
+        timed-out one before it is settled by the same answer only if it
+        too was refused. BoxNow refuses with P410 when it was not."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            requests.ReadTimeout("read timed out"),
+            _response(400, {"code": "P401", "message": "Invalid locker"}),
+        )
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+    def test_a_p410_keeps_it(self, http):
+        """P410 proves an earlier request created something; a lookup that
+        lists nothing yet must not end the uncertainty."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            requests.ReadTimeout("read timed out"),
+            _response(400, _P410),
+        )
+        http.answer(_LOOKUP, _lookup(), _lookup())
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_a_saved_parcel_clears_it(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            requests.ReadTimeout("read timed out"),
+            _response(400, _P410),
+        )
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        assert BoxNowShipment.objects.get(pk=shipment.pk).metadata[
+            "creation_uncertain_at"
+        ]
+
+        BoxNowService.create_shipment_for_order(order)
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.metadata["creation_uncertain_at"] is None
+
+
 def _canceled_while_boxnow_answers(shipment, answer: Any):
     """BoxNow's answer, delivered after the row was cancelled locally.
 

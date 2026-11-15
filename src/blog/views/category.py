@@ -100,9 +100,8 @@ serializers_config: SerializersConfig = {
         operation_id="getBlogCategoryTree",
         summary=_("Get complete category tree"),
         description=_(
-            "Get the complete category tree structure with nested relationships. "
-            "This is more efficient than using list?tree=true for displaying "
-            "navigation menus or category hierarchies."
+            "Get the complete category tree structure with nested relationships, "
+            "for displaying navigation menus or category hierarchies."
         ),
     ),
     "reorder": ActionConfig(
@@ -190,25 +189,9 @@ class BlogCategoryViewSet(BaseModelViewSet):
     def get_queryset(self):
         if self.action == "posts":
             return self._posts_queryset()
-        if self.request and self.request.query_params.get("tree") == "true":
-            return BlogCategory.objects.for_tree()
-
         if self.action == "list":
             return BlogCategory.objects.for_list()
         return BlogCategory.objects.for_detail()
-
-    def list(self, request, *args, **kwargs):
-        if request.query_params.get("tree") == "true":
-            return self.get_tree_structure(request)
-        return super().list(request, *args, **kwargs)
-
-    def get_tree_structure(self, request):
-        queryset = self.filter_queryset(
-            self.get_queryset().filter(parent__isnull=True)
-        )
-
-        serializer = BlogCategorySerializer(queryset, many=True)
-        return Response(serializer.data)
 
     def _posts_queryset(self):
         # Schema generation builds this view without a request or a pk.

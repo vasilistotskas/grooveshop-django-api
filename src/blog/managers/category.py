@@ -80,20 +80,6 @@ class BlogCategoryQuerySet(TreeTranslatableQuerySet):
         """
         return self.for_list().with_children().with_posts()
 
-    def for_tree(self) -> Self:
-        """
-        Optimized queryset for tree views.
-
-        Includes parent, translations, children, posts, and counts.
-        """
-        return (
-            self.with_parent()
-            .with_translations()
-            .with_children()
-            .with_posts()
-            .with_counts()
-        )
-
 
 class BlogCategoryManager(TreeTranslatableManager):
     """

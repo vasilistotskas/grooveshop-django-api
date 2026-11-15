@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from celery import Celery
 from celery.signals import (
@@ -9,6 +10,7 @@ from celery.signals import (
     task_prerun,
     worker_process_init,
 )
+from kombu.exceptions import OperationalError
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -25,8 +27,54 @@ def config_loggers(*args, **kwargs):
     from django.conf import settings  # noqa: F401
 
 
+class BrokerBlocked(OperationalError):
+    """RabbitMQ blocked the connection: it takes no publish until its alarm
+    clears (a memory or disk alarm)."""
+
+
+def _refuse_blocked_connection(reason: str) -> None:
+    """py-amqp's ``on_blocked``: end the publish that is waiting on it.
+
+    RabbitMQ sends ``connection.blocked`` right after the first publish it
+    holds back, while py-amqp is still waiting for the confirm. Raising here
+    ends that wait. kombu does not retry a ``KombuError`` (only the
+    transport's connection errors), and a retry would only write another
+    copy that the broker delivers once the alarm clears.
+    """
+    raise BrokerBlocked(reason)
+
+
+class GrooveShopCelery(Celery):
+    """Celery with bounded waits on the connections it publishes on.
+
+    Celery opens every connection it publishes on through
+    ``connection_for_write`` (the producer pool behind tasks and control
+    commands, a worker's event dispatcher) and a worker's consuming
+    connection through ``connection_for_read``. Only the first get
+    ``BROKER_PUBLISH_READ_TIMEOUT`` and the ``on_blocked`` refusal: a read
+    that times out on a consuming connection makes the worker reconnect,
+    and RabbitMQ then redelivers every task the worker was still running
+    (``task_acks_late``).
+    """
+
+    def connection_for_write(self, url: Any = None, **kwargs: Any) -> Any:
+        from django.conf import settings
+
+        options = {
+            "on_blocked": _refuse_blocked_connection,
+            **(kwargs.pop("transport_options", None) or {}),
+        }
+        if settings.BROKER_PUBLISH_READ_TIMEOUT:
+            options.setdefault(
+                "read_timeout", settings.BROKER_PUBLISH_READ_TIMEOUT
+            )
+        return super().connection_for_write(
+            url, transport_options=options, **kwargs
+        )
+
+
 def create_celery_app():
-    tasker = Celery("core")
+    tasker = GrooveShopCelery("core")
 
     # Every Celery option lives in settings/celery.py under the CELERY_
     # namespace.

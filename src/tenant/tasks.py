@@ -663,11 +663,11 @@ def redispatch_deferred_tasks() -> dict[str, int]:
 
     One sweep runs at a time, and the publishes run outside any transaction.
     While RabbitMQ blocks publishers (a memory or disk alarm) each publish
-    waits out the broker socket timeouts (``CELERY_BROKER_TRANSPORT_OPTIONS``,
-    about four of them) before it fails. A lease would have to outlive that,
-    and a transaction could be ended by
-    ``idle_in_transaction_session_timeout``, so a sweep holds a
-    session-level advisory lock and a sweep that finds it held does nothing.
+    waits out ``BROKER_PUBLISH_READ_TIMEOUT`` about twice before it fails
+    (docs/deferred-dispatch.md). A lease would have to outlive that, and a
+    transaction could be ended by ``idle_in_transaction_session_timeout``,
+    so a sweep holds a session-level advisory lock and a sweep that finds it
+    held does nothing.
     The lock goes with the session if the worker dies, and the next sweep
     sends again at most the one row that was going out.
 

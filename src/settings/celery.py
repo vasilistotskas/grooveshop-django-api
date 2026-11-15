@@ -83,30 +83,35 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "interval_step": 0.2,
     "interval_max": 0.5,
 }
-# How long one read on the broker socket may block, in seconds. py-amqp
-# sets it as ``SO_RCVTIMEO`` on every connection, so it bounds the waits
-# nothing else does: while RabbitMQ blocks publishers (a memory or disk
-# alarm) it stops reading the connection and sends nothing back, so the
-# publish confirm never comes, and neither does the ``Close-Ok`` kombu then
-# waits for when it replaces the connection. A ``timeout=`` on the publish
-# covers only the first. Without it a request that published waited
-# without end (#509). A read that times out is a connection error, so a
-# publish to a blocked broker fails after about four of them (two attempts,
-# see ``CELERY_TASK_PUBLISH_RETRY_POLICY``, then closing the channel and the
-# connection: 8.2 s measured at 2 s) and ``dispatch_on_commit`` keeps the
-# task as a ``DeferredDispatch``. A healthy broker answers in milliseconds,
-# and a worker reads its consuming connection only when the socket is
-# readable, so neither meets the bound. Writes need no such option: the
-# ``TCP_USER_TIMEOUT`` py-amqp sets by default already ends a write the
-# broker stops taking. docs/deferred-dispatch.md has the measurements.
+# How long one read on a PUBLISHING broker connection may block, in
+# seconds. ``core.celery.GrooveShopCelery.connection_for_write`` hands it to
+# py-amqp as ``read_timeout`` (``SO_RCVTIMEO``) on the connections the app
+# publishes on (tasks, control commands, worker events), never on a
+# worker's consuming connection. It bounds the waits nothing else does:
+# while RabbitMQ blocks publishers (a memory or disk alarm) it stops
+# reading the connection and sends nothing back, so the publish confirm
+# never comes, and neither does the ``Close-Ok`` kombu waits for when it
+# replaces the connection. Those publishing connections also refuse to
+# publish once RabbitMQ says it blocked them (``connection.blocked``), so a
+# blocked publish is not retried. Without either a request that published
+# waited without end (#509).
+#
+# Every synchronous reply on those connections must arrive within it: a
+# confirm, a declare, a channel open. A healthy broker answers in
+# milliseconds (49 ms at worst measured with half a CPU, as in production;
+# docs/deferred-dispatch.md), so 5 s is ample headroom for a slow one. A
+# blocked publish then fails after two of these waits (closing the channel
+# and the connection: 10.5 s measured), four at most when the broker
+# blocked the connection without saying so.
 #
 # Linux only, where every deployment runs: py-amqp packs the value as a
 # POSIX ``timeval``, which Windows reads as a DWORD of MILLISECONDS, so the
-# same 2 would cut every read on a Windows host at 2 ms.
-if sys.platform != "win32":
-    CELERY_BROKER_TRANSPORT_OPTIONS["read_timeout"] = float(
-        getenv("CELERY_BROKER_READ_TIMEOUT", "2")
-    )
+# same 5 would cut every read on a Windows host at 5 ms.
+BROKER_PUBLISH_READ_TIMEOUT = (
+    None
+    if sys.platform == "win32"
+    else float(getenv("BROKER_PUBLISH_READ_TIMEOUT", "5"))
+)
 # How often kombu publishes a task again after a connection error, each
 # time on a new connection (``kombu.Connection.ensure``). One retry is what
 # a dead pooled connection needs: after a broker restart the first publish

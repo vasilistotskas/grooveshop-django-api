@@ -4,10 +4,13 @@ While RabbitMQ blocks publishers (a memory or disk alarm) it stops reading a
 connection that has published and sends nothing back. py-amqp then waits for
 the publish confirm, and kombu, replacing the failed connection, waits for a
 ``Close-Ok``: both come down to ``Transport.read_frame()`` on a blocking
-socket, with no timeout of their own. The ``read_timeout`` in
-``CELERY_BROKER_TRANSPORT_OPTIONS`` is what bounds them.
+socket, with no timeout of their own. ``GrooveShopCelery.connection_for_write``
+bounds them on the connections the app publishes on, with a read timeout and
+a refusal of ``connection.blocked``, and leaves a worker's consuming
+connection as it was: a read timeout there makes the worker reconnect and
+RabbitMQ redeliver every task it was still running.
 
-The peer here behaves like that broker: it accepts the connection, then
+The silent peer behaves like that broker: it accepts the connection, then
 neither reads nor writes. The socket is opened by py-amqp with the options the
 app hands kombu, as ``amqp.Connection.connect`` opens it; the AMQP handshake
 that would follow is left out, since a silent peer never answers it.
@@ -27,8 +30,10 @@ from amqp.transport import TCPTransport
 from kombu.transport.pyamqp import Transport
 
 from core import celery_app
+from core.celery import BrokerBlocked
+from core.retry import TRANSIENT_NETWORK_ERRORS
 
-pytestmark = pytest.mark.skipif(
+linux_only = pytest.mark.skipif(
     sys.platform == "win32",
     reason=(
         "py-amqp packs the socket timeout as a POSIX timeval, so the app "
@@ -49,13 +54,18 @@ _UNBOUNDED_WATCH_SECONDS = 2.0
 _UNREAD_BYTES = 64 * 1024 * 1024
 
 
-def _app_options() -> dict:
+def _publishing_options() -> dict:
     with celery_app.connection_for_write() as connection:
         return dict(connection.transport_options)
 
 
+def _consuming_options() -> dict:
+    with celery_app.connection_for_read() as connection:
+        return dict(connection.transport_options)
+
+
 def _watch_seconds() -> float:
-    timeout = _app_options().get("read_timeout")
+    timeout = _publishing_options().get("read_timeout")
     return timeout * _MARGIN if timeout else _UNBOUNDED_WATCH_SECONDS
 
 
@@ -79,8 +89,8 @@ def silent_broker() -> Iterator[str]:
 
 
 @pytest.fixture
-def app_transport(silent_broker: str) -> Iterator[TCPTransport]:
-    connection = amqp.Connection(host=silent_broker, **_app_options())
+def publishing_transport(silent_broker: str) -> Iterator[TCPTransport]:
+    connection = amqp.Connection(host=silent_broker, **_publishing_options())
     transport = connection.Transport(
         silent_broker,
         connection.connect_timeout,
@@ -118,29 +128,54 @@ def _run_bounded(
     return worker.is_alive(), (raised or [None])[0], time.monotonic() - started
 
 
-def test_the_app_bounds_every_read_on_the_broker_socket():
-    assert _app_options().get("read_timeout", 0) > 0
+@linux_only
+def test_a_publishing_connection_bounds_every_read():
+    assert _publishing_options().get("read_timeout", 0) > 0
 
 
+def test_a_consuming_connection_is_left_unbounded():
+    options = _consuming_options()
+
+    assert "read_timeout" not in options
+    assert "on_blocked" not in options
+
+
+def test_a_blocked_publish_ends_in_an_error_kombu_does_not_retry():
+    """``kombu.Connection.ensure`` retries the transport's recoverable
+    connection errors on a new connection, which on a blocked broker only
+    writes another copy; the refusal is a ``KombuError`` instead, which
+    ``dispatch_on_commit`` keeps as a ``DeferredDispatch``."""
+    on_blocked = _publishing_options()["on_blocked"]
+
+    with pytest.raises(BrokerBlocked) as raised:
+        on_blocked("connection blocked, see broker logs")
+
+    assert not isinstance(raised.value, Transport.recoverable_connection_errors)
+    assert isinstance(raised.value, TRANSIENT_NETWORK_ERRORS)
+
+
+@linux_only
 def test_waiting_for_a_reply_that_never_comes_ends_in_a_connection_error(
-    app_transport,
+    publishing_transport,
 ):
     still_waiting, raised, took = _run_bounded(
-        app_transport.read_frame, _watch_seconds()
+        publishing_transport.read_frame, _watch_seconds()
     )
 
     assert not still_waiting, f"still waiting after {took:.1f} s"
     assert isinstance(raised, Transport.connection_errors), raised
 
 
+@linux_only
 def test_writing_to_a_broker_that_stopped_reading_ends_in_a_connection_error(
-    app_transport,
+    publishing_transport,
 ):
     """py-amqp's default ``TCP_USER_TIMEOUT`` ends it, which is why the app
     sets no ``write_timeout``; this fails if the app's socket settings ever
     take that away."""
     still_writing, raised, took = _run_bounded(
-        lambda: app_transport.write(b"\0" * _UNREAD_BYTES), _watch_seconds()
+        lambda: publishing_transport.write(b"\0" * _UNREAD_BYTES),
+        _watch_seconds(),
     )
 
     assert not still_writing, f"still writing after {took:.1f} s"

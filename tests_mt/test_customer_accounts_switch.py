@@ -13,6 +13,7 @@ hosts, so the identity routes are walked here
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import timedelta
 
 import pytest
@@ -27,7 +28,7 @@ pytestmark = pytest.mark.django_db
 
 SWITCH = "CUSTOMER_ACCOUNTS_ENABLED"
 PLATFORM_DOMAIN = "platform-accounts-mt.test"
-PASSWORD = "A-passw0rd-for-the-test!"
+PASSWORD = secrets.token_urlsafe(16)
 
 
 def _switch(schema: str, on: bool) -> None:

@@ -204,6 +204,9 @@ and says which file holds each § number used here.
     last failure (`last_error["staff_alerted"]`, written by
     `record_staff_alerted`); anything else is handed to staff with what BoxNow lists. A
     lookup that fails is left for the next run.
+    Before acting on anything but a take-over (which re-reads the order
+    itself), the order is read again under the row lock: one canceled while
+    BoxNow answered goes to the canceled-order branch.
   The creation task names a canceled order's outcome as a cancel: status
   `order_canceled` (or `shipment_canceled`) instead of "created", and a
   refused cancel (`BoxNowCancelRefusedError`) is reported as the cancel it

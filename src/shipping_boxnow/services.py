@@ -840,13 +840,38 @@ class BoxNowService:
                 shipment.save(update_fields=["metadata", "updated_at"])
 
         if order_canceled:
-            try:
-                cls._cancel_for_a_canceled_order(shipment.order)
-            except BoxNowCancelRefusedError as exc:
-                cls.report_cancel_refused(shipment.order_id, exc.message)
-                return "cancel_refused"
-            return "canceled"
+            return cls._settle_for_a_canceled_order(shipment)
         return cls._settle_for_a_live_order(shipment)
+
+    @classmethod
+    def _settle_for_a_canceled_order(cls, shipment: BoxNowShipment) -> str:
+        """The canceled-order half of :meth:`settle_uncertain_creation`."""
+        try:
+            cls._cancel_for_a_canceled_order(shipment.order)
+        except BoxNowCancelRefusedError as exc:
+            cls.report_cancel_refused(shipment.order_id, exc.message)
+            return "cancel_refused"
+        return "canceled"
+
+    @staticmethod
+    def _order_canceled_meanwhile(shipment_pk: int) -> bool:
+        """Whether the order was canceled while the sweep asked BoxNow,
+        read under the row lock (with the order's); if so the sweep's
+        claim is released for the cancel to run."""
+        with transaction.atomic():
+            shipment = (
+                BoxNowShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment_pk)
+            )
+            if shipment.order.status != _CANCELED_ORDER_STATUS:
+                return False
+            shipment.metadata = {
+                **(shipment.metadata or {}),
+                "mint_started_at": None,
+            }
+            shipment.save(update_fields=["metadata", "updated_at"])
+            return True
 
     @classmethod
     def _settle_for_a_live_order(cls, shipment: BoxNowShipment) -> str:
@@ -885,6 +910,17 @@ class BoxNowService:
                     extra={"order_id": order.id, "carrier": "boxnow"},
                 )
                 return "taken_over"
+            case _:
+                pass
+
+        # A take-over above re-reads the order itself (_persist_parcel);
+        # anything else is decided for an order that may have been
+        # canceled while BoxNow answered.
+        if cls._order_canceled_meanwhile(shipment.pk):
+            shipment.refresh_from_db()
+            return cls._settle_for_a_canceled_order(shipment)
+
+        match live:
             case []:
                 told = cls._staff_told_of_the_failure(shipment.metadata)
                 cls._end_uncertainty(shipment.pk)

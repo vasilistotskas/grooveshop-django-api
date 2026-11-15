@@ -1515,6 +1515,31 @@ class TestTheThirdReview:
         assert shipment.metadata["creation_uncertain_at"] is None
         assert sum("did not cancel" in note for note in _notes(order)) == 1
 
+    def test_an_order_canceled_during_the_lookup_is_canceled(self, http):
+        """The sweep re-reads the order before acting on what it
+        found; a canceled one gets its cancel, not a "Create" alert."""
+        order = _paid_order()
+        shipment = _settled(order)
+
+        def cancel_the_order_while_boxnow_answers():
+            type(order).objects.filter(pk=order.pk).update(
+                status=OrderStatus.CANCELED
+            )
+            return _lookup()
+
+        http.answer(_LOOKUP, cancel_the_order_while_boxnow_answers)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
 
 def _age_the_stamp(shipment) -> None:
     """Move a stamp the creation wrote past the settle time."""

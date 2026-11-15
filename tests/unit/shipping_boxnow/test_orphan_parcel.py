@@ -791,7 +791,9 @@ class TestACancelAfterACreationOfUncertainOutcome:
             pytest.param(
                 _response(403, {"message": "Forbidden"}), id="auth-layer"
             ),
-            pytest.param(_response(503, text="busy"), id="token-5xx"),
+            pytest.param(
+                _response(401, {"error": "invalid_client"}), id="token-401"
+            ),
         ],
     )
     def test_a_later_refusal_keeps_it(self, http, refusal):
@@ -805,8 +807,8 @@ class TestACancelAfterACreationOfUncertainOutcome:
         http.answer(_CREATE, requests.ReadTimeout("read timed out"))
         with pytest.raises(BoxNowRetryableError):
             BoxNowService.create_shipment_for_order(order)
-        if refusal.status_code == 503:
-            # The token call answers any non-200 with BoxNowAuthError.
+        if refusal.status_code == 401:
+            # The token endpoint refusing the store's credentials.
             from django.core.cache import cache
 
             cache.clear()
@@ -1596,3 +1598,89 @@ def _age_the_stamp(shipment) -> None:
     BoxNowShipment.objects.filter(pk=shipment.pk).update(
         metadata={**metadata, "creation_uncertain_at": stamp.isoformat()}
     )
+
+
+def _token_answers(http, response) -> None:
+    """The token endpoint's next answers; the token cache starts empty."""
+    from django.core.cache import cache
+
+    cache.clear()
+    http.post.return_value = response
+
+
+class TestNoAnswerKeepsTheUncertainty:
+    """A BoxNow outage (a token 5xx, a 429) is no answer and revoked
+    credentials say nothing about a parcel: the uncertainty stays, so the
+    sweep settles it once BoxNow answers again."""
+
+    @pytest.mark.parametrize(
+        "token",
+        [
+            pytest.param(_response(503, text="busy"), id="token-5xx"),
+            pytest.param(_response(429, text="slow down"), id="token-429"),
+        ],
+    )
+    def test_a_token_outage_is_left_for_the_next_run(self, http, token):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        _token_answers(http, token)
+
+        with (
+            patch(
+                "shipping.alerts.alert_admins_shipment_creation_failed"
+            ) as alert,
+            pytest.raises(BoxNowRetryableError),
+        ):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+        assert shipment.metadata["mint_started_at"] is None
+
+    def test_a_rate_limited_lookup_is_left_for_the_next_run(self, http):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        http.answer(_LOOKUP, _response(429, {"message": "Too many"}))
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+
+    def test_revoked_credentials_keep_every_stamp_and_alert_once(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        first = _settled(_paid_order())
+        second = _settled(_canceled_order())
+        _token_answers(http, _response(401, {"error": "invalid_client"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            settle_uncertain_boxnow_creations.run()
+            settle_uncertain_boxnow_creations.run()
+
+        alert.assert_called_once()
+        assert "credentials" in alert.call_args.kwargs["remedy"]
+        for shipment in (first, second):
+            shipment.refresh_from_db()
+            assert shipment.metadata["creation_uncertain_at"]
+            assert shipment.metadata["mint_started_at"] is None
+            assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_revoked_credentials_on_a_canceled_order_keep_the_stamp(self, http):
+        order = _canceled_order()
+        shipment = _settled(order)
+        _token_answers(http, _response(403, {"error": "forbidden"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"]

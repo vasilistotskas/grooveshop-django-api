@@ -173,7 +173,11 @@ class BoxNowClient:
             force_refresh: Bypass the cache and always fetch a fresh token.
 
         Raises:
-            BoxNowAuthError: If BoxNow returns a non-200 response.
+            BoxNowRetryableError: No answer to act on: a connection error,
+                a timeout, a 5xx or a 429 (a rate limit refuses the call
+                before judging the credentials).
+            BoxNowAuthError: Any other non-200 response: BoxNow refused the
+                credentials.
         """
         from django.core.cache import cache
 
@@ -209,6 +213,16 @@ class BoxNowClient:
                 message=f"Timeout fetching BoxNow token: {exc}",
             ) from exc
 
+        if response.status_code >= 500 or response.status_code == 429:
+            # An outage or a rate limit: nothing was said about the
+            # credentials, so every caller retries it like a lost answer.
+            raise BoxNowRetryableError(
+                status_code=response.status_code,
+                message=(
+                    f"BoxNow token endpoint answered {response.status_code}"
+                ),
+                response_text=response.text,
+            )
         if response.status_code != 200:
             raise BoxNowAuthError(
                 status_code=response.status_code,
@@ -263,7 +277,7 @@ class BoxNowClient:
 
         Raises:
             BoxNowAuthError:      HTTP 401 / 403.
-            BoxNowRetryableError: HTTP 5xx or connection error.
+            BoxNowRetryableError: HTTP 5xx, 429 or connection error.
             BoxNowAPIError:       Other non-2xx HTTP response.
         """
         effective_base = (base_url or self.api_base_url).rstrip("/")
@@ -325,6 +339,21 @@ class BoxNowClient:
             raise BoxNowRetryableError(
                 status_code=response.status_code,
                 message=f"BoxNow server error {response.status_code}",
+                response_text=response.text,
+            )
+
+        if response.status_code == 429:
+            # A rate limit refuses the call before BoxNow processes it:
+            # no answer about the request, so it is retried later.
+            logger.warning(
+                "BoxNow %s %s → 429: %s",
+                method.upper(),
+                path,
+                response.text[:500],
+            )
+            raise BoxNowRetryableError(
+                status_code=429,
+                message="BoxNow rate limit (HTTP 429)",
                 response_text=response.text,
             )
 

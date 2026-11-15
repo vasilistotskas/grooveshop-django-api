@@ -14,6 +14,7 @@ from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
+    BoxNowAuthError,
     BoxNowCancelRefusedError,
     BoxNowConfigError,
     BoxNowRetryableError,
@@ -160,6 +161,22 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
         # error and the retry policy would be dead code.
         raise
     except BoxNowAPIError as exc:
+        if (
+            isinstance(exc, BoxNowAuthError)
+            and Order.objects.filter(
+                pk=order_id, status=OrderStatus.CANCELED
+            ).exists()
+        ):
+            # A canceled order's cancel could not be asked: its
+            # uncertainty stays for the sweep, and staff hear about the
+            # cancel, not a creation to retry.
+            BoxNowService.report_cancel_refused(order_id, exc.message)
+            return {
+                "status": "boxnow_cancel_refused",
+                "order_id": order_id,
+                "code": exc.code,
+                "message": str(exc),
+            }
         # P-coded business error from BoxNow (e.g. P402 invalid locker,
         # P410 order number conflict). Do not retry — manual intervention
         # is required, so tell a human immediately (prod order 143 sat
@@ -626,6 +643,20 @@ def settle_uncertain_boxnow_creations(
     for shipment_id in candidates:
         try:
             outcomes[BoxNowService.settle_uncertain_creation(shipment_id)] += 1
+        except BoxNowAuthError as exc:
+            # The store's credentials: every other shipment would fail the
+            # same way. They keep their stamps and settle once BoxNow
+            # accepts the credentials; staff are told once.
+            order_id = (
+                BoxNowShipment.objects.filter(pk=shipment_id)
+                .values_list("order_id", flat=True)
+                .get()
+            )
+            BoxNowService.alert_credentials_refused(
+                order_id, exc, waiting=len(candidates)
+            )
+            outcomes["credentials_refused"] += 1
+            break
         except BoxNowAPIError as exc:
             logger.warning(
                 "settle_uncertain_boxnow_creations: shipment=%s not "

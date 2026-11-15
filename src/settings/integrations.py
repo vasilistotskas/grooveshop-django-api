@@ -100,6 +100,12 @@ BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
 BOXNOW_CREATION_SETTLE_SECONDS = int(
     getenv("BOXNOW_CREATION_SETTLE_SECONDS", "600")
 )
+# How often staff hear, at most, that BoxNow refuses a store's credentials
+# while uncertain creations wait for the settle sweep (#712): one alert
+# per store per interval, never one per shipment or per run.
+BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS = int(
+    getenv("BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS", "86400")
+)
 
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing

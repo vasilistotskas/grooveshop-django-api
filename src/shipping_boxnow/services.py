@@ -20,6 +20,7 @@ from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
+    BoxNowAuthError,
     BoxNowBusyError,
     BoxNowCancelRefusedError,
     BoxNowConfigError,
@@ -735,7 +736,10 @@ class BoxNowService:
                         "The order was canceled before its parcel was created."
                     ),
                 )
-            except BoxNowRetryableError:
+            except BoxNowRetryableError, BoxNowAuthError:
+                # No answer, or the store's credentials refused: nothing
+                # was said about the parcel, so the uncertainty stays and
+                # the sweep settles it once BoxNow answers again.
                 raise
             except BoxNowAPIError as exc:
                 # Handed to staff: the refusal is reported once, by the
@@ -750,6 +754,43 @@ class BoxNowService:
                 ) from exc
             shipment.refresh_from_db()
         return shipment
+
+    @staticmethod
+    def alert_credentials_refused(
+        order_id: int, exc: BoxNowAuthError, *, waiting: int
+    ) -> None:
+        """Tell staff once that BoxNow refuses the store's credentials
+        while creations of uncertain outcome wait to be settled.
+
+        Once per ``BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS`` for the
+        store, never per shipment or per run: every waiting shipment fails
+        the same way until the credentials are fixed, and each settles by
+        itself afterwards.
+        """
+        from django.core.cache import cache
+
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
+        if not cache.add(
+            "boxnow:settle:credentials_refused",
+            True,
+            timeout=settings.BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS,
+        ):
+            return
+        alert_admins_shipment_creation_failed(
+            order_id=order_id,
+            carrier="BoxNow",
+            error=(
+                f"BoxNow refused the store's credentials (HTTP "
+                f"{exc.status_code}) while {waiting} parcel creation(s) of "
+                "uncertain outcome waited to be settled"
+            ),
+            remedy=(
+                "Check the store's BoxNow credentials (client id and "
+                "secret). The waiting shipments are settled automatically "
+                "once BoxNow accepts them."
+            ),
+        )
 
     @staticmethod
     def report_cancel_refused(order_id: int, error: str) -> None:
@@ -886,8 +927,9 @@ class BoxNowService:
         order = shipment.order
         try:
             live = cls._live_parcels_at_boxnow(order.id)
-        except BoxNowRetryableError:
-            # No answer: the next run asks again.
+        except BoxNowRetryableError, BoxNowAuthError:
+            # No answer, or the store's credentials refused: nothing was
+            # said about the parcel, so the next run asks again.
             cls._release_mint_claim(shipment.pk)
             raise
         except BoxNowAPIError as exc:

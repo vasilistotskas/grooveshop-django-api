@@ -205,10 +205,19 @@ and says which file holds each § number used here.
     parcel now"), unless the creation task already alerted them about the
     last failure (`last_error["staff_alerted"]`, written by
     `record_staff_alerted`); anything else is handed to staff with what
-    BoxNow lists. A lookup BoxNow refuses (a deterministic answer) ends the uncertainty and
-    alerts staff at once; one BoxNow does not answer is left for the next
-    run, with no escalation after N runs: an outage resolves by itself and
-    every BoxNow task meets it.
+    BoxNow lists. A lookup BoxNow refuses (a deterministic answer) ends
+    the uncertainty and alerts staff at once; one BoxNow does not answer is
+    left for the next run, with no escalation after N runs: an outage
+    resolves by itself and every BoxNow task meets it. The client counts as
+    no answer a 5xx, a timeout and a 429 from the token endpoint as well as
+    from the API (`BoxNowRetryableError`); only a real refusal of the
+    credentials (401, 403, 400 `invalid_client`) is a `BoxNowAuthError`.
+    That one says nothing about a parcel either: the shipment keeps its
+    stamp, the run stops (the store's other shipments would fail the same
+    way) and staff hear once per `BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS`
+    (`alert_credentials_refused`); the shipments settle by themselves once
+    the credentials work again. A canceled order's cancel that meets it in
+    the creation task is reported as that cancel and keeps its stamp.
     Before acting on anything but a take-over (which re-reads the order
     itself), the order is read again under the row lock: one canceled while
     BoxNow answered goes to the canceled-order branch.

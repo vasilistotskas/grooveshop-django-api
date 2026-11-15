@@ -1553,6 +1553,36 @@ class TestTheThirdReview:
             include_suspended=True,
         )
 
+    def test_a_lookup_boxnow_refuses_is_handed_to_staff(self, http):
+        """A deterministic refusal of the lookup would answer the same on
+        every run: staff are told at once and the uncertainty ends."""
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _response(400, {"code": "P400", "message": "bad"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "lookup_refused"
+        alert.assert_called_once()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+
+    def test_the_task_counts_a_shipment_boxnow_did_not_answer_for(self, http):
+        """No answer is left for the next run, and the rest go on."""
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _response(503, text="busy"))
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"unanswered": 1}
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"]
+
 
 def _age_the_stamp(shipment) -> None:
     """Move a stamp the creation wrote past the settle time."""

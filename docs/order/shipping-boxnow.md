@@ -193,18 +193,22 @@ and says which file holds each § number used here.
   whose creation is not in flight:
   - a canceled order: its cancel is finished as the creation would
     (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
-    there and recorded, none is a local cancel. A refusal is reported once
+    there and recorded, none is a local cancel. A refusal is reported
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
-    and ends the uncertainty, whether the sweep or the creation task met
-    it (`_cancel_for_a_canceled_order` ends it), so it is reported once;
+    and ends the uncertainty wherever it is met, by the sweep or by the
+    creation task (`_cancel_for_a_canceled_order` ends it), so it is
+    reported once;
   - a live order: under the creation's own claim, the order is looked up by
     `orderNumber`. One live `new` parcel created for this shipment's terms
     is saved (`_persist_parcel`); nothing listed settles it as not created,
     the stamp is cleared and staff get the creation alert ("Create BoxNow
     parcel now"), unless the creation task already alerted them about the
     last failure (`last_error["staff_alerted"]`, written by
-    `record_staff_alerted`); anything else is handed to staff with what BoxNow lists. A
-    lookup that fails is left for the next run.
+    `record_staff_alerted`); anything else is handed to staff with what
+    BoxNow lists. A lookup BoxNow refuses (a deterministic answer) ends the uncertainty and
+    alerts staff at once; one BoxNow does not answer is left for the next
+    run, with no escalation after N runs: an outage resolves by itself and
+    every BoxNow task meets it.
     Before acting on anything but a take-over (which re-reads the order
     itself), the order is read again under the row lock: one canceled while
     BoxNow answered goes to the canceled-order branch.

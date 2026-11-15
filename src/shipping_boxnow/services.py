@@ -809,9 +809,13 @@ class BoxNowService:
           unless they were already told of a refusal; anything else is
           left to staff, who are told what BoxNow lists.
 
-        A lookup that fails raises (the next run asks again). Returns the
-        outcome: ``not_due``, ``canceled``, ``cancel_refused``,
-        ``taken_over``, ``not_created`` or ``not_taken_over``.
+        A lookup BoxNow does not answer raises (the next run asks again;
+        an outage resolves by itself and is seen by every BoxNow task, so
+        no per-shipment count escalates it). A lookup BoxNow refuses would
+        be refused on every run, so it is handed to staff at once. Returns
+        the outcome: ``not_due``, ``canceled``, ``cancel_refused``,
+        ``taken_over``, ``not_created``, ``not_taken_over`` or
+        ``lookup_refused``.
         """
         with transaction.atomic():
             shipment = (
@@ -882,6 +886,27 @@ class BoxNowService:
         order = shipment.order
         try:
             live = cls._live_parcels_at_boxnow(order.id)
+        except BoxNowRetryableError:
+            # No answer: the next run asks again.
+            cls._release_mint_claim(shipment.pk)
+            raise
+        except BoxNowAPIError as exc:
+            # A refusal would be the same on every run: staff now.
+            cls._end_uncertainty(shipment.pk)
+            alert_admins_shipment_creation_failed(
+                order_id=order.id,
+                carrier="BoxNow",
+                error=(
+                    "the parcel creation had an uncertain outcome, and BoxNow "
+                    f"refused the lookup of the order's parcels: {exc.message}"
+                ),
+                remedy=(
+                    "Check the order's parcels with BoxNow, and press "
+                    "“Create BoxNow parcel now” on the order's BoxNow "
+                    "shipment only if BoxNow holds none for it."
+                ),
+            )
+            return "lookup_refused"
         except Exception:
             cls._release_mint_claim(shipment.pk)
             raise

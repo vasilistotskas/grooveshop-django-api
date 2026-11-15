@@ -230,8 +230,16 @@ and says which file holds each § number used here.
   derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
   (the store default when there is none) and refuses a cart that fits no
   compartment with 400 `parcel_too_large`; the old `compartment_size` body
-  field is gone. The storefront's locker picker is BoxNow's own iframe
-  widget, which this API does not drive.
+  field is gone. BoxNow's own refusal (P422 address not found, P423 no
+  locker near it) is a 400 with BoxNow's `code`. BoxNow giving no answer
+  (a `CarrierUnavailableError`: a 5xx, a timeout, a connection or auth
+  failure, no credentials) is a 503 `carrier_unavailable`
+  (`shipping.api_errors.CarrierUnavailable`) whose `detail` is written for
+  a client; the error text goes to the log (#650). The agent gateway reads
+  only the status, so an outage is no longer "no locker nearby". The
+  storefront's locker picker is BoxNow's own iframe widget, which this API
+  does not drive. The same 503 answers an outage on the staff cancel
+  endpoints of both carriers and on ACS address validation.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

@@ -263,7 +263,7 @@ and says which file holds each § number used here.
   - **Reserved slot.** The poll batch is paced to keep its slots busy, so
     without a reserve a shopper's `price_calculation` or
     `address_validation` could wait the full `ACS_SLOT_WAIT_SECONDS`
-    behind it and then fall back or 502. The last
+    behind it and then fall back or 503 (`carrier_unavailable`, #650). The last
     `ACS_INTERACTIVE_RESERVED_SLOTS` (default 1) slots are for interactive
     calls only: the tracking polls (`tracking_summary` /
     `tracking_details`, `background=True` in `AcsClient._call`) may take

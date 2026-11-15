@@ -14586,6 +14586,9 @@ msgstr "The coupon code can no longer be used."
 msgid "The coupon code to apply."
 msgstr "The coupon code to apply."
 
+msgid "The courier cannot be reached right now. Try again in a moment."
+msgstr "The courier cannot be reached right now. Try again in a moment."
+
 msgid "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 msgstr "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 

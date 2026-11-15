@@ -86,12 +86,13 @@ def test_acs_api_error_returns_502():
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
 
 
-def test_acs_read_timeout_returns_502_not_500():
+def test_acs_read_timeout_returns_503_not_500():
     """Regression: prod 2026-07-04 — a 15s ACS read timeout escaped
     the client unwrapped and surfaced as an unhandled 500 during
     checkout. The client now wraps ``requests.Timeout`` into
-    ``AcsRetryableError`` (an ``AcsAPIError`` subclass), which this
-    view maps to a clean 502."""
+    ``AcsOutcomeUnknownError`` (a ``CarrierUnavailableError``), which this
+    view answers with a clean 503 ``carrier_unavailable`` (#650; a 502
+    carrying the exception text before)."""
     import requests as requests_lib
 
     from shipping_acs.client import AcsClient as RealAcsClient
@@ -114,7 +115,8 @@ def test_acs_read_timeout_returns_502_not_500():
             {"address": "ΠΕΙΡΑΙΩΣ 25 17778 timeout-case"},
             format="json",
         )
-    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json()["code"] == "carrier_unavailable"
 
 
 def test_repeated_calls_hit_cache_not_api():

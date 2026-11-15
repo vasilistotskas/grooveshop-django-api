@@ -1063,10 +1063,17 @@ class BoxNowService:
         (#690): the P410 proves BoxNow holds a request under the
         ``orderNumber``, and a parcel the lookup does not list yet (a
         worker that died between the POST and phase 3 left no stamp of
-        its own) must not let a cancel trust an empty lookup.
+        its own) must not let a cancel trust an empty lookup. One exception:
+        when BoxNow lists nothing live and every parcel it lists is a
+        canceled one this shipment recorded before "Create BoxNow parcel
+        now" reset it (``metadata['previous_parcels']``), the conflict has
+        that known cause (the documented reissue case) and is not stamped,
+        or every reissue attempt would block a cancel of a shipment that
+        was never created. A canceled parcel the shipment never recorded
+        proves no such thing: something unknown used the ``orderNumber``.
         """
         try:
-            live = cls._live_parcels_at_boxnow(order.id)
+            listed = cls._parcels_at_boxnow(order.id)
         except BoxNowAPIError as exc:
             logger.warning(
                 "create_shipment_for_order: BoxNow answered P410 for "
@@ -1085,6 +1092,7 @@ class BoxNowService:
             cls._release_mint_claim(shipment_pk, outcome_uncertain=True)
             raise
 
+        live = [p for p in listed if p.state != BoxNowParcelState.CANCELED]
         match live:
             case [
                 _ListedParcel(parcel_id, BoxNowParcelState.NEW, False, terms)
@@ -1130,6 +1138,9 @@ class BoxNowService:
                         "it lists no single new parcel to take over (live "
                         f"parcels: {found})"
                     ),
+                    outcome_uncertain=not cls._conflict_is_a_reissue(
+                        shipment_pk, listed
+                    ),
                 )
 
         shipment = cls._persist_parcel(
@@ -1169,10 +1180,11 @@ class BoxNowService:
         *,
         conflict: BoxNowAPIError,
         reason: str,
+        outcome_uncertain: bool = True,
     ) -> NoReturn:
         """Raise the P410 as the refusal it is, saying why; free the claim
-        and stamp the creation uncertain (see
-        :meth:`_take_over_existing_parcel`)."""
+        and, unless the conflict has a known cause, stamp the creation
+        uncertain (see :meth:`_take_over_existing_parcel`)."""
         refusal = BoxNowAPIError(
             conflict.status_code,
             code=conflict.code,
@@ -1190,13 +1202,45 @@ class BoxNowService:
         cls._release_mint_claim(
             shipment_pk,
             last_error=_last_error(refusal),
-            outcome_uncertain=True,
+            outcome_uncertain=outcome_uncertain,
         )
         raise refusal from conflict
 
+    @staticmethod
+    def _conflict_is_a_reissue(
+        shipment_pk: int, listed: list[_ListedParcel]
+    ) -> bool:
+        """Whether every parcel BoxNow lists is a canceled one this shipment
+        had before it was reset for a reissue (``previous_parcels``)."""
+        previous = {
+            str(entry.get("parcel_id"))
+            for entry in (
+                BoxNowShipment.objects.filter(pk=shipment_pk)
+                .values_list("metadata", flat=True)
+                .first()
+                or {}
+            ).get("previous_parcels", [])
+            if entry.get("parcel_id")
+        }
+        return bool(listed) and all(
+            parcel.state == BoxNowParcelState.CANCELED
+            and parcel.parcel_id in previous
+            for parcel in listed
+        )
+
     @classmethod
     def _live_parcels_at_boxnow(cls, order_id: int) -> list[_ListedParcel]:
-        """The parcels BoxNow holds under this order's ``orderNumber``.
+        """The parcels BoxNow holds under this order's ``orderNumber`` that
+        are not ``canceled`` (:meth:`_parcels_at_boxnow`)."""
+        return [
+            parcel
+            for parcel in cls._parcels_at_boxnow(order_id)
+            if parcel.state != BoxNowParcelState.CANCELED
+        ]
+
+    @classmethod
+    def _parcels_at_boxnow(cls, order_id: int) -> list[_ListedParcel]:
+        """Every parcel BoxNow lists under this order's ``orderNumber``.
 
         ``GET /api/v1/parcels?orderNumber=`` (API Manual v7.2, §6.5.3,
         p. 45: "Return only parcels related to this order number"), never
@@ -1208,10 +1252,11 @@ class BoxNowService:
         - Each answer is read page by page through ``pagination.next``
           ("Token to use to get to the next page"; ``limit`` defaults to
           50), until a page names no next one or one already read.
-        - A ``canceled`` parcel is left out. One whose cancel was only
-          requested stays, flagged: ``cancelationRequested`` is "True if
-          you or system administrator had requested parcel cancelation",
-          and nothing says BoxNow carried the cancel out.
+        - ``canceled`` parcels are listed too (:meth:`_live_parcels_at_boxnow`
+          leaves them out). One whose cancel was only requested is flagged:
+          ``cancelationRequested`` is "True if you or system administrator
+          had requested parcel cancelation", and nothing says BoxNow carried
+          the cancel out.
 
         Raises the client's error when BoxNow does not answer, and a
         ``BoxNowAPIError`` when an answer cannot be read: "cannot tell"
@@ -1219,7 +1264,7 @@ class BoxNowService:
         """
         client = BoxNowClient()
         order_number = _order_number(order_id)
-        live: dict[str, _ListedParcel] = {}
+        listed: dict[str, _ListedParcel] = {}
         for mode in BoxNowPaymentMode.values:
             page_token: str | None = None
             pages_read: set[str] = set()
@@ -1241,8 +1286,7 @@ class BoxNowService:
                     )
                 for row in rows:
                     parcel = cls._listed_parcel(row, order_number)
-                    if parcel.state != BoxNowParcelState.CANCELED:
-                        live[parcel.parcel_id] = parcel
+                    listed[parcel.parcel_id] = parcel
                 pagination = answer.get("pagination")
                 next_token = (
                     pagination.get("next")
@@ -1253,7 +1297,7 @@ class BoxNowService:
                     break
                 page_token = str(next_token)
                 pages_read.add(page_token)
-        return list(live.values())
+        return list(listed.values())
 
     @staticmethod
     def _listed_parcel(row: Any, order_number: str) -> _ListedParcel:

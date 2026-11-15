@@ -830,9 +830,13 @@ class TestACancelAfterACreationOfUncertainOutcome:
         "lookup",
         [
             pytest.param(_lookup(), id="nothing-listed"),
+            # A canceled parcel this shipment never recorded: something
+            # it does not know made a request under the orderNumber, so
+            # the conflict proves nothing about what else BoxNow holds.
+            # Contrast the reissue case below.
             pytest.param(
                 _lookup(_parcel("9219709201", "canceled")),
-                id="only-a-canceled-one",
+                id="only-an-unrecorded-canceled-one",
             ),
             pytest.param(_response(503, text="busy"), id="lookup-fails"),
         ],
@@ -859,6 +863,35 @@ class TestACancelAfterACreationOfUncertainOutcome:
         shipment.refresh_from_db()
         assert shipment.metadata["creation_uncertain_at"] is not None
         assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_a_reissue_whose_p410_is_its_own_old_parcel_is_not_stamped(
+        self, http
+    ):
+        """After "Create BoxNow parcel now" resets a canceled shipment, a
+        new creation gets P410 because the old canceled request still holds
+        the orderNumber (the documented reissue case). When that recorded
+        parcel is all BoxNow lists, the conflict has a known cause: no
+        stamp, so a cancel of the never-created shipment is not blocked
+        for the settle time."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            parcel_id="9219709201", parcel_state=BoxNowParcelState.CANCELED
+        )
+        BoxNowService.reset_shipment_for_reissue(shipment)
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "canceled")))
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+        assert not BoxNowShipment.objects.get(pk=shipment.pk).metadata.get(
+            "creation_uncertain_at"
+        )
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "canceled")))
+
+        BoxNowService.cancel_shipment(shipment, reason="staff")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
 
     def test_a_parcel_already_saved_clears_it(self, http):
         """Phase 3 finding its own parcel already on the row (saved by

@@ -217,18 +217,20 @@ gateway_levels() {
 # storefront-levels.txt raises it to ERR (a guest's 202 for a product
 # alert, 2026-10-30, would have passed).
 #
-# Nullability is compared a second time, unflattened. Flattening drops a
-# `nullable: true` that sits beside an `allOf` (oasdiff/oasdiff#1348), and
-# that is the shape drf-spectacular emits for a nullable nested serializer:
-# a required response object made nullable came out of the flattened pass
-# as "No changes detected" (#710, found on Django #709). Unflattened, the
-# change is reported, so the second pass runs every check at `none` except
-# the nullability checks whose level is ERR, with that level written out,
-# which also stops oasdiff lowering it to a warning for being inside an
-# `allOf` (nullability_levels). Its findings follow the first pass's,
-# without the lines the first pass already printed. Remove the pass once
-# the pinned oasdiff keeps `nullable` when it flattens: the fixtures in
-# tests/compare.sh then pass on the first pass alone.
+# Nullability is compared in a pass of its own, unflattened. Flattening
+# drops a `nullable: true` that sits beside an `allOf`
+# (oasdiff/oasdiff#1348), and that is the shape drf-spectacular emits for
+# a nullable nested serializer: a required response object made nullable
+# came out of the flattened pass as "No changes detected" (#710, found on
+# Django #709). Unflattened, it is reported. The nullability checks run in
+# that pass only, so each change is reported once, in one wording, and an
+# ignore.txt line copied from the output matches it (the unflattened pass
+# names a property inside an `allOf` as `.../allOf[#/components/...]/x`).
+# Over the 76 released schema.yml pairs from v3.150.1 to v3.246.3 the two
+# passes found the same nullability changes, none only flattened
+# (2026-11-15). The levels come from split_levels. Fold the pass back into
+# the first once the pinned oasdiff keeps `nullable` when it flattens:
+# tests/compare.sh then passes that way.
 breaks() {
     consumer=$1 django=$2 document=$3 levels=$4
     if [ "$consumer" = allauth ]; then
@@ -237,58 +239,77 @@ breaks() {
         resolve_document "$django" "Django's allauth document" || return $?
         django=$DOC
     fi
-    flattened="$WORK_DIR/contract-flattened.out"
-    set -- --flatten-allof --severity-levels "$levels"
+    split_levels "$levels" || return 2
+    set -- --flatten-allof --severity-levels "$FLATTENED_LEVELS"
     [ -s "$IGNORE_FILE" ] && set -- "$@" --err-ignore "$IGNORE_FILE"
     # run_oasdiff sets `code`, so each pass keeps its verdict under its own name.
-    run_oasdiff "$document" "$django" "$@" > "$flattened"
+    run_oasdiff "$document" "$django" "$@"
     flattened_verdict=$?
-    cat "$flattened"
     [ "$flattened_verdict" -le 1 ] || return "$flattened_verdict"
 
-    nullability_levels "$levels" || return 2
-    unflattened="$WORK_DIR/contract-nullability.out"
+    nullability="$WORK_DIR/contract-nullability.out"
     set -- --severity-levels "$NULLABILITY_LEVELS"
     [ -s "$IGNORE_FILE" ] && set -- "$@" --err-ignore "$IGNORE_FILE"
-    run_oasdiff "$document" "$django" "$@" > "$unflattened"
+    run_oasdiff "$document" "$django" "$@" > "$nullability"
     nullability_verdict=$?
     case $nullability_verdict in
         0) return "$flattened_verdict" ;;
-        1) if grep '^error ' "$unflattened" | grep -vxF -f "$flattened" > "$unflattened.new"; then
-               echo "nullability, compared unflattened (oasdiff/oasdiff#1348):"
-               cat "$unflattened.new"
-           fi
+        1) echo "nullability, compared unflattened (oasdiff/oasdiff#1348):"
+           grep '^error ' "$nullability"
            return 1 ;;
-        *) cat "$unflattened"
+        *) cat "$nullability"
            return "$nullability_verdict" ;;
     esac
 }
 
-# nullability_levels LEVELS_FILE: sets NULLABILITY_LEVELS to a levels file
-# for the unflattened pass. Every check the pinned oasdiff lists is `none`
-# except the `*-became-nullable` / `*-became-not-nullable` checks whose
-# level for this consumer (its LEVELS_FILE, else oasdiff's default) is ERR,
-# which are written as `err`. Read from the image, so a pin bump that adds
-# or renames a check needs no edit here; a listing with no such check left
-# fails the comparison rather than skipping it.
-nullability_levels() {
-    NULLABILITY_LEVELS="$WORK_DIR/nullability-levels-$(cksum < "$1" | cut -d' ' -f1).txt"
-    [ -s "$NULLABILITY_LEVELS" ] && return 0
-    oasdiff checks changelog | awk -v consumer="$1" '
+# split_levels LEVELS_FILE: sets FLATTENED_LEVELS and NULLABILITY_LEVELS,
+# the consumer's severity levels divided between the two passes. The
+# nullability checks are the `*-became-nullable` / `*-became-not-nullable`
+# ones the pinned oasdiff lists:
+#
+#   FLATTENED_LEVELS    the consumer's levels, with every nullability check
+#                       at `none`;
+#   NULLABILITY_LEVELS  every check at `none`, except the nullability
+#                       checks whose level for this consumer (its levels
+#                       file, else oasdiff's default) is ERR, written out
+#                       as `err`, which also keeps oasdiff from lowering
+#                       one to a warning for sitting inside an `allOf`.
+#
+# Read from the image, so a pin bump that adds or renames a check needs no
+# edit here; a listing with no nullability check at ERR fails the
+# comparison rather than skipping it.
+split_levels() {
+    key=$(cksum < "$1" | cut -d' ' -f1)
+    FLATTENED_LEVELS="$WORK_DIR/levels-flattened-$key.txt"
+    NULLABILITY_LEVELS="$WORK_DIR/levels-nullability-$key.txt"
+    [ -s "$FLATTENED_LEVELS" ] && [ -s "$NULLABILITY_LEVELS" ] && return 0
+    oasdiff checks changelog | awk -v consumer="$1" \
+        -v flattened="$FLATTENED_LEVELS" -v nullability="$NULLABILITY_LEVELS" '
         BEGIN {
             while ((getline line < consumer) > 0) {
                 sub(/\r$/, "", line)
-                if (split(line, field, /[ \t]+/) >= 2) own[field[1]] = tolower(field[2])
+                if (split(line, field, /[ \t]+/) >= 2) {
+                    own[field[1]] = tolower(field[2])
+                    owned[++owns] = line
+                }
             }
         }
         $2 == "error" || $2 == "warn" || $2 == "info" {
+            if ($1 !~ /-became-(not-)?nullable$/) { print $1, "none" > nullability; next }
+            checked[$1] = 1
+            print $1, "none" > flattened
             level = ($1 in own) ? own[$1] : ($2 == "error" ? "err" : $2)
-            kept = $1 ~ /-became-(not-)?nullable$/ && level == "err"
-            print $1, kept ? "err" : "none"
-            if (kept) count++
+            print $1, (level == "err") ? "err" : "none" > nullability
+            if (level == "err") kept++
         }
-        END { exit count ? 0 : 1 }' > "$NULLABILITY_LEVELS" && return 0
-    rm -f "$NULLABILITY_LEVELS"
+        END {
+            for (i = 1; i <= owns; i++) {
+                split(owned[i], field, /[ \t]+/)
+                if (!(field[1] in checked)) print owned[i] > flattened
+            }
+            exit kept ? 0 : 1
+        }' && return 0
+    rm -f "$FLATTENED_LEVELS" "$NULLABILITY_LEVELS"
     echo "   the pinned oasdiff lists no nullability check at ERR: cannot compare nullability" >&2
     return 2
 }

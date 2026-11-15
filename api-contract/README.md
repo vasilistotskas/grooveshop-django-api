@@ -58,6 +58,8 @@ never pass in one piece.
 ## Two passes per pairing
 
 Every pairing runs oasdiff twice, and fails if either pass finds an error.
+The nullability checks (`*-became-nullable`, `*-became-not-nullable`) run in
+the second pass only; every other check runs in the first.
 
 1. **Flattened** (`--flatten-allof`), with the consumer's levels. drf-spectacular
    wraps every nested serializer in an `allOf`, and unflattened oasdiff reports
@@ -66,18 +68,23 @@ Every pairing runs oasdiff twice, and fails if either pass finds an error.
 2. **Nullability, unflattened.** Flattening drops a `nullable: true` that sits
    beside an `allOf` ([oasdiff#1348](https://github.com/oasdiff/oasdiff/issues/1348)),
    and that is how drf-spectacular declares a nullable nested serializer. A
-   required response object made nullable came out of the first pass as "No
-   changes detected" (#710). The second pass runs only the
-   `*-became-nullable` / `*-became-not-nullable` checks whose level for this
-   consumer is ERR (its levels file, else oasdiff's default), every other check
-   at `none`. The list comes from `oasdiff checks changelog` in the pinned
-   image, so a pin bump needs no edit; a pinned oasdiff that lists none of them
-   fails the check instead of skipping it. Its findings print under
-   "nullability, compared unflattened", without the lines the first pass
-   already printed, and `ignore.txt` applies to both passes.
+   required response object made nullable came out of a flattened comparison
+   as "No changes detected" (#710). This pass runs the nullability checks whose
+   level for this consumer is ERR (its levels file, else oasdiff's default),
+   written out as `err` so oasdiff does not lower one to a warning for sitting
+   inside an `allOf`. Its findings print under "nullability, compared
+   unflattened"; a property inside an `allOf` is named
+   `.../allOf[#/components/schemas/X]/name`, and an `ignore.txt` line copies
+   that text like any other. Over the released `schema.yml` pairs from v3.150.1
+   to v3.246.3 both passes found the same nullability changes, none of them
+   only flattened, so giving them to one pass loses nothing and reports each
+   change once.
 
-The second pass goes once the pinned oasdiff keeps `nullable` when it flattens:
-`tests/compare.sh` then passes with the first pass alone.
+The levels for both passes are derived from `oasdiff checks changelog` in the
+pinned image, so a pin bump needs no edit; a pinned oasdiff that lists no
+nullability check at ERR fails the check instead of skipping it. The checks go
+back to the first pass once the pinned oasdiff keeps `nullable` when it
+flattens: `tests/compare.sh` then passes that way.
 
 ## An accepted break
 

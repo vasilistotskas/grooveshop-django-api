@@ -73,6 +73,19 @@ run consumer.yml required-removed.yml
 expect "a required property removed inside allOf is still refused flattened" 1 \
   "removed the required property \`author/name\`" "[response-required-property-removed]"
 
+# Nullability belongs to the unflattened pass alone: a change the flattened
+# pass would also see is printed once, in the unflattened wording, so the
+# ignore.txt line copied from it is the only one needed.
+run consumer.yml inner-nullable.yml
+expect "a property made nullable inside an allOf is refused" 1 \
+  "the response property \`author/allOf[#/components/schemas/User]/name\` became nullable" \
+  "the response property \`parent/user/name\` became nullable"
+if grep -qF -- "\`author/name\`" <<<"$output"; then
+  echo "FAIL a nullability change is reported by both passes"; failed=1
+else
+  echo "ok   a nullability change is reported by one pass only"
+fi
+
 # The consumer's own levels decide, in the nullability pass as in the first.
 printf 'response-property-became-nullable INFO\n' > "$work/fixtures/lenient-levels.txt"
 run consumer.yml response-nullable.yml lenient-levels.txt
@@ -87,5 +100,14 @@ cat > "$work/rules/ignore.txt" <<'EOF'
 EOF
 run consumer.yml response-nullable.yml
 expect "ignore.txt accepts a nullability break" 0 "ok"
+
+cat > "$work/rules/ignore.txt" <<'EOF'
+2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `author/allOf[#/components/schemas/User]/name` became nullable for the status `200`
+2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `parent/user/name` became nullable for the status `200`
+2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `author/allOf[#/components/schemas/User]/name` became nullable for the status `201`
+2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `parent/user/name` became nullable for the status `201`
+EOF
+run consumer.yml inner-nullable.yml
+expect "ignore.txt accepts what the nullability pass printed" 0 "ok"
 
 exit "$failed"

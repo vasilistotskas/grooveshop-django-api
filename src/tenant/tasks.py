@@ -662,12 +662,11 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     stood for was not done.
 
     One sweep runs at a time, and the publishes run outside any transaction.
-    A publish can wait without end: while RabbitMQ blocks publishers (a memory
-    or disk alarm) the producer waits for its confirm, and closing the channel
-    after a failed publish waits too. Measured against a broker with its
-    memory alarm on: still waiting after 75 s, with a publish timeout or
-    without. No lease is long enough for that, and a transaction would be
-    ended by ``idle_in_transaction_session_timeout``, so a sweep holds a
+    While RabbitMQ blocks publishers (a memory or disk alarm) each publish
+    waits out the broker socket timeouts (``CELERY_BROKER_TRANSPORT_OPTIONS``,
+    about six of them) before it fails. A lease would have to outlive that,
+    and a transaction could be ended by
+    ``idle_in_transaction_session_timeout``, so a sweep holds a
     session-level advisory lock and a sweep that finds it held does nothing.
     The lock goes with the session if the worker dies, and the next sweep
     sends again at most the one row that was going out.

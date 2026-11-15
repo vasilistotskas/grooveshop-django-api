@@ -1,6 +1,7 @@
 """Celery: broker, results, workers and deferred dispatch."""
 
 import datetime
+import sys
 from os import getenv
 
 from django.core.exceptions import ImproperlyConfigured
@@ -82,6 +83,30 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "interval_step": 0.2,
     "interval_max": 0.5,
 }
+# How long one read on the broker socket may block, in seconds. py-amqp
+# sets it as ``SO_RCVTIMEO`` on every connection, so it bounds the waits
+# nothing else does: while RabbitMQ blocks publishers (a memory or disk
+# alarm) it stops reading the connection and sends nothing back, so the
+# publish confirm never comes, and neither does the ``Close-Ok`` kombu then
+# waits for when it replaces the connection. A ``timeout=`` on the publish
+# covers only the first. Without it a request that published waited
+# without end (#509). A read that times out is a connection error, so a
+# publish to a blocked broker fails after about six of them (four attempts
+# of ``task_publish_retry_policy``, then closing the channel and the
+# connection: 12.6 s measured at 2 s) and ``dispatch_on_commit`` keeps the
+# task as a ``DeferredDispatch``. A healthy broker answers in milliseconds,
+# and a worker reads its consuming connection only when the socket is
+# readable, so neither meets the bound. Writes need no such option: the
+# ``TCP_USER_TIMEOUT`` py-amqp sets by default already ends a write the
+# broker stops taking. docs/deferred-dispatch.md has the measurements.
+#
+# Linux only, where every deployment runs: py-amqp packs the value as a
+# POSIX ``timeval``, which Windows reads as a DWORD of MILLISECONDS, so the
+# same 2 would cut every read on a Windows host at 2 ms.
+if sys.platform != "win32":
+    CELERY_BROKER_TRANSPORT_OPTIONS["read_timeout"] = float(
+        getenv("CELERY_BROKER_READ_TIMEOUT", "2")
+    )
 CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100

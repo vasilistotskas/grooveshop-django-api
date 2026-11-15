@@ -130,4 +130,16 @@ EOF
 run consumer.yml inner-nullable.yml
 expect "one ignore.txt line accepts a change both passes see" 0 "ok"
 
+# A finding only the nullability pass sees, inside a nested allOf, is
+# printed with its `allOf[...]` segment: the line copied as printed accepts it.
+: > "$work/rules/ignore.txt"
+run nested-consumer.yml nested-nullable.yml
+expect "a nested object made nullable beside allOf is refused" 1 \
+  "the response property \`parent/allOf[#/components/schemas/Parent]/user\` became nullable for the status \`200\`"
+cat > "$work/rules/ignore.txt" <<'EOF'
+2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `parent/allOf[#/components/schemas/Parent]/user` became nullable for the status `200`
+EOF
+run nested-consumer.yml nested-nullable.yml
+expect "ignore.txt accepts a nested allOf finding copied as printed" 0 "ok"
+
 exit "$failed"

@@ -333,7 +333,8 @@ new_nullability_findings() {
         function plain(s) { gsub(/allOf\[[^]]*\]\//, "", s); return s }
         BEGIN {
             while ((read = getline line < ignore) > 0) {
-                line = plain(tolower(line))
+                # plain() before tolower(): its pattern is the `allOf` oasdiff prints.
+                line = tolower(plain(line))
                 accepted[++accepts] = line
                 at[accepts] = ""
                 n = split(line, word, /[ \t]+/)

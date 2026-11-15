@@ -159,6 +159,22 @@ and says which file holds each § number used here.
   /api/v1/parcels?orderNumber=` (with `paymentMode` for a COD parcel), and
   set the setting to that plus a margin. The 600 s default is twice the
   mint claim's TTL, chosen without that measurement.
+- **A canceled order never gets a live parcel.** A staff or system order
+  cancel goes on when the courier step is refused
+  (`OrderService.cancel_attached_shipment` never raises): while a creation
+  of uncertain outcome settles, or one is in flight. The order's status is
+  that cancel's durable record, and the creation reads it at both ends.
+  Before phase 1, a canceled order's shipment with no parcel is not
+  created: `create_shipment_for_order` runs `cancel_shipment` instead
+  (`_cancel_for_a_canceled_order`), which cancels a parcel BoxNow lists,
+  refuses with a `BoxNowBusyError` while the creation settles (the task
+  retries) and cancels locally once the lookup is authoritative or when no
+  creation was sent. In phase 3, `_persist_parcel` treats an order canceled
+  meanwhile like a shipment canceled meanwhile: the row is recorded
+  CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
+  cancelled at BoxNow. Its locked `select_related` join takes the order
+  row too, so an order cancel still in its transaction is waited for and
+  then seen.
 - **The tracking poll asks in the shipment's payment mode** (#691).
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources

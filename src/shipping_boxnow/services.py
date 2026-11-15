@@ -61,6 +61,9 @@ _SHIPPED_EVENTS: frozenset[str] = frozenset(
 # we are allowed to advance forward to SHIPPED.
 _PRE_SHIPPED_STATUSES: frozenset[str] = frozenset({"PENDING", "PROCESSING"})
 
+#: The status of a canceled order: its shipment gets no parcel.
+_CANCELED_ORDER_STATUS = "CANCELED"
+
 # Terminal Order statuses — never move backwards from these.
 _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
     {"DELIVERED", "COMPLETED", "CANCELED", "RETURNED", "REFUNDED"}
@@ -356,6 +359,10 @@ class BoxNowService:
         was lost: :meth:`_take_over_existing_parcel` looks it up and saves
         its parcel, or refuses as before (#606).
         """
+        # A canceled order gets no parcel: finish its cancel instead.
+        if (finished := cls._cancel_for_a_canceled_order(order)) is not None:
+            return finished
+
         # ---- Phase 1: claim ----------------------------------------------
         with transaction.atomic():
             try:
@@ -674,6 +681,60 @@ class BoxNowService:
         return shipment
 
     @classmethod
+    def _cancel_for_a_canceled_order(
+        cls, order: Order
+    ) -> BoxNowShipment | None:
+        """Finish the cancel of a canceled order's shipment instead of
+        creating its parcel.
+
+        A staff or system order cancel goes on when the courier step is
+        refused (``OrderService.cancel_attached_shipment`` never raises):
+        while a creation of uncertain outcome settles, or one is in
+        flight. The order is then CANCELED while its shipment still waits
+        for a parcel, and a pending retry of the creation would create one,
+        or take over the one BoxNow holds after a P410, and save it live on
+        the canceled order. The order's status is the durable record of
+        that cancel, so the creation reads it and runs the cancel instead:
+        :meth:`cancel_shipment` cancels a parcel BoxNow lists, refuses
+        retryably while the creation settles (Celery retries the task),
+        and cancels locally once the lookup is authoritative or when no
+        creation was ever sent.
+
+        None for an order that is not canceled, and for a shipment that
+        already has a parcel, which phase 1 returns unchanged as for any
+        order. A cancel that lands after this check, while the creation is
+        in flight, is caught by :meth:`_persist_parcel`.
+        """
+        shipment = (
+            BoxNowShipment.objects.select_related("order")
+            .filter(order=order)
+            .first()
+        )
+        if (
+            shipment is None
+            or shipment.order.status != _CANCELED_ORDER_STATUS
+            or shipment.has_parcel
+        ):
+            return None
+        if shipment.parcel_state != BoxNowParcelState.CANCELED:
+            logger.info(
+                "create_shipment_for_order: order=%s is canceled — "
+                "cancelling its shipment instead of creating a parcel",
+                order.id,
+                extra={
+                    "order_id": order.id,
+                    "shipment_pk": shipment.pk,
+                    "carrier": "boxnow",
+                },
+            )
+            cls.cancel_shipment(
+                shipment,
+                reason="The order was canceled before its parcel was created.",
+            )
+            shipment.refresh_from_db()
+        return shipment
+
+    @classmethod
     def _release_mint_claim(
         cls,
         shipment_pk: int,
@@ -772,7 +833,9 @@ class BoxNowService:
         reconciliation.
 
         A row cancelled while BoxNow answered (a cancel once the claim's
-        TTL ran out) stays CANCELED: the parcel is recorded under
+        TTL ran out), or whose order was canceled meanwhile (an order
+        cancel goes on when the courier step is refused), is CANCELED and
+        stays so: the parcel is recorded under
         ``metadata['minted_after_cancel']`` and, with the lock released,
         cancelled at BoxNow (:meth:`_cancel_parcel_minted_after_cancel`).
 
@@ -788,14 +851,20 @@ class BoxNowService:
             if shipment.parcel_id == parcel_id:
                 return shipment
 
+            # The order row is locked with the shipment's (the join of
+            # ``select_related``), so an order cancel still in its
+            # transaction is waited for and then seen.
+            order_canceled = shipment.order.status == _CANCELED_ORDER_STATUS
             canceled_meanwhile = (
                 shipment.parcel_state == BoxNowParcelState.CANCELED
+                or order_canceled
             )
             if canceled_meanwhile:
                 logger.warning(
-                    "create_shipment_for_order: shipment=%s (order=%s) was "
-                    "canceled while BoxNow created parcel_id=%s — keeping "
-                    "the cancel and cancelling the parcel at BoxNow.",
+                    "create_shipment_for_order: shipment=%s (order=%s) or "
+                    "its order was canceled while BoxNow created "
+                    "parcel_id=%s — keeping the cancel and cancelling the "
+                    "parcel at BoxNow.",
                     shipment.pk,
                     order.id,
                     parcel_id,
@@ -813,7 +882,16 @@ class BoxNowService:
                     "mint_started_at": None,
                     "creation_uncertain_at": None,
                 }
-                shipment.save(update_fields=["metadata", "updated_at"])
+                if shipment.parcel_state == BoxNowParcelState.CANCELED:
+                    shipment.save(update_fields=["metadata", "updated_at"])
+                else:
+                    # The order was canceled, its shipment not yet: record
+                    # it, so no later creation treats the row as waiting.
+                    cls._record_cancel(
+                        shipment,
+                        reason="The order was canceled while BoxNow "
+                        "created its parcel.",
+                    )
 
             elif shipment.parcel_id:
                 logger.error(

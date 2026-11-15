@@ -1100,3 +1100,80 @@ class TestStaffAreToldWhenBoxNowCannotBeAsked:
             )
         ]
         assert any("may still be delivered" in note for note in notes)
+
+
+class TestACanceledOrderGetsNoLiveParcel:
+    """A staff or system order cancel goes on when the courier step is
+    refused (a creation of uncertain outcome still settling, one in
+    flight), so the order is canceled while its shipment still waits for
+    a parcel. The creation must never then leave a live parcel on it."""
+
+    _CREATED = {"id": "42224", "parcels": [{"id": "9219709201"}]}
+
+    def test_a_retry_after_the_order_was_canceled_cancels_instead(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        type(order).objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED
+        )
+        order.refresh_from_db()
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, *_LOOKUPS, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        order.refresh_from_db()
+        assert not order.tracking_number
+
+    def test_a_retry_while_it_settles_creates_nothing(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        type(order).objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED
+        )
+        order.refresh_from_db()
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, *_LOOKUPS]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.parcel_id is None
+
+    def test_a_parcel_created_while_the_order_was_canceled_is_canceled(
+        self, http
+    ):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+
+        def cancel_the_order_while_boxnow_answers() -> Any:
+            type(order).objects.filter(pk=order.pk).update(
+                status=OrderStatus.CANCELED
+            )
+            return _response(200, self._CREATED)
+
+        http.answer(_CREATE, cancel_the_order_while_boxnow_answers)
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+        [minted] = shipment.metadata["minted_after_cancel"]
+        assert minted["parcel_id"] == "9219709201"
+        assert minted["canceled_at_boxnow"]
+        order.refresh_from_db()
+        assert not order.tracking_number

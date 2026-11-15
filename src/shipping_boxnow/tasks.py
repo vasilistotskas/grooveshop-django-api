@@ -24,6 +24,24 @@ from tenant.celery import TenantTask
 logger = logging.getLogger(__name__)
 
 
+class BoxNowTask(TenantTask):
+    """A BoxNow task: its retry waits at least as long as BoxNow asked.
+
+    Celery's ``autoretry_for`` and an explicit ``self.retry`` both land in
+    :meth:`retry`, so a ``BoxNowRetryableError`` carrying a
+    ``retry_after`` (a 429's ``Retry-After``) is retried no sooner than
+    that, never on the shorter backoff alone.
+    """
+
+    def retry(self, *args: Any, **options: Any) -> Any:
+        retry_after = getattr(options.get("exc"), "retry_after", None)
+        if retry_after is not None:
+            options["countdown"] = max(
+                options.get("countdown") or 0, retry_after
+            )
+        return super().retry(*args, **options)
+
+
 def _skip_if_boxnow_unconfigured(task_name: str) -> bool:
     """Return True (and log) when BoxNow has no credentials for this tenant.
 
@@ -49,7 +67,7 @@ def _skip_if_boxnow_unconfigured(task_name: str) -> bool:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -255,7 +273,7 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=3600,
@@ -293,7 +311,7 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -466,7 +484,7 @@ _BOXNOW_POLL_DISPATCH_STAGGER_SECONDS = 0.2
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=300,
@@ -485,6 +503,13 @@ def poll_boxnow_tracking_batch(
     """
     if _skip_if_boxnow_unconfigured("poll_boxnow_tracking_batch"):
         return {"dispatched": 0, "skipped": True}
+
+    from shipping_boxnow.client import BoxNowClient
+
+    # BoxNow asked this store to wait (a 429): sub-tasks already sent
+    # cannot be recalled, so none is sent until the wait is over.
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"dispatched": 0, "rate_limited": True}
 
     from datetime import timedelta
 
@@ -539,7 +564,7 @@ def poll_boxnow_tracking_batch(
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -547,9 +572,17 @@ def poll_boxnow_tracking_batch(
     max_retries=5,
 )
 def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
-    """Poll one BoxNowShipment and apply any new state transitions."""
+    """Poll one BoxNowShipment and apply any new state transitions.
+
+    While BoxNow rate-limits the store (a 429, ``Retry-After``), a poll
+    already dispatched makes no call: the next batch polls it again.
+    """
+    from shipping_boxnow.client import BoxNowClient
     from shipping_boxnow.models import BoxNowShipment
     from shipping_boxnow.services import BoxNowService
+
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"status": "rate_limited", "shipment_id": shipment_id}
 
     try:
         shipment = BoxNowShipment.objects.select_related("order").get(
@@ -624,6 +657,11 @@ def settle_uncertain_boxnow_creations(
 
     from collections import Counter
 
+    from shipping_boxnow.client import BoxNowClient
+
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"rate_limited": 1}
+
     from shipping_boxnow.enum.parcel_state import BoxNowParcelState
     from shipping_boxnow.models import BoxNowShipment
     from shipping_boxnow.services import BoxNowService
@@ -656,6 +694,20 @@ def settle_uncertain_boxnow_creations(
                 order_id, exc, waiting=len(candidates)
             )
             outcomes["credentials_refused"] += 1
+            break
+        except BoxNowRetryableError as exc:
+            if exc.status_code != 429:
+                logger.warning(
+                    "settle_uncertain_boxnow_creations: shipment=%s not "
+                    "settled, BoxNow did not answer: %s",
+                    shipment_id,
+                    exc,
+                )
+                outcomes["unanswered"] += 1
+                continue
+            # A rate limit: every further call would be refused too. The
+            # rest wait for the next run, after BoxNow's Retry-After.
+            outcomes["rate_limited"] += 1
             break
         except BoxNowAPIError as exc:
             logger.warning(

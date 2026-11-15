@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from shipping.exceptions import (
     CarrierBusyError,
     CarrierError,
@@ -97,9 +99,20 @@ class BoxNowRetryableError(BoxNowAPIError, CarrierUnavailableError):
     """
     Raised for transient failures that Celery tasks should auto-retry on.
 
-    Covers HTTP 5xx responses and connection-level errors (wrapped in this
-    class so Celery's ``autoretry_for`` can target a single type).
+    Covers HTTP 5xx and 429 responses and connection-level errors (wrapped
+    in this class so Celery's ``autoretry_for`` can target a single type).
+
+    Attributes:
+        retry_after: Seconds BoxNow asked us to wait (its ``Retry-After``,
+            capped by ``BOXNOW_RETRY_AFTER_MAX_SECONDS``), or None. A
+            BoxNow task never retries sooner (``tasks.BoxNowTask``).
     """
+
+    def __init__(
+        self, *args: Any, retry_after: float | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.retry_after = retry_after
 
 
 class BoxNowBusyError(BoxNowRetryableError, CarrierBusyError):

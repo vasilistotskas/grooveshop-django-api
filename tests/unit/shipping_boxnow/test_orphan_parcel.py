@@ -1847,3 +1847,115 @@ class TestEveryPathLocksTheOrderFirst:
             )
 
         assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]
+
+
+def _rate_limited(retry_after: str | None = None) -> Any:
+    response = _response(429, {"message": "Too many requests"})
+    response.headers = (
+        {} if retry_after is None else {"Retry-After": retry_after}
+    )
+    return response
+
+
+class TestBoxNowRateLimits:
+    """A 429 is retried no sooner than BoxNow's ``Retry-After`` says, and
+    the store's other BoxNow work waits for it too instead of multiplying
+    the calls BoxNow refused."""
+
+    @pytest.mark.parametrize(
+        ("header", "expected"),
+        [
+            pytest.param("30", 30, id="seconds"),
+            pytest.param(None, None, id="no-header"),
+            pytest.param("999999", None, id="above-the-cap"),
+        ],
+    )
+    def test_the_wait_travels_on_the_error(
+        self, http, settings, header, expected
+    ):
+        client = BoxNowClient(session=http)
+        http.answer(_LOOKUP, _rate_limited(header))
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        wait = {
+            "no-header": settings.BOXNOW_RATE_LIMIT_DEFAULT_SECONDS,
+            "above-the-cap": settings.BOXNOW_RETRY_AFTER_MAX_SECONDS,
+        }
+        assert raised.value.retry_after == (
+            expected
+            if expected is not None
+            else wait["no-header" if header is None else "above-the-cap"]
+        )
+        assert BoxNowClient.rate_limited_for() > 0
+
+    def test_an_http_date_is_read_as_seconds_from_now(self, http):
+        from email.utils import format_datetime
+
+        client = BoxNowClient(session=http)
+        http.answer(
+            _LOOKUP,
+            _rate_limited(
+                format_datetime(timezone.now() + timedelta(seconds=120))
+            ),
+        )
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        assert 100 < raised.value.retry_after <= 120
+
+    def test_a_task_retries_no_sooner_than_boxnow_asked(self):
+        exc = BoxNowRetryableError(429, retry_after=120)
+
+        with patch("celery.app.task.Task.retry") as retry:
+            create_boxnow_shipment_for_order.retry(exc=exc, countdown=4)
+
+        assert retry.call_args.kwargs["countdown"] == 120
+
+    def test_the_poll_of_one_parcel_waits_while_rate_limited(self, http):
+        from shipping_boxnow.tasks import poll_boxnow_tracking_one
+
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        BoxNowClient._note_rate_limit(60)
+
+        result = poll_boxnow_tracking_one.run(shipment.pk)
+
+        assert result["status"] == "rate_limited"
+        assert http.calls == []
+
+    def test_the_poll_batch_dispatches_nothing_while_rate_limited(self):
+        from shipping_boxnow.tasks import (
+            poll_boxnow_tracking_batch,
+            poll_boxnow_tracking_one,
+        )
+
+        BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        BoxNowClient._note_rate_limit(60)
+
+        with patch.object(poll_boxnow_tracking_one, "apply_async") as sent:
+            result = poll_boxnow_tracking_batch.run()
+
+        assert result["dispatched"] == 0
+        sent.assert_not_called()
+
+    def test_the_sweep_stops_its_run_at_the_first_rate_limit(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        _settled(_paid_order())
+        _settled(_paid_order())
+        http.answer(_LOOKUP, _rate_limited("30"))
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"rate_limited": 1}
+        assert http.routes() == [_LOOKUP]

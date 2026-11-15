@@ -106,6 +106,14 @@ BOXNOW_CREATION_SETTLE_SECONDS = int(
 BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS = int(
     getenv("BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS", "86400")
 )
+# A BoxNow 429: how long the store's BoxNow work waits when BoxNow sends no
+# usable Retry-After, and the longest wait any Retry-After is held to.
+BOXNOW_RATE_LIMIT_DEFAULT_SECONDS = int(
+    getenv("BOXNOW_RATE_LIMIT_DEFAULT_SECONDS", "60")
+)
+BOXNOW_RETRY_AFTER_MAX_SECONDS = int(
+    getenv("BOXNOW_RETRY_AFTER_MAX_SECONDS", "900")
+)
 
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing

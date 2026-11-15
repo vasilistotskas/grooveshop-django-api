@@ -230,6 +230,17 @@ and says which file holds each § number used here.
   not have this case: a voucher request of unknown outcome is never
   cancelled or re-sent automatically, it waits for staff (§5.1 of
   `shipping-acs.md`).
+- **A rate limit is waited out, not multiplied.** A 429 from BoxNow
+  (the token endpoint or the API) is a `BoxNowRetryableError` carrying
+  `retry_after`: BoxNow's `Retry-After` (seconds or an HTTP-date), or
+  `BOXNOW_RATE_LIMIT_DEFAULT_SECONDS` without one, at most
+  `BOXNOW_RETRY_AFTER_MAX_SECONDS`. Every BoxNow task's retry
+  (`tasks.BoxNowTask`, for `autoretry_for` and `self.retry` alike) waits at
+  least that long. The client also records the wait for the store
+  (`BoxNowClient.rate_limited_for`): until it is over the tracking poll
+  dispatches nothing, a poll already dispatched makes no call (the next
+  batch polls it again), and the settle sweep skips its run; a sweep run
+  that meets a 429 stops there.
 - **Lock order: the order, then the shipment.** An order cancel locks
   the order and then cancels the shipment (`OrderService._cancel_order_locked`
   → `cancel_shipment`). Every BoxNow path that locks both takes them in

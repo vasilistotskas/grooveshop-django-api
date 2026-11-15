@@ -121,3 +121,14 @@ class CarrierUnavailableError(CarrierError):
     the courier did not judge the request, so nothing is known about the
     parcel and asking again later may succeed.
     """
+
+
+class CarrierBusyError(CarrierUnavailableError):
+    """Our own refusal: the same work is already running.
+
+    A creation or a cancel of this shipment is in flight, or a creation
+    of uncertain outcome is still settling, so nothing was asked of the
+    courier. Retryable like any :class:`CarrierUnavailableError`, but the
+    message says what to wait for, so an API answers it as a 409 with
+    that text instead of "the courier cannot be reached".
+    """

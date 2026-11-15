@@ -14,12 +14,32 @@ from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
+    BoxNowAuthError,
+    BoxNowCancelRefusedError,
     BoxNowConfigError,
     BoxNowRetryableError,
 )
 from tenant.celery import TenantTask
 
 logger = logging.getLogger(__name__)
+
+
+class BoxNowTask(TenantTask):
+    """A BoxNow task: its retry waits at least as long as BoxNow asked.
+
+    Celery's ``autoretry_for`` and an explicit ``self.retry`` both land in
+    :meth:`retry`, so a ``BoxNowRetryableError`` carrying a
+    ``retry_after`` (a 429's ``Retry-After``) is retried no sooner than
+    that, never on the shorter backoff alone.
+    """
+
+    def retry(self, *args: Any, **options: Any) -> Any:
+        retry_after = getattr(options.get("exc"), "retry_after", None)
+        if retry_after is not None:
+            options["countdown"] = max(
+                options.get("countdown") or 0, retry_after
+            )
+        return super().retry(*args, **options)
 
 
 def _skip_if_boxnow_unconfigured(task_name: str) -> bool:
@@ -47,7 +67,7 @@ def _skip_if_boxnow_unconfigured(task_name: str) -> bool:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -70,7 +90,9 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
     """
     # Lazy imports to avoid circular dependencies between shipping_boxnow
     # and order apps at Django startup time.
+    from order.enum.status import OrderStatus
     from order.models.order import Order
+    from shipping_boxnow.enum.parcel_state import BoxNowParcelState
     from shipping_boxnow.services import BoxNowService
 
     try:
@@ -139,6 +161,17 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             "order_id": order_id,
             "message": str(exc),
         }
+    except BoxNowCancelRefusedError as exc:
+        # The order is canceled: its cancel, not a creation, failed. The
+        # creation alert's remedy ("Create BoxNow parcel now") is wrong
+        # here, so staff get the cancel's record instead.
+        BoxNowService.report_cancel_refused(order_id, exc.message)
+        return {
+            "status": "boxnow_cancel_refused",
+            "order_id": order_id,
+            "code": exc.code,
+            "message": str(exc),
+        }
     except BoxNowRetryableError:
         # Transient (HTTP 5xx / connection). Re-raise so Celery's autoretry_for
         # handles it — BoxNowRetryableError subclasses BoxNowAPIError, so the
@@ -146,6 +179,22 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
         # error and the retry policy would be dead code.
         raise
     except BoxNowAPIError as exc:
+        if (
+            isinstance(exc, BoxNowAuthError)
+            and Order.objects.filter(
+                pk=order_id, status=OrderStatus.CANCELED
+            ).exists()
+        ):
+            # A canceled order's cancel could not be asked: its
+            # uncertainty stays for the sweep, and staff hear about the
+            # cancel, not a creation to retry.
+            BoxNowService.report_cancel_refused(order_id, exc.message)
+            return {
+                "status": "boxnow_cancel_refused",
+                "order_id": order_id,
+                "code": exc.code,
+                "message": str(exc),
+            }
         # P-coded business error from BoxNow (e.g. P402 invalid locker,
         # P410 order number conflict). Do not retry — manual intervention
         # is required, so tell a human immediately (prod order 143 sat
@@ -172,11 +221,35 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
                 "now” on that shipment."
             ),
         )
+        # What the sweep reads before alerting about the same failure.
+        BoxNowService.record_staff_alerted(order_id)
         return {
             "status": "boxnow_api_error",
             "order_id": order_id,
             "code": exc.code,
             "message": str(exc),
+        }
+
+    if shipment.parcel_state == BoxNowParcelState.CANCELED:
+        # Canceled instead of created: the order was canceled (its cancel
+        # finished here), or the shipment was while BoxNow answered.
+        order_canceled = Order.objects.filter(
+            pk=order_id, status=OrderStatus.CANCELED
+        ).exists()
+        logger.info(
+            "BoxNow parcel for order %s not created: the %s was canceled "
+            "(parcel_id=%s)",
+            order_id,
+            "order" if order_canceled else "shipment",
+            shipment.parcel_id,
+            extra={"order_id": order_id, "parcel_id": shipment.parcel_id},
+        )
+        return {
+            "status": "order_canceled"
+            if order_canceled
+            else "shipment_canceled",
+            "order_id": order_id,
+            "parcel_id": shipment.parcel_id,
         }
 
     logger.info(
@@ -200,7 +273,7 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=3600,
@@ -238,7 +311,7 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -411,7 +484,7 @@ _BOXNOW_POLL_DISPATCH_STAGGER_SECONDS = 0.2
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=300,
@@ -430,6 +503,13 @@ def poll_boxnow_tracking_batch(
     """
     if _skip_if_boxnow_unconfigured("poll_boxnow_tracking_batch"):
         return {"dispatched": 0, "skipped": True}
+
+    from shipping_boxnow.client import BoxNowClient
+
+    # BoxNow asked this store to wait (a 429): sub-tasks already sent
+    # cannot be recalled, so none is sent until the wait is over.
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"dispatched": 0, "rate_limited": True}
 
     from datetime import timedelta
 
@@ -484,7 +564,7 @@ def poll_boxnow_tracking_batch(
 
 @shared_task(
     bind=True,
-    base=TenantTask,
+    base=BoxNowTask,
     autoretry_for=(BoxNowRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -492,9 +572,17 @@ def poll_boxnow_tracking_batch(
     max_retries=5,
 )
 def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
-    """Poll one BoxNowShipment and apply any new state transitions."""
+    """Poll one BoxNowShipment and apply any new state transitions.
+
+    While BoxNow rate-limits the store (a 429, ``Retry-After``), a poll
+    already dispatched makes no call: the next batch polls it again.
+    """
+    from shipping_boxnow.client import BoxNowClient
     from shipping_boxnow.models import BoxNowShipment
     from shipping_boxnow.services import BoxNowService
+
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"status": "rate_limited", "shipment_id": shipment_id}
 
     try:
         shipment = BoxNowShipment.objects.select_related("order").get(
@@ -551,3 +639,82 @@ def purge_expired_boxnow_parcel_events() -> dict[str, int]:
             "Purged %s BoxNow parcel events of settled shipments", deleted
         )
     return {"deleted": deleted}
+
+
+@shared_task(base=TenantTask)
+def settle_uncertain_boxnow_creations(
+    *, max_per_run: int = 100
+) -> dict[str, int]:
+    """Settle the creations whose outcome stayed uncertain past the settle
+    time (#712): ``BoxNowService.settle_uncertain_creation`` per shipment.
+
+    Beat-scheduled through ``tenant.tasks.fanout_settle_uncertain_boxnow_
+    creations``. A shipment BoxNow did not answer for is counted and left
+    for the next run, so one failure never stops the rest.
+    """
+    if _skip_if_boxnow_unconfigured("settle_uncertain_boxnow_creations"):
+        return {}
+
+    from collections import Counter
+
+    from shipping_boxnow.client import BoxNowClient
+
+    if BoxNowClient.rate_limited_for() is not None:
+        return {"rate_limited": 1}
+
+    from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+    from shipping_boxnow.models import BoxNowShipment
+    from shipping_boxnow.services import BoxNowService
+
+    candidates = list(
+        BoxNowShipment.objects.real()
+        .filter(
+            parcel_id__isnull=True,
+            metadata__has_key="creation_uncertain_at",
+        )
+        .exclude(metadata__creation_uncertain_at=None)
+        .exclude(parcel_state=BoxNowParcelState.CANCELED)
+        .order_by("updated_at")
+        .values_list("id", flat=True)[:max_per_run]
+    )
+    outcomes: Counter[str] = Counter()
+    for shipment_id in candidates:
+        try:
+            outcomes[BoxNowService.settle_uncertain_creation(shipment_id)] += 1
+        except BoxNowAuthError as exc:
+            # The store's credentials: every other shipment would fail the
+            # same way. They keep their stamps and settle once BoxNow
+            # accepts the credentials; staff are told once.
+            order_id = (
+                BoxNowShipment.objects.filter(pk=shipment_id)
+                .values_list("order_id", flat=True)
+                .get()
+            )
+            BoxNowService.alert_credentials_refused(
+                order_id, exc, waiting=len(candidates)
+            )
+            outcomes["credentials_refused"] += 1
+            break
+        except BoxNowRetryableError as exc:
+            if exc.status_code != 429:
+                logger.warning(
+                    "settle_uncertain_boxnow_creations: shipment=%s not "
+                    "settled, BoxNow did not answer: %s",
+                    shipment_id,
+                    exc,
+                )
+                outcomes["unanswered"] += 1
+                continue
+            # A rate limit: every further call would be refused too. The
+            # rest wait for the next run, after BoxNow's Retry-After.
+            outcomes["rate_limited"] += 1
+            break
+        except BoxNowAPIError as exc:
+            logger.warning(
+                "settle_uncertain_boxnow_creations: shipment=%s not "
+                "settled, BoxNow did not answer: %s",
+                shipment_id,
+                exc,
+            )
+            outcomes["unanswered"] += 1
+    return dict(outcomes)

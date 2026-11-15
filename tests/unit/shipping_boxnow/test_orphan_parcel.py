@@ -1500,6 +1500,21 @@ class TestTheThirdReview:
         assert outcome == "not_created"
         alert.assert_not_called()
 
+    def test_a_refused_cancel_in_the_task_ends_the_uncertainty(self, http):
+        """Reported once, by the task; the sweep has nothing left."""
+        order = _canceled_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        result = create_boxnow_shipment_for_order.run(order.id)
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        assert outcome == "not_due"
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert sum("did not cancel" in note for note in _notes(order)) == 1
+
 
 def _age_the_stamp(shipment) -> None:
     """Move a stamp the creation wrote past the settle time."""

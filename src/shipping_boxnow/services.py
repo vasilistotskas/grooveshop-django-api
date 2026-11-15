@@ -738,6 +738,9 @@ class BoxNowService:
             except BoxNowRetryableError:
                 raise
             except BoxNowAPIError as exc:
+                # Handed to staff: the refusal is reported once, by the
+                # caller, and the sweep must not repeat the cancel.
+                cls._end_uncertainty(shipment.pk)
                 raise BoxNowCancelRefusedError(
                     exc.status_code,
                     code=exc.code,
@@ -840,7 +843,6 @@ class BoxNowService:
             try:
                 cls._cancel_for_a_canceled_order(shipment.order)
             except BoxNowCancelRefusedError as exc:
-                cls._end_uncertainty(shipment_pk)
                 cls.report_cancel_refused(shipment.order_id, exc.message)
                 return "cancel_refused"
             return "canceled"

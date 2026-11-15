@@ -194,7 +194,8 @@ and says which file holds each § number used here.
     (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
     there and recorded, none is a local cancel. A refusal is reported once
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
-    and ends the uncertainty;
+    and ends the uncertainty, whether the sweep or the creation task met
+    it (`_cancel_for_a_canceled_order` ends it), so it is reported once;
   - a live order: under the creation's own claim, the order is looked up by
     `orderNumber`. One live `new` parcel created for this shipment's terms
     is saved (`_persist_parcel`); nothing listed settles it as not created,

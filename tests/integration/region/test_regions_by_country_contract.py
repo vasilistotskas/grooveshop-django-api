@@ -30,7 +30,7 @@ def test_the_schema_documents_a_bare_array(openapi_schema):
 def test_the_response_is_every_region_of_the_country(openapi_schema):
     country = CountryFactory()
     regions = RegionFactory.create_batch(2, country=country)
-    RegionFactory()
+    RegionFactory(country=CountryFactory())
 
     response = APIClient().get(
         reverse("region-get-regions-by-country-alpha-2", args=[country.alpha_2])

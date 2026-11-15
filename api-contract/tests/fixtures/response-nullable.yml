@@ -1,0 +1,70 @@
+# consumer.yml with both response objects made nullable, in the two shapes
+# drf-spectacular emits for a nullable nested serializer (#710).
+openapi: 3.0.3
+info: {title: fixture, version: "1"}
+paths:
+  /comment:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    Comment:
+      type: object
+      properties:
+        author:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+          nullable: true
+        parent:
+          type: object
+          properties:
+            user:
+              allOf:
+              - $ref: '#/components/schemas/User'
+              nullable: true
+          required:
+          - user
+      required:
+      - author
+      - parent
+    CommentRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        replyTo:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          nullable: true
+      required:
+      - text

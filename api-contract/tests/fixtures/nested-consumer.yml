@@ -1,0 +1,43 @@
+# A consumer whose nested object holds another nested object, both wrapped
+# in allOf as drf-spectacular emits them. nested-nullable.yml makes the
+# inner one nullable beside its allOf: only the unflattened pass sees it,
+# and it names the path with an `allOf[...]` segment.
+openapi: 3.0.3
+info: {title: fixture, version: "1"}
+paths:
+  /comment:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+      required:
+      - id
+    Parent:
+      type: object
+      properties:
+        user:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+      required:
+      - user
+    Comment:
+      type: object
+      properties:
+        parent:
+          allOf:
+          - $ref: '#/components/schemas/Parent'
+          readOnly: true
+      required:
+      - parent

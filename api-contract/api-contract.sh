@@ -14,6 +14,7 @@
 #   api-contract.sh deploy DJANGO_LIVE DJANGO_TARGET STOREFRONT_LIVE \
 #                          STOREFRONT_TARGET GATEWAY_LIVE GATEWAY_TARGET
 #   api-contract.sh pr KIND REPO_ROOT ENVIRONMENT...
+#   api-contract.sh compare CONSUMER_DOCUMENT DJANGO_DOCUMENT [LEVELS_FILE]
 #
 # Consumers parse Django's responses:
 #
@@ -56,6 +57,11 @@
 #
 # A gateway tag that predates its contract file (HTTP 404 on the levels
 # file) is reported as not checked; any other failure to fetch it fails.
+#
+# compare: one pairing of two documents (paths or URLs), with the rules
+# both other modes apply to every pairing; LEVELS_FILE defaults to the
+# storefront's. What tests/compare.sh runs, and how to ask about two
+# documents by hand.
 #
 # Exit 0 = compatible, 1 = a pairing breaks, anything else = the check
 # could not run (a sync or a merge must not proceed on an unanswered
@@ -210,6 +216,27 @@ gateway_levels() {
 # storefront rejects with a 422. oasdiff rates that INFO;
 # storefront-levels.txt raises it to ERR (a guest's 202 for a product
 # alert, 2026-10-30, would have passed).
+#
+# Nullability is compared a second time, unflattened. Flattening drops a
+# `nullable: true` that sits beside an `allOf` (oasdiff/oasdiff#1348), and
+# that is the shape drf-spectacular emits for a nullable nested serializer:
+# a required response object made nullable came out of the flattened pass
+# as "No changes detected" (#710, found on Django #709).
+#
+# The first pass keeps every check, the nullability ones included:
+# unflattened oasdiff cannot follow a property from `$ref: X` in one
+# document to `allOf: [X]` in the other, and the two sides are often
+# shaped differently (the gateway's contract, generated from Go types, has
+# no `allOf`; Django wraps every nested serializer in one). The second pass
+# runs only the nullability checks (nullability_levels) and adds what the
+# first did not see: a finding is dropped when the first pass already
+# printed it, or when an ignore.txt line accepts it. Both are compared with
+# the `allOf[#/components/...]/` segments the unflattened pass puts in a
+# property path removed, so one accepted line covers both wordings
+# (new_nullability_findings).
+#
+# Fold the second pass into the first once the pinned oasdiff keeps
+# `nullable` when it flattens: tests/compare.sh then passes that way.
 breaks() {
     consumer=$1 django=$2 document=$3 levels=$4
     if [ "$consumer" = allauth ]; then
@@ -218,9 +245,114 @@ breaks() {
         resolve_document "$django" "Django's allauth document" || return $?
         django=$DOC
     fi
+    [ -f "$levels" ] && [ -r "$levels" ] || {
+        echo "   cannot read the severity levels $levels" >&2
+        return 2
+    }
+    flattened="$WORK_DIR/contract-flattened.out"
     set -- --flatten-allof --severity-levels "$levels"
     [ -s "$IGNORE_FILE" ] && set -- "$@" --err-ignore "$IGNORE_FILE"
-    run_oasdiff "$document" "$django" "$@"
+    # run_oasdiff sets `code`, so each pass keeps its verdict under its own name.
+    run_oasdiff "$document" "$django" "$@" > "$flattened"
+    flattened_verdict=$?
+    cat "$flattened"
+    [ "$flattened_verdict" -le 1 ] || return "$flattened_verdict"
+
+    nullability_levels "$levels" || return 2
+    unflattened="$WORK_DIR/contract-nullability.out"
+    run_oasdiff "$document" "$django" --severity-levels "$NULLABILITY_LEVELS" > "$unflattened"
+    nullability_verdict=$?
+    case $nullability_verdict in
+        0) return "$flattened_verdict" ;;
+        1) new_nullability_findings "$flattened" "$unflattened" > "$unflattened.new" || return 2
+           [ -s "$unflattened.new" ] || return "$flattened_verdict"
+           echo "nullability, compared unflattened (oasdiff/oasdiff#1348):"
+           cat "$unflattened.new"
+           return 1 ;;
+        *) cat "$unflattened"
+           return "$nullability_verdict" ;;
+    esac
+}
+
+# nullability_levels LEVELS_FILE: sets NULLABILITY_LEVELS to the levels of
+# the unflattened pass: every check the pinned oasdiff lists at `none`,
+# except the `*-became-nullable` / `*-became-not-nullable` checks whose
+# level for this consumer (its LEVELS_FILE, else oasdiff's default) is ERR,
+# written out as `err`, which also keeps oasdiff from lowering one to a
+# warning for sitting inside an `allOf`. Read from the image, so a pin bump
+# that adds or renames a check needs no edit here. A levels file that
+# cannot be read, or a listing with no nullability check at ERR, fails the
+# comparison rather than skipping it.
+nullability_levels() {
+    NULLABILITY_LEVELS="$WORK_DIR/levels-nullability-$(cksum < "$1" | cut -d' ' -f1).txt" || return 2
+    [ -s "$NULLABILITY_LEVELS" ] && return 0
+    oasdiff checks changelog | awk -v consumer="$1" '
+        BEGIN {
+            while ((read = getline line < consumer) > 0) {
+                sub(/\r$/, "", line)
+                if (split(line, field, /[ \t]+/) >= 2) own[field[1]] = tolower(field[2])
+            }
+            if (read < 0) exit 2
+        }
+        $2 == "error" || $2 == "warn" || $2 == "info" {
+            level = ($1 in own) ? own[$1] : ($2 == "error" ? "err" : $2)
+            kept = $1 ~ /-became-(not-)?nullable$/ && level == "err"
+            print $1, kept ? "err" : "none"
+            if (kept) count++
+        }
+        END { exit read < 0 ? 2 : count ? 0 : 1 }' > "$NULLABILITY_LEVELS" && return 0
+    rm -f "$NULLABILITY_LEVELS"
+    echo "   cannot build the nullability levels from $1 and the pinned oasdiff's checks" >&2
+    return 2
+}
+
+# new_nullability_findings FLATTENED_OUTPUT UNFLATTENED_OUTPUT: prints the
+# error lines of the unflattened pass that neither the flattened pass
+# printed nor ignore.txt accepts. A line is read as oasdiff's singleline
+# format prints it: `error at FILE, in API METHOD PATH TEXT [id]. ...`.
+# A finding is matched as oasdiff matches --err-ignore (checker.ApiChange
+# MatchIgnore): the line's first word starting with `/` is the path, and
+# the lower-cased line holds "METHOD PATH" and TEXT; here with every
+# `allOf[...]/` segment removed from TEXT and from the line first.
+new_nullability_findings() {
+    ignore=/dev/null
+    [ -s "$IGNORE_FILE" ] && ignore=$IGNORE_FILE
+    awk -v ignore="$ignore" -v flattened="$1" '
+        function finding(line, parts) {
+            if (!match(line, /^error at .*, in API [A-Z]+ \/[^ ]* /)) return 0
+            parts = substr(line, RSTART, RLENGTH)
+            sub(/^error at .*, in API /, "", parts)
+            split(parts, word, " ")
+            method = word[1]; path = word[2]
+            text = substr(line, RSTART + RLENGTH)
+            if (!match(text, / \[[a-z0-9-]+\]\./)) return 0
+            check = substr(text, RSTART + 2, RLENGTH - 4)
+            text = plain(substr(text, 1, RSTART - 1))
+            return 1
+        }
+        function plain(s) { gsub(/allOf\[[^]]*\]\//, "", s); return s }
+        BEGIN {
+            while ((read = getline line < ignore) > 0) {
+                # plain() before tolower(): its pattern is the `allOf` oasdiff prints.
+                line = tolower(plain(line))
+                accepted[++accepts] = line
+                at[accepts] = ""
+                n = split(line, word, /[ \t]+/)
+                for (i = 1; i <= n; i++) if (word[i] ~ /^\//) { at[accepts] = word[i]; break }
+            }
+            if (read < 0) exit 2
+            while ((read = getline line < flattened) > 0)
+                if (finding(line)) seen[method " " path " " text " " check] = 1
+            if (read < 0) exit 2
+        }
+        /^error / {
+            if (!finding($0)) { print; next }
+            if ((method " " path " " text " " check) in seen) next
+            lowered = tolower(method " " path); body = tolower(text)
+            for (i = 1; i <= accepts; i++)
+                if (at[i] == tolower(path) && index(accepted[i], lowered) && index(accepted[i], body)) next
+            print
+        }' "$2"
 }
 
 status=0
@@ -402,5 +534,7 @@ pr() {
 case ${1:-} in
     deploy) shift; [ $# -ge 4 ] || { echo "usage: api-contract.sh deploy DJANGO_LIVE DJANGO_TARGET STOREFRONT_LIVE STOREFRONT_TARGET [GATEWAY_LIVE GATEWAY_TARGET]" >&2; exit 2; }; deploy "$@" ;;
     pr) shift; [ $# -ge 3 ] || { echo "usage: api-contract.sh pr KIND REPO_ROOT ENVIRONMENT..." >&2; exit 2; }; pr "$@" ;;
-    *) echo "usage: api-contract.sh deploy|pr ..." >&2; exit 2 ;;
+    compare) shift; [ $# -ge 2 ] || { echo "usage: api-contract.sh compare CONSUMER_DOCUMENT DJANGO_DOCUMENT [LEVELS_FILE]" >&2; exit 2; }
+             breaks storefront "$2" "$1" "${3:-$STOREFRONT_LEVELS_FILE}"; record $?; exit "$status" ;;
+    *) echo "usage: api-contract.sh deploy|pr|compare ..." >&2; exit 2 ;;
 esac

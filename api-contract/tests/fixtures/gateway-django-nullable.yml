@@ -1,0 +1,39 @@
+# gateway-django.yml with a feature flag made nullable: refused against the
+# gateway contract, whose plain $ref the unflattened pass cannot follow.
+openapi: 3.0.3
+info: {title: fixture, version: "1"}
+paths:
+  /tenant/resolve:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantConfig'
+components:
+  schemas:
+    TenantConfig:
+      type: object
+      properties:
+        name:
+          type: string
+        features:
+          allOf:
+          - $ref: '#/components/schemas/StoreFeatures'
+          readOnly: true
+      required:
+      - name
+      - features
+    StoreFeatures:
+      type: object
+      properties:
+        cart:
+          type: boolean
+        customerAccounts:
+          type: boolean
+          nullable: true
+      required:
+      - cart
+      - customerAccounts

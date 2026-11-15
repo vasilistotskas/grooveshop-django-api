@@ -207,14 +207,16 @@ def effective_features(tenant) -> dict[str, bool]:
     if tenant.schema_name == get_public_schema_name():
         return dict.fromkeys(STORE_FEATURES, False)
 
-    from core.store_settings import store_setting
+    from core.store_settings import store_settings
 
+    # Several features share a gate (customer accounts gates seven), so the
+    # distinct settings are read in one ``get_many``, not one read per gate.
+    gates = {
+        gate for feature in STORE_FEATURES.values() for gate in feature.settings
+    }
     with schema_context(tenant.schema_name):
-        setting_on = {
-            gate: bool(store_setting(gate.setting_key))
-            for feature in STORE_FEATURES.values()
-            for gate in feature.settings
-        }
+        values = store_settings({gate.setting_key for gate in gates})
+    setting_on = {gate: bool(values[gate.setting_key]) for gate in gates}
     return {
         name: (
             feature.plan is None

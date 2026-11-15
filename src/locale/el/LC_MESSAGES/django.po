@@ -6762,8 +6762,8 @@ msgstr "Λήψη κατηγοριών-αδερφών (ίδιο επίπεδο γ
 msgid "Get the blog post that this comment belongs to."
 msgstr "Λήψη του άρθρου στο οποίο ανήκει αυτό το σχόλιο."
 
-msgid "Get the complete category tree structure with nested relationships. This is more efficient than using list?tree=true for displaying navigation menus or category hierarchies."
-msgstr "Λήψη της πλήρους δενδρικής δομής κατηγοριών με ένθετες σχέσεις. Είναι πιο αποδοτικό από τη χρήση list?tree=true για την εμφάνιση μενού πλοήγησης ή ιεραρχιών κατηγοριών."
+msgid "Get the complete category tree structure with nested relationships, for displaying navigation menus or category hierarchies."
+msgstr "Λήψη της πλήρους δενδρικής δομής κατηγοριών με ένθετες σχέσεις, για την εμφάνιση μενού πλοήγησης ή ιεραρχιών κατηγοριών."
 
 msgid "Get the complete thread (all ancestors and descendants) of this comment."
 msgstr "Λήψη ολόκληρου του νήματος (όλοι οι πρόγονοι και απόγονοι) αυτού του σχολίου."

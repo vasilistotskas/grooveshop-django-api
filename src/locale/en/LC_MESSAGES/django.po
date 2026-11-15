@@ -6756,8 +6756,8 @@ msgstr "Get sibling categories (same parent level)."
 msgid "Get the blog post that this comment belongs to."
 msgstr "Get the blog post that this comment belongs to."
 
-msgid "Get the complete category tree structure with nested relationships. This is more efficient than using list?tree=true for displaying navigation menus or category hierarchies."
-msgstr "Get the complete category tree structure with nested relationships. This is more efficient than using list?tree=true for displaying navigation menus or category hierarchies."
+msgid "Get the complete category tree structure with nested relationships, for displaying navigation menus or category hierarchies."
+msgstr "Get the complete category tree structure with nested relationships, for displaying navigation menus or category hierarchies."
 
 msgid "Get the complete thread (all ancestors and descendants) of this comment."
 msgstr "Get the complete thread (all ancestors and descendants) of this comment."

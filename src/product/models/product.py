@@ -9,10 +9,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
-from django.db.models import (
-    Avg,
-    F,
-)
+from django.db.models import Avg
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -470,22 +467,6 @@ class Product(
 
     def generate_unique_sku(self) -> str:
         return str(uuid.uuid4())
-
-    def increment_stock(self, quantity: int) -> None:
-        if quantity < 0:
-            raise ValueError("Quantity to increment must be non-negative")
-        Product.objects.filter(id=self.id).update(stock=F("stock") + quantity)
-        self.refresh_from_db()
-
-    def decrement_stock(self, quantity: int) -> None:
-        if quantity < 0:
-            raise ValueError("Invalid quantity to decrement")
-        updated_rows = Product.objects.filter(
-            id=self.id, stock__gte=quantity
-        ).update(stock=F("stock") - quantity)
-        if not updated_rows:
-            raise ValueError("Not enough stock to decrement")
-        self.refresh_from_db()
 
     @property
     def is_purchasable(self) -> bool:

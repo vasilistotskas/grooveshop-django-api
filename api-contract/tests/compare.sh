@@ -73,25 +73,44 @@ run consumer.yml required-removed.yml
 expect "a required property removed inside allOf is still refused flattened" 1 \
   "removed the required property \`author/name\`" "[response-required-property-removed]"
 
-# Nullability belongs to the unflattened pass alone: a change the flattened
-# pass would also see is printed once, in the unflattened wording, so the
-# ignore.txt line copied from it is the only one needed.
+# A change both passes see is printed once, in the flattened pass's
+# wording; the nullability pass's copy (`author/allOf[...]/name`) is dropped.
 run consumer.yml inner-nullable.yml
 expect "a property made nullable inside an allOf is refused" 1 \
-  "the response property \`author/allOf[#/components/schemas/User]/name\` became nullable" \
+  "the response property \`author/name\` became nullable" \
   "the response property \`parent/user/name\` became nullable"
-if grep -qF -- "\`author/name\`" <<<"$output"; then
+if grep -qF -- "allOf[#/components/schemas/User]/name" <<<"$output"; then
   echo "FAIL a nullability change is reported by both passes"; failed=1
 else
-  echo "ok   a nullability change is reported by one pass only"
+  echo "ok   a nullability change is reported once"
 fi
+
+# The two sides shaped differently: unflattened oasdiff cannot follow a
+# property from a plain $ref to an allOf, so only the flattened pass sees
+# these, and it must keep the nullability checks.
+run consumer-ref.yml inner-nullable.yml
+expect "a property made nullable where the consumer has \$ref and Django allOf is refused" 1 \
+  "the response property \`author/name\` became nullable for the status \`200\`" \
+  "the response property \`author/name\` became nullable for the status \`201\`"
+
+run gateway-consumer.json gateway-django.yml gateway-levels.txt
+expect "the gateway's allOf-free contract against Django's allOf wrapper is compatible" 0 "ok"
+
+run gateway-consumer.json gateway-django-nullable.yml gateway-levels.txt
+expect "a feature flag made nullable is refused against the gateway's contract" 1 \
+  "the response property \`features/customerAccounts\` became nullable for the status \`200\`"
 
 # The consumer's own levels decide, in the nullability pass as in the first.
 printf 'response-property-became-nullable INFO\n' > "$work/fixtures/lenient-levels.txt"
 run consumer.yml response-nullable.yml lenient-levels.txt
 expect "a consumer that tolerates null in responses is not refused" 0 "ok"
 
-# An accepted break is accepted in the nullability pass too.
+# A levels file that cannot be read is no answer, not the defaults.
+run consumer.yml consumer.yml no-such-levels.txt
+expect "a missing levels file cannot be checked" 2 "cannot read the severity levels"
+
+# An accepted break is accepted in the nullability pass too: a line in the
+# wording only that pass prints (#709's shape) ...
 cat > "$work/rules/ignore.txt" <<'EOF'
 2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `author` became nullable for the status `200`
 2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `parent/user` became nullable for the status `200`
@@ -99,15 +118,16 @@ cat > "$work/rules/ignore.txt" <<'EOF'
 2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `parent/user` became nullable for the status `201`
 EOF
 run consumer.yml response-nullable.yml
-expect "ignore.txt accepts a nullability break" 0 "ok"
+expect "ignore.txt accepts a nullability break only the unflattened pass sees" 0 "ok"
 
+# ... and one line in the printed (flattened) wording covers both passes.
 cat > "$work/rules/ignore.txt" <<'EOF'
-2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `author/allOf[#/components/schemas/User]/name` became nullable for the status `200`
+2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `author/name` became nullable for the status `200`
 2026-11-15 until storefront v9.9.9 | fixture | GET /comment the response property `parent/user/name` became nullable for the status `200`
-2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `author/allOf[#/components/schemas/User]/name` became nullable for the status `201`
+2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `author/name` became nullable for the status `201`
 2026-11-15 until storefront v9.9.9 | fixture | POST /comment the response property `parent/user/name` became nullable for the status `201`
 EOF
 run consumer.yml inner-nullable.yml
-expect "ignore.txt accepts what the nullability pass printed" 0 "ok"
+expect "one ignore.txt line accepts a change both passes see" 0 "ok"
 
 exit "$failed"

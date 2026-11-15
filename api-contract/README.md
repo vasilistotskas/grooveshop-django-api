@@ -58,33 +58,37 @@ never pass in one piece.
 ## Two passes per pairing
 
 Every pairing runs oasdiff twice, and fails if either pass finds an error.
-The nullability checks (`*-became-nullable`, `*-became-not-nullable`) run in
-the second pass only; every other check runs in the first.
 
-1. **Flattened** (`--flatten-allof`), with the consumer's levels. drf-spectacular
-   wraps every nested serializer in an `allOf`, and unflattened oasdiff reports
-   a required property removed inside one only as a warning, which let Django
-   v3.157.0 through on 2026-10-27.
+1. **Flattened** (`--flatten-allof`), with the consumer's levels and every
+   check. drf-spectacular wraps every nested serializer in an `allOf`, and
+   unflattened oasdiff reports a required property removed inside one only as
+   a warning, which let Django v3.157.0 through on 2026-10-27. Flattening is
+   also what lets the two sides differ in shape: the gateway's contract,
+   generated from Go types, has no `allOf`, and a consumer generated before
+   Django wrapped a field has a plain `$ref` where Django now has `allOf`.
+   Unflattened oasdiff cannot follow a property across that difference.
 2. **Nullability, unflattened.** Flattening drops a `nullable: true` that sits
    beside an `allOf` ([oasdiff#1348](https://github.com/oasdiff/oasdiff/issues/1348)),
    and that is how drf-spectacular declares a nullable nested serializer. A
-   required response object made nullable came out of a flattened comparison
-   as "No changes detected" (#710). This pass runs the nullability checks whose
-   level for this consumer is ERR (its levels file, else oasdiff's default),
-   written out as `err` so oasdiff does not lower one to a warning for sitting
-   inside an `allOf`. Its findings print under "nullability, compared
-   unflattened"; a property inside an `allOf` is named
-   `.../allOf[#/components/schemas/X]/name`, and an `ignore.txt` line copies
-   that text like any other. Over the released `schema.yml` pairs from v3.150.1
-   to v3.246.3 both passes found the same nullability changes, none of them
-   only flattened, so giving them to one pass loses nothing and reports each
-   change once.
+   required response object made nullable came out of the first pass as "No
+   changes detected" (#710). This pass runs only the `*-became-nullable` /
+   `*-became-not-nullable` checks whose level for this consumer is ERR (its
+   levels file, else oasdiff's default), written out as `err` so oasdiff does
+   not lower one to a warning for sitting inside an `allOf`. The levels come
+   from `oasdiff checks changelog` in the pinned image, so a pin bump needs no
+   edit. A levels file that cannot be read, or a listing with no such check at
+   ERR, fails the check instead of skipping it.
 
-The levels for both passes are derived from `oasdiff checks changelog` in the
-pinned image, so a pin bump needs no edit; a pinned oasdiff that lists no
-nullability check at ERR fails the check instead of skipping it. The checks go
-back to the first pass once the pinned oasdiff keeps `nullable` when it
-flattens: `tests/compare.sh` then passes that way.
+The second pass prints, under "nullability, compared unflattened", only what
+the first did not: a finding the first pass printed, or one an `ignore.txt`
+line accepts, is dropped. Both comparisons remove the
+`allOf[#/components/schemas/X]/` segments the unflattened pass puts in a
+property path, and match `ignore.txt` lines the way oasdiff does. So a change
+both passes see is printed once, in the first pass's wording, and one accepted
+line covers both passes. Copy the line as printed.
+
+The second pass goes once the pinned oasdiff keeps `nullable` when it
+flattens: `tests/compare.sh` then passes with the first pass alone.
 
 ## An accepted break
 

@@ -214,8 +214,11 @@ value on it is `untranslatable_setting`.
 
 The catalogue declares, for the theme document, the pairs of colours that must
 keep a WCAG 2.2 contrast (`documentKinds.theme.contrast`): `{id, foreground,
-background, min, severity}`, each side an RFC 6901 pointer into the theme's
-root settings or a literal `#RRGGBB`. The theme stores its colour scales, so
+background, min, severity, label}`, each side an RFC 6901 pointer into the theme's
+root settings or a literal `#RRGGBB`, and `label` the rule's name in every
+language of `settings.LANGUAGES` (`{"el": ..., "en": ...}`). The catalogue is
+the one place a rule is named: the editor's theme panel and Publish dialog read
+the same `label`. A rule's other keys (the editor's `fix`) are not read. The theme stores its colour scales, so
 the rules read stored colours and need no colour maths beyond the one ratio.
 
 - **Saving never refuses for contrast.** The editor shows every rule.
@@ -223,10 +226,14 @@ the rules read stored colours and need no colour maths beyond the one ratio.
   used by `publish`, `publish/check` and scheduling): an `insufficient_contrast`
   problem with `document: "theme"`, the pointer side of the rule as `path` (the
   foreground when both are pointers, `/settings` when neither is) and `params`
-  `{rule, ratio, min}` as strings. The ratio is compared unrounded.
+  `{rule, ratio, min, label-<language>...}` as strings: `rule` is the id the
+  editor leads to, and the name in every language lets a kept failure be worded
+  again in the language that reads it (`errors.message_for`, the scheduled
+  publish email). The message names the rule by its `label` in the request's
+  language. The ratio is compared unrounded.
 - **A rule that points at no colour is a catalogue bug**, answered `503
-  invalid_catalogue`, never a pass. A malformed rule is refused when the
-  catalogue is read.
+  invalid_catalogue`, never a pass. A malformed rule, or one not named in
+  every language, is refused when the catalogue is read.
 - Rolling back or republishing a stored version is not re-judged: it was valid
   when it was released.
 

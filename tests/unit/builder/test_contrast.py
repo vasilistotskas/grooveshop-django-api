@@ -23,6 +23,8 @@ FIXTURE = json.loads(
     ).read_text(encoding="utf-8")
 )
 RULES = contrast.parse_rules(FIXTURE["rules"])
+#: A rule's name in both languages, as the catalogue gives it.
+LABEL = {"el": "Κείμενο, φωτεινό", "en": "Text, light"}
 
 
 @pytest.mark.parametrize(
@@ -70,6 +72,7 @@ class TestACatalogueThatContradictsItself:
                     "background": "#ffffff",
                     "min": 4.5,
                     "severity": "error",
+                    "label": LABEL,
                 }
             ]
         )
@@ -104,7 +107,32 @@ class TestACatalogueThatContradictsItself:
     )
     def test_a_malformed_rule_is_refused_when_the_catalogue_is_read(self, rule):
         with pytest.raises(ValueError):
-            contrast.parse_rules([{"min": 4.5, "severity": "error", **rule}])
+            contrast.parse_rules(
+                [{"min": 4.5, "severity": "error", "label": LABEL, **rule}]
+            )
+
+    @pytest.mark.parametrize(
+        "label",
+        [
+            None,
+            {"el": "Κείμενο, φωτεινό"},
+            {"el": "Κείμενο, φωτεινό", "en": "  "},
+            {"el": 3, "en": "Text, light"},
+        ],
+        ids=["none", "a language missing", "a blank name", "not text"],
+    )
+    def test_a_rule_not_named_in_every_language_is_refused(self, label):
+        rule = {
+            "id": "x",
+            "foreground": "#000000",
+            "background": "#ffffff",
+            "min": 4.5,
+            "severity": "error",
+            "label": label,
+        }
+
+        with pytest.raises((ValueError, KeyError, AttributeError)):
+            contrast.parse_rules([rule])
 
     def test_two_rules_with_one_id(self):
         rule = {
@@ -113,7 +141,30 @@ class TestACatalogueThatContradictsItself:
             "background": "#ffffff",
             "min": 4.5,
             "severity": "error",
+            "label": LABEL,
         }
 
         with pytest.raises(ValueError):
             contrast.parse_rules([rule, rule])
+
+
+class TestARuleIsNamedByTheCatalogue:
+    def test_its_name_in_every_language_and_nothing_the_editor_keeps(self):
+        (rule,) = contrast.parse_rules(
+            [
+                {
+                    "id": "body-text-light",
+                    "foreground": "#000000",
+                    "background": "#ffffff",
+                    "min": 4.5,
+                    "severity": "error",
+                    "label": {**LABEL, "de": "Text, hell"},
+                    "fix": {"el": "Αλλάζει.", "en": "Changes it."},
+                }
+            ]
+        )
+
+        assert rule.label == LABEL
+
+    def test_every_rule_of_the_shared_cases_is_named(self):
+        assert all(set(rule.label) == {"el", "en"} for rule in RULES)

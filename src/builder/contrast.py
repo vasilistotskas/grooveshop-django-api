@@ -3,12 +3,16 @@
 The storefront's catalogue declares, for the theme document, the pairs of
 colours that must keep a contrast (``documentKinds.theme.contrast``):
 
-    {id, foreground, background, min, severity}
+    {id, foreground, background, min, severity, label}
 
 Each side is an RFC 6901 pointer into the theme's root settings
 (``/colors/light/neutral/scale/700``) or a literal ``#RRGGBB``. A rule of
 severity ``error`` blocks a publish (``insufficient_contrast``); a ``warning``
-is the editor's to show. A save is never refused for contrast.
+is the editor's to show. A save is never refused for contrast. ``label`` is
+what the rule is called, in every language of ``settings.LANGUAGES``
+(``{"el": ..., "en": ...}``): the storefront's catalogue is the one place a
+rule is named, and a refused publish names it so. Other keys of a rule (the
+editor's ``fix``) are not Django's and are not read.
 
 The ratio is the unrounded WCAG 2.2 one, compared with ``min``; the storefront
 computes the same function (``shared/utils/contrast.ts``) and both run
@@ -21,8 +25,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+from django.conf import settings
 
 from builder import pointers
 
@@ -45,6 +51,8 @@ class Rule:
     background: str
     min: float
     severity: str
+    #: What the rule is called, by language code.
+    label: dict[str, str] = field(hash=False)
 
     @property
     def path(self) -> str:
@@ -66,6 +74,17 @@ class Outcome:
         return self.ratio >= self.rule.min
 
 
+def _parse_label(raw: Any) -> dict[str, str]:
+    """A rule's name in every language Django speaks; one missing or blank
+    is a catalogue that cannot name the rule, refused when it is read."""
+    label = {code: raw.get(code) for code, _name in settings.LANGUAGES}
+    if not all(
+        isinstance(text, str) and text.strip() for text in label.values()
+    ):
+        raise ValueError("a contrast rule is not named in every language")
+    return label
+
+
 def parse_rules(raw: Any) -> tuple[Rule, ...]:
     """The rules of a catalogue's ``contrast`` list; a malformed one is a
     catalogue bug, refused when the catalogue is read."""
@@ -77,6 +96,7 @@ def parse_rules(raw: Any) -> tuple[Rule, ...]:
             background=str(item["background"]),
             min=float(item["min"]),
             severity=str(item["severity"]),
+            label=_parse_label(item["label"]),
         )
         sides_ok = all(
             side.startswith("/") or HEX.match(side)

@@ -95,8 +95,9 @@ BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
 # 5xx: the request may have reached BoxNow) during which an empty lookup by
 # ``orderNumber`` does not prove that no parcel exists: BoxNow may still be
 # processing the request, or not list its parcel yet. A cancel then refuses
-# retryably instead of cancelling locally (#690). Not yet measured on
-# BoxNow's stage environment (docs/order/shipping-boxnow.md), so generous.
+# retryably instead of cancelling locally (#690). On BoxNow's stage a parcel is
+# listed at once (docs/order/shipping-boxnow.md); the bound is for a request
+# BoxNow goes on with after its answer was given up on, so generous.
 BOXNOW_CREATION_SETTLE_SECONDS = int(
     getenv("BOXNOW_CREATION_SETTLE_SECONDS", "600")
 )

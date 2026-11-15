@@ -159,12 +159,15 @@ and says which file holds each § number used here.
   and leaves the error in `shipment_cancel`) instead of a local cancel;
   after it, the lookup is authoritative. The creation task's own retries
   refresh the stamp, and their `P410` take-over usually saves the parcel
-  first. **The settle time is not measured yet**: on BoxNow's stage
-  environment, time how long after a successful `POST
-  /api/v1/delivery-requests` the parcel appears in `GET
-  /api/v1/parcels?orderNumber=` (with `paymentMode` for a COD parcel), and
-  set the setting to that plus a margin. The 600 s default is twice the
-  mint claim's TTL, chosen without that measurement.
+  first. **Measured on BoxNow's stage environment (2026-11-15):** a parcel
+  is listed by `GET /api/v1/parcels?orderNumber=` in the first lookup,
+  under 0.1 s after `POST /api/v1/delivery-requests` answers (4 of 4;
+  the POST itself took 0.2 to 0.5 s). So the listing adds no delay of its
+  own. What the settle time still has to cover cannot be measured from
+  outside: how long BoxNow may go on with a request whose answer we gave
+  up on (`BOXNOW_HTTP_TIMEOUT`). The 600 s default, twice the mint claim's
+  TTL, is kept as a generous bound on that; the sweep below settles the
+  rest.
 - **A canceled order never gets a live parcel.** A staff or system order
   cancel goes on when the courier step is refused
   (`OrderService.cancel_attached_shipment` never raises): while a creation
@@ -260,9 +263,13 @@ and says which file holds each § number used here.
   v7.2, §6.5.3) and neither exempts a `parcelId` query, so a call naming
   no mode would, as documented, not list a cash-on-delivery parcel: its
   states would never reach the shop. Naming the mode the parcel was
-  created with is right either way. Not tried on stage: create a COD
-  parcel there and call the endpoint with and without `paymentMode=cod`
-  to confirm the default applies to `parcelId`.
+  created with is right either way. **Tried on stage (2026-11-15):** for
+  a COD parcel, `parcelId` and `orderNumber` lookups naming no mode both
+  listed it, `paymentMode=cod` listed it, and `paymentMode=prepaid` did
+  not. So stage does not apply the documented default, the filter itself
+  works, and the poll before this change was not shown to miss COD
+  parcels; the documents still say otherwise, and production was not
+  tried.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   with no `parcel_id` can cancel (the paragraph above says how); a parcel
   cancels only while it is `new` (BoxNow answers P420

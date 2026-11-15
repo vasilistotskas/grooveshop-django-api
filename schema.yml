@@ -17834,6 +17834,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/order/{id}/acs_label:
     get:
       operationId: getAcsLabelForOrder
@@ -18012,6 +18024,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
           content:
             application/json:
               schema:
@@ -18814,6 +18838,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/order/{id}/shipment_label:
     get:
@@ -29049,6 +29085,8 @@ paths:
           description: No response body
         '502':
           description: No response body
+        '503':
+          description: No response body
   /api/v1/shipping/acs/pickup-lists/{pickup_list_no}/manifest.pdf:
     get:
       operationId: getAcsPickupListManifest
@@ -29119,6 +29157,10 @@ paths:
         '403':
           description: No response body
         '404':
+          description: No response body
+        '409':
+          description: No response body
+        '503':
           description: No response body
   /api/v1/shipping/acs/shipments/{voucher_no}/label.pdf:
     get:
@@ -29537,6 +29579,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/BoxNowNearestLockerResponse'
           description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/shipping/boxnow/parcels/{parcel_id}/cancel:
     post:
       operationId: cancelBoxNowShipment
@@ -29562,6 +29610,10 @@ paths:
         '403':
           description: No response body
         '404':
+          description: No response body
+        '409':
+          description: No response body
+        '503':
           description: No response body
   /api/v1/shipping/boxnow/parcels/{parcel_id}/label.pdf:
     get:

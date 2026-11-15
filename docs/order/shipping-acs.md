@@ -15,7 +15,13 @@ and says which file holds each § number used here.
   transaction are open during the call now. **TTL 300s** (PR #6,
   commit `65b465390`). The
   claim keeps two workers from minting at once; it was never designed
-  against a lost answer.
+  against a lost answer. An answer no shipment uses (another worker saved
+  a voucher first, or staff resolved the check while it was out) is
+  recorded in `metadata["orphan_vouchers"]` under the lock, and only after
+  that transaction commits is ACS asked to delete it (#640,
+  `AcsService._delete_unused_voucher`): deleted, it comes off the list;
+  any failure of the delete keeps it there and records it as our own
+  unused voucher. No ACS call runs while the row is locked.
 - **A voucher request of unknown outcome is never sent again** (#622).
   ACS's manual gives `ACS_Create_Voucher` no idempotency key and no
   duplicate error, and no call finds a voucher by our reference before it
@@ -257,7 +263,7 @@ and says which file holds each § number used here.
   - **Reserved slot.** The poll batch is paced to keep its slots busy, so
     without a reserve a shopper's `price_calculation` or
     `address_validation` could wait the full `ACS_SLOT_WAIT_SECONDS`
-    behind it and then fall back or 502. The last
+    behind it and then fall back or 503 (`carrier_unavailable`, #650). The last
     `ACS_INTERACTIVE_RESERVED_SLOTS` (default 1) slots are for interactive
     calls only: the tracking polls (`tracking_summary` /
     `tracking_details`, `background=True` in `AcsClient._call`) may take

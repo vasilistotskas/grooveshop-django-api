@@ -475,3 +475,44 @@ class TestEndpointShaping:
             {"id": "p1", "name": "BoxNow"}
         ]
         assert self._sent(client)["url"] == f"{_API}/api/v1/delivery-partners"
+
+
+class TestNoAnswerIsAnOutage:
+    """A 5xx or a 429 from the token endpoint, and a 429 from the API, are
+    BoxNow giving no answer to act on, so every caller (the creation, the
+    sweep, the cancel, the tracking poll) retries them as an outage. Only a
+    real 401 or 403 is an auth refusal."""
+
+    @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
+    def test_a_token_endpoint_without_an_answer_is_retryable(self, status):
+        client = _client()
+        client._session.post.return_value = _response(status, text="busy")
+
+        with pytest.raises(BoxNowRetryableError) as exc_info:
+            client._get_access_token()
+
+        assert exc_info.value.status_code == status
+
+    @pytest.mark.parametrize("status", [401, 403])
+    def test_a_token_refusal_stays_an_auth_error(self, status):
+        client = _client()
+        client._session.post.return_value = _response(
+            status, {"error": "invalid_client"}
+        )
+
+        with pytest.raises(BoxNowAuthError) as exc_info:
+            client._get_access_token()
+
+        assert not isinstance(exc_info.value, BoxNowRetryableError)
+
+    def test_an_api_rate_limit_is_retryable(self):
+        client = _client()
+        client._session.post.return_value = _token()
+        client._session.request.return_value = _response(
+            429, {"message": "Too many requests"}
+        )
+
+        with pytest.raises(BoxNowRetryableError) as exc_info:
+            client._request("GET", "/api/v1/parcels")
+
+        assert exc_info.value.status_code == 429

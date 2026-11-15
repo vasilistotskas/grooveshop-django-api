@@ -29,7 +29,11 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
-from shipping.exceptions import ShippingParcelTooLargeError
+from shipping.api_errors import CarrierUnavailable
+from shipping.exceptions import (
+    CarrierUnavailableError,
+    ShippingParcelTooLargeError,
+)
 from shipping_boxnow.models import BoxNowLocker
 from shipping_boxnow.packing import resolve_compartment_size
 from shipping_boxnow.serializers import (
@@ -57,6 +61,7 @@ serializers_config: SerializersConfig = {
         ),
         tags=["BoxNow lockers"],
         parameters=CART_TOKEN_HEADERS,
+        responses={503: ErrorResponseSerializer},
     ),
 }
 
@@ -109,7 +114,10 @@ class BoxNowLockerViewSet(BaseModelViewSet):
 
         Delegates to ``BoxNowClient.find_closest_locker()`` which calls
         the BoxNow ``checkAddressDelivery`` endpoint.  Returns a single
-        locker object (external ID, name, address) on success.
+        locker object (external ID, name, address) on success. BoxNow's
+        refusal (P422 address not found, P423 no locker near it) is a 400
+        with BoxNow's code; BoxNow giving no answer is a 503
+        ``carrier_unavailable``.
         """
         from shipping_boxnow.client import BoxNowClient
         from shipping_boxnow.exceptions import BoxNowAPIError
@@ -143,6 +151,12 @@ class BoxNowLockerViewSet(BaseModelViewSet):
                 region=vd.get("region", "el-GR"),
                 compartment_size=compartment_size,
             )
+        except CarrierUnavailableError as exc:
+            # BoxNow gave no answer (a 5xx, a timeout, a connection or
+            # auth failure, no credentials): an outage, never "no locker
+            # here", so a caller can tell the two apart (#650).
+            logger.warning("BoxNow nearest-locker unavailable | %s", exc)
+            raise CarrierUnavailable from exc
         except BoxNowAPIError as exc:
             logger.warning(
                 "BoxNow nearest-locker API error | code=%s | msg=%s",

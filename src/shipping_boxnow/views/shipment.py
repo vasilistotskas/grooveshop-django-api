@@ -23,6 +23,8 @@ from core.api.permissions import (
     IsOwnerOrAdminOrGuest,
     StoreStaffModelPermissions,
 )
+from shipping.api_errors import unanswered
+from shipping.exceptions import CarrierUnavailableError
 from shipping_boxnow.models import BoxNowShipment
 from shipping_boxnow.serializers import BoxNowShipmentSerializer
 
@@ -125,6 +127,8 @@ class BoxNowCancelView(APIView):
             400: None,
             403: None,
             404: None,
+            409: None,
+            503: None,
         },
     )
     def post(self, request: Request, parcel_id: str) -> Response:
@@ -148,6 +152,15 @@ class BoxNowCancelView(APIView):
 
         try:
             BoxNowService.cancel_shipment(shipment, reason=reason)
+        except CarrierUnavailableError as exc:
+            # BoxNow gave no answer, or the work is already running here:
+            # retry later, not a refusal (#650).
+            logger.warning(
+                "BoxNow cancel not answered | parcel_id=%s | %s",
+                parcel_id,
+                exc,
+            )
+            raise unanswered(exc) from exc
         except BoxNowAPIError as exc:
             logger.warning(
                 "BoxNow cancel failed | parcel_id=%s | code=%s | msg=%s",

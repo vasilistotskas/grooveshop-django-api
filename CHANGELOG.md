@@ -3,6 +3,402 @@
 
 
 
+## v3.246.3 (2026-11-15)
+
+### Bug fixes
+
+* fix(shipping): carrier outages answer 503, uncertain BoxNow creations and COD polls, ACS delete outside the lock (#708) ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_acs): delete a mint's unused voucher with no row lock held
+
+Phase 3 of AcsService.create_voucher_for_order deleted a duplicate (or a
+late answer staff had already resolved) at ACS inside its atomic block,
+holding select_for_update on the shipment for the length of the ACS
+call. An exception other than AcsAPIError from that delete also rolled
+the block back and lost the voucher number.
+
+Phase 3 now records the number in metadata["orphan_vouchers"] under the
+lock and commits. A new phase 4, _delete_unused_voucher, calls
+ACS_Delete_Voucher with no lock and no transaction: deleted, the number
+comes off the list under a short lock and an open unrecognised row is
+resolved as deleted; any failure keeps it on the list and records it as
+our own unused voucher (refused_delete), so no outcome loses it.
+
+Closes #640 ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): an uncertain creation keeps a cancel from cancelling locally
+
+A creation that failed after its request may have reached BoxNow (a
+timeout, a 5xx) released its claim and left nothing that said a parcel
+might exist. A cancel that followed looked the order up by orderNumber,
+and when BoxNow did not list the parcel yet, recorded a local-only
+cancel while that parcel stayed live at BoxNow.
+
+The claim release now stamps metadata["creation_uncertain_at"] after a
+BoxNowRetryableError or an unclassified error, and clears it after any
+other BoxNow refusal (that request created nothing); a P410 leaves it,
+since it proves an earlier request created something. Saving a parcel,
+in every branch of _persist_parcel, and a cancel that finds the parcel
+clear it too. While the stamp is younger than the new
+BOXNOW_CREATION_SETTLE_SECONDS setting (default 600, not yet measured on
+stage), an empty lookup in the cancel path refuses with a
+BoxNowRetryableError instead of cancelling locally; after it, the lookup
+is authoritative.
+
+Closes #690 ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): poll a parcel in the payment mode it was created with
+
+sync_shipment_state asked GET /api/v1/parcels?parcelId= without
+paymentMode. BoxNow documents that parameter's default as prepaid
+(partner-api-1.68.yaml, the PaymentMode schema the query parameter
+references; API Manual v7.2, section 6.5.3) with no exception for a
+parcelId query, so as documented a cash-on-delivery parcel is filtered
+out and its states never reach the shop. The poll now passes the
+shipment's payment_mode, which is right whether or not the default
+applies to parcelId. Still to confirm on BoxNow's stage environment.
+
+Closes #691 ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping): a carrier that gives no answer is a 503, not a refusal
+
+The BOX NOW nearest-locker lookup caught every BoxNowAPIError and
+answered 400 with the error's message, so an outage (a 5xx, a timeout, a
+connection or auth failure) read exactly like "no locker near this
+address", with the requests exception text as its detail. The agent
+gateway then told shoppers there were no lockers nearby while BOX NOW
+was down. With no credentials, BoxNowConfigError escaped as a 500.
+
+shipping.api_errors.CarrierUnavailable is a 503 carrier_unavailable
+with a translated detail written for a client. The views that call a
+carrier map CarrierUnavailableError, which both carriers already raise,
+to it before their refusal branch, and log the carrier's text instead
+of returning it: the BOX NOW nearest-locker lookup, ACS address
+validation (a 502 that carried the exception text) and both staff
+cancel endpoints (a 400, or a 500 for a missing BOX NOW credential).
+A carrier's own refusal keeps its answer. schema.yml documents the 503s.
+
+Closes #650 ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): only a parcel ends an uncertain creation
+
+A refusal of a later creation request cleared
+metadata["creation_uncertain_at"], but it proves only that this request
+created nothing, not that the earlier request whose answer was lost did
+not. A BoxNowAuthError is the sharpest case: the token call answers any
+non-200, a 5xx included, with it, so a timeout followed by an auth
+failure on the retry stopped the task and let a cancel minutes later
+trust an empty lookup and cancel locally, the #690 orphan. Nothing
+documents that BoxNow checks P410 before an auth or a validation answer
+either.
+
+_release_mint_claim now only stamps; a parcel saved or found clears the
+stamp, and otherwise it ages out after BOXNOW_CREATION_SETTLE_SECONDS. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a P410 that takes over no parcel leaves the creation uncertain
+
+A worker that dies between the creation POST and phase 3 writes no
+creation_uncertain_at stamp. After the claim's TTL the retry gets P410,
+which proves BoxNow holds a request under the orderNumber; when the
+take-over lookup lists no live parcel yet, or fails, the claim was
+released with nothing recorded, and a later cancel trusted an empty
+lookup and cancelled locally.
+
+Every P410 path that saves no parcel (the take-over refusal and a failed
+lookup) now stamps the creation uncertain when it releases the claim. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping): a request already in progress here is a 409 with its own text
+
+#650 mapped every CarrierUnavailableError to the 503 "the courier
+cannot be reached". Some of those errors are our own refusals, raised
+with no carrier call because the same work is already running: an ACS
+voucher mint or cancel in progress, a BoxNow creation or cancel in
+flight, a creation of uncertain outcome still settling, a reset during
+a cancel. Their text says what to wait for, and the staff cancel
+endpoints now hid it behind the outage answer.
+
+shipping.exceptions.CarrierBusyError (a CarrierUnavailableError, so
+Celery still retries it and a customer cancel still answers
+courier_unreachable) is raised as BoxNowBusyError and AcsBusyError at
+those refusals. shipping.api_errors.unanswered maps it to a 409
+carrier_request_in_progress whose detail is the refusal's own text, and
+every other CarrierUnavailableError to the 503; the two carrier cancel
+endpoints use it, and schema.yml documents their 409. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(order): the order's staff cancel actions answer an unanswered carrier with 503 or 409
+
+#650 mapped a carrier outage to a 503 on the carriers' own cancel
+endpoints, but the order-scoped staff actions (boxnow_cancel, acs_cancel,
+shipment_cancel) still answered it as a 400 refusal carrying the
+requests exception text, and a BoxNowConfigError escaped as a 500.
+They are also the only API routes that reach the #690 cancel refusal.
+
+Each now catches CarrierUnavailableError before its refusal branch, logs
+the carrier's text and raises shipping.api_errors.unanswered: a 409
+with the refusal's own text when the work is already running here, the
+503 carrier_unavailable otherwise. A carrier's refusal keeps its 400.
+schema.yml documents the 409 and the 503 on the three operations. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a canceled order never gets a live parcel
+
+A staff or system order cancel goes on when the courier step is refused
+(cancel_attached_shipment never raises), which #690 made happen while a
+creation of uncertain outcome settles, and which already happened while
+one was in flight. The order was then canceled and refunded while its
+shipment waited for a parcel, and a pending retry of the creation could
+create one, or take over BoxNow's after a P410, and save it as a live
+NEW parcel with a tracking number on the canceled order.
+
+The order's status is the cancel's durable record, so the creation now
+reads it at both ends:
+
+- before phase 1, a canceled order's shipment with no parcel is not
+  created: create_shipment_for_order runs cancel_shipment instead, which
+  cancels a parcel BoxNow lists, refuses retryably while the creation
+  settles (the task retries), and cancels locally once the lookup is
+  authoritative or when no creation was sent;
+- in phase 3, _persist_parcel treats an order canceled meanwhile like a
+  shipment canceled meanwhile: the row is recorded CANCELED, the parcel
+  goes to minted_after_cancel and is cancelled at BoxNow. Its locked
+  select_related join waits for an order cancel still in its
+  transaction. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): phase 3 clears the uncertainty when its parcel is already saved
+
+_persist_parcel returned at once when the row already held the parcel
+it was saving (another path saved it first), leaving
+creation_uncertain_at and the claim behind, although its docstring says
+every branch clears the stamp: the outcome is known there too. It now
+clears both before returning. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a reissue's own P410 does not stamp the creation uncertain
+
+After "Create BoxNow parcel now" resets a canceled shipment, every new
+creation gets P410: the old canceled request still holds the
+orderNumber, the documented reissue case. The take-over lookup lists
+only that canceled parcel, and _refuse_take_over stamped
+creation_uncertain_at on each attempt, which refused a cancel of a
+shipment that was never created for the settle time.
+
+The lookup now returns every listed parcel (_parcels_at_boxnow;
+_live_parcels_at_boxnow keeps filtering), and a P410 whose listing is
+only canceled parcels recorded in metadata["previous_parcels"] is not
+stamped. A canceled parcel the shipment never recorded still stamps:
+something unknown used the orderNumber. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a sweep settles creations that stayed uncertain
+
+The creation task's retries back off for about 30 seconds, far inside
+BOXNOW_CREATION_SETTLE_SECONDS, and the tracking poll reads only
+shipments with a parcel_id, so once the retries ran out nothing asked
+BoxNow again: a canceled order's shipment stayed PENDING_CREATION while
+BoxNow might hold a live parcel, with no alert. Inside the task, a
+canceled order's outcome also read as a creation: "BoxNow shipment
+created" with status ok, and a refused cancel sent the "shipment
+creation failed, press Create BoxNow parcel now" alert, the wrong
+remedy.
+
+settle_uncertain_boxnow_creations runs every 15 minutes, fanned out per
+tenant (tenant.tasks.fanout_settle_uncertain_boxnow_creations), and
+calls BoxNowService.settle_uncertain_creation for each shipment with no
+parcel whose creation_uncertain_at is older than the settle time and
+whose creation is not in flight:
+
+- canceled order: the cancel is finished (a listed parcel cancelled at
+  BoxNow and recorded, none a local cancel); a refusal is reported once
+  through report_cancel_refused (an ERROR line and a staff note, as the
+  order cancel cascade does) and ends the uncertainty;
+- live order, under the creation's own claim: one live new parcel
+  created for the shipment's terms is saved through _persist_parcel;
+  nothing listed clears the stamp and sends the creation alert unless
+  staff were already told of a refusal; anything else goes to staff
+  with what BoxNow lists. A lookup that fails waits for the next run.
+
+The creation task returns order_canceled or shipment_canceled for a
+shipment canceled instead of created, and a refused cancel of a
+canceled order (BoxNowCancelRefusedError) is reported as that cancel,
+never with the creation alert. ACS has no such case: a voucher request
+of unknown outcome waits for staff.
+
+Closes #712 ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): the sweep reads whether staff were alerted, not a status range
+
+_staff_told_of_the_failure took a 4xx last_error for one the creation
+task had alerted about. The task alerts on every BoxNowAPIError it does
+not retry, an unreadable answer (raised as status 200) and an auth
+failure with a 5xx included, so the sweep alerted a second time for
+those. The task now records the alert on the shipment's last_error
+(record_staff_alerted, staff_alerted: true), and the sweep reads that. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a refused cancel of a canceled order ends the uncertainty wherever it is met
+
+When the creation task met a canceled order and BoxNow refused its
+cancel, report_cancel_refused told staff but the uncertainty stamp
+stayed, so the sweep later repeated the cancel and reported it a second
+time. _cancel_for_a_canceled_order now ends the uncertainty before it
+raises BoxNowCancelRefusedError, for the task and the sweep alike, and
+the sweep's own end of it is gone. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): the sweep re-reads the order before acting on a live order's lookup
+
+The live-order branch of settle_uncertain_creation decided on the
+lookup with the order it read before asking BoxNow. An order canceled
+while BoxNow answered then got the "Create BoxNow parcel now" alert and
+its shipment stayed PENDING_CREATION. Before anything but a take-over
+(_persist_parcel re-reads the order itself), the order is read again
+under the row lock; a canceled one releases the sweep's claim and goes
+to the canceled-order branch, now _settle_for_a_canceled_order. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(tenant): the uncertain BoxNow creation sweep runs for suspended stores too
+
+fanout_settle_uncertain_boxnow_creations dispatched to active stores
+only, so a canceled order's parcel left live at BoxNow stayed so until
+its store was reactivated. A parcel is customer-facing whatever the
+store's status; the fanout passes include_suspended=True, as
+fanout_reconcile_pending_refunds does. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a lookup BoxNow refuses in the sweep goes to staff at once
+
+On the live-order path of settle_uncertain_creation, a lookup BoxNow
+refused (a 4xx, or an answer with no parcel list) was handled like one
+BoxNow did not answer: the claim was released, the shipment was retried
+every 15 minutes with only a WARNING, and staff were never told. A
+refusal is deterministic, so the sweep now ends the uncertainty and
+sends the creation alert with BoxNow's answer (outcome lookup_refused).
+A lookup BoxNow does not answer is still left for the next run, with no
+escalation after N runs: an outage resolves by itself and every BoxNow
+task meets it, so a per-shipment count would repeat one outage once per
+pending shipment.
+
+Adds the tests the review found missing: the refused lookup, and the
+sweep task counting a shipment BoxNow did not answer for (unanswered). ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a token outage or a rate limit is no answer, not a refusal
+
+The client raised BoxNowAuthError for any non-200 from /auth-sessions,
+502 and 503 included, and a 429 from the API became a plain
+BoxNowAPIError. Neither was retryable, so a short BoxNow outage made
+the creation task alert staff about a creation to fix, and made the
+settle sweep and the canceled-order cancel treat the order's parcels
+as refused: the uncertainty ended, one alert per due shipment, and the
+automatic recovery of a lost parcel was gone.
+
+The client now raises BoxNowRetryableError for a 5xx or a 429 from the
+token endpoint and for a 429 from the API, so every caller (creation,
+sweep, cancel, tracking poll) retries it as an outage. A real refusal of
+the credentials (401, 403, 400 invalid_client) stays a BoxNowAuthError.
+
+Revoked credentials say nothing about a parcel either, so the sweep
+and _cancel_for_a_canceled_order no longer end the uncertainty on a
+BoxNowAuthError: the shipment keeps its stamp and settles by itself once
+the credentials work. The sweep stops its run at the first one (every
+other shipment of the store would fail the same way) and alerts staff
+once per BOXNOW_CREDENTIALS_ALERT_INTERVAL_SECONDS (a new setting,
+default one day), never per shipment or per run. A canceled order whose
+cancel meets it in the creation task is reported as that cancel.
+
+ACS is not changed: it has no token endpoint (AcsApiKey header), and a
+429 there is deliberately an AcsUndocumentedHttpError, a known outcome
+the voucher hold reasons about (#626, #631; test_voucher_hold.py). ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a new creation attempt drops the old alert record
+
+record_staff_alerted marks last_error once staff were told about a
+failure, and the sweep reads it to avoid a second alert. Nothing cleared
+it when a new attempt started: phase 1 kept last_error, and a later
+failure that leaves none of its own (an answer cut off mid-body, raised
+as an unclassified error) inherited it, so neither the task nor the
+sweep told anyone. Phase 1 now drops staff_alerted when it takes a new
+claim. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): lock the order before the shipment, and settle in one locked step
+
+The settle sweep, _persist_parcel and the creation's phase 1 locked the
+shipment with its order in one select_for_update().select_related()
+statement, shipment first, while an order cancel locks the order and
+then cancels the shipment (OrderService._cancel_order_locked ->
+cancel_shipment): the two operations this code coordinates could wait
+on each other in opposite orders. And the sweep checked the order for a
+cancel in one transaction and cleared the stamp in another, so a cancel
+landing in between was refused busy while the sweep still sent its
+"Create BoxNow parcel now" alert.
+
+_lock_with_order locks the order first, then the shipment, and every
+BoxNow path that locks both uses it: the creation's phase 1,
+_persist_parcel and the sweep. On a live order's lookup that took
+nothing over, _settle_unless_canceled checks the order and clears the
+claim and the stamp in one step under those locks; a canceled order
+releases the claim and goes to the cancel branch, and the alert is sent
+after the step commits. This is the order #713 keeps when it moves the
+order cancel's courier call out of its transaction, as
+docs/order/shipping-boxnow.md now states. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): the webhook and the tracking poll lock the order first too
+
+apply_webhook_event and sync_shipment_state still locked the shipment
+with its order in one select_for_update().select_related() statement,
+shipment first, now opposite to the creation's phase 1, _persist_parcel
+and the settle sweep, which lock the order first: a re-dispatched
+creation and that parcel's webhook or poll could deadlock, and an
+aborted webhook loses its event until the next poll. Both go through
+_lock_with_order now, so every BoxNow path that locks both rows takes
+the order, then the shipment.
+
+TestEveryPathLocksTheOrderFirst pins the order for the creation (phase
+1 and phase 3), the webhook and the poll, beside the sweep's test, so
+reverting any path fails a test. The webhook and poll cases failed
+before this change. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): a BoxNow rate limit is waited out, not multiplied
+
+A 429 became a BoxNowRetryableError without its Retry-After. Each
+dispatched tracking poll then autoretried up to five times on a jittered
+0-16 s backoff, so a rate limit hit by a batch of ~200 polls turned into
+~1,200 calls within about a minute, and the settle sweep kept asking for
+every candidate.
+
+- The client reads Retry-After (delay-seconds or an HTTP-date) on a 429
+  or a 5xx and carries it on the error as retry_after; a 429 without one
+  waits BOXNOW_RATE_LIMIT_DEFAULT_SECONDS, and any wait is held to
+  BOXNOW_RETRY_AFTER_MAX_SECONDS (two new settings).
+- tasks.BoxNowTask, the base of the BoxNow tasks that retry, overrides
+  retry so autoretry_for and self.retry alike wait at least retry_after.
+- A 429 also records the wait for the store (BoxNowClient.rate_limited_for,
+  per-tenant cache). Until it is over the poll batch dispatches nothing,
+  a poll already dispatched makes no call (dispatched sub-tasks cannot
+  be recalled; the next batch polls them again) and the settle sweep
+  skips its run; a sweep run that meets a 429 stops there, as it does on
+  a credentials failure. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+* fix(shipping_boxnow): every Retry-After is capped, an outage's too
+
+The cap on BoxNow's Retry-After applied to a 429 only, so a 5xx asking
+for hours delayed a retry past the broker's consumer timeout, and an
+absurd value overflowed Celery's countdown and failed the task for good.
+_retry_after itself now holds every wait to
+BOXNOW_RETRY_AFTER_MAX_SECONDS. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+### Documentation
+
+* docs(shipping_boxnow): what BoxNow's stage showed for the settle time and the COD lookup
+
+Measured on stage on 2026-11-15: a parcel is listed by orderNumber in the
+first lookup after the creation answers, and a COD parcel is listed by
+parcelId with no paymentMode. The settle default stays: it bounds a request
+BoxNow goes on with after its answer was given up on, which cannot be
+measured from outside. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
+### Testing
+
+* test(shipping_boxnow): the not-yet-due sweep test stamps when it runs
+
+test_nothing_is_asked_before_it_is_due built its timezone.now() stamps
+in the parametrize list, at collection. A run starting more than 300 s
+(the claim TTL) or 600 s (the settle time) after collection found them
+stale and the sweep asked BoxNow. The test now stamps inside its body;
+run 700 s after collection, both cases failed before and pass now. ([`307ff06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/307ff06dca117b1dfa4b195a1a9ecb70c8c3d88e))
+
 ## v3.246.2 (2026-11-15)
 
 ### Bug fixes

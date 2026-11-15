@@ -132,6 +132,7 @@ shipping_boxnow.tasks.poll_boxnow_tracking_batch
 shipping_boxnow.tasks.poll_boxnow_tracking_one
 shipping_boxnow.tasks.process_boxnow_webhook_event
 shipping_boxnow.tasks.purge_expired_boxnow_parcel_events
+shipping_boxnow.tasks.settle_uncertain_boxnow_creations
 shipping_boxnow.tasks.sync_boxnow_lockers
 tenant.tasks.fanout_alert_unremitted_cod_payouts
 tenant.tasks.fanout_allocate_credit_sources
@@ -184,6 +185,7 @@ tenant.tasks.fanout_send_checkout_abandonment_emails
 tenant.tasks.fanout_send_gift_card_expiry_reminders
 tenant.tasks.fanout_send_inactive_user_notifications
 tenant.tasks.fanout_send_review_request_emails
+tenant.tasks.fanout_settle_uncertain_boxnow_creations
 tenant.tasks.fanout_submit_indexnow_urls
 tenant.tasks.fanout_sync_acs_stations
 tenant.tasks.fanout_sync_boxnow_lockers

@@ -266,8 +266,9 @@ the parcel, so a customer cancel is only accepted once the courier agrees:
 
    The split rides the carrier exception hierarchy: every carrier app's errors
    derive from `shipping.exceptions.CarrierError`, and the no-answer ones
-   (`AcsRetryableError` and with it `AcsAuthError`, `AcsConfigError`,
-   `BoxNowRetryableError`, `BoxNowAuthError`, `BoxNowConfigError`) also from
+   (`AcsRetryableError` and with it `AcsAuthError`, `AcsBusyError`,
+   `AcsConfigError`, `BoxNowRetryableError`, `BoxNowBusyError`,
+   `BoxNowAuthError`, `BoxNowConfigError`) also from
    `CarrierUnavailableError`. A new carrier gets the same answers by deriving
    its errors the same way.
 4. The courier is asked before the order row is locked, so the order can move

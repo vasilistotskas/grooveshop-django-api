@@ -3,6 +3,22 @@
 
 
 
+## v3.246.4 (2026-11-15)
+
+### Bug fixes
+
+* fix(blog): a comment by a deleted account declares its author as null (#709)
+
+BlogComment.user is SET_NULL, so a comment outlives the account that wrote
+it and the body carries "user": null, while the schema declared a non-null
+UserPublic: the storefront's generated Zod rejects the whole page of
+comments (422). The comment's own author is now declared nullable
+(BlogComment and BlogCommentDetail), and a reply's parentComment.user and
+ancestorsPath[].user are null for such an author too, instead of the
+empty object UserPublicSerializer(None) produced, and declared so.
+
+Closes #682 ([`5cb92f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cb92f6c86cea490a9f52a06492d84efd4b9d182))
+
 ## v3.246.3 (2026-11-15)
 
 ### Bug fixes

@@ -24,6 +24,20 @@ from user.serializers.account import UserPublicSerializer
 User = get_user_model()
 
 
+#: A comment's author as the public identity, ``null`` once the account is
+#: deleted (``BlogComment.user`` is ``SET_NULL``).
+_AUTHOR_OR_NULL = {
+    "allOf": [{"$ref": "#/components/schemas/UserPublic"}],
+    "nullable": True,
+}
+
+
+def _author(comment: BlogComment) -> dict[str, Any] | None:
+    if comment.user is None:
+        return None
+    return UserPublicSerializer(comment.user).data
+
+
 @extend_schema_field(generate_schema_multi_lang(BlogComment))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
@@ -34,7 +48,9 @@ class BlogCommentSerializer(
 ):
     # PUBLIC serializer: these endpoints serve anonymous readers, and
     # the account serializer carries email/phone/address/birth_date.
-    user = UserPublicSerializer(read_only=True)
+    # ``null`` once the author deleted their account: ``BlogComment.user``
+    # is ``SET_NULL``, so the comment outlives it.
+    user = UserPublicSerializer(read_only=True, allow_null=True)
     content_preview = serializers.SerializerMethodField(
         help_text=_("First 150 characters of the comment content")
     )
@@ -152,7 +168,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             "properties": {
                 "id": {"type": "integer"},
                 "content_preview": {"type": "string"},
-                "user": {"$ref": "#/components/schemas/UserPublic"},
+                "user": _AUTHOR_OR_NULL,
                 "created_at": {"type": "string", "format": "date-time"},
             },
             "required": ["id", "content_preview", "user", "created_at"],
@@ -163,7 +179,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             return {
                 "id": obj.parent.id,
                 "content_preview": self.get_content_preview(obj.parent),
-                "user": UserPublicSerializer(obj.parent.user).data,
+                "user": _author(obj.parent),
                 "created_at": obj.parent.created_at,
             }
         return None
@@ -196,7 +212,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
                 "properties": {
                     "id": {"type": "integer"},
                     "content_preview": {"type": "string"},
-                    "user": {"$ref": "#/components/schemas/UserPublic"},
+                    "user": _AUTHOR_OR_NULL,
                 },
                 "required": ["id", "content_preview", "user"],
             },
@@ -213,7 +229,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             {
                 "id": ancestor.id,
                 "content_preview": self.get_content_preview(ancestor),
-                "user": UserPublicSerializer(ancestor.user).data,
+                "user": _author(ancestor),
             }
             for ancestor in ancestors
         ]

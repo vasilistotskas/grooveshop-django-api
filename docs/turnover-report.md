@@ -29,7 +29,7 @@ event, a script): it is the one save they all share. A later status never moves
 it.
 
 Why dispatch and not payment or placement. The platform's retail receipt is
-issued when the parcel ships (`order.invoicing.receipt_issuable`,
+issued when the parcel ships (`order.accounting.invoicing.receipt_issuable`,
 `docs/order/fiscal-mydata.md` section 7.4), and a Greek store keeps accrual
 books
 (ν.4308/2014): a sale belongs to the period of its receipt, not to the day a
@@ -61,7 +61,7 @@ The order's `OrderVatLine` rows: goods net (one row per `OrderItem`, at the rate
 and the discount snapshotted on it), shipping net and fee net (apportioned over
 the goods' rates by value, largest remainder), and the VAT of each. They are
 written once, when the order is created, by
-`order.taxation.order_vat_lines` (`write_vat_lines`, called at the end of both
+`order.accounting.taxation.order_vat_lines` (`write_vat_lines`, called at the end of both
 creation paths in `OrderService`), the same function the PDF receipt, the
 `Invoice` row and the myDATA payload derive their lines from, so a figure cannot
 disagree with the receipt. A zero-gross line has no row, as on the receipt. A
@@ -92,14 +92,14 @@ Money that went back, in the month it went back:
 | A shipped order that closed unpaid (`payment_status` `CANCELED`), whole | `status_updated_at` | + |
 
 These are the facts the myDATA credit documents are created from
-(`order.credit_documents.create_pending_credits`). A chargeback is a return only
+(`order.accounting.credit_documents.create_pending_credits`). A chargeback is a return only
 when staff decided the goods came back. Points restored are not counted: a
 loyalty redemption is a discount already taken off the sale. A return whose
 order never shipped is not counted (the sale it would reverse was never earned).
 
 **Only the goods part of a provider refund is a return.** A refund pays a
 duplicate payment back first, and that part is no return of the sale: it gets no
-credit document and takes no room on the receipt (`order.credit_allocation`,
+credit document and takes no room on the receipt (`order.accounting.credit_allocation`,
 `docs/order/fiscal-credit-vat-split.md`). Turnover reads each refund's goods from
 `CreditAllocation.goods_claimed`, which is written once when the money is claimed
 or booked and never scaled afterwards, capped to what the refund really moved

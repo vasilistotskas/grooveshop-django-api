@@ -9,7 +9,7 @@ When a sale is earned
     The moment the order **left the store** (``Order.shipped_at``,
     stamped by ``Order.save`` the first time the order is in a dispatched
     status), for every payment method alike. The retail receipt is issued
-    when the parcel ships (``order.invoicing.receipt_issuable``,
+    when the parcel ships (``order.accounting.invoicing.receipt_issuable``,
     ``docs/order/fiscal-mydata.md`` section 7.4), and the books of a Greek store
     are accrual books (ν.4308/2014): the sale belongs to the period of its
     receipt, not to the day the courier pays the cash on delivery out, nor
@@ -31,7 +31,7 @@ What is owed, not yet collected
 
 What a sale is worth
     The order's ``OrderVatLine`` rows, written when the order was created
-    from the same ``order.taxation.order_vat_lines`` the receipt and the
+    from the same ``order.accounting.taxation.order_vat_lines`` the receipt and the
     myDATA payload are built by: goods net (each line at the rate and the
     discount snapshotted on it), shipping net and fee net (apportioned
     over the goods' rates), and the VAT on all three. Gross is net plus
@@ -50,7 +50,7 @@ Returns
     counted: a loyalty redemption is a discount already taken off the
     sale. A refund is gross money, brought to net and VAT pro rata over
     the receipt, ``amount x order net / receipt gross``, the way a credit
-    document spreads it (``order.credit_documents``), so a refund of the
+    document spreads it (``order.accounting.credit_documents``), so a refund of the
     whole receipt returns exactly the sale's net, shipping and fee
     included. A return of an order that never shipped is not counted.
 
@@ -102,9 +102,9 @@ from django.db.models.functions import (
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from order.accounting.taxation import ChargeKind
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
-from order.taxation import ChargeKind
 
 #: The payment states in which the order's money was collected: the only
 #: ones a refund can follow.

@@ -31,13 +31,13 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase, override_settings
 from djmoney.money import Money
 
+from order.accounting.invoicing import generate_invoice
+from order.accounting.mydata.exceptions import MyDataTransportError
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
-from order.invoicing import generate_invoice
 from order.models.invoice import MyDataStatus
-from order.mydata.exceptions import MyDataTransportError
 from order.tasks import send_invoice_to_mydata
 from product.factories.product import ProductFactory
 from tests.utils.dispatch import assert_published_once
@@ -119,7 +119,7 @@ def _make_invoice():
         quantity=1,
     )
     with patch(
-        "order.invoicing._render_pdf_bytes",
+        "order.accounting.invoicing._render_pdf_bytes",
         return_value=b"%PDF-1.4 test",
     ):
         invoice = generate_invoice(issuable(order))
@@ -140,8 +140,11 @@ class MarkRecoveryTestCase(TestCase):
     # Scenario 1: 228 + one matching uid with MARK → CONFIRMED
     # ------------------------------------------------------------------
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_success_confirms_invoice(
         self, mock_email, mock_send, _mock_render
@@ -174,7 +177,7 @@ class MarkRecoveryTestCase(TestCase):
         query_mock.side_effect = _query_side_effect
 
         with patch(
-            "order.mydata.client.MyDataClient.request_transmitted_docs",
+            "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
             new=query_mock,
         ):
             result = send_invoice_to_mydata(order.id)
@@ -196,12 +199,15 @@ class MarkRecoveryTestCase(TestCase):
     # Scenario 2: 228 + zero matches → REJECTED
     # ------------------------------------------------------------------
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch(
-        "order.mydata.client.MyDataClient.request_transmitted_docs",
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch(
+        "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
         return_value=_TRANSMITTED_EMPTY,
     )
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_zero_matches_stays_rejected(
         self, mock_email, mock_send, _mock_query, _mock_render
@@ -229,8 +235,11 @@ class MarkRecoveryTestCase(TestCase):
     # Scenario 3: 228 + multiple matches for the uid → REJECTED (safety)
     # ------------------------------------------------------------------
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_multiple_matches_safety_guard(
         self, mock_email, mock_send, _mock_render
@@ -260,7 +269,7 @@ class MarkRecoveryTestCase(TestCase):
         query_mock.side_effect = _query_side_effect
 
         with patch(
-            "order.mydata.client.MyDataClient.request_transmitted_docs",
+            "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
             new=query_mock,
         ):
             result = send_invoice_to_mydata(order.id)
@@ -279,12 +288,15 @@ class MarkRecoveryTestCase(TestCase):
     # Scenario 4: 228 + recovery query transport error → REJECTED
     # ------------------------------------------------------------------
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch(
-        "order.mydata.client.MyDataClient.request_transmitted_docs",
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch(
+        "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
         side_effect=MyDataTransportError("network timeout"),
     )
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_transport_error_no_crash(
         self, mock_email, mock_send, mock_query, _mock_render
@@ -317,8 +329,11 @@ class MarkRecoveryTestCase(TestCase):
     # Scenario 5: 228 + match on a later page → follow continuationToken
     # ------------------------------------------------------------------
 
-    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_follows_continuation_token_pagination(
         self, mock_email, mock_send, _mock_render
@@ -363,7 +378,7 @@ class MarkRecoveryTestCase(TestCase):
         query_mock.side_effect = _query_side_effect
 
         with patch(
-            "order.mydata.client.MyDataClient.request_transmitted_docs",
+            "order.accounting.mydata.client.MyDataClient.request_transmitted_docs",
             new=query_mock,
         ):
             result = send_invoice_to_mydata(order.id)

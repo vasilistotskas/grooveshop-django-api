@@ -6,7 +6,7 @@ import pytest
 from django.conf import settings as django_settings
 from extra_settings.models import Setting
 
-from order.mydata.config import load_config
+from order.accounting.mydata.config import load_config
 from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db

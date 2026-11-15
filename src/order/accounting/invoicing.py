@@ -12,7 +12,7 @@ a retail credit document (11.4) is rendered here too
 The platform issues no invoice (Τιμολόγιο): from 2.11.2026 AADE decision
 Α.1128/2025 requires invoices to come from a licensed provider or AADE's
 timologio app, so ``document_type=INVOICE`` orders never reach this
-module (see ``order.mydata.types``).
+module (see ``order.accounting.mydata.types``).
 
 The heavy lifting is split into small helpers so the unit tests can
 pin ``_compute_vat_breakdown`` and ``_build_context`` without spinning
@@ -23,7 +23,7 @@ up WeasyPrint's native stack:
   (:class:`ReceiptNotIssuable`) an order the platform issues no receipt
   for.
 - :func:`_compute_vat_breakdown` — aggregates the order's taxable lines
-  (goods, shipping, payment fee; ``order.taxation``) by VAT rate so the
+  (goods, shipping, payment fee; ``order.accounting.taxation``) by VAT rate so the
   invoice shows one row per rate band (24 %, 13 %, 6 %, 0 %).
 - :func:`_build_context` — builds the template context dict.
 - :func:`_render_pdf_bytes` — calls WeasyPrint; imported lazily so
@@ -55,15 +55,15 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
-from order import credit_allocation
+from order.accounting import credit_allocation
+from order.accounting.mydata.config import load_config as load_mydata_config
+from order.accounting.taxation import breakdown_by_rate, order_vat_lines
 from order.checkout.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 from order.models.retail_credit import RetailCredit
-from order.mydata.config import load_config as load_mydata_config
-from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.membership import is_demo_store
 
@@ -127,7 +127,7 @@ class ReceiptNotIssuable(Exception):
 class ReceiptDeferred(ReceiptNotIssuable):
     """:func:`generate_invoice` waits: the order has a refund or chargeback
     whose place on the receipt is not decided yet, because a refund claim
-    still PENDING holds the room it needs (``order.credit_allocation``).
+    still PENDING holds the room it needs (``order.accounting.credit_allocation``).
     Issuing the receipt now would document the sale without netting that
     money, and no credit would ever follow for it. Not final: the receipt
     is issued once the claim resolves (``order.tasks.allocate_credit_sources``
@@ -178,7 +178,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     convention): ``{rate, subtotal, vat, gross}`` where values are
     decimals in the order's currency. The bands cover goods, shipping and
     the payment-method fee alike — the same lines the myDATA payload is
-    built from (``order.taxation``), at the rates snapshotted on the
+    built from (``order.accounting.taxation``), at the rates snapshotted on the
     order items, so a ``Vat`` row edited or deleted after checkout changes
     nothing here.
 
@@ -198,7 +198,7 @@ def _returned_before_receipt(
 ) -> dict[Decimal, Decimal]:
     """The gross per rate that moved back before the receipt, at the rates
     each refund was allocated when it was claimed or booked
-    (``order.credit_allocation``): the one figure the receipt is netted by
+    (``order.accounting.credit_allocation``): the one figure the receipt is netted by
     and ``refunded_before_receipt`` adds up."""
     from order.models import CreditAllocation
 
@@ -234,7 +234,7 @@ def refunded_before_receipt(
 
     A retail receipt documents the sale for the consideration actually
     paid, so money returned before it is issued reduces what it says, and
-    no credit document follows for it (``order.credit_documents`` credits
+    no credit document follows for it (``order.accounting.credit_documents`` credits
     only what was refunded after the receipt row existed). A chargeback
     counts only once staff decided the goods came back
     (``ChargebackDecision``), by the moment of that decision; otherwise the
@@ -258,7 +258,7 @@ def _net_of(
     (``credit_documents.credit_breakdown``) so the figures add up. Rates
     left with nothing drop out. An allocation the receipt cannot hold (more
     than a rate has) is taken up to what the rate holds."""
-    from order.credit_documents import credit_breakdown
+    from order.accounting.credit_documents import credit_breakdown
 
     held = {Decimal(r["rate"]): Decimal(r["gross"]) for r in rows}
     capped = {
@@ -549,7 +549,7 @@ def _persist_invoice_row(
         # frozen (G0263: a corrective regen must not disagree with the
         # registered invoice); before that they are still the receipt's
         # cut-off: it netted what was returned before the row existed, and
-        # money returned since is credited (``order.credit_documents``), so
+        # money returned since is credited (``order.accounting.credit_documents``), so
         # recomputing on a retry or a forced regeneration would count it
         # twice.
         vat_breakdown = existing.vat_breakdown

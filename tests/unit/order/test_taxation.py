@@ -4,7 +4,7 @@ Shipping and the payment-method fee are incidental costs charged to the
 customer, so they are part of the taxable amount of the goods they
 accompany (Directive 2006/112/EC art. 78(b); Greek VAT Code, Law
 5144/2024, art. 24(4)(a)) and take the goods' rate — apportioned over the
-rates when the order mixes them. ``order.taxation`` is where that lives;
+rates when the order mixes them. ``order.accounting.taxation`` is where that lives;
 these tests pin its arithmetic, the document-level agreement is in
 ``test_invoice_mydata_agreement.py``.
 """
@@ -16,14 +16,14 @@ from decimal import Decimal
 import pytest
 from djmoney.money import Money
 
-from order.checkout.discounts import proportional_shares
-from order.factories.order import OrderFactory
-from order.taxation import (
+from order.accounting.taxation import (
     ChargeKind,
     breakdown_by_rate,
     order_vat_lines,
     split_gross,
 )
+from order.checkout.discounts import proportional_shares
+from order.factories.order import OrderFactory
 from product.factories import ProductFactory
 from tests.utils.discounts import snapshot_discounts
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES

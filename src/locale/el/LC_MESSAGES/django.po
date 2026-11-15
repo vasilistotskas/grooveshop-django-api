@@ -10965,8 +10965,8 @@ msgstr "Δημοφιλή (>10 χρήσεις)"
 msgid "Popularity"
 msgstr "Δημοτικότητα"
 
-msgid "Populated by the automated submission pipeline (``order.mydata``). Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
-msgstr "Συμπληρώνεται από τον αυτοματοποιημένο μηχανισμό υποβολής (``order.mydata``). Μόνο για ανάγνωση — επεξεργαστείτε τα κύρια δεδομένα (πωλητής / αγοραστής) και χρησιμοποιήστε την ενέργεια «Αποστολή στο myDATA» στη διαχείριση Παραγγελιών για αναδημιουργία. Οι συντελεστές ΦΠΑ καθορίζονται στη γραμμή της παραγγελίας κατά την ολοκλήρωση της αγοράς και δεν ακολουθούν μεταγενέστερες αλλαγές του καταλόγου."
+msgid "Populated by the automated submission pipeline. Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
+msgstr "Συμπληρώνεται από τον αυτοματοποιημένο μηχανισμό υποβολής. Μόνο για ανάγνωση — επεξεργαστείτε τα κύρια δεδομένα (πωλητής / αγοραστής) και χρησιμοποιήστε την ενέργεια «Αποστολή στο myDATA» στη διαχείριση Παραγγελιών για αναδημιουργία. Οι συντελεστές ΦΠΑ καθορίζονται στη γραμμή της παραγγελίας κατά την ολοκλήρωση της αγοράς και δεν ακολουθούν μεταγενέστερες αλλαγές του καταλόγου."
 
 msgid "Portion of the order settled by gift-card balance. A payment, not a discount — it never reduces the taxable order value, only what the payment provider charges."
 msgstr "Τμήμα της παραγγελίας που εξοφλήθηκε με υπόλοιπο δωροκάρτας. Πληρωμή, όχι έκπτωση — δεν μειώνει ποτέ τη φορολογητέα αξία της παραγγελίας, μόνο το ποσό που χρεώνει ο πάροχος πληρωμής."

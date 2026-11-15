@@ -758,7 +758,8 @@ def _no_pdf_engine():
     which a developer machine may not have. Everything around the render
     (numbering, snapshots, the context) still runs for real."""
     with mock.patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 demo"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 demo",
     ):
         yield
 
@@ -1256,7 +1257,7 @@ class TestResetRebuildsTheAccounts:
         """``Invoice.order`` is PROTECT, so the wipe removes any receipt a
         demo order carries (an earlier seed issued some) before the order
         goes — the row and its PDF."""
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
         from order.models.invoice import Invoice
         from order.models.order import Order
         from tests.utils.mydata import issuable, mydata_enabled

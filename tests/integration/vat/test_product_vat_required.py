@@ -289,8 +289,8 @@ class TestDeletingARateInTheAdmin:
 
 class TestTheStandardRate:
     def test_it_is_myDATA_category_one(self):
-        from order.mydata.builder import _VAT_CATEGORY_BY_RATE
-        from order.mydata.types import VAT_CATEGORY_24
+        from order.accounting.mydata.builder import _VAT_CATEGORY_BY_RATE
+        from order.accounting.mydata.types import VAT_CATEGORY_24
         from vat.constants import STANDARD_VAT_RATE
 
         assert _VAT_CATEGORY_BY_RATE[STANDARD_VAT_RATE] == VAT_CATEGORY_24

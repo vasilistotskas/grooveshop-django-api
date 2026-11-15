@@ -23,9 +23,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.api.throttling import OrderSpecimenThrottle
-from order.enum.status import OrderStatus
-from order.factories.order import OrderFactory
-from order.invoicing import (
+from order.accounting.invoicing import (
     SpecimenNotAvailable,
     _build_context,
     _compute_vat_breakdown,
@@ -33,6 +31,8 @@ from order.invoicing import (
     render_specimen_pdf,
     specimen_available,
 )
+from order.enum.status import OrderStatus
+from order.factories.order import OrderFactory
 from order.models.invoice import Invoice, InvoiceCounter
 from tests.utils.mydata import issuable
 from user.factories.account import UserAccountFactory
@@ -97,7 +97,7 @@ def test_specimen_download_streams_a_pdf_on_a_demo_store(
     order = issuable(OrderFactory(user=user))
 
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=FAKE_PDF
+        "order.accounting.invoicing._render_pdf_bytes", return_value=FAKE_PDF
     ) as render:
         response = client.get(_download_url(order))
 
@@ -113,9 +113,12 @@ def test_specimen_is_never_issued_stored_or_submitted(
     order = issuable(OrderFactory(user=user))
 
     with (
-        patch("order.invoicing._render_pdf_bytes", return_value=FAKE_PDF),
-        patch("order.invoicing._persist_invoice_row") as persist,
-        patch("order.mydata.service.submit_document") as submit,
+        patch(
+            "order.accounting.invoicing._render_pdf_bytes",
+            return_value=FAKE_PDF,
+        ),
+        patch("order.accounting.invoicing._persist_invoice_row") as persist,
+        patch("order.accounting.mydata.service.submit_document") as submit,
     ):
         response = client.get(_download_url(order))
 
@@ -131,7 +134,7 @@ def test_specimen_is_refused_on_a_store_that_is_not_a_demo_store(
 ) -> None:
     order = issuable(OrderFactory(user=user))
 
-    with patch("order.invoicing._render_pdf_bytes") as render:
+    with patch("order.accounting.invoicing._render_pdf_bytes") as render:
         response = client.get(_download_url(order))
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -251,7 +254,9 @@ def test_the_specimen_download_is_throttled(
     )
     order = issuable(OrderFactory(user=user))
 
-    with patch("order.invoicing._render_pdf_bytes", return_value=FAKE_PDF):
+    with patch(
+        "order.accounting.invoicing._render_pdf_bytes", return_value=FAKE_PDF
+    ):
         statuses = [
             client.get(_download_url(order)).status_code
             for _ in range(rate + 2)
@@ -277,7 +282,9 @@ def test_a_guest_with_the_orders_uuid_gets_the_specimen(
 ) -> None:
     order = _guest_order()
 
-    with patch("order.invoicing._render_pdf_bytes", return_value=FAKE_PDF):
+    with patch(
+        "order.accounting.invoicing._render_pdf_bytes", return_value=FAKE_PDF
+    ):
         response = guest_client.get(
             _download_url(order), {"uuid": str(order.uuid)}
         )
@@ -292,7 +299,7 @@ def test_a_guest_without_the_right_uuid_is_refused(
 ) -> None:
     order = _guest_order()
 
-    with patch("order.invoicing._render_pdf_bytes") as render:
+    with patch("order.accounting.invoicing._render_pdf_bytes") as render:
         response = guest_client.get(_download_url(order), query)
 
     assert response.status_code == status.HTTP_403_FORBIDDEN

@@ -15,7 +15,7 @@ document:
   the receipt still holds and no credit has covered.
 
 A refund recorded before the receipt existed has no document: the receipt
-is issued net of it (``order.invoicing.refunded_before_receipt``), so there
+is issued net of it (``order.accounting.invoicing.refunded_before_receipt``), so there
 is nothing to credit. A chargeback has one only when staff decided the goods
 came back (``ChargebackDecision``): the card network taking money back does
 not reverse the sale by itself, but a sale whose goods returned is reversed
@@ -31,7 +31,7 @@ registered) calls the same idempotent function.
 **How a credit splits over VAT rates.** The receipt froze its gross per
 rate (``Invoice.vat_breakdown``: goods, shipping and fees all in it). The
 split of every credit was FIXED when its money was claimed, booked or
-decided, under the order lock (``order.credit_allocation``,
+decided, under the order lock (``order.accounting.credit_allocation``,
 ``CreditAllocation``: the rates of the lines a refund pays for, or a bare
 amount spread over the headroom left at that moment), and the credit is
 issued from that allocation only. The order credits are issued in cannot
@@ -46,7 +46,7 @@ cannot check it against the receipt's total (error 319 belongs to linked
 credits). The link lives in our ``RetailCredit.invoice`` row only, and the
 cap below is the sole guard: a credit the receipt cannot hold is never
 submitted. The NET of a credit is derived cumulatively: what the rate's total credited gross splits to
-(``order.taxation.split_gross``), capped at the receipt's net for the
+(``order.accounting.taxation.split_gross``), capped at the receipt's net for the
 rate, less the net already credited. Rounding can therefore never push
 several partial credits past the receipt, and the last one lands exactly on
 it.
@@ -63,7 +63,8 @@ from django.db import transaction
 from django.utils import timezone
 from djmoney.money import Money
 
-from order import credit_allocation
+from order.accounting import credit_allocation
+from order.accounting.taxation import split_gross
 from order.checkout.discounts import allocate_capped, proportional_shares
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
@@ -83,7 +84,6 @@ from order.models.refund_attempt import (
 )
 from order.models.retail_credit import CreditReason
 from order.payment_ledger import PaymentLedger
-from order.taxation import split_gross
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -259,7 +259,7 @@ def request_credit_documents(order_id: int) -> None:
     its retail documents by itself (``MYDATA_AUTO_SUBMIT``). Idempotent on
     the receiving side: nothing is owed until the order's receipt is
     registered, and each refund or chargeback is credited once."""
-    from order.mydata.config import load_config
+    from order.accounting.mydata.config import load_config
     from order.tasks import issue_pending_credits
 
     if load_config().issues_automatically():

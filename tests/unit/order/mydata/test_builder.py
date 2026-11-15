@@ -1,4 +1,4 @@
-"""Unit tests for :func:`order.mydata.builder.build_receipt_xml`.
+"""Unit tests for :func:`order.accounting.mydata.builder.build_receipt_xml`.
 
 Focuses on the mapping from ``Invoice`` → ``InvoicesDoc`` XML. Uses
 the real ``OrderFactory`` / ``InvoiceCounter`` path to produce a
@@ -21,10 +21,10 @@ from xml.etree.ElementTree import fromstring
 from django.test import TestCase
 from djmoney.money import Money
 
+from order.accounting.invoicing import generate_invoice
+from order.accounting.mydata.builder import build_receipt_xml
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
-from order.invoicing import generate_invoice
-from order.mydata.builder import build_receipt_xml
 from pay_way.enum.settlement import PaySettlement
 from product.factories.product import ProductFactory
 from tests.utils.mydata import issuable, mydata_enabled
@@ -53,7 +53,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         with (
             mydata_enabled(auto_submit=False),
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 return_value=b"%PDF-1.4 test",
             ),
         ):
@@ -278,7 +278,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         rates used to trigger AADE error 217 with a misleading
         message. Now we raise a builder-side ValueError so
         ``submit_invoice`` converts it to MyDataValidationError."""
-        from order.mydata.builder import _vat_category
+        from order.accounting.mydata.builder import _vat_category
 
         with self.assertRaises(ValueError):
             _vat_category(Decimal(11))
@@ -298,7 +298,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         with (
             mydata_enabled(auto_submit=False),
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 return_value=b"%PDF-1.4 test",
             ),
         ):
@@ -346,7 +346,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         with (
             mydata_enabled(auto_submit=False),
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 return_value=b"%PDF-1.4 test",
             ),
         ):
@@ -402,7 +402,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         with (
             mydata_enabled(auto_submit=False),
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 return_value=b"%PDF-1.4 test",
             ),
         ):

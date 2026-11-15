@@ -80,7 +80,7 @@ COST_PRICE_PERMISSION = "product.manage_cost_price"
 
 def _quantize_cents(value: Decimal) -> Decimal:
     """Round a monetary amount to whole cents (2dp, ROUND_HALF_UP — the
-    AADE convention, see ``order/mydata/builder.py``).
+    AADE convention, see ``order/accounting/mydata/builder.py``).
 
     Percentage-derived amounts (VAT, discount) carry sub-cent precision
     (e.g. 16.12 × 24% = 3.8688). Left unquantized they leak into

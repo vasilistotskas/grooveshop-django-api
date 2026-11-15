@@ -26,10 +26,10 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from djmoney.money import Money
 
+from order.accounting.invoicing import _render_items
 from order.admin import OrderAdmin, OrderItemAdmin, OrderItemInline
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.invoicing import _render_items
 from order.line_snapshot import backfill_line_snapshots
 from order.models.item import OrderItem, product_name_for
 from order.models.order import Order

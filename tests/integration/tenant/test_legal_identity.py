@@ -56,7 +56,7 @@ class TestOneDefinition:
     """Invoice and storefront must never name a different seller."""
 
     def test_invoicing_imports_the_shared_map(self):
-        from order.invoicing import INVOICE_SELLER_SETTING_KEYS
+        from order.accounting.invoicing import INVOICE_SELLER_SETTING_KEYS
 
         assert INVOICE_SELLER_SETTING_KEYS is SELLER_SETTING_KEYS, (
             "invoicing kept its own copy — the two will drift and an "

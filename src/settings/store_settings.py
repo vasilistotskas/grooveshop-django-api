@@ -857,7 +857,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 100,
     },
     # Invoice seller info — surfaced on the generated PDF via
-    # ``order.invoicing._seller_snapshot``. Defaults land blank so
+    # ``order.accounting.invoicing._seller_snapshot``. Defaults land blank so
     # a fresh install doesn't silently ship a plausible-but-wrong
     # legal identity; ops must fill them in via the admin Settings
     # page before issuing the first invoice in production. Keys are

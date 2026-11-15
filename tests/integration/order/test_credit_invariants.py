@@ -95,10 +95,11 @@ from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
-from order import credit_allocation, refund_reconciliation
+from order.accounting import credit_allocation
+from order.accounting.credit_documents import create_pending_credits
+from order.accounting.taxation import ChargeKind, order_vat_lines
 from order.chargebacks import ChargebackDecisionError, decide_chargebacks
 from order.checkout.discounts import discounted_line_gross
-from order.credit_documents import create_pending_credits
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.exceptions import PaymentError
@@ -118,14 +119,18 @@ from order.models.refund_attempt import (
     RefundAttemptStatus,
 )
 from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
-from order.refund_lines import covered_units, held_values, pending_request
+from order.refunds import refund_reconciliation
+from order.refunds.refund_lines import (
+    covered_units,
+    held_values,
+    pending_request,
+)
 from order.services import OrderService
 from order.tasks import (
     allocate_credit_sources,
     generate_order_invoice,
     send_invoice_to_mydata,
 )
-from order.taxation import ChargeKind, order_vat_lines
 from tests.integration.order.test_credit_allocation import (  # noqa: F401
     _render_and_site,
 )

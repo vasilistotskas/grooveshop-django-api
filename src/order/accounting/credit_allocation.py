@@ -15,7 +15,7 @@ is left on the receipt:
   before any money moves.
 * A refund claim is allocated by ``OrderService._claim_refund`` when it is
   made: a bare amount pro rata over the headroom, a refund by lines (see
-  :mod:`order.refund_lines`) as its own pieces, each at its line's rate,
+  :mod:`order.refunds.refund_lines`) as its own pieces, each at its line's rate,
   which must fit their rates (:func:`first_short_rate`). Every other source (a refund nobody claimed, a returned chargeback)
   is decided by :func:`allocate_order`, which every WRITE path calls first
   (the receipt, a claim, the credit documents, a booked refund, a decision)
@@ -45,6 +45,11 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from djmoney.money import Money
 
+from order.accounting.taxation import (
+    ChargeKind,
+    breakdown_by_rate,
+    order_vat_lines,
+)
 from order.checkout.discounts import allocate_capped, proportional_shares
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.models import (
@@ -62,7 +67,6 @@ from order.models.refund_attempt import (
     RefundAttemptKind,
     RefundAttemptStatus,
 )
-from order.taxation import ChargeKind, breakdown_by_rate, order_vat_lines
 
 _ZERO = Decimal(0)
 
@@ -760,7 +764,7 @@ def allocate_order(order: Order) -> int:
     the admin) never calls it. Returns how many sources were decided. A
     write path issues the credits itself (or its caller does, once the money
     is booked); the periodic task asks for them
-    (``order.credit_allocation_backfill``), so a source decided on an order
+    (``order.accounting.credit_allocation_backfill``), so a source decided on an order
     that already has a receipt is credited then.
 
     Sources are decided strictly oldest first, and the first one that

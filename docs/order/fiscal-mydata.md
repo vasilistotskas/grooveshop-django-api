@@ -5,8 +5,8 @@ and says which file holds each § number used here.
 
 ## 7.4 Retail tax documents (myDATA): a receipt at shipment, a credit per refund
 
-`src/order/mydata/` (builder, client, parser, service),
-`src/order/invoicing.py`, `src/order/credit_documents.py`,
+`src/order/accounting/mydata/` (builder, client, parser, service),
+`src/order/accounting/invoicing.py`, `src/order/accounting/credit_documents.py`,
 `src/order/models/invoice.py` and `retail_credit.py`. The platform issues
 **retail** documents only, over the ERP `SendInvoices` channel, with the
 tenant's own credentials (`tenant.credentials.mydata_credentials()`):
@@ -59,7 +59,7 @@ sandbox, and a sandbox "receipt" is a test registration. Instead
 order, with a «ΔΕΙΓΜΑ» watermark (a `position: fixed` box, which WeasyPrint
 repeats on every page), the title line "SPECIMEN - not a tax document", and no
 QR code (nothing is registered, so nothing to verify).
-`order.invoicing.specimen_available` is the one gate, used by the endpoint and
+`order.accounting.invoicing.specimen_available` is the one gate, used by the endpoint and
 by `OrderDetail.hasSpecimenReceipt`: a demo store AND `receipt_issuable(order)`
 (a RECEIPT order at SHIPPED onwards, `RECEIPT_ISSUING_STATUSES`); any other
 store and any earlier status answer 404 and `false`. It never issues: no
@@ -109,7 +109,7 @@ included): `handle_order_shipped` dispatches `generate_order_invoice` when
 COMPLETED or RETURNED) and `issues_automatically()`. Exactly once:
 `generate_invoice` returns the existing row, `submit_document` returns the
 existing MARK, and a receipt that already has one is not dispatched again. The
-payment rows are the ones `src/order/mydata/builder.py` always emitted
+payment rows are the ones `src/order/accounting/mydata/builder.py` always emitted
 (card/online, cash for COD, the gift-card share under its own configurable
 code). A refused or unanswered receipt is **never emailed**: the customer's
 email (`send_invoice_email`, "Receipt ...") goes out only after AADE registered
@@ -121,7 +121,7 @@ unchanged.
 BEFORE it.** A retail receipt (11.1) documents the sale at shipment; a credit
 document (11.4) only corrects a receipt that exists (it relates to its MARK).
 So money returned before the receipt is issued reduces the receipt and gets NO
-credit document: `order.invoicing.refunded_before_receipt` adds up the
+credit document: `order.accounting.invoicing.refunded_before_receipt` adds up the
 allocations (`CreditAllocation`) that moved before the receipt: the REFUND
 rows on the payment ledger (less REFUND_REVERSAL, a refund the provider
 reported failed), the value returned onto gift cards, and a chargeback staff
@@ -206,7 +206,7 @@ decision does not touch the ledger, `payment_status` or loyalty. A chargeback
 recorded before the decision is not netted into a receipt
 (`refunded_before_receipt` counts only decided rows).
 
-**Credit documents.** `order.credit_documents.create_pending_credits(order_id)`
+**Credit documents.** `order.accounting.credit_documents.create_pending_credits(order_id)`
 is the one reconciliation (under the order row lock, idempotent) and the
 `issue_pending_credits` task wraps it and also resubmits any credit not
 registered yet. It is dispatched by:
@@ -258,7 +258,7 @@ produces no `Invoice`, no PDF, no email and no myDATA submission
 (`receipt_issuable` refuses it; the 1.1 builder is gone). The checkout still
 collects the buyer's company details; the order admin's "Billing / Invoice" tab
 shows staff what timologio needs (`OrderAdmin.timologio_summary`: the identity
-and the VAT rows of the order, from `src/order/taxation.py`) and records what
+and the VAT rows of the order, from `src/order/accounting/taxation.py`) and records what
 they issued (`Order.timologio_invoice_number` / `_mark`,
 `timologio_credit_number` / `_mark`). The order confirmation says an invoice
 was *requested* ("Invoice request"), never that one is attached.

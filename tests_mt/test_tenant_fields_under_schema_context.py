@@ -19,7 +19,7 @@ from django.db import connection
 from django_tenants.postgresql_backend.base import FakeTenant
 from django_tenants.utils import schema_context, tenant_context
 
-from order.mydata.config import load_config
+from order.accounting.mydata.config import load_config
 from tenant import credentials
 from tenant.models import Tenant
 

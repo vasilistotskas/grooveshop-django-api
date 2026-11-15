@@ -431,7 +431,7 @@ class TestAWebhookRefundIsKeyedLikeEveryOtherPath:
     webhook booked, and a reversal finds the row to free."""
 
     def test_reconciliation_does_not_book_it_a_second_time(self):
-        from order.refund_reconciliation import reconcile
+        from order.refunds.refund_reconciliation import reconcile
 
         order = _order("pi_keyed_1", amount_due=Money("50.00", "EUR"))
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
@@ -465,7 +465,7 @@ class TestAWebhookRefundIsKeyedLikeEveryOtherPath:
     def test_a_failed_refund_frees_the_credit_of_a_webhook_booked_one(
         self, refund_states
     ):
-        from order import credit_allocation
+        from order.accounting import credit_allocation
 
         order = _order("pi_keyed_2", amount_due=Money("50.00", "EUR"))
         _deliver("re_keyed_2", "pi_keyed_2", 2000)

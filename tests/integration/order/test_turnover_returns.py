@@ -2,7 +2,7 @@
 
 A refund pays a duplicate payment back first, and that part is no return of
 the sale (it owes no credit document and takes no room on the receipt,
-``order.credit_allocation``). Turnover reads the fixed
+``order.accounting.credit_allocation``). Turnover reads the fixed
 ``CreditAllocation.goods_claimed`` of each refund, so it agrees with the
 credit documents, and a past month never moves when a refund is later
 reversed. These tests run the real ledger paths that write the allocations.

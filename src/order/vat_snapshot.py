@@ -3,7 +3,7 @@
 ``OrderVatLine`` rows are written when an order is created
 (``write_vat_lines``, from both creation paths of ``OrderService``) by the
 very function the receipt and the myDATA payload use
-(``order.taxation.order_vat_lines``), so no figure can differ from the
+(``order.accounting.taxation.order_vat_lines``), so no figure can differ from the
 receipt. ``Order.shipped_at`` is stamped by ``Order.save`` the first time
 the order is in a dispatched status.
 
@@ -24,8 +24,8 @@ import logging
 from django.db.models import Exists, F, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
+from order.accounting.taxation import VatLine, order_vat_lines
 from order.enum.status import DISPATCHED_STATUSES
-from order.taxation import VatLine, order_vat_lines
 
 logger = logging.getLogger(__name__)
 

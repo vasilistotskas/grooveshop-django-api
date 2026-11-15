@@ -457,6 +457,15 @@ def get_celery_beat_schedule():
             "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
         },
+        # Settle the BoxNow creations whose outcome stayed uncertain
+        # past BOXNOW_CREATION_SETTLE_SECONDS (#712): the creation task's
+        # retries end long before, so nothing else asks BoxNow again.
+        # Fanout, as for the poll: BoxNowShipment is per tenant.
+        "settle-uncertain-boxnow-creations": {
+            "task": "tenant.tasks.fanout_settle_uncertain_boxnow_creations",
+            "schedule": crontab(minute="*/15"),
+            "options": {"queue": "celery", "expires": 300},
+        },
         # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
         # when the AcsStation cache is in use; harmless to schedule now
         # since the task no-ops when ACS provider is inactive).

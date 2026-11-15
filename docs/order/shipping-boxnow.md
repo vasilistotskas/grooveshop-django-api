@@ -181,6 +181,34 @@ and says which file holds each § number used here.
   cancelled at BoxNow. Its locked `select_related` join takes the order
   row too, so an order cancel still in its transaction is waited for and
   then seen.
+- **A sweep settles creations that stayed uncertain** (#712). The
+  creation task's retries back off for about 30 seconds, far inside
+  `BOXNOW_CREATION_SETTLE_SECONDS`, and the tracking poll only reads
+  shipments with a `parcel_id`, so nothing else asks BoxNow again.
+  `settle_uncertain_boxnow_creations` (every 15 minutes, fanned out per
+  tenant by `tenant.tasks.fanout_settle_uncertain_boxnow_creations`) runs
+  `BoxNowService.settle_uncertain_creation` for each shipment with no
+  parcel whose `creation_uncertain_at` is older than the settle time and
+  whose creation is not in flight:
+  - a canceled order: its cancel is finished as the creation would
+    (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
+    there and recorded, none is a local cancel. A refusal is reported once
+    (`report_cancel_refused`: an ERROR line and a staff note on the order)
+    and ends the uncertainty;
+  - a live order: under the creation's own claim, the order is looked up by
+    `orderNumber`. One live `new` parcel created for this shipment's terms
+    is saved (`_persist_parcel`); nothing listed settles it as not created,
+    the stamp is cleared and staff get the creation alert ("Create BoxNow
+    parcel now"), unless the last failure was a refusal they were already
+    told about; anything else is handed to staff with what BoxNow lists. A
+    lookup that fails is left for the next run.
+  The creation task names a canceled order's outcome as a cancel: status
+  `order_canceled` (or `shipment_canceled`) instead of "created", and a
+  refused cancel (`BoxNowCancelRefusedError`) is reported as the cancel it
+  is, never with the creation alert, whose remedy would be wrong. ACS does
+  not have this case: a voucher request of unknown outcome is never
+  cancelled or re-sent automatically, it waits for staff (§5.1 of
+  `shipping-acs.md`).
 - **The tracking poll asks in the shipment's payment mode** (#691).
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources

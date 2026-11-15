@@ -107,3 +107,14 @@ class BoxNowBusyError(BoxNowRetryableError, CarrierBusyError):
     creation of uncertain outcome is still settling: refused here, with
     no BoxNow call. Celery retries it like any ``BoxNowRetryableError``.
     """
+
+
+class BoxNowCancelRefusedError(BoxNowAPIError):
+    """A canceled order's parcel could not be canceled at BoxNow.
+
+    BoxNow refused the cancel, holds a parcel past ``new`` or several,
+    or refused the lookup by ``orderNumber``. Raised in place of a
+    creation for a canceled order
+    (``BoxNowService._cancel_for_a_canceled_order``), so the creation task
+    tells staff about a cancel, not about a creation to retry.
+    """

@@ -14,6 +14,7 @@ from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
+    BoxNowCancelRefusedError,
     BoxNowConfigError,
     BoxNowRetryableError,
 )
@@ -70,7 +71,9 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
     """
     # Lazy imports to avoid circular dependencies between shipping_boxnow
     # and order apps at Django startup time.
+    from order.enum.status import OrderStatus
     from order.models.order import Order
+    from shipping_boxnow.enum.parcel_state import BoxNowParcelState
     from shipping_boxnow.services import BoxNowService
 
     try:
@@ -139,6 +142,17 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             "order_id": order_id,
             "message": str(exc),
         }
+    except BoxNowCancelRefusedError as exc:
+        # The order is canceled: its cancel, not a creation, failed. The
+        # creation alert's remedy ("Create BoxNow parcel now") is wrong
+        # here, so staff get the cancel's record instead.
+        BoxNowService.report_cancel_refused(order_id, exc.message)
+        return {
+            "status": "boxnow_cancel_refused",
+            "order_id": order_id,
+            "code": exc.code,
+            "message": str(exc),
+        }
     except BoxNowRetryableError:
         # Transient (HTTP 5xx / connection). Re-raise so Celery's autoretry_for
         # handles it — BoxNowRetryableError subclasses BoxNowAPIError, so the
@@ -177,6 +191,28 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             "order_id": order_id,
             "code": exc.code,
             "message": str(exc),
+        }
+
+    if shipment.parcel_state == BoxNowParcelState.CANCELED:
+        # Canceled instead of created: the order was canceled (its cancel
+        # finished here), or the shipment was while BoxNow answered.
+        order_canceled = Order.objects.filter(
+            pk=order_id, status=OrderStatus.CANCELED
+        ).exists()
+        logger.info(
+            "BoxNow parcel for order %s not created: the %s was canceled "
+            "(parcel_id=%s)",
+            order_id,
+            "order" if order_canceled else "shipment",
+            shipment.parcel_id,
+            extra={"order_id": order_id, "parcel_id": shipment.parcel_id},
+        )
+        return {
+            "status": "order_canceled"
+            if order_canceled
+            else "shipment_canceled",
+            "order_id": order_id,
+            "parcel_id": shipment.parcel_id,
         }
 
     logger.info(
@@ -551,3 +587,49 @@ def purge_expired_boxnow_parcel_events() -> dict[str, int]:
             "Purged %s BoxNow parcel events of settled shipments", deleted
         )
     return {"deleted": deleted}
+
+
+@shared_task(base=TenantTask)
+def settle_uncertain_boxnow_creations(
+    *, max_per_run: int = 100
+) -> dict[str, int]:
+    """Settle the creations whose outcome stayed uncertain past the settle
+    time (#712): ``BoxNowService.settle_uncertain_creation`` per shipment.
+
+    Beat-scheduled through ``tenant.tasks.fanout_settle_uncertain_boxnow_
+    creations``. A shipment BoxNow did not answer for is counted and left
+    for the next run, so one failure never stops the rest.
+    """
+    if _skip_if_boxnow_unconfigured("settle_uncertain_boxnow_creations"):
+        return {}
+
+    from collections import Counter
+
+    from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+    from shipping_boxnow.models import BoxNowShipment
+    from shipping_boxnow.services import BoxNowService
+
+    candidates = list(
+        BoxNowShipment.objects.real()
+        .filter(
+            parcel_id__isnull=True,
+            metadata__has_key="creation_uncertain_at",
+        )
+        .exclude(metadata__creation_uncertain_at=None)
+        .exclude(parcel_state=BoxNowParcelState.CANCELED)
+        .order_by("updated_at")
+        .values_list("id", flat=True)[:max_per_run]
+    )
+    outcomes: Counter[str] = Counter()
+    for shipment_id in candidates:
+        try:
+            outcomes[BoxNowService.settle_uncertain_creation(shipment_id)] += 1
+        except BoxNowAPIError as exc:
+            logger.warning(
+                "settle_uncertain_boxnow_creations: shipment=%s not "
+                "settled, BoxNow did not answer: %s",
+                shipment_id,
+                exc,
+            )
+            outcomes["unanswered"] += 1
+    return dict(outcomes)

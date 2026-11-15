@@ -1232,3 +1232,245 @@ class TestACanceledOrderGetsNoLiveParcel:
         assert minted["canceled_at_boxnow"]
         order.refresh_from_db()
         assert not order.tracking_number
+
+
+def _settled(order=None, **metadata: Any) -> BoxNowShipment:
+    """A creation whose answer was lost, stamped uncertain longer ago than
+    ``BOXNOW_CREATION_SETTLE_SECONDS``: what the creation task's retries
+    leave once they run out (about 30 s of backoff, far inside the window).
+    """
+    from django.conf import settings as django_settings
+
+    shipment = _after_a_lost_answer(order)
+    stamp = timezone.now() - timedelta(
+        seconds=django_settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+    )
+    BoxNowShipment.objects.filter(pk=shipment.pk).update(
+        metadata={
+            **shipment.metadata,
+            "creation_uncertain_at": stamp.isoformat(),
+            **metadata,
+        }
+    )
+    shipment.refresh_from_db()
+    return shipment
+
+
+def _canceled_order():
+    order = _paid_order()
+    type(order).objects.filter(pk=order.pk).update(status=OrderStatus.CANCELED)
+    order.refresh_from_db()
+    return order
+
+
+def _notes(order) -> list[str]:
+    return [
+        row.new_value["note"]
+        for row in OrderHistory.objects.filter(order=order, change_type="NOTE")
+    ]
+
+
+class TestTheCreationTaskOnACanceledOrder:
+    """The task names a canceled order's outcome as a cancel, never as a
+    created parcel nor as a creation to retry from the admin."""
+
+    def test_a_parcel_canceled_instead_is_not_reported_as_created(self, http):
+        order = _canceled_order()
+        _after_a_lost_answer(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "order_canceled"
+        alert.assert_not_called()
+
+    def test_a_cancel_boxnow_refuses_is_not_a_creation_alert(self, http):
+        order = _canceled_order()
+        _after_a_lost_answer(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        alert.assert_not_called()
+        assert any("did not cancel" in note for note in _notes(order))
+
+
+class TestTheSweepSettlesUncertainCreations:
+    """#712: once the settle time has passed, the sweep asks BoxNow once
+    more and settles the shipment, since the creation task's retries ran
+    out long before."""
+
+    def test_a_canceled_orders_parcel_is_canceled_at_boxnow(self, http):
+        shipment = _settled(_canceled_order())
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        assert http.routes() == [*_LOOKUPS, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id == "9219709201"
+
+    def test_a_canceled_order_with_nothing_listed_cancels_locally(self, http):
+        shipment = _settled(_canceled_order())
+        http.answer(_LOOKUP, _lookup())
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+
+    def test_a_cancel_boxnow_refuses_is_noted_once(self, http):
+        order = _canceled_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+        again = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "cancel_refused"
+        assert again == "not_due"
+        assert http.routes() == _LOOKUPS
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert any("did not cancel" in note for note in _notes(order))
+
+    def test_a_live_orders_parcel_is_saved(self, http):
+        order = _paid_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "taken_over"
+        shipment.refresh_from_db()
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.parcel_state == BoxNowParcelState.NEW
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+        order.refresh_from_db()
+        assert order.tracking_number == "9219709201"
+
+    def test_a_live_order_with_nothing_listed_is_settled_and_staff_told(
+        self, http
+    ):
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        alert.assert_called_once()
+        assert "Create BoxNow parcel now" in alert.call_args.kwargs["remedy"]
+
+    def test_staff_already_told_of_a_refusal_are_not_told_again(self, http):
+        shipment = _settled(
+            _paid_order(),
+            last_error={
+                "type": "BoxNowAPIError",
+                "code": "P401",
+                "message": "Invalid locker",
+                "status_code": 400,
+                "response_text": "",
+            },
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_not_called()
+
+    def test_a_parcel_for_other_terms_is_left_to_staff(self, http):
+        shipment = _settled(_paid_order())
+        http.answer(
+            _LOOKUP,
+            _lookup(
+                _parcel(
+                    "9219709201",
+                    "new",
+                    delivery_request={"destination": {"locationId": "other"}},
+                )
+            ),
+        )
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_taken_over"
+        shipment.refresh_from_db()
+        assert shipment.parcel_id is None
+        assert shipment.metadata["creation_uncertain_at"] is None
+        alert.assert_called_once()
+
+    def test_a_lookup_that_fails_leaves_it_for_the_next_run(self, http):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        http.answer(_LOOKUP, _response(503, text="busy"))
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+        assert shipment.metadata["mint_started_at"] is None
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            pytest.param(
+                {"creation_uncertain_at": timezone.now().isoformat()},
+                id="still-settling",
+            ),
+            pytest.param(
+                {"mint_started_at": timezone.now().isoformat()},
+                id="creation-in-flight",
+            ),
+        ],
+    )
+    def test_nothing_is_asked_before_it_is_due(self, http, metadata):
+        shipment = _settled(_paid_order(), **metadata)
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_due"
+        assert http.calls == []
+
+    def test_the_task_settles_every_due_shipment(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        due = _settled(_canceled_order())
+        _pending_shipment(
+            _paid_order(), creation_uncertain_at=timezone.now().isoformat()
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"canceled": 1, "not_due": 1}
+        due.refresh_from_db()
+        assert due.parcel_state == BoxNowParcelState.CANCELED

@@ -91,9 +91,9 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 # waits for when it replaces the connection. A ``timeout=`` on the publish
 # covers only the first. Without it a request that published waited
 # without end (#509). A read that times out is a connection error, so a
-# publish to a blocked broker fails after about six of them (four attempts
-# of ``task_publish_retry_policy``, then closing the channel and the
-# connection: 12.6 s measured at 2 s) and ``dispatch_on_commit`` keeps the
+# publish to a blocked broker fails after about four of them (two attempts,
+# see ``CELERY_TASK_PUBLISH_RETRY_POLICY``, then closing the channel and the
+# connection: 8.2 s measured at 2 s) and ``dispatch_on_commit`` keeps the
 # task as a ``DeferredDispatch``. A healthy broker answers in milliseconds,
 # and a worker reads its consuming connection only when the socket is
 # readable, so neither meets the bound. Writes need no such option: the
@@ -107,6 +107,21 @@ if sys.platform != "win32":
     CELERY_BROKER_TRANSPORT_OPTIONS["read_timeout"] = float(
         getenv("CELERY_BROKER_READ_TIMEOUT", "2")
     )
+# How often kombu publishes a task again after a connection error, each
+# time on a new connection (``kombu.Connection.ensure``). One retry is what
+# a dead pooled connection needs: after a broker restart the first publish
+# finds the pooled connection reset and the retry reconnects (measured:
+# with 0 that publish fails, with 1 it goes out). Every further retry only
+# adds a copy: a publish that timed out on a blocked broker is still
+# delivered once the alarm clears, and ``dispatch_on_commit`` already keeps
+# the failure as a ``DeferredDispatch`` that the sweep publishes again.
+# The intervals are Celery's defaults.
+CELERY_TASK_PUBLISH_RETRY_POLICY = {
+    "max_retries": int(getenv("CELERY_TASK_PUBLISH_MAX_RETRIES", "1")),
+    "interval_start": 0,
+    "interval_step": 0.2,
+    "interval_max": 1,
+}
 CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100

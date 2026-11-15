@@ -14,7 +14,7 @@ from core.retry import (
     TRANSIENT_NETWORK_ERRORS,
 )
 from core.tasks import MonitoredTask, safe_task_arguments
-from tenant.celery import TenantTask, run_for_all_tenants
+from tenant.celery import TenantTask, describe_error, run_for_all_tenants
 
 if TYPE_CHECKING:
     from core.cache.edge import MediaPurge
@@ -664,7 +664,7 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     One sweep runs at a time, and the publishes run outside any transaction.
     While RabbitMQ blocks publishers (a memory or disk alarm) each publish
     waits out the broker socket timeouts (``CELERY_BROKER_TRANSPORT_OPTIONS``,
-    about six of them) before it fails. A lease would have to outlive that,
+    about four of them) before it fails. A lease would have to outlive that,
     and a transaction could be ended by
     ``idle_in_transaction_session_timeout``, so a sweep holds a
     session-level advisory lock and a sweep that finds it held does nothing.
@@ -769,7 +769,7 @@ def _redispatch_due() -> dict[str, int]:
         except Exception as exc:
             broker_down = isinstance(exc, TRANSIENT_NETWORK_ERRORS)
             row.attempts += 1
-            row.last_error = f"{type(exc).__name__}: {exc}"[:255]
+            row.last_error = describe_error(exc)[:255]
             row.next_attempt_at = now + timedelta(
                 seconds=min(
                     settings.DEFERRED_DISPATCH_BACKOFF_SECONDS

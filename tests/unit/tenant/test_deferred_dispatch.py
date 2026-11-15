@@ -34,6 +34,16 @@ def broker_down_task(name: str = "demo.task"):
     return task
 
 
+def timed_out_task(name: str = "demo.task"):
+    """A publish to a blocked broker, as kombu reports it: an
+    ``OperationalError`` with no text, raised from py-amqp's bare timeout."""
+    task = broker_down_task(name)
+    error = OperationalError("")
+    error.__cause__ = TimeoutError()
+    task.apply_async.side_effect = error
+    return task
+
+
 class TestAFailedPublish:
     def test_it_does_not_reach_the_caller_and_is_kept(self, caplog):
         task = broker_down_task()
@@ -49,6 +59,27 @@ class TestAFailedPublish:
         assert row.schema_name == connection.schema_name
         assert "OperationalError" in row.last_error
         assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+    def test_a_timed_out_publish_says_it_timed_out(self, caplog):
+        with caplog.at_level(logging.ERROR, logger="tenant.celery"):
+            dispatch_on_commit(timed_out_task(), [7])
+
+        row = DeferredDispatch.objects.get()
+        assert row.last_error == "OperationalError: timed out"
+        assert "(OperationalError: timed out)" in caplog.text
+
+    def test_an_error_without_text_is_described_by_its_cause(self):
+        task = broker_down_task()
+        error = OperationalError("")
+        error.__cause__ = ConnectionRefusedError(111, "Connection refused")
+        task.apply_async.side_effect = error
+
+        dispatch_on_commit(task, [7])
+
+        row = DeferredDispatch.objects.get()
+        assert row.last_error == (
+            "OperationalError: [Errno 111] Connection refused"
+        )
 
     def test_a_bug_is_still_raised(self):
         task = mock.Mock()
@@ -318,6 +349,17 @@ class TestTheSweep:
         assert second.next_attempt_at <= timezone.now(), (
             "a row the run never reached stays due for the next one"
         )
+
+    def test_a_timed_out_republish_says_it_timed_out(self):
+        row = deferred()
+
+        with mock.patch(
+            "tenant.tasks.celery_app.tasks.get", return_value=timed_out_task()
+        ):
+            redispatch_deferred_tasks()
+
+        row.refresh_from_db()
+        assert row.last_error == "OperationalError: timed out"
 
     def test_a_task_nobody_knows_is_kept_with_the_reason(self):
         row = deferred("nobody.knows")

@@ -40,34 +40,45 @@ timeout or without).
 `CELERY_BROKER_TRANSPORT_OPTIONS` therefore sets py-amqp's `read_timeout`
 (`CELERY_BROKER_READ_TIMEOUT`, 2 s by default), which it applies to every broker
 socket as `SO_RCVTIMEO`. A read that times out is a connection error, so a
-publish to a blocked broker fails after about six of them: four attempts
-(`task_publish_retry_policy`), then closing the channel and the connection.
-Measured on Linux against the same blocked broker: `dispatch_on_commit` returned
-after 12.6 s and kept the task as a row, and the sweep published it once the
-alarm cleared. A worker reads its consuming connection only when the socket is
+publish to a blocked broker fails after about four of them: two attempts, then
+closing the channel and the connection. The error is recorded as
+`OperationalError: timed out` (`tenant.celery.describe_error`: kombu's own text
+for it is empty). A worker reads its consuming connection only when the socket is
 readable, so an idle worker never meets the bound. Writes need no option of
 their own: the `TCP_USER_TIMEOUT` py-amqp sets by default already ends a write
 the broker stops taking (`tests/unit/core/test_celery_broker_socket_timeouts.py`
 checks both).
 
-A publish that timed out is not necessarily lost to the broker: RabbitMQ reads
-what each attempt wrote once the alarm clears. Measured: one blocked
-`dispatch_on_commit` left four messages in the queue after the alarm cleared, one
-per attempt, and its row was published by the sweep as a fifth. A task published
-through the helper must therefore be safe to run more than once, as it already
-must be for a row the sweep replays.
+A publish that timed out is not lost to the broker: RabbitMQ reads what each
+attempt wrote once the alarm clears, so every attempt is delivered, and the row
+the sweep publishes is one more. Kombu's retries therefore add copies and nothing
+else here, and `CELERY_TASK_PUBLISH_RETRY_POLICY` keeps one
+(`CELERY_TASK_PUBLISH_MAX_RETRIES`): the one a pooled connection needs after a
+broker restart, where the first publish finds it reset and the retry reconnects.
+With no retry that publish fails; with one it goes out.
 
-The option is set on Linux only, where every deployment runs: py-amqp packs the
-value as a POSIX `timeval`, which Windows reads as milliseconds, so a Windows host
-has no bound.
+Measured on Linux against RabbitMQ with its memory alarm on, one
+`dispatch_on_commit`:
+
+| Publish retries | Request held | Delivered after the alarm cleared |
+|---|---|---|
+| 3 (Celery's default) | 12.2 s | 4 messages, then the swept row: 5 runs |
+| 1 | 8.2 s | 2 messages, then the swept row: 3 runs |
+
+A task published through the helper must therefore be safe to run more than
+once, as it already must be for a row the sweep replays.
+
+The read timeout is set on Linux only, where every deployment runs: py-amqp packs
+the value as a POSIX `timeval`, which Windows reads as milliseconds, so a Windows
+host has no bound.
 
 ## One sweep at a time
 
 One sweep runs at a time, and it publishes outside any transaction. Each publish
 to a blocked broker holds it for the bound above. A transaction held across that
 could be ended by `idle_in_transaction_session_timeout` and send every row
-already published a second time, and any lease could be outlived. So a sweep holds a session-level
-advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
+already published a second time, and any lease could be outlived. So a sweep
+holds a session-level advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
 The lock ends with the session if the worker dies; the next sweep then sends again
 at most the one row that was going out.
 

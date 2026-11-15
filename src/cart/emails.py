@@ -104,5 +104,11 @@ marketing_email(
     sample=_sample_cart,
     recipients=_owner,
     list_id="abandoned-cart",
-    gates=(FeatureGate(feature="cart", label=_("Cart feature")),),
+    # Its link opens the cart in the shopper's account.
+    gates=(
+        FeatureGate(feature="cart", label=_("Cart feature")),
+        FeatureGate(
+            feature="customer_accounts", label=_("Customer accounts feature")
+        ),
+    ),
 )

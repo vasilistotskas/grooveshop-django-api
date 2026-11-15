@@ -3,6 +3,112 @@
 
 
 
+## v3.246.1 (2026-11-15)
+
+### Bug fixes
+
+* fix(blog): the category list answers its declared envelope; the demo stock restore reindexes and purges (#707) ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+* fix(blog): the category list always answers the paginated envelope it declares
+
+GET /blog/category?tree=true answered a bare array of the root categories
+while the schema documents the list as PaginatedBlogCategoryList and does
+not know the parameter, so a client generated from the document could not
+parse that body. The undocumented branch, its queryset and the manager's
+for_tree() that only it used are removed: the tree has its own documented
+route, GET /blog/category/tree, and nothing calls ?tree=true (storefront,
+gateway). Dropping the list override also restores the base list's
+documented cursor parameter.
+
+Closes #683 ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+* fix(devtools): a demo store's stock restore reindexes and purges what it restocks
+
+The nightly demo reset puts stock back with queryset update(), which sends
+no post_save, so a product sold out and restored kept in_stock=false in
+Meilisearch until the 02:00 sync (~22 hours) and stayed sold out in the
+cached listings, product pages and page-builder lists until their TTL.
+
+Both restores (the catalogue's seeded quantities and the stock of wiped
+guest orders) keep update(), so product_back_in_stock still fires no
+restock email or favourite notification and no recommendation recompute is
+queued, and then, for the products whose stock actually changed:
+reindex them (reindex_products_by_pk), mark every surface that declares
+product.Product stale (products, sitemap_seo, recommendations) and queue
+the builder documents that show them (new data_purge.record_products).
+
+Product.increment_stock and decrement_stock, which wrote stock the same
+way and had no callers, are deleted.
+
+Closes #679 ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+### Testing
+
+* test(region): the other-country region gets its own country
+
+RegionFactory with no country takes a random existing one, which can be the
+country under test, so the region meant to be left out was sometimes listed
+(seen in CI on #709). It now gets a country of its own. ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+## v3.246.0 (2026-11-15)
+
+### Features
+
+* feat(tenant): a store can run without customer accounts (CUSTOMER_ACCOUNTS_ENABLED) (#704) ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+* feat(tenant): a store can run without customer accounts (CUSTOMER_ACCOUNTS_ENABLED)
+
+A new store setting, CUSTOMER_ACCOUNTS_ENABLED (default on, so nothing
+changes until a store turns it off), served as the store feature
+customer_accounts (features.customerAccounts). Off, on that store's
+hosts:
+
+- The customer identity routes answer a bare 404 with the
+  feature_gate:refused log line: allauth's headless API, the TOTP image,
+  allauth's pages and the social callbacks, the store's OIDC provider and
+  its metadata (CUSTOMER_IDENTITY_VIEWS, collected from the three URL
+  groups that mount them in core/urls.py, refused on the resolved view by
+  tenant.middleware.CustomerAccountsMiddleware). The agent routes acting
+  for a linked shopper refuse through AgentAPIView.
+- A sign-in a shopper already holds is none (tokens are left to expire,
+  not revoked): the Knox token (before the lookup, so it is not renewed),
+  the session (StoreSessionAuthentication), the OIDC access token, the
+  cart agent token and the WebSocket ticket each answer as if no
+  credential had been sent. Account endpoints refuse it as a guest's; a
+  guest checkout with a stale token still makes a guest order. Staff
+  sessions and StaffBearer tokens are platform identities and unaffected;
+  the platform host is never gated.
+- favourites, product_reviews, account_reviews, blog_comments, loyalty and
+  wholesale list the switch in their rows, so they read as off. Their
+  views gate through feature_gates(name) and their services and jobs
+  through feature_on(name) instead of naming the classes, so the row
+  decides everywhere: LoyaltyService and B2BService, the loyalty pause
+  watcher, the favourites notifications.
+- The account mail (allauth's, the data export, re-engagement) and the
+  abandoned-checkout reminder are skipped as "Off: Customer accounts
+  feature".
+
+Also: feature_on reads a plan flag off the real Tenant row
+(tenant_plan_allows), so a task under schema_context, where the
+connection holds a bare FakeTenant, is gated by the store's plan.
+
+schema.yml: customerAccounts added to StoreFeatures and
+StoreFeatureStates (additive).
+
+Refs #198 ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+### Performance improvements
+
+* perf(tenant): read the distinct feature settings in one get_many
+
+Several features share a gate (customer accounts gates seven), and
+effective_features read each gate's setting once per use. It now collects
+the distinct settings and reads them with store_settings, one get_many. ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+### Testing
+
+* test(tenant): generate the customer-accounts test password instead of a literal ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
 ## v3.245.13 (2026-11-15)
 
 ### Refactoring

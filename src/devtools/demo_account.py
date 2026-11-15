@@ -1516,7 +1516,8 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
     restock subscriber and pushes a live notification to favouriters;
     the save also queues a recommendation recompute. A reset that must
     be silent cannot go through it — ``_restore_demo_stock`` uses
-    ``update()`` for the same reason.
+    ``update()`` for the same reason. What the save would have done for
+    the storefront is done by ``_refresh_restocked``.
 
     Then the rows go with ``hard_delete``: items, history and carrier
     shipments cascade; the audit trails that ``SET_NULL`` (stock log,
@@ -1560,6 +1561,7 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
             continue
 
     restored = 0
+    restocked: set[int] = set()
     taken = (
         StockLog.objects.filter(
             order_id__in=order_ids,
@@ -1594,6 +1596,8 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
                 reason=f"Demo reset: guest order {row['order_id']} cleared",
             )
         restored += quantity
+        restocked.add(row["product_id"])
+    _refresh_restocked(restocked)
 
     PromotionRedemption.objects.filter(order_id__in=order_ids).delete()
     _delete_invoices(order_ids)
@@ -1703,20 +1707,53 @@ def _restore_demo_stock() -> int:
 
     A cash-on-delivery checkout consumes stock, so a demo left running
     drifts towards "out of stock" on exactly the products a prospect is
-    most likely to try.
+    most likely to try. ``update()``, not a save, for the reason
+    ``_wipe_guest_checkouts`` gives; ``_refresh_restocked`` then does
+    what the save would have done for the storefront.
     """
     from devtools.demo_catalogue import PRODUCTS
     from product.models import Product
 
-    restored = 0
+    restocked: list[int] = []
     for row in PRODUCTS:
-        updated = (
+        changed = list(
             Product.objects.filter(slug=row.slug)
             .exclude(stock=row.stock)
-            .update(stock=row.stock)
+            .values_list("pk", flat=True)
         )
-        restored += updated
-    return restored
+        if changed:
+            Product.objects.filter(pk__in=changed).update(stock=row.stock)
+            restocked += changed
+    _refresh_restocked(restocked)
+    return len(restocked)
+
+
+def _refresh_restocked(product_ids) -> None:
+    """What a save of these products' stock does for the storefront, for
+    stock the reset wrote with ``update()``, which sends no ``post_save``.
+
+    Their search documents are rebuilt (they hold ``stock`` and
+    ``in_stock``, so a product sold out and put back stayed filtered out
+    of in-stock listings until the 02:00 sync, ~22 hours later), every
+    surface that declares ``product.Product`` is purged, and so are the
+    page builder's documents that show them. Nothing else a save runs:
+    no ``product_back_in_stock`` and no recommendation recompute.
+    """
+    from builder import data_purge
+    from core.cache.invalidation import (
+        mark_surface_stale,
+        surfaces_invalidated_by,
+    )
+    from product.models import Product
+    from product.signals import reindex_products_by_pk
+
+    ids = sorted(set(product_ids))
+    if not ids:
+        return
+    reindex_products_by_pk(ids)
+    for code in surfaces_invalidated_by(Product):
+        mark_surface_stale(code)
+    data_purge.record_products(ids)
 
 
 def showcase_settings() -> dict[str, Any]:

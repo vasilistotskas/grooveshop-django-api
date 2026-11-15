@@ -33,13 +33,8 @@ from order.models.order import Order
 from order.serializers.order import OrderDetailSerializer, OrderSerializer
 from order.services import OrderService
 from product.models.favourite import ProductFavourite
+from tenant.features import feature_gates
 from tenant.internal import is_internal_caller
-from tenant.permissions import (
-    IsCatalogueEnabled,
-    IsFavouritesEnabled,
-    IsLoyaltyEnabled,
-    IsLoyaltyRuntimeEnabled,
-)
 
 # Agents want "my recent items", not a paginated browse — cap the lists.
 AGENT_ORDERS_LIMIT = 20
@@ -63,9 +58,17 @@ class AgentTokenAuthentication(TokenAuthentication):
     another store's. Such a token is invalid here, not short of a scope,
     so it answers 401 and the client links again. The rest is allauth's
     own ``authenticate``.
+
+    Every token this provider issues on a store host is a shopper's, so
+    none is looked at while the store has customer accounts off
+    (``tenant.customer_accounts``): the request goes on unauthenticated.
     """
 
     def authenticate(self, request):
+        from tenant.customer_accounts import customer_accounts_on
+
+        if not customer_accounts_on():
+            return None
         valid, orequest = get_server().verify_request(
             *extract_params(request), scopes=[]
         )
@@ -165,14 +168,17 @@ class AgentAPIView(APIView):
         from tenant.permissions import (
             IsAgentCommerceEnabled,
             IsAgentCommerceRuntimeEnabled,
+            IsCustomerAccountsEnabled,
         )
 
         # Effective agent-commerce gate (plan flag AND merchant
         # runtime setting) — mirrors the folded TenantConfig value the
-        # gateway enforces on its own routes.
+        # gateway enforces on its own routes. Every view here acts for a
+        # linked shopper, so a store without customer accounts serves none.
         return [
             IsAgentCommerceEnabled(),
             IsAgentCommerceRuntimeEnabled(),
+            IsCustomerAccountsEnabled(),
             *super().get_permissions(),
         ]
 
@@ -238,8 +244,7 @@ class AgentFavouritesView(AgentAPIView):
     # The store's own switch first: with favourites off an agent finds
     # none, as the storefront does.
     permission_classes = [
-        IsCatalogueEnabled,
-        IsFavouritesEnabled,
+        *feature_gates("favourites"),
         TokenPermission.has_scope(SCOPE_FAVOURITES_READ),
     ]
 
@@ -295,8 +300,7 @@ class AgentLoyaltyView(AgentAPIView):
     # Plan flag and the store's switch, as on /loyalty: with the
     # programme off an agent finds no points either.
     permission_classes = [
-        IsLoyaltyEnabled,
-        IsLoyaltyRuntimeEnabled,
+        *feature_gates("loyalty"),
         TokenPermission.has_scope(SCOPE_LOYALTY_READ),
     ]
 

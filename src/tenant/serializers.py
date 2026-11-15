@@ -51,6 +51,7 @@ class StoreFeaturesSerializer(serializers.Serializer):
     flag AND its store settings (``tenant/features.py``), so a client reads
     one answer instead of combining the two tiers and copying defaults."""
 
+    customer_accounts = serializers.BooleanField(read_only=True)
     blog = serializers.BooleanField(read_only=True)
     blog_comments = serializers.BooleanField(read_only=True)
     product_reviews = serializers.BooleanField(read_only=True)

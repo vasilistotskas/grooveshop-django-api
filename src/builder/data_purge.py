@@ -135,10 +135,10 @@ def _stored(model_label: str, pk: int | None, field: str):
 
 
 def _product_documents(
-    product_id: int, category_ids: Iterable[int | None]
+    product_ids: Iterable[int], category_ids: Iterable[int | None]
 ) -> set[str]:
     return documents_for(
-        records=[(ReferenceKind.PRODUCT, product_id)],
+        records=[(ReferenceKind.PRODUCT, pk) for pk in product_ids],
         lists=[
             (
                 ReferenceKind.QUERY_PRODUCT,
@@ -198,6 +198,24 @@ def _blog_category_documents(category_id: int) -> set[str]:
             (ReferenceKind.QUERY_BLOG_CATEGORY, {ANY}),
             (ReferenceKind.QUERY_BLOG_POST, {f"category:{category_id}"}),
         ],
+    )
+
+
+def record_products(product_ids: Iterable[int]) -> None:
+    """Queue, after the commit, a purge of the documents that show any of
+    ``product_ids``, for a write no signal reports: a queryset ``update()``
+    sends no ``post_save``, so the receivers below never see it."""
+    ids = sorted(set(product_ids))
+    if not ids or getattr(settings, "DISABLE_CACHE", False):
+        return
+    product = apps.get_model("product.Product")
+    _later(
+        lambda: _product_documents(
+            ids,
+            product._base_manager.filter(pk__in=ids).values_list(
+                "category_id", flat=True
+            ),
+        )
     )
 
 
@@ -284,12 +302,14 @@ def connect(*, force: bool = False) -> None:
         before = stored_category_id(instance)
         _later(
             lambda: _product_documents(
-                instance.pk, [before, instance.category_id]
+                [instance.pk], [before, instance.category_id]
             )
         )
 
     def deleted_product(sender, instance, **kwargs):
-        _later(lambda: _product_documents(instance.pk, [instance.category_id]))
+        _later(
+            lambda: _product_documents([instance.pk], [instance.category_id])
+        )
 
     def product_translation(sender, instance, **kwargs):
         if _skip(kwargs):
@@ -297,7 +317,7 @@ def connect(*, force: bool = False) -> None:
         master_id = instance.master_id
         _later(
             lambda: _product_documents(
-                master_id,
+                [master_id],
                 [_stored("product.Product", master_id, "category_id")],
             )
         )

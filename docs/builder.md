@@ -324,7 +324,10 @@ listing. A `pre_save` of the product reads the stored category and stock in
 one query, so a sale costs no query for either purge. In a batched purge the
 surfaces that purge documents run last, so a page rendered in between never
 stores the data cache that is about to go. A promotion reaches
-the offer lists and every page that shows a product. Over-purging is safe;
+the offer lists and every page that shows a product. A write that sends no
+`post_save` (a queryset `update()` of stock, as the demo reset's restore in
+`src/devtools/demo_account.py: _refresh_restocked`) queues the same documents
+with `data_purge.record_products`. Over-purging is safe;
 under-purging is the bug, so a list is matched by ANY of its facets.
 
 ## Writes

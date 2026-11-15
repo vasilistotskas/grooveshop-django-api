@@ -78,6 +78,9 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
     """
 
     token_model_name = "tenant.PlatformStaffToken"
+    # A platform identity is never a store's customer, so a store with
+    # customer accounts off still accepts it.
+    customer_tokens = False
 
     def authenticate(self, request):
         result = super().authenticate(request)

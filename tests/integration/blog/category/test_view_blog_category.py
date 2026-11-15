@@ -433,13 +433,6 @@ class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url, {"search": "test"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_tree_parameter_in_list(self):
-        url = self.get_category_list_url()
-        response = self.client.get(url, {"tree": "true"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
-
     def test_validation_errors_consistent(self):
         payload = {
             "slug": "",

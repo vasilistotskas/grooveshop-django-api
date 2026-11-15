@@ -3,6 +3,53 @@
 
 
 
+## v3.246.1 (2026-11-15)
+
+### Bug fixes
+
+* fix(blog): the category list answers its declared envelope; the demo stock restore reindexes and purges (#707) ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+* fix(blog): the category list always answers the paginated envelope it declares
+
+GET /blog/category?tree=true answered a bare array of the root categories
+while the schema documents the list as PaginatedBlogCategoryList and does
+not know the parameter, so a client generated from the document could not
+parse that body. The undocumented branch, its queryset and the manager's
+for_tree() that only it used are removed: the tree has its own documented
+route, GET /blog/category/tree, and nothing calls ?tree=true (storefront,
+gateway). Dropping the list override also restores the base list's
+documented cursor parameter.
+
+Closes #683 ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+* fix(devtools): a demo store's stock restore reindexes and purges what it restocks
+
+The nightly demo reset puts stock back with queryset update(), which sends
+no post_save, so a product sold out and restored kept in_stock=false in
+Meilisearch until the 02:00 sync (~22 hours) and stayed sold out in the
+cached listings, product pages and page-builder lists until their TTL.
+
+Both restores (the catalogue's seeded quantities and the stock of wiped
+guest orders) keep update(), so product_back_in_stock still fires no
+restock email or favourite notification and no recommendation recompute is
+queued, and then, for the products whose stock actually changed:
+reindex them (reindex_products_by_pk), mark every surface that declares
+product.Product stale (products, sitemap_seo, recommendations) and queue
+the builder documents that show them (new data_purge.record_products).
+
+Product.increment_stock and decrement_stock, which wrote stock the same
+way and had no callers, are deleted.
+
+Closes #679 ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
+### Testing
+
+* test(region): the other-country region gets its own country
+
+RegionFactory with no country takes a random existing one, which can be the
+country under test, so the region meant to be left out was sometimes listed
+(seen in CI on #709). It now gets a country of its own. ([`017625e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/017625eac5c4e856d1ab502f6c34800c90956c2a))
+
 ## v3.246.0 (2026-11-15)
 
 ### Features

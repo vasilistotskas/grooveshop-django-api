@@ -7,7 +7,7 @@ here, next to `schema.yml` and `allauth-schema.yml`.
 
 | File | What it is |
 |---|---|
-| `api-contract.sh` | The single script. `deploy ...` is what the deploy gate in `grooveshop-infrastructure` runs; `pr KIND ROOT ENVIRONMENT...` is what a pull request check runs. Always inside the pinned oasdiff image. |
+| `api-contract.sh` | The single script. `deploy ...` is what the deploy gate in `grooveshop-infrastructure` runs; `pr KIND ROOT ENVIRONMENT...` is what a pull request check runs; `compare CONSUMER DJANGO [LEVELS]` pairs two documents by hand or in a test. Always inside the pinned oasdiff image. |
 | `storefront-levels.txt` | oasdiff severity overrides for the storefront pairing. |
 | `ignore.txt` | Breaks accepted on purpose, one line each, with an `until` release. |
 | `check-ignore.py` | Fails an entry whose `until` release is live in production, so overrides cannot pile up. |
@@ -16,7 +16,7 @@ here, next to `schema.yml` and `allauth-schema.yml`.
 | `allauth-required.txt` | `true` once the storefront commits `openapi/allauth-schema.yml`: a missing allauth document then fails the check instead of being reported as not checked. |
 | `watched.txt` | The files whose change makes a pull request check run. |
 | `oasdiff-image.txt` | The oasdiff image, by tag and digest. The single pin; the deploy gate's literal image in `grooveshop-infrastructure` must equal it. |
-| `tests/` | Unit tests, and `replay.sh`, which replays the 2026-11-03 deadlock against the real released documents. |
+| `tests/` | Unit tests; `compare.sh`, which pairs the documents in `tests/fixtures/` (no network); and `replay.sh`, which replays the 2026-11-03 deadlock against the real released documents. |
 
 ## What is live
 
@@ -54,6 +54,30 @@ the consumer's document.
 A pull request that is wrong in either direction cannot merge; it has to be
 split. A change that has both kinds (a required field and an enum value) can
 never pass in one piece.
+
+## Two passes per pairing
+
+Every pairing runs oasdiff twice, and fails if either pass finds an error.
+
+1. **Flattened** (`--flatten-allof`), with the consumer's levels. drf-spectacular
+   wraps every nested serializer in an `allOf`, and unflattened oasdiff reports
+   a required property removed inside one only as a warning, which let Django
+   v3.157.0 through on 2026-10-27.
+2. **Nullability, unflattened.** Flattening drops a `nullable: true` that sits
+   beside an `allOf` ([oasdiff#1348](https://github.com/oasdiff/oasdiff/issues/1348)),
+   and that is how drf-spectacular declares a nullable nested serializer. A
+   required response object made nullable came out of the first pass as "No
+   changes detected" (#710). The second pass runs only the
+   `*-became-nullable` / `*-became-not-nullable` checks whose level for this
+   consumer is ERR (its levels file, else oasdiff's default), every other check
+   at `none`. The list comes from `oasdiff checks changelog` in the pinned
+   image, so a pin bump needs no edit; a pinned oasdiff that lists none of them
+   fails the check instead of skipping it. Its findings print under
+   "nullability, compared unflattened", without the lines the first pass
+   already printed, and `ignore.txt` applies to both passes.
+
+The second pass goes once the pinned oasdiff keeps `nullable` when it flattens:
+`tests/compare.sh` then passes with the first pass alone.
 
 ## An accepted break
 
@@ -105,5 +129,12 @@ document can.
 
 ```bash
 python3 -I -m unittest discover -s api-contract/tests   # unit tests
+bash api-contract/tests/compare.sh                      # fixture pairings (docker, no network)
 bash api-contract/tests/replay.sh                       # #442 / #347 replay (docker, network)
+```
+
+Two documents by hand, in the pinned image (the consumer's first):
+
+```bash
+docker run --rm -v "$PWD:/w" -w /w --entrypoint /bin/sh "$(cat api-contract/oasdiff-image.txt)"   api-contract/api-contract.sh compare consumer.yml schema.yml
 ```

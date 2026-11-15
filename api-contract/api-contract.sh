@@ -14,6 +14,7 @@
 #   api-contract.sh deploy DJANGO_LIVE DJANGO_TARGET STOREFRONT_LIVE \
 #                          STOREFRONT_TARGET GATEWAY_LIVE GATEWAY_TARGET
 #   api-contract.sh pr KIND REPO_ROOT ENVIRONMENT...
+#   api-contract.sh compare CONSUMER_DOCUMENT DJANGO_DOCUMENT [LEVELS_FILE]
 #
 # Consumers parse Django's responses:
 #
@@ -56,6 +57,11 @@
 #
 # A gateway tag that predates its contract file (HTTP 404 on the levels
 # file) is reported as not checked; any other failure to fetch it fails.
+#
+# compare: one pairing of two documents (paths or URLs), with the rules
+# both other modes apply to every pairing; LEVELS_FILE defaults to the
+# storefront's. What tests/compare.sh runs, and how to ask about two
+# documents by hand.
 #
 # Exit 0 = compatible, 1 = a pairing breaks, anything else = the check
 # could not run (a sync or a merge must not proceed on an unanswered
@@ -210,6 +216,19 @@ gateway_levels() {
 # storefront rejects with a 422. oasdiff rates that INFO;
 # storefront-levels.txt raises it to ERR (a guest's 202 for a product
 # alert, 2026-10-30, would have passed).
+#
+# Nullability is compared a second time, unflattened. Flattening drops a
+# `nullable: true` that sits beside an `allOf` (oasdiff/oasdiff#1348), and
+# that is the shape drf-spectacular emits for a nullable nested serializer:
+# a required response object made nullable came out of the flattened pass
+# as "No changes detected" (#710, found on Django #709). Unflattened, the
+# change is reported, so the second pass runs every check at `none` except
+# the nullability checks whose level is ERR, with that level written out,
+# which also stops oasdiff lowering it to a warning for being inside an
+# `allOf` (nullability_levels). Its findings follow the first pass's,
+# without the lines the first pass already printed. Remove the pass once
+# the pinned oasdiff keeps `nullable` when it flattens: the fixtures in
+# tests/compare.sh then pass on the first pass alone.
 breaks() {
     consumer=$1 django=$2 document=$3 levels=$4
     if [ "$consumer" = allauth ]; then
@@ -218,9 +237,60 @@ breaks() {
         resolve_document "$django" "Django's allauth document" || return $?
         django=$DOC
     fi
+    flattened="$WORK_DIR/contract-flattened.out"
     set -- --flatten-allof --severity-levels "$levels"
     [ -s "$IGNORE_FILE" ] && set -- "$@" --err-ignore "$IGNORE_FILE"
-    run_oasdiff "$document" "$django" "$@"
+    # run_oasdiff sets `code`, so each pass keeps its verdict under its own name.
+    run_oasdiff "$document" "$django" "$@" > "$flattened"
+    flattened_verdict=$?
+    cat "$flattened"
+    [ "$flattened_verdict" -le 1 ] || return "$flattened_verdict"
+
+    nullability_levels "$levels" || return 2
+    unflattened="$WORK_DIR/contract-nullability.out"
+    set -- --severity-levels "$NULLABILITY_LEVELS"
+    [ -s "$IGNORE_FILE" ] && set -- "$@" --err-ignore "$IGNORE_FILE"
+    run_oasdiff "$document" "$django" "$@" > "$unflattened"
+    nullability_verdict=$?
+    case $nullability_verdict in
+        0) return "$flattened_verdict" ;;
+        1) if grep '^error ' "$unflattened" | grep -vxF -f "$flattened" > "$unflattened.new"; then
+               echo "nullability, compared unflattened (oasdiff/oasdiff#1348):"
+               cat "$unflattened.new"
+           fi
+           return 1 ;;
+        *) cat "$unflattened"
+           return "$nullability_verdict" ;;
+    esac
+}
+
+# nullability_levels LEVELS_FILE: sets NULLABILITY_LEVELS to a levels file
+# for the unflattened pass. Every check the pinned oasdiff lists is `none`
+# except the `*-became-nullable` / `*-became-not-nullable` checks whose
+# level for this consumer (its LEVELS_FILE, else oasdiff's default) is ERR,
+# which are written as `err`. Read from the image, so a pin bump that adds
+# or renames a check needs no edit here; a listing with no such check left
+# fails the comparison rather than skipping it.
+nullability_levels() {
+    NULLABILITY_LEVELS="$WORK_DIR/nullability-levels-$(cksum < "$1" | cut -d' ' -f1).txt"
+    [ -s "$NULLABILITY_LEVELS" ] && return 0
+    oasdiff checks changelog | awk -v consumer="$1" '
+        BEGIN {
+            while ((getline line < consumer) > 0) {
+                sub(/\r$/, "", line)
+                if (split(line, field, /[ \t]+/) >= 2) own[field[1]] = tolower(field[2])
+            }
+        }
+        $2 == "error" || $2 == "warn" || $2 == "info" {
+            level = ($1 in own) ? own[$1] : ($2 == "error" ? "err" : $2)
+            kept = $1 ~ /-became-(not-)?nullable$/ && level == "err"
+            print $1, kept ? "err" : "none"
+            if (kept) count++
+        }
+        END { exit count ? 0 : 1 }' > "$NULLABILITY_LEVELS" && return 0
+    rm -f "$NULLABILITY_LEVELS"
+    echo "   the pinned oasdiff lists no nullability check at ERR: cannot compare nullability" >&2
+    return 2
 }
 
 status=0
@@ -402,5 +472,7 @@ pr() {
 case ${1:-} in
     deploy) shift; [ $# -ge 4 ] || { echo "usage: api-contract.sh deploy DJANGO_LIVE DJANGO_TARGET STOREFRONT_LIVE STOREFRONT_TARGET [GATEWAY_LIVE GATEWAY_TARGET]" >&2; exit 2; }; deploy "$@" ;;
     pr) shift; [ $# -ge 3 ] || { echo "usage: api-contract.sh pr KIND REPO_ROOT ENVIRONMENT..." >&2; exit 2; }; pr "$@" ;;
-    *) echo "usage: api-contract.sh deploy|pr ..." >&2; exit 2 ;;
+    compare) shift; [ $# -ge 2 ] || { echo "usage: api-contract.sh compare CONSUMER_DOCUMENT DJANGO_DOCUMENT [LEVELS_FILE]" >&2; exit 2; }
+             breaks storefront "$2" "$1" "${3:-$STOREFRONT_LEVELS_FILE}"; record $?; exit "$status" ;;
+    *) echo "usage: api-contract.sh deploy|pr|compare ..." >&2; exit 2 ;;
 esac

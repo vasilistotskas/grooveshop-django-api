@@ -849,6 +849,19 @@ class BoxNowService:
                 .get(pk=shipment_pk)
             )
             if shipment.parcel_id == parcel_id:
+                # Saved already (another path got there first): the
+                # outcome is known here too, so the claim and any
+                # uncertainty stamp go, as in every branch below.
+                metadata = shipment.metadata or {}
+                if metadata.get("mint_started_at") or metadata.get(
+                    "creation_uncertain_at"
+                ):
+                    shipment.metadata = {
+                        **metadata,
+                        "mint_started_at": None,
+                        "creation_uncertain_at": None,
+                    }
+                    shipment.save(update_fields=["metadata", "updated_at"])
                 return shipment
 
             # The order row is locked with the shipment's (the join of

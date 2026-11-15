@@ -860,6 +860,28 @@ class TestACancelAfterACreationOfUncertainOutcome:
         assert shipment.metadata["creation_uncertain_at"] is not None
         assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
 
+    def test_a_parcel_already_saved_clears_it(self, http):
+        """Phase 3 finding its own parcel already on the row (saved by
+        another path meanwhile) knows the outcome too."""
+        order = _paid_order()
+        shipment = _pending_shipment(
+            order, creation_uncertain_at=timezone.now().isoformat()
+        )
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            parcel_id="9219709201", parcel_state=BoxNowParcelState.NEW
+        )
+
+        BoxNowService._persist_parcel(
+            order,
+            shipment.pk,
+            delivery_request_id=None,
+            parcel_id="9219709201",
+            record={},
+        )
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+
     def test_a_p410_keeps_it(self, http):
         """P410 proves an earlier request created something; a lookup that
         lists nothing yet must not end the uncertainty."""

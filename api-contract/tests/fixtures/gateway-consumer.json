@@ -1,0 +1,36 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "fixture: the gateway's contract, generated from Go types, with no allOf", "version": "1"},
+  "paths": {
+    "/tenant/resolve": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TenantConfig"}}}
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TenantConfig": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "features": {"$ref": "#/components/schemas/StoreFeatures"}
+        },
+        "required": ["name", "features"]
+      },
+      "StoreFeatures": {
+        "type": "object",
+        "properties": {
+          "cart": {"type": "boolean"},
+          "customerAccounts": {"type": "boolean"}
+        },
+        "required": ["cart", "customerAccounts"]
+      }
+    }
+  }
+}

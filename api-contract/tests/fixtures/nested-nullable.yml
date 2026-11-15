@@ -1,0 +1,41 @@
+# nested-consumer.yml with Parent.user made nullable beside its allOf.
+openapi: 3.0.3
+info: {title: fixture, version: "1"}
+paths:
+  /comment:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+      required:
+      - id
+    Parent:
+      type: object
+      properties:
+        user:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+          nullable: true
+      required:
+      - user
+    Comment:
+      type: object
+      properties:
+        parent:
+          allOf:
+          - $ref: '#/components/schemas/Parent'
+          readOnly: true
+      required:
+      - parent

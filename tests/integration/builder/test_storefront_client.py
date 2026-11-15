@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest import mock
 
 import pytest
@@ -97,6 +98,28 @@ def test_with_no_copy_a_bad_status_or_a_bad_shape_refuses(catalogue):
     catalogue.blocks = [{"type": "broken"}]
     with pytest.raises(StorefrontUnavailable, match="shape"):
         storefront.fetch_catalogue("shop")
+
+
+# A catalogue the storefront serves and Django cannot read is a broken
+# contract between two releases: logged at ERROR with the storefront it came
+# from and why, not only refused.
+def test_a_catalogue_that_cannot_be_read_is_logged_as_an_error(
+    catalogue, caplog
+):
+    catalogue.blocks = [{"type": "broken"}]
+
+    with (
+        caplog.at_level(logging.ERROR, logger="builder.storefront"),
+        pytest.raises(StorefrontUnavailable),
+    ):
+        storefront.fetch_catalogue("shop")
+
+    (record,) = [r for r in caplog.records if r.levelno == logging.ERROR]
+    message = record.getMessage()
+    assert "http://storefront.test" in message
+    assert "shop" in message
+    assert "KeyError" in message
+    assert record.exc_info is not None
 
 
 def test_a_reference_kind_the_platform_does_not_know_is_a_bad_shape(catalogue):

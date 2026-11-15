@@ -1,7 +1,7 @@
 {
   "commits": {
     "vasilistotskas/grooveshop-media-stream": "5707d654a0786736498f1c3a2e7b99fb69253517",
-    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "f78f23d68b3621c4e49b0a02ed62f042fd42f3cd"
+    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "bce36c9d26e77c3382c6141877005327499d55cf"
   },
   "sources": {
     "catalogue": {
@@ -44,7 +44,7 @@
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
       "path": "test/fixtures/builder/contrast-cases.json",
       "kind": "blob",
-      "sha": "54b09e3925e48cf0aa829855831c9e9caf34661e"
+      "sha": "9fe19e260db7aabc0bd5b83777ec5c2142e23b57"
     },
     "image-limits": {
       "repository": "vasilistotskas/grooveshop-media-stream",

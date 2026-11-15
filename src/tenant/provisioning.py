@@ -345,10 +345,11 @@ def _seed_builder_documents(tenant: Tenant) -> bool:
 
 def _seed_theme_document(tenant: Tenant) -> bool:
     """The theme a new store of its design starts with, from the
-    storefront's catalogue view. A store without it is usable (the
-    storefront renders its tokens as before), so a catalogue that cannot be
-    fetched only reports the step; ``install_theme_defaults`` is idempotent
-    and re-running provisioning finishes it."""
+    storefront's catalogue view. A store without it renders its design's
+    tokens but has no theme to edit or publish, so a catalogue that cannot
+    be fetched or read fails the step at ERROR (``seeding_failures`` names
+    it to the operator); ``install_theme_defaults`` is idempotent and
+    re-running provisioning finishes it."""
     try:
         from builder.seeding import install_theme_defaults
 
@@ -360,7 +361,11 @@ def _seed_theme_document(tenant: Tenant) -> bool:
         )
         return True
     except Exception:
-        logger.warning("Could not seed the theme document", exc_info=True)
+        logger.exception(
+            "Store %s has no theme document: it could not be seeded. "
+            "Re-run provisioning once the storefront's catalogue is read.",
+            tenant.schema_name,
+        )
         return False
 
 

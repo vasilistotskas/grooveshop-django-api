@@ -36,6 +36,62 @@ def test_the_ratio_of_two_colours(case):
     assert contrast.format_ratio(got) == case["ratio"]
 
 
+# A side the page draws mixed, ``color-mix(in oklab, ...)``: the storefront's
+# ``mixOklab`` computed these, and Django must mix to the same byte.
+@pytest.mark.parametrize(
+    "case", FIXTURE["mixes"], ids=[c["why"] for c in FIXTURE["mixes"]]
+)
+def test_a_mix_as_the_page_draws_it(case):
+    mixed = contrast.mix_oklab(case["mix"], case["toward"], case["percent"])
+
+    assert mixed == case["mixed"]
+    assert (
+        contrast.format_ratio(contrast.ratio(mixed, case["against"]))
+        == (case["ratio"])
+    )
+
+
+class TestAMixedSide:
+    RULE = {
+        "id": "accent-text-dark",
+        "foreground": {
+            "mix": "/colors/dark/accent",
+            "toward": "#ffffff",
+            "percent": 20,
+        },
+        "background": "#464646",
+        "min": 4.5,
+        "severity": "warning",
+        "label": LABEL,
+    }
+
+    def test_is_judged_as_drawn_and_reported_at_what_it_mixes(self):
+        (rule,) = contrast.parse_rules([self.RULE])
+
+        (outcome,) = contrast.evaluate(
+            [rule], {"colors": {"dark": {"accent": "#ff3cc3"}}}
+        )
+
+        assert contrast.format_ratio(outcome.ratio) == "3.81"
+        assert not outcome.passed
+        assert rule.path == "/colors/dark/accent"
+
+    @pytest.mark.parametrize(
+        "foreground",
+        [
+            {"mix": "red", "toward": "#ffffff", "percent": 20},
+            {"mix": "/colors/dark/accent", "toward": "#ffffff", "percent": 120},
+            {"mix": "/colors/dark/accent", "percent": 20},
+        ],
+        ids=["not a colour", "past 100%", "nothing to mix toward"],
+    )
+    def test_a_malformed_mix_is_refused_when_the_catalogue_is_read(
+        self, foreground
+    ):
+        with pytest.raises((ValueError, KeyError)):
+            contrast.parse_rules([{**self.RULE, "foreground": foreground}])
+
+
 @pytest.mark.parametrize(
     "case", FIXTURE["boundaries"], ids=[c["why"] for c in FIXTURE["boundaries"]]
 )

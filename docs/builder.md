@@ -215,11 +215,16 @@ value on it is `untranslatable_setting`.
 The catalogue declares, for the theme document, the pairs of colours that must
 keep a WCAG 2.2 contrast (`documentKinds.theme.contrast`): `{id, foreground,
 background, min, severity, label}`, each side an RFC 6901 pointer into the theme's
-root settings or a literal `#RRGGBB`, and `label` the rule's name in every
+root settings, a literal `#RRGGBB`, or a colour as the page draws it mixed,
+`{mix, toward, percent}` (CSS `color-mix(in oklab, <mix>, <toward>
+<percent>%)`, the dark accent as text); and `label` the rule's name in every
 language of `settings.LANGUAGES` (`{"el": ..., "en": ...}`). The catalogue is
 the one place a rule is named: the editor's theme panel and Publish dialog read
-the same `label`. A rule's other keys (the editor's `fix`) are not read. The theme stores its colour scales, so
-the rules read stored colours and need no colour maths beyond the one ratio.
+the same `label`. A rule's other keys (the editor's `fix`) are not read. The
+theme stores its colour scales, so the rules read stored colours; the one
+colour derived is a mix, `contrast.mix_oklab` (OKLab with CSS Color 4's
+matrices, clipped to sRGB, rounded to 8 bits), the storefront's `mixOklab`
+held to the same `mixes` vectors.
 
 - **Saving never refuses for contrast.** The editor shows every rule.
 - **A release blocks on the `error` rules** (`validation.check_before_release`,
@@ -250,9 +255,13 @@ theme is.
   `documentKinds.theme.defaults` of THE STORE'S catalogue view (a design's
   defaults) as its theme document, validated like a publish and released in its
   own release (`builder.seeding.install_theme_defaults`). A catalogue without
-  defaults installs nothing; a catalogue that cannot be fetched reports the
-  step, and re-running provisioning finishes it (a store with a theme is left
-  alone). The platform's own `Theme` release does not count as work an editor
+  defaults installs nothing; a catalogue that cannot be fetched or read fails
+  the step at ERROR (the store has no theme document, and `seeding_failures`
+  names `theme` to the operator), and re-running provisioning finishes it (a
+  store with a theme is left alone). A catalogue the storefront serves and
+  Django cannot read (a storefront older than the catalogue shape this release
+  requires) is logged at ERROR by `fetch_catalogue` with the storefront and the
+  reason; every caller then refuses. The platform's own `Theme` release does not count as work an editor
   made (`seed_with_content` still applies).
 
 

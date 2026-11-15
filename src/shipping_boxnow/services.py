@@ -20,6 +20,7 @@ from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
+    BoxNowBusyError,
     BoxNowConfigError,
     BoxNowError,
     BoxNowRetryableError,
@@ -404,7 +405,7 @@ class BoxNowService:
                     # so Celery backs off and re-checks. ``status_code=
                     # 409`` matches the semantic ("conflict — work already
                     # in progress"); nothing inspects it for routing.
-                    raise BoxNowRetryableError(
+                    raise BoxNowBusyError(
                         409,
                         message=(
                             f"BoxNow mint already in flight for order "
@@ -1310,7 +1311,7 @@ class BoxNowService:
                 if (
                     age := cls._creation_in_flight(locked.metadata)
                 ) is not None:
-                    raise BoxNowRetryableError(
+                    raise BoxNowBusyError(
                         409,
                         message=(
                             f"A BoxNow parcel for order {order_id} is being "
@@ -1484,7 +1485,7 @@ class BoxNowService:
             if (locked.metadata or {}).get(
                 "reset_for_reissue_at"
             ) != reset_mark:
-                raise BoxNowRetryableError(
+                raise BoxNowBusyError(
                     409,
                     message=(
                         f"BoxNow shipment {shipment.pk} was reset for a new "
@@ -1499,7 +1500,7 @@ class BoxNowService:
             if not stored_meanwhile:
                 age = cls._creation_in_flight(locked.metadata)
                 if found is None and age is not None:
-                    raise BoxNowRetryableError(
+                    raise BoxNowBusyError(
                         409,
                         message=(
                             f"A BoxNow parcel for order {order_id} started "
@@ -1512,7 +1513,7 @@ class BoxNowService:
                 # lookup proves nothing (#690).
                 unsettled = cls._creation_unsettled(locked.metadata)
                 if found is None and unsettled is not None:
-                    raise BoxNowRetryableError(
+                    raise BoxNowBusyError(
                         409,
                         message=(
                             f"A BoxNow parcel creation for order {order_id} "
@@ -1633,7 +1634,7 @@ class BoxNowService:
                 parcel_id, age = pending
                 # Its creation would answer P410 and take over that very
                 # parcel, which the running cancel then cancels.
-                raise BoxNowRetryableError(
+                raise BoxNowBusyError(
                     409,
                     message=(
                         f"BoxNow parcel {parcel_id}, created after shipment "

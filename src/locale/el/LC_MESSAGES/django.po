@@ -15439,6 +15439,9 @@ msgstr "Αυτή η ρύθμιση είναι ίδια σε όλες τις γλ
 msgid "This shipment already has a BoxNow parcel."
 msgstr "Αυτή η αποστολή έχει ήδη δέμα BoxNow."
 
+msgid "This shipment is already being worked on. Try again in a few minutes."
+msgstr "Γίνεται ήδη εργασία σε αυτή την αποστολή. Δοκίμασε ξανά σε λίγα λεπτά."
+
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "Αυτή η αποστολή έχει ήδη καταγραφεί ως εισπραγμένη εκτός ACS."
 

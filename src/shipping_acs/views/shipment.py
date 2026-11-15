@@ -24,7 +24,7 @@ from core.api.permissions import (
     IsOwnerOrAdminOrGuest,
     StoreStaffModelPermissions,
 )
-from shipping.api_errors import CarrierUnavailable
+from shipping.api_errors import unanswered
 from shipping.exceptions import CarrierUnavailableError
 from shipping_acs.models import AcsShipment
 from shipping_acs.serializers import AcsShipmentDetailSerializer
@@ -111,7 +111,14 @@ class AcsCancelView(APIView):
             "the voucher is issued in a pickup list."
         ),
         tags=["ACS shipments"],
-        responses={200: None, 400: None, 403: None, 404: None, 503: None},
+        responses={
+            200: None,
+            400: None,
+            403: None,
+            404: None,
+            409: None,
+            503: None,
+        },
     )
     def post(self, request: Request, voucher_no: str) -> Response:
         from shipping_acs.exceptions import AcsAPIError
@@ -131,13 +138,14 @@ class AcsCancelView(APIView):
         try:
             AcsService.cancel_voucher(shipment, reason=reason)
         except CarrierUnavailableError as exc:
-            # ACS gave no answer: retry later, not a refusal (#650).
+            # ACS gave no answer, or the work is already running here:
+            # retry later, not a refusal (#650).
             logger.warning(
-                "ACS cancel unavailable | voucher_no=%s | %s",
+                "ACS cancel not answered | voucher_no=%s | %s",
                 voucher_no,
                 exc,
             )
-            raise CarrierUnavailable from exc
+            raise unanswered(exc) from exc
         except AcsAPIError as exc:
             logger.warning(
                 "ACS cancel failed | voucher_no=%s | msg=%s",

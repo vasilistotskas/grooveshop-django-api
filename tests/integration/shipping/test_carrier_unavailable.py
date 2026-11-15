@@ -206,3 +206,34 @@ class TestStaffCancels:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.json()["code"] == "P420"
+
+
+class TestARequestAlreadyInProgress:
+    """A refusal raised here, with no carrier call, because the same work
+    is already running (a cancel or a mint in flight, a creation still
+    settling) is a 409 with its own text: what to wait for, not "the
+    courier cannot be reached"."""
+
+    def test_an_acs_cancel_in_progress_is_a_409(self, staff_client):
+        from django.utils import timezone
+
+        from shipping_acs.enum.shipment_state import AcsShipmentState
+
+        shipment = AcsShipmentFactory(
+            voucher_no="9001999001",
+            shipment_state=AcsShipmentState.NEW,
+            pickup_list=None,
+            metadata={"cancel_started_at": timezone.now().isoformat()},
+        )
+
+        response = staff_client.post(
+            reverse(
+                "shipping-acs-cancel",
+                kwargs={"voucher_no": shipment.voucher_no},
+            )
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        body = response.json()
+        assert body["code"] == "carrier_request_in_progress"
+        assert "already in progress" in body["detail"]

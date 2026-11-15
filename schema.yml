@@ -29118,6 +29118,8 @@ paths:
           description: No response body
         '404':
           description: No response body
+        '409':
+          description: No response body
         '503':
           description: No response body
   /api/v1/shipping/acs/shipments/{voucher_no}/label.pdf:
@@ -29568,6 +29570,8 @@ paths:
         '403':
           description: No response body
         '404':
+          description: No response body
+        '409':
           description: No response body
         '503':
           description: No response body

@@ -15437,6 +15437,9 @@ msgstr "This setting is the same in every language."
 msgid "This shipment already has a BoxNow parcel."
 msgstr "This shipment already has a BoxNow parcel."
 
+msgid "This shipment is already being worked on. Try again in a few minutes."
+msgstr "This shipment is already being worked on. Try again in a few minutes."
+
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "This shipment is already recorded as received outside ACS."
 

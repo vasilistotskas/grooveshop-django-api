@@ -38,6 +38,7 @@ from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import (
     AcsAPIError,
+    AcsBusyError,
     AcsError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
@@ -1104,7 +1105,7 @@ class AcsService:
     ) -> float | None:
         """Age in seconds of an expired mint claim, None without a claim.
 
-        Raises :class:`AcsRetryableError` while a claim is inside its TTL:
+        Raises :class:`AcsBusyError` while a claim is inside its TTL:
         another worker is minting, so Celery backs off instead of racing
         in.
         """
@@ -1112,7 +1113,7 @@ class AcsService:
         if age is None:
             return None
         if age < cls._MINT_CLAIM_TTL_SECONDS:
-            raise AcsRetryableError(
+            raise AcsBusyError(
                 alias="ACS_Create_Voucher",
                 error_message=(
                     f"Voucher mint already in progress for "
@@ -1579,9 +1580,7 @@ class AcsService:
                         started = timezone.make_aware(started)
                     age = (timezone.now() - started).total_seconds()
                     if age < cls._MINT_CLAIM_TTL_SECONDS:
-                        from shipping_acs.exceptions import AcsRetryableError
-
-                        raise AcsRetryableError(
+                        raise AcsBusyError(
                             alias="ACS_Delete_Voucher",
                             error_message=(
                                 f"Voucher cancel already in progress for "

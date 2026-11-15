@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from shipping.exceptions import CarrierError, CarrierUnavailableError
+from shipping.exceptions import (
+    CarrierBusyError,
+    CarrierError,
+    CarrierUnavailableError,
+)
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy
@@ -95,4 +99,11 @@ class BoxNowRetryableError(BoxNowAPIError, CarrierUnavailableError):
 
     Covers HTTP 5xx responses and connection-level errors (wrapped in this
     class so Celery's ``autoretry_for`` can target a single type).
+    """
+
+
+class BoxNowBusyError(BoxNowRetryableError, CarrierBusyError):
+    """A creation or a cancel of this shipment is in flight, or a
+    creation of uncertain outcome is still settling: refused here, with
+    no BoxNow call. Celery retries it like any ``BoxNowRetryableError``.
     """

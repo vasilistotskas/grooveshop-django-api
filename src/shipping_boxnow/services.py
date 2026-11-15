@@ -617,8 +617,9 @@ class BoxNowService:
                 },
             )
             # A 5xx or a lost answer may have created the parcel: the
-            # outcome stays uncertain (#690). Any other answer refused the
-            # request, which certainly created nothing.
+            # outcome is uncertain (#690). A refusal says only that THIS
+            # request created nothing, not that an earlier one whose
+            # answer was lost did not, so it leaves a stamp as it is.
             cls._release_mint_claim(
                 shipment.pk,
                 last_error=_last_error(exc),
@@ -677,7 +678,7 @@ class BoxNowService:
         shipment_pk: int,
         *,
         last_error: dict | None = None,
-        outcome_uncertain: bool | None = None,
+        outcome_uncertain: bool = False,
     ) -> None:
         """Drop the mint claim after a Phase-2 failure.
 
@@ -686,13 +687,17 @@ class BoxNowService:
         clobbered. ``last_error`` is stashed for ops diagnostics when
         the failure is a non-retryable BoxNow API error.
 
-        ``outcome_uncertain`` records what the failure says about a parcel
-        at BoxNow (#690): True stamps ``metadata['creation_uncertain_at']``
-        (the request may have created one), False clears it (BoxNow
-        refused the request, which created nothing), None leaves it as it
-        is (a P410: an earlier request did create something). While the
-        stamp is younger than ``BOXNOW_CREATION_SETTLE_SECONDS`` a cancel
-        does not trust an empty lookup (:meth:`_cancel_unrecorded_parcel`).
+        ``outcome_uncertain`` stamps ``metadata['creation_uncertain_at']``:
+        the request may have created a parcel BoxNow does not list yet
+        (#690). Nothing here clears a stamp. A refusal proves only that
+        its own request created nothing, never that an earlier request
+        whose answer was lost did not (nothing documents that BoxNow
+        checks P410 before an auth or a validation answer, and the token
+        call answers any non-200, a 5xx included, with
+        ``BoxNowAuthError``). Only a parcel saved or found ends it, or the
+        settle time: while the stamp is younger than
+        ``BOXNOW_CREATION_SETTLE_SECONDS`` a cancel does not trust an empty
+        lookup (:meth:`_cancel_unrecorded_parcel`).
         """
         with transaction.atomic():
             shipment = (
@@ -705,10 +710,8 @@ class BoxNowService:
             update: dict[str, Any] = {"mint_started_at": None}
             if last_error is not None:
                 update["last_error"] = last_error
-            if outcome_uncertain is not None:
-                update["creation_uncertain_at"] = (
-                    timezone.now().isoformat() if outcome_uncertain else None
-                )
+            if outcome_uncertain:
+                update["creation_uncertain_at"] = timezone.now().isoformat()
             shipment.metadata = {**shipment.metadata, **update}
             shipment.save(update_fields=["metadata", "updated_at"])
 

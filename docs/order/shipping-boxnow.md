@@ -136,12 +136,14 @@ and says which file holds each § number used here.
   reached BoxNow (a `BoxNowRetryableError`: a read timeout, a dropped
   connection, a 5xx; or an error the client does not classify) stamps
   `metadata["creation_uncertain_at"]` when it releases its claim, so the
-  evidence outlives the claim. The stamp is cleared when a parcel is saved
-  (`_persist_parcel`, every branch), when the cancel finds the parcel by
-  `orderNumber`, and when BoxNow refuses a later request with any other
-  answer (a 4xx, the auth errors included), which created nothing. A
-  `P410` leaves it as it is: it proves an earlier request created
-  something. While the stamp is younger than
+  evidence outlives the claim. Only a parcel ends it: one saved
+  (`_persist_parcel`, every branch) or one the cancel finds by
+  `orderNumber`. A refusal of a later request does not: it proves only
+  that this request created nothing, not that the earlier one whose
+  answer was lost did not, and nothing documents that BoxNow checks `P410`
+  before an auth or a validation answer (the token call even answers a 5xx
+  with `BoxNowAuthError`). Otherwise the stamp simply ages out. While the
+  stamp is younger than
   `BOXNOW_CREATION_SETTLE_SECONDS` (settings/env, default 600), a cancel
   whose lookup lists nothing live refuses with a `BoxNowRetryableError`
   (a customer is told to try again; a staff cancel goes on with the order

@@ -781,28 +781,50 @@ class TestACancelAfterACreationOfUncertainOutcome:
         assert shipment.parcel_id == "9219709201"
         assert shipment.metadata["creation_uncertain_at"] is None
 
-    def test_a_refusal_by_boxnow_clears_it(self, http):
-        """The retry was refused: that request created nothing, and the
-        timed-out one before it is settled by the same answer only if it
-        too was refused. BoxNow refuses with P410 when it was not."""
+    @pytest.mark.parametrize(
+        "refusal",
+        [
+            pytest.param(
+                _response(400, {"code": "P401", "message": "Invalid locker"}),
+                id="validation",
+            ),
+            pytest.param(
+                _response(403, {"message": "Forbidden"}), id="auth-layer"
+            ),
+            pytest.param(_response(503, text="busy"), id="token-5xx"),
+        ],
+    )
+    def test_a_later_refusal_keeps_it(self, http, refusal):
+        """A refusal of the retry proves only that the retry created
+        nothing: the timed-out request before it may still have, and
+        nothing documents that BoxNow checks P410 before an auth or a
+        validation answer. Only a parcel saved or found ends it, or the
+        settle time."""
         order = _paid_order()
         shipment = _pending_shipment(order)
-        http.answer(
-            _CREATE,
-            requests.ReadTimeout("read timed out"),
-            _response(400, {"code": "P401", "message": "Invalid locker"}),
-        )
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
         with pytest.raises(BoxNowRetryableError):
             BoxNowService.create_shipment_for_order(order)
-        with pytest.raises(BoxNowAPIError):
+        if refusal.status_code == 503:
+            # The token call answers any non-200 with BoxNowAuthError.
+            from django.core.cache import cache
+
+            cache.clear()
+            http.post.return_value = refusal
+        else:
+            http.answer(_CREATE, refusal)
+        with pytest.raises(BoxNowAPIError) as raised:
             BoxNowService.create_shipment_for_order(order)
+        assert not isinstance(raised.value, BoxNowRetryableError)
+        http.post.return_value = _token()
         http.answer(_LOOKUP, _lookup())
 
-        BoxNowService.cancel_shipment(shipment, reason="customer")
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
 
         shipment.refresh_from_db()
-        assert shipment.metadata["creation_uncertain_at"] is None
-        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
 
     def test_a_p410_keeps_it(self, http):
         """P410 proves an earlier request created something; a lookup that

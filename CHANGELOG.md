@@ -3,6 +3,36 @@
 
 
 
+## v3.247.0 (2026-11-15)
+
+### Features
+
+* feat(order): remove the per-carrier label and cancel order routes (#717)
+
+The storefront downloads labels through the provider-agnostic
+shipment_label since v3.341.6, and nothing ever called the per-carrier
+cancel routes. shipment_label and shipment_cancel serve both BoxNow and
+ACS through the shipping registry, including the 503/409 answer to a
+carrier outage or a request already in progress, so the four
+per-carrier order actions go:
+
+- GET /api/v1/order/{id}/boxnow_label
+- GET /api/v1/order/{id}/acs_label
+- POST /api/v1/order/{id}/boxnow_cancel
+- POST /api/v1/order/{id}/acs_cancel
+
+Their actions, action configs, permission entries and URLs are
+removed, along with the import-linter ignores for the carrier services
+only they imported. The carrier-scoped shipping views and the admin
+actions are unchanged.
+
+The outage tests now cover the 503, the 409 and the carrier refusal on
+shipment_cancel for both carriers, and a test asserts the four routes
+answer 404. api-contract/ignore.txt accepts the four path removals
+until storefront v3.341.7, the release regenerated from this schema.
+
+Closes #581 ([`a28da4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a28da4d565ac68f5f9faf54a70dcd6550fa26413))
+
 ## v3.246.5 (2026-11-15)
 
 ### Bug fixes

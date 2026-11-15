@@ -4,7 +4,7 @@ Two documents are issued, both over the ERP ``SendInvoices`` channel:
 
 * ``invoiceType=11.1`` (Α.Λ.Π. — retail receipt), from an
   :class:`~order.models.invoice.Invoice`, one line per order item plus
-  shipping and fees (``order.taxation``);
+  shipping and fees (``order.accounting.taxation``);
 * ``invoiceType=11.4`` (retail credit document), from a
   :class:`~order.models.retail_credit.RetailCredit`, one line per VAT rate
   of what is credited. AADE forbids ``correlatedInvoices`` on this type
@@ -14,7 +14,7 @@ Two documents are issued, both over the ERP ``SendInvoices`` channel:
 
 Invoices (1.1) and credit invoices (5.1) are not built here: AADE decision
 Α.1128/2025 art. 1(2) takes them off the ERP channel (see
-``order.mydata.types``).
+``order.accounting.mydata.types``).
 
 Element ordering inside ``<invoice>`` is fixed by AADE's schema:
 ``issuer, counterpart, paymentMethods, invoiceHeader, invoiceDetails,
@@ -42,7 +42,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from order.mydata.types import (
+from order.accounting.mydata.types import (
     CLASSIFICATION_CATEGORY_GOODS_SALES,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
     INVOICE_TYPE_RETAIL_CREDIT,
@@ -60,8 +60,8 @@ from order.mydata.types import (
     VAT_CATEGORY_24,
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
-from order.mydata.uid import build_uid
-from order.taxation import order_vat_lines
+from order.accounting.mydata.uid import build_uid
+from order.accounting.taxation import order_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
@@ -99,7 +99,7 @@ def _vat_category(rate: Decimal) -> int:
     """Map a numeric VAT rate to the AADE ``vatCategory`` integer.
 
     Raises ``ValueError`` on unknown rates so bad master data
-    surfaces loudly in :func:`order.mydata.service.submit_invoice`
+    surfaces loudly in :func:`order.accounting.mydata.service.submit_invoice`
     rather than getting silently rewritten and rejected by AADE
     with a misleading error code."""
     try:
@@ -290,7 +290,7 @@ class _Line:
 
 def _receipt_lines(invoice: Any) -> list[_Line]:
     """The receipt's lines — the PDF's lines, one rule for both documents
-    (``order.taxation``): goods at the rate snapshotted on each item, then
+    (``order.accounting.taxation``): goods at the rate snapshotted on each item, then
     shipping and the payment-method fee at the rate(s) of the goods they
     travel with. Order-level discounts are already allocated across the
     goods; gift-card amounts are payment and never reduce a taxable
@@ -303,7 +303,7 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
         invoice.total.amount
     ):
         return lines
-    # A receipt issued net of money refunded before it (``order.invoicing``)
+    # A receipt issued net of money refunded before it (``order.accounting.invoicing``)
     # is documented by the breakdown frozen on its row, one line per rate:
     # the order's own lines would add up to the sale it no longer is.
     return [
@@ -318,7 +318,7 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
 
 def _credit_lines(credit: Any) -> list[_Line]:
     """The credit document's lines: the VAT breakdown frozen on the row when
-    it was issued (``order.credit_documents``), so a retry sends exactly
+    it was issued (``order.accounting.credit_documents``), so a retry sends exactly
     what the first attempt did."""
     return [
         _Line(

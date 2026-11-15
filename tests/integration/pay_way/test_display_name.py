@@ -18,8 +18,8 @@ from __future__ import annotations
 from django.test import TestCase
 from django.utils import translation
 
+from order.accounting.invoicing import _pay_way_display
 from order.factories.order import OrderFactory
-from order.invoicing import _pay_way_display
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory

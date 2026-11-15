@@ -1,5 +1,5 @@
 [project]
-version = "3.245.12"
+version = "3.246.3"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -781,12 +781,35 @@ allowed_importers = ["order.apps"]
 name = "order.services imports neither the tasks nor the refund reconciliation"
 type = "forbidden"
 source_modules = ["order.services"]
-forbidden_modules = ["order.refund_reconciliation", "order.tasks"]
+forbidden_modules = ["order.refunds.refund_reconciliation", "order.tasks"]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "order credit documents are imported by neither allocation nor ledger"
 type = "forbidden"
-source_modules = ["order.credit_allocation", "order.payment_ledger"]
-forbidden_modules = ["order.credit_documents"]
+source_modules = [
+    "order.accounting.credit_allocation",
+    "order.payment_ledger",
+]
+forbidden_modules = ["order.accounting.credit_documents"]
 allow_indirect_imports = true
+
+# The subpackages that exist so far (#566); `payments` joins when it moves.
+# A layer contract also forbids indirect chains. The two ignored edges are
+# the chains that held when it was written: credit documents queue their
+# task through `order.tasks`, which imports the refund reconciliation, and
+# checkout's one lazy import of the order models reaches, through the model
+# graph, every app and so accounting.
+[[tool.importlinter.contracts]]
+name = "order subpackages: reporting and refunds over accounting over checkout"
+type = "layers"
+containers = ["order"]
+layers = [
+    "reporting | refunds",
+    "accounting",
+    "checkout",
+]
+ignore_imports = [
+    "order.accounting.credit_documents -> order.tasks",
+    "order.checkout.discounts -> order.models.item",
+]

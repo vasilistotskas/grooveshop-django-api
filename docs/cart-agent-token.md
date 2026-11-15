@@ -61,7 +61,8 @@ one and retries. Checked on every use:
 
 - the token is still in the cache (TTL),
 - the minting Knox token still exists, has not expired and is within
-  `KNOX_ABSOLUTE_MAX_AGE` (logging out revokes the token),
+  `KNOX_ABSOLUTE_MAX_AGE` (logging out revokes the token), and the store
+  still has customer accounts (`CUSTOMER_ACCOUNTS_ENABLED`),
 - the cart still exists, still belongs to the minting user, and that user
   is active.
 

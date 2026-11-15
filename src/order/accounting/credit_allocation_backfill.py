@@ -36,8 +36,8 @@ import logging
 
 from django.db import transaction
 
-from order import credit_allocation
-from order.credit_documents import request_credit_documents
+from order.accounting import credit_allocation
+from order.accounting.credit_documents import request_credit_documents
 from order.models import Invoice, Order
 
 logger = logging.getLogger(__name__)

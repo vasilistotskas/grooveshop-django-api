@@ -1,6 +1,6 @@
 """One taxable line of an order as it was when the order was created.
 
-``order.taxation.order_vat_lines`` derives the lines the receipt and the
+``order.accounting.taxation.order_vat_lines`` derives the lines the receipt and the
 myDATA payload bill; this row keeps them. The turnover report, the store
 dashboard and every other sales figure read these rows instead of
 re-deriving the split in SQL, so a figure cannot disagree with the receipt
@@ -18,7 +18,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
-from order.taxation import ChargeKind
+from order.accounting.taxation import ChargeKind
 from vat.models import validate_mydata_vat_rate
 
 

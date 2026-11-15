@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from shipping.exceptions import CarrierError, CarrierUnavailableError
+from typing import Any
+
+from shipping.exceptions import (
+    CarrierBusyError,
+    CarrierError,
+    CarrierUnavailableError,
+)
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy
@@ -93,6 +99,35 @@ class BoxNowRetryableError(BoxNowAPIError, CarrierUnavailableError):
     """
     Raised for transient failures that Celery tasks should auto-retry on.
 
-    Covers HTTP 5xx responses and connection-level errors (wrapped in this
-    class so Celery's ``autoretry_for`` can target a single type).
+    Covers HTTP 5xx and 429 responses and connection-level errors (wrapped
+    in this class so Celery's ``autoretry_for`` can target a single type).
+
+    Attributes:
+        retry_after: Seconds BoxNow asked us to wait (its ``Retry-After``,
+            capped by ``BOXNOW_RETRY_AFTER_MAX_SECONDS``), or None. A
+            BoxNow task never retries sooner (``tasks.BoxNowTask``).
+    """
+
+    def __init__(
+        self, *args: Any, retry_after: float | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.retry_after = retry_after
+
+
+class BoxNowBusyError(BoxNowRetryableError, CarrierBusyError):
+    """A creation or a cancel of this shipment is in flight, or a
+    creation of uncertain outcome is still settling: refused here, with
+    no BoxNow call. Celery retries it like any ``BoxNowRetryableError``.
+    """
+
+
+class BoxNowCancelRefusedError(BoxNowAPIError):
+    """A canceled order's parcel could not be canceled at BoxNow.
+
+    BoxNow refused the cancel, holds a parcel past ``new`` or several,
+    or refused the lookup by ``orderNumber``. Raised in place of a
+    creation for a canceled order
+    (``BoxNowService._cancel_for_a_canceled_order``), so the creation task
+    tells staff about a cancel, not about a creation to retry.
     """

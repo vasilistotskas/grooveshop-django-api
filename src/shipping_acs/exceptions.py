@@ -22,7 +22,11 @@ ACS error semantics (per PDF):
 
 from __future__ import annotations
 
-from shipping.exceptions import CarrierError, CarrierUnavailableError
+from shipping.exceptions import (
+    CarrierBusyError,
+    CarrierError,
+    CarrierUnavailableError,
+)
 
 
 class AcsError(CarrierError):
@@ -86,6 +90,13 @@ class AcsRetryableError(AcsAPIError, CarrierUnavailableError):
     have reached ACS.
 
     Celery autoretries.
+    """
+
+
+class AcsBusyError(AcsRetryableError, CarrierBusyError):
+    """A voucher mint or cancel of this shipment is already in progress
+    (its claim is younger than the TTL): refused here, with no ACS call.
+    Celery retries it like any ``AcsRetryableError``.
     """
 
 

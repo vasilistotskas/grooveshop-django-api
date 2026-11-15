@@ -20,6 +20,7 @@ from loyalty.enum import PriceBasis, TransactionType
 from loyalty.models.pause import LoyaltyPause
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
+from tenant.features import feature_on
 
 logger = logging.getLogger(__name__)
 
@@ -99,14 +100,11 @@ class LoyaltyService:
 
         The loyalty endpoints are plan-gated by DRF permissions, but
         points are earned and redeemed through order signals and order
-        create, which runs with no permission classes. See
-        tenant.membership.tenant_plan_allows.
+        create, which runs with no permission classes. Read from the
+        feature's row (``tenant.features``), so whatever else the
+        programme needs (customer accounts) is honoured here too.
         """
-        from tenant.membership import tenant_plan_allows
-
-        if not tenant_plan_allows("loyalty_enabled"):
-            return False
-        return bool(store_setting("LOYALTY_ENABLED"))
+        return feature_on("loyalty")
 
     @classmethod
     def points_rates(cls) -> PointsRates:
@@ -115,16 +113,11 @@ class LoyaltyService:
 
     @classmethod
     def active_points_rates(cls) -> PointsRates | None:
-        """The rates to show a shopper, or ``None`` while loyalty is off:
-        :meth:`is_enabled` and :meth:`points_rates` in one settings read."""
-        from tenant.membership import tenant_plan_allows
-
-        if not tenant_plan_allows("loyalty_enabled"):
+        """The rates to show a shopper, or ``None`` while loyalty is off
+        (:meth:`is_enabled`, then :meth:`points_rates`)."""
+        if not cls.is_enabled():
             return None
-        values = store_settings(("LOYALTY_ENABLED", *_RATE_SETTINGS))
-        if not values["LOYALTY_ENABLED"]:
-            return None
-        return PointsRates.from_settings(values)
+        return cls.points_rates()
 
     @classmethod
     def tier_multiplier(cls, user) -> Decimal:

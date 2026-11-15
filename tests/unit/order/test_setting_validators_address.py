@@ -42,3 +42,18 @@ def test_every_stored_validator_path_imports():
     assert paths
     for name, path in paths.items():
         assert callable(import_string(path)), name
+
+
+def test_every_order_validator_is_stored_at_the_permanent_address():
+    """A path stored as data cannot move in one release, so an ``order``
+    validator is named at ``order.setting_validators``, never at the
+    module that defines it."""
+    stored = [
+        row["validator"]
+        for row in settings.EXTRA_SETTINGS_DEFAULTS
+        if str(row.get("validator") or "").startswith("order.")
+    ]
+    assert stored
+    assert all(
+        path.startswith("order.setting_validators.") for path in stored
+    ), stored

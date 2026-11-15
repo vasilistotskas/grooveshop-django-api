@@ -758,7 +758,8 @@ def _no_pdf_engine():
     which a developer machine may not have. Everything around the render
     (numbering, snapshots, the context) still runs for real."""
     with mock.patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 demo"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 demo",
     ):
         yield
 
@@ -1256,7 +1257,7 @@ class TestResetRebuildsTheAccounts:
         """``Invoice.order`` is PROTECT, so the wipe removes any receipt a
         demo order carries (an earlier seed issued some) before the order
         goes — the row and its PDF."""
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
         from order.models.invoice import Invoice
         from order.models.order import Order
         from tests.utils.mydata import issuable, mydata_enabled
@@ -2041,3 +2042,134 @@ class TestPriceHistoryUpkeep(TestCase):
 
         purge.assert_not_called()
         assert report == {"unchanged": 12}
+
+
+@pytest.mark.django_db
+class TestStockRestoreReachesSearchAndCaches:
+    """The reset puts stock back with ``update()``, which sends no
+    ``post_save``: the products it brings back must still be reindexed
+    (their documents hold ``stock`` and ``in_stock``), purged from every
+    surface a product save purges, and purged from the builder pages that
+    show them. Still without the save that fires ``product_back_in_stock``.
+    """
+
+    PAGE = "page:home"
+
+    @pytest.fixture
+    def watched(self, settings, django_capture_on_commit_callbacks):
+        """Run a restore; what it reindexed, marked stale and announced."""
+        from django.core.cache import cache
+        from django.test import override_settings
+
+        from builder import data_purge
+        from product.signals import product_back_in_stock
+
+        def run(restore):
+            settings.DISABLE_CACHE = False
+            cache.delete(data_purge.KEY)
+            back_in_stock = mock.Mock()
+            product_back_in_stock.connect(
+                back_in_stock, weak=False, dispatch_uid="test-restore"
+            )
+            try:
+                with (
+                    override_settings(
+                        MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
+                    ),
+                    mock.patch(
+                        "meili.tasks.index_documents_task.apply_async"
+                    ) as indexed,
+                    mock.patch(
+                        "core.cache.invalidation.mark_surface_stale"
+                    ) as stale,
+                    django_capture_on_commit_callbacks(execute=True),
+                ):
+                    restore()
+            finally:
+                product_back_in_stock.disconnect(dispatch_uid="test-restore")
+            return SimpleNamespace(
+                documents=[
+                    pk
+                    for call in indexed.call_args_list
+                    for pk in call.kwargs["kwargs"]["pks"]
+                ],
+                stale={call.args[0] for call in stale.call_args_list},
+                pages=data_purge.take(),
+                back_in_stock=back_in_stock,
+            )
+
+        return run
+
+    def _on_a_page(self, product):
+        from builder.models import BuilderReference, ReferenceKind
+
+        BuilderReference.objects.create(
+            kind=ReferenceKind.PRODUCT,
+            target=str(product.pk),
+            document=self.PAGE,
+            node_path="/sections/products",
+        )
+
+    def _assert_reached(self, seen, product):
+        from product.models.product import ProductTranslation
+
+        translations = ProductTranslation.objects.filter(master=product)
+        assert set(seen.documents) == set(
+            translations.values_list("pk", flat=True)
+        )
+        assert all(t.meili_serialize()["in_stock"] for t in translations)
+        assert seen.stale >= {
+            "products",
+            "sitemap_seo",
+            "recommendations",
+            "builder_documents",
+        }
+        assert seen.pages == [self.PAGE]
+        seen.back_in_stock.assert_not_called()
+
+    def test_a_sold_out_catalogue_product_comes_back_everywhere(self, watched):
+        from product.factories.product import ProductFactory
+
+        row = next(row for row in PRODUCTS if row.stock > 0)
+        sold_out = ProductFactory(
+            slug=row.slug, stock=0, active=True, num_images=0, num_reviews=0
+        )
+        self._on_a_page(sold_out)
+
+        seen = watched(demo_account._restore_demo_stock)
+
+        sold_out.refresh_from_db()
+        assert sold_out.stock == row.stock
+        self._assert_reached(seen, sold_out)
+
+    def test_a_product_a_wiped_guest_order_sold_out_comes_back_everywhere(
+        self, watched
+    ):
+        from product.models.product import Product
+
+        product = TestGuestCheckoutsAreCleared._guest_order_holding_stock()[1]
+        # The guest bought the last units.
+        Product.objects.filter(pk=product.pk).update(stock=0)
+        self._on_a_page(product)
+
+        seen = watched(
+            lambda: demo_account._wipe_guest_checkouts(before=timezone.now())
+        )
+
+        product.refresh_from_db()
+        assert product.stock == 2
+        self._assert_reached(seen, product)
+
+    def test_a_product_already_in_line_is_left_alone(self, watched):
+        from product.factories.product import ProductFactory
+
+        row = next(row for row in PRODUCTS if row.stock > 0)
+        ProductFactory(
+            slug=row.slug, stock=row.stock, num_images=0, num_reviews=0
+        )
+
+        seen = watched(demo_account._restore_demo_stock)
+
+        assert seen.documents == []
+        assert seen.stale == set()
+        assert seen.pages == []

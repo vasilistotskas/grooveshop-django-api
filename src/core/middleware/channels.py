@@ -57,8 +57,16 @@ def authenticate_ticket(ticket: str, tenant=None):
 def _authenticate_ticket_inner(ticket: str, token_model):
     """Ticket consumption proper — always called with the tenant's
     schema already bound by the caller."""
+    from tenant.customer_accounts import customer_accounts_on
+
     user_id = tickets.spend(tickets.WEBSOCKET, ticket)
     if user_id is None:
+        return AnonymousUser()
+
+    # Every socket identity is a shopper, and a store with customer
+    # accounts off signs none in: a ticket minted before the switch-off
+    # opens no session either.
+    if not customer_accounts_on():
         return AnonymousUser()
 
     try:

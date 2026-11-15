@@ -165,6 +165,12 @@ def _sample_subscription(env: RenderEnv) -> UserSubscription:
     )
 
 
+#: Mail that only means something to an account holder: a store without
+#: customer accounts sends none of it.
+_accounts = FeatureGate(
+    feature="customer_accounts", label=_("Customer accounts feature")
+)
+
 customer_email(
     "user.data_export_ready",
     title=_("Data export ready"),
@@ -178,6 +184,7 @@ customer_email(
     build_context=_data_export,
     sample=_sample_data_export,
     recipients=lambda export: [customer_of(export.user)],
+    gates=(_accounts,),
 )
 customer_email(
     "newsletter.confirmation",
@@ -223,6 +230,7 @@ REENGAGEMENT = marketing_email(
     recipients=lambda user: [customer_of(user)],
     list_id="reengagement",
     gates=(
+        _accounts,
         ScheduleGate(
             entry=REENGAGEMENT_BEAT_ENTRY,
             label=_("Scheduled re-engagement run"),
@@ -358,7 +366,8 @@ def _allauth_email(
     templates: str = "",
 ) -> None:
     """Declare the type allauth's *prefix* is sent as. Account security
-    and sign-in mail is required: a store cannot switch it off."""
+    and sign-in mail is required: a store cannot switch it off, but a
+    store without customer accounts has none to send."""
     ALLAUTH_TYPES[prefix] = key
     customer_email(
         key,
@@ -370,6 +379,7 @@ def _allauth_email(
         build_context=_allauth_context,
         sample=sample,
         recipients=lambda mail: [Recipient(mail.address, mail.language)],
+        gates=(_accounts,),
     )
 
 

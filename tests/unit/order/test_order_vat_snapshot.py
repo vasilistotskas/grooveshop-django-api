@@ -27,16 +27,16 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
-from order.enum.status import PaymentStatus
-from order.factories.order import OrderFactory
-from order.invoicing import (
+from order.accounting.invoicing import (
     _compute_vat_breakdown,
     _render_items,
     generate_invoice,
 )
+from order.accounting.mydata.builder import build_receipt_xml
+from order.enum.status import PaymentStatus
+from order.factories.order import OrderFactory
 from order.models.invoice import Invoice
 from order.models.item import OrderItem
-from order.mydata.builder import build_receipt_xml
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -140,7 +140,8 @@ def _issue(order):
     with (
         mydata_enabled(auto_submit=False),
         patch(
-            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+            "order.accounting.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 test",
         ),
     ):
         invoice = generate_invoice(issuable(order))

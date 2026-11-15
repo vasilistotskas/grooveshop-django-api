@@ -17,11 +17,11 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
+from order.accounting.taxation import ChargeKind, order_vat_lines
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models import Order, OrderHistory, OrderVatLine
 from order.services import OrderService
-from order.taxation import ChargeKind, order_vat_lines
 from order.vat_snapshot import (
     backfill_shipped_at,
     backfill_vat_lines,

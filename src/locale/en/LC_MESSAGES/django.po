@@ -3952,6 +3952,9 @@ msgstr "Customer Notes"
 msgid "Customer accounts"
 msgstr "Customer accounts"
 
+msgid "Customer accounts feature"
+msgstr "Customer accounts feature"
+
 msgid "Customer charged more than the order is for"
 msgstr "Customer charged more than the order is for"
 
@@ -6753,8 +6756,8 @@ msgstr "Get sibling categories (same parent level)."
 msgid "Get the blog post that this comment belongs to."
 msgstr "Get the blog post that this comment belongs to."
 
-msgid "Get the complete category tree structure with nested relationships. This is more efficient than using list?tree=true for displaying navigation menus or category hierarchies."
-msgstr "Get the complete category tree structure with nested relationships. This is more efficient than using list?tree=true for displaying navigation menus or category hierarchies."
+msgid "Get the complete category tree structure with nested relationships, for displaying navigation menus or category hierarchies."
+msgstr "Get the complete category tree structure with nested relationships, for displaying navigation menus or category hierarchies."
 
 msgid "Get the complete thread (all ancestors and descendants) of this comment."
 msgstr "Get the complete thread (all ancestors and descendants) of this comment."
@@ -10958,8 +10961,8 @@ msgstr "Popular (>10 uses)"
 msgid "Popularity"
 msgstr "Popularity"
 
-msgid "Populated by the automated submission pipeline (``order.mydata``). Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
-msgstr "Populated by the automated submission pipeline (``order.mydata``). Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
+msgid "Populated by the automated submission pipeline. Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
+msgstr "Populated by the automated submission pipeline. Read-only — edit master data (seller / buyer) and use the Order admin's 'Send to myDATA' action to regenerate. VAT rates are fixed on each order line at checkout and do not follow later catalogue edits."
 
 msgid "Portion of the order settled by gift-card balance. A payment, not a discount — it never reduces the taxable order value, only what the payment provider charges."
 msgstr "Portion of the order settled by gift-card balance. A payment, not a discount — it never reduces the taxable order value, only what the payment provider charges."
@@ -14586,6 +14589,9 @@ msgstr "The coupon code can no longer be used."
 msgid "The coupon code to apply."
 msgstr "The coupon code to apply."
 
+msgid "The courier cannot be reached right now. Try again in a moment."
+msgstr "The courier cannot be reached right now. Try again in a moment."
+
 msgid "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 msgstr "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
 
@@ -15433,6 +15439,9 @@ msgstr "This setting is the same in every language."
 
 msgid "This shipment already has a BoxNow parcel."
 msgstr "This shipment already has a BoxNow parcel."
+
+msgid "This shipment is already being worked on. Try again in a few minutes."
+msgstr "This shipment is already being worked on. Try again in a few minutes."
 
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "This shipment is already recorded as received outside ACS."

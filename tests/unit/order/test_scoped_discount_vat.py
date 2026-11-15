@@ -6,7 +6,7 @@ the lines it covers: a coupon for the 13% food must not be booked against
 the 24% line, or the VAT per rate (and in total) on the invoice and the
 myDATA payload is wrong. The engine reports the allocation
 (``CartDiscountResult.line_discounts``), checkout freezes it on
-``OrderItem.discount_allocation``, and ``order.taxation`` reads it; shipping
+``OrderItem.discount_allocation``, and ``order.accounting.taxation`` reads it; shipping
 and the payment fee follow the value of the goods actually charged
 (Εγκ. 10/1987).
 """
@@ -24,11 +24,11 @@ from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
 from country.factories import CountryFactory
 from loyalty.models.transaction import PointsTransaction
-from order.invoicing import generate_invoice
+from order.accounting.invoicing import generate_invoice
+from order.accounting.mydata.builder import build_receipt_xml
+from order.accounting.taxation import ChargeKind, order_vat_lines
 from order.models.item import OrderItem
-from order.mydata.builder import build_receipt_xml
 from order.services import OrderService
-from order.taxation import ChargeKind, order_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductCategoryFactory, ProductFactory
@@ -168,7 +168,8 @@ def _documents(order):
     with (
         mydata_enabled(auto_submit=False),
         patch(
-            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+            "order.accounting.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 test",
         ),
     ):
         invoice = generate_invoice(issuable(order))

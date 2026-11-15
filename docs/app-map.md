@@ -108,8 +108,10 @@ secrets, Fernet-encrypted at rest, no platform-wide fallback for money or
 secrets), `src/tenant/provisioning.py`, `src/tenant/lifecycle.py`,
 `src/tenant/billing.py`, `src/tenant/cache.py` (`make_tenant_key`,
 `tenant_resolve_key`), `src/tenant/celery.py` (`TenantTask`,
-`run_for_all_tenants`, `dispatch_on_commit`) and `src/tenant/tasks.py`
-(every beat fan-out).
+`run_for_all_tenants`, `dispatch_on_commit`), `src/tenant/tasks.py`
+(every beat fan-out), `src/tenant/features.py` (`STORE_FEATURES`, the
+store feature table) and `src/tenant/customer_accounts.py` (a store
+without customer accounts).
 
 Read a per-store field through `tenant.membership.bound_tenant()`, never
 `connection.tenant`: under `schema_context` that is a bare `FakeTenant`
@@ -207,7 +209,7 @@ cancel, refund), `src/order/stock.py` (`StockManager`),
 `src/order/payment_ledger.py` (`PaymentLedger`),
 `src/order/signals/handlers.py` (the side effects of a change),
 `src/order/tasks.py`, `src/order/emails.py`, `src/order/communications/notifications.py`
-(live toasts), `src/order/mydata/` and `src/order/views/`.
+(live toasts), `src/order/accounting/mydata/` and `src/order/views/`.
 
 ### `cart/`
 

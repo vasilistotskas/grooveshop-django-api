@@ -142,7 +142,7 @@ the restock option: moving the order to RETURNED / REFUNDED stays the "Mark as
 action or `POST order-items/<id>/restock` (below). The read-only ledger is the
 order page's "Payment Transactions" tab.
 
-**Refund by lines** (`src/order/refund_lines.py`; its pieces are
+**Refund by lines** (`src/order/refunds/refund_lines.py`; its pieces are
 `CreditAllocation` rows).
 `refund_order(order, lines=[(item, units)], include_shipping=True, reason_code=..., reason=<note>)`
 derives the amount from the figures the order froze, never from the catalogue:
@@ -165,7 +165,7 @@ order, the provider's charges first, then gift cards and points
 of the same line and rate, each with its own value and the request's units,
 informational), and stored with the claim, under the order lock, before any
 provider is called. Its credit document is then issued from those rows like
-every other (`order.credit_documents`), so it carries exactly the lines' own
+every other (`order.accounting.credit_documents`), so it carries exactly the lines' own
 rates (returning one 13% item of a 24%/13% order credits 13% only), whatever
 refunds came before or settle after. A bare `amount` stays a **goodwill
 refund**: allocated pro rata over the headroom left at that moment, as before.

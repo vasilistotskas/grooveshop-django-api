@@ -6,7 +6,7 @@ and says which file holds each § number used here.
 This is part of §7.4, [`fiscal-mydata.md`](fiscal-mydata.md), between its
 "Credit documents" and "CancelInvoice" paragraphs.
 
-**VAT split: fixed when the money is claimed (`src/order/credit_allocation.py`,
+**VAT split: fixed when the money is claimed (`src/order/accounting/credit_allocation.py`,
 `CreditAllocation`).** The receipt froze its gross and net per rate
 (`Invoice.vat_breakdown`, shipping and fees included). Where a credit sits on
 those rates is NOT worked out when the credit is issued: every source of a
@@ -74,7 +74,7 @@ its decisions; `credit_allocation.drop(decision__in=...)` clears the changed
 ones first). A read path (a specimen render, the admin) never calls it. The
 periodic task `allocate_credit_sources` (every five minutes, through
 `tenant.tasks.fanout_allocate_credit_sources`, suspended stores included;
-`src/order/credit_allocation_backfill.py`) decides what no write path has
+`src/order/accounting/credit_allocation_backfill.py`) decides what no write path has
 touched since, so a source that waited for a claim is decided within five
 minutes of the claim resolving, whichever path resolved it (reconciliation, the
 admin outcome action, the provider's webhook, a decline); when it decided
@@ -260,7 +260,7 @@ receipt still holds at every rate.
 its receipt it cannot check a credit against the receipt's total (error 319
 belongs to linked credits), so `credit_breakdown` is the sole protection at
 issue: a credit's NET is derived cumulatively, from what the rate's total
-credited gross splits to (`order.taxation.split_gross`), capped at the
+credited gross splits to (`order.accounting.taxation.split_gross`), capped at the
 receipt's net for the rate, less the net already credited. Any number of
 partial credits stay under the receipt and the last lands exactly on it. A
 credit the receipt cannot hold is not sent: a staff `OrderHistory` note says

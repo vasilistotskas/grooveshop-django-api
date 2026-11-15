@@ -18,11 +18,11 @@ MAX_VAT_VALUE = Decimal("100.0")
 
 
 def validate_mydata_vat_rate(value) -> None:
-    """Reject a VAT rate ``order/mydata/builder.py`` cannot map.
+    """Reject a VAT rate ``order/accounting/mydata/builder.py`` cannot map.
 
     A rate outside ``MYDATA_SUPPORTED_VAT_RATES`` would build an
     invoice fine and then raise ``ValueError`` deep inside
-    ``order.mydata.service.submit_invoice`` for every order that uses
+    ``order.accounting.mydata.service.submit_invoice`` for every order that uses
     it — surfacing here instead, at row-save time, is far cheaper to
     fix than a submission failure discovered after the fact.
     """

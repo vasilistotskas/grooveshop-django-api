@@ -41,7 +41,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from djmoney.money import Money
 
-from order import credit_allocation
+from order.accounting import credit_allocation
 from order.enum.payment_transaction import (
     PaymentFeeSource,
     PaymentTransactionKind,

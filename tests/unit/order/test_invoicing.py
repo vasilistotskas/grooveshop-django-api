@@ -1,4 +1,4 @@
-"""Unit tests for ``order.invoicing``.
+"""Unit tests for ``order.accounting.invoicing``.
 
 Covers the parts that don't need WeasyPrint's GTK stack: the atomic
 counter, the VAT breakdown computation, the totals derivation, and
@@ -18,11 +18,7 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from djmoney.money import Money
 
 from core.utils.qr import qr_svg
-from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus
-from order.factories.item import OrderItemFactory
-from order.factories.order import OrderFactory
-from order.invoicing import (
+from order.accounting.invoicing import (
     ReceiptNotIssuable,
     _build_context,
     _compute_vat_breakdown,
@@ -31,6 +27,10 @@ from order.invoicing import (
     _verification_url,
     generate_invoice,
 )
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatus
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 from product.factories.product import ProductFactory
@@ -244,7 +244,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         return issuable(order)
 
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_second_call_returns_existing(self, _mock_render) -> None:
         order = self._make_order()
@@ -256,7 +257,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         self.assertEqual(first.invoice_number, second.invoice_number)
 
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_regen_after_mydata_mark_keeps_every_total_row(
         self, _mock_render
@@ -281,7 +283,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
 
         # Go through the persistence step directly: it is what picks the
         # frozen branch and hands the totals to the template.
-        from order.invoicing import _persist_invoice_row
+        from order.accounting.invoicing import _persist_invoice_row
 
         _regenerated, _breakdown, totals = _persist_invoice_row(order, invoice)
 
@@ -308,7 +310,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         )
 
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_the_registered_receipt_prints_its_amounts(self, _mock_render):
         """Render the real template for the post-MARK regen.
@@ -322,7 +325,10 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         from django.template.defaultfilters import floatformat
         from django.template.loader import render_to_string
 
-        from order.invoicing import _build_context, _persist_invoice_row
+        from order.accounting.invoicing import (
+            _build_context,
+            _persist_invoice_row,
+        )
 
         order = self._make_order()
         order.shipping_price = Money(Decimal("3.50"), "EUR")
@@ -348,7 +354,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         self.assertNotIn(f": {order.payment_status}<", html)
 
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_the_receipt_prints_the_distinctive_title_when_set(
         self, _mock_render
@@ -357,7 +364,10 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         name; a snapshot taken before the field existed prints none."""
         from django.template.loader import render_to_string
 
-        from order.invoicing import _build_context, _persist_invoice_row
+        from order.accounting.invoicing import (
+            _build_context,
+            _persist_invoice_row,
+        )
 
         order = self._make_order()
         invoice = generate_invoice(order)
@@ -376,7 +386,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         self.assertNotIn("Acme Shop", render({"name": "Acme MON IKE"}))
 
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_force_refreshes_snapshots_without_new_row(
         self, _mock_render
@@ -408,7 +419,8 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
 
     @override_settings(DEFAULT_CURRENCY="EUR")
     @patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 ... %EOF",
     )
     def test_captures_seller_snapshot_and_vat_breakdown(
         self, _mock_render
@@ -447,7 +459,9 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
             )
             return b"%PDF-1.4 ... %EOF"
 
-        with patch("order.invoicing._render_pdf_bytes", side_effect=_capture):
+        with patch(
+            "order.accounting.invoicing._render_pdf_bytes", side_effect=_capture
+        ):
             generate_invoice(order)
 
         self.assertEqual(
@@ -491,7 +505,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
 
         with (
             patch(
-                "order.invoicing._render_pdf_bytes",
+                "order.accounting.invoicing._render_pdf_bytes",
                 side_effect=RuntimeError("weasyprint exploded"),
             ),
             self.assertRaises(RuntimeError),
@@ -505,7 +519,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         ).next_number
 
         with patch(
-            "order.invoicing._render_pdf_bytes",
+            "order.accounting.invoicing._render_pdf_bytes",
             return_value=b"%PDF-1.4 ... %EOF",
         ):
             finished = generate_invoice(order)
@@ -541,7 +555,7 @@ class GenerateInvoiceRefusalTestCase(TestCase):
     def _assert_refused(self, order, **kwargs) -> None:
         counters = list(InvoiceCounter.objects.values_list("next_number"))
         with (
-            patch("order.invoicing._render_pdf_bytes") as render,
+            patch("order.accounting.invoicing._render_pdf_bytes") as render,
             self.assertRaises(ReceiptNotIssuable),
         ):
             generate_invoice(order, **kwargs)
@@ -600,7 +614,9 @@ class GenerateInvoiceRefusalTestCase(TestCase):
             for force in (False, True):
                 with (
                     self.subTest(force=force),
-                    patch("order.invoicing._render_pdf_bytes") as render,
+                    patch(
+                        "order.accounting.invoicing._render_pdf_bytes"
+                    ) as render,
                     self.assertRaises(ReceiptNotIssuable),
                 ):
                     generate_invoice(order, force=force)
@@ -613,7 +629,8 @@ class GenerateInvoiceRefusalTestCase(TestCase):
         with (
             mydata_enabled(auto_submit=False),
             patch(
-                "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+                "order.accounting.invoicing._render_pdf_bytes",
+                return_value=b"%PDF-1.4",
             ),
         ):
             first = generate_invoice(order)

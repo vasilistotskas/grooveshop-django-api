@@ -24,7 +24,7 @@ class ChargebackDecision(models.Model):
     No row means the dispute still awaits a decision (the dashboard lists
     it). ``decided_by`` and ``decided_at`` are the audit; every change is
     also written to the order's history. A decision that the goods came
-    back drives a credit document (``order.credit_documents``); one that
+    back drives a credit document (``order.accounting.credit_documents``); one that
     the customer kept them changes nothing.
     """
 

@@ -220,3 +220,68 @@ class TestSyncShipmentState:
         assert result["events_synced"] == 0
         shipment.refresh_from_db()
         assert shipment.last_polled_at is not None
+
+
+class _BoxNowFilteringByPaymentMode:
+    """``GET /api/v1/parcels`` as BoxNow documents it: ``paymentMode`` has
+    "Default value: prepaid" (API Manual v7.2, §6.5.3; partner-api-1.68.yaml,
+    ``PaymentMode``), so a call naming no mode lists prepaid parcels only."""
+
+    def __init__(self, parcel_id: str, mode: str, payload: dict) -> None:
+        self.parcel_id = parcel_id
+        self.mode = mode
+        self.payload = payload
+        self.calls: list[dict] = []
+
+    def get_parcel_info(self, **filters) -> dict:
+        self.calls.append(filters)
+        asked_mode = filters.get("payment_mode") or "prepaid"
+        if filters.get("parcel_id") == self.parcel_id and (
+            asked_mode == self.mode
+        ):
+            return self.payload
+        return {"data": [], "pagination": {}}
+
+
+@pytest.mark.django_db
+class TestThePollFindsEveryPaymentMode:
+    """#691: the poll asks for the parcel in the shipment's own payment
+    mode, so a cash-on-delivery parcel is not filtered out by BoxNow's
+    ``prepaid`` default."""
+
+    @pytest.mark.parametrize("mode", ["cod", "prepaid"])
+    def test_the_parcel_is_found_and_its_state_applied(self, mode):
+        shipment = BoxNowShipmentFactory(
+            order=OrderFactory(),
+            parcel_id="7700000001",
+            delivery_request_id="dr-7700000001",
+            parcel_state=BoxNowParcelState.NEW,
+            payment_mode=mode,
+        )
+        boxnow = _BoxNowFilteringByPaymentMode(
+            shipment.parcel_id,
+            mode,
+            _parcel_payload(
+                parcel_id=shipment.parcel_id,
+                state="delivered",
+                events=[
+                    {"type": "new", "createTime": "2026-05-12T20:00:00Z"},
+                    {
+                        "type": "delivered",
+                        "createTime": "2026-05-13T10:00:00Z",
+                    },
+                ],
+            ),
+        )
+
+        with patch(
+            "shipping_boxnow.services.BoxNowClient", return_value=boxnow
+        ):
+            result = BoxNowService.sync_shipment_state(shipment)
+
+        assert boxnow.calls == [
+            {"parcel_id": shipment.parcel_id, "payment_mode": mode}
+        ]
+        assert result["events_synced"] == 2
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.DELIVERED

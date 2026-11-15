@@ -703,6 +703,265 @@ class TestCancellingAShipmentWithNoParcelNumber:
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
 
 
+class TestACancelAfterACreationOfUncertainOutcome:
+    """#690: a creation that timed out may have made a parcel BoxNow does
+    not list yet. Until ``BOXNOW_CREATION_SETTLE_SECONDS`` have passed, an
+    empty lookup by ``orderNumber`` is not proof that none exists."""
+
+    def test_an_empty_lookup_refuses_the_cancel_while_it_is_fresh(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        assert "uncertain outcome" in raised.value.message
+        assert http.routes() == [_CREATE, *_LOOKUPS]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.cancel_requested_at is None
+        assert "cancellations" not in shipment.metadata
+
+    def test_after_the_settle_time_the_empty_lookup_is_authoritative(
+        self, http, settings
+    ):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, _response(503, text="busy"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        stamp = timezone.now() - timedelta(
+            seconds=settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+        )
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            metadata={
+                **BoxNowShipment.objects.get(pk=shipment.pk).metadata,
+                "creation_uncertain_at": stamp.isoformat(),
+            }
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+
+    def test_the_settle_time_is_a_setting(self, http, settings):
+        settings.BOXNOW_CREATION_SETTLE_SECONDS = 0
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+    def test_a_parcel_listed_meanwhile_is_canceled_at_boxnow(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.metadata["creation_uncertain_at"] is None
+
+    @pytest.mark.parametrize(
+        "refusal",
+        [
+            pytest.param(
+                _response(400, {"code": "P401", "message": "Invalid locker"}),
+                id="validation",
+            ),
+            pytest.param(
+                _response(403, {"message": "Forbidden"}), id="auth-layer"
+            ),
+            pytest.param(
+                _response(401, {"error": "invalid_client"}), id="token-401"
+            ),
+        ],
+    )
+    def test_a_later_refusal_keeps_it(self, http, refusal):
+        """A refusal of the retry proves only that the retry created
+        nothing: the timed-out request before it may still have, and
+        nothing documents that BoxNow checks P410 before an auth or a
+        validation answer. Only a parcel saved or found ends it, or the
+        settle time."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        if refusal.status_code == 401:
+            # The token endpoint refusing the store's credentials.
+            from django.core.cache import cache
+
+            cache.clear()
+            http.post.return_value = refusal
+        else:
+            http.answer(_CREATE, refusal)
+        with pytest.raises(BoxNowAPIError) as raised:
+            BoxNowService.create_shipment_for_order(order)
+        assert not isinstance(raised.value, BoxNowRetryableError)
+        http.post.return_value = _token()
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    @pytest.mark.parametrize(
+        "lookup",
+        [
+            pytest.param(_lookup(), id="nothing-listed"),
+            # A canceled parcel this shipment never recorded: something
+            # it does not know made a request under the orderNumber, so
+            # the conflict proves nothing about what else BoxNow holds.
+            # Contrast the reissue case below.
+            pytest.param(
+                _lookup(_parcel("9219709201", "canceled")),
+                id="only-an-unrecorded-canceled-one",
+            ),
+            pytest.param(_response(503, text="busy"), id="lookup-fails"),
+        ],
+    )
+    def test_a_p410_with_no_stamp_stamps_it(self, http, lookup):
+        """A worker that died between the POST and phase 3 left no stamp.
+        After the claim's TTL the retry gets P410, which proves BoxNow
+        holds a request under the orderNumber; a take-over that cannot
+        find its parcel leaves the creation uncertain."""
+        order = _paid_order()
+        stale = timezone.now() - timedelta(
+            seconds=BoxNowService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _pending_shipment(order, mint_started_at=stale.isoformat())
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, lookup)
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_a_reissue_whose_p410_is_its_own_old_parcel_is_not_stamped(
+        self, http
+    ):
+        """After "Create BoxNow parcel now" resets a canceled shipment, a
+        new creation gets P410 because the old canceled request still holds
+        the orderNumber (the documented reissue case). When that recorded
+        parcel is all BoxNow lists, the conflict has a known cause: no
+        stamp, so a cancel of the never-created shipment is not blocked
+        for the settle time."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            parcel_id="9219709201", parcel_state=BoxNowParcelState.CANCELED
+        )
+        BoxNowService.reset_shipment_for_reissue(shipment)
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "canceled")))
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+        assert not BoxNowShipment.objects.get(pk=shipment.pk).metadata.get(
+            "creation_uncertain_at"
+        )
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "canceled")))
+
+        BoxNowService.cancel_shipment(shipment, reason="staff")
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+    def test_a_parcel_already_saved_clears_it(self, http):
+        """Phase 3 finding its own parcel already on the row (saved by
+        another path meanwhile) knows the outcome too."""
+        order = _paid_order()
+        shipment = _pending_shipment(
+            order, creation_uncertain_at=timezone.now().isoformat()
+        )
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            parcel_id="9219709201", parcel_state=BoxNowParcelState.NEW
+        )
+
+        BoxNowService._persist_parcel(
+            order,
+            shipment.pk,
+            delivery_request_id=None,
+            parcel_id="9219709201",
+            record={},
+        )
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+
+    def test_a_p410_keeps_it(self, http):
+        """P410 proves an earlier request created something; a lookup that
+        lists nothing yet must not end the uncertainty."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            requests.ReadTimeout("read timed out"),
+            _response(400, _P410),
+        )
+        http.answer(_LOOKUP, _lookup(), _lookup())
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_a_saved_parcel_clears_it(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            requests.ReadTimeout("read timed out"),
+            _response(400, _P410),
+        )
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        assert BoxNowShipment.objects.get(pk=shipment.pk).metadata[
+            "creation_uncertain_at"
+        ]
+
+        BoxNowService.create_shipment_for_order(order)
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.metadata["creation_uncertain_at"] is None
+
+
 def _canceled_while_boxnow_answers(shipment, answer: Any):
     """BoxNow's answer, delivered after the row was cancelled locally.
 
@@ -898,3 +1157,823 @@ class TestStaffAreToldWhenBoxNowCannotBeAsked:
             )
         ]
         assert any("may still be delivered" in note for note in notes)
+
+
+class TestACanceledOrderGetsNoLiveParcel:
+    """A staff or system order cancel goes on when the courier step is
+    refused (a creation of uncertain outcome still settling, one in
+    flight), so the order is canceled while its shipment still waits for
+    a parcel. The creation must never then leave a live parcel on it."""
+
+    _CREATED = {"id": "42224", "parcels": [{"id": "9219709201"}]}
+
+    def test_a_retry_after_the_order_was_canceled_cancels_instead(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        type(order).objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED
+        )
+        order.refresh_from_db()
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, *_LOOKUPS, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        order.refresh_from_db()
+        assert not order.tracking_number
+
+    def test_a_retry_while_it_settles_creates_nothing(self, http):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, requests.ReadTimeout("read timed out"))
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+        type(order).objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED
+        )
+        order.refresh_from_db()
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, *_LOOKUPS]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.parcel_id is None
+
+    def test_a_parcel_created_while_the_order_was_canceled_is_canceled(
+        self, http
+    ):
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+
+        def cancel_the_order_while_boxnow_answers() -> Any:
+            type(order).objects.filter(pk=order.pk).update(
+                status=OrderStatus.CANCELED
+            )
+            return _response(200, self._CREATED)
+
+        http.answer(_CREATE, cancel_the_order_while_boxnow_answers)
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+        [minted] = shipment.metadata["minted_after_cancel"]
+        assert minted["parcel_id"] == "9219709201"
+        assert minted["canceled_at_boxnow"]
+        order.refresh_from_db()
+        assert not order.tracking_number
+
+
+def _settled(order=None, **metadata: Any) -> BoxNowShipment:
+    """A creation whose answer was lost, stamped uncertain longer ago than
+    ``BOXNOW_CREATION_SETTLE_SECONDS``: what the creation task's retries
+    leave once they run out (about 30 s of backoff, far inside the window).
+    """
+    from django.conf import settings as django_settings
+
+    shipment = _after_a_lost_answer(order)
+    stamp = timezone.now() - timedelta(
+        seconds=django_settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+    )
+    BoxNowShipment.objects.filter(pk=shipment.pk).update(
+        metadata={
+            **shipment.metadata,
+            "creation_uncertain_at": stamp.isoformat(),
+            **metadata,
+        }
+    )
+    shipment.refresh_from_db()
+    return shipment
+
+
+def _canceled_order():
+    order = _paid_order()
+    type(order).objects.filter(pk=order.pk).update(status=OrderStatus.CANCELED)
+    order.refresh_from_db()
+    return order
+
+
+def _notes(order) -> list[str]:
+    return [
+        row.new_value["note"]
+        for row in OrderHistory.objects.filter(order=order, change_type="NOTE")
+    ]
+
+
+class TestTheCreationTaskOnACanceledOrder:
+    """The task names a canceled order's outcome as a cancel, never as a
+    created parcel nor as a creation to retry from the admin."""
+
+    def test_a_parcel_canceled_instead_is_not_reported_as_created(self, http):
+        order = _canceled_order()
+        _after_a_lost_answer(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "order_canceled"
+        alert.assert_not_called()
+
+    def test_a_cancel_boxnow_refuses_is_not_a_creation_alert(self, http):
+        order = _canceled_order()
+        _after_a_lost_answer(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        alert.assert_not_called()
+        assert any("did not cancel" in note for note in _notes(order))
+
+
+class TestTheSweepSettlesUncertainCreations:
+    """#712: once the settle time has passed, the sweep asks BoxNow once
+    more and settles the shipment, since the creation task's retries ran
+    out long before."""
+
+    def test_a_canceled_orders_parcel_is_canceled_at_boxnow(self, http):
+        shipment = _settled(_canceled_order())
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        assert http.routes() == [*_LOOKUPS, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id == "9219709201"
+
+    def test_a_canceled_order_with_nothing_listed_cancels_locally(self, http):
+        shipment = _settled(_canceled_order())
+        http.answer(_LOOKUP, _lookup())
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.parcel_id is None
+
+    def test_a_cancel_boxnow_refuses_is_noted_once(self, http):
+        order = _canceled_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+        again = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "cancel_refused"
+        assert again == "not_due"
+        assert http.routes() == _LOOKUPS
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert any("did not cancel" in note for note in _notes(order))
+
+    def test_a_live_orders_parcel_is_saved(self, http):
+        order = _paid_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "taken_over"
+        shipment.refresh_from_db()
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.parcel_state == BoxNowParcelState.NEW
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+        order.refresh_from_db()
+        assert order.tracking_number == "9219709201"
+
+    def test_a_live_order_with_nothing_listed_is_settled_and_staff_told(
+        self, http
+    ):
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        alert.assert_called_once()
+        assert "Create BoxNow parcel now" in alert.call_args.kwargs["remedy"]
+
+    def test_staff_already_told_of_a_refusal_are_not_told_again(self, http):
+        shipment = _settled(
+            _paid_order(),
+            last_error={
+                "type": "BoxNowAPIError",
+                "code": "P401",
+                "message": "Invalid locker",
+                "status_code": 400,
+                "response_text": "",
+                "staff_alerted": True,
+            },
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_not_called()
+
+    def test_a_parcel_for_other_terms_is_left_to_staff(self, http):
+        shipment = _settled(_paid_order())
+        http.answer(
+            _LOOKUP,
+            _lookup(
+                _parcel(
+                    "9219709201",
+                    "new",
+                    delivery_request={"destination": {"locationId": "other"}},
+                )
+            ),
+        )
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_taken_over"
+        shipment.refresh_from_db()
+        assert shipment.parcel_id is None
+        assert shipment.metadata["creation_uncertain_at"] is None
+        alert.assert_called_once()
+
+    def test_a_lookup_that_fails_leaves_it_for_the_next_run(self, http):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        http.answer(_LOOKUP, _response(503, text="busy"))
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+        assert shipment.metadata["mint_started_at"] is None
+
+    @pytest.mark.parametrize(
+        "fresh_key",
+        [
+            pytest.param("creation_uncertain_at", id="still-settling"),
+            pytest.param("mint_started_at", id="creation-in-flight"),
+        ],
+    )
+    def test_nothing_is_asked_before_it_is_due(self, http, fresh_key):
+        # Stamped when the test runs, never at collection: a run that
+        # starts minutes after collection would find them stale.
+        shipment = _settled(
+            _paid_order(), **{fresh_key: timezone.now().isoformat()}
+        )
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_due"
+        assert http.calls == []
+
+    def test_the_task_settles_every_due_shipment(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        due = _settled(_canceled_order())
+        _pending_shipment(
+            _paid_order(), creation_uncertain_at=timezone.now().isoformat()
+        )
+        http.answer(_LOOKUP, _lookup())
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"canceled": 1, "not_due": 1}
+        due.refresh_from_db()
+        assert due.parcel_state == BoxNowParcelState.CANCELED
+
+
+class TestTheThirdReview:
+    """What the sweep and the creation task decide at the edges."""
+
+    def test_staff_alerted_of_a_non_4xx_refusal_are_not_told_again(self, http):
+        """The creation task alerts on every BoxNowAPIError it does
+        not retry, an unreadable lookup (status 200) included, so the
+        sweep reads what was alerted, never a status range."""
+        order = _paid_order()
+        shipment = _pending_shipment(order)
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, _response(200, text="<html>maintenance</html>"))
+        with patch("shipping.alerts.alert_admins_shipment_creation_failed"):
+            result = create_boxnow_shipment_for_order.run(order.id)
+        assert result["status"] == "boxnow_api_error"
+        _age_the_stamp(shipment)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_not_called()
+
+    def test_a_refused_cancel_in_the_task_ends_the_uncertainty(self, http):
+        """Reported once, by the task; the sweep has nothing left."""
+        order = _canceled_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "in-transit")))
+
+        result = create_boxnow_shipment_for_order.run(order.id)
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        assert outcome == "not_due"
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert sum("did not cancel" in note for note in _notes(order)) == 1
+
+    def test_an_order_canceled_during_the_lookup_is_canceled(self, http):
+        """The sweep re-reads the order before acting on what it
+        found; a canceled one gets its cancel, not a "Create" alert."""
+        order = _paid_order()
+        shipment = _settled(order)
+
+        def cancel_the_order_while_boxnow_answers():
+            type(order).objects.filter(pk=order.pk).update(
+                status=OrderStatus.CANCELED
+            )
+            return _lookup()
+
+        http.answer(_LOOKUP, cancel_the_order_while_boxnow_answers)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+    def test_the_fanout_includes_suspended_stores(self):
+        """A canceled order's parcel may be live at BoxNow whether
+        or not its store is suspended."""
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_settle_uncertain_boxnow_creations()
+
+        run.assert_called_once_with(
+            "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+            include_suspended=True,
+        )
+
+    def test_a_lookup_boxnow_refuses_is_handed_to_staff(self, http):
+        """A deterministic refusal of the lookup would answer the same on
+        every run: staff are told at once and the uncertainty ends."""
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _response(400, {"code": "P400", "message": "bad"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "lookup_refused"
+        alert.assert_called_once()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is None
+        assert shipment.metadata["mint_started_at"] is None
+
+    def test_the_task_counts_a_shipment_boxnow_did_not_answer_for(self, http):
+        """No answer is left for the next run, and the rest go on."""
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _response(503, text="busy"))
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"unanswered": 1}
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"]
+
+
+def _age_the_stamp(shipment) -> None:
+    """Move a stamp the creation wrote past the settle time."""
+    from django.conf import settings as django_settings
+
+    metadata = BoxNowShipment.objects.get(pk=shipment.pk).metadata
+    assert metadata["creation_uncertain_at"]
+    stamp = timezone.now() - timedelta(
+        seconds=django_settings.BOXNOW_CREATION_SETTLE_SECONDS + 1
+    )
+    BoxNowShipment.objects.filter(pk=shipment.pk).update(
+        metadata={**metadata, "creation_uncertain_at": stamp.isoformat()}
+    )
+
+
+def _token_answers(http, response) -> None:
+    """The token endpoint's next answers; the token cache starts empty."""
+    from django.core.cache import cache
+
+    cache.clear()
+    http.post.return_value = response
+
+
+class TestNoAnswerKeepsTheUncertainty:
+    """A BoxNow outage (a token 5xx, a 429) is no answer and revoked
+    credentials say nothing about a parcel: the uncertainty stays, so the
+    sweep settles it once BoxNow answers again."""
+
+    @pytest.mark.parametrize(
+        "token",
+        [
+            pytest.param(_response(503, text="busy"), id="token-5xx"),
+            pytest.param(_response(429, text="slow down"), id="token-429"),
+        ],
+    )
+    def test_a_token_outage_is_left_for_the_next_run(self, http, token):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        _token_answers(http, token)
+
+        with (
+            patch(
+                "shipping.alerts.alert_admins_shipment_creation_failed"
+            ) as alert,
+            pytest.raises(BoxNowRetryableError),
+        ):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+        assert shipment.metadata["mint_started_at"] is None
+
+    def test_a_rate_limited_lookup_is_left_for_the_next_run(self, http):
+        shipment = _settled(_paid_order())
+        stamp = shipment.metadata["creation_uncertain_at"]
+        http.answer(_LOOKUP, _response(429, {"message": "Too many"}))
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] == stamp
+
+    def test_revoked_credentials_keep_every_stamp_and_alert_once(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        first = _settled(_paid_order())
+        second = _settled(_canceled_order())
+        _token_answers(http, _response(401, {"error": "invalid_client"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            settle_uncertain_boxnow_creations.run()
+            settle_uncertain_boxnow_creations.run()
+
+        alert.assert_called_once()
+        assert "credentials" in alert.call_args.kwargs["remedy"]
+        for shipment in (first, second):
+            shipment.refresh_from_db()
+            assert shipment.metadata["creation_uncertain_at"]
+            assert shipment.metadata["mint_started_at"] is None
+            assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
+    def test_revoked_credentials_on_a_canceled_order_keep_the_stamp(self, http):
+        order = _canceled_order()
+        shipment = _settled(order)
+        _token_answers(http, _response(403, {"error": "forbidden"}))
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            result = create_boxnow_shipment_for_order.run(order.id)
+
+        assert result["status"] == "boxnow_cancel_refused"
+        alert.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"]
+
+
+class TestANewAttemptIsAlertedAgain:
+    def test_a_new_claim_drops_the_old_alert_record(self, http):
+        """Staff were alerted about a refusal; a later attempt whose
+        answer is cut off must not inherit that record, or neither the task
+        nor the sweep tells anyone about it."""
+        order = _paid_order()
+        shipment = _pending_shipment(
+            order,
+            mint_started_at=None,
+            last_error={
+                "type": "BoxNowAPIError",
+                "code": "P401",
+                "message": "Invalid locker",
+                "status_code": 400,
+                "response_text": "",
+                "staff_alerted": True,
+            },
+        )
+        http.answer(_CREATE, requests.exceptions.ChunkedEncodingError("cut"))
+        with pytest.raises(requests.exceptions.ChunkedEncodingError):
+            BoxNowService.create_shipment_for_order(order)
+        assert (
+            "staff_alerted"
+            not in (
+                BoxNowShipment.objects.get(pk=shipment.pk).metadata[
+                    "last_error"
+                ]
+            )
+        )
+        _age_the_stamp(shipment)
+        http.answer(_LOOKUP, _lookup())
+
+        with patch(
+            "shipping.alerts.alert_admins_shipment_creation_failed"
+        ) as alert:
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        alert.assert_called_once()
+
+
+def _locked_tables(queries) -> list[str]:
+    """The table each ``SELECT ... FOR UPDATE`` names first, in order."""
+    import re
+
+    tables = []
+    for query in queries:
+        sql = query["sql"]
+        if "FOR UPDATE" in sql:
+            match = re.search(r'FROM "(\w+)"', sql)
+            tables.append(match.group(1) if match else sql[:40])
+    return tables
+
+
+class TestTheSweepLocksTheOrderFirst:
+    """An order cancel locks the order, then the shipment
+    (``OrderService._cancel_order_locked`` → ``cancel_shipment``). The
+    sweep takes them in that order too, and decides on a live order's
+    empty lookup and clears its stamp in one locked step, so a cancel
+    cannot slip in between."""
+
+    def test_order_then_shipment_and_one_step_to_settle(self, http):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _lookup())
+
+        with (
+            patch("shipping.alerts.alert_admins_shipment_creation_failed"),
+            CaptureQueriesContext(connection) as captured,
+        ):
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_created"
+        assert _locked_tables(captured.captured_queries) == [
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+        ]
+
+
+class TestEveryPathLocksTheOrderFirst:
+    """Order, then shipment, on every BoxNow path that locks both, as an
+    order cancel takes them. Reverting any path to the joined
+    ``select_for_update().select_related("order")`` fails here."""
+
+    @staticmethod
+    def _locks(run) -> list[str]:
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as captured:
+            run()
+        return _locked_tables(captured.captured_queries)
+
+    def test_the_creation_phase_1_and_phase_3(self, http):
+        order = _paid_order()
+        _pending_shipment(order)
+        http.answer(
+            _CREATE,
+            _response(200, {"id": "42224", "parcels": [{"id": "9219709201"}]}),
+        )
+
+        locks = self._locks(
+            lambda: BoxNowService.create_shipment_for_order(order)
+        )
+
+        assert locks[:4] == [
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+            "order_order",
+            "shipping_boxnow_boxnowshipment",
+        ]
+
+    def test_the_webhook(self):
+        from tests.unit.shipping_boxnow.test_service import _build_envelope
+
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id, event="in-depot"
+        )
+
+        locks = self._locks(lambda: BoxNowService.apply_webhook_event(envelope))
+
+        assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]
+
+    def test_the_tracking_poll(self):
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        client = MagicMock()
+        client.return_value.get_parcel_info.return_value = {
+            "data": [
+                {
+                    "id": shipment.parcel_id,
+                    "state": "in-depot",
+                    "events": [
+                        {
+                            "type": "in-depot",
+                            "createTime": "2026-05-12T20:00:00Z",
+                        }
+                    ],
+                }
+            ],
+            "pagination": {},
+        }
+
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            locks = self._locks(
+                lambda: BoxNowService.sync_shipment_state(shipment)
+            )
+
+        assert locks[:2] == ["order_order", "shipping_boxnow_boxnowshipment"]
+
+
+def _rate_limited(retry_after: str | None = None, status: int = 429) -> Any:
+    response = _response(status, {"message": "Too many requests"})
+    response.headers = (
+        {} if retry_after is None else {"Retry-After": retry_after}
+    )
+    return response
+
+
+class TestBoxNowRateLimits:
+    """A 429 is retried no sooner than BoxNow's ``Retry-After`` says, and
+    the store's other BoxNow work waits for it too instead of multiplying
+    the calls BoxNow refused."""
+
+    @pytest.mark.parametrize(
+        ("header", "expected"),
+        [
+            pytest.param("30", 30, id="seconds"),
+            pytest.param(None, None, id="no-header"),
+            pytest.param("999999", None, id="above-the-cap"),
+        ],
+    )
+    def test_the_wait_travels_on_the_error(
+        self, http, settings, header, expected
+    ):
+        client = BoxNowClient(session=http)
+        http.answer(_LOOKUP, _rate_limited(header))
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        wait = {
+            "no-header": settings.BOXNOW_RATE_LIMIT_DEFAULT_SECONDS,
+            "above-the-cap": settings.BOXNOW_RETRY_AFTER_MAX_SECONDS,
+        }
+        assert raised.value.retry_after == (
+            expected
+            if expected is not None
+            else wait["no-header" if header is None else "above-the-cap"]
+        )
+        assert BoxNowClient.rate_limited_for() > 0
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            pytest.param("21600", id="hours"),
+            pytest.param("99999999999999999999", id="beyond-a-countdown"),
+        ],
+    )
+    def test_an_outages_wait_is_capped_too(self, http, settings, header):
+        client = BoxNowClient(session=http)
+        http.answer(_LOOKUP, _rate_limited(header, status=503))
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        assert raised.value.retry_after == (
+            settings.BOXNOW_RETRY_AFTER_MAX_SECONDS
+        )
+
+    def test_an_http_date_is_read_as_seconds_from_now(self, http):
+        from email.utils import format_datetime
+
+        client = BoxNowClient(session=http)
+        http.answer(
+            _LOOKUP,
+            _rate_limited(
+                format_datetime(timezone.now() + timedelta(seconds=120))
+            ),
+        )
+
+        with pytest.raises(BoxNowRetryableError) as raised:
+            client.get_parcel_info(parcel_id="9219709201")
+
+        assert 100 < raised.value.retry_after <= 120
+
+    def test_a_task_retries_no_sooner_than_boxnow_asked(self):
+        exc = BoxNowRetryableError(429, retry_after=120)
+
+        with patch("celery.app.task.Task.retry") as retry:
+            create_boxnow_shipment_for_order.retry(exc=exc, countdown=4)
+
+        assert retry.call_args.kwargs["countdown"] == 120
+
+    def test_the_poll_of_one_parcel_waits_while_rate_limited(self, http):
+        from shipping_boxnow.tasks import poll_boxnow_tracking_one
+
+        shipment = BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        BoxNowClient._note_rate_limit(60)
+
+        result = poll_boxnow_tracking_one.run(shipment.pk)
+
+        assert result["status"] == "rate_limited"
+        assert http.calls == []
+
+    def test_the_poll_batch_dispatches_nothing_while_rate_limited(self):
+        from shipping_boxnow.tasks import (
+            poll_boxnow_tracking_batch,
+            poll_boxnow_tracking_one,
+        )
+
+        BoxNowShipmentFactory(
+            order=_paid_order(),
+            parcel_id="9219709201",
+            parcel_state=BoxNowParcelState.NEW,
+        )
+        BoxNowClient._note_rate_limit(60)
+
+        with patch.object(poll_boxnow_tracking_one, "apply_async") as sent:
+            result = poll_boxnow_tracking_batch.run()
+
+        assert result["dispatched"] == 0
+        sent.assert_not_called()
+
+    def test_the_sweep_stops_its_run_at_the_first_rate_limit(self, http):
+        from shipping_boxnow.tasks import settle_uncertain_boxnow_creations
+
+        _settled(_paid_order())
+        _settled(_paid_order())
+        http.answer(_LOOKUP, _rate_limited("30"))
+
+        result = settle_uncertain_boxnow_creations.run()
+
+        assert result == {"rate_limited": 1}
+        assert http.routes() == [_LOOKUP]

@@ -34,22 +34,22 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
-from order.models.retail_credit import RetailCredit
-from order.mydata.builder import build_credit_xml, build_receipt_xml
-from order.mydata.client import MyDataClient
-from order.mydata.config import load_config
-from order.mydata.exceptions import (
+from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
+from order.accounting.mydata.client import MyDataClient
+from order.accounting.mydata.config import load_config
+from order.accounting.mydata.exceptions import (
     MyDataDuplicateError,
     MyDataTransportError,
     MyDataValidationError,
 )
-from order.mydata.parser import (
+from order.accounting.mydata.parser import (
     ResponseRow,
     parse_requested_doc,
     parse_response_doc,
 )
-from order.mydata.types import ERROR_DUPLICATE_UID
-from order.mydata.validator import validate_invoice_doc
+from order.accounting.mydata.types import ERROR_DUPLICATE_UID
+from order.accounting.mydata.validator import validate_invoice_doc
+from order.models.retail_credit import RetailCredit
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # invoice from CONFIRMED to REJECTED. Return the existing identifiers
         # as a synthetic Success so the caller treats it as already-done
         # (idempotent), mirroring the 228-recovery path (G0262).
-        from order.mydata.parser import ResponseRow as _ResponseRow
+        from order.accounting.mydata.parser import ResponseRow as _ResponseRow
 
         return _ResponseRow(
             index=0,
@@ -170,7 +170,9 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             # re-render + email delivery). We don't have a real
             # ResponseRow from AADE, so synthesise one that carries
             # only the fields _persist_recovered_mark wrote.
-            from order.mydata.parser import ResponseRow as _ResponseRow
+            from order.accounting.mydata.parser import (
+                ResponseRow as _ResponseRow,
+            )
 
             return _ResponseRow(
                 index=0,

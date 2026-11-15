@@ -3,14 +3,14 @@
 Greek standard VAT is 24% (23% stopped being valid in June 2016), and
 myDATA B2B e-invoicing becomes mandatory during 2026 — a ``Vat`` row
 outside this set builds an invoice fine, then raises ``ValueError``
-deep in ``order.mydata.builder._vat_category`` for every order that
+deep in ``order.accounting.mydata.builder._vat_category`` for every order that
 uses it, which is how production's stale 23.0 row was found (fixed:
 products moved 23%→24%, dead row deleted).
 
-These are the KEYS of ``order/mydata/builder.py``'s
+These are the KEYS of ``order/accounting/mydata/builder.py``'s
 ``_VAT_CATEGORY_BY_RATE`` — mirrored here (not imported from there)
 because ``order`` depends on ``vat`` (``product.vat`` FKs to it, and
-``order`` depends on ``product``); importing ``order.mydata`` back into
+``order`` depends on ``product``); importing ``order.accounting.mydata`` back into
 ``vat`` would invert that dependency. The builder module asserts its
 own keys match this set at import time, so the two cannot silently
 drift apart.
@@ -27,7 +27,7 @@ from decimal import Decimal
 
 # Mainland rates (24/13/6/0) plus the island-discount bands (17/9/4)
 # and the Law 5057/2023 addition (3) — every rate
-# ``order/mydata/builder.py`` can map to an AADE ``vatCategory``.
+# ``order/accounting/mydata/builder.py`` can map to an AADE ``vatCategory``.
 MYDATA_SUPPORTED_VAT_RATES: frozenset[Decimal] = frozenset(
     {
         Decimal(24),
@@ -42,7 +42,7 @@ MYDATA_SUPPORTED_VAT_RATES: frozenset[Decimal] = frozenset(
 )
 
 # The rate a product is priced at when nobody chose one: Greek standard
-# VAT, ``order/mydata/builder.py``'s ``VAT_CATEGORY_24`` (AADE category 1).
+# VAT, ``order/accounting/mydata/builder.py``'s ``VAT_CATEGORY_24`` (AADE category 1).
 # A ``Vat`` row carries only its ``value``, so the value IS what identifies
 # the standard row; there is no flag to read. Must stay a supported rate.
 STANDARD_VAT_RATE: Decimal = Decimal(24)

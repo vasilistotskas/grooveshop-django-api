@@ -13,7 +13,7 @@ from djmoney.money import Money
 
 from cart.managers.cart import CartManager
 from core.models import TimeStampMixinModel, UUIDModel
-from order.taxation import split_gross
+from order.accounting.taxation import split_gross
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
@@ -114,7 +114,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         each line's gross is reduced by its own share
         (``CartDiscountResult.line_discounts``, cart item pk -> amount)
         exactly as the invoice reads it from the order's snapshots — see
-        ``order.checkout.discounts`` and ``order.taxation``, whose per-line rounding
+        ``order.checkout.discounts`` and ``order.accounting.taxation``, whose per-line rounding
         this shares. Never pass a gift card here: it is a means of payment
         and leaves VAT untouched.
         """

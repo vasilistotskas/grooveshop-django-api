@@ -17,7 +17,7 @@ from djmoney.money import Money
 
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
-from order import credit_allocation
+from order.accounting import credit_allocation
 from order.checkout.attribution import (
     AttributionInput,
     ClassifiedAttribution,
@@ -92,7 +92,7 @@ from order.payment_ledger import (
     PaymentLedger,
     is_cash_collection,
 )
-from order.refund_lines import plan_pieces
+from order.refunds.refund_lines import plan_pieces
 from order.signals import (
     order_refunded,
     order_stored_value_returned,
@@ -3453,7 +3453,7 @@ class OrderService:
 
         **By lines.** With ``lines`` (``(item, units)`` pairs) and/or
         ``include_shipping`` the amount is derived from the order's frozen
-        figures (``order.refund_lines``: price, ``discount_allocation`` and
+        figures (``order.refunds.refund_lines``: price, ``discount_allocation`` and
         ``vat_rate`` of the units, the shipping split over the rates as the
         receipt splits it) and ``amount`` must not be given. No line can be
         refunded past what was sold less what earlier line refunds paid
@@ -3607,7 +3607,7 @@ class OrderService:
         )
         payment_status = locked["payment_status"]
         # Every older source nobody allocated yet is decided before this
-        # claim takes its room (``order.credit_allocation``).
+        # claim takes its room (``order.accounting.credit_allocation``).
         credit_allocation.allocate_order(order)
 
         by_lines = bool(requested) or include_shipping
@@ -3808,7 +3808,7 @@ class OrderService:
     ) -> None:
         """Fix, now and under the order lock, where the refund sits on the
         receipt's VAT rates: its amount spread over the headroom left at
-        this moment (``order.credit_allocation``), laid over its shares in
+        this moment (``order.accounting.credit_allocation``), laid over its shares in
         order. A refund the headroom cannot hold is refused before any
         provider is called: its credit document could never be issued.
 
@@ -3922,7 +3922,7 @@ class OrderService:
         (order line, kind, VAT rate, units, exact gross from the frozen
         figures), laid over its shares in order (``split_over_shares``), so
         its credit document carries exactly their rates and what a line has
-        had back is read from these rows (``order.refund_lines``).
+        had back is read from these rows (``order.refunds.refund_lines``).
 
         The lines are goods the customer returned, owed as credit at their
         own rates in full, so a duplicate payment (``refundable_excess``) is
@@ -4227,7 +4227,7 @@ class OrderService:
         lock, the refund is recorded (*refund_id* is the provider's id, or
         ``None`` for cash paid back by the merchant under *reference*), the
         attempt settles and ``order_refunded`` fires. Also what resolves an
-        attempt whose outcome was unknown (``order.refund_reconciliation``)."""
+        attempt whose outcome was unknown (``order.refunds.refund_reconciliation``)."""
         charge = attempt.charge
         with transaction.atomic():
             Order.objects.select_for_update().values_list("pk", flat=True).get(

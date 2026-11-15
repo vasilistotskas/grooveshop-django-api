@@ -3,7 +3,7 @@
 Every refund (a claimed attempt, a webhook-booked row, a returned
 chargeback) fixes its per-rate share of the receipt under the order lock;
 the credit document is issued from that share only, so the order credits are
-issued in cannot change it. See ``order.credit_allocation``.
+issued in cannot change it. See ``order.accounting.credit_allocation``.
 """
 
 from __future__ import annotations
@@ -19,9 +19,11 @@ from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
-from order import credit_allocation
-from order.credit_allocation_backfill import backfill_credit_allocations
-from order.credit_documents import create_pending_credits
+from order.accounting import credit_allocation
+from order.accounting.credit_allocation_backfill import (
+    backfill_credit_allocations,
+)
+from order.accounting.credit_documents import create_pending_credits
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.exceptions import PaymentError
 from order.models import (
@@ -54,7 +56,8 @@ def _render_and_site(settings):
     settings.STATIC_BASE_URL = "http://example.com"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
     with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
     ):
         yield
 
@@ -480,7 +483,7 @@ class TestPointsOweNoCredit:
         assert credit_allocation.headroom_total(order) == Decimal("0.00")
 
     def test_points_restored_before_the_receipt_are_not_paid_back(self):
-        from order.invoicing import fully_refunded_before_receipt
+        from order.accounting.invoicing import fully_refunded_before_receipt
         from order.models.refund_attempt import (
             RefundAttempt,
             RefundAttemptKind,
@@ -601,7 +604,7 @@ class TestEveryWritePathAllocatesFirst:
         }
 
     def test_a_receipt_issued_before_the_first_task_run_is_net(self):
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
 
         order = _mixed()
         charge = order.payment_transactions.get(
@@ -1087,7 +1090,7 @@ class TestAReceiptWaitsForUndecidedMoney:
     receipt is issued after the claim resolves."""
 
     def test_the_receipt_is_deferred_then_issued_net(self):
-        from order.invoicing import ReceiptDeferred, generate_invoice
+        from order.accounting.invoicing import ReceiptDeferred, generate_invoice
         from order.models import Invoice
         from order.tasks import allocate_credit_sources, generate_order_invoice
         from tests.integration.order.test_mydata_lifecycle import (
@@ -1125,7 +1128,7 @@ class TestAReceiptWaitsForUndecidedMoney:
         assert credit_allocation.is_allocated(refund=late)
 
     def test_a_duplicate_given_back_before_the_receipt_is_not_a_return(self):
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
         from tests.integration.order.test_mydata_lifecycle import (
             _mark_shipped,
         )
@@ -1854,7 +1857,7 @@ def _legacy_gift_return(order):
 
 class TestALegacyStoredValueReturnIsAllocated:
     def test_a_receipt_issued_afterwards_is_net_of_it(self):
-        from order.invoicing import generate_invoice
+        from order.accounting.invoicing import generate_invoice
         from order.tasks import allocate_credit_sources
 
         order = _points_order(gift="20.00")

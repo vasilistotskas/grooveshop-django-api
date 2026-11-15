@@ -10,6 +10,7 @@ from knox.auth import TokenAuthentication as KnoxTokenAuthentication
 from knox.models import get_token_model
 from knox.settings import knox_settings
 from rest_framework import exceptions
+from rest_framework.authentication import get_authorization_header
 
 AuthToken = get_token_model()
 
@@ -41,9 +42,35 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
     on one tenant does not exist in another's. That is structural, not
     defence in depth.
 
+    A customer token is no sign-in on a store whose customer accounts are
+    off (``tenant.customer_accounts``): the request goes on as a guest's,
+    before the token is looked up, so presenting it does not renew it
+    either. ``customer_tokens`` says whether this class authenticates
+    customers; the staff subclass does not.
+
     Wired into ``REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`` in settings
     in place of ``knox.auth.TokenAuthentication``.
     """
+
+    customer_tokens: bool = True
+
+    def authenticate(self, request):
+        from tenant.customer_accounts import customer_accounts_on
+
+        if (
+            self.customer_tokens
+            and self._carries_my_keyword(request)
+            and not customer_accounts_on()
+        ):
+            return None
+        return super().authenticate(request)
+
+    def _carries_my_keyword(self, request) -> bool:
+        """Whether the request presents a token this class would read, so
+        a request without one costs no settings read."""
+        auth = get_authorization_header(request).split()
+        keyword = self.authenticate_header(request).encode()
+        return bool(auth) and auth[0].lower() == keyword.lower()
 
     @staticmethod
     def enforce_absolute_age(auth_token) -> None:
@@ -96,9 +123,14 @@ def is_auth_token_live(user_id: int, digest: str) -> bool:
     For credentials derived from a login (the cart agent token) that must
     stop working the moment it ends: logout and password changes delete
     the row, and the expiry and absolute-age caps apply as they do to
-    ``BoundedTokenAuthentication``. Read-only: it neither renews nor
-    deletes the token.
+    ``BoundedTokenAuthentication``, and none is live on a store whose
+    customer accounts are off. Read-only: it neither renews nor deletes
+    the token.
     """
+    from tenant.customer_accounts import customer_accounts_on
+
+    if not customer_accounts_on():
+        return False
     auth_token = AuthToken.objects.filter(
         user_id=user_id, digest=digest
     ).first()

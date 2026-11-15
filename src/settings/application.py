@@ -219,6 +219,10 @@ MIDDLEWARE = [
     # serves data: django_tenants resolves a host without looking at
     # ``is_active``, so a SUSPENDED store kept answering its API in full.
     "tenant.middleware.SuspendedTenantMiddleware",
+    # A store's customer identity routes answer 404 while it has customer
+    # accounts off. Its process_view runs once the URL is resolved,
+    # wherever it sits; here it sits with the other store gates.
+    "tenant.middleware.CustomerAccountsMiddleware",
     # Response phase runs in reverse: placed here, it rewrites the
     # session/CSRF cookie Domain AFTER Session/Csrf middleware set them
     # — the static *_COOKIE_DOMAIN settings only fit the platform apex.

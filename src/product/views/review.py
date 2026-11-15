@@ -106,9 +106,7 @@ class ProductReviewViewSet(BaseModelViewSet):
         return queryset.visible_to(self.request.user)
 
     def get_permissions(self):
-        from tenant.permissions import (
-            IsProductReviewsEnabled,
-        )
+        from tenant.features import feature_gates
 
         if self.action in [
             "create",
@@ -118,8 +116,11 @@ class ProductReviewViewSet(BaseModelViewSet):
             "user_product_review",
         ]:
             self.permission_classes = [IsOwnerOrAdmin]
-        # Merchant feature gate always fires first (404 when disabled).
-        return [IsProductReviewsEnabled(), *super().get_permissions()]
+        # Merchant feature gates always fire first (404 when disabled).
+        return [
+            *(gate() for gate in feature_gates("product_reviews")),
+            *super().get_permissions(),
+        ]
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]

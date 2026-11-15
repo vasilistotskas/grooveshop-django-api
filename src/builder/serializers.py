@@ -208,6 +208,7 @@ class FeatureStateSerializer(serializers.Serializer):
 class StoreFeatureStatesSerializer(serializers.Serializer):
     """Every ``TenantConfig.features`` name, with its state."""
 
+    customer_accounts = FeatureStateSerializer(read_only=True)
     blog = FeatureStateSerializer(read_only=True)
     blog_comments = FeatureStateSerializer(read_only=True)
     product_reviews = FeatureStateSerializer(read_only=True)

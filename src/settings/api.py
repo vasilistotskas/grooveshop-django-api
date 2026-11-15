@@ -18,7 +18,9 @@ REST_FRAMEWORK = {
         # ``Bearer`` authenticators cannot coexist). Resolves and
         # stamps PUBLIC-schema identities; see docs/api-staff-identity.md.
         "tenant.api_tokens.PlatformStaffTokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        # DRF's session authentication, minus a customer's session on a
+        # store with customer accounts off (tenant.customer_accounts).
+        "tenant.customer_accounts.StoreSessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
         # Anonymous GET/HEAD/OPTIONS stay allowed so public catalog
@@ -167,7 +169,8 @@ SPECTACULAR_SETTINGS = {
     else ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        # Matched by exact class: the one REST_FRAMEWORK authenticates with.
+        "tenant.customer_accounts.StoreSessionAuthentication",
     ],
     "SERVE_AUTHENTICATION": [
         "knox.auth.TokenAuthentication",

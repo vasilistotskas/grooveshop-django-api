@@ -57,20 +57,26 @@ def refuse(request, gate: BasePermission, switch: str) -> NoReturn:
     looks like any other 404 in the access log, and on 2026-10-13 that
     is how a store's search broke with nothing flagging it.
     """
+    log_refusal(request, type(gate).__name__, switch)
+    raise NotFound()
+
+
+def log_refusal(request, gate: str, switch: str) -> None:
+    """The log line of a refusal, for a gate that answers its 404 outside
+    DRF (``tenant.middleware.CustomerAccountsMiddleware``)."""
     match = getattr(request, "resolver_match", None)
     route = match.route if match is not None else ""
     logger.info(
         REFUSED_MESSAGE,
         extra={
             "fields": {
-                "gate": type(gate).__name__,
+                "gate": gate,
                 "switch": switch,
                 "route": route,
                 "method": request.method,
             }
         },
     )
-    raise NotFound()
 
 
 class IsTenantFeatureEnabled(BasePermission):
@@ -260,6 +266,21 @@ class IsCartEnabled(IsSettingEnabled):
     """404 when the store does not take orders."""
 
     setting_key = "CART_ENABLED"
+
+
+class IsCustomerAccountsEnabled(IsSettingEnabled):
+    """404 when the store has no customer accounts.
+
+    The DRF half of the switch, on the routes that act for a linked
+    shopper (``agent.views.AgentAPIView``) and, through ``STORE_FEATURES``,
+    on every feature that needs an account. The identity routes (allauth,
+    the store's OIDC provider) are refused by
+    ``tenant.middleware.CustomerAccountsMiddleware`` and a sign-in a
+    shopper already holds by ``tenant.customer_accounts``. Fails OPEN
+    (declared ``True``): every store had accounts before the switch.
+    """
+
+    setting_key = "CUSTOMER_ACCOUNTS_ENABLED"
 
 
 class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):

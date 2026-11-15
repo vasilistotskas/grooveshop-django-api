@@ -18,7 +18,7 @@ from order.signals import (
     order_stored_value_returned,
 )
 from tenant.celery import dispatch_on_commit
-from tenant.permissions import IsLoyaltyRuntimeEnabled
+from tenant.features import STORE_FEATURES
 from tenant.switches import on_switch_change
 from user.models.account import UserAccount
 
@@ -369,10 +369,13 @@ def notify_tier_up_live(
     )
 
 
-# Loyalty switched off or on: open or close the pause that keeps points
-# from ageing while the programme is off (``LoyaltyService.sync_pause``).
+# Loyalty switched off or on, by its own switches or by one it needs
+# (customer accounts): open or close the pause that keeps points from
+# ageing while the programme is off (``LoyaltyService.sync_pause``).
 on_switch_change(
-    setting_keys=(IsLoyaltyRuntimeEnabled.setting_key,),
+    setting_keys=tuple(
+        gate.setting_key for gate in STORE_FEATURES["loyalty"].settings
+    ),
     plan_flags=("loyalty_enabled",),
     task="loyalty.tasks.sync_loyalty_pause",
 )

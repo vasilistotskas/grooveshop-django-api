@@ -3,6 +3,79 @@
 
 
 
+## v3.246.0 (2026-11-15)
+
+### Features
+
+* feat(tenant): a store can run without customer accounts (CUSTOMER_ACCOUNTS_ENABLED) (#704) ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+* feat(tenant): a store can run without customer accounts (CUSTOMER_ACCOUNTS_ENABLED)
+
+A new store setting, CUSTOMER_ACCOUNTS_ENABLED (default on, so nothing
+changes until a store turns it off), served as the store feature
+customer_accounts (features.customerAccounts). Off, on that store's
+hosts:
+
+- The customer identity routes answer a bare 404 with the
+  feature_gate:refused log line: allauth's headless API, the TOTP image,
+  allauth's pages and the social callbacks, the store's OIDC provider and
+  its metadata (CUSTOMER_IDENTITY_VIEWS, collected from the three URL
+  groups that mount them in core/urls.py, refused on the resolved view by
+  tenant.middleware.CustomerAccountsMiddleware). The agent routes acting
+  for a linked shopper refuse through AgentAPIView.
+- A sign-in a shopper already holds is none (tokens are left to expire,
+  not revoked): the Knox token (before the lookup, so it is not renewed),
+  the session (StoreSessionAuthentication), the OIDC access token, the
+  cart agent token and the WebSocket ticket each answer as if no
+  credential had been sent. Account endpoints refuse it as a guest's; a
+  guest checkout with a stale token still makes a guest order. Staff
+  sessions and StaffBearer tokens are platform identities and unaffected;
+  the platform host is never gated.
+- favourites, product_reviews, account_reviews, blog_comments, loyalty and
+  wholesale list the switch in their rows, so they read as off. Their
+  views gate through feature_gates(name) and their services and jobs
+  through feature_on(name) instead of naming the classes, so the row
+  decides everywhere: LoyaltyService and B2BService, the loyalty pause
+  watcher, the favourites notifications.
+- The account mail (allauth's, the data export, re-engagement) and the
+  abandoned-checkout reminder are skipped as "Off: Customer accounts
+  feature".
+
+Also: feature_on reads a plan flag off the real Tenant row
+(tenant_plan_allows), so a task under schema_context, where the
+connection holds a bare FakeTenant, is gated by the store's plan.
+
+schema.yml: customerAccounts added to StoreFeatures and
+StoreFeatureStates (additive).
+
+Refs #198 ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+### Performance improvements
+
+* perf(tenant): read the distinct feature settings in one get_many
+
+Several features share a gate (customer accounts gates seven), and
+effective_features read each gate's setting once per use. It now collects
+the distinct settings and reads them with store_settings, one get_many. ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+### Testing
+
+* test(tenant): generate the customer-accounts test password instead of a literal ([`1911942`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1911942348c6ef1e8d058920cffeb37baafe960b))
+
+## v3.245.13 (2026-11-15)
+
+### Refactoring
+
+* refactor(order): store settings name their order validators at order.setting_validators (#706)
+
+The four order validator paths in EXTRA_SETTINGS_DEFAULTS move to the
+permanent address #703 added. sync_setting_metadata writes them into every
+store's rows on migrate; the release still serving during the rollout
+(v3.245.12 or later in production and staging) already has that module.
+After this, order.stock, order.review_request and order.payment_hold can
+move with #566. A test keeps every stored order validator at the
+permanent address. ([`00c72f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00c72f993c17e711e1e572026ecd044183fd78f9))
+
 ## v3.245.12 (2026-11-14)
 
 ### Refactoring

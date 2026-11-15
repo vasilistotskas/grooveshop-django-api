@@ -3952,6 +3952,9 @@ msgstr "Customer Notes"
 msgid "Customer accounts"
 msgstr "Customer accounts"
 
+msgid "Customer accounts feature"
+msgstr "Customer accounts feature"
+
 msgid "Customer charged more than the order is for"
 msgstr "Customer charged more than the order is for"
 

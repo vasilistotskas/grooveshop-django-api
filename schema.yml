@@ -36777,6 +36777,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/UserPublic'
           readOnly: true
+          nullable: true
         contentPreview:
           type: string
           nullable: true
@@ -36867,6 +36868,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/UserPublic'
           readOnly: true
+          nullable: true
         contentPreview:
           type: string
           nullable: true
@@ -36931,7 +36933,9 @@ components:
             contentPreview:
               type: string
             user:
-              $ref: '#/components/schemas/UserPublic'
+              allOf:
+              - $ref: '#/components/schemas/UserPublic'
+              nullable: true
             createdAt:
               type: string
               format: date-time
@@ -36958,7 +36962,9 @@ components:
               contentPreview:
                 type: string
               user:
-                $ref: '#/components/schemas/UserPublic'
+                allOf:
+                - $ref: '#/components/schemas/UserPublic'
+                nullable: true
             required:
             - id
             - contentPreview

@@ -826,6 +826,40 @@ class TestACancelAfterACreationOfUncertainOutcome:
         assert shipment.metadata["creation_uncertain_at"] is not None
         assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
 
+    @pytest.mark.parametrize(
+        "lookup",
+        [
+            pytest.param(_lookup(), id="nothing-listed"),
+            pytest.param(
+                _lookup(_parcel("9219709201", "canceled")),
+                id="only-a-canceled-one",
+            ),
+            pytest.param(_response(503, text="busy"), id="lookup-fails"),
+        ],
+    )
+    def test_a_p410_with_no_stamp_stamps_it(self, http, lookup):
+        """A worker that died between the POST and phase 3 left no stamp.
+        After the claim's TTL the retry gets P410, which proves BoxNow
+        holds a request under the orderNumber; a take-over that cannot
+        find its parcel leaves the creation uncertain."""
+        order = _paid_order()
+        stale = timezone.now() - timedelta(
+            seconds=BoxNowService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _pending_shipment(order, mint_started_at=stale.isoformat())
+        http.answer(_CREATE, _response(400, _P410))
+        http.answer(_LOOKUP, lookup)
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.create_shipment_for_order(order)
+        http.answer(_LOOKUP, _lookup())
+
+        with pytest.raises(BoxNowRetryableError):
+            BoxNowService.cancel_shipment(shipment, reason="customer")
+
+        shipment.refresh_from_db()
+        assert shipment.metadata["creation_uncertain_at"] is not None
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+
     def test_a_p410_keeps_it(self, http):
         """P410 proves an earlier request created something; a lookup that
         lists nothing yet must not end the uncertainty."""

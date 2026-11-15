@@ -966,6 +966,12 @@ class BoxNowService:
         lookup found, for staff. A lookup that fails raises its own error
         (a ``BoxNowRetryableError`` lets the task try again). The claim
         from phase 1 is held until then and released on every failure.
+
+        Every path that saves no parcel stamps the creation uncertain
+        (#690): the P410 proves BoxNow holds a request under the
+        ``orderNumber``, and a parcel the lookup does not list yet (a
+        worker that died between the POST and phase 3 left no stamp of
+        its own) must not let a cancel trust an empty lookup.
         """
         try:
             live = cls._live_parcels_at_boxnow(order.id)
@@ -977,10 +983,14 @@ class BoxNowService:
                 exc,
                 extra={"order_id": order.id, "boxnow_code": exc.code},
             )
-            cls._release_mint_claim(shipment_pk, last_error=_last_error(exc))
+            cls._release_mint_claim(
+                shipment_pk,
+                last_error=_last_error(exc),
+                outcome_uncertain=True,
+            )
             raise
         except Exception:
-            cls._release_mint_claim(shipment_pk)
+            cls._release_mint_claim(shipment_pk, outcome_uncertain=True)
             raise
 
         match live:
@@ -1068,7 +1078,9 @@ class BoxNowService:
         conflict: BoxNowAPIError,
         reason: str,
     ) -> NoReturn:
-        """Raise the P410 as the refusal it is, saying why; free the claim."""
+        """Raise the P410 as the refusal it is, saying why; free the claim
+        and stamp the creation uncertain (see
+        :meth:`_take_over_existing_parcel`)."""
         refusal = BoxNowAPIError(
             conflict.status_code,
             code=conflict.code,
@@ -1083,7 +1095,11 @@ class BoxNowService:
             refusal,
             extra={"order_id": order.id, "boxnow_code": conflict.code},
         )
-        cls._release_mint_claim(shipment_pk, last_error=_last_error(refusal))
+        cls._release_mint_claim(
+            shipment_pk,
+            last_error=_last_error(refusal),
+            outcome_uncertain=True,
+        )
         raise refusal from conflict
 
     @classmethod

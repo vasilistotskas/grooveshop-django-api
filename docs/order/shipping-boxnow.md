@@ -136,7 +136,10 @@ and says which file holds each § number used here.
   reached BoxNow (a `BoxNowRetryableError`: a read timeout, a dropped
   connection, a 5xx; or an error the client does not classify) stamps
   `metadata["creation_uncertain_at"]` when it releases its claim, so the
-  evidence outlives the claim. Only a parcel ends it: one saved
+  evidence outlives the claim. So does a `P410` whose take-over saves no
+  parcel (nothing listed yet, only canceled ones, a lookup that fails):
+  it proves BoxNow holds a request under the `orderNumber`, possibly from
+  a worker that died between the POST and phase 3 and left no stamp. Only a parcel ends it: one saved
   (`_persist_parcel`, every branch) or one the cancel finds by
   `orderNumber`. A refusal of a later request does not: it proves only
   that this request created nothing, not that the earlier one whose

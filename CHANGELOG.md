@@ -3,6 +3,134 @@
 
 
 
+## v3.249.1 (2026-11-16)
+
+### Bug fixes
+
+* fix(core): a publish to a blocked RabbitMQ fails within a bound (#719) ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a publish to a blocked RabbitMQ fails within a bound
+
+While RabbitMQ blocks publishers (a memory or disk alarm) it stops reading
+a connection once it has published and sends nothing back. The publish
+waited for its confirm without end, and a publish timeout only moved the
+wait: kombu then replaced the connection and waited for a Close-Ok that
+never came. Every request that published, and everything sent through
+dispatch_on_commit, waited with it.
+
+CELERY_BROKER_TRANSPORT_OPTIONS now sets py-amqp's read_timeout
+(CELERY_BROKER_READ_TIMEOUT, 2 s by default), applied as SO_RCVTIMEO to
+every broker socket. A read that times out is a connection error, so a
+publish to a blocked broker fails after about six of them (four publish
+attempts, then closing the channel and the connection) and
+dispatch_on_commit keeps the task as a DeferredDispatch, which the sweep
+publishes once the alarm clears. Writes need no option: py-amqp's
+default TCP_USER_TIMEOUT already ends one the broker stops taking. A
+worker reads its consuming connection only when the socket is readable,
+so an idle worker never meets the bound.
+
+The option is set on Linux only: py-amqp packs it as a POSIX timeval,
+which Windows reads as milliseconds.
+
+Measured against RabbitMQ with its memory alarm on, on Linux: a
+dispatch_on_commit that waited past 90 s now returns after about 12 s
+with the task kept, and the sweep published it after the alarm cleared.
+docs/deferred-dispatch.md records the measurements, and that each
+attempt written before the block is still delivered once it clears.
+
+Closes #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): one publish retry, and a timed-out publish says it timed out
+
+A publish that timed out on a blocked broker is still delivered once the
+alarm clears, one message per attempt, and dispatch_on_commit keeps it
+as a DeferredDispatch that the sweep publishes again. Celery's default
+three retries therefore only added copies: one blocked dispatch ran its
+task five times. CELERY_TASK_PUBLISH_RETRY_POLICY keeps one retry
+(CELERY_TASK_PUBLISH_MAX_RETRIES), the one a pooled connection needs
+after a broker restart; with none that publish fails, with one it
+reconnects and goes out. Measured on Linux with the memory alarm on:
+the request is held 8.2 s instead of 12.2 s, and the task runs three
+times instead of five.
+
+kombu re-raises py-amqp's bare socket timeout as an OperationalError
+with no text, so the row and the log read "OperationalError: ".
+tenant.celery.describe_error takes the reason from the cause, and names
+a bare timeout "timed out", for defer_dispatch and the sweep.
+
+Refs #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): bound only the connections the app publishes on
+
+The broker read timeout sat in CELERY_BROKER_TRANSPORT_OPTIONS, so it
+also reached a worker's consuming connection, where a read that times out
+makes the worker drop the connection and RabbitMQ redeliver every task it
+is still running (task_acks_late). It also turned kombu's unbounded
+publish retries (control commands, worker events: retry=True, no policy)
+into an endless reconnect loop during an alarm: a health-check ping made a
+new blocked connection every 2 s, 128 of them in four minutes.
+
+GrooveShopCelery.connection_for_write now gives only the publishing
+connections (the producer pool behind tasks and control commands, a
+worker's event dispatcher) two py-amqp options:
+
+- on_blocked raises BrokerBlocked, a kombu OperationalError: RabbitMQ
+  sends connection.blocked right after the first publish it holds back,
+  so the confirm wait ends at once, and kombu does not retry it;
+- read_timeout (BROKER_PUBLISH_READ_TIMEOUT, 5 s) bounds the Close-Ok
+  waits that follow.
+
+connection_for_read is left as it was. Measured on Linux with the memory
+alarm on: dispatch_on_commit returns in 10.5 s and the task runs twice
+(the written message and the swept row) instead of three times; the
+health-check ping fails in 10.3 s instead of looping; a worker running a
+task through the alarm runs it once. A healthy broker limited to half a
+CPU confirmed in 49 ms at worst, so 5 s leaves ample headroom.
+
+Refs #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a process publishes nothing more once RabbitMQ blocks it
+
+RabbitMQ sends connection.blocked only on the connection that published,
+and tells a new connection nothing until it publishes too. Beat and the
+worker's event dispatcher kept the blocked connection, so each later
+publish wrote another copy, timed out, reconnected and wrote again.
+
+Publishing connections now use core.broker.PublishingTransport, with one
+blocked state per process:
+
+- connection.blocked starts a hold of BROKER_BLOCKED_HOLD_SECONDS and
+  ends the confirm wait with py-amqp's Blocked, a recoverable connection
+  error, so kombu drops the blocked connection without a close handshake
+  (also when the frame arrives during a close) and retries on a new one;
+- during the hold every publish is refused before it writes, with
+  BrokerBlocked, which kombu does not retry; send_task refuses before it
+  takes a pooled connection;
+- connection.unblocked ends the hold; otherwise, once it passes, the next
+  publish first asks with an empty message to a reserved routing key no
+  queue can have, so a still-blocked broker never receives a task.
+
+A worker's consuming connection keeps kombu's own transport. ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a task published from a running task waits out a broker block
+
+Task.retry turns a failed publish into Reject(requeue=False), so refusing
+a publish inside a worker dropped the acks_late task, and a refused
+.delay() failed its caller. A publish from a task the worker is running
+is no longer refused: its message is written once and the publish waits
+for that message's confirm until the broker unblocks.
+
+A question asked after the hold that fails for a reason other than a
+block (a connection reset by a restarted broker) no longer restarts the
+hold, so kombu's retry asks again on a new connection. One thread asks at
+a time. BROKER_BLOCKED_HOLD_SECONDS must be above 0. ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): refuse an endless broker hold, and say what an alarm costs the workers ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+### Testing
+
+* test(core): the app tests patch the Celery subclass the app is built from ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
 ## v3.249.0 (2026-11-16)
 
 ### Chores

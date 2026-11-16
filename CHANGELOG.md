@@ -3,6 +3,41 @@
 
 
 
+## v3.249.0 (2026-11-16)
+
+### Chores
+
+* chore(builder): pin the upstream copies to storefront main with #489 ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+### Features
+
+* feat(builder): port the upgrade that leaves out a choice's own default (#722) ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+* feat(builder): port the upgrade that leaves out a choice's own default
+
+The storefront's optional choices no longer hold the value their section
+draws when the setting is left out (the editor's "Default"), and each
+affected block moved one version with an upgrade that takes a stored
+setting holding that value out. block_upgrades ports it
+(_leave_out_defaults) for every one of those blocks, so
+persist_block_upgrades writes it into the stored drafts and versions:
+surface on the bands (default; muted on newsletter_signup and
+stats_strip; ink on offers_preview), blog_categories.layout slider,
+divider.variant line, features_grid.decor none, hero_banner decor none,
+align center and theme auto, hero_carousel.aspect wide,
+media_text.imagePosition left and decor none, product_categories.layout
+tiles, spacer.height md, and a product rule's stock any.
+
+A product rule's stock no longer takes "any" (PRODUCT_STOCK): a rule
+without the key is the list as ordered. The demo store's pages move to
+the new versions, through the same upgrade. The catalogue, the home
+seed, upgrade-cases.json and data-cases.json are the storefront's,
+refreshed by sync_upstream_sources.py.
+
+Closes vasilistotskas/grooveshop-storefront-ui-node-nuxt#469 ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+* feat(builder): the categories band's grid layout is left out too, as the storefront's upgrade does ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
 ## v3.248.2 (2026-11-16)
 
 ### Bug fixes

@@ -257,12 +257,34 @@ class TestIdentity:
             if source == Path(throttling.__file__).resolve():
                 continue
             tree = ast.parse(source.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module == (
-                    "rest_framework.throttling"
-                ):
-                    offenders.append(str(source.relative_to(src)))
+            if any(_names_drf_throttling(node) for node in ast.walk(tree)):
+                offenders.append(str(source.relative_to(src)))
         assert offenders == []
+
+
+_DRF_THROTTLING = "rest_framework.throttling"
+
+
+def _names_drf_throttling(node: ast.AST) -> bool:
+    """Every way a module can reach DRF's throttles: ``import`` of the
+    module, ``from rest_framework import throttling``, ``from
+    rest_framework.throttling import ...``, or a dotted path in a string
+    (``DEFAULT_THROTTLE_CLASSES``, ``throttle_classes`` set by name)."""
+    if isinstance(node, ast.Import):
+        return any(
+            alias.name == _DRF_THROTTLING
+            or alias.name.startswith(f"{_DRF_THROTTLING}.")
+            for alias in node.names
+        )
+    if isinstance(node, ast.ImportFrom):
+        if node.module == _DRF_THROTTLING:
+            return True
+        return node.module == "rest_framework" and any(
+            alias.name == "throttling" for alias in node.names
+        )
+    return isinstance(node, ast.Constant) and (
+        isinstance(node.value, str) and _DRF_THROTTLING in node.value
+    )
 
 
 class TestRedisUp:

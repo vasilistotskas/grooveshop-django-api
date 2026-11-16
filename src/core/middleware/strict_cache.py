@@ -83,7 +83,9 @@ def unavailable_response(
     request: HttpRequest, exc: BaseException
 ) -> HttpResponse:
     """The 503 for *request*, in the shape of the route it reached."""
-    _refused.report(request.path_info, exc)
+    # The traceback names the key's caller: the middleware answers any
+    # Redis outage a view raises, strict keys or not.
+    _refused.report(request.path_info, exc, exc_info=exc)
     message = str(STRICT_CACHE_UNAVAILABLE_MESSAGE)
     match = _match(request)
     namespaces = match.namespaces if match is not None else []

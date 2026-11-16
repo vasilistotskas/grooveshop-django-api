@@ -121,6 +121,25 @@ def test_a_drf_route_answers_the_error_contract(redis_down, user):
     assert response.json()["detail"]
 
 
+def test_the_refusal_is_logged_with_the_failure_s_traceback(
+    redis_down, user, caplog, monkeypatch
+):
+    """The middleware answers any Redis outage a view raises, strict keys
+    or not: the logged line carries the traceback that names the caller."""
+    from core.middleware import strict_cache
+
+    monkeypatch.setattr(strict_cache._refused, "_last_logged", float("-inf"))
+
+    with caplog.at_level("ERROR", logger="core.middleware.strict_cache"):
+        response = Client().post(
+            "/accounts/login/", {"login": user.email, "password": PASSWORD}
+        )
+
+    assert response.status_code == 503
+    (record,) = [r for r in caplog.records if r.name == strict_cache.__name__]
+    assert record.exc_info is not None
+
+
 class TestVivaHandshake:
     """Viva's webhook GET answers with the store's verification key. Its
     per-address budget fails open only while the key is stored (answering

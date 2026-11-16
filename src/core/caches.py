@@ -137,7 +137,9 @@ class BurstLogger:
         self._last_logged = float("-inf")
         self._suppressed = 0
 
-    def report(self, *args: Any) -> None:
+    def report(self, *args: Any, exc_info: BaseException | None = None) -> None:
+        """Log one line for a burst; *exc_info* adds the first event's
+        traceback, so where the failure came from stays visible."""
         now = time.monotonic()
         with self._lock:
             if now - self._last_logged < BURST_INTERVAL_SECONDS:
@@ -151,6 +153,7 @@ class BurstLogger:
             *args,
             suppressed,
             int(BURST_INTERVAL_SECONDS),
+            exc_info=exc_info,
         )
 
 

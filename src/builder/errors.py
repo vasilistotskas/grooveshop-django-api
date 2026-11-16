@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from django.utils.translation import (
+    get_language,
+    get_supported_language_variant,
+)
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import APIException
@@ -136,10 +140,28 @@ FAILURE_MESSAGES = {
     "document_gone": _("%(key)s no longer exists."),
     "nothing_to_publish": _("Nothing has changed since the last release."),
     "insufficient_contrast": _(
-        "The colours of %(rule)s have a contrast of %(ratio)s, below the "
-        "required %(min)s."
+        "The colour pair “%(label)s” has a contrast of %(ratio)s:1, "
+        "below the required %(min)s:1."
     ),
 }
+
+
+def per_language(name: str, language: str) -> str:
+    """The key of a param written once per language (``label-el``): a name
+    the catalogue gives in every language, held so that the sentence can be
+    worded again in whichever language reads it (``message_for``)."""
+    return f"{name}-{language}"
+
+
+def _in_active_language(params: dict[str, str]) -> dict[str, str]:
+    """*params* with each per-language param also under its bare name, in
+    the active language."""
+    suffix = per_language("", get_supported_language_variant(get_language()))
+    return params | {
+        key.removesuffix(suffix): value
+        for key, value in params.items()
+        if key.endswith(suffix)
+    }
 
 
 def message_for(code: str, params: dict[str, str] | None, fallback: str) -> str:
@@ -147,7 +169,7 @@ def message_for(code: str, params: dict[str, str] | None, fallback: str) -> str:
     template = FAILURE_MESSAGES.get(code)
     if template is None or (params is None and "%(" in str(template)):
         return fallback
-    return str(template) % (params or {})
+    return str(template) % _in_active_language(params or {})
 
 
 class DocumentInvalid(BuilderError):

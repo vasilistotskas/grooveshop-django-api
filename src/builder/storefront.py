@@ -349,7 +349,21 @@ def fetch_catalogue(schema: str) -> Catalogue:
         )
     try:
         catalogue = parse_catalogue(response.json())
-    except ValueError as exc:
+    except (ValueError, StorefrontUnavailable) as exc:
+        # The storefront answered and Django cannot read what it said: a
+        # contract broken between two releases (a storefront older than the
+        # catalogue shape this release requires), never a passing outage.
+        # Every save, publish and provisioning step refuses until it is
+        # fixed, so it is an ERROR with what went wrong and where.
+        logger.error(
+            "Builder catalogue of %s for %s cannot be read: %r",
+            base_url(),
+            schema,
+            exc.__cause__ or exc,
+            exc_info=exc,
+        )
+        if isinstance(exc, StorefrontUnavailable):
+            raise
         raise StorefrontUnavailable("catalogue is not JSON") from exc
 
     with _lock:

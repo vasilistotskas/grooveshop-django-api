@@ -14535,8 +14535,8 @@ msgid "The code has reached its usage limit"
 msgstr "The code has reached its usage limit"
 
 #, python-format
-msgid "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
-msgstr "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
+msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
+msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."

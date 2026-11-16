@@ -23,6 +23,8 @@ FIXTURE = json.loads(
     ).read_text(encoding="utf-8")
 )
 RULES = contrast.parse_rules(FIXTURE["rules"])
+#: A rule's name in both languages, as the catalogue gives it.
+LABEL = {"el": "Κείμενο, φωτεινό", "en": "Text, light"}
 
 
 @pytest.mark.parametrize(
@@ -32,6 +34,62 @@ def test_the_ratio_of_two_colours(case):
     got = contrast.ratio(case["foreground"], case["background"])
 
     assert contrast.format_ratio(got) == case["ratio"]
+
+
+# A side the page draws mixed, ``color-mix(in oklab, ...)``: the storefront's
+# ``mixOklab`` computed these, and Django must mix to the same byte.
+@pytest.mark.parametrize(
+    "case", FIXTURE["mixes"], ids=[c["why"] for c in FIXTURE["mixes"]]
+)
+def test_a_mix_as_the_page_draws_it(case):
+    mixed = contrast.mix_oklab(case["mix"], case["toward"], case["percent"])
+
+    assert mixed == case["mixed"]
+    assert (
+        contrast.format_ratio(contrast.ratio(mixed, case["against"]))
+        == (case["ratio"])
+    )
+
+
+class TestAMixedSide:
+    RULE = {
+        "id": "accent-text-dark",
+        "foreground": {
+            "mix": "/colors/dark/accent",
+            "toward": "#ffffff",
+            "percent": 20,
+        },
+        "background": "#464646",
+        "min": 4.5,
+        "severity": "warning",
+        "label": LABEL,
+    }
+
+    def test_is_judged_as_drawn_and_reported_at_what_it_mixes(self):
+        (rule,) = contrast.parse_rules([self.RULE])
+
+        (outcome,) = contrast.evaluate(
+            [rule], {"colors": {"dark": {"accent": "#ff3cc3"}}}
+        )
+
+        assert contrast.format_ratio(outcome.ratio) == "3.81"
+        assert not outcome.passed
+        assert rule.path == "/colors/dark/accent"
+
+    @pytest.mark.parametrize(
+        "foreground",
+        [
+            {"mix": "red", "toward": "#ffffff", "percent": 20},
+            {"mix": "/colors/dark/accent", "toward": "#ffffff", "percent": 120},
+            {"mix": "/colors/dark/accent", "percent": 20},
+        ],
+        ids=["not a colour", "past 100%", "nothing to mix toward"],
+    )
+    def test_a_malformed_mix_is_refused_when_the_catalogue_is_read(
+        self, foreground
+    ):
+        with pytest.raises((ValueError, KeyError)):
+            contrast.parse_rules([{**self.RULE, "foreground": foreground}])
 
 
 @pytest.mark.parametrize(
@@ -70,6 +128,7 @@ class TestACatalogueThatContradictsItself:
                     "background": "#ffffff",
                     "min": 4.5,
                     "severity": "error",
+                    "label": LABEL,
                 }
             ]
         )
@@ -104,7 +163,32 @@ class TestACatalogueThatContradictsItself:
     )
     def test_a_malformed_rule_is_refused_when_the_catalogue_is_read(self, rule):
         with pytest.raises(ValueError):
-            contrast.parse_rules([{"min": 4.5, "severity": "error", **rule}])
+            contrast.parse_rules(
+                [{"min": 4.5, "severity": "error", "label": LABEL, **rule}]
+            )
+
+    @pytest.mark.parametrize(
+        "label",
+        [
+            None,
+            {"el": "Κείμενο, φωτεινό"},
+            {"el": "Κείμενο, φωτεινό", "en": "  "},
+            {"el": 3, "en": "Text, light"},
+        ],
+        ids=["none", "a language missing", "a blank name", "not text"],
+    )
+    def test_a_rule_not_named_in_every_language_is_refused(self, label):
+        rule = {
+            "id": "x",
+            "foreground": "#000000",
+            "background": "#ffffff",
+            "min": 4.5,
+            "severity": "error",
+            "label": label,
+        }
+
+        with pytest.raises((ValueError, KeyError, AttributeError)):
+            contrast.parse_rules([rule])
 
     def test_two_rules_with_one_id(self):
         rule = {
@@ -113,7 +197,30 @@ class TestACatalogueThatContradictsItself:
             "background": "#ffffff",
             "min": 4.5,
             "severity": "error",
+            "label": LABEL,
         }
 
         with pytest.raises(ValueError):
             contrast.parse_rules([rule, rule])
+
+
+class TestARuleIsNamedByTheCatalogue:
+    def test_its_name_in_every_language_and_nothing_the_editor_keeps(self):
+        (rule,) = contrast.parse_rules(
+            [
+                {
+                    "id": "body-text-light",
+                    "foreground": "#000000",
+                    "background": "#ffffff",
+                    "min": 4.5,
+                    "severity": "error",
+                    "label": {**LABEL, "de": "Text, hell"},
+                    "fix": {"el": "Αλλάζει.", "en": "Changes it."},
+                }
+            ]
+        )
+
+        assert rule.label == LABEL
+
+    def test_every_rule_of_the_shared_cases_is_named(self):
+        assert all(set(rule.label) == {"el", "en"} for rule in RULES)

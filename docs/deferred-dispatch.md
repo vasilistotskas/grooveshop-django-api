@@ -44,8 +44,9 @@ producer, a worker's event dispatcher) with `core.broker.PublishingTransport`.
 Its connections confirm every publish and keep one state per process:
 
 - `connection.blocked` holds the process off the broker for
-  `BROKER_BLOCKED_HOLD_SECONDS` (60 s; the settings refuse anything not above 0,
-  which would let events and heartbeats reconnect in a loop). The publish waiting for its confirm ends
+  `BROKER_BLOCKED_HOLD_SECONDS` (60 s; the settings refuse anything not a finite
+  number above 0: 0 would let events and heartbeats reconnect in a loop, an
+  endless hold would refuse every publish for good). The publish waiting for its confirm ends
   at once with py-amqp's `Blocked`, a recoverable connection error: kombu drops
   that connection without a close handshake and retries on a new one (the one
   retry of `CELERY_TASK_PUBLISH_RETRY_POLICY`, or kombu's endless retry for
@@ -74,7 +75,11 @@ Its connections confirm every publish and keep one state per process:
   confirm through the block, as it did before #509, so the task runs once after
   the alarm clears. The cost: a worker child that publishes during an alarm is
   held until it clears, bounded by the task's time limit
-  (`CELERY_TASK_SOFT_TIME_LIMIT`), as before #509.
+  (`CELERY_TASK_SOFT_TIME_LIMIT`), as before #509. The tasks that run every
+  minute and always publish (`fanout_*`, `redispatch_deferred_tasks`, builder
+  publishes) take every child within about a minute of an alarm, so the
+  workers stop draining queues until it clears. An alarm caused by a backlog
+  does not clear by itself: free broker memory or raise its watermark.
 
 So during an alarm a process writes one message, the publish that found out, and
 then nothing but one question per hold. Each question leaves one connection the

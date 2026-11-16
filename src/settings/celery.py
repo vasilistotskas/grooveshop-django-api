@@ -1,6 +1,7 @@
 """Celery: broker, results, workers and deferred dispatch."""
 
 import datetime
+import math
 import sys
 from os import getenv
 
@@ -120,11 +121,16 @@ BROKER_PUBLISH_READ_TIMEOUT = (
 # so a shorter hold leaves more of them on a broker already short of
 # memory: one per minute per process that publishes.
 BROKER_BLOCKED_HOLD_SECONDS = float(getenv("BROKER_BLOCKED_HOLD_SECONDS", "60"))
-if not BROKER_BLOCKED_HOLD_SECONDS > 0:
+if not (
+    math.isfinite(BROKER_BLOCKED_HOLD_SECONDS)
+    and BROKER_BLOCKED_HOLD_SECONDS > 0
+):
     # Without a hold, worker events and heartbeats (which kombu retries
-    # without end) reconnect to a blocked broker in a loop.
+    # without end) reconnect to a blocked broker in a loop; an endless one
+    # refuses every publish for good.
     raise ImproperlyConfigured(
-        "BROKER_BLOCKED_HOLD_SECONDS must be more than 0 seconds."
+        "BROKER_BLOCKED_HOLD_SECONDS must be a finite number of seconds"
+        " above 0."
     )
 # How often kombu publishes a task again after a connection error, each
 # time on a new connection (``kombu.Connection.ensure``). One retry is what

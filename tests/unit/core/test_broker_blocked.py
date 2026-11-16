@@ -487,7 +487,7 @@ def settings_module(monkeypatch) -> Iterator[Callable[..., object]]:
     importlib.reload(module)
 
 
-@pytest.mark.parametrize("hold", ["0", "-1", "nan"])
+@pytest.mark.parametrize("hold", ["0", "-1", "nan", "inf"])
 def test_a_hold_must_be_longer_than_nothing(settings_module, hold):
     """With no hold, worker events and heartbeats, which kombu retries
     without end, would reconnect to a blocked broker in a loop."""

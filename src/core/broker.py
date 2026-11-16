@@ -180,8 +180,13 @@ class PublishingChannel(pyamqp.Channel):
         try:
             return super().basic_publish_confirm(*args, **kwargs)
         except Blocked:
+            # ``bytes_sent`` counts socket writes (``Confirm.Select``
+            # included), not message bytes. RabbitMQ sends
+            # ``connection.blocked`` after a publish it holds back, so this
+            # only guards a block that arrives before any write; then
+            # nothing was sent and kombu's retry is safe.
             if self.connection.bytes_sent == written:
-                raise  # blocked before the write: kombu retries it
+                raise
         # Written, and held back by the broker until its alarm clears: wait
         # for the confirm on this connection, which the broker unblocks.
         while True:

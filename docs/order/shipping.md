@@ -25,6 +25,26 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **Lock order: the order, then the shipment.** A carrier path that
+  needs both rows (it reads the order under the lock, writes it, or
+  inserts a row that references it) takes them through
+  `shipping.locks.lock_with_order`, and nowhere else: the voucher and
+  parcel creation's claim and save, the tracking poll, the BoxNow webhook
+  and settle sweep, ACS's adopt / request again / close and "COD received
+  outside ACS". A joined `select_for_update().select_related("order")`
+  locks the shipment's row first, the opposite order, and two
+  transactions that take the same rows in opposite orders wait on each
+  other until PostgreSQL aborts one (#613: an ACS poll and a staff
+  cancel, reproduced with two connections). A path that touches the
+  shipment alone locks the shipment alone (`AcsService.cancel_voucher`,
+  `BoxNowService.cancel_shipment`) and must not write the order in that
+  transaction. `tests/unit/shipping_acs/test_lock_order.py` and
+  `TestEveryPathLocksTheOrderFirst` (BoxNow) fail for a path that goes
+  back to the join.
+- **No carrier HTTP call while a row is locked.** Every carrier call is
+  made between two short transactions (claim, call, save). An order
+  cancel keeps to it too: it commits, and only then asks the courier
+  ([§7.1.2](cancel.md)).
 - **A permanent rejection is noted on the order.**
   `shipping.alerts.alert_admins_shipment_creation_failed` emails ops AND
   writes an `OrderHistory` note, both carrying the carrier's own remedy

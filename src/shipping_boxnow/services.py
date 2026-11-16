@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
@@ -368,8 +369,8 @@ class BoxNowService:
         # ---- Phase 1: claim ----------------------------------------------
         with transaction.atomic():
             try:
-                shipment: BoxNowShipment = cls._lock_with_order(
-                    order_id=order.pk
+                shipment: BoxNowShipment = lock_with_order(
+                    BoxNowShipment.objects.filter(order_id=order.pk)
                 )
             except BoxNowShipment.DoesNotExist as exc:
                 raise ValueError(
@@ -867,7 +868,9 @@ class BoxNowService:
         ``lookup_refused``.
         """
         with transaction.atomic():
-            shipment = cls._lock_with_order(pk=shipment_pk)
+            shipment = lock_with_order(
+                BoxNowShipment.objects.filter(pk=shipment_pk)
+            )
             metadata = shipment.metadata or {}
             age = cls._seconds_since(metadata.get("creation_uncertain_at"))
             if (
@@ -915,7 +918,9 @@ class BoxNowService:
         caller sends its alert after this commits.
         """
         with transaction.atomic():
-            shipment = cls._lock_with_order(pk=shipment_pk)
+            shipment = lock_with_order(
+                BoxNowShipment.objects.filter(pk=shipment_pk)
+            )
             metadata = shipment.metadata or {}
             if shipment.order.status == _CANCELED_ORDER_STATUS:
                 shipment.metadata = {**metadata, "mint_started_at": None}
@@ -929,27 +934,6 @@ class BoxNowService:
             }
             shipment.save(update_fields=["metadata", "updated_at"])
             return False, told
-
-    @staticmethod
-    def _lock_with_order(**lookup: Any) -> BoxNowShipment:
-        """Lock a shipment and its order, the order first.
-
-        The order an order cancel takes them in
-        (``OrderService._cancel_order_locked`` locks the order, then
-        ``cancel_shipment`` the shipment), so the two never wait on each
-        other in opposite orders. Call inside ``transaction.atomic()``.
-        ``lookup`` names the shipment (``pk=`` or ``order_id=``);
-        ``shipment.order`` is the locked row. Raises
-        ``BoxNowShipment.DoesNotExist`` when there is no shipment.
-        """
-        from order.models.order import Order
-
-        shipments = BoxNowShipment.objects.filter(**lookup)
-        order_id = shipments.values_list("order_id", flat=True).get()
-        locked_order = Order.objects.select_for_update().get(pk=order_id)
-        shipment = shipments.select_for_update().get()
-        shipment.order = locked_order
-        return shipment
 
     @classmethod
     def _settle_for_a_live_order(cls, shipment: BoxNowShipment) -> str:
@@ -1231,7 +1215,9 @@ class BoxNowService:
         ``metadata['creation_uncertain_at']`` (#690).
         """
         with transaction.atomic():
-            shipment = cls._lock_with_order(pk=shipment_pk)
+            shipment = lock_with_order(
+                BoxNowShipment.objects.filter(pk=shipment_pk)
+            )
             if shipment.parcel_id == parcel_id:
                 # Saved already (another path got there first): the
                 # outcome is known here too, so the claim and any
@@ -1248,7 +1234,7 @@ class BoxNowService:
                     shipment.save(update_fields=["metadata", "updated_at"])
                 return shipment
 
-            # The order row is locked first (_lock_with_order), so an
+            # The order row is locked first (lock_with_order), so an
             # order cancel still in its transaction is waited for and then
             # seen.
             order_canceled = shipment.order.status == _CANCELED_ORDER_STATUS
@@ -2339,8 +2325,8 @@ class BoxNowService:
         # racy under two concurrent webhooks for the same parcel.
         with transaction.atomic():
             try:
-                shipment: BoxNowShipment = cls._lock_with_order(
-                    parcel_id=parcel_id
+                shipment: BoxNowShipment = lock_with_order(
+                    BoxNowShipment.objects.filter(parcel_id=parcel_id)
                 )
             except BoxNowShipment.DoesNotExist:
                 # Disappeared between the pre-check and the lock — same
@@ -2694,7 +2680,9 @@ class BoxNowService:
         event_time = parse_datetime(event_time_raw)
 
         with transaction.atomic():
-            locked = cls._lock_with_order(pk=shipment.pk)
+            locked = lock_with_order(
+                BoxNowShipment.objects.filter(pk=shipment.pk)
+            )
 
             # Two-stage dedup so the poll never duplicates a webhook
             # row that arrived with BoxNow's own CloudEvents id.

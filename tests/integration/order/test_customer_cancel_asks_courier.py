@@ -30,7 +30,7 @@ from django.db import connection
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext
 from djmoney.money import Money
 from rest_framework import status
@@ -47,7 +47,11 @@ from order.exceptions import (
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.services import OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    OrderService,
+    shipment_cancel_wait_minutes,
+)
 from pay_way.factories import PayWayFactory
 from shipping.models import ShippingProvider
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -646,6 +650,46 @@ class TestAStaffCancelIsNotBoundByTheCourier:
         assert warning.kwargs == {"level": "error"}
         assert "did not cancel its parcel" in str(warning.args[1])
         assert "already in a pickup list" in str(warning.args[1])
+
+    def test_the_admin_action_says_a_cancel_is_still_pending(self, settings):
+        """A shipment already being worked on (here a BoxNow creation in
+        flight) is not the courier's answer, so nothing is recorded and
+        the cancel stays pending: staff are told, as information, and
+        how long the sweep takes at most."""
+        settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS = 90
+        order = _paid_order("boxnow", user=UserAccountFactory())
+        BoxNowShipmentFactory(
+            order=order,
+            metadata={"mint_started_at": timezone.now().isoformat()},
+        )
+        request = RequestFactory().get("/")
+        request.user = get_user_model()(
+            id=1, username="staff", is_superuser=True
+        )
+
+        with (
+            FakeVivaApi() as viva,
+            patch.object(OrderAdmin, "message_user") as message,
+        ):
+            OrderAdmin(Order, AdminSite()).mark_as_canceled(
+                request, Order.objects.filter(pk=order.pk)
+            )
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert len(viva.deletes) == 1
+        assert order.metadata[SHIPMENT_CANCEL_PENDING_FLAG] is True
+        assert "shipment_cancel" not in order.metadata["cancellation"]
+        assert message.call_count == 2
+        pending = message.call_args_list[-1]
+        # No level: an informational message, not an error.
+        assert pending.kwargs == {}
+        text = str(pending.args[1])
+        assert "already being worked on at the courier" in text
+        # 90 seconds round up to 2 minutes, plus the time between runs.
+        wait = 2 + settings.ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES
+        assert shipment_cancel_wait_minutes() == wait
+        assert f"within {wait} minutes" in text
 
 
 class TestCanBeCanceled:

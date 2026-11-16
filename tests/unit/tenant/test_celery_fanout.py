@@ -96,6 +96,20 @@ class TestFanoutTaskWrappers:
         )
 
     @pytest.mark.django_db
+    def test_fanout_finish_pending_shipment_cancels(self):
+        """Suspended stores too: a canceled order's voucher may be live
+        at the courier whatever the store's status."""
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_finish_pending_shipment_cancels()
+
+        run.assert_called_once_with(
+            "order.tasks.finish_pending_shipment_cancels",
+            include_suspended=True,
+        )
+
+    @pytest.mark.django_db
     def test_fanout_complete_paid_delivered_orders(self):
         from tenant import tasks as tenant_tasks
 

@@ -31,6 +31,7 @@ from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
@@ -470,10 +471,8 @@ class AcsService:
         # ----- Phase 1: claim the row + sync COD amount -----
         with transaction.atomic():
             try:
-                shipment: AcsShipment = (
-                    AcsShipment.objects.select_for_update()
-                    .select_related("order")
-                    .get(order=order)
+                shipment: AcsShipment = lock_with_order(
+                    AcsShipment.objects.filter(order=order)
                 )
             except AcsShipment.DoesNotExist as exc:
                 raise ValueError(
@@ -686,10 +685,8 @@ class AcsService:
         # ----- Phase 3: persist (fresh atomic, race-checked) -----
         unused_answer = False
         with transaction.atomic():
-            shipment = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
+            shipment = lock_with_order(
+                AcsShipment.objects.filter(pk=shipment.pk)
             )
             # Our claim was taken (expired, recorded as unknown) and staff
             # have since resolved the check: requested again, so another
@@ -1531,7 +1528,13 @@ class AcsService:
         ACS API call is never made while a Postgres transaction is open.
         With ``idle_in_transaction_session_timeout`` a slow ACS response
         would otherwise roll back the transaction AFTER ACS already
-        cancelled the voucher, leaving local state inconsistent.
+        cancelled the voucher, leaving local state inconsistent. That
+        only holds with no transaction open around this call: an order
+        cancel asks after its own has committed
+        (``OrderService.cancel_attached_shipment``).
+
+        It locks the shipment alone and never writes the order
+        (``shipping.locks``).
 
         Per PDF: ``ACS_Delete_Voucher`` only succeeds for vouchers not
         yet finalised in a pickup list — once issued, the voucher is
@@ -1539,10 +1542,8 @@ class AcsService:
         """
         # ----- Phase 1: claim the row + guard against double-cancel -----
         with transaction.atomic():
-            shipment = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
+            shipment = AcsShipment.objects.select_for_update().get(
+                pk=shipment.pk
             )
 
             if shipment.shipment_state == AcsShipmentState.CANCELED:
@@ -1628,10 +1629,8 @@ class AcsService:
 
         # ----- Phase 3: persist (fresh atomic, brief lock) -----
         with transaction.atomic():
-            shipment = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
+            shipment = AcsShipment.objects.select_for_update().get(
+                pk=shipment.pk
             )
             metadata = shipment.metadata or {}
             metadata.pop("cancel_started_at", None)
@@ -2055,10 +2054,8 @@ class AcsService:
 
         try:
             with transaction.atomic():
-                fresh = (
-                    AcsShipment.objects.select_for_update()
-                    .select_related("order")
-                    .get(pk=shipment.pk)
+                fresh = lock_with_order(
+                    AcsShipment.objects.filter(pk=shipment.pk)
                 )
                 cls._require_voucher_request_unknown(
                     fresh, order_needs_a_voucher=True
@@ -2210,11 +2207,7 @@ class AcsService:
         from shipping_acs.tasks import create_acs_voucher_for_order
 
         with transaction.atomic():
-            fresh = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
-            )
+            fresh = lock_with_order(AcsShipment.objects.filter(pk=shipment.pk))
             cls._require_voucher_request_unknown(
                 fresh, order_needs_a_voucher=True
             )
@@ -2258,11 +2251,7 @@ class AcsService:
                 gettext("Write what you checked at ACS.")
             )
         with transaction.atomic():
-            fresh = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
-            )
+            fresh = lock_with_order(AcsShipment.objects.filter(pk=shipment.pk))
             cls._require_voucher_request_unknown(
                 fresh, order_needs_a_voucher=False
             )
@@ -3122,10 +3111,8 @@ class AcsService:
 
         # --- Phase 3: persist atomically ---
         with transaction.atomic():
-            shipment = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
+            shipment = lock_with_order(
+                AcsShipment.objects.filter(pk=shipment.pk)
             )
 
             old_state = AcsShipmentState(shipment.shipment_state)
@@ -3861,11 +3848,7 @@ class AcsService:
             raise AcsCodSettlementError(gettext("A note is required."))
 
         with transaction.atomic():
-            locked = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(pk=shipment.pk)
-            )
+            locked = lock_with_order(AcsShipment.objects.filter(pk=shipment.pk))
             if (
                 locked.charge_type != AcsChargeType.COD
                 or locked.cod_amount.amount <= 0

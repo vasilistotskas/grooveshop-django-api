@@ -259,7 +259,8 @@ the cross-service view is
   `ShippingProvider`, the per-store `ShippingRate` table
   (`src/shipping/models/rate.py`: the only source of a shipping price,
   availability and weight cap), `ShippingService`
-  (`src/shipping/services.py`) and the operational alerts
+  (`src/shipping/services.py`), the one lock order for an order and its
+  shipment (`src/shipping/locks.py`) and the operational alerts
   (`src/shipping/alerts.py`). Read `docs/order/shipping.md`.
 - `shipping_acs/`: `AcsShipment`, `AcsPickupList`, `AcsPickupListRun`,
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,

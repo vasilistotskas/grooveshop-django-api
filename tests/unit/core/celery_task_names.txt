@@ -71,6 +71,7 @@ order.tasks.cancel_mydata_credit
 order.tasks.cancel_mydata_invoice
 order.tasks.cleanup_expired_stock_reservations
 order.tasks.complete_paid_delivered_orders
+order.tasks.finish_pending_shipment_cancels
 order.tasks.generate_order_invoice
 order.tasks.issue_pending_credits
 order.tasks.purge_expired_pending_payment_fees
@@ -151,6 +152,7 @@ tenant.tasks.fanout_clear_old_history
 tenant.tasks.fanout_complete_paid_delivered_orders
 tenant.tasks.fanout_deliver_scheduled_gift_cards
 tenant.tasks.fanout_expire_gift_cards
+tenant.tasks.fanout_finish_pending_shipment_cancels
 tenant.tasks.fanout_issue_daily_acs_pickup_list
 tenant.tasks.fanout_issue_held_acs_vouchers
 tenant.tasks.fanout_learn_recommendation_weights

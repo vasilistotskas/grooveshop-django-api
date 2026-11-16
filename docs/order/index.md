@@ -19,11 +19,11 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 | 3, 3.1 to 3.3 | [`creation.md`](creation.md) | checkout: the payment-first and order-first creation paths, locks and stock holds, delivery-address rules |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
 | 4 | [`payments.md`](payments.md) | Stripe, Viva Wallet or cash on delivery: per-tenant credentials, webhooks, fees, provider refunds, disputes |
-| 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares, shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
+| 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares (the lock order included), shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
 | 5.1 | [`shipping-acs.md`](shipping-acs.md) | `src/shipping_acs/`: vouchers, the voucher hold, pickup lists, tracking polls, COD payouts, the concurrency cap |
 | 5.2 | [`shipping-boxnow.md`](shipping-boxnow.md) | `src/shipping_boxnow/`: parcels, the webhook, the cancel rule, compartment sizes |
 | 6 | [`emails-and-notifications.md`](emails-and-notifications.md) | an order email or a live toast: triggers, locale, suppression, marketing unsubscribe, account emails |
-| 7, 7.1, 7.1.0, 7.1.1 | [`cancel.md`](cancel.md) | cancelling an order: every path, the payment hold and its sweep, asking the courier first |
+| 7, 7.1, 7.1.0 to 7.1.2 | [`cancel.md`](cancel.md) | cancelling an order: every path, the payment hold and its sweep, asking the courier first (a customer) or after the commit (staff) |
 | 7.2, first half | [`refunds.md`](refunds.md) | what a refund returns: the paths, value-based refunds, refund by lines, restock, cash on delivery |
 | 7.2, second half | [`refund-execution.md`](refund-execution.md) | how `refund_order` runs: the plan from the ledger, attempts and idempotency keys, reconciliation, provider statuses, the `order_refunded` contract |
 | 7.3 | [`payment-ledger.md`](payment-ledger.md) | `PaymentTransaction` and `PaymentLedger`: recording money, what is refundable, `amount_due`, an order paid twice |
@@ -36,7 +36,11 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-14 (an agent order is refused while its cart's earlier
+Last refresh: 2026-11-16 (a staff or system cancel asks the courier after it
+has committed, with no row locked, and a sweep finishes a cancel whose worker
+stopped in between, [§7.1.2](cancel.md); one lock order for an order and its
+shipment, the order first, [§5](shipping.md); before that 2026-11-14: an agent
+order is refused while its cart's earlier
 order awaits its online payment, [§3.2](creation.md); before that 2026-11-11:
 a BoxNow `P410` on creation takes over the parcel
 BoxNow holds under the `orderNumber`, and a cancel of a shipment with no

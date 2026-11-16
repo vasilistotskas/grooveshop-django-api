@@ -133,6 +133,14 @@ BUILDER_PUBLISHED_CACHE_SECONDS = int(
 REFUND_RECONCILE_AFTER_MINUTES = int(
     getenv("REFUND_RECONCILE_AFTER_MINUTES", "60")
 )
+# Seconds after a staff or system order cancel before
+# ``order.tasks.finish_pending_shipment_cancels`` takes it for one whose
+# worker stopped before the courier was asked (#713). The courier is asked
+# right after the cancel commits, so this only has to outlast that call with
+# its retries; a run that overlaps it is harmless but asks twice.
+ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS = int(
+    getenv("ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS", "600")
+)
 # Retention sweeps (``core.retention``): primary keys deleted per statement.
 RETENTION_PURGE_BATCH_SIZE = int(getenv("RETENTION_PURGE_BATCH_SIZE", "1000"))
 # Days a ``CachePurgeLog`` audit row (public schema, every store's purges)

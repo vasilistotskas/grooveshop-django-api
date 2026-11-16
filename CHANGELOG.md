@@ -3,6 +3,40 @@
 
 
 
+## v3.249.3 (2026-11-16)
+
+### Chores
+
+* chore(builder): pin the per-design catalogues to storefront main with #493 ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
+### Refactoring
+
+* refactor(builder): seeds, demo pages and the email theme read the catalogue of each design (#729) ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
+### Testing
+
+* test(builder): hold seeds and demo pages to the catalogue of each design
+
+The storefront now commits its block catalogue as each design is served it
+(test/fixtures/builder/catalogue/<design>.json, default.json for every store
+whose schema no design names; storefront #491) instead of only the whole
+build's, which no store is served.
+
+- sync_upstream_sources.py copies that directory to src/builder/catalogues/
+  (a pinned tree) in place of the whole build's seed_catalogue.json.
+- builder.seeding derives the seeds against default.json: they go to every
+  new store, so they may name only what every design draws.
+- test_seeds runs every seed against every design's catalogue, and checks
+  that what seeding derives is what each design derives.
+- test_real_catalogue checks the link pointers of every design's blocks and
+  roots.
+- test_demo_pages checks the demo pages against the demo store's design
+  (default).
+- test_block_upgrades finds a design's own block (contact_panel) in its
+  design's catalogue.
+- tests/utils/real_catalogues.py reads the pinned files; the pin test's
+  fake GitHub serves the directory. ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
 ## v3.249.2 (2026-11-16)
 
 ### Bug fixes

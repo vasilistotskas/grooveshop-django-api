@@ -147,7 +147,7 @@ def reindex_products_by_pk(product_ids) -> int:
     values. Measured: a bulk update fires **0** post_save receivers
     where an instance save fires 1.
 
-    Both flags are indexed and filtered on — ``search/views.py`` filters
+    Both flags are indexed and filtered on — ``search/views/product.py`` filters
     the INDEXED ``active`` — so bulk-deactivating products left them
     fully searchable and buyable until the nightly sync. The admin
     reported success either way.

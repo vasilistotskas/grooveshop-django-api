@@ -202,7 +202,7 @@ class BlogPostTranslation(
         )
 
     class MeiliMeta:
-        # Exactly the fields ``search.views`` filters on (equality only;
+        # Exactly the fields ``search.views.blog`` filters on (equality only;
         # the blog search has no facets and no range filter). Everything
         # else stays a document field through its searchable or
         # displayed entry.

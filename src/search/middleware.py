@@ -102,7 +102,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             if response.status_code != 200:
                 return
 
-            # A facet read (see ``search.views._mark_count_only``) is not
+            # A facet read (see ``search.analytics.mark_count_only``) is not
             # a search the shopper made.
             if getattr(request, "search_is_count_only", False):
                 return
@@ -165,7 +165,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             query_uuid = query_uuid or str(uuid4())
 
             # The view stamps Meilisearch's own processing time here (see
-            # ``search.views._record_engine_time``), summed over every
+            # ``search.analytics.record_engine_time``), summed over every
             # engine call the request made. It wins over the body: it is
             # the real measurement, while the body has never carried one.
             engine_ms = getattr(request, "search_processing_time_ms", None)

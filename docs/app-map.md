@@ -360,7 +360,9 @@ cross-service views are
 class (`src/meili/models.py`), the client (`src/meili/_client.py`), the
 index and delete tasks (`src/meili/tasks.py`) and the management
 commands. `search/` is the product-facing side: the product and blog
-search views (`src/search/views.py`), Greeklish transliteration
+search views (`src/search/views/`: `blog`, `product`, `click`, `report`,
+`trending`; query-string parsing in `src/search/params.py`, what a request
+tells the analytics middleware in `src/search/analytics.py`), Greeklish transliteration
 (`src/search/transliteration.py`) and the `SearchQuery` / `SearchClick`
 analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 

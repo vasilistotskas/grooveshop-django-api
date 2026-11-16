@@ -165,9 +165,10 @@ _root_storefront_patterns = [
     *_customer_identity_storefront_patterns,
 ]
 
-# Locale-prefixed, served on BOTH hosts: editor infra (unfold/tinymce/
-# rosetta/image upload are admin dependencies) and shared reference/control-plane data
-# (country/region, tenant resolve + memberships, health, settings, schema).
+# Locale-prefixed, served on BOTH hosts: editor infra (unfold, rosetta and
+# the image upload the admin's rich-text editor posts to) and shared
+# reference/control-plane data (country/region, tenant resolve +
+# memberships, health, settings, schema).
 _shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
     path("upload_image", upload_image, name="upload_image"),

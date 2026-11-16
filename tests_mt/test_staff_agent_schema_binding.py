@@ -449,3 +449,188 @@ def test_a_store_that_turns_it_off_refuses_consent_and_connected_apps(
     assert client.get(authorize, secure=True).status_code == 403
     for name in STAFF_ENDPOINTS:
         assert _get(mt_tenant, name, token).status_code == 404, name
+
+
+# ── the token endpoint and its resource (RFC 8707) ──────────────────
+
+
+def _authorization_code(
+    mt_tenant, email: str
+) -> tuple[HttpClient, str, str, str]:
+    """Sign a staff member in, grant consent, and return the connect
+    client, the client id, the code and the PKCE verifier."""
+    staff = _staff_member(email, mt_tenant, "staff")
+    client = _connect_client()
+    client_id = _staff_client()
+    verifier, challenge = _pkce()
+    authorize = "/identity/o/authorize?" + _authorize_query(
+        client_id, _resource(mt_tenant), challenge
+    )
+    _sign_in(client, staff.email, authorize)
+    consent = client.get(authorize, secure=True)
+    assert consent.status_code == 200
+    granted = client.post(
+        "/identity/o/authorize",
+        {
+            "request": consent.context["form"].initial["request"],
+            "scopes": ["admin:orders:read"],
+            "action": "grant",
+        },
+        secure=True,
+    )
+    assert granted.status_code == 302, granted.content
+    code = parse_qs(urlsplit(granted["Location"]).query)["code"][0]
+    return client, client_id, code, verifier
+
+
+def _exchange(
+    client: HttpClient, client_id: str, code: str, verifier: str, **extra
+):
+    return client.post(
+        "/identity/o/api/token",
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": REDIRECT_URI,
+            "client_id": client_id,
+            "code_verifier": verifier,
+            **extra,
+        },
+        secure=True,
+    )
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_code_exchange_without_a_resource_is_invalid_target_not_a_500(
+    mt_public_tenant, mt_tenant
+):
+    """The staff issuer binds a token to one store, and MCP clients send
+    the resource on the token request, so one without it is refused with
+    the error RFC 8707 names for a missing resource."""
+    client, client_id, code, verifier = _authorization_code(
+        mt_tenant, "mt-staff-noresource@example.com"
+    )
+
+    token = _exchange(client, client_id, code, verifier)
+
+    assert token.status_code == 400, token.content
+    assert token.json()["error"] == "invalid_target"
+    assert "required" in token.json()["error_description"]
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_refresh_is_held_to_the_same_resource_rule(
+    mt_public_tenant, mt_tenant
+):
+    client, client_id, code, verifier = _authorization_code(
+        mt_tenant, "mt-staff-refresh@example.com"
+    )
+    first = _exchange(
+        client, client_id, code, verifier, resource=_resource(mt_tenant)
+    )
+    assert first.status_code == 200, first.content
+    refresh = {
+        "grant_type": "refresh_token",
+        "refresh_token": first.json()["refresh_token"],
+        "client_id": client_id,
+    }
+
+    without = client.post("/identity/o/api/token", refresh, secure=True)
+    assert without.status_code == 400, without.content
+    assert without.json()["error"] == "invalid_target"
+
+    refreshed = client.post(
+        "/identity/o/api/token",
+        {**refresh, "resource": _resource(mt_tenant)},
+        secure=True,
+    )
+    assert refreshed.status_code == 200, refreshed.content
+    orders = _get(
+        mt_tenant, "agent-staff-orders", refreshed.json()["access_token"]
+    )
+    assert orders.status_code == 200, orders.content
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+@pytest.mark.parametrize(
+    "resource",
+    [
+        "https://not-a-store.test/mcp/admin",
+        "not-an-absolute-uri",
+        "https://shop.test/mcp/admin#fragment",
+    ],
+)
+def test_a_resource_the_issuer_refuses_is_invalid_target_not_a_500(
+    mt_public_tenant, mt_tenant, resource
+):
+    client, client_id, code, verifier = _authorization_code(
+        mt_tenant, f"mt-staff-bad-{abs(hash(resource))}@example.com"
+    )
+
+    token = _exchange(client, client_id, code, verifier, resource=resource)
+
+    assert token.status_code == 400, token.content
+    assert token.json()["error"] == "invalid_target"
+    assert token.json()["error_description"]
+
+
+@pytest.mark.parametrize(
+    "path", ["/identity/o/api/token", "/identity/o/api/device/code"]
+)
+def test_a_store_issuer_answers_a_malformed_resource_with_invalid_target(
+    mt_tenant, path
+):
+    response = TenantClient(mt_tenant).post(
+        path,
+        {
+            "grant_type": "authorization_code",
+            "client_id": "unknown",
+            "resource": "not-an-absolute-uri",
+        },
+        secure=True,
+    )
+
+    assert response.status_code == 400, response.content
+    assert response.json()["error"] == "invalid_target"
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_code_stays_redeemable_after_a_refused_resource(
+    mt_public_tenant, mt_tenant
+):
+    """The refusal comes before oauthlib looks at the code, so a client
+    that sent a bad or missing resource can retry with the right one."""
+    client, client_id, code, verifier = _authorization_code(
+        mt_tenant, "mt-staff-retry@example.com"
+    )
+
+    missing = _exchange(client, client_id, code, verifier)
+    bad = _exchange(
+        client, client_id, code, verifier, resource="not-an-absolute-uri"
+    )
+    assert missing.status_code == bad.status_code == 400
+    assert missing.json()["error"] == bad.json()["error"] == "invalid_target"
+
+    redeemed = _exchange(
+        client, client_id, code, verifier, resource=_resource(mt_tenant)
+    )
+
+    assert redeemed.status_code == 200, redeemed.content
+
+
+def test_a_store_issuer_refuses_another_stores_resource(mt_tenant, mt_tenant_b):
+    other = f"https://{mt_tenant_b.get_primary_domain().domain}/mcp"
+
+    response = TenantClient(mt_tenant).post(
+        "/identity/o/api/token",
+        {
+            "grant_type": "authorization_code",
+            "client_id": "x",
+            "resource": other,
+        },
+        secure=True,
+    )
+
+    assert response.status_code == 400, response.content
+    assert response.json()["error"] == "invalid_target"
+    assert "this store" in response.json()["error_description"]

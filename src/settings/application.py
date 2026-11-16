@@ -241,6 +241,9 @@ MIDDLEWARE = [
     # replay check, an IdP code, a ticket) answers the coded 503 here, in
     # the shape of its route, on every route (``core.caches``' rule).
     "core.middleware.strict_cache.StrictCacheUnavailableMiddleware",
+    # The IdP's token endpoints let a refused ``resource`` escape as a 500;
+    # it is OAuth's ``invalid_target`` (``core.middleware.idp_oauth_errors``).
+    "core.middleware.idp_oauth_errors.IdpResourceErrorMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
     "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking

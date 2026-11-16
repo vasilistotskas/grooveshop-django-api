@@ -103,7 +103,7 @@ No explicit table — flips are direct assignments. Common paths:
 | From → To | Trigger |
 |---|---|
 | `PENDING → COMPLETED` | `Order.mark_as_paid()` (called by Stripe + Viva success handlers, COD reconcile) |
-| `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`) |
+| `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`); a poll that reads the payment failed or canceled (`OrderService._apply_polled_payment_status`, [§4.1](payments.md)) |
 | `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. (continues under the table) |
 | `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Every refund path writes a `PaymentTransaction` REFUND row and `PaymentLedger.record_refund` derives the status from the ledger's sums in that one place ([§7.3](payment-ledger.md)): `OrderService.refund_order` (the in-app refund, the staff "Refund" action, a cancel), `handle_stripe_refund_made` ([§4.2](payments.md)) and the Viva reversal webhook (`_handle_reversal_created`, event 1797, [§4.3](payments.md)). (continues under the table) |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `src/order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). (continues under the table) |
@@ -111,7 +111,9 @@ No explicit table — flips are direct assignments. Common paths:
 | `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. (continues under the table) |
 
 **`FAILED / PENDING / CANCELED → PENDING`.** A CANCELED payment on a PENDING
-order (an intent canceled while the order waits) is retryable. Every endpoint
+order (an intent canceled while the order waits) is retryable; no path writes
+one any more (a poll records a canceled attempt as FAILED, #697), so only
+rows written before that carry it. Every endpoint
 that starts a payment (`create_payment_intent`, `create_checkout_session`,
 `retry-payment`, `confirm_agent_payment`) shares
 `OrderViewSet._payment_start_refusal`: a paid order gets 400 "This order has

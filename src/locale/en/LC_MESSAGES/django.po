@@ -14793,6 +14793,9 @@ msgstr "The payment on delivery has not been collected yet, so there is nothing 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "The payment provider cannot be reached to check this reference."
 
+msgid "The payment provider could not be reached. Try again in a moment."
+msgstr "The payment provider could not be reached. Try again in a moment."
+
 msgid "The payment provider has not been asked about this refund yet: it is looked up automatically first."
 msgstr "The payment provider has not been asked about this refund yet: it is looked up automatically first."
 

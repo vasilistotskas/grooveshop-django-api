@@ -72,6 +72,7 @@ from order.exceptions import (
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
+    PaymentStatusUnavailableError,
     PaymentVerificationError,
     RefundOutstandingError,
     StockReservationError,
@@ -273,6 +274,8 @@ serializers_config: SerializersConfig = {
     ),
     "payment_status": ActionConfig(
         response=PaymentStatusResponseSerializer,
+        # The provider could not be asked; nothing was recorded.
+        responses={503: ErrorResponseSerializer},
         operation_id="getOrderPaymentStatus",
         summary=_("Get payment status for an order"),
         description=_(
@@ -2551,6 +2554,19 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_serializer.validated_data)
 
+        except PaymentStatusUnavailableError:
+            # Not a payment outcome: the order keeps its state and the
+            # caller asks again later. The provider logged the cause.
+            return Response(
+                {
+                    "detail": _(
+                        "The payment provider could not be reached. "
+                        "Try again in a moment."
+                    ),
+                    "code": "payment_provider_unavailable",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except ValueError as e:
             logger.warning(
                 "Payment status error for order %s: %s",

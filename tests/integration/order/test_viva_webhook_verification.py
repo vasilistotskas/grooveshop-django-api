@@ -553,15 +553,11 @@ class TestVivaPaymentFailedVerification:
         assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_failed_raises_when_verification_returns_error(self):
-        """A network blip during verification maps to FAILED with an
-        ``error`` key — that must be treated as unavailable (raise), not as
-        a confirmed failure."""
+        """Viva failing to answer the verification is unavailable (raise),
+        never a confirmed failure."""
         order = self._order()
         with (
-            patch(
-                "order.views.viva_webhook._verify_transaction",
-                return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
-            ),
+            FakeVivaApi(retrieve=(503, "Service Unavailable")),
             pytest.raises(RuntimeError),
         ):
             _handle_payment_failed(order, {}, "viva_txn_2")
@@ -630,14 +626,10 @@ class TestVivaPaymentCreatedVerification:
 
     def test_raises_when_verification_reports_viva_error(self):
         """A 404 because the transaction is not in this tenant's Viva
-        account maps to (FAILED, {viva_error: True}) — must raise, not
-        skip."""
+        account must raise, not skip."""
         order = self._order()
         with (
-            patch(
-                "order.views.viva_webhook._verify_transaction",
-                return_value=(PaymentStatus.FAILED, {"viva_error": True}),
-            ),
+            FakeVivaApi(retrieve=(404, "Not Found")),
             pytest.raises(RuntimeError),
         ):
             _handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
@@ -648,10 +640,7 @@ class TestVivaPaymentCreatedVerification:
     def test_raises_when_verification_reports_error(self):
         order = self._order()
         with (
-            patch(
-                "order.views.viva_webhook._verify_transaction",
-                return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
-            ),
+            FakeVivaApi(retrieve=(503, "Service Unavailable")),
             pytest.raises(RuntimeError),
         ):
             _handle_payment_created(order, {"StatusId": "F"}, "txn")

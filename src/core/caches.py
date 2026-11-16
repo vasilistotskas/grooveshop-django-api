@@ -63,27 +63,31 @@ STRICT_NAMESPACE = "strict:"
 #: directly and offers no setting to point it elsewhere — so the match is
 #: on the key, in this one place.
 #:
-#: **Every security limit fails closed, and says so.** A limit is a
-#: counter whose loss lifts a brute-force or abuse bound: allauth's own
-#: limits, ``core.middleware.allauth_ratelimit``, the security scopes of
-#: ``core.api.throttling`` (``fail_closed = True``), the staff sign-in
-#: counters (``tenant.staff_login_limits``) and the staff password-reset
-#: budget (``admin.password_reset``). One rule for all of them:
+#: **Every security control fails closed, and says so.** A control is a
+#: key whose loss lifts a bound or a guarantee: allauth's limits, TOTP
+#: replay protection and IdP codes, ``core.middleware.allauth_ratelimit``,
+#: the security scopes of ``core.api.throttling`` (``fail_closed = True``),
+#: the single-use tickets, the staff sign-in counters
+#: (``tenant.staff_login_limits``, ``admin.staff_mfa``) and the staff
+#: password-reset budget (``admin.password_reset``). One rule for all:
 #:
 #: 1. Its keys sit under this tuple (or it counts with ``count_in_window``,
 #:    ``add`` or ``incr``, which raise for any key), so an unreachable
 #:    Redis RAISES ``REDIS_UNAVAILABLE`` instead of reporting "no history".
-#: 2. The code that owns the answer catches that and refuses the request
-#:    with **503** and a stable code: ``rate_limit_unavailable`` for the
-#:    throttles and the allauth limits, ``staff_login_unavailable`` for the
-#:    staff sign-in, the form's own error page for the admin forms. Never a
-#:    429, which tells the caller they sent too much and comes with a
-#:    ``Retry-After`` no empty history can compute; never a 500, which is
-#:    uncoded and reads as a crash; and never a pass.
+#: 2. The request is refused with **503** and the code
+#:    ``temporarily_unavailable`` (``STRICT_CACHE_UNAVAILABLE_CODE``).
+#:    Whatever raises it from a view, on any route, is answered by
+#:    ``core.middleware.strict_cache``, in the shape the route's client
+#:    reads; only a flow that has a refusal of its own catches it first
+#:    (the staff sign-in: 503 ``staff_login_unavailable`` on the API, the
+#:    form's error on the admin pages). Never a 429, which tells the caller
+#:    they sent too much and comes with a ``Retry-After`` no empty history
+#:    can compute; never a 500, which is uncoded and reads as a crash; and
+#:    never a pass.
 #:
 #: A limit that fails OPEN instead writes its reason beside it
-#: (``order.views.viva_webhook._webhook_get_rate_limit``: Viva's handshake
-#: must not break with Redis).
+#: (``order.views.viva_webhook._webhook_get_rate_limit``, while a stored
+#: verification key makes Viva's handshake free to answer).
 STRICT_KEY_PREFIXES: tuple[str, ...] = (
     STRICT_NAMESPACE,
     f"global:{STRICT_NAMESPACE}",
@@ -94,11 +98,11 @@ STRICT_KEY_PREFIXES: tuple[str, ...] = (
     "allauth.idp.oidc.device_code[",
 )
 
-#: The code and sentence of the 503 a throttle or an allauth limit answers
-#: while it cannot count (the rule above): ``core.api.throttling.
-#: RateLimitUnavailable`` and ``core.middleware.allauth_ratelimit``.
-RATE_LIMIT_UNAVAILABLE_CODE = "rate_limit_unavailable"
-RATE_LIMIT_UNAVAILABLE_MESSAGE = _(
+#: The code and sentence of every 503 the rule above gives
+#: (``core.middleware.strict_cache``). The code is OAuth's own for this
+#: case (RFC 6749, 4.1.2.1), so the IdP's answer needs no second one.
+STRICT_CACHE_UNAVAILABLE_CODE = "temporarily_unavailable"
+STRICT_CACHE_UNAVAILABLE_MESSAGE = _(
     "This action is temporarily unavailable. Try again shortly."
 )
 

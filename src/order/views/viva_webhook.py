@@ -23,6 +23,7 @@ from django_tenants.utils import (
     tenant_context,
 )
 
+from core.caches import REDIS_UNAVAILABLE
 from core.client_ip import client_ip_or_peer
 from order.disputes import announce_chargeback
 from order.enum.status import (
@@ -206,12 +207,20 @@ def viva_wallet_webhook(request):
     return _handle_webhook_event(request)
 
 
-def _webhook_get_rate_limit(request) -> bool:
+def _webhook_get_rate_limit(request, *, answer_is_free: bool) -> bool:
     """Return True when the request should be blocked.
 
     Applies a 10-req/hour per-IP cap on the GET verification endpoint.
-    Fails open on cache errors so a Redis outage doesn't take down
-    Viva's handshake.
+
+    With Redis unreachable it fails OPEN only while ``answer_is_free``:
+    the store has its verification key stored, so answering costs one
+    credentials read and nothing else, and a Redis outage must not take
+    down Viva's handshake. Without a stored key every answer fetches it
+    from Viva with the store's credentials, so an unthrottled caller would
+    spend the store's Viva budget: the cache's error goes on, and the
+    request is refused with 503 (``core.middleware.strict_cache``, the rule
+    beside ``core.caches.STRICT_KEY_PREFIXES``). Only the cache's
+    unavailability is caught; any other error is a bug.
 
     Keyed on ``client_ip_or_peer``, never a bare ``X-Real-IP``: a caller
     that chooses that header gets a fresh budget per request.
@@ -227,13 +236,20 @@ def _webhook_get_rate_limit(request) -> bool:
     key = "viva_wh_get:" + hashlib.sha256(ip.encode()).hexdigest()[:24]
     try:
         return cache.count_in_window(key, 3600) > 10
-    except Exception:
+    except REDIS_UNAVAILABLE:
+        if not answer_is_free:
+            raise
         logger.warning("viva_webhook GET rate-limit: cache error, failing open")
         return False
 
 
 def _handle_verification(request):
-    if _webhook_get_rate_limit(request):
+    from tenant.credentials import viva_wallet_credentials
+
+    creds = viva_wallet_credentials()
+    verification_key = creds["webhook_verification_key"]
+
+    if _webhook_get_rate_limit(request, answer_is_free=bool(verification_key)):
         logger.warning(
             "Viva webhook GET rate limit hit | remote_addr=%s",
             request.META.get("REMOTE_ADDR", ""),
@@ -246,10 +262,6 @@ def _handle_verification(request):
         request.META.get("REMOTE_ADDR", ""),
         request.META.get("HTTP_X_FORWARDED_FOR", ""),
     )
-    from tenant.credentials import viva_wallet_credentials
-
-    creds = viva_wallet_credentials()
-    verification_key = creds["webhook_verification_key"]
 
     if verification_key:
         logger.info("Using configured Viva Wallet webhook verification key")

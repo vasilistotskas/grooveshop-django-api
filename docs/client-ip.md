@@ -17,10 +17,14 @@ checkout). `X-Real-IP` on the SSR path is the caller's own
 it. Use `edge_client_ip(request)`, which believes Cloudflare's
 `CF-Connecting-IP`/`X-Real-IP` **only** when the request carries the
 `X-Origin-Verify` secret our Cloudflare Transform Rules stamp, else
-returns `None`; DRF throttles then fall back to `get_ident()`, and
-everything else uses `client_ip_or_peer(request)` (the proven visitor,
-else the rightmost `X-Forwarded-For` hop Traefik appended, else
-`REMOTE_ADDR`). `edge_client_ip` itself never falls back to
+returns `None`; everything that keys on a caller uses
+`client_ip_or_peer(request)` (the proven visitor, else the rightmost
+`X-Forwarded-For` hop Traefik appended, else `REMOTE_ADDR`). That includes
+every DRF throttle: they are all defined in `src/core/api/throttling.py`,
+whose `ResilientThrottleMixin.get_ident` is `client_ip_or_peer`, the
+`anon`/`user` defaults too (`AnonIpRateThrottle`, `UserBudgetThrottle`).
+DRF's own classes take the rightmost hop alone, the shared peer, and no
+module imports them (`tests/unit/core/test_throttle_outage.py`). `edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
 (`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is

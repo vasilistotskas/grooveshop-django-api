@@ -38,8 +38,10 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        # Ours, not DRF's: keyed on the proven visitor, not the proxy
+        # (``core.api.throttling``, ``docs/client-ip.md``).
+        "core.api.throttling.AnonIpRateThrottle",
+        "core.api.throttling.UserBudgetThrottle",
     ],
     # One trusted reverse proxy (Traefik) fronts the app - DRF must key
     # anon throttling off the XFF hop that proxy appended, not the whole

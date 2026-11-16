@@ -407,7 +407,7 @@ def test_a_call_whose_limits_cannot_count(document, user, monkeypatch):
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     body = assert_documented(document, "/auth/login", "post", response)
     assert [error["code"] for error in body["errors"]] == [
-        "rate_limit_unavailable"
+        "temporarily_unavailable"
     ]
 
 

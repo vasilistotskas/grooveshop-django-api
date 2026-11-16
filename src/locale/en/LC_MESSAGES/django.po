@@ -14303,6 +14303,9 @@ msgstr "Tells the store's staff which products have run down to their low-stock 
 msgid "Template"
 msgstr "Template"
 
+msgid "Temporarily unavailable"
+msgstr "Temporarily unavailable"
+
 msgid "Ten"
 msgstr "Ten"
 

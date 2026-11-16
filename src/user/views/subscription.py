@@ -9,7 +9,6 @@ from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from core.api.permissions import (
@@ -17,7 +16,11 @@ from core.api.permissions import (
     StoreStaffModelPermissions,
 )
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
-from core.api.throttling import NewsletterSubscribeThrottle
+from core.api.throttling import (
+    AnonIpRateThrottle,
+    NewsletterSubscribeThrottle,
+    UserBudgetThrottle,
+)
 from core.api.views import BaseModelViewSet
 from core.client_ip import edge_client_ip
 from core.utils.i18n import resolve_request_language
@@ -497,8 +500,8 @@ class NewsletterSubscribeView(APIView):
 
     permission_classes = [AllowAny]
     throttle_classes = [
-        AnonRateThrottle,
-        UserRateThrottle,
+        AnonIpRateThrottle,
+        UserBudgetThrottle,
         NewsletterSubscribeThrottle,
     ]
 
@@ -514,7 +517,7 @@ class NewsletterSubscribeView(APIView):
         # The scoped budget bounds SUBMISSIONS. The availability read is
         # made on every render of the band and must not spend it.
         if self.request.method == "GET":
-            return [AnonRateThrottle(), UserRateThrottle()]
+            return [AnonIpRateThrottle(), UserBudgetThrottle()]
         return super().get_throttles()
 
     @extend_schema(

@@ -4,26 +4,29 @@ The default cache fails open, and DRF keeps throttle history with plain
 ``cache.get``/``cache.set``, so without this a Redis outage silently
 lifted every rate limit — including the ones guarding a bearer secret
 (gift cards), a code oracle (coupons), a third party (VIES) and money
-(checkout). Security scopes now REFUSE with 503 ``rate_limit_unavailable``
-(never a 429: nothing was sent too often); general scopes ALLOW, as a
-storefront must keep serving through a Redis blip.
+(checkout). Security scopes now REFUSE: the cache's error reaches
+``core.middleware.strict_cache``, which answers 503
+``temporarily_unavailable`` (never a 429: nothing was sent too often);
+general scopes ALLOW, as a storefront must keep serving through a Redis
+blip. Every throttle is ours, keyed on the proven visitor.
 """
 
 from __future__ import annotations
 
+import ast
 import inspect
 import logging
 import uuid
 from os import getenv
+from pathlib import Path
 
 import pytest
-from django.test import override_settings
+from django.conf import settings
+from django.test import Client, override_settings
+from django.urls import path
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
-from rest_framework.throttling import (
-    AnonRateThrottle,
-    SimpleRateThrottle,
-)
+from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from core import caches as core_caches
@@ -53,6 +56,7 @@ FAIL_CLOSED = {
 }
 FAIL_OPEN = {
     "UserOrIpRateThrottle",
+    "UserBudgetThrottle",
     "AnonIpRateThrottle",
     "GatewayAnonThrottle",
     "ContactCreateThrottle",
@@ -134,7 +138,7 @@ class TestRedisDown:
 
         with (
             caplog.at_level(logging.ERROR, logger="core.api.throttling"),
-            pytest.raises(throttling.RateLimitUnavailable),
+            pytest.raises(core_caches.REDIS_UNAVAILABLE),
         ):
             throttle.allow_request(_request(), view=None)
 
@@ -153,10 +157,17 @@ class TestRedisDown:
 
         assert any("ALLOWED" in r.getMessage() for r in caplog.records)
 
-    def test_drfs_own_default_throttles_stay_open(self, monkeypatch):
+    @pytest.mark.parametrize(
+        "name", settings.REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"]
+    )
+    def test_the_default_budgets_stay_open(self, monkeypatch, name):
         """``anon``/``user`` are the day-scale browsing ceilings in
-        ``DEFAULT_THROTTLE_CLASSES``; they read the fail-open cache."""
-        throttle = _throttle(AnonRateThrottle, monkeypatch, stopped_cache())
+        ``DEFAULT_THROTTLE_CLASSES``: ours, and failing open."""
+        module, _, class_name = name.rpartition(".")
+        assert module == throttling.__name__
+        throttle = _throttle(
+            getattr(throttling, class_name), monkeypatch, stopped_cache()
+        )
 
         assert throttle.allow_request(_request(), view=None) is True
 
@@ -175,7 +186,7 @@ class TestRedisDown:
 
         with caplog.at_level(logging.ERROR, logger="core.api.throttling"):
             for _ in range(5):
-                with pytest.raises(throttling.RateLimitUnavailable):
+                with pytest.raises(core_caches.REDIS_UNAVAILABLE):
                     throttle.allow_request(_request(), view=None)
 
         assert sum("DENIED" in r.getMessage() for r in caplog.records) == 1
@@ -192,7 +203,7 @@ class TestRedisDown:
         view = type("View", (), {"throttle_scope": "staff_login"})()
 
         throttle = throttling.StaffLoginThrottle()
-        with pytest.raises(throttling.RateLimitUnavailable):
+        with pytest.raises(core_caches.REDIS_UNAVAILABLE):
             throttle.allow_request(_request(), view)
 
     @override_settings(ROOT_URLCONF=__name__)
@@ -204,21 +215,54 @@ class TestRedisDown:
             throttling.GiftCardCheckThrottle, "rate", "6/minute", raising=False
         )
 
-        class _View(APIView):
-            authentication_classes = []
-            permission_classes = []
-            throttle_classes = [throttling.GiftCardCheckThrottle]
-
-            def get(self, request):
-                return Response({"ok": True})
-
-        response = _View.as_view()(
-            APIRequestFactory().get("/x", REMOTE_ADDR="203.0.113.7")
-        )
+        response = Client().get("/throttled", REMOTE_ADDR="203.0.113.7")
 
         assert response.status_code == 503
-        assert response.data["code"] == "rate_limit_unavailable"
+        assert response.json()["code"] == "temporarily_unavailable"
         assert "Retry-After" not in response
+
+
+class TestIdentity:
+    @pytest.mark.parametrize(
+        "throttle_class",
+        [
+            throttling.StaffLoginThrottle,
+            throttling.PaymentAttemptThrottle,
+            throttling.AnonIpRateThrottle,
+            throttling.UserBudgetThrottle,
+        ],
+    )
+    def test_an_anonymous_caller_is_the_proven_visitor(
+        self, settings, throttle_class
+    ):
+        """Not DRF's ``get_ident`` (Traefik's peer, a Cloudflare edge node
+        many visitors share): ``core.client_ip.client_ip_or_peer``."""
+        settings.ORIGIN_VERIFY_SECRET = "edge-secret"
+        request = APIRequestFactory().get(
+            "/x",
+            REMOTE_ADDR="10.42.1.0",
+            HTTP_X_FORWARDED_FOR="203.0.113.50, 172.70.1.1",
+            HTTP_X_ORIGIN_VERIFY="edge-secret",
+            HTTP_CF_CONNECTING_IP="198.51.100.9",
+        )
+
+        assert throttle_class().get_ident(request) == "198.51.100.9"
+
+    def test_no_module_uses_drfs_own_throttles(self):
+        """DRF's classes key an anonymous caller on the peer; every
+        throttle is defined in ``core.api.throttling``."""
+        src = Path(throttling.__file__).resolve().parents[2]
+        offenders = []
+        for source in src.rglob("*.py"):
+            if source == Path(throttling.__file__).resolve():
+                continue
+            tree = ast.parse(source.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module == (
+                    "rest_framework.throttling"
+                ):
+                    offenders.append(str(source.relative_to(src)))
+        assert offenders == []
 
 
 class TestRedisUp:
@@ -253,4 +297,13 @@ class TestRedisUp:
         cache.delete(throttle_cls().get_cache_key(request, None))
 
 
-urlpatterns: list = []
+class _GiftCardCheckView(APIView):
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = [throttling.GiftCardCheckThrottle]
+
+    def get(self, request):
+        return Response({"ok": True})
+
+
+urlpatterns = [path("throttled", _GiftCardCheckView.as_view())]

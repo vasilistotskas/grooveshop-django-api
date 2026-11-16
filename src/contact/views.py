@@ -6,7 +6,6 @@ from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from contact.attachments import AttachmentPolicy, storage_pressure
 from contact.models import Contact, ContactAttachment, Feedback
@@ -17,9 +16,11 @@ from contact.serializers import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     ContactAttachmentThrottle,
     ContactCreateThrottle,
     FeedbackCreateThrottle,
+    UserBudgetThrottle,
 )
 from tenant.permissions import IsContactAttachmentsEnabled, IsFeedbackEnabled
 
@@ -34,8 +35,8 @@ class ContactCreateView(generics.CreateAPIView):
     # unauthenticated endpoint. Without this, the default 100k/day anon limit
     # is too loose for a contact form and enables spam/abuse.
     throttle_classes = [
-        AnonRateThrottle,
-        UserRateThrottle,
+        AnonIpRateThrottle,
+        UserBudgetThrottle,
         ContactCreateThrottle,
     ]
 
@@ -61,8 +62,8 @@ class FeedbackCreateView(generics.CreateAPIView):
     permission_classes = [IsFeedbackEnabled]
     # Same throttle stack rationale as ContactCreateView above.
     throttle_classes = [
-        AnonRateThrottle,
-        UserRateThrottle,
+        AnonIpRateThrottle,
+        UserBudgetThrottle,
         FeedbackCreateThrottle,
     ]
 
@@ -111,8 +112,8 @@ class ContactAttachmentUploadView(generics.CreateAPIView):
     # upload handler.
     parser_classes = [MultiPartParser]
     throttle_classes = [
-        AnonRateThrottle,
-        UserRateThrottle,
+        AnonIpRateThrottle,
+        UserBudgetThrottle,
         ContactAttachmentThrottle,
     ]
 

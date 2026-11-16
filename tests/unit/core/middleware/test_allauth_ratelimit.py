@@ -2,9 +2,8 @@
 
 With Redis unreachable the limits must not lift: the 2FA and login-code
 routes would lose their per-address bound exactly when someone can make
-Redis slow. The middleware answers 503 ``rate_limit_unavailable`` in
-allauth's envelope instead, for its own counters and for the strict keys
-allauth's views read (their own limits, TOTP replay, the IdP's codes).
+Redis slow. The middleware refuses with ``core.middleware.strict_cache``'s
+503 instead, in allauth's envelope.
 """
 
 from __future__ import annotations
@@ -17,11 +16,9 @@ from unittest.mock import MagicMock
 import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory
-from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from core.caches import STRICT_NAMESPACE
-from core.middleware import allauth_ratelimit
+from core.middleware import allauth_ratelimit, strict_cache
 from core.middleware.allauth_ratelimit import AllAuthRateLimitMiddleware
 from tests.utils.redis import stopped_cache
 
@@ -42,22 +39,12 @@ def _post(path: str, address: str = "203.0.113.7"):
     return RequestFactory().post(path, REMOTE_ADDR=address)
 
 
-def _assert_unavailable(response) -> None:
-    assert response.status_code == 503
-    body = json.loads(response.content)
-    assert body["status"] == 503
-    assert [error["code"] for error in body["errors"]] == [
-        "rate_limit_unavailable"
-    ]
-    assert body["errors"][0]["message"]
-
-
 @pytest.fixture(autouse=True)
 def _fresh_burst(monkeypatch):
-    original = allauth_ratelimit._refused_while_unavailable
+    original = strict_cache._refused
     monkeypatch.setattr(
-        allauth_ratelimit,
-        "_refused_while_unavailable",
+        strict_cache,
+        "_refused",
         type(original)(
             original._message, level=original._level, target=original._logger
         ),
@@ -71,13 +58,18 @@ class TestRedisDown:
 
         response = _middleware(view)(_post(TWO_FACTOR))
 
-        _assert_unavailable(response)
+        assert response.status_code == 503
+        body = json.loads(response.content)
+        assert body["status"] == 503
+        assert [error["code"] for error in body["errors"]] == [
+            "temporarily_unavailable"
+        ]
         view.assert_not_called()
 
     def test_the_refusal_is_logged_as_an_error(self, monkeypatch, caplog):
         monkeypatch.setattr(allauth_ratelimit, "cache", stopped_cache())
 
-        with caplog.at_level("ERROR", logger=allauth_ratelimit.__name__):
+        with caplog.at_level("ERROR", logger=strict_cache.__name__):
             _middleware()(_post(LOGIN))
 
         assert any("REFUSED" in r.getMessage() for r in caplog.records)
@@ -88,30 +80,6 @@ class TestRedisDown:
         response = _middleware()(_post("/_allauth/app/v1/auth/session"))
 
         assert response.content == b"view"
-
-    @pytest.mark.parametrize(
-        "error", [RedisConnectionError("down"), RedisTimeoutError("slow")]
-    )
-    def test_allauths_own_strict_keys_answer_the_same_503(self, error):
-        response = _middleware().process_exception(_post(LOGIN), error)
-
-        _assert_unavailable(response)
-
-    def test_an_outage_outside_allauth_is_left_to_its_own_view(self):
-        request = _post("/api/v1/cart")
-
-        assert (
-            _middleware().process_exception(
-                request, RedisConnectionError("down")
-            )
-            is None
-        )
-
-    def test_any_other_error_stays_an_error(self):
-        assert (
-            _middleware().process_exception(_post(LOGIN), ValueError("bug"))
-            is None
-        )
 
 
 class TestRedisUp:

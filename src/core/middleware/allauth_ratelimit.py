@@ -8,11 +8,9 @@ Uses Django's Redis cache for counters (already configured in settings).
 **A Redis outage refuses, it never lifts the limit** (the rule beside
 ``core.caches.STRICT_KEY_PREFIXES``). The counters live under
 ``STRICT_NAMESPACE``, and ``count_in_window`` raises on an unreachable
-Redis; this middleware answers that with 503 ``rate_limit_unavailable`` in
-allauth's error envelope. allauth's OWN limits (``allauth:rl:``), its TOTP
-replay guard and the IdP's single-use codes are strict keys too, and raise
-from inside allauth's views: ``process_exception`` gives them the same 503
-instead of an uncoded 500.
+Redis; the request is answered by ``core.middleware.strict_cache``: 503
+``temporarily_unavailable`` in allauth's error envelope, the same answer
+allauth's own limits get when they raise inside its views.
 """
 
 import hashlib
@@ -24,27 +22,11 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from core.caches import (
-    RATE_LIMIT_UNAVAILABLE_CODE,
-    RATE_LIMIT_UNAVAILABLE_MESSAGE,
-    REDIS_UNAVAILABLE,
-    STRICT_NAMESPACE,
-    BurstLogger,
-)
+from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE
 from core.client_ip import client_ip_or_peer
+from core.middleware.strict_cache import unavailable_response
 
 logger = logging.getLogger(__name__)
-
-#: allauth's headless API: the routes this middleware limits, and the ones
-#: whose Redis outage it answers.
-_ALLAUTH_PREFIX = "/_allauth/"
-
-_refused_while_unavailable = BurstLogger(
-    "AllAuth %s REFUSED: Redis unavailable, and its limits fail closed: "
-    "%s (%s similar refusal(s) suppressed in the last %ss)",
-    level=logging.ERROR,
-    target=logger,
-)
 
 # (path_prefix, per_minute, per_hour) — None means unlimited
 _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
@@ -96,8 +78,7 @@ class AllAuthRateLimitMiddleware:
     Rate limit the allauth headless API endpoints.
 
     Only POST/PUT/PATCH requests are rate-limited (reads are harmless).
-    Skips counting when DEBUG=True or DISABLE_CACHE=True (test
-    environments); an outage inside allauth's views is answered either way.
+    Skips when DEBUG=True or DISABLE_CACHE=True (test environments).
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
@@ -111,23 +92,10 @@ class AllAuthRateLimitMiddleware:
             try:
                 response = self._check_rate_limit(request)
             except REDIS_UNAVAILABLE as exc:
-                return self._unavailable(request, exc)
+                return unavailable_response(request, exc)
             if response is not None:
                 return response
         return self.get_response(request)
-
-    def process_exception(
-        self, request: HttpRequest, exception: Exception
-    ) -> HttpResponse | None:
-        """An allauth view that could not reach a strict key: its own rate
-        limits, TOTP replay protection, the IdP's single-use codes. The
-        cache raised rather than lift the control; answer the coded 503
-        instead of a 500."""
-        if isinstance(exception, REDIS_UNAVAILABLE) and (
-            request.path_info.startswith(_ALLAUTH_PREFIX)
-        ):
-            return self._unavailable(request, exception)
-        return None
 
     def _check_rate_limit(self, request: HttpRequest) -> HttpResponse | None:
         path = request.path_info
@@ -185,20 +153,4 @@ class AllAuthRateLimitMiddleware:
                 ],
             },
             status=429,
-        )
-
-    @staticmethod
-    def _unavailable(request: HttpRequest, exc: Exception) -> JsonResponse:
-        _refused_while_unavailable.report(request.path_info, exc)
-        return JsonResponse(
-            {
-                "status": 503,
-                "errors": [
-                    {
-                        "code": RATE_LIMIT_UNAVAILABLE_CODE,
-                        "message": str(RATE_LIMIT_UNAVAILABLE_MESSAGE),
-                    }
-                ],
-            },
-            status=503,
         )

@@ -14305,6 +14305,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Template"
 msgstr "Πρότυπο"
 
+msgid "Temporarily unavailable"
+msgstr "Προσωρινά μη διαθέσιμο"
+
 msgid "Ten"
 msgstr "Δέκα"
 

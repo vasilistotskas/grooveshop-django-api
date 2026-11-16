@@ -5,9 +5,7 @@ fails open (``core.caches.CustomCache``): during an outage a read is a
 miss and a write does nothing, so a throttle reading through it would
 see no history and allow everything. For the day-scale ``anon`` /
 ``user`` browsing budgets that is right — a Redis blip must not take the
-storefront API down — and DRF's own ``AnonRateThrottle`` /
-``UserRateThrottle``, used directly by views and as
-``DEFAULT_THROTTLE_CLASSES``, behave exactly that way.
+storefront API down.
 
 It is wrong for the scopes that guard something. So every throttle
 defined here uses ``ResilientThrottleMixin``: its keys live under
@@ -15,10 +13,12 @@ defined here uses ``ResilientThrottleMixin``: its keys live under
 and the class decides what an outage means with ONE attribute,
 ``fail_closed``:
 
-- ``fail_closed = True`` — REFUSE with 503 ``rate_limit_unavailable``
-  (``RateLimitUnavailable``) and log at ERROR, once per burst. Not a 429:
-  the caller sent nothing too many, and with no history there is no
-  honest ``Retry-After`` (the rule is ``core.caches.STRICT_KEY_PREFIXES``'s). The rule: the endpoint is a secret
+- ``fail_closed = True`` — REFUSE: the cache's error goes on to
+  ``core.middleware.strict_cache``, which answers 503
+  ``temporarily_unavailable`` (the rule beside
+  ``core.caches.STRICT_KEY_PREFIXES``), logged at ERROR once per burst.
+  Not a 429: the caller sent nothing too many, and with no history there
+  is no honest ``Retry-After``. Which scopes: the endpoint is a secret
   or existence oracle (coupon, gift card, order lookup, staff login),
   moves money or stock (order create, payment), makes us send email to
   an address the caller chooses (newsletter), stores the caller's
@@ -27,6 +27,13 @@ and the class decides what an outage means with ONE attribute,
 - ``fail_closed = False`` — ALLOW and log at WARNING, once per burst:
   every other scope (browsing, search, cart edits, analytics events,
   messages to the store's own inbox).
+
+Every throttle is defined here, the ``anon``/``user`` budgets too
+(``AnonIpRateThrottle``, ``UserBudgetThrottle``): DRF's own classes key an
+anonymous caller on ``get_ident``, Traefik's peer, which many visitors
+share (``docs/client-ip.md``). ``ResilientThrottleMixin.get_ident`` is the
+proven visitor instead, and no module outside this one imports
+``rest_framework.throttling`` (``tests/unit/core/test_throttle_outage.py``).
 """
 
 import hashlib
@@ -35,8 +42,6 @@ import logging
 from typing import ClassVar
 
 from django.conf import settings
-from rest_framework import status
-from rest_framework.exceptions import APIException
 from rest_framework.throttling import (
     AnonRateThrottle,
     ScopedRateThrottle,
@@ -44,14 +49,7 @@ from rest_framework.throttling import (
     UserRateThrottle,
 )
 
-from cart.agent_token import cart_token_from_request, hash_cart_token
-from core.caches import (
-    RATE_LIMIT_UNAVAILABLE_CODE,
-    RATE_LIMIT_UNAVAILABLE_MESSAGE,
-    REDIS_UNAVAILABLE,
-    STRICT_NAMESPACE,
-    BurstLogger,
-)
+from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
@@ -69,14 +67,6 @@ _allowed_while_unavailable = BurstLogger(
 )
 
 
-class RateLimitUnavailable(APIException):
-    """A fail-closed throttle could not count: 503, never a 429."""
-
-    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    default_detail = RATE_LIMIT_UNAVAILABLE_MESSAGE
-    default_code = RATE_LIMIT_UNAVAILABLE_CODE
-
-
 class ResilientThrottleMixin:
     """Decide, per throttle class, what a Redis outage means.
 
@@ -85,10 +75,23 @@ class ResilientThrottleMixin:
     connection error instead of reporting an empty history, and
     ``allow_request`` turns it into the class's policy — see the module
     docstring for which scopes refuse.
+
+    An anonymous caller is the proven visitor (``get_ident``), never DRF's
+    rightmost ``X-Forwarded-For`` hop: that is Traefik's peer, a Cloudflare
+    edge node shared by everyone behind it (an internal ``10.42.x.x`` SNAT
+    address before the Traefik Service moved to ``externalTrafficPolicy:
+    Local``, proven in production 2026-09-16), so one caller could spend
+    everyone's budget: at ``order_create_anon`` 10/minute, lock all guests
+    out of checkout. ``client_ip_or_peer`` falls back to that peer only for
+    a request whose provenance cannot be proven, because it is coarse but
+    cannot be forged.
     """
 
     fail_closed: ClassVar[bool] = False
     cache_format = STRICT_NAMESPACE + "throttle_%(scope)s_%(ident)s"
+
+    def get_ident(self, request) -> str:
+        return client_ip_or_peer(request)
 
     def allow_request(self, request, view) -> bool:
         try:
@@ -97,7 +100,7 @@ class ResilientThrottleMixin:
             scope = getattr(self, "scope", None)
             if self.fail_closed:
                 _denied_while_unavailable.report(scope, exc)
-                raise RateLimitUnavailable from exc
+                raise
             _allowed_while_unavailable.report(scope, exc)
             return True
 
@@ -124,6 +127,12 @@ def _gateway_ident(request) -> str | None:
         secret.encode("utf-8", "surrogateescape"),
     ):
         return None
+    # Imported here, not at the top: ``DEFAULT_THROTTLE_CLASSES`` names
+    # this module, so DRF imports it while ``rest_framework.views`` is
+    # still loading, and ``cart.agent_token`` reaches drf-spectacular,
+    # which needs ``APIView`` (a circular import at start-up).
+    from cart.agent_token import cart_token_from_request, hash_cart_token
+
     token = cart_token_from_request(request)
     if token:
         # The token names the cart; key on its hash, never the token.
@@ -150,21 +159,10 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
     of these endpoints had no other throttle at all, which made logging
     in the way to remove the limit.
 
-    Keyed by user id when authenticated and by the real client IP
-    otherwise, so one signed-in caller cannot spend another's budget and
-    a shared office IP no longer puts every colleague in one bucket.
-
-    For anonymous callers the IP comes from ``core.client_ip``, NOT from
-    ``get_ident``. The NUM_PROXIES-aware rightmost X-Forwarded-For hop is
-    Traefik's TCP peer: a Cloudflare edge node for proxied traffic (and
-    an internal ``10.42.x.x`` SNAT address before the Traefik Service
-    moved to ``externalTrafficPolicy: Local`` — proven in production
-    2026-09-16). Keying on it puts everyone behind that address in one
-    bucket, which turns a per-caller budget into a shared one: at
-    ``order_create_anon`` 10/minute, a single client could lock all guests
-    out of checkout. ``client_ip_or_peer`` falls back to that peer for
-    requests whose provenance cannot be proven, because it is coarse but
-    cannot be forged.
+    Keyed by user id when authenticated and by the proven client IP
+    otherwise (``ResilientThrottleMixin.get_ident``), so one signed-in
+    caller cannot spend another's budget and a shared office IP no longer
+    puts every colleague in one bucket.
     """
 
     def get_cache_key(self, request, view):
@@ -172,8 +170,16 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
         if user is not None and user.is_authenticated:
             ident = f"user:{user.pk}"
         else:
-            ident = client_ip_or_peer(request)
+            ident = self.get_ident(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class UserBudgetThrottle(UserOrIpRateThrottle):
+    """The day-scale ``user`` budget (``DEFAULT_THROTTLE_CLASSES``), the
+    sibling of ``AnonIpRateThrottle``'s ``anon``. Fails open: browsing
+    must survive a Redis blip."""
+
+    scope = "user"
 
 
 class ContactCreateThrottle(UserOrIpRateThrottle):
@@ -227,21 +233,13 @@ class ContactAttachmentThrottle(UserOrIpRateThrottle):
 
 
 class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
-    """The anonymous half of an Anon/User pair, keyed on the visitor.
+    """The anonymous half of an Anon/User pair, keyed on the visitor
+    (``ResilientThrottleMixin.get_ident``); on its own, the day-scale
+    ``anon`` budget (``DEFAULT_THROTTLE_CLASSES``), failing open.
 
-    Anon-only by design: ``None`` for an authenticated request, whose
-    ``UserRateThrottle`` sibling covers it. The address is the proven
-    client IP, for the reason ``UserOrIpRateThrottle`` gives: DRF's
-    ``get_ident`` is Traefik's peer, a Cloudflare edge node, so keying
-    on it would let one guest exhaust every guest's checkout budget.
+    Anon-only by design: DRF's ``get_cache_key`` is ``None`` for an
+    authenticated request, whose user-keyed sibling covers it.
     """
-
-    def get_cache_key(self, request, view):
-        user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated:
-            return None
-        ident = client_ip_or_peer(request)
-        return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
 class GatewayAnonThrottle(AnonIpRateThrottle):
@@ -412,6 +410,8 @@ class RecommendationEventThrottle(UserOrIpRateThrottle):
 
 class StaffLoginThrottle(ResilientThrottleMixin, ScopedRateThrottle):
     """The platform staff token endpoint — a credential-guessing surface
-    (``tenant/staff_api.py``). Scoped by the view's ``throttle_scope``."""
+    (``tenant/staff_api.py``). Scoped by the view's ``throttle_scope``,
+    and keyed like every throttle here on the proven caller, so one
+    caller behind a shared edge node cannot spend everyone's budget."""
 
     fail_closed = True

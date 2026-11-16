@@ -217,7 +217,10 @@ def test_viva_handshake_budget_does_not_follow_a_forged_x_real_ip(rf, settings):
     cache.clear()
     results = [
         _webhook_get_rate_limit(
-            _req(rf, HTTP_X_REAL_IP=f"1.2.3.{n}", HTTP_X_FORWARDED_FOR=EDGE_HOP)
+            _req(
+                rf, HTTP_X_REAL_IP=f"1.2.3.{n}", HTTP_X_FORWARDED_FOR=EDGE_HOP
+            ),
+            answer_is_free=True,
         )
         for n in range(11)
     ]

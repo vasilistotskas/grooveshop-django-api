@@ -19,7 +19,7 @@ from typing import Any
 
 from allauth.headless.constants import Flow
 
-from core.caches import RATE_LIMIT_UNAVAILABLE_CODE
+from core.caches import STRICT_CACHE_UNAVAILABLE_CODE
 
 Document = dict[str, Any]
 
@@ -222,17 +222,16 @@ def declare_rate_limit_answer(document: Document) -> None:
                 operation["responses"].setdefault("429", copy.deepcopy(answer))
 
 
-def declare_rate_limit_unavailable_answer(document: Document) -> None:
-    """Any operation can answer 503 ``rate_limit_unavailable``: a limit
-    that cannot count while Redis is unreachable refuses the call rather
-    than lift the limit (``core.middleware.allauth_ratelimit``, for its own
-    counters and for allauth's strict keys, which raise inside its views).
-    Ours, so the document cannot know it."""
-    _schemas(document)["RateLimitUnavailableResponse"] = {
+def declare_unavailable_answer(document: Document) -> None:
+    """Any operation can answer 503 ``temporarily_unavailable``: a security
+    control that cannot reach Redis (a rate limit, TOTP replay protection)
+    refuses the call rather than lift itself (``core.middleware.
+    strict_cache``). Ours, so the document cannot know it."""
+    _schemas(document)["UnavailableResponse"] = {
         "type": "object",
         "description": (
-            "The call's rate limits cannot be counted right now, so it is "
-            "refused. Try again shortly."
+            "A security control of the call cannot be checked right now, "
+            "so it is refused. Try again shortly."
         ),
         "properties": {
             "status": {"type": "integer", "enum": [503]},
@@ -243,7 +242,7 @@ def declare_rate_limit_unavailable_answer(document: Document) -> None:
                     "properties": {
                         "code": {
                             "type": "string",
-                            "enum": [RATE_LIMIT_UNAVAILABLE_CODE],
+                            "enum": [STRICT_CACHE_UNAVAILABLE_CODE],
                         },
                         "message": {"type": "string"},
                     },
@@ -254,12 +253,10 @@ def declare_rate_limit_unavailable_answer(document: Document) -> None:
         "required": ["status", "errors"],
     }
     answer = {
-        "description": "Rate limits unavailable.",
+        "description": "Temporarily unavailable.",
         "content": {
             "application/json": {
-                "schema": {
-                    "$ref": "#/components/schemas/RateLimitUnavailableResponse"
-                }
+                "schema": {"$ref": "#/components/schemas/UnavailableResponse"}
             }
         },
     }
@@ -342,7 +339,7 @@ CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_totp_svg,
     name_totp_not_found_response,
     declare_rate_limit_answer,
-    declare_rate_limit_unavailable_answer,
+    declare_unavailable_answer,
     allow_session_meta_on_every_answer,
 )
 

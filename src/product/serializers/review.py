@@ -8,7 +8,7 @@ from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from product.enum.review import RateEnum, ReviewStatus
 from product.models.product import Product
-from product.models.review import ProductReview
+from product.models.review import COMMENT_MAX_LENGTH, ProductReview
 from product.serializers.product import ProductSerializer
 from tenant.celery import dispatch_on_commit
 from user.serializers.account import UserPublicSerializer
@@ -19,6 +19,16 @@ User = get_user_model()
 @extend_schema_field(generate_schema_multi_lang(ProductReview))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(
+        ProductReview, max_lengths={"comment": COMMENT_MAX_LENGTH}
+    )
+)
+class TranslatedFieldsWriteFieldExtend(TranslatedFieldExtended):
+    """The request's ``translations``: the bound is published on what a
+    shopper sends, never on what the API answers."""
 
 
 class ProductBriefSerializer(serializers.ModelSerializer[Product]):
@@ -108,7 +118,7 @@ class ProductReviewDetailSerializer(
 class ProductReviewWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
-    translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
+    translations = TranslatedFieldsWriteFieldExtend(shared_model=ProductReview)
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
 
     class Meta:

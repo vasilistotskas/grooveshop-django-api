@@ -84,25 +84,18 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "interval_max": 0.5,
 }
 # How long one read on a PUBLISHING broker connection may block, in
-# seconds. ``core.celery.GrooveShopCelery.connection_for_write`` hands it to
-# py-amqp as ``read_timeout`` (``SO_RCVTIMEO``) on the connections the app
-# publishes on (tasks, control commands, worker events), never on a
-# worker's consuming connection. It bounds the waits nothing else does:
-# while RabbitMQ blocks publishers (a memory or disk alarm) it stops
-# reading the connection and sends nothing back, so the publish confirm
-# never comes, and neither does the ``Close-Ok`` kombu waits for when it
-# replaces the connection. Those publishing connections also refuse to
-# publish once RabbitMQ says it blocked them (``connection.blocked``), so a
-# blocked publish is not retried. Without either a request that published
-# waited without end (#509).
+# seconds: py-amqp's ``read_timeout`` (``SO_RCVTIMEO``) on the connections
+# ``core.broker.PublishingTransport`` opens (tasks, control commands, beat,
+# worker events), never on a worker's consuming connection. It bounds a
+# reply the broker never sends, such as the publish confirm of a
+# connection it blocked without sending ``connection.blocked``, or the
+# ``Close-Ok`` of one kombu closes after a failed publish. Without a bound
+# a request that published to a blocked broker waited without end (#509).
 #
 # Every synchronous reply on those connections must arrive within it: a
 # confirm, a declare, a channel open. A healthy broker answers in
 # milliseconds (49 ms at worst measured with half a CPU, as in production;
-# docs/deferred-dispatch.md), so 5 s is ample headroom for a slow one. A
-# blocked publish then fails after two of these waits (closing the channel
-# and the connection: 10.5 s measured), four at most when the broker
-# blocked the connection without saying so.
+# docs/deferred-dispatch.md), so 5 s is ample headroom for a slow one.
 #
 # Linux only, where every deployment runs: py-amqp packs the value as a
 # POSIX ``timeval``, which Windows reads as a DWORD of MILLISECONDS, so the
@@ -112,15 +105,31 @@ BROKER_PUBLISH_READ_TIMEOUT = (
     if sys.platform == "win32"
     else float(getenv("BROKER_PUBLISH_READ_TIMEOUT", "5"))
 )
+# How long a process publishes nothing after RabbitMQ blocked one of its
+# publishing connections (``connection.blocked``: a memory or disk alarm),
+# in seconds. Every publish is refused before it writes until the broker
+# says ``connection.unblocked`` or this passes; then the next publish
+# first asks again with a message no queue receives (``core.broker``).
+#
+# RabbitMQ sends ``connection.unblocked`` only on the connection it
+# blocked, which kombu has dropped by then, so in practice this is how
+# soon publishing resumes after an alarm clears: rows kept by
+# ``dispatch_on_commit`` are swept, and beat sends a missed entry again
+# after ``PUBLISH_RETRY_SECONDS``. Each question asked during an alarm
+# leaves one connection the broker no longer reads until the alarm clears,
+# so a shorter hold leaves more of them on a broker already short of
+# memory: one per minute per process that publishes.
+BROKER_BLOCKED_HOLD_SECONDS = float(getenv("BROKER_BLOCKED_HOLD_SECONDS", "60"))
 # How often kombu publishes a task again after a connection error, each
 # time on a new connection (``kombu.Connection.ensure``). One retry is what
 # a dead pooled connection needs: after a broker restart the first publish
 # finds the pooled connection reset and the retry reconnects (measured:
-# with 0 that publish fails, with 1 it goes out). Every further retry only
-# adds a copy: a publish that timed out on a blocked broker is still
-# delivered once the alarm clears, and ``dispatch_on_commit`` already keeps
-# the failure as a ``DeferredDispatch`` that the sweep publishes again.
-# The intervals are Celery's defaults.
+# with 0 that publish fails, with 1 it goes out). The same retry drops a
+# connection RabbitMQ blocked, and ends there: the new connection refuses
+# to publish (``core.broker``). Every further retry only adds a copy when a
+# publish times out, since the broker still delivers what it was sent, and
+# ``dispatch_on_commit`` already keeps the failure as a ``DeferredDispatch``
+# that the sweep publishes again. The intervals are Celery's defaults.
 CELERY_TASK_PUBLISH_RETRY_POLICY = {
     "max_retries": int(getenv("CELERY_TASK_PUBLISH_MAX_RETRIES", "1")),
     "interval_start": 0,

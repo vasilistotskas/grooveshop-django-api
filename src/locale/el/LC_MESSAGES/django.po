@@ -14537,8 +14537,8 @@ msgid "The code has reached its usage limit"
 msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης του"
 
 #, python-format
-msgid "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
-msgstr "Τα χρώματα του %(rule)s έχουν αντίθεση %(ratio)s, χαμηλότερη από την απαιτούμενη %(min)s."
+msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
+msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
 
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."

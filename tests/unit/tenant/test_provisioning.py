@@ -13,6 +13,8 @@ best-effort/try-except'd already.
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from django.contrib.auth import get_user_model
 from django_tenants.utils import schema_context
@@ -238,6 +240,30 @@ class TestSeedTenantDefaults:
         )
 
         assert provisioning.seed_tenant_defaults(tenant) == ["theme"]
+
+    # A store left without its theme document cannot edit or publish a
+    # theme: the step says so at ERROR, naming the store, and reports.
+    def test_a_theme_that_could_not_be_seeded_is_an_error(
+        self, db, monkeypatch, caplog
+    ):
+        from builder import seeding
+        from core.storefront import StorefrontUnavailable
+        from tenant import provisioning
+
+        tenant = store_tenant("seed_defaults_theme_error")
+
+        def unreadable():
+            raise StorefrontUnavailable("unexpected catalogue shape")
+
+        monkeypatch.setattr(seeding, "install_theme_defaults", unreadable)
+
+        with caplog.at_level(logging.ERROR, logger="tenant.provisioning"):
+            assert provisioning._seed_theme_document(tenant) is False
+
+        (record,) = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert "seed_defaults_theme_error" in record.getMessage()
+        assert "no theme document" in record.getMessage()
+        assert record.exc_info is not None
 
     def test_a_clean_seed_reports_nothing(self, db, monkeypatch):
         from tenant import provisioning

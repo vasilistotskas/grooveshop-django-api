@@ -7,9 +7,10 @@ import json
 from pathlib import Path
 
 import pytest
+from django.utils import translation
 
 from builder import services
-from builder.errors import DocumentInvalid, InvalidCatalogueError
+from builder.errors import DocumentInvalid, InvalidCatalogueError, message_for
 
 pytestmark = pytest.mark.django_db
 
@@ -22,6 +23,11 @@ FIXTURE = json.loads(
     ).read_text(encoding="utf-8")
 )
 GOOD, PALE_LIGHT, DIM_DARK, YELLOW = (t["settings"] for t in FIXTURE["themes"])
+BODY_TEXT_LIGHT = next(
+    rule["label"]
+    for rule in FIXTURE["rules"]
+    if rule["id"] == "body-text-light"
+)
 THEME = "theme"
 
 
@@ -75,7 +81,57 @@ class TestPublishing:
             "rule": "body-text-light",
             "ratio": "2.56",
             "min": "4.5",
+            "label-el": BODY_TEXT_LIGHT["el"],
+            "label-en": BODY_TEXT_LIGHT["en"],
         }
+
+    @pytest.mark.parametrize(
+        ("language", "sentence"),
+        [
+            (
+                "el",
+                (
+                    "Το ζεύγος χρωμάτων «Κείμενο, φωτεινό» έχει αντίθεση 2.56:1, "
+                    "κάτω από την απαιτούμενη 4.5:1."
+                ),
+            ),
+            (
+                "en",
+                (
+                    "The colour pair \u201cText, light\u201d has a contrast of "
+                    "2.56:1, below the required 4.5:1."
+                ),
+            ),
+        ],
+    )
+    def test_the_refusal_names_the_rule_in_the_merchants_language(
+        self, admin, theme_catalogue, features_on, language, sentence
+    ):
+        save(admin, PALE_LIGHT)
+
+        with translation.override(language):
+            with pytest.raises(DocumentInvalid) as caught:
+                services.publish(admin, keys=[THEME])
+            check = services.check_publish(admin, keys=[THEME])
+
+        assert [i.message for i in caught.value.issues] == [sentence]
+        assert [i.message for i in check.problems] == [sentence]
+
+    # A failure is kept and worded again in the language its email is sent
+    # in (``builder.emails``): the params hold the name in every language.
+    def test_a_kept_refusal_is_worded_again_in_another_language(
+        self, admin, theme_catalogue, features_on
+    ):
+        save(admin, PALE_LIGHT)
+        with translation.override("el"):
+            with pytest.raises(DocumentInvalid) as caught:
+                services.publish(admin, keys=[THEME])
+        (issue,) = caught.value.issues
+
+        with translation.override("en"):
+            again = message_for(issue.code, issue.params, issue.message)
+
+        assert again.startswith("The colour pair \u201cText, light\u201d")
 
     def test_the_dark_scheme_is_held_to_its_own_rule(
         self, admin, theme_catalogue, features_on
@@ -119,6 +175,7 @@ class TestAContradictoryCatalogue:
                 "background": "#ffffff",
                 "min": 4.5,
                 "severity": "error",
+                "label": {"el": "Πουθενά", "en": "Nowhere"},
             }
         ]
         save(admin, GOOD)

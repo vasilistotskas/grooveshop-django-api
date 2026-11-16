@@ -31,7 +31,12 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 
 from builder import contrast, data_sources, pointers, references
-from builder.errors import InvalidCatalogueError, Issue, message_for
+from builder.errors import (
+    InvalidCatalogueError,
+    Issue,
+    message_for,
+    per_language,
+)
 from builder.models import DocumentKind, kind_of_key
 from builder.storefront import (
     KIND_BLOCK,
@@ -769,6 +774,10 @@ def check_before_release(
                         "rule": outcome.rule.id,
                         "ratio": contrast.format_ratio(outcome.ratio),
                         "min": f"{outcome.rule.min:g}",
+                        **{
+                            per_language("label", code): text
+                            for code, text in outcome.rule.label.items()
+                        },
                     },
                     "",
                 ),

@@ -22,6 +22,7 @@ Exception Hierarchy:
     │   └── ParcelWithCourierError
     └── PaymentError
         ├── PaymentNotFoundError
+        ├── PaymentStatusUnavailableError
         ├── PaymentVerificationError
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
@@ -474,6 +475,28 @@ class PaymentNotFoundError(PaymentError):
         """
         self.payment_id = payment_id
         super().__init__(f"Payment intent with ID {payment_id} not found")
+
+
+class PaymentStatusUnavailableError(PaymentError):
+    """
+    Raised when a payment provider could not be asked where a payment
+    stands: a network error, a timeout, a rate limit, an outage, or an
+    answer that could not be read.
+
+    It says nothing about the payment. A caller keeps what it holds and
+    asks again later; it never records the payment as failed, because the
+    sweep cancels an order whose payment failed and the shopper may still
+    be paying.
+
+    Attributes:
+        payment_id (str): The payment the provider was asked about
+    """
+
+    def __init__(self, payment_id: str):
+        self.payment_id = payment_id
+        super().__init__(
+            f"The provider could not be asked about payment {payment_id}"
+        )
 
 
 class OrderChangedDuringPaymentError(PaymentError):

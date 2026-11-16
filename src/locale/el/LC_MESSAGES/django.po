@@ -14801,6 +14801,9 @@ msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακό�
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "Ο πάροχος πληρωμών δεν είναι προσβάσιμος για να ελεγχθεί αυτός ο κωδικός."
 
+msgid "The payment provider could not be reached. Try again in a moment."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον πάροχο πληρωμών. Δοκίμασε ξανά σε λίγο."
+
 msgid "The payment provider has not been asked about this refund yet: it is looked up automatically first."
 msgstr "Ο πάροχος πληρωμών δεν έχει ερωτηθεί ακόμη γι' αυτή την επιστροφή: πρώτα αναζητείται αυτόματα."
 

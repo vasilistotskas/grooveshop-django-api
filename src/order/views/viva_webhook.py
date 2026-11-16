@@ -374,18 +374,15 @@ def _retrieve_transaction(transaction_id):
 
     Raises ``RuntimeError`` (→ 500, Viva retries) when verification is
     UNAVAILABLE: the infrastructure failed, or Viva could not cleanly
-    retrieve the transaction. A forged or unknown id returns an error
-    row, and ``get_payment_status`` maps errors to FAILED, which would
-    otherwise auto-satisfy a failed check. Roll back and retry rather
-    than trust the unverified event; the same raise is what lets the
-    multi-tenant candidate loop move on from a tenant that does not own
-    the transaction.
+    retrieve the transaction (a forged or unknown id is a 404, and
+    ``get_payment_status`` raises for it as for any error, never
+    answering a status that could satisfy a failed check). Roll back and
+    retry rather than trust the unverified event; the same raise is what
+    lets the multi-tenant candidate loop move on from a tenant that does
+    not own the transaction.
     """
     verified_status, verified_data = _verify_transaction(transaction_id)
-    verify_errored = isinstance(verified_data, dict) and (
-        verified_data.get("error") or verified_data.get("viva_error")
-    )
-    if verified_status is None or verify_errored:
+    if verified_status is None:
         raise RuntimeError(
             f"Viva transaction verification unavailable for {transaction_id}"
         )
@@ -982,11 +979,7 @@ def _process_gift_card_purchase_event(
                     verified_status, verified_data = _verify_transaction(
                         transaction_id
                     )
-                    verify_errored = isinstance(verified_data, dict) and (
-                        verified_data.get("error")
-                        or verified_data.get("viva_error")
-                    )
-                    if verified_status is None or verify_errored:
+                    if verified_status is None:
                         # Unverifiable ≠ failed: raise so the outer
                         # candidate loop tries the next tenant / Viva
                         # redelivers (same contract as the order path).
@@ -1283,23 +1276,18 @@ def _handle_payment_created(order, event_data, transaction_id):
         if isinstance(verified_data, dict)
         else None,
     )
-    verify_errored = isinstance(verified_data, dict) and (
-        verified_data.get("error") or verified_data.get("viva_error")
-    )
-    if verified_status is None or verify_errored:
+    if verified_status is None:
         logger.error(
-            "Could not verify Viva transaction %s (status=%s, errored=%s) "
+            "Could not verify Viva transaction %s "
             "— leaving event unprocessed so Viva can retry",
             transaction_id,
-            verified_status,
-            bool(verify_errored),
         )
         # Raise so the outer atomic block rolls back; the
         # VivaWebhookEvent row is never written, Viva retries fresh.
         #
-        # Treating a Retrieve-Transaction ERROR (``error`` / ``viva_error``
-        # — e.g. a 404 because the id is not in THIS tenant's Viva account)
-        # as "unavailable" rather than as a confirmed non-completion is
+        # Treating a Retrieve-Transaction ERROR (e.g. a 404 because the id
+        # is not in THIS tenant's Viva account) as "unavailable" rather
+        # than as a confirmed non-completion is
         # what lets a webhook whose transaction belongs to a DIFFERENT
         # tenant fall through to the next candidate in
         # ``_handle_webhook_event`` — and, independent of multi-tenancy,

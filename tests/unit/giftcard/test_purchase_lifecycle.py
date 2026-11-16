@@ -223,7 +223,7 @@ class TestVivaPurchaseWebhookBranch:
 
         with patch(
             "order.views.viva_webhook._verify_transaction",
-            return_value=(None, {"error": "boom", "viva_error": True}),
+            return_value=(None, {}),
         ):
             response = self._event(purchase, 1796)
 

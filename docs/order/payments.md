@@ -83,6 +83,29 @@ intent no gift-card purchase holds; any other provider's payment is settled by
 its webhook alone. `PayWayService.check_payment_status` (a second, caller-less
 polling writer) was removed.
 
+**A poll records only an open payment's state**
+(`_POLLED_STATUS_RECORDED` in `src/order/services.py`): PENDING, PROCESSING
+and FAILED as reported, and a provider's `canceled` (a Stripe intent closed by
+a retry whose new intent then failed to open, a Viva `X`) as **FAILED**. The
+attempt is over, not the order: CANCELED is the payment state of a closed
+order (`Order.settle_unpaid_payment`), and on an open one it is settled, so
+neither bucket of `auto_cancel_stuck_pending_orders` selected the order, its
+stock stayed reserved, and a later success was ignored as stale (#697).
+FAILED keeps the order payable (`retry-payment`) and is swept after
+`ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`. A polled REFUNDED or
+PARTIALLY_REFUNDED is never written: the ledger derives those from the refunds
+it booked ([§7.3](payment-ledger.md)).
+
+**A provider that could not be asked is not a payment outcome** (#698). Each
+provider's `get_payment_status` raises `PaymentStatusUnavailableError` for a
+network error, a timeout, a rate limit, an outage or an answer it could not
+read; it used to answer FAILED, which the 30-minute sweep then acted on.
+Nothing is written. `GET /order/{id}/payment_status` answers 503
+`payment_provider_unavailable`, payment-first order creation refuses the
+intent as before (400 `payment_verification`), `PaymentLedger.ensure_charge`
+records no charge, and the Viva webhook's verification raises so Viva
+redelivers.
+
 `applied` is False for a stale event against a settled payment, a
 repeat of one already applied, and a charge on a canceled order
 (`record_payment_after_cancel` books it and alerts ops): none of them

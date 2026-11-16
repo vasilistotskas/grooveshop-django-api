@@ -3,6 +3,31 @@
 
 
 
+## v3.249.5 (2026-11-16)
+
+### Bug fixes
+
+* fix(agent): answer a refused resource at the IdP token endpoints with invalid_target (#733) ([`d4e9df1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4e9df1e64b327c09a526eec342a28fa9169f466))
+
+* fix(agent): answer a refused resource at the IdP token endpoints with invalid_target
+
+allauth validates the resource parameters of the token and device-code
+endpoints with get_resources, which raises a Django ValidationError, but
+those views catch only oauthlib's OAuth2Error. A token request without a
+resource on the staff issuer (AgentOIDCAdapter.validate_resource_uris wants
+one store's staff MCP server), and a malformed or unknown resource on either
+issuer, therefore answered an uncoded 500.
+
+IdpResourceErrorMiddleware answers it with OAuth's invalid_target (RFC 8707
+section 2), matched on allauth's idp:oidc token and device_code routes. The
+staff issuer keeps requiring the resource on the token request. ([`d4e9df1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4e9df1e64b327c09a526eec342a28fa9169f466))
+
+### Testing
+
+* test(agent): cover another store's resource and a code kept after a refused resource
+
+The middleware docstring now names the allauth calls whose ValidationError it maps. ([`d4e9df1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4e9df1e64b327c09a526eec342a28fa9169f466))
+
 ## v3.249.4 (2026-11-16)
 
 ### Documentation

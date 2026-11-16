@@ -932,14 +932,30 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def customer_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+    @property
+    def served_as_guest(self) -> bool:
+        """Whether a shopper reaches this order with its uuid
+        (:meth:`opens_for_guest`) rather than by signing in as its owner.
+
+        A guest's order is, and so is every order of a store that signs no
+        shopper in (``tenant.customer_accounts``): its account holders are
+        served as guests, so the uuid is the only way back to their orders.
+        The one rule both the order API's permissions and the storefront
+        links to an order (``order.storefront_links``) follow.
+        """
+        from tenant.customer_accounts import customer_accounts_on
+
+        return self.user_id is None or not customer_accounts_on()
+
     def opens_for_guest(self, request_uuid: object) -> bool:
         """Whether *request_uuid* opens this guest order.
 
         The uuid reads the customer's details without a login, so it is a key,
         and a key that lasts for ever outlives every place it has been seen. It
-        works for ``settings.GUEST_ORDER_ACCESS_DAYS`` after the order. Nothing
-        sends a guest back to an order after that: no email links to it, and the
-        store can read it for them.
+        works for ``settings.GUEST_ORDER_ACCESS_DAYS`` after the order, the time
+        the emails that link to it (``order.storefront_links``) are sent in:
+        paying, the confirmation, a delivery. Past it the store reads the order
+        for them.
         """
         if not request_uuid or str(self.uuid) != str(request_uuid):
             return False

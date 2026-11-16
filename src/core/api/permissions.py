@@ -184,8 +184,9 @@ class IsOwnerOrAdminOrGuest(IsOwnerMixin, BasePermission):
             return True
 
         if hasattr(obj, "user"):
-            if obj.user is None:
-                # Guest orders require UUID verification
+            if obj.served_as_guest:
+                # A guest's order, or one of a store without customer
+                # accounts (``Order.served_as_guest``): its uuid opens it.
                 request_uuid = request.query_params.get(
                     "uuid"
                 ) or request.parser_context.get("kwargs", {}).get("uuid")

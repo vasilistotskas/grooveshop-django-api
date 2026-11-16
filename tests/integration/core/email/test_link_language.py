@@ -36,6 +36,7 @@ from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
 from order.accounting.invoicing import generate_invoice
 from order.communications.notifications import notify_order_created_live
+from order.enum.status import PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
@@ -106,8 +107,12 @@ def _assert_links(body: str, url: str, language: str) -> None:
 @pytest.mark.django_db
 class TestOrderEmails:
     @LANGUAGES
-    def test_payment_failed_retry_link(self, language, prefix):
-        order = OrderFactory(num_order_items=0, language_code=language)
+    def test_payment_failed_order_link(self, language, prefix):
+        order = OrderFactory(
+            num_order_items=0,
+            language_code=language,
+            payment_status=PaymentStatus.FAILED,
+        )
 
         assert send_payment_failed_email(order.id) is True
 

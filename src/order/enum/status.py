@@ -99,3 +99,15 @@ Stripe order still reports its intent as ``succeeded`` forever.
 Defined here, beside the enum, because all three enforcement points
 need it: the Viva webhook, ``OrderService`` and ``PayWayService``.
 """
+
+CHARGED_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        PaymentStatus.COMPLETED,
+        PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
+    }
+)
+"""The settled payment states in which the customer's money was taken,
+kept or refunded since. ``CANCELED`` is settled too, but nothing was
+charged and the order can still be paid (a retry starts from it).
+"""

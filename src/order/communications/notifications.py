@@ -27,7 +27,6 @@ from django.utils.translation import override as translation_override
 from core import celery_app
 from core.retry import TRANSIENT_DB_ERRORS
 from core.tasks import MonitoredTask
-from core.utils.tenant_urls import storefront_path
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -36,6 +35,7 @@ from notification.enum import (
 from notification.services import create_user_notification
 from order.enum.status import OrderStatus
 from order.models.order import Order
+from order.storefront_links import account_order_path
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +118,9 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
 
 
 def _order_link(order: Order) -> str:
-    """Storefront path of the shopper's order detail page."""
-    return storefront_path(f"/account/orders/{order.id}")
+    """Storefront path of the shopper's order detail page: a notification
+    is read signed in (``order.storefront_links``)."""
+    return account_order_path(order)
 
 
 def _render_translations(

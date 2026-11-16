@@ -547,7 +547,9 @@ class OrderViewSet(BaseModelViewSet):
             super().check_object_permissions(request, obj)
             return
 
-        if obj.user_id is None:
+        # A guest's order, or any order of a store that signs no
+        # shopper in: opened with its uuid, never by a sign-in.
+        if obj.served_as_guest:
             if self.action not in {
                 "retrieve_by_uuid",
                 *GUEST_UUID_QUERY_ACTIONS,
@@ -1979,7 +1981,7 @@ class OrderViewSet(BaseModelViewSet):
             and order.user
             and order.user.id == user.id
         )
-        is_guest_order = order.user is None
+        is_guest_order = order.served_as_guest
 
         if not (is_admin or is_owner or is_guest_order):
             raise PermissionDenied(

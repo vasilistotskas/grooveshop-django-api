@@ -134,7 +134,11 @@ class TestPreviewEqualsTheSentEmail:
         _assert_same_email(_preview("order.shipped", order, language), sent)
 
     def test_payment_failed(self, language):
-        order = OrderFactory(num_order_items=1, language_code=language)
+        order = OrderFactory(
+            num_order_items=1,
+            language_code=language,
+            payment_status=PaymentStatus.FAILED,
+        )
         mail.outbox.clear()
 
         assert send_payment_failed_email.run(order.id) is True

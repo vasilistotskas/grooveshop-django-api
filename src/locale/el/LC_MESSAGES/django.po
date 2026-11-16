@@ -1208,9 +1208,6 @@ msgstr "Λίστες παραλαβής ACS"
 msgid "ACS refused"
 msgstr "Απόρριψη από την ACS"
 
-msgid "ACS rejected the cancellation."
-msgstr "Η ACS απέρριψε την ακύρωση."
-
 #, python-format
 msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
 msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», που δεν ταιριάζει με τον παραλήπτη που έστειλε το αίτημα voucher. Αν επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα αυτής της παραγγελίας, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
@@ -1570,14 +1567,8 @@ msgstr "Ο διαχειριστής που πάτησε το κουμπί· κε
 msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που ενεργοποίησε την χειροκίνητη έκδοση· κενό όταν τη λίστα εξέδωσε η ημερήσια προγραμματισμένη εργασία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
-msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
-msgstr "Μόνο για διαχειριστές. Καλεί το ACS_Delete_Voucher. Έγκυρο μόνο πριν το voucher οριστικοποιηθεί σε λίστα παραλαβής."
-
 msgid "Admin-only. Provider-agnostic cancellation: looks up the order's shipping provider and dispatches to the carrier adapter. The provider's own rules apply (BoxNow only cancels parcels in NEW state; ACS only cancels vouchers not yet finalised in a pickup list)."
 msgstr "Μόνο για διαχειριστές. Ακύρωση ανεξάρτητη παρόχου: αναζητά τον πάροχο αποστολής της παραγγελίας και τη διαβιβάζει στον προσαρμογέα μεταφορέα. Ισχύουν οι κανόνες του κάθε παρόχου (το BoxNow ακυρώνει μόνο δέματα σε κατάσταση NEW· η ACS ακυρώνει μόνο vouchers που δεν έχουν οριστικοποιηθεί σε λίστα παραλαβής)."
-
-msgid "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
-msgstr "Μόνο για διαχειριστές. Ζητά ακύρωση δέματος μέσω του API του BoxNow. Έγκυρο μόνο όταν η κατάσταση δέματος είναι NEW (διαφορετικά σφάλμα BoxNow P420). Δέχεται προαιρετικό πεδίο ``reason`` στο σώμα του αιτήματος."
 
 msgid "Adopt ACS voucher"
 msgstr "Υιοθέτηση voucher ACS"
@@ -2435,9 +2426,6 @@ msgstr "Λεξιλόγιο κατάστασης δέματος BoxNow (data.parc
 msgid "BoxNow partner identifier (digits only). Used by the storefront BoxNow widget. No platform fallback — empty disables BoxNow."
 msgstr "Αναγνωριστικό συνεργάτη BoxNow (μόνο ψηφία). Χρησιμοποιείται από το widget BoxNow του storefront. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το BoxNow."
 
-msgid "BoxNow rejected the cancellation."
-msgstr "Η BoxNow απέρριψε την ακύρωση."
-
 #, python-format
 msgid "BoxNow shipment %(parcel)s (order %(order)s)"
 msgstr "Αποστολή BoxNow %(parcel)s (παραγγελία %(order)s)"
@@ -2749,14 +2737,8 @@ msgstr "Αίτημα ακύρωσης στις"
 msgid "Cancel selected orders and restore stock"
 msgstr "Ακύρωση επιλεγμένων παραγγελιών και επιστροφή στο απόθεμα"
 
-msgid "Cancel the ACS shipment for an order"
-msgstr "Ακύρωση της αποστολής ACS για παραγγελία"
-
 msgid "Cancel the ACS voucher"
 msgstr "Ακύρωση του voucher ACS"
-
-msgid "Cancel the BoxNow shipment for an order"
-msgstr "Ακύρωση της αποστολής BoxNow για παραγγελία"
 
 msgid "Cancel the carrier shipment for an order"
 msgstr "Ακύρωση της αποστολής μεταφορέα για παραγγελία"
@@ -4489,12 +4471,6 @@ msgstr "Λήψη εξαγωγής δεδομένων GDPR"
 
 msgid "Download shipping voucher (PDF)"
 msgstr "Λήψη voucher αποστολής (PDF)"
-
-msgid "Download the ACS voucher label PDF for an order"
-msgstr "Λήψη του PDF ετικέτας voucher ACS για παραγγελία"
-
-msgid "Download the BoxNow parcel label PDF for an order"
-msgstr "Λήψη του PDF ετικέτας δέματος BoxNow για παραγγελία"
 
 msgid "Download the carrier label PDF for an order"
 msgstr "Λήψη του PDF ετικέτας μεταφορέα για παραγγελία"
@@ -9071,17 +9047,11 @@ msgstr "Εννέα"
 msgid "No"
 msgstr "Όχι"
 
-msgid "No ACS shipment or voucher found for this order."
-msgstr "Δεν βρέθηκε αποστολή ACS ή voucher για αυτή την παραγγελία."
-
 msgid "No Active Reservations"
 msgstr "Χωρίς Ενεργές Δεσμεύσεις"
 
 msgid "No Attribute"
 msgstr "Χωρίς χαρακτηριστικό"
-
-msgid "No BoxNow shipment or parcel ID found for this order."
-msgstr "Δεν βρέθηκε αποστολή BoxNow ή ID δέματος για αυτή την παραγγελία."
 
 msgid "No CartItem matches the given query."
 msgstr "Δεν βρέθηκε είδος καλαθιού που να ταιριάζει με το αίτημα."
@@ -13890,12 +13860,6 @@ msgstr "Αλυσίδα στρατηγικών"
 msgid "Strategy code → weight in 0..1. Missing codes default to 1.0. With \"Learn weights\" on, replaced nightly from each strategy's attach rate on this surface."
 msgstr "Κωδικός στρατηγικής → βάρος στο διάστημα 0..1. Οι κωδικοί που λείπουν έχουν προεπιλεγμένη τιμή 1.0. Με ενεργή την «Εκμάθηση βαρών» αντικαθίστανται κάθε βράδυ από το ποσοστό αγορών κάθε στρατηγικής σε αυτή την επιφάνεια."
 
-msgid "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
-msgstr "Μεταδίδει το PDF ετικέτας ACS μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή ACS για την παραγγελία ή δεν έχει εκδοθεί ακόμα το voucher."
-
-msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
-msgstr "Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία ή δεν έχει ακόμα ανατεθεί ID δέματος."
-
 msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
 msgstr "Επιστρέφει το αρχείο JSON μιας εξαγωγής δεδομένων αυτού του χρήστη. Μόνο ο κάτοχος του λογαριασμού μπορεί να το διαβάσει, συνδεδεμένος: η διεύθυνση δεν περιέχει διαπιστευτήριο."
 
@@ -15328,12 +15292,6 @@ msgstr "Μπορείτε να αγνοήσετε με ασφάλεια αυτό 
 
 msgid "This order changed while the payment was being prepared. Reload it and try again."
 msgstr "Η παραγγελία άλλαξε όσο ετοιμαζόταν η πληρωμή. Ανανεώστε τη σελίδα και δοκιμάστε ξανά."
-
-msgid "This order does not have a BoxNow shipment."
-msgstr "Αυτή η παραγγελία δεν έχει αποστολή BoxNow."
-
-msgid "This order does not have an ACS shipment."
-msgstr "Αυτή η παραγγελία δεν έχει αποστολή ACS."
 
 msgid "This order has already been paid."
 msgstr "Αυτή η παραγγελία έχει ήδη πληρωθεί."
@@ -18066,6 +18024,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
+#~ msgid "ACS rejected the cancellation."
+#~ msgstr "Η ACS απέρριψε την ακύρωση."
+
 #, python-format
 #~ msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
 #~ msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», όχι για τον παραλήπτη αυτής της παραγγελίας. Ελέγξτε τον αριθμό στην πύλη της ACS."
@@ -18122,6 +18083,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 #~ msgstr "Διαχειριστής που ενεργοποίησε τη χειροκίνητη έκδοση. Null όταν η λίστα εκδόθηκε από την καθημερινή εργασία Celery beat. Αποθηκεύει ID χρήστη του schema της ΠΛΑΤΦΟΡΜΑΣ· δεν επιβάλλεται ως FK (δείτε το db_constraint παραπάνω)."
+
+#~ msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
+#~ msgstr "Μόνο για διαχειριστές. Καλεί το ACS_Delete_Voucher. Έγκυρο μόνο πριν το voucher οριστικοποιηθεί σε λίστα παραλαβής."
+
+#~ msgid "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
+#~ msgstr "Μόνο για διαχειριστές. Ζητά ακύρωση δέματος μέσω του API του BoxNow. Έγκυρο μόνο όταν η κατάσταση δέματος είναι NEW (διαφορετικά σφάλμα BoxNow P420). Δέχεται προαιρετικό πεδίο ``reason`` στο σώμα του αιτήματος."
 
 #~ msgid "Advanced Configuration"
 #~ msgstr "Προηγμένη Διαμόρφωση"
@@ -18197,6 +18164,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated."
 #~ msgstr "Ο συγχρονισμός locker BoxNow ολοκληρώθηκε: %(created)d δημιουργήθηκαν, %(updated)d ενημερώθηκαν, %(deactivated)d απενεργοποιήθηκαν."
 
+#~ msgid "BoxNow rejected the cancellation."
+#~ msgstr "Η BoxNow απέρριψε την ακύρωση."
+
 #~ msgid "Built-in page"
 #~ msgstr "Ενσωματωμένη σελίδα"
 
@@ -18211,6 +18181,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Call to Action Banner"
 #~ msgstr "Banner παρότρυνσης για δράση"
+
+#~ msgid "Cancel the ACS shipment for an order"
+#~ msgstr "Ακύρωση της αποστολής ACS για παραγγελία"
+
+#~ msgid "Cancel the BoxNow shipment for an order"
+#~ msgstr "Ακύρωση της αποστολής BoxNow για παραγγελία"
 
 #, python-brace-format
 #~ msgid "Cart validation failed: {errors}"
@@ -18338,6 +18314,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Download a GDPR data export bundle"
 #~ msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
+
+#~ msgid "Download the ACS voucher label PDF for an order"
+#~ msgstr "Λήψη του PDF ετικέτας voucher ACS για παραγγελία"
+
+#~ msgid "Download the BoxNow parcel label PDF for an order"
+#~ msgstr "Λήψη του PDF ετικέτας δέματος BoxNow για παραγγελία"
 
 #, python-format
 #~ msgid "Each CSP source must start with 'https://', 'http://localhost', or 'wss://'. Invalid entries: %(bad)s"
@@ -18754,6 +18736,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Newsletter Signup"
 #~ msgstr "Εγγραφή στο newsletter"
+
+#~ msgid "No ACS shipment or voucher found for this order."
+#~ msgstr "Δεν βρέθηκε αποστολή ACS ή voucher για αυτή την παραγγελία."
+
+#~ msgid "No BoxNow shipment or parcel ID found for this order."
+#~ msgstr "Δεν βρέθηκε αποστολή BoxNow ή ID δέματος για αυτή την παραγγελία."
 
 #~ msgid "No Configuration Needed"
 #~ msgstr "Δεν απαιτείται διαμόρφωση"
@@ -19274,6 +19262,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Story Timeline"
 #~ msgstr "Χρονολόγιο ιστορίας"
 
+#~ msgid "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
+#~ msgstr "Μεταδίδει το PDF ετικέτας ACS μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή ACS για την παραγγελία ή δεν έχει εκδοθεί ακόμα το voucher."
+
+#~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+#~ msgstr "Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία ή δεν έχει ακόμα ανατεθεί ID δέματος."
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."
 
@@ -19350,6 +19344,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "This download link has expired."
 #~ msgstr "Ο σύνδεσμος λήψης έχει λήξει."
+
+#~ msgid "This order does not have a BoxNow shipment."
+#~ msgstr "Αυτή η παραγγελία δεν έχει αποστολή BoxNow."
+
+#~ msgid "This order does not have an ACS shipment."
+#~ msgstr "Αυτή η παραγγελία δεν έχει αποστολή ACS."
 
 #~ msgid "This store already has page builder data."
 #~ msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."

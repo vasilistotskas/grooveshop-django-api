@@ -379,67 +379,6 @@ serializers_config: SerializersConfig = {
         parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
-    "boxnow_cancel": ActionConfig(
-        operation_id="cancelBoxNowShipmentForOrder",
-        summary=_("Cancel the BoxNow shipment for an order"),
-        description=_(
-            "Admin-only. Requests parcel cancellation via the BoxNow API. "
-            "Only valid when the parcel state is NEW (BoxNow error P420 "
-            "otherwise). Accepts an optional ``reason`` field in the "
-            "request body."
-        ),
-        tags=["Orders"],
-        responses={
-            409: ErrorResponseSerializer,
-            503: ErrorResponseSerializer,
-        },
-    ),
-    "boxnow_label": ActionConfig(
-        # Same (status, media_type) key as ``shipment_label`` above:
-        # this streams a PDF, and without it the schema declared a 200
-        # with NO body at all, so a generated client expected nothing
-        # back from a file download.
-        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
-        operation_id="getBoxNowLabelForOrder",
-        summary=_("Download the BoxNow parcel label PDF for an order"),
-        description=_(
-            "Streams the BoxNow label PDF through Django auth. "
-            "Accessible by the order owner or store staff; guest "
-            "orders cannot download labels. Returns 404 when no BoxNow "
-            "shipment exists for the order or the parcel ID has not yet "
-            "been assigned."
-        ),
-        tags=["Orders"],
-    ),
-    "acs_cancel": ActionConfig(
-        operation_id="cancelAcsShipmentForOrder",
-        summary=_("Cancel the ACS shipment for an order"),
-        description=_(
-            "Admin-only. Calls ACS_Delete_Voucher. Only valid before "
-            "the voucher is finalised in a pickup list."
-        ),
-        tags=["Orders"],
-        responses={
-            409: ErrorResponseSerializer,
-            503: ErrorResponseSerializer,
-        },
-    ),
-    "acs_label": ActionConfig(
-        # Same (status, media_type) key as ``shipment_label`` above:
-        # this streams a PDF, and without it the schema declared a 200
-        # with NO body at all, so a generated client expected nothing
-        # back from a file download.
-        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
-        operation_id="getAcsLabelForOrder",
-        summary=_("Download the ACS voucher label PDF for an order"),
-        description=_(
-            "Streams the ACS label PDF through Django auth. "
-            "Accessible by the order owner or store staff; guest orders "
-            "cannot download labels. Returns 404 when no ACS shipment "
-            "exists for the order or the voucher has not been minted yet."
-        ),
-        tags=["Orders"],
-    ),
     "shipment_label": ActionConfig(
         # Streams application/pdf. Declaring OrderDetailSerializer here
         # put a JSON 200 in schema.yml, so the generated storefront
@@ -556,8 +495,6 @@ class OrderViewSet(BaseModelViewSet):
             "partial_update",
             "my_orders",
             "reorder",
-            "boxnow_label",
-            "acs_label",
             "shipment_label",
         }
         guest_allowed_actions = {"retrieve_by_uuid", *GUEST_UUID_QUERY_ACTIONS}
@@ -565,8 +502,6 @@ class OrderViewSet(BaseModelViewSet):
             "destroy",
             "add_tracking",
             "update_status",
-            "boxnow_cancel",
-            "acs_cancel",
             "shipment_cancel",
         }
         # ``viva_return`` is the Viva Wallet hosted-checkout callback
@@ -2643,186 +2578,6 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-    @action(
-        detail=True,
-        methods=["post"],
-        url_path="boxnow_cancel",
-        permission_classes=[StoreStaffChangePermission],
-    )
-    def boxnow_cancel(self, request, pk=None):
-        """Cancel the BoxNow shipment for an order (admin-only)."""
-        from shipping.api_errors import unanswered
-        from shipping.exceptions import CarrierUnavailableError
-        from shipping_boxnow.exceptions import BoxNowAPIError
-        from shipping_boxnow.services import BoxNowService
-
-        order = self.get_object()
-
-        shipment = getattr(order, "boxnow_shipment", None)
-        if shipment is None:
-            raise NotFound(
-                _("This order does not have a BoxNow shipment."),
-                code="shipment_missing",
-            )
-
-        reason: str = request.data.get("reason", "")
-
-        try:
-            BoxNowService.cancel_shipment(shipment, reason=reason)
-        except CarrierUnavailableError as exc:
-            # No answer from BoxNow, or the work is already running here:
-            # a 503 or a 409, never a refusal (#650).
-            logger.warning(
-                "BoxNow cancel (order-action) not answered | order=%s | %s",
-                order.id,
-                exc,
-            )
-            raise unanswered(exc) from exc
-        except BoxNowAPIError as exc:
-            logger.warning(
-                "BoxNow cancel (order-action) failed | order=%s"
-                " | parcel_id=%s | code=%s | msg=%s",
-                order.id,
-                shipment.parcel_id,
-                exc.code,
-                exc,
-            )
-            # ``exc.message`` is the parsed BoxNow business message —
-            # unlike ``str(exc)`` it is never raw exception text
-            # (CodeQL py/stack-trace-exposure).
-            return Response(
-                {
-                    "detail": exc.message
-                    or _("BoxNow rejected the cancellation."),
-                    "code": exc.code,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        order = OrderService.get_order_by_id(order.id)
-        response_serializer_class = self.get_response_serializer()
-        serializer = response_serializer_class(
-            order, context=self.get_serializer_context()
-        )
-        return Response(serializer.data)
-
-    @action(
-        detail=True,
-        methods=["get"],
-        url_path="boxnow_label",
-    )
-    def boxnow_label(self, request, pk=None):
-        """Download the BoxNow parcel label PDF for an order."""
-        from io import BytesIO
-
-        from shipping_boxnow.services import BoxNowService
-
-        order = self.get_object()
-
-        shipment = getattr(order, "boxnow_shipment", None)
-        if shipment is None or not shipment.parcel_id:
-            raise NotFound(
-                _("No BoxNow shipment or parcel ID found for this order."),
-                code="shipment_missing",
-            )
-
-        label_bytes: bytes = BoxNowService.fetch_label_bytes(shipment)
-        return FileResponse(
-            BytesIO(label_bytes),
-            content_type="application/pdf",
-            as_attachment=True,
-            filename=f"boxnow-{shipment.parcel_id}.pdf",
-        )
-
-    @action(
-        detail=True,
-        methods=["post"],
-        url_path="acs_cancel",
-        permission_classes=[StoreStaffChangePermission],
-    )
-    def acs_cancel(self, request, pk=None):
-        """Cancel the ACS shipment for an order (admin-only)."""
-        from shipping.api_errors import unanswered
-        from shipping.exceptions import CarrierUnavailableError
-        from shipping_acs.exceptions import AcsAPIError
-        from shipping_acs.services import AcsService
-
-        order = self.get_object()
-
-        shipment = getattr(order, "acs_shipment", None)
-        if shipment is None:
-            raise NotFound(
-                _("This order does not have an ACS shipment."),
-                code="shipment_missing",
-            )
-
-        reason: str = request.data.get("reason", "")
-        try:
-            AcsService.cancel_voucher(shipment, reason=reason)
-        except CarrierUnavailableError as exc:
-            # No answer from ACS, or the work is already running here: a
-            # 503 or a 409, never a refusal (#650).
-            logger.warning(
-                "ACS cancel (order-action) not answered | order=%s | %s",
-                order.id,
-                exc,
-            )
-            raise unanswered(exc) from exc
-        except AcsAPIError as exc:
-            logger.warning(
-                "ACS cancel (order-action) failed | order=%s | "
-                "voucher_no=%s | msg=%s",
-                order.id,
-                shipment.voucher_no,
-                exc,
-            )
-            # ``exc.error_message`` is the verbatim ACS business message —
-            # unlike ``str(exc)`` it is never raw exception text
-            # (CodeQL py/stack-trace-exposure).
-            return Response(
-                {
-                    "detail": exc.error_message
-                    or _("ACS rejected the cancellation."),
-                    "code": "acs_cancellation_rejected",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        order = OrderService.get_order_by_id(order.id)
-        response_serializer_class = self.get_response_serializer()
-        serializer = response_serializer_class(
-            order, context=self.get_serializer_context()
-        )
-        return Response(serializer.data)
-
-    @action(
-        detail=True,
-        methods=["get"],
-        url_path="acs_label",
-    )
-    def acs_label(self, request, pk=None):
-        """Download the ACS voucher label PDF for an order."""
-        from io import BytesIO
-
-        from shipping_acs.services import AcsService
-
-        order = self.get_object()
-
-        shipment = getattr(order, "acs_shipment", None)
-        if shipment is None or not shipment.voucher_no:
-            raise NotFound(
-                _("No ACS shipment or voucher found for this order."),
-                code="shipment_missing",
-            )
-
-        label_bytes: bytes = AcsService.fetch_label_bytes(shipment)
-        return FileResponse(
-            BytesIO(label_bytes),
-            content_type="application/pdf",
-            as_attachment=True,
-            filename=f"acs-{shipment.voucher_no}.pdf",
-        )
 
     @action(
         detail=True,

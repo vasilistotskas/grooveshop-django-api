@@ -20,6 +20,7 @@ from redis.backoff import NoBackoff
 from redis.retry import Retry
 from rest_framework.test import APIClient
 
+from core.caches import STRICT_CACHE_UNAVAILABLE_MESSAGE
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -115,10 +116,9 @@ def test_a_drf_route_answers_the_error_contract(redis_down, user):
 
     assert response.status_code == 503
     assert response.json() == {
-        "detail": response.json()["detail"],
+        "detail": str(STRICT_CACHE_UNAVAILABLE_MESSAGE),
         "code": CODE,
     }
-    assert response.json()["detail"]
 
 
 def test_the_refusal_is_logged_with_the_failure_s_traceback(

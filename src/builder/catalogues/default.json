@@ -1,42 +1,11 @@
 {
-  "hash": "3978e489a1bc4628",
+  "hash": "4e2bfcaaecee7672",
   "blocks": [
     {
-      "type": "about_content",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "translatable": [],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "webside"
-      ],
-      "presets": [
-        {
-          "id": "default"
-        }
-      ]
-    },
-    {
       "type": "blog_categories",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -232,7 +201,6 @@
           "layout": {
             "type": "string",
             "enum": [
-              "slider",
               "tiles"
             ]
           },
@@ -307,9 +275,9 @@
     },
     {
       "type": "blog_posts_carousel",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -318,7 +286,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -627,9 +594,9 @@
     },
     {
       "type": "blog_posts_grid",
-      "version": 3,
+      "version": 4,
       "accepts": [
-        3
+        4
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -638,7 +605,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -1018,9 +984,9 @@
     },
     {
       "type": "blog_posts_list",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1029,7 +995,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -1380,9 +1345,9 @@
     },
     {
       "type": "business_hours",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1395,7 +1360,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           }
@@ -1421,63 +1385,10 @@
       ]
     },
     {
-      "type": "contact_panel",
-      "version": 2,
-      "accepts": [
-        2
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "eyebrow": {
-            "type": "string",
-            "maxLength": 100
-          },
-          "heading": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "body": {
-            "type": "string",
-            "maxLength": 600
-          },
-          "hint": {
-            "type": "string",
-            "maxLength": 400
-          }
-        },
-        "additionalProperties": false
-      },
-      "translatable": [
-        "/eyebrow",
-        "/heading",
-        "/body",
-        "/hint"
-      ],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "ekfyseosfyteias"
-      ],
-      "presets": [
-        {
-          "id": "default"
-        }
-      ]
-    },
-    {
       "type": "cta_banner",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1673,7 +1584,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           }
@@ -1704,9 +1614,9 @@
     },
     {
       "type": "divider",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1715,7 +1625,6 @@
           "variant": {
             "type": "string",
             "enum": [
-              "line",
               "thread"
             ]
           }
@@ -1740,9 +1649,9 @@
     },
     {
       "type": "faq",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1751,7 +1660,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -1939,9 +1847,9 @@
     },
     {
       "type": "featured_products",
-      "version": 3,
+      "version": 4,
       "accepts": [
-        3
+        4
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1950,7 +1858,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -2205,7 +2112,6 @@
                   "stock": {
                     "type": "string",
                     "enum": [
-                      "any",
                       "inStockFirst",
                       "inStockOnly"
                     ]
@@ -2277,9 +2183,9 @@
     },
     {
       "type": "features_grid",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2288,7 +2194,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -2308,7 +2213,6 @@
           "decor": {
             "type": "string",
             "enum": [
-              "none",
               "gradient_tiles",
               "framed"
             ]
@@ -2989,9 +2893,9 @@
     },
     {
       "type": "hero_banner",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3402,7 +3306,6 @@
           "decor": {
             "type": "string",
             "enum": [
-              "none",
               "orbs",
               "gradient"
             ]
@@ -3410,16 +3313,14 @@
           "align": {
             "type": "string",
             "enum": [
-              "left",
-              "center"
+              "left"
             ]
           },
           "theme": {
             "type": "string",
             "enum": [
               "light",
-              "dark",
-              "auto"
+              "dark"
             ]
           }
         },
@@ -3470,9 +3371,9 @@
     },
     {
       "type": "hero_carousel",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3494,7 +3395,6 @@
           "aspect": {
             "type": "string",
             "enum": [
-              "wide",
               "banner",
               "square"
             ]
@@ -4883,9 +4783,9 @@
     },
     {
       "type": "image_gallery",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4898,7 +4798,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -4935,9 +4834,9 @@
     },
     {
       "type": "location_map",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4950,7 +4849,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -5390,9 +5288,9 @@
     },
     {
       "type": "media_text",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5401,7 +5299,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -5445,7 +5342,6 @@
           "imagePosition": {
             "type": "string",
             "enum": [
-              "left",
               "right"
             ]
           },
@@ -5627,7 +5523,6 @@
           "decor": {
             "type": "string",
             "enum": [
-              "none",
               "orbs",
               "gradient"
             ]
@@ -5859,9 +5754,9 @@
     },
     {
       "type": "newsletter_signup",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5886,8 +5781,7 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
-              "muted"
+              "default"
             ]
           },
           "headingColor": {
@@ -5929,9 +5823,9 @@
     },
     {
       "type": "offers_preview",
-      "version": 3,
+      "version": 4,
       "accepts": [
-        3
+        4
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5941,8 +5835,7 @@
             "type": "string",
             "enum": [
               "default",
-              "muted",
-              "ink"
+              "muted"
             ]
           },
           "eyebrow": {
@@ -6196,284 +6089,10 @@
       ]
     },
     {
-      "type": "partner",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 60
-          },
-          "href": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "href": {
-                    "type": "string",
-                    "maxLength": 1000,
-                    "pattern": "^https:\\/\\/"
-                  }
-                },
-                "required": [
-                  "href"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "route": {
-                    "type": "string",
-                    "enum": [
-                      "/",
-                      "/products",
-                      "/blog",
-                      "/contact",
-                      "/offers",
-                      "/gift-cards",
-                      "/loyalty-program",
-                      "/feedback",
-                      "/account/login",
-                      "/account/signup"
-                    ]
-                  }
-                },
-                "required": [
-                  "route"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "ref": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "product"
-                          },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 2147483647
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "category"
-                          },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 2147483647
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "blogCategory"
-                          },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 2147483647
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "blogPost"
-                          },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 2147483647
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "page"
-                          },
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "const": "contentPage"
-                          },
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64,
-                            "pattern": "^[-a-zA-Z0-9_]+$"
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "id"
-                        ],
-                        "additionalProperties": false
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "ref"
-                ],
-                "additionalProperties": false
-              }
-            ],
-            "x-builder-link": true
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "translatable": [
-        "/name"
-      ],
-      "refs": {},
-      "linkRefs": [
-        "/href"
-      ],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "block"
-      ],
-      "designs": [
-        "ekfyseosfyteias"
-      ],
-      "presets": [
-        {
-          "id": "default"
-        }
-      ]
-    },
-    {
-      "type": "partner_strip",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 80
-          }
-        },
-        "additionalProperties": false
-      },
-      "translatable": [
-        "/title",
-        "/label"
-      ],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {
-        "maxBlocks": 12
-      },
-      "children": {
-        "allowed": [
-          "partner"
-        ],
-        "maxDepth": 1
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "ekfyseosfyteias"
-      ],
-      "presets": [
-        {
-          "id": "default",
-          "blocks": [
-            {
-              "type": "partner"
-            },
-            {
-              "type": "partner"
-            },
-            {
-              "type": "partner"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "type": "product_categories",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6482,7 +6101,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -6493,9 +6111,7 @@
           "layout": {
             "type": "string",
             "enum": [
-              "slider",
-              "grid",
-              "tiles"
+              "slider"
             ]
           },
           "categories": {
@@ -6593,9 +6209,9 @@
     },
     {
       "type": "products_grid",
-      "version": 3,
+      "version": 4,
       "accepts": [
-        3
+        4
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6604,7 +6220,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -6859,7 +6474,6 @@
                   "stock": {
                     "type": "string",
                     "enum": [
-                      "any",
                       "inStockFirst",
                       "inStockOnly"
                     ]
@@ -7007,9 +6621,9 @@
     },
     {
       "type": "products_slider",
-      "version": 3,
+      "version": 4,
       "accepts": [
-        3
+        4
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7018,7 +6632,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -7273,7 +6886,6 @@
                   "stock": {
                     "type": "string",
                     "enum": [
-                      "any",
                       "inStockFirst",
                       "inStockOnly"
                     ]
@@ -7340,54 +6952,6 @@
               "limit": 8
             }
           }
-        }
-      ]
-    },
-    {
-      "type": "pull_quote",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "quote": {
-            "type": "string",
-            "maxLength": 300
-          },
-          "text": {
-            "type": "string",
-            "maxLength": 1000
-          },
-          "attribution": {
-            "type": "string",
-            "maxLength": 120
-          }
-        },
-        "additionalProperties": false
-      },
-      "translatable": [
-        "/quote",
-        "/text",
-        "/attribution"
-      ],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "ekfyseosfyteias"
-      ],
-      "presets": [
-        {
-          "id": "default"
         }
       ]
     },
@@ -7506,9 +7070,9 @@
     },
     {
       "type": "spacer",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7518,7 +7082,6 @@
             "type": "string",
             "enum": [
               "sm",
-              "md",
               "lg",
               "xl"
             ]
@@ -7698,9 +7261,9 @@
     },
     {
       "type": "stats_strip",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7709,8 +7272,7 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
-              "muted"
+              "default"
             ]
           }
         },
@@ -7750,9 +7312,9 @@
     },
     {
       "type": "store_assurances",
-      "version": 1,
+      "version": 2,
       "accepts": [
-        1
+        2
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7761,7 +7323,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -7799,9 +7360,9 @@
     },
     {
       "type": "story_timeline",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7818,7 +7379,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           }
@@ -7933,9 +7493,9 @@
     },
     {
       "type": "testimonials",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7944,7 +7504,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -8395,9 +7954,9 @@
     },
     {
       "type": "trust_badges",
-      "version": 2,
+      "version": 3,
       "accepts": [
-        2
+        3
       ],
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8406,7 +7965,6 @@
           "surface": {
             "type": "string",
             "enum": [
-              "default",
               "muted"
             ]
           },
@@ -8451,99 +8009,6 @@
               "type": "trust_badge"
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "vision_content",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "translatable": [],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "webside"
-      ],
-      "presets": [
-        {
-          "id": "default"
-        }
-      ]
-    },
-    {
-      "type": "what_is_microlearning",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "translatable": [],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "webside"
-      ],
-      "presets": [
-        {
-          "id": "default"
-        }
-      ]
-    },
-    {
-      "type": "why_microlearning",
-      "version": 1,
-      "accepts": [
-        1
-      ],
-      "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "translatable": [],
-      "refs": {},
-      "linkRefs": [],
-      "limits": {},
-      "children": {
-        "allowed": []
-      },
-      "kinds": [
-        "section"
-      ],
-      "designs": [
-        "webside"
-      ],
-      "presets": [
-        {
-          "id": "default"
         }
       ]
     }
@@ -9313,69 +8778,9 @@
       "linkRefs": [],
       "contrast": [
         {
-          "id": "body-text-light",
-          "foreground": "/colors/light/neutral/scale/700",
-          "background": "/colors/light/neutral/scale/50",
-          "min": 4.5,
-          "severity": "error",
-          "label": {
-            "el": "Κείμενο, φωτεινό",
-            "en": "Text, light"
-          },
-          "fix": {
-            "el": "Αλλάζει το χρώμα του κειμένου όσο χρειάζεται για να διαβάζεται στη σελίδα.",
-            "en": "Changes the text colour just enough to read on the page."
-          }
-        },
-        {
-          "id": "body-text-dark",
-          "foreground": "/colors/dark/neutral/scale/200",
-          "background": "/colors/dark/neutral/scale/950",
-          "min": 4.5,
-          "severity": "error",
-          "label": {
-            "el": "Κείμενο, σκούρο",
-            "en": "Text, dark"
-          },
-          "fix": {
-            "el": "Αλλάζει το χρώμα του κειμένου όσο χρειάζεται για να διαβάζεται στη σελίδα.",
-            "en": "Changes the text colour just enough to read on the page."
-          }
-        },
-        {
-          "id": "muted-text-light",
-          "foreground": "/colors/light/neutral/scale/500",
-          "background": "/colors/light/neutral/scale/50",
-          "min": 4.5,
-          "severity": "warning",
-          "label": {
-            "el": "Δευτερεύον κείμενο, φωτεινό",
-            "en": "Secondary text, light"
-          },
-          "fix": {
-            "el": "Αλλάζει το χρώμα του δευτερεύοντος κειμένου όσο χρειάζεται για να διαβάζεται στη σελίδα.",
-            "en": "Changes the secondary text colour just enough to read on the page."
-          }
-        },
-        {
-          "id": "muted-text-dark",
-          "foreground": "/colors/dark/neutral/scale/400",
-          "background": "/colors/dark/neutral/scale/950",
-          "min": 4.5,
-          "severity": "warning",
-          "label": {
-            "el": "Δευτερεύον κείμενο, σκούρο",
-            "en": "Secondary text, dark"
-          },
-          "fix": {
-            "el": "Αλλάζει το χρώμα του δευτερεύοντος κειμένου όσο χρειάζεται για να διαβάζεται στη σελίδα.",
-            "en": "Changes the secondary text colour just enough to read on the page."
-          }
-        },
-        {
           "id": "action-light",
           "foreground": "/colors/light/action",
-          "background": "/colors/light/neutral/scale/50",
+          "background": "#ffffff",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9390,7 +8795,7 @@
         {
           "id": "action-dark",
           "foreground": "/colors/dark/action",
-          "background": "/colors/dark/neutral/scale/950",
+          "background": "#17171a",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9405,7 +8810,7 @@
         {
           "id": "accent-light",
           "foreground": "/colors/light/accent",
-          "background": "/colors/light/neutral/scale/50",
+          "background": "#ffffff",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9420,7 +8825,7 @@
         {
           "id": "accent-dark",
           "foreground": "/colors/dark/accent",
-          "background": "/colors/dark/neutral/scale/950",
+          "background": "#17171a",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9435,7 +8840,7 @@
         {
           "id": "accent-muted-light",
           "foreground": "/colors/light/accent",
-          "background": "#ffffff",
+          "background": "#f7f7f5",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9450,7 +8855,7 @@
         {
           "id": "accent-muted-dark",
           "foreground": "/colors/dark/accent",
-          "background": "/colors/dark/neutral/scale/900",
+          "background": "#0e0e10",
           "min": 3,
           "severity": "warning",
           "label": {
@@ -9465,7 +8870,7 @@
         {
           "id": "accent-text-light",
           "foreground": "/colors/light/accent",
-          "background": "/colors/light/neutral/scale/50",
+          "background": "#ffffff",
           "min": 4.5,
           "severity": "warning",
           "label": {
@@ -9478,14 +8883,52 @@
           }
         },
         {
+          "id": "accent-text-dark",
+          "foreground": {
+            "mix": "/colors/dark/accent",
+            "toward": "#ffffff",
+            "percent": 20
+          },
+          "background": "#17171a",
+          "min": 4.5,
+          "severity": "warning",
+          "label": {
+            "el": "Έμφαση σε μικρό κείμενο, σκούρο",
+            "en": "Accent as small text, dark"
+          },
+          "fix": {
+            "el": "Αλλάζει το χρώμα έμφασης όσο χρειάζεται για να διαβάζεται και σε μικρό κείμενο στη σελίδα.",
+            "en": "Changes the accent colour just enough for small text in it to read on the page."
+          }
+        },
+        {
           "id": "accent-text-muted-light",
           "foreground": "/colors/light/accent",
-          "background": "#ffffff",
+          "background": "#f7f7f5",
           "min": 4.5,
           "severity": "warning",
           "label": {
             "el": "Έμφαση σε μικρό κείμενο, σε απαλό φόντο, φωτεινό",
             "en": "Accent as small text on the muted ground, light"
+          },
+          "fix": {
+            "el": "Αλλάζει το χρώμα έμφασης όσο χρειάζεται για να διαβάζεται και σε μικρό κείμενο στο απαλό φόντο.",
+            "en": "Changes the accent colour just enough for small text in it to read on the muted ground."
+          }
+        },
+        {
+          "id": "accent-text-muted-dark",
+          "foreground": {
+            "mix": "/colors/dark/accent",
+            "toward": "#ffffff",
+            "percent": 20
+          },
+          "background": "#0e0e10",
+          "min": 4.5,
+          "severity": "warning",
+          "label": {
+            "el": "Έμφαση σε μικρό κείμενο, σε απαλό φόντο, σκούρο",
+            "en": "Accent as small text on the muted ground, dark"
           },
           "fix": {
             "el": "Αλλάζει το χρώμα έμφασης όσο χρειάζεται για να διαβάζεται και σε μικρό κείμενο στο απαλό φόντο.",
@@ -9544,13 +8987,13 @@
                 "950": "#09090b"
               }
             },
-            "action": "#737373",
-            "actionLinked": true,
-            "accent": "#003dff",
-            "success": "#00a63e",
-            "warning": "#d08700",
-            "error": "#e7000b",
-            "info": "#155dfc",
+            "action": "#17171a",
+            "actionLinked": false,
+            "accent": "#0038e8",
+            "success": "#13703a",
+            "warning": "#8a5a00",
+            "error": "#b4232a",
+            "info": "#0030c4",
             "liked": "#ff00bd"
           },
           "dark": {
@@ -9602,23 +9045,23 @@
                 "950": "#09090b"
               }
             },
-            "action": "#f5f5f5",
-            "actionLinked": true,
-            "accent": "#3364ff",
-            "success": "#05df72",
-            "warning": "#fcc800",
-            "error": "#ff6467",
-            "info": "#51a2ff",
+            "action": "#f7f7f5",
+            "actionLinked": false,
+            "accent": "#4d73ff",
+            "success": "#4ade80",
+            "warning": "#fbbf24",
+            "error": "#f87171",
+            "info": "#8aa4ff",
             "liked": "#ff00bd"
           }
         },
-        "radius": "0.25rem",
+        "radius": "0.75rem",
         "fonts": {
-          "sans": "system",
-          "display": "system",
-          "mono": "system-mono"
+          "sans": "manrope",
+          "display": "geologica",
+          "mono": "jetbrains-mono"
         },
-        "container": "wide"
+        "container": "comfortable"
       }
     }
   },
@@ -9630,8 +9073,6 @@
     "feedback",
     "home",
     "products",
-    "vision",
-    "what-is-microlearning",
-    "why-microlearning"
+    "vision"
   ]
 }

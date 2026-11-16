@@ -47,6 +47,7 @@ from order.enum.payment_transaction import (
     PaymentTransactionKind,
 )
 from order.enum.status import PaymentStatus
+from order.exceptions import PaymentStatusUnavailableError
 from order.models.payment_transaction import PaymentTransaction
 from order.models.pending_payment_fee import PendingPaymentFee
 from order.models.refund_attempt import (
@@ -1321,9 +1322,13 @@ class PaymentLedger:
         if existing is not None:
             return existing
 
-        status, data = get_payment_provider(provider_code).get_payment_status(
-            payment_id
-        )
+        try:
+            status, data = get_payment_provider(
+                provider_code
+            ).get_payment_status(payment_id)
+        except PaymentStatusUnavailableError:
+            # The provider logged why; nothing is known about the capture.
+            return None
         captured = data.get("amount")
         if status not in _CAPTURED_STATUSES or captured is None:
             logger.error(

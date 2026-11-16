@@ -60,7 +60,7 @@
         "settings": {
           "heading": "Η πορεία μας"
         },
-        "type": "story_timeline@2"
+        "type": "story_timeline@3"
       },
       "7f54c44e-e1cc-4c5f-9cd0-35443a9bff96": {
         "settings": {
@@ -68,13 +68,13 @@
           "placeholder": "Το email σου",
           "heading": "Μείνε ενημερωμένος"
         },
-        "type": "newsletter_signup@2"
+        "type": "newsletter_signup@3"
       },
       "9fafa287-0070-4cf2-83bf-3e99249befcb": {
         "settings": {
           "height": "lg"
         },
-        "type": "spacer@1"
+        "type": "spacer@2"
       },
       "9fe93702-6924-489e-9be2-de20dcd21994": {
         "blockOrder": [
@@ -117,7 +117,7 @@
           "heading": "Συχνές ερωτήσεις",
           "multiple": true
         },
-        "type": "faq@1"
+        "type": "faq@2"
       },
       "ea50d7aa-e4ca-4e48-ae5e-3fb27944c009": {
         "blockOrder": [
@@ -156,7 +156,7 @@
           "decor": "gradient_tiles",
           "heading": "Γιατί να μας επιλέξεις"
         },
-        "type": "features_grid@1"
+        "type": "features_grid@2"
       },
       "f2126905-b5cb-4701-a4b1-fc3cc622207f": {
         "blockOrder": [
@@ -193,7 +193,7 @@
         "settings": {
           "columns": 3
         },
-        "type": "image_gallery@1"
+        "type": "image_gallery@2"
       },
       "f21b42d9-8e2d-4a32-8b46-d58e8c5f9cb9": {
         "settings": {
@@ -203,11 +203,10 @@
           },
           "ctaText": "Δες τη γκάμα",
           "decor": "orbs",
-          "imagePosition": "left",
           "imageUrl": "/img/main-banner.png",
           "heading": "Ξεκινήσαμε από ένα συρτάρι με καλώδια"
         },
-        "type": "media_text@2"
+        "type": "media_text@3"
       },
       "ff8b5710-dfe2-4a69-b935-374dbc4067b6": {
         "settings": {

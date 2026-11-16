@@ -634,7 +634,7 @@ def read_decisions(path: Path) -> dict[str, Decisions]:
     store holds ``images``, each value as a document writes it to the id of a
     library image or ``"empty"``; ``alt``, an image id to its text per
     language; and ``slots``, an empty list entry as the report names it to the
-    id of a library image or ``"remove"`` (``docs/builder.md`` has an
+    id of a library image or ``"remove"`` (``docs/builder/media.md`` has an
     example)."""
     try:
         stated = json.loads(path.read_text(encoding="utf-8"))

@@ -9,6 +9,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
+from django.utils.translation import gettext_lazy as _
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
@@ -61,6 +62,32 @@ STRICT_NAMESPACE = "strict:"
 #: These are third-party or fixed keys — allauth reads the default alias
 #: directly and offers no setting to point it elsewhere — so the match is
 #: on the key, in this one place.
+#:
+#: **Every security control fails closed, and says so.** A control is a
+#: key whose loss lifts a bound or a guarantee: allauth's limits, TOTP
+#: replay protection and IdP codes, ``core.middleware.allauth_ratelimit``,
+#: the security scopes of ``core.api.throttling`` (``fail_closed = True``),
+#: the single-use tickets, the staff sign-in counters
+#: (``tenant.staff_login_limits``, ``admin.staff_mfa``) and the staff
+#: password-reset budget (``admin.password_reset``). One rule for all:
+#:
+#: 1. Its keys sit under this tuple (or it counts with ``count_in_window``,
+#:    ``add`` or ``incr``, which raise for any key), so an unreachable
+#:    Redis RAISES ``REDIS_UNAVAILABLE`` instead of reporting "no history".
+#: 2. The request is refused with **503** and the code
+#:    ``temporarily_unavailable`` (``STRICT_CACHE_UNAVAILABLE_CODE``).
+#:    Whatever raises it from a view, on any route, is answered by
+#:    ``core.middleware.strict_cache``, in the shape the route's client
+#:    reads; only a flow that has a refusal of its own catches it first
+#:    (the staff sign-in: 503 ``staff_login_unavailable`` on the API, the
+#:    form's error on the admin pages). Never a 429, which tells the caller
+#:    they sent too much and comes with a ``Retry-After`` no empty history
+#:    can compute; never a 500, which is uncoded and reads as a crash; and
+#:    never a pass.
+#:
+#: A limit that fails OPEN instead writes its reason beside it
+#: (``order.views.viva_webhook._webhook_get_rate_limit``, while a stored
+#: verification key makes Viva's handshake free to answer).
 STRICT_KEY_PREFIXES: tuple[str, ...] = (
     STRICT_NAMESPACE,
     f"global:{STRICT_NAMESPACE}",
@@ -69,6 +96,14 @@ STRICT_KEY_PREFIXES: tuple[str, ...] = (
     "allauth.idp.oidc.authorization_code[",
     "allauth.idp.oidc.user_code[",
     "allauth.idp.oidc.device_code[",
+)
+
+#: The code and sentence of every 503 the rule above gives
+#: (``core.middleware.strict_cache``). The code is OAuth's own for this
+#: case (RFC 6749, 4.1.2.1), so the IdP's answer needs no second one.
+STRICT_CACHE_UNAVAILABLE_CODE = "temporarily_unavailable"
+STRICT_CACHE_UNAVAILABLE_MESSAGE = _(
+    "This action is temporarily unavailable. Try again shortly."
 )
 
 
@@ -102,7 +137,9 @@ class BurstLogger:
         self._last_logged = float("-inf")
         self._suppressed = 0
 
-    def report(self, *args: Any) -> None:
+    def report(self, *args: Any, exc_info: BaseException | None = None) -> None:
+        """Log one line for a burst; *exc_info* adds the first event's
+        traceback, so where the failure came from stays visible."""
         now = time.monotonic()
         with self._lock:
             if now - self._last_logged < BURST_INTERVAL_SECONDS:
@@ -116,6 +153,7 @@ class BurstLogger:
             *args,
             suppressed,
             int(BURST_INTERVAL_SECONDS),
+            exc_info=exc_info,
         )
 
 

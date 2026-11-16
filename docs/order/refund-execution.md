@@ -14,10 +14,12 @@ refunded, payment by payment) and:
 - refuses an amount that is not positive, and an amount above the remainder
   (`Refund amount (X) cannot exceed the refundable amount (Y)`), before any
   provider is called; a repeat refund that finds nothing left raises
-  `This order has already been refunded.`; an order the ledger holds no
-  provider payment for raises
+  `This order has already been refunded.`; an order with nothing refundable
+  (the ledger holds no provider payment and no gift-card or points value left
+  to return) raises
   `This order was not paid through a payment provider...` (cash on delivery, a
-  gift card, a hand edit);
+  hand edit); an order paid only with a gift card still has stored value to
+  return, so it gets a stored-value attempt instead;
 - plans the refund payment by payment, oldest first: an order paid twice holds
   two CHARGE rows and a refund larger than one is split across them, one
   provider call each, one REFUND row each (a COD_COLLECTION share is recorded
@@ -168,18 +170,18 @@ PARTIALLY_REFUNDED while part of the payment remains refundable, REFUNDED once
 nothing does. **Whatever hangs off the order's total is released only on
 REFUNDED, once, with the last refund**: the loyalty points
 (`loyalty.signals.handle_order_refunded_loyalty`, which is all-or-nothing and
-once per order). The gift-card redemption has no `order_refunded` receiver any
-more (`giftcard.signals.handle_order_refunded_giftcard` is gone): `refund_order`
-credits the cards itself, with the value of a refund beyond the provider's
-money (`GiftCardService.credit_refund`, [§7.2](refunds.md)), and a cancel
-returns the whole redemption (`giftcard.signals.handle_order_canceled_giftcard`
-→ `giftcard.tasks.credit_refund_to_gift_cards`). A refund is paid back by the
-provider first, and releasing the whole redemption on top handed back more
-than the refund was worth (a EUR 5 refund once put EUR 60 back on a gift
-card). The cards now get the value in parts, as each refund reaches past the
-provider's money: a card can be credited more than once for one order, never
-for more than it is still owed, which `credit_refund` reads under the card's
-row lock.
+once per order). Gift-card value does not go through `order_refunded`: there is
+no receiver for it. `refund_order` credits the cards itself, in parts, with the
+value of a refund beyond the provider's money (`GiftCardService.credit_refund`,
+called from `OrderService._return_stored_value`; [§7.2](refunds.md)). When the
+order used gift cards and points, the excess is split between them in
+proportion to what each has not yet got back
+(`PaymentLedger.split_stored_value`): the cards get their share, not the whole
+excess. A card can be credited more than once for one order, never for more
+than it is still owed, which `credit_refund` reads under the card's row lock. A
+cancel returns the whole redemption
+(`giftcard.signals.handle_order_canceled_giftcard` →
+`giftcard.tasks.credit_refund_to_gift_cards`).
 The email, the toast, the history row and the Meta `Refund` event fire on every
 refund, partial Stripe dashboard refunds included (they used to be silent).
 

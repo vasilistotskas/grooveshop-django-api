@@ -75,5 +75,8 @@ def test_wrong_codes_on_every_host_share_one_lockout(mt_tenant, mt_tenant_b):
                 staff_mfa.verify_second_factor(user, "000000")
 
     for host in (get_public_schema_name(), *hosts):
-        with schema_context(host):
-            assert staff_mfa.is_locked(user)
+        with (
+            schema_context(host),
+            pytest.raises(staff_mfa.SecondFactorLocked),
+        ):
+            staff_mfa.verify_second_factor(user, "000000")

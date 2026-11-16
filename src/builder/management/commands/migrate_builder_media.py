@@ -183,7 +183,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
             raise CommandError(
                 "Nothing of these stores was written. Settle each line "
-                "(docs/builder.md says how) and run it again:\n"
+                "(docs/builder/media.md says how) and run it again:\n"
                 + "\n".join(failed)
             )
 

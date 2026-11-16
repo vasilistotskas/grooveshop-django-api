@@ -13,7 +13,7 @@ _real_path_exists = os.path.exists
 
 
 class CeleryConfigTestCase(TestCase):
-    @patch("core.celery.Celery")
+    @patch("core.celery.GrooveShopCelery")
     def test_create_celery_app(self, mock_celery):
         mock_celery_instance = mock_celery.return_value
 
@@ -25,7 +25,7 @@ class CeleryConfigTestCase(TestCase):
         )
         self.assertTrue(app.autodiscover_tasks.called)
 
-    @patch("core.celery.Celery")
+    @patch("core.celery.GrooveShopCelery")
     def test_settings_are_the_only_config_source(self, mock_celery):
         """No ``conf.update()`` in ``create_celery_app``, ever.
 

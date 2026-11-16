@@ -28,7 +28,6 @@ from rest_framework.exceptions import (
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.permissions import (
     IsOwnerOrAdmin,
@@ -38,11 +37,13 @@ from core.api.permissions import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
     OrderSpecimenThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
+    UserBudgetThrottle,
     VivaReturnThrottle,
 )
 from core.api.views import BaseModelViewSet
@@ -72,6 +73,7 @@ from order.exceptions import (
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
+    PaymentStatusUnavailableError,
     PaymentVerificationError,
     RefundOutstandingError,
     StockReservationError,
@@ -273,6 +275,8 @@ serializers_config: SerializersConfig = {
     ),
     "payment_status": ActionConfig(
         response=PaymentStatusResponseSerializer,
+        # The provider could not be asked; nothing was recorded.
+        responses={503: ErrorResponseSerializer},
         operation_id="getOrderPaymentStatus",
         summary=_("Get payment status for an order"),
         description=_(
@@ -547,7 +551,9 @@ class OrderViewSet(BaseModelViewSet):
             super().check_object_permissions(request, obj)
             return
 
-        if obj.user_id is None:
+        # A guest's order, or any order of a store that signs no
+        # shopper in: opened with its uuid, never by a sign-in.
+        if obj.served_as_guest:
             if self.action not in {
                 "retrieve_by_uuid",
                 *GUEST_UUID_QUERY_ACTIONS,
@@ -1428,8 +1434,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1506,8 +1512,8 @@ class OrderViewSet(BaseModelViewSet):
         methods=["POST"],
         url_path="retry-payment",
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1656,8 +1662,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1797,8 +1803,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1979,7 +1985,7 @@ class OrderViewSet(BaseModelViewSet):
             and order.user
             and order.user.id == user.id
         )
-        is_guest_order = order.user is None
+        is_guest_order = order.served_as_guest
 
         if not (is_admin or is_owner or is_guest_order):
             raise PermissionDenied(
@@ -2549,6 +2555,19 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_serializer.validated_data)
 
+        except PaymentStatusUnavailableError:
+            # Not a payment outcome: the order keeps its state and the
+            # caller asks again later. The provider logged the cause.
+            return Response(
+                {
+                    "detail": _(
+                        "The payment provider could not be reached. "
+                        "Try again in a moment."
+                    ),
+                    "code": "payment_provider_unavailable",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except ValueError as e:
             logger.warning(
                 "Payment status error for order %s: %s",

@@ -19,6 +19,7 @@ from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
 from order.enum.status import PaymentStatus
+from order.exceptions import PaymentStatusUnavailableError
 from order.payment_binding import PaymentPurpose, binding_metadata
 
 if TYPE_CHECKING:
@@ -219,7 +220,13 @@ class PaymentProvider(ABC):
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
-        pass
+        """Where *payment_id* stands, as the provider reports it.
+
+        Raises ``PaymentStatusUnavailableError`` when the provider could not
+        be asked or its answer could not be read. That is never a payment
+        outcome: answering FAILED for it let the sweep cancel an order whose
+        payment was fine (#698).
+        """
 
     @abstractmethod
     def create_checkout_session(
@@ -976,18 +983,12 @@ class StripePaymentProvider(PaymentProvider):
 
             return status, status_data
 
-        except stripe.StripeError as e:
+        except Exception as e:
             logger.exception(
                 "Failed to get Stripe payment status",
                 extra={"payment_id": payment_id, "error": str(e)},
             )
-            return PaymentStatus.FAILED, {"error": str(e), "stripe_error": True}
-        except Exception as e:
-            logger.exception(
-                "Failed to get payment status",
-                extra={"payment_id": payment_id, "error": str(e)},
-            )
-            return PaymentStatus.FAILED, {"error": str(e)}
+            raise PaymentStatusUnavailableError(payment_id) from e
 
 
 _ISO_NUMERIC_TO_ALPHA: dict[str, str] = {
@@ -1652,17 +1653,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 error_body,
                 extra={"payment_id": payment_id},
             )
-            return PaymentStatus.FAILED, {
-                "error": str(e),
-                "viva_error": True,
-                "details": error_body,
-            }
+            raise PaymentStatusUnavailableError(payment_id) from e
         except Exception as e:
             logger.exception(
                 "Failed to get Viva Wallet payment status",
                 extra={"payment_id": payment_id},
             )
-            return PaymentStatus.FAILED, {"error": str(e)}
+            raise PaymentStatusUnavailableError(payment_id) from e
 
 
 # Every code a PayWay row can carry that is NOT registered — "paypal",

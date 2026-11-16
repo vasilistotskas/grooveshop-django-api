@@ -3,9 +3,10 @@
 The pages are builder documents exported from production's demo store, with
 what differs per store (a product's id, an image's media path) left as a
 placeholder the seeder resolves. The dataset is checked against the pinned
-snapshot of the storefront's real catalogue, so a block change that breaks
-a demo page fails here rather than on a rebuilt demo store; the seed itself
-is validated again, references included, by ``seed_with_content``.
+snapshot of the storefront's real catalogue for the demo store's design, so
+a block change that breaks a demo page fails here rather than on a rebuilt
+demo store; the seed itself is validated again, references included, by
+``seed_with_content``.
 """
 
 from __future__ import annotations
@@ -19,16 +20,15 @@ from django.test import TestCase
 
 from builder import seeding
 from builder.models import kind_of_key
-from builder.seeding import SEED_CATALOGUE
-from builder.storefront import parse_catalogue
 from builder.validation import validate_document
 from devtools import demo_store
 from devtools.demo_catalogue import PRODUCTS
 from product.factories.product import ProductFactory
+from tests.utils.real_catalogues import catalogue
 
-CATALOGUE = parse_catalogue(
-    json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
-)
+#: The demo store is any store marked ``is_demo``: its schema names no
+#: design, so it is served the default design's catalogue.
+CATALOGUE = catalogue("default")
 LOCK = json.loads(
     (
         Path(demo_store.__file__).resolve().parent

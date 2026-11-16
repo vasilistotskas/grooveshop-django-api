@@ -1152,12 +1152,13 @@ def _seed_notifications(user, orders: dict[int, Any]) -> int:
     from django.utils import timezone
 
     from notification.models import Notification, NotificationUser
+    from order.storefront_links import account_order_path
 
     now = timezone.now()
     written = 0
     for row in NOTIFICATIONS:
         order = orders.get(row.order) if row.order is not None else None
-        link = f"/account/orders/{order.pk}" if order else row.link
+        link = account_order_path(order) if order else row.link
         if NotificationUser.objects.filter(
             user=user,
             notification__notification_type=row.notification_type,

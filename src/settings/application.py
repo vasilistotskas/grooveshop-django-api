@@ -66,7 +66,7 @@ SHARED_APPS = [
     # in public-schema auth migrations. Tenant schemas have their own copy.
     "user",
     # Email platform: a store's switches and opt-outs live in its schema,
-    # the platform's own in public (one model, ``docs/emails.md``).
+    # the platform's own in public (one model, ``docs/emails/sending.md``).
     "emails",
     # Session tracking rows must exist where the session's USER row
     # lives: platform staff are public-schema identities, so their
@@ -237,6 +237,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # A view that cannot reach a strict cache key (a rate limit, a TOTP
+    # replay check, an IdP code, a ticket) answers the coded 503 here, in
+    # the shape of its route, on every route (``core.caches``' rule).
+    "core.middleware.strict_cache.StrictCacheUnavailableMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
     "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking

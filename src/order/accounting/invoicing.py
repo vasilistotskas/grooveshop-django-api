@@ -54,7 +54,6 @@ from django.utils.translation import override as translation_override
 from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
-from core.utils.tenant_urls import get_tenant_frontend_url
 from order.accounting import credit_allocation
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.accounting.taxation import breakdown_by_rate, order_vat_lines
@@ -64,6 +63,7 @@ from order.enum.status import OrderStatus
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 from order.models.retail_credit import RetailCredit
+from order.storefront_links import order_page_url
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.membership import is_demo_store
 
@@ -361,17 +361,16 @@ def _pay_way_display(order: Order) -> str:
 
 
 def _verification_url(order: Order, *, language: str) -> str:
-    """Public-facing order URL the QR code points at.
+    """Public-facing order URL the QR code points at until AADE's own
+    replaces it.
 
-    Lands on the customer's order detail page on the storefront —
-    scanning redirects a logged-in customer straight to their copy of
-    the invoice download button. Guests hit the login wall; once the
-    order is claimed via its UUID the Nuxt page re-renders. *language*
-    is the one the invoice is rendered in.
+    The order's page for whoever holds the document
+    (``order.storefront_links``): the account's page for an account
+    holder's order on a store that signs its shoppers in, the order
+    confirmation by uuid for a guest's and on a store without accounts.
+    *language* is the one the invoice is rendered in.
     """
-    return get_tenant_frontend_url(
-        f"/account/orders/{order.id}", language=language
-    )
+    return order_page_url(order, language=language)
 
 
 def _vat_breakdown_for_render(

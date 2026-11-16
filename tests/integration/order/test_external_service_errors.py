@@ -58,13 +58,6 @@ class TestExternalServiceErrorsAreLogged:
                     "idempotency_key": "order-1-refund-1",
                 },
             ),
-            # Stripe payment status
-            (
-                "get_payment_status",
-                {
-                    "payment_id": "pi_test_789",
-                },
-            ),
             # Stripe checkout session
             (
                 "create_checkout_session",
@@ -127,21 +120,11 @@ class TestExternalServiceErrorsAreLogged:
             result = method(**method_args)
 
             # Verify: Method returns failure status
-            # Note: get_payment_status returns (PaymentStatus, dict) not (bool, dict)
-            if method_name == "get_payment_status":
-                from order.enum.status import PaymentStatus
-
-                status, error_data = result
-                assert status == PaymentStatus.FAILED, (
-                    f"Expected FAILED status for stripe.{method_name}, "
-                    f"but got {status}"
-                )
-            else:
-                success, error_data = result
-                assert success is False, (
-                    f"Expected failure for stripe.{method_name}, "
-                    f"but got success=True"
-                )
+            success, error_data = result
+            assert success is False, (
+                f"Expected failure for stripe.{method_name}, "
+                f"but got success=True"
+            )
 
             # Verify: Error response is structured
             assert isinstance(error_data, dict), (

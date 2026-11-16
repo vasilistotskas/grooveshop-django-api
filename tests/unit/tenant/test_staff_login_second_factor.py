@@ -155,7 +155,8 @@ class TestSuperuserNeedsASecondFactor:
         for _attempt in range(staff_mfa.MAX_FAILURES):
             _login(email=user.email, password=PASSWORD, code="000000")
 
-        assert staff_mfa.is_locked(user)
+        failures = cache.get(staff_mfa._failures_key(user), 0)
+        assert failures >= staff_mfa.MAX_FAILURES
 
     def test_a_right_code_clears_the_failures(self):
         user = _superuser()

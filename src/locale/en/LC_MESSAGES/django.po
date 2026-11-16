@@ -2621,6 +2621,9 @@ msgstr "COD reconciliation task dispatched."
 msgid "COD recorded as received outside ACS."
 msgstr "COD recorded as received outside ACS."
 
+msgid "COMPLETE YOUR PAYMENT"
+msgstr "COMPLETE YOUR PAYMENT"
+
 msgid "CONFIRM HERE"
 msgstr "CONFIRM HERE"
 
@@ -3258,12 +3261,6 @@ msgstr "Click"
 msgid "Click Score"
 msgstr "Click Score"
 
-msgid "Click the button below to retry your payment with a different card or method."
-msgstr "Click the button below to retry your payment with a different card or method."
-
-msgid "Click the link below to retry your payment:"
-msgstr "Click the link below to retry your payment:"
-
 msgid "Clicked a result"
 msgstr "Clicked a result"
 
@@ -3415,6 +3412,9 @@ msgstr "Complete Profile"
 
 msgid "Complete payment with an agent-granted Stripe token"
 msgstr "Complete payment with an agent-granted Stripe token"
+
+msgid "Complete your payment"
+msgstr "Complete your payment"
 
 msgid "Completed"
 msgstr "Completed"
@@ -7438,9 +7438,6 @@ msgstr "If the address belongs to a staff account that can sign in here, a link 
 msgid "If the button doesn't work, copy and paste this link into your browser:"
 msgstr "If the button doesn't work, copy and paste this link into your browser:"
 
-msgid "If the problem persists, please contact our customer service."
-msgstr "If the problem persists, please contact our customer service."
-
 #, python-format
 msgid "If the term lapses, your store keeps running for a grace period of %(grace)s days before it is suspended."
 msgstr "If the term lapses, your store keeps running for a grace period of %(grace)s days before it is suspended."
@@ -9369,6 +9366,9 @@ msgstr "Nothing retained"
 msgid "Nothing to issue"
 msgstr "Nothing to issue"
 
+msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+msgstr "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Nothing was saved. Fix the marked texts."
 
@@ -10342,6 +10342,9 @@ msgstr "Password reset"
 
 msgid "Password reset code"
 msgstr "Password reset code"
+
+msgid "Password reset is temporarily unavailable. Try again shortly."
+msgstr "Password reset is temporarily unavailable. Try again shortly."
 
 msgid "Password reset link"
 msgstr "Password reset link"
@@ -12369,9 +12372,6 @@ msgstr "Retrieve every anonymously readable store setting in one call, keyed by 
 msgid "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 msgstr "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 
-msgid "Retry Payment"
-msgstr "Retry Payment"
-
 msgid "Retry is only supported for Stripe payments."
 msgstr "Retry is only supported for Stripe payments."
 
@@ -13048,8 +13048,8 @@ msgstr "Sent when an order is placed with its payment captured."
 msgid "Sent when an order is returned to the store."
 msgstr "Sent when an order is returned to the store."
 
-msgid "Sent when an order's payment fails, with a link to retry."
-msgstr "Sent when an order's payment fails, with a link to retry."
+msgid "Sent when an order's payment fails, with a link to the order."
+msgstr "Sent when an order's payment fails, with a link to the order."
 
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Sent when someone signs up with an address that already has an account."
@@ -14161,9 +14161,6 @@ msgstr "THE PRODUCT"
 msgid "TOTP Issuer"
 msgstr "TOTP Issuer"
 
-msgid "TRY AGAIN"
-msgstr "TRY AGAIN"
-
 msgid "Tag"
 msgstr "Tag"
 
@@ -14305,6 +14302,9 @@ msgstr "Tells the store's staff which products have run down to their low-stock 
 
 msgid "Template"
 msgstr "Template"
+
+msgid "Temporarily unavailable"
+msgstr "Temporarily unavailable"
 
 msgid "Ten"
 msgstr "Ten"
@@ -14799,6 +14799,9 @@ msgstr "The payment on delivery has not been collected yet, so there is nothing 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "The payment provider cannot be reached to check this reference."
 
+msgid "The payment provider could not be reached. Try again in a moment."
+msgstr "The payment provider could not be reached. Try again in a moment."
+
 msgid "The payment provider has not been asked about this refund yet: it is looked up automatically first."
 msgstr "The payment provider has not been asked about this refund yet: it is looked up automatically first."
 
@@ -15210,6 +15213,9 @@ msgstr "This Quarter"
 
 msgid "This Week"
 msgstr "This Week"
+
+msgid "This action is temporarily unavailable. Try again shortly."
+msgstr "This action is temporarily unavailable. Try again shortly."
 
 msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
 msgstr "This address has unsubscribed from these emails, so the alert could not be delivered."
@@ -15764,9 +15770,6 @@ msgstr "True when the caller's cart (identified by the same ``X-Cart-Id`` header
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
-
-msgid "Try again"
-msgstr "Try again"
 
 msgid "Try using a different email address."
 msgstr "Try using a different email address."
@@ -18036,6 +18039,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Cancel the BoxNow shipment for an order"
 
+#~ msgid "Click the button below to retry your payment with a different card or method."
+#~ msgstr "Click the button below to retry your payment with a different card or method."
+
+#~ msgid "Click the link below to retry your payment:"
+#~ msgstr "Click the link below to retry your payment:"
+
 #~ msgid "Clocked Schedules"
 #~ msgstr "Clocked Schedules"
 
@@ -18190,6 +18199,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Idle"
 #~ msgstr "Idle"
+
+#~ msgid "If the problem persists, please contact our customer service."
+#~ msgstr "If the problem persists, please contact our customer service."
 
 #~ msgid "If you have any questions about your order, please contact our customer service."
 #~ msgstr "If you have any questions, please contact our customer service."
@@ -18494,6 +18506,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "Required compartment size: 1=Small, 2=Medium, 3=Large"
 
+#~ msgid "Retry Payment"
+#~ msgstr "Retry Payment"
+
 #~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 #~ msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 
@@ -18580,6 +18595,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Successfully unsubscribed"
 
+#~ msgid "TRY AGAIN"
+#~ msgstr "TRY AGAIN"
+
 # Email Template Translations
 #~ msgid "Testimonials"
 #~ msgstr "Testimonials"
@@ -18653,6 +18671,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Trust Badges"
+
+#~ msgid "Try again"
+#~ msgstr "Try again"
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Unsubscribe from a topic via email link (GET)"

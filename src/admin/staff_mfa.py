@@ -106,11 +106,6 @@ def _failures_key(user) -> str:
     return f"global:strict:staff_mfa.failures:{user.pk}"
 
 
-def is_locked(user) -> bool:
-    """Whether the next attempt is refused."""
-    return cache.get(_failures_key(user), 0) >= MAX_FAILURES
-
-
 def register_attempt(user) -> None:
     """Count one attempt and raise ``SecondFactorLocked`` when it is over
     ``MAX_FAILURES``, before the code is looked at (counting afterwards would
@@ -140,11 +135,15 @@ class SecondFactorWrong(SecondFactorRefused):
 
 def verify_code(user, code: str) -> bool:
     """Whether *code* is a current authenticator code or an unused recovery
-    code of *user* (a recovery code is spent by being used)."""
+    code of *user* (a recovery code is spent by being used).
+
+    A TOTP code is checked against allauth's replay record, a strict cache
+    key: with Redis unreachable that raises ``StaffLoginUnavailable``, the
+    sign-in's own refusal, rather than an uncoded 500."""
     code = (code or "").strip().replace(" ", "")
     if not code:
         return False
-    with _public():
+    with _public(), staff_login_limits.refuse_when_cache_is_down():
         for authenticator in Authenticator.objects.filter(
             user_id=user.pk,
             type__in=(
@@ -201,8 +200,14 @@ def complete_enrolment(request, user, code: str) -> list[str] | None:
     secret = state["secret"]
     if not validate_totp_code(secret, (code or "").strip().replace(" ", "")):
         return None
-    with _public(), transaction.atomic():
-        # The code that enrolled is spent: it cannot also log in.
+    with (
+        _public(),
+        staff_login_limits.refuse_when_cache_is_down(),
+        transaction.atomic(),
+    ):
+        # The code that enrolled is spent: it cannot also log in (a replay
+        # record in the cache; ``StaffLoginUnavailable`` when it cannot be
+        # written, and the activation is rolled back).
         TOTP.activate(user, secret).validate_code(code.strip().replace(" ", ""))
         recovery = RecoveryCodes.activate(user)
         codes = recovery.generate_codes()

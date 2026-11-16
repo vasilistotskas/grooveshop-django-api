@@ -1,7 +1,7 @@
 """The storefront editor's sign-in: trade a ticket for a staff token, end it.
 
 Both routes are called by the storefront's SERVER, never by a browser
-(``docs/builder.md``); the token goes into the storefront's own HttpOnly
+(``docs/builder/sign-in-and-defaults.md``); the token goes into the storefront's own HttpOnly
 cookie."""
 
 from __future__ import annotations

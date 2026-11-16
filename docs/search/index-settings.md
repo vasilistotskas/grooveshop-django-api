@@ -11,7 +11,7 @@ into a payload by `MeiliIndexSettings` (`src/meili/dataclasses.py`) and
 
 The rule behind every value: **the engine builds a structure for each thing
 it is told it may do, so it is told only what a query really does.** The
-list of what the queries do is `src/search/views.py`; when a view starts to filter,
+list of what the queries do is `src/search/views/`; when a view starts to filter,
 sort or facet on a new field, that field is added to `MeiliMeta` in the same
 change.
 

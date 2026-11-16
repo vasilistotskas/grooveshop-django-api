@@ -145,12 +145,12 @@ settings.
 | `gift_cards` | `gift_cards_enabled` | `CATALOGUE_ENABLED`, `GIFT_CARDS_ENABLED` | `src/giftcard/views.py` (a purchase's status stays open) |
 | `wholesale` | `b2b_enabled` | `CUSTOMER_ACCOUNTS_ENABLED`, `B2B_WHOLESALE_ENABLED` | `src/b2b/views.py`; pricing through `B2BService.is_enabled` |
 | `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `src/order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
-| `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `src/recommendation/views.py`, `src/search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
+| `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `src/recommendation/views.py`, `src/search/views/`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
 | `product_alerts` | | `CATALOGUE_ENABLED`, `PRODUCT_ALERTS_ENABLED` | `src/product/views/alert.py` |
 | `price_history` | | `PRICE_HISTORY_ENABLED` | `src/product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `src/contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
-| `catalogue` | | `CATALOGUE_ENABLED` | `src/product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `src/search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
+| `catalogue` | | `CATALOGUE_ENABLED` | `src/product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `src/search/views/` (`product_meili_search` in `product.py`, and `search_trending` in `trending.py` for the product queries) |
 | `staff_ai_access` | | `STAFF_AI_ACCESS_ENABLED` | `src/agent/staff_views.py` (all of `/api/v1/agent/staff/*`, a connected app's token included), and the staff consent on the connect host (`src/agent/staff_connect.py`); the gateway refuses `/mcp/admin` on the same answer |
 | `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `src/cart/views/` (every cart and cart-item action but the staff `cart/list`), `src/order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
 
@@ -204,6 +204,16 @@ need accounts. Off, on that store's hosts:
   `wholesale` list the switch in their rows. The account mail (allauth's,
   the data export, re-engagement) and the abandoned-checkout reminder are
   skipped as "Off: Customer accounts feature".
+- **Every order is served as a guest's.** An account holder cannot sign in
+  to reach their orders, so the order's uuid opens it as it opens a guest's
+  (`Order.served_as_guest`, for `GUEST_ORDER_ACCESS_DAYS`): the order API's
+  uuid routes and the receipt download. The emails and documents that link
+  to an order (`src/order/storefront_links.py`: the payment-failed email,
+  ACS out for delivery, BOX NOW at the locker, the receipt's QR before
+  AADE's) send such an order, and a guest's on any store, to the order
+  confirmation by uuid, `/checkout/success/{uuid}`, and only an account
+  holder's order on a store with accounts to `/account/orders/{id}`. In-app
+  notifications, read only signed in, keep the account page.
 
 What stays: guest checkout and guest orders by UUID, the newsletter form,
 product alerts, the contact and feedback forms, gift-card purchase and

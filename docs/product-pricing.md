@@ -135,7 +135,7 @@ What it cannot know:
 | `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `ProductVariantSerializer` (`/api/v1/product/{id}/variants`) | each sibling's own three fields, the same `EffectivePriceFieldsSerializer`, so a variant swatch or an agent's variant list shows the price and announcement its product card shows |
 | `?minAnnouncedDiscountPercent=` / `?ordering=-announcedDiscountPercent` | `ProductFilter`, `ProductViewSet.ordering_fields` | list filter and sort on the same percent (`with_announced_discount_percent()`); the discounted rail uses both |
 | `?minEffectivePrice=` / `?maxEffectivePrice=` / `?ordering=effectivePrice` | `ProductFilter`, `ProductViewSet.ordering_fields` | list price filter and sort on `effective_price`, a stored column |
-| search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `src/search/views.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |
+| search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `src/search/views/product.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |
 
 Price filter and price sort follow what the customer pays, not the list
 price: a product under a 20% automatic category promotion is found by a price

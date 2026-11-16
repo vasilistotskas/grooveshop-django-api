@@ -320,3 +320,26 @@ def test_a_guest_reads_their_order_without_accounts(mt_tenant, accounts):
     )
 
     assert response.status_code == 200, response.content
+
+
+@pytest.mark.parametrize("on", [True, False], ids=["accounts-on", "off"])
+def test_an_account_order_opens_by_uuid_only_without_accounts(
+    mt_tenant, accounts, on
+):
+    """Its owner cannot sign in on a store without accounts, so the uuid the
+    order emails link to opens it (``Order.served_as_guest``). Where
+    accounts are on it still needs its owner."""
+    from order.factories.order import OrderFactory
+    from user.factories.account import UserAccountFactory
+
+    accounts(on)
+    with schema_context(mt_tenant.schema_name):
+        order = OrderFactory(
+            user=UserAccountFactory(num_addresses=0), num_order_items=0
+        )
+
+    response = TenantClient(mt_tenant).get(
+        reverse("order-retrieve-by-uuid", kwargs={"uuid": str(order.uuid)})
+    )
+
+    assert response.status_code == (403 if on else 200), response.content

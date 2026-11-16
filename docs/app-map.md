@@ -75,7 +75,9 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   `src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
-- the Celery app (`src/core/celery.py`), `MonitoredTask` and the system
+- the Celery app (`src/core/celery.py`) and the transport its publishing
+  connections use while RabbitMQ blocks publishers (`src/core/broker.py`,
+  `docs/deferred-dispatch.md`), `MonitoredTask` and the system
   tasks (`src/core/tasks.py`), the retry sets (`src/core/retry.py`) and
   the retention helper (`src/core/retention.py`);
 - the cache backend (`src/core/caches.py`) and the cache surface registry
@@ -163,7 +165,7 @@ its app (`src/order/emails.py`, `src/user/emails.py` and the other
 (`src/emails/send.py`). Models: `EmailSwitch` (a store switches a type
 off), `EmailOptOut`, `EmailLog`, `EmailEvent` and `EmailSuppression`.
 Also the admin preview (`src/emails/preview.py`) and the Resend webhook
-(`src/emails/webhooks.py`). Read `docs/emails.md`.
+(`src/emails/webhooks.py`). Read `docs/emails/index.md`.
 
 ### `admin/`
 
@@ -317,7 +319,7 @@ derived `BuilderReference` index and the media library (`MediaAsset`).
 It serves the staff API and the public read of the current release
 (`src/builder/views.py`); the writes go through
 `src/builder/services.py`. The block catalogue is the storefront's. Read
-`docs/builder.md`.
+`docs/builder/index.md`.
 
 ### `recommendation/`
 
@@ -358,7 +360,9 @@ cross-service views are
 class (`src/meili/models.py`), the client (`src/meili/_client.py`), the
 index and delete tasks (`src/meili/tasks.py`) and the management
 commands. `search/` is the product-facing side: the product and blog
-search views (`src/search/views.py`), Greeklish transliteration
+search views (`src/search/views/`: `blog`, `product`, `click`, `report`,
+`trending`; query-string parsing in `src/search/params.py`, what a request
+tells the analytics middleware in `src/search/analytics.py`), Greeklish transliteration
 (`src/search/transliteration.py`) and the `SearchQuery` / `SearchClick`
 analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 

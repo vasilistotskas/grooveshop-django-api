@@ -215,7 +215,7 @@ accepting Cyprus orders at the Greek flat rate.
 
 Merchant-operations mail is a set of email types (`ops.<kind>`, declared in
 `src/shipping/emails.py`, `src/shipping_acs/emails.py`, `src/order/emails.py`,
-`src/giftcard/emails.py` and `src/product/emails.py`; see `docs/emails.md`,
+`src/giftcard/emails.py` and `src/product/emails.py`; see `docs/emails/types.md`,
 Operational alerts). They go through `send_email` to `store_operators()` (the
 store's contact and owner addresses; no `ADMINS` fallback, a store with
 neither skips the mail, [§6.2](emails-and-notifications.md)) and are **per
@@ -241,7 +241,7 @@ is the whole list:
   No carrier module imports `send_mail`
   (`tests/integration/emails/test_ops_alerts.py` enforces it). The stale
   digest used to call `send_mail` itself, so it could not be muted.
-- **One switch per type**, an `EmailSwitch` row (`docs/emails.md`, The
+- **One switch per type**, an `EmailSwitch` row (`docs/emails/sending.md`, The
   store's switch): a store opts OUT, so a type added later reaches every
   store. The `OPS_ALERT_<KIND>_ENABLED` settings it replaces were imported
   by `emails/0003`. Adding an alert means declaring its type in the owning

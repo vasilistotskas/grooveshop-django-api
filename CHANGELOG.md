@@ -3,6 +3,419 @@
 
 
 
+## v3.249.4 (2026-11-16)
+
+### Documentation
+
+* docs(search): the engine-time docstring names relax_query ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
+### Refactoring
+
+* refactor(search): views.py into views/, params.py and analytics.py (#732) ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
+* refactor(search): views.py into views/, params.py and analytics.py
+
+Pure move of src/search/views.py by responsibility:
+
+- search/params.py: query-string parsing, the sort and facet allowlists,
+  language-code validation, relax_query
+- search/analytics.py: what a request tells SearchAnalyticsMiddleware
+  (record_engine_time, mark_count_only, COUNT_ONLY_MAX_LIMIT)
+- search/views/blog.py, product.py (with its facet helpers), click.py,
+  report.py (staff analytics report), trending.py
+
+Names that now cross a module lose their leading underscore;
+_relaxed_query becomes relax_query so it no longer collides with the
+view's local relaxed_query. No logic change, schema.yml unchanged. The
+importers, a test and the docs naming the old path move with it. ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
+## v3.249.3 (2026-11-16)
+
+### Chores
+
+* chore(builder): pin the per-design catalogues to storefront main with #493 ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
+### Refactoring
+
+* refactor(builder): seeds, demo pages and the email theme read the catalogue of each design (#729) ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
+### Testing
+
+* test(builder): hold seeds and demo pages to the catalogue of each design
+
+The storefront now commits its block catalogue as each design is served it
+(test/fixtures/builder/catalogue/<design>.json, default.json for every store
+whose schema no design names; storefront #491) instead of only the whole
+build's, which no store is served.
+
+- sync_upstream_sources.py copies that directory to src/builder/catalogues/
+  (a pinned tree) in place of the whole build's seed_catalogue.json.
+- builder.seeding derives the seeds against default.json: they go to every
+  new store, so they may name only what every design draws.
+- test_seeds runs every seed against every design's catalogue, and checks
+  that what seeding derives is what each design derives.
+- test_real_catalogue checks the link pointers of every design's blocks and
+  roots.
+- test_demo_pages checks the demo pages against the demo store's design
+  (default).
+- test_block_upgrades finds a design's own block (contact_panel) in its
+  design's catalogue.
+- tests/utils/real_catalogues.py reads the pinned files; the pin test's
+  fake GitHub serves the directory. ([`de06c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06c7cb8e7240b98d3f2fd9fa42e6f297235513))
+
+## v3.249.2 (2026-11-16)
+
+### Bug fixes
+
+* fix(core): security limits refuse with a coded 503 while Redis is down; staff pages sign in at the host's admin (#728) ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): security limits refuse with a coded 503 while Redis is down
+
+The allauth rate-limit middleware failed open on any cache error, so a
+Redis outage lifted the per-address bound on login, 2FA and login-code
+confirmation, while allauth's own limits on the same routes failed
+closed with an uncoded 500.
+
+One rule now covers every security limit, written beside
+STRICT_KEY_PREFIXES in core.caches: its keys are strict, the cache
+raises instead of reporting no history, and the owner of the answer
+refuses with 503 and a stable code.
+
+- AllAuthRateLimitMiddleware counts under the strict namespace and
+  answers 503 rate_limit_unavailable in allauth's envelope; its
+  process_exception gives allauth's own strict keys (rate limits, TOTP
+  replay, IdP codes) the same answer instead of a 500.
+- Fail-closed DRF throttles raise RateLimitUnavailable (503
+  rate_limit_unavailable) instead of a 429 with a guessed Retry-After.
+- The staff password-reset budget lets a Redis error reach the view,
+  which answers 503 on the form; other errors are no longer swallowed.
+- allauth-schema.yml declares the 503 on every operation.
+
+Closes #727 ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): staff pages send a signed-out visitor to the host's admin login
+
+The editor's image upload and Rosetta sent a signed-out visitor to
+LOGIN_URL, allauth's shopper sign-in: a page the platform host is
+losing, and on a store host one that signs staff in as a customer who
+may not upload.
+
+STAFF_LOGIN_URL names "admin:login", reversed per request in the host's
+URL conf. Both admin sites are instances of the admin application, so
+it is the platform admin's login on the platform host and the store
+admin's on a store host. upload_image and ROSETTA_LOGIN_URL use it;
+LOGIN_URL keeps meaning allauth's page, which allauth reads.
+
+Closes #726 ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): one coded 503 on every route a security store cannot be reached
+
+The review of the fail-closed rule found the coded answer only on
+/_allauth/: the IdP, allauth's account pages and any other route still
+answered an uncoded 500 when a strict cache key raised.
+
+- core.middleware.strict_cache answers REDIS_UNAVAILABLE from any view,
+  once, in the route's shape: allauth's envelope on its headless API,
+  OAuth's error on the IdP's API, {detail, code} on a DRF view, an HTML
+  page elsewhere. 503, code temporarily_unavailable (OAuth's own).
+  Fail-closed throttles re-raise to it; the allauth limiter calls it.
+- Viva's webhook GET budget fails open only while a verification key is
+  stored; without one each answer calls Viva, so it fails closed, and
+  only the cache's unavailability is caught.
+- Every throttle keys an anonymous caller on client_ip_or_peer
+  (ResilientThrottleMixin.get_ident), StaffLoginThrottle and the
+  anon/user defaults included: AnonIpRateThrottle and the new
+  UserBudgetThrottle replace DRF's classes in every view and in
+  DEFAULT_THROTTLE_CLASSES, and a test keeps rest_framework.throttling
+  out of every other module.
+- staff_mfa checks TOTP replay under refuse_when_cache_is_down; the
+  unused is_locked is gone.
+- Full-stack tests with the default cache stopped: allauth API, IdP
+  token, accounts page, DRF route, Viva handshake. ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): a refused request logs its Redis failure's traceback; the DRF throttle ban covers every import form ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+### Testing
+
+* test(core): the DRF outage test asserts the refusal's message ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* test(core): unblock the fake broker only once it holds the publish (#731) ([`5a698e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a698e3005dfd58c260cee1ddd72c0cf4751c610))
+
+## v3.249.1 (2026-11-16)
+
+### Bug fixes
+
+* fix(core): a publish to a blocked RabbitMQ fails within a bound (#719) ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a publish to a blocked RabbitMQ fails within a bound
+
+While RabbitMQ blocks publishers (a memory or disk alarm) it stops reading
+a connection once it has published and sends nothing back. The publish
+waited for its confirm without end, and a publish timeout only moved the
+wait: kombu then replaced the connection and waited for a Close-Ok that
+never came. Every request that published, and everything sent through
+dispatch_on_commit, waited with it.
+
+CELERY_BROKER_TRANSPORT_OPTIONS now sets py-amqp's read_timeout
+(CELERY_BROKER_READ_TIMEOUT, 2 s by default), applied as SO_RCVTIMEO to
+every broker socket. A read that times out is a connection error, so a
+publish to a blocked broker fails after about six of them (four publish
+attempts, then closing the channel and the connection) and
+dispatch_on_commit keeps the task as a DeferredDispatch, which the sweep
+publishes once the alarm clears. Writes need no option: py-amqp's
+default TCP_USER_TIMEOUT already ends one the broker stops taking. A
+worker reads its consuming connection only when the socket is readable,
+so an idle worker never meets the bound.
+
+The option is set on Linux only: py-amqp packs it as a POSIX timeval,
+which Windows reads as milliseconds.
+
+Measured against RabbitMQ with its memory alarm on, on Linux: a
+dispatch_on_commit that waited past 90 s now returns after about 12 s
+with the task kept, and the sweep published it after the alarm cleared.
+docs/deferred-dispatch.md records the measurements, and that each
+attempt written before the block is still delivered once it clears.
+
+Closes #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): one publish retry, and a timed-out publish says it timed out
+
+A publish that timed out on a blocked broker is still delivered once the
+alarm clears, one message per attempt, and dispatch_on_commit keeps it
+as a DeferredDispatch that the sweep publishes again. Celery's default
+three retries therefore only added copies: one blocked dispatch ran its
+task five times. CELERY_TASK_PUBLISH_RETRY_POLICY keeps one retry
+(CELERY_TASK_PUBLISH_MAX_RETRIES), the one a pooled connection needs
+after a broker restart; with none that publish fails, with one it
+reconnects and goes out. Measured on Linux with the memory alarm on:
+the request is held 8.2 s instead of 12.2 s, and the task runs three
+times instead of five.
+
+kombu re-raises py-amqp's bare socket timeout as an OperationalError
+with no text, so the row and the log read "OperationalError: ".
+tenant.celery.describe_error takes the reason from the cause, and names
+a bare timeout "timed out", for defer_dispatch and the sweep.
+
+Refs #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): bound only the connections the app publishes on
+
+The broker read timeout sat in CELERY_BROKER_TRANSPORT_OPTIONS, so it
+also reached a worker's consuming connection, where a read that times out
+makes the worker drop the connection and RabbitMQ redeliver every task it
+is still running (task_acks_late). It also turned kombu's unbounded
+publish retries (control commands, worker events: retry=True, no policy)
+into an endless reconnect loop during an alarm: a health-check ping made a
+new blocked connection every 2 s, 128 of them in four minutes.
+
+GrooveShopCelery.connection_for_write now gives only the publishing
+connections (the producer pool behind tasks and control commands, a
+worker's event dispatcher) two py-amqp options:
+
+- on_blocked raises BrokerBlocked, a kombu OperationalError: RabbitMQ
+  sends connection.blocked right after the first publish it holds back,
+  so the confirm wait ends at once, and kombu does not retry it;
+- read_timeout (BROKER_PUBLISH_READ_TIMEOUT, 5 s) bounds the Close-Ok
+  waits that follow.
+
+connection_for_read is left as it was. Measured on Linux with the memory
+alarm on: dispatch_on_commit returns in 10.5 s and the task runs twice
+(the written message and the swept row) instead of three times; the
+health-check ping fails in 10.3 s instead of looping; a worker running a
+task through the alarm runs it once. A healthy broker limited to half a
+CPU confirmed in 49 ms at worst, so 5 s leaves ample headroom.
+
+Refs #509 ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a process publishes nothing more once RabbitMQ blocks it
+
+RabbitMQ sends connection.blocked only on the connection that published,
+and tells a new connection nothing until it publishes too. Beat and the
+worker's event dispatcher kept the blocked connection, so each later
+publish wrote another copy, timed out, reconnected and wrote again.
+
+Publishing connections now use core.broker.PublishingTransport, with one
+blocked state per process:
+
+- connection.blocked starts a hold of BROKER_BLOCKED_HOLD_SECONDS and
+  ends the confirm wait with py-amqp's Blocked, a recoverable connection
+  error, so kombu drops the blocked connection without a close handshake
+  (also when the frame arrives during a close) and retries on a new one;
+- during the hold every publish is refused before it writes, with
+  BrokerBlocked, which kombu does not retry; send_task refuses before it
+  takes a pooled connection;
+- connection.unblocked ends the hold; otherwise, once it passes, the next
+  publish first asks with an empty message to a reserved routing key no
+  queue can have, so a still-blocked broker never receives a task.
+
+A worker's consuming connection keeps kombu's own transport. ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): a task published from a running task waits out a broker block
+
+Task.retry turns a failed publish into Reject(requeue=False), so refusing
+a publish inside a worker dropped the acks_late task, and a refused
+.delay() failed its caller. A publish from a task the worker is running
+is no longer refused: its message is written once and the publish waits
+for that message's confirm until the broker unblocks.
+
+A question asked after the hold that fails for a reason other than a
+block (a connection reset by a restarted broker) no longer restarts the
+hold, so kombu's retry asks again on a new connection. One thread asks at
+a time. BROKER_BLOCKED_HOLD_SECONDS must be above 0. ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+* fix(core): refuse an endless broker hold, and say what an alarm costs the workers ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+### Testing
+
+* test(core): the app tests patch the Celery subclass the app is built from ([`7b35d84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b35d84a0703e7a174f5bcb5a387dc4199a02ef8))
+
+## v3.249.0 (2026-11-16)
+
+### Chores
+
+* chore(builder): pin the upstream copies to storefront main with #489 ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+### Features
+
+* feat(builder): port the upgrade that leaves out a choice's own default (#722) ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+* feat(builder): port the upgrade that leaves out a choice's own default
+
+The storefront's optional choices no longer hold the value their section
+draws when the setting is left out (the editor's "Default"), and each
+affected block moved one version with an upgrade that takes a stored
+setting holding that value out. block_upgrades ports it
+(_leave_out_defaults) for every one of those blocks, so
+persist_block_upgrades writes it into the stored drafts and versions:
+surface on the bands (default; muted on newsletter_signup and
+stats_strip; ink on offers_preview), blog_categories.layout slider,
+divider.variant line, features_grid.decor none, hero_banner decor none,
+align center and theme auto, hero_carousel.aspect wide,
+media_text.imagePosition left and decor none, product_categories.layout
+tiles, spacer.height md, and a product rule's stock any.
+
+A product rule's stock no longer takes "any" (PRODUCT_STOCK): a rule
+without the key is the list as ordered. The demo store's pages move to
+the new versions, through the same upgrade. The catalogue, the home
+seed, upgrade-cases.json and data-cases.json are the storefront's,
+refreshed by sync_upstream_sources.py.
+
+Closes vasilistotskas/grooveshop-storefront-ui-node-nuxt#469 ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+* feat(builder): the categories band's grid layout is left out too, as the storefront's upgrade does ([`d42c356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42c356dd0102bc367e2df968b5d0243425b26d6))
+
+## v3.248.2 (2026-11-16)
+
+### Bug fixes
+
+* fix(order): a payment poll records only what the provider settled on (#724) ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+* fix(order): a payment poll records only what the provider settled on
+
+A provider that could not be asked (network error, timeout, rate
+limit, outage, unreadable answer) was answered as FAILED by both
+providers' get_payment_status, and the poll stored it. The 30-minute
+sweep then cancels a PENDING order whose payment FAILED, so a shopper
+still paying could lose the order. get_payment_status now raises
+PaymentStatusUnavailableError and nothing is written:
+GET /order/{id}/payment_status answers 503
+payment_provider_unavailable, payment-first order creation refuses the
+intent as before (400 payment_verification), PaymentLedger.ensure_charge
+records no charge, and the Viva webhook verification raises for
+redelivery (its error-dict checks are gone with the dict).
+
+A polled "canceled" (a Stripe intent closed by a retry whose new
+intent failed to open, a Viva X) was stored as CANCELED on a PENDING
+order. That state is settled, so neither sweep bucket selected the
+order, its stock stayed reserved, and a later success was ignored as
+stale. A poll now records only an open payment's state: a canceled
+attempt is FAILED (still payable, swept after its window, stock
+released through cancel_order) and a refunded state is never written
+by a poll, since the ledger derives it. ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+### Chores
+
+* chore(api-contract): drop the per-carrier route overrides production no longer needs ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+### Documentation
+
+* docs: split emails.md and builder.md into folders, fix refund-execution (#723) ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+* docs: split emails.md and builder.md into docs/emails/ and docs/builder/
+
+Both references were over 40,000 characters. Each is now a folder with an
+index.md that says which file to read for which change, like docs/order/:
+
+docs/emails/: index, types, sending, delivery
+docs/builder/: index, documents, publishing, media, sign-in-and-defaults
+
+The text is moved, not rewritten. The only edits are five cross-file
+pointers ("see Tests" now names its file) and the new titles and indexes.
+Every reference to the old files (CLAUDE rules, app map, other docs,
+comments and docstrings in src/) names the new file. The size guard in
+test_doc_references.py holds every file under docs/ to the limit; its list
+of files over the limit is gone.
+
+docs/order/refund-execution.md: the order_refunded paragraph no longer
+argues from the old gift-card design. It states that gift-card value is
+returned by refund_order itself (GiftCardService.credit_refund), not by a
+signal receiver. ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+* docs: fix relative links after the split and two refund and rewrite passages
+
+Links to docs/image-uploads.md from docs/builder/ gain ../, and the two guide links in the rules file resolve from .claude/rules/. A stored version in no release can also be reached by publish_version, the refund text says how the excess is split between cards and points, and an order paid only with a gift card gets a stored-value attempt instead of the no-provider-payment error. ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+### Testing
+
+* test(order): a payment-status read error is a raise, not a FAILED answer ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+## v3.248.1 (2026-11-16)
+
+### Bug fixes
+
+* fix(order): order links open a page the shopper can reach, guest or without accounts (#718) ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): order links open a page the shopper can reach, guest or without accounts
+
+The payment-failed email, the ACS out-for-delivery and BOX NOW at-locker
+emails and the receipt's pre-AADE QR all linked to /account/orders/{id}.
+A guest has no account to open it with (sign-in wall), and on a store
+with customer accounts off the storefront answers 404 for every
+/account/** path. They now go through order.storefront_links: the
+account page only for an account holder's order on a store that signs
+its shoppers in, the order confirmation /checkout/success/{uuid}
+otherwise. The two carrier templates take the link from the context, so
+it carries the email's language prefix the same way.
+
+Order.served_as_guest is the one rule behind both the links and the
+order API: a guest's order, or any order of a store without customer
+accounts, is opened with its uuid (within GUEST_ORDER_ACCESS_DAYS). The
+order view's object permission, IsOwnerOrAdminOrGuest (carrier label
+and tracking views), the cancel action and the receipt download link
+read it, so the uuid page the emails send an account holder to on such
+a store actually opens. Where accounts are on nothing changes.
+
+In-app notifications are read only signed in and keep the account page,
+through account_order_path, so the path lives in one place.
+
+Part of #198 ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): the payment-failed email no longer promises a retry
+
+Nothing in the storefront can retry a payment yet, so the email's "Retry
+Payment" button and its "click to retry" text promised what the linked
+order page cannot do. It now says what that page says: nothing was
+charged, the order is registered unpaid, contact the store to complete
+the payment, with a "View your order" link (order_url). The admin
+description of the email changes with it. The retry flow comes with
+#694, and the email will link it then.
+
+Part of #198 ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): a payment-failed email does not go out once the payment settled ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): a canceled payment still gets the payment-failed email ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
 ## v3.248.0 (2026-11-16)
 
 ### Chores

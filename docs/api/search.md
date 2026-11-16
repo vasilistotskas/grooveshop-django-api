@@ -3,7 +3,7 @@
 Meilisearch-backed search over products and blog posts, plus click
 attribution, trending queries and per-store analytics.
 
-**Source of truth:** `src/search/views.py`, `src/search/serializers.py`,
+**Source of truth:** `src/search/views/`, `src/search/params.py`, `src/search/serializers.py`,
 `src/search/middleware.py`, `src/meili/querysets.py`, and the generated
 `schema.yml`. Where this page and the code disagree, the code wins.
 

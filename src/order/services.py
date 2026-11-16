@@ -53,6 +53,7 @@ from order.exceptions import (
     PaymentCurrencyMismatchError,
     PaymentError,
     PaymentNotFoundError,
+    PaymentStatusUnavailableError,
     PaymentVerificationError,
     ProductNotFoundError,
     RefundOutstandingError,
@@ -142,6 +143,18 @@ _PAID_PAYMENT_STATUSES: frozenset[str] = frozenset(
         PaymentStatus.REFUNDED,
     }
 )
+
+# What a poll of the provider records for each status it reports
+# (``OrderService._apply_polled_payment_status``): an open payment's state
+# only. A canceled attempt is a failed one, since the order is still open;
+# COMPLETED settles through ``handle_payment_succeeded``; a refunded state is
+# the ledger's, so a status missing here is never written by a poll.
+_POLLED_STATUS_RECORDED: dict[PaymentStatus, PaymentStatus] = {
+    PaymentStatus.PENDING: PaymentStatus.PENDING,
+    PaymentStatus.PROCESSING: PaymentStatus.PROCESSING,
+    PaymentStatus.FAILED: PaymentStatus.FAILED,
+    PaymentStatus.CANCELED: PaymentStatus.FAILED,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -777,9 +790,16 @@ class OrderService:
             )
 
         provider = get_payment_provider(pay_way.provider_code)
-        payment_status, payment_data = provider.get_payment_status(
-            payment_intent_id
-        )
+        try:
+            payment_status, payment_data = provider.get_payment_status(
+                payment_intent_id
+            )
+        except PaymentStatusUnavailableError as exc:
+            # Nothing can be created from an intent nobody could read; the
+            # shopper submits again.
+            raise PaymentVerificationError(
+                payment_intent_id, "the provider could not be asked"
+            ) from exc
         if payment_status not in [
             PaymentStatus.PENDING,
             PaymentStatus.PROCESSING,
@@ -4381,7 +4401,8 @@ class OrderService:
     def _apply_polled_payment_status(
         cls, order: Order, payment_status_enum: PaymentStatus
     ) -> None:
-        """Write a POLLED provider status, unless the order is settled.
+        """Record where a POLLED payment attempt stands, unless the order
+        is settled.
 
         Polling reports the provider's view of the payment, which is not
         the order's view of the money. A Stripe PaymentIntent stays
@@ -4393,7 +4414,27 @@ class OrderService:
         Same rule the webhook handlers already follow: a settled state is
         final, and the row is re-read under lock so a concurrent webhook
         either lands first or is seen.
+
+        A poll records only an open payment's state
+        (``_POLLED_STATUS_RECORDED``). A canceled attempt is a FAILED one:
+        CANCELED is the payment state of a closed order
+        (``Order.settle_unpaid_payment``), and on an open order it is
+        settled, so the sweep never closed the order and its stock stayed
+        reserved, a later success was ignored as stale, and a retry was the
+        only way out (#697). FAILED keeps the order payable and is swept
+        after ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES``. A refunded state
+        is the ledger's to derive from the refunds it booked, so a poll
+        never writes one.
         """
+        recorded = _POLLED_STATUS_RECORDED.get(payment_status_enum)
+        if recorded is None:
+            logger.warning(
+                "Not recording polled payment status %s for order %s: "
+                "a poll records only an open payment's state",
+                payment_status_enum,
+                order.id,
+            )
+            return
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
             if locked.payment_status in SETTLED_PAYMENT_STATUSES:
@@ -4406,18 +4447,20 @@ class OrderService:
                 )
                 order.payment_status = locked.payment_status
                 return
-            if payment_status_enum == locked.payment_status:
+            if recorded == locked.payment_status:
                 order.payment_status = locked.payment_status
                 return
             logger.info(
-                "Updating order %s payment status from %s to %s",
+                "Updating order %s payment status from %s to %s "
+                "(provider reports %s)",
                 order.id,
                 locked.payment_status,
+                recorded,
                 payment_status_enum,
             )
-            locked.payment_status = payment_status_enum
+            locked.payment_status = recorded
             locked.save(update_fields=["payment_status"])
-            order.payment_status = payment_status_enum
+            order.payment_status = recorded
 
     @classmethod
     def get_payment_status(
@@ -4425,6 +4468,13 @@ class OrderService:
         order: Order,
         update_order: bool = True,
     ) -> tuple[PaymentStatus, dict[str, Any]]:
+        """Ask the provider where the order's payment stands and record it.
+
+        Returns what the provider reported. Raises
+        ``PaymentStatusUnavailableError``, having written nothing, when the
+        provider could not be asked: the order keeps its state and the
+        caller asks again later.
+        """
         if not order.payment_id:
             raise PaymentError(_("This order has no payment ID."))
 

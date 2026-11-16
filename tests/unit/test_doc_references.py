@@ -55,9 +55,6 @@ _SOURCE_DIRS_SKIPPED = frozenset(
 # ``docs/product-`` at the end of a line: a path cut in two by a wrap.
 _SPLIT_DOC_PATH = re.compile(r"`(docs/[\w./-]*)$", re.MULTILINE)
 _DOC_MAX_CHARACTERS = 40_000
-# Over the limit on the day the rule was written; #656 splits them. Delete
-# a name when its file fits, never add one.
-_DOCS_OVER_THE_LIMIT = frozenset({"docs/builder.md", "docs/emails.md"})
 _ORDER_DOC_MAX_LINE = 200
 # Code, workflows, hooks and config: where a comment gives a reason.
 _SOURCE_SUFFIXES = frozenset({".py", ".yml", ".yaml", ".toml", ".sh", ".mjs"})
@@ -271,22 +268,18 @@ def test_a_split_or_absent_doc_path_in_python_is_reported(
     assert _split_doc_paths() == {"src/apps.py: docs/product-"}
 
 
-def test_a_doc_fits_in_one_read():
+def test_a_doc_file_fits_in_one_read():
     """``docs/order-system.md`` grew to 273,000 characters in one file and
-    could no longer be read whole. Split a doc on a subject before it
-    reaches the limit, into a folder with an ``index.md`` that says which
-    file to read (``docs/order/index.md``)."""
-    sizes = {
-        path.relative_to(REPO_ROOT).as_posix(): len(
-            path.read_text(encoding="utf-8")
-        )
+    could no longer be read whole; the email and builder references passed
+    64,000 each. Split a doc on a subject before it reaches the limit, into
+    a folder with an ``index.md`` that says which file to read
+    (``docs/order/index.md``). Every file under ``docs/`` is held to it."""
+    over = sorted(
+        f"{path.relative_to(REPO_ROOT).as_posix()}: {size}"
         for path in (REPO_ROOT / "docs").rglob("*.md")
-    }
-    over = {name for name, size in sizes.items() if size > _DOC_MAX_CHARACTERS}
-    new = sorted(over - _DOCS_OVER_THE_LIMIT)
-    assert not new, "\n  ".join(f"{name}: {sizes[name]}" for name in new)
-    fits = sorted(_DOCS_OVER_THE_LIMIT - over)
-    assert not fits, f"These fit now, delete them from the list: {fits}"
+        if (size := len(path.read_text(encoding="utf-8"))) > _DOC_MAX_CHARACTERS
+    )
+    assert not over, "\n  ".join(over)
 
 
 def test_the_order_reference_has_no_paragraph_on_one_line():

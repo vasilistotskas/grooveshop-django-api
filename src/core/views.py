@@ -109,7 +109,7 @@ def _may_upload_editor_image(user) -> bool:
     return membership is not None and membership.can_manage_tenant
 
 
-@login_required
+@login_required(login_url=settings.STAFF_LOGIN_URL)
 def upload_image(request):
     if not _may_upload_editor_image(request.user):
         return JsonResponse(

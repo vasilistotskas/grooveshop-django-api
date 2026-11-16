@@ -7,9 +7,18 @@ from settings.env import DEBUG, NUXT_BASE_URL
 
 # allauth's own login page: it serves SHOPPERS (email+password), which
 # the OIDC authorize view (/identity/o/authorize) depends on — the
-# admin login would reject non-staff. Staff hitting a @login_required
-# view land here too and can log in with the same credentials.
+# admin login would reject non-staff. A staff-only view never sends a
+# visitor here: staff do not sign in through allauth, and the platform
+# host does not serve it. It names ``STAFF_LOGIN_URL`` instead.
 LOGIN_URL = "/accounts/login/"
+
+# Where a staff-only page outside the admin (the editor's image upload,
+# Rosetta) sends a visitor who is not signed in: the admin login of the
+# site this host serves. A URL name, reversed per request in the host's
+# URL conf: both admin sites are instances of the ``admin`` application,
+# so it is the store admin's login on a store host and the platform
+# admin's (``platform_admin``) on the platform host.
+STAFF_LOGIN_URL = "admin:login"
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",

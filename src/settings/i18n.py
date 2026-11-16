@@ -5,6 +5,7 @@ from os import getenv, path
 from django.utils.translation import gettext_lazy as _
 
 from settings.application import SITE_ID
+from settings.auth import STAFF_LOGIN_URL
 from settings.env import SRC_DIR
 
 LANGUAGE_CODE = getenv("LANGUAGE_CODE", "el")
@@ -86,6 +87,9 @@ ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = False
 ROSETTA_REQUIRES_AUTH = True
+# Rosetta is for staff: its sign-in is the admin login of the host's site,
+# never allauth's shopper login (``LOGIN_URL``, its default).
+ROSETTA_LOGIN_URL = STAFF_LOGIN_URL
 ROSETTA_WSGI_AUTO_RELOAD = False
 ROSETTA_UWSGI_AUTO_RELOAD = False
 ROSETTA_AUTO_COMPILE = True

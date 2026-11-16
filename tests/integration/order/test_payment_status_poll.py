@@ -21,6 +21,7 @@ Two answers were recorded wrongly:
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -104,7 +105,8 @@ class TestAProviderThatCannotBeAskedIsNotAnOutcome:
     @pytest.mark.parametrize(
         "error", PROVIDER_ERRORS, ids=lambda e: type(e).__name__
     )
-    def test_stripe_raises_instead_of_answering_failed(self, error):
+    def test_stripe_raises_instead_of_answering_failed(self, error, caplog):
+        caplog.set_level(logging.ERROR)
         with (
             _stripe_credentials(),
             patch.object(stripe.PaymentIntent, "retrieve", side_effect=error),
@@ -113,6 +115,11 @@ class TestAProviderThatCannotBeAskedIsNotAnOutcome:
             StripePaymentProvider().get_payment_status(PAYMENT_ID)
 
         assert raised.value.payment_id == PAYMENT_ID
+        assert raised.value.__cause__ is error
+        # The cause is logged with its traceback where it happened.
+        assert any(
+            r.levelname == "ERROR" and r.exc_info for r in caplog.records
+        )
 
     @pytest.mark.parametrize("http_status", [429, 500, 503])
     def test_viva_raises_instead_of_answering_failed(self, http_status):

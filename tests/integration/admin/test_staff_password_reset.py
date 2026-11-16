@@ -19,6 +19,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from admin.forms import PlatformAdminAuthenticationForm
 from tenant.models import PlatformStaffToken
@@ -205,11 +206,36 @@ class TestRateLimits:
         user = _staff()
 
         with patch(
-            "admin.password_reset.cache.count_in_window", side_effect=OSError
+            "admin.password_reset.cache.count_in_window",
+            side_effect=RedisConnectionError("down"),
         ):
             response = _ask(user.email)
 
-        assert response.status_code == 429
+        assert response.status_code == 503
+        assert "temporarily unavailable" in str(
+            response.context["form"].non_field_errors()
+        )
+        assert mail.outbox == []
+
+    def test_a_cache_that_cannot_count_the_address_closes_the_form(self):
+        """The per-address budget is counted after the per-client one, so
+        Redis can fail between the two."""
+        user = _staff()
+        calls = 0
+
+        def count(key, window):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RedisConnectionError("down")
+            return 1
+
+        with patch(
+            "admin.password_reset.cache.count_in_window", side_effect=count
+        ):
+            response = _ask(user.email)
+
+        assert response.status_code == 503
         assert mail.outbox == []
 
 

@@ -21,7 +21,8 @@ that row. So the flow is Django's own ``PasswordResetView`` /
   task per accepted request, and the task finds the account, so a match
   is not slower either. Budgets per client address and per target
   address (``settings.STAFF_PASSWORD_RESET``) fail closed when the cache
-  is down, because the form makes us mail an address the caller chose.
+  is down (503, the rule beside ``core.caches.STRICT_KEY_PREFIXES``),
+  because the form makes us mail an address the caller chose.
 - **MFA is not bypassed.** The reset sets a password and nothing else: it
   does not log the user in (``post_reset_login`` stays off) and leaves
   their authenticators alone, so a platform superuser still passes the
@@ -56,6 +57,7 @@ from unfold.widgets import (
     UnfoldAdminPasswordWidget,
 )
 
+from core.caches import REDIS_UNAVAILABLE
 from core.client_ip import client_ip_or_peer
 from tenant import staff_login_limits
 from tenant.celery import dispatch_on_commit
@@ -85,7 +87,8 @@ def can_reset_here(user) -> bool:
 def _over_budget(scope: str, identity: str, limit: int) -> bool:
     """Count one request against *identity*'s budget; True once spent.
 
-    Fails closed: a cache that cannot count is a budget that is spent.
+    Raises ``REDIS_UNAVAILABLE`` when the cache cannot count, which the
+    view answers with 503: the budget fails closed.
     """
     from django.db import connection
 
@@ -95,11 +98,7 @@ def _over_budget(scope: str, identity: str, limit: int) -> bool:
         digest=hashlib.sha256(identity.encode()).hexdigest(),
     )
     window = settings.STAFF_PASSWORD_RESET["WINDOW_SECONDS"]
-    try:
-        return cache.count_in_window(key, window) > limit
-    except Exception:
-        logger.exception("Staff password reset budget unavailable")
-        return True
+    return cache.count_in_window(key, window) > limit
 
 
 class StaffPasswordResetForm(PasswordResetForm):
@@ -181,13 +180,28 @@ class StaffPasswordResetView(_SiteContextMixin, PasswordResetView):
 
     def post(self, request, *args, **kwargs):
         budget = settings.STAFF_PASSWORD_RESET
-        if _over_budget("ip", client_ip_or_peer(request), budget["PER_IP"]):
-            form = self.get_form()
-            form.add_error(None, _("Too many requests. Try again in a while."))
-            return self.render_to_response(
-                self.get_context_data(form=form), status=429
+        try:
+            if _over_budget("ip", client_ip_or_peer(request), budget["PER_IP"]):
+                return self._refuse(
+                    _("Too many requests. Try again in a while."), 429
+                )
+            return super().post(request, *args, **kwargs)
+        except REDIS_UNAVAILABLE:
+            logger.exception("Staff password reset budget unavailable")
+            return self._refuse(
+                _(
+                    "Password reset is temporarily unavailable. "
+                    "Try again shortly."
+                ),
+                503,
             )
-        return super().post(request, *args, **kwargs)
+
+    def _refuse(self, message, status: int) -> HttpResponse:
+        form = self.get_form()
+        form.add_error(None, message)
+        return self.render_to_response(
+            self.get_context_data(form=form), status=status
+        )
 
     def form_valid(self, form) -> HttpResponse:
         email = form.cleaned_data["email"].strip().lower()

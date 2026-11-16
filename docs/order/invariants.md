@@ -87,7 +87,8 @@ These invariants need more than a table row. Each ends with its anchor.
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
   the IdP's single-use codes and WebSocket tickets. The checkout, payment,
   coupon and gift-card throttles (`src/core/api/throttling.py`,
-  `fail_closed = True`) therefore DENY with 429 during an outage, while
+  `fail_closed = True`) therefore REFUSE with 503 `rate_limit_unavailable`
+  during an outage (never a 429: the caller sent nothing too often), while
   browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow
   - Anchor: `src/core/api/throttling.py` module docstring
 - The tenant resolve payload and domain set are invalidated by

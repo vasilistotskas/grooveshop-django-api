@@ -4,8 +4,9 @@ The default cache fails open, and DRF keeps throttle history with plain
 ``cache.get``/``cache.set``, so without this a Redis outage silently
 lifted every rate limit — including the ones guarding a bearer secret
 (gift cards), a code oracle (coupons), a third party (VIES) and money
-(checkout). Security scopes now DENY with ``Retry-After``; general
-scopes ALLOW, as a storefront must keep serving through a Redis blip.
+(checkout). Security scopes now REFUSE with 503 ``rate_limit_unavailable``
+(never a 429: nothing was sent too often); general scopes ALLOW, as a
+storefront must keep serving through a Redis blip.
 """
 
 from __future__ import annotations
@@ -17,8 +18,6 @@ from os import getenv
 
 import pytest
 from django.test import override_settings
-from redis.backoff import NoBackoff
-from redis.retry import Retry
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework.throttling import (
@@ -30,6 +29,7 @@ from rest_framework.views import APIView
 from core import caches as core_caches
 from core.api import throttling
 from core.caches import STRICT_NAMESPACE, CustomCache
+from tests.utils.redis import stopped_cache
 
 #: The classification this module locks in. Changing a scope's policy
 #: must be a deliberate edit here too.
@@ -68,19 +68,6 @@ FAIL_OPEN = {
     # or money behind it, and a store's team keeps working through a blip.
     "StaffAgentThrottle",
 }
-
-
-def _stopped_cache() -> CustomCache:
-    return CustomCache(
-        server="redis://127.0.0.1:1/0",
-        params={
-            "OPTIONS": {
-                "retry": Retry(NoBackoff(), 0),
-                "socket_connect_timeout": 0.2,
-                "health_check_interval": 0,
-            }
-        },
-    )
 
 
 def _live_cache() -> CustomCache:
@@ -138,18 +125,19 @@ class TestClassification:
 
 
 class TestRedisDown:
-    def test_a_security_scope_denies_and_logs_an_error(
+    def test_a_security_scope_refuses_and_logs_an_error(
         self, monkeypatch, caplog
     ):
         throttle = _throttle(
-            throttling.GiftCardCheckThrottle, monkeypatch, _stopped_cache()
+            throttling.GiftCardCheckThrottle, monkeypatch, stopped_cache()
         )
 
-        with caplog.at_level(logging.ERROR, logger="core.api.throttling"):
-            assert throttle.allow_request(_request(), view=None) is False
+        with (
+            caplog.at_level(logging.ERROR, logger="core.api.throttling"),
+            pytest.raises(throttling.RateLimitUnavailable),
+        ):
+            throttle.allow_request(_request(), view=None)
 
-        # DRF turns a denial into 429 + Retry-After from ``wait()``.
-        assert throttle.wait() > 0
         assert any(
             "gift_card_check" in r.getMessage() and "DENIED" in r.getMessage()
             for r in caplog.records
@@ -157,7 +145,7 @@ class TestRedisDown:
 
     def test_a_general_scope_allows_and_warns(self, monkeypatch, caplog):
         throttle = _throttle(
-            throttling.SearchThrottle, monkeypatch, _stopped_cache()
+            throttling.SearchThrottle, monkeypatch, stopped_cache()
         )
 
         with caplog.at_level(logging.WARNING, logger="core.api.throttling"):
@@ -168,13 +156,13 @@ class TestRedisDown:
     def test_drfs_own_default_throttles_stay_open(self, monkeypatch):
         """``anon``/``user`` are the day-scale browsing ceilings in
         ``DEFAULT_THROTTLE_CLASSES``; they read the fail-open cache."""
-        throttle = _throttle(AnonRateThrottle, monkeypatch, _stopped_cache())
+        throttle = _throttle(AnonRateThrottle, monkeypatch, stopped_cache())
 
         assert throttle.allow_request(_request(), view=None) is True
 
     def test_the_throttle_key_really_raises_in_the_cache(self):
         with pytest.raises(core_caches.REDIS_UNAVAILABLE):
-            _stopped_cache().get(
+            stopped_cache().get(
                 throttling.GiftCardCheckThrottle.cache_format
                 % {"scope": "gift_card_check", "ident": "1"},
                 [],
@@ -182,18 +170,19 @@ class TestRedisDown:
 
     def test_a_denial_is_logged_once_per_burst(self, monkeypatch, caplog):
         throttle = _throttle(
-            throttling.CouponApplyThrottle, monkeypatch, _stopped_cache()
+            throttling.CouponApplyThrottle, monkeypatch, stopped_cache()
         )
 
         with caplog.at_level(logging.ERROR, logger="core.api.throttling"):
             for _ in range(5):
-                throttle.allow_request(_request(), view=None)
+                with pytest.raises(throttling.RateLimitUnavailable):
+                    throttle.allow_request(_request(), view=None)
 
         assert sum("DENIED" in r.getMessage() for r in caplog.records) == 1
 
-    def test_staff_login_denies(self, monkeypatch):
+    def test_staff_login_refuses(self, monkeypatch):
         monkeypatch.setattr(
-            throttling.StaffLoginThrottle, "cache", _stopped_cache()
+            throttling.StaffLoginThrottle, "cache", stopped_cache()
         )
         monkeypatch.setattr(
             throttling.StaffLoginThrottle,
@@ -203,12 +192,13 @@ class TestRedisDown:
         view = type("View", (), {"throttle_scope": "staff_login"})()
 
         throttle = throttling.StaffLoginThrottle()
-        assert throttle.allow_request(_request(), view) is False
+        with pytest.raises(throttling.RateLimitUnavailable):
+            throttle.allow_request(_request(), view)
 
     @override_settings(ROOT_URLCONF=__name__)
-    def test_a_view_answers_429_with_retry_after(self, monkeypatch):
+    def test_a_view_answers_a_coded_503(self, monkeypatch):
         monkeypatch.setattr(
-            throttling.GiftCardCheckThrottle, "cache", _stopped_cache()
+            throttling.GiftCardCheckThrottle, "cache", stopped_cache()
         )
         monkeypatch.setattr(
             throttling.GiftCardCheckThrottle, "rate", "6/minute", raising=False
@@ -226,8 +216,9 @@ class TestRedisDown:
             APIRequestFactory().get("/x", REMOTE_ADDR="203.0.113.7")
         )
 
-        assert response.status_code == 429
-        assert int(response["Retry-After"]) >= 1
+        assert response.status_code == 503
+        assert response.data["code"] == "rate_limit_unavailable"
+        assert "Retry-After" not in response
 
 
 class TestRedisUp:

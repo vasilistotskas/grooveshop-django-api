@@ -9,6 +9,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
+from django.utils.translation import gettext_lazy as _
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
@@ -61,6 +62,28 @@ STRICT_NAMESPACE = "strict:"
 #: These are third-party or fixed keys — allauth reads the default alias
 #: directly and offers no setting to point it elsewhere — so the match is
 #: on the key, in this one place.
+#:
+#: **Every security limit fails closed, and says so.** A limit is a
+#: counter whose loss lifts a brute-force or abuse bound: allauth's own
+#: limits, ``core.middleware.allauth_ratelimit``, the security scopes of
+#: ``core.api.throttling`` (``fail_closed = True``), the staff sign-in
+#: counters (``tenant.staff_login_limits``) and the staff password-reset
+#: budget (``admin.password_reset``). One rule for all of them:
+#:
+#: 1. Its keys sit under this tuple (or it counts with ``count_in_window``,
+#:    ``add`` or ``incr``, which raise for any key), so an unreachable
+#:    Redis RAISES ``REDIS_UNAVAILABLE`` instead of reporting "no history".
+#: 2. The code that owns the answer catches that and refuses the request
+#:    with **503** and a stable code: ``rate_limit_unavailable`` for the
+#:    throttles and the allauth limits, ``staff_login_unavailable`` for the
+#:    staff sign-in, the form's own error page for the admin forms. Never a
+#:    429, which tells the caller they sent too much and comes with a
+#:    ``Retry-After`` no empty history can compute; never a 500, which is
+#:    uncoded and reads as a crash; and never a pass.
+#:
+#: A limit that fails OPEN instead writes its reason beside it
+#: (``order.views.viva_webhook._webhook_get_rate_limit``: Viva's handshake
+#: must not break with Redis).
 STRICT_KEY_PREFIXES: tuple[str, ...] = (
     STRICT_NAMESPACE,
     f"global:{STRICT_NAMESPACE}",
@@ -69,6 +92,14 @@ STRICT_KEY_PREFIXES: tuple[str, ...] = (
     "allauth.idp.oidc.authorization_code[",
     "allauth.idp.oidc.user_code[",
     "allauth.idp.oidc.device_code[",
+)
+
+#: The code and sentence of the 503 a throttle or an allauth limit answers
+#: while it cannot count (the rule above): ``core.api.throttling.
+#: RateLimitUnavailable`` and ``core.middleware.allauth_ratelimit``.
+RATE_LIMIT_UNAVAILABLE_CODE = "rate_limit_unavailable"
+RATE_LIMIT_UNAVAILABLE_MESSAGE = _(
+    "This action is temporarily unavailable. Try again shortly."
 )
 
 

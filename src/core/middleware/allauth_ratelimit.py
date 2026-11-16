@@ -4,6 +4,15 @@ Rate limiting middleware for django-allauth headless endpoints.
 DRF throttling only applies to /api/v1/ views. The /_allauth/ headless
 endpoints bypass DRF entirely, so we need a separate rate limiter.
 Uses Django's Redis cache for counters (already configured in settings).
+
+**A Redis outage refuses, it never lifts the limit** (the rule beside
+``core.caches.STRICT_KEY_PREFIXES``). The counters live under
+``STRICT_NAMESPACE``, and ``count_in_window`` raises on an unreachable
+Redis; this middleware answers that with 503 ``rate_limit_unavailable`` in
+allauth's error envelope. allauth's OWN limits (``allauth:rl:``), its TOTP
+replay guard and the IdP's single-use codes are strict keys too, and raise
+from inside allauth's views: ``process_exception`` gives them the same 503
+instead of an uncoded 500.
 """
 
 import hashlib
@@ -15,9 +24,27 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
+from core.caches import (
+    RATE_LIMIT_UNAVAILABLE_CODE,
+    RATE_LIMIT_UNAVAILABLE_MESSAGE,
+    REDIS_UNAVAILABLE,
+    STRICT_NAMESPACE,
+    BurstLogger,
+)
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
+
+#: allauth's headless API: the routes this middleware limits, and the ones
+#: whose Redis outage it answers.
+_ALLAUTH_PREFIX = "/_allauth/"
+
+_refused_while_unavailable = BurstLogger(
+    "AllAuth %s REFUSED: Redis unavailable, and its limits fail closed: "
+    "%s (%s similar refusal(s) suppressed in the last %ss)",
+    level=logging.ERROR,
+    target=logger,
+)
 
 # (path_prefix, per_minute, per_hour) — None means unlimited
 _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
@@ -57,18 +84,11 @@ def _is_rate_limited(cache_key: str, limit: int, window_seconds: int) -> bool:
 
     ``count_in_window`` increments and sets the expiry in one Redis
     script, so concurrent requests each get their own number and the
-    key can never be left without an expiry.
-
-    Fails open on any cache error so a Redis outage never 500s users.
+    key can never be left without an expiry. It raises
+    ``REDIS_UNAVAILABLE`` when Redis cannot be reached, and the caller
+    refuses the request (see the module docstring).
     """
-    try:
-        return cache.count_in_window(cache_key, window_seconds) > limit
-    except Exception as exc:
-        logger.warning(
-            "AllAuthRateLimit: cache error, failing open",
-            exc_info=exc,
-        )
-        return False
+    return cache.count_in_window(cache_key, window_seconds) > limit
 
 
 class AllAuthRateLimitMiddleware:
@@ -76,7 +96,8 @@ class AllAuthRateLimitMiddleware:
     Rate limit the allauth headless API endpoints.
 
     Only POST/PUT/PATCH requests are rate-limited (reads are harmless).
-    Skips when DEBUG=True or DISABLE_CACHE=True (test environments).
+    Skips counting when DEBUG=True or DISABLE_CACHE=True (test
+    environments); an outage inside allauth's views is answered either way.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
@@ -87,10 +108,26 @@ class AllAuthRateLimitMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         if not self.disabled and request.method in ("POST", "PUT", "PATCH"):
-            response = self._check_rate_limit(request)
+            try:
+                response = self._check_rate_limit(request)
+            except REDIS_UNAVAILABLE as exc:
+                return self._unavailable(request, exc)
             if response is not None:
                 return response
         return self.get_response(request)
+
+    def process_exception(
+        self, request: HttpRequest, exception: Exception
+    ) -> HttpResponse | None:
+        """An allauth view that could not reach a strict key: its own rate
+        limits, TOTP replay protection, the IdP's single-use codes. The
+        cache raised rather than lift the control; answer the coded 503
+        instead of a 500."""
+        if isinstance(exception, REDIS_UNAVAILABLE) and (
+            request.path_info.startswith(_ALLAUTH_PREFIX)
+        ):
+            return self._unavailable(request, exception)
+        return None
 
     def _check_rate_limit(self, request: HttpRequest) -> HttpResponse | None:
         path = request.path_info
@@ -106,8 +143,11 @@ class AllAuthRateLimitMiddleware:
             # a NAT will share an IP, but with the schema in the key
             # they cannot exhaust each other's quota.
             schema = getattr(connection, "schema_name", "public") or "public"
+            # Under the strict namespace: the cache never answers these
+            # from a failing Redis (``core.caches.STRICT_KEY_PREFIXES``).
             cache_prefix = (
-                f"allauth_rl:{schema}:{path_prefix.replace('/', '_')}"
+                f"{STRICT_NAMESPACE}allauth_rl:{schema}:"
+                f"{path_prefix.replace('/', '_')}"
             )
 
             if per_minute and _is_rate_limited(
@@ -145,4 +185,20 @@ class AllAuthRateLimitMiddleware:
                 ],
             },
             status=429,
+        )
+
+    @staticmethod
+    def _unavailable(request: HttpRequest, exc: Exception) -> JsonResponse:
+        _refused_while_unavailable.report(request.path_info, exc)
+        return JsonResponse(
+            {
+                "status": 503,
+                "errors": [
+                    {
+                        "code": RATE_LIMIT_UNAVAILABLE_CODE,
+                        "message": str(RATE_LIMIT_UNAVAILABLE_MESSAGE),
+                    }
+                ],
+            },
+            status=503,
         )

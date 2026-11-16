@@ -19,14 +19,13 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from redis.backoff import NoBackoff
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 from redis.exceptions import TimeoutError as RedisTimeoutError
-from redis.retry import Retry
 
 from core import caches
 from core.caches import CustomCache
+from tests.utils.redis import stopped_cache
 
 
 @pytest.fixture(autouse=True)
@@ -41,16 +40,7 @@ def _fresh_burst_window(monkeypatch):
 @pytest.fixture
 def stopped():
     """A real client against a port nothing listens on."""
-    return CustomCache(
-        server="redis://127.0.0.1:1/0",
-        params={
-            "OPTIONS": {
-                "retry": Retry(NoBackoff(), 0),
-                "socket_connect_timeout": 0.2,
-                "health_check_interval": 0,
-            }
-        },
-    )
+    return stopped_cache()
 
 
 @pytest.fixture

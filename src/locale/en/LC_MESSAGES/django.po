@@ -10343,6 +10343,9 @@ msgstr "Password reset"
 msgid "Password reset code"
 msgstr "Password reset code"
 
+msgid "Password reset is temporarily unavailable. Try again shortly."
+msgstr "Password reset is temporarily unavailable. Try again shortly."
+
 msgid "Password reset link"
 msgstr "Password reset link"
 
@@ -15207,6 +15210,9 @@ msgstr "This Quarter"
 
 msgid "This Week"
 msgstr "This Week"
+
+msgid "This action is temporarily unavailable. Try again shortly."
+msgstr "This action is temporarily unavailable. Try again shortly."
 
 msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
 msgstr "This address has unsubscribed from these emails, so the alert could not be delivered."

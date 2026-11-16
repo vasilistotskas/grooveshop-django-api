@@ -15,8 +15,10 @@ defined here uses ``ResilientThrottleMixin``: its keys live under
 and the class decides what an outage means with ONE attribute,
 ``fail_closed``:
 
-- ``fail_closed = True`` — DENY (DRF answers 429 with ``Retry-After``)
-  and log at ERROR, once per burst. The rule: the endpoint is a secret
+- ``fail_closed = True`` — REFUSE with 503 ``rate_limit_unavailable``
+  (``RateLimitUnavailable``) and log at ERROR, once per burst. Not a 429:
+  the caller sent nothing too many, and with no history there is no
+  honest ``Retry-After`` (the rule is ``core.caches.STRICT_KEY_PREFIXES``'s). The rule: the endpoint is a secret
   or existence oracle (coupon, gift card, order lookup, staff login),
   moves money or stock (order create, payment), makes us send email to
   an address the caller chooses (newsletter), stores the caller's
@@ -33,6 +35,8 @@ import logging
 from typing import ClassVar
 
 from django.conf import settings
+from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.throttling import (
     AnonRateThrottle,
     ScopedRateThrottle,
@@ -41,7 +45,13 @@ from rest_framework.throttling import (
 )
 
 from cart.agent_token import cart_token_from_request, hash_cart_token
-from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
+from core.caches import (
+    RATE_LIMIT_UNAVAILABLE_CODE,
+    RATE_LIMIT_UNAVAILABLE_MESSAGE,
+    REDIS_UNAVAILABLE,
+    STRICT_NAMESPACE,
+    BurstLogger,
+)
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
@@ -59,6 +69,14 @@ _allowed_while_unavailable = BurstLogger(
 )
 
 
+class RateLimitUnavailable(APIException):
+    """A fail-closed throttle could not count: 503, never a 429."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = RATE_LIMIT_UNAVAILABLE_MESSAGE
+    default_code = RATE_LIMIT_UNAVAILABLE_CODE
+
+
 class ResilientThrottleMixin:
     """Decide, per throttle class, what a Redis outage means.
 
@@ -66,7 +84,7 @@ class ResilientThrottleMixin:
     moves under ``STRICT_NAMESPACE``, so ``CustomCache`` re-raises the
     connection error instead of reporting an empty history, and
     ``allow_request`` turns it into the class's policy — see the module
-    docstring for which scopes deny.
+    docstring for which scopes refuse.
     """
 
     fail_closed: ClassVar[bool] = False
@@ -76,14 +94,10 @@ class ResilientThrottleMixin:
         try:
             return super().allow_request(request, view)  # type: ignore[misc]
         except REDIS_UNAVAILABLE as exc:
-            # ``wait()`` reads these to compute ``Retry-After``; with no
-            # history it suggests a fraction of the window.
-            self.history = []
-            self.now = self.timer()  # type: ignore[attr-defined]
             scope = getattr(self, "scope", None)
             if self.fail_closed:
                 _denied_while_unavailable.report(scope, exc)
-                return False
+                raise RateLimitUnavailable from exc
             _allowed_while_unavailable.report(scope, exc)
             return True
 

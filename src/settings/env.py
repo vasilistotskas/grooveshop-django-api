@@ -94,7 +94,7 @@ for _key in FIELD_ENCRYPTION_KEYS:
 # list stores (``emails.optout.address_hash``), so no row holds an address.
 # Separate from SECRET_KEY on purpose: rotating SECRET_KEY must not orphan
 # every opt-out, and changing THIS key forgets them all. Generate one with
-# ``secrets.token_urlsafe(48)``; the runbook is ``docs/emails.md``.
+# ``secrets.token_urlsafe(48)``; the runbook is ``docs/emails/sending.md``.
 EMAIL_HASH_KEY = getenv("EMAIL_HASH_KEY", "")
 if not EMAIL_HASH_KEY:
     if PRODUCTION_PROFILE:

@@ -432,7 +432,7 @@ protect the Django admin login either.
   Django swaps the token for a session marker on the first visit, so it does
   not leak in a `Referer`.
 - **Mail.** `platform.staff_password_reset` (`src/tenant/emails.py`, see
-  `docs/emails.md`): the PLATFORM sends it, from `"{SITE_NAME}"
+  `docs/emails/types.md`): the PLATFORM sends it, from `"{SITE_NAME}"
   <DEFAULT_FROM_EMAIL>` under `public`, in the store's `default_locale` (the
   project default on the platform host). The subject and the heading name the
   store, read in its schema before the send (the mail is built under
@@ -451,7 +451,7 @@ protect the Django admin login either.
 
 A staff token has a `scope`. `api` is the token the platform login mints
 (renewed by use, any staff route the role allows). `builder` is minted by
-the page builder's ticket exchange (`docs/builder.md`, "Signing in to the
+the page builder's ticket exchange (`docs/builder/sign-in-and-defaults.md`, "Signing in to the
 editor"): it is never renewed, ends at its expiry, and
 `PlatformStaffTokenAuthentication` refuses it outside the `builder` URL
 namespace (`staff_token_scope`). The role and `is_staff` re-checks apply to

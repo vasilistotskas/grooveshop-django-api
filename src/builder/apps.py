@@ -6,7 +6,7 @@ class BuilderConfig(AppConfig):
     """The storefront page builder: versioned documents, immutable releases,
     the staff API, the public read and the media library.
 
-    Models and entry points: ``docs/app-map.md``. Read ``docs/builder.md``.
+    Models and entry points: ``docs/app-map.md``. Read ``docs/builder/index.md``.
     """
 
     default_auto_field = "django.db.models.BigAutoField"

@@ -113,7 +113,7 @@ passed to `send_email`; the bytes are never logged.
 Every other domain's emails follow the same pattern (`src/product/emails.py`,
 `src/giftcard/emails.py`, `src/b2b/emails.py`, `src/contact/emails.py`,
 `src/user/emails.py`,
-`src/cart/emails.py`; see `docs/emails.md`). A builder states the language of
+`src/cart/emails.py`; see `docs/emails/types.md`). A builder states the language of
 every translated row it prints (`set_current_language(env.language)`), so a
 product, topic or cart line is named in the recipient's language whatever
 language the task loaded it in.
@@ -283,12 +283,12 @@ additive migration; the moment is the proof of when they asked), beside the
   customer can, through their own preferences
   (`PATCH /api/v1/user/email-preferences`, `set_marketing_preferences`: a
   `*` row is split into rows for the other types, and the flag clears when
-  no row is left; `docs/emails.md`). A restock or price-drop alert made by a
+  no row is left; `docs/emails/types.md`). A restock or price-drop alert made by a
   signed-in customer who opted out answers `409 email_opted_out`. A
   guest's is a double opt-in: every guest request answers the same `202`,
   and the alert starts only when the link emailed to the address is
   confirmed, which also lifts that address's opt-out of the alert's type
-  (`src/product/alerts.py`, `docs/emails.md`). Staff may record an
+  (`src/product/alerts.py`, `docs/emails/sending.md`). Staff may record an
   objection a customer made by phone or email (Loyalty & Engagement tab:
   saving the field writes `EmailOptOut("*")`); once set the field is
   read-only.
@@ -318,7 +318,7 @@ allauth's `current_site` is not in the context and must not be
 (`SITE_ID` is one store's `Site` row: every store would sign as it).
 The templates under `src/core/templates/emails/{account,mfa,social}/` read
 the store from `build_email_context` instead: `SITE_NAME`, `SITE_URL`,
-the logo and theme. See `docs/emails.md` (allauth mail).
+the logo and theme. See `docs/emails/sending.md` (allauth mail).
 `tests/integration/user/test_allauth_email_store_identity.py` discovers
 the kinds from the installed allauth, so a template a later allauth adds
 fails there until it is covered.

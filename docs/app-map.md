@@ -163,7 +163,7 @@ its app (`src/order/emails.py`, `src/user/emails.py` and the other
 (`src/emails/send.py`). Models: `EmailSwitch` (a store switches a type
 off), `EmailOptOut`, `EmailLog`, `EmailEvent` and `EmailSuppression`.
 Also the admin preview (`src/emails/preview.py`) and the Resend webhook
-(`src/emails/webhooks.py`). Read `docs/emails.md`.
+(`src/emails/webhooks.py`). Read `docs/emails/index.md`.
 
 ### `admin/`
 
@@ -317,7 +317,7 @@ derived `BuilderReference` index and the media library (`MediaAsset`).
 It serves the staff API and the public read of the current release
 (`src/builder/views.py`); the writes go through
 `src/builder/services.py`. The block catalogue is the storefront's. Read
-`docs/builder.md`.
+`docs/builder/index.md`.
 
 ### `recommendation/`
 

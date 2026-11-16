@@ -21,13 +21,17 @@ from rest_framework.decorators import (
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.permissions import IsStoreStaff
 from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import SearchClickThrottle, SearchThrottle
+from core.api.throttling import (
+    AnonIpRateThrottle,
+    SearchClickThrottle,
+    SearchThrottle,
+    UserBudgetThrottle,
+)
 from core.store_settings import store_setting
 from product.attribute_selection import (
     ATTRIBUTE_VALUES_FIELD,
@@ -372,7 +376,7 @@ def _relaxed_query(query: str) -> str | None:
 # indexing on `is_published` only, never on the plan flag, so the
 # documents are in the index either way — the gate has to be here.
 @permission_classes([IsBlogEnabled])
-@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+@throttle_classes([SearchThrottle, AnonIpRateThrottle, UserBudgetThrottle])
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
     if not query:
@@ -628,7 +632,7 @@ def blog_post_meili_search(request):
 # Explicit, per the project rule that an anonymous endpoint declares
 # itself rather than leaning on DEFAULT_PERMISSION_CLASSES.
 @permission_classes([IsCatalogueEnabled, AllowAny])
-@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+@throttle_classes([SearchThrottle, AnonIpRateThrottle, UserBudgetThrottle])
 def product_meili_search(request):
     """Search products with advanced filtering via Meilisearch."""
 
@@ -817,7 +821,7 @@ def product_meili_search(request):
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@throttle_classes([SearchClickThrottle, AnonRateThrottle, UserRateThrottle])
+@throttle_classes([SearchClickThrottle, AnonIpRateThrottle, UserBudgetThrottle])
 def search_click(request):
     serializer = SearchClickRequestSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -1133,7 +1137,7 @@ _TRENDING_WINDOW_HOURS = 24
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+@throttle_classes([SearchThrottle, AnonIpRateThrottle, UserBudgetThrottle])
 def search_trending(request):
     """Return top search queries over the last 24h (Redis-cached)."""
     language_code = request.query_params.get("language_code") or ""

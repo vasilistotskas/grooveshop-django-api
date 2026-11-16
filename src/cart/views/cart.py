@@ -16,7 +16,6 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from cart.agent_token import CART_TOKEN_PARAMETER, mint_cart_token
 from cart.filters.cart import CartFilter
@@ -37,10 +36,12 @@ from cart.services import CartService
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     CartAgentTokenThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CouponApplyThrottle,
+    UserBudgetThrottle,
 )
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
@@ -343,8 +344,8 @@ class CartViewSet(BaseModelViewSet):
         if self.action == "agent_token":
             return [
                 CartAgentTokenThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         if self.action == "apply_coupon":
             # Coupon apply is a brute-forceable code oracle — cap it far
@@ -353,8 +354,8 @@ class CartViewSet(BaseModelViewSet):
                 CouponApplyThrottle(),
                 CartMutationThrottle(),
                 CartMutationAnonThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         if self.action in self._MUTATION_ACTIONS:
             # Per-minute burst limits layered ON TOP of the global daily caps
@@ -363,8 +364,8 @@ class CartViewSet(BaseModelViewSet):
             return [
                 CartMutationThrottle(),
                 CartMutationAnonThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         return super().get_throttles()
 

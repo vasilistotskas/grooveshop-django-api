@@ -119,6 +119,18 @@ Bodies built from a variable (a serializer's errors, `error_data`) are not
 judged; the blog reorder and comment actions now raise instead, so the handler
 adds `code` and `fields`.
 
+## A security store that is down
+
+A view that cannot reach a strict cache key (a rate limit that cannot count,
+a TOTP replay check, an IdP code, a single-use ticket) refuses the request,
+on every route, with **503** and the code `temporarily_unavailable`
+(`src/core/middleware/strict_cache.py`; the rule beside
+`STRICT_KEY_PREFIXES` in `src/core/caches.py`). The body is the route's own
+shape: `{detail, code}` on a DRF view, allauth's
+`{status, errors: [{code, message}]}` on `/_allauth/`, OAuth's
+`{error, error_description}` on the IdP's `identity/o/api/` endpoints, and an
+HTML page anywhere else. Never a 429 and never a 500.
+
 ## Which codes are returned (monitoring)
 
 Every request writes one access line (`src/core/middleware/access_log.py`), and

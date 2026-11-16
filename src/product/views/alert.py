@@ -5,11 +5,14 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
-from core.api.throttling import ProductAlertCreateThrottle
+from core.api.throttling import (
+    AnonIpRateThrottle,
+    ProductAlertCreateThrottle,
+    UserBudgetThrottle,
+)
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import stated_request_language
 from core.utils.serializers import (
@@ -92,8 +95,8 @@ class ProductAlertViewSet(BaseModelViewSet):
         if self.action == "create":
             return [
                 ProductAlertCreateThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         return super().get_throttles()
 

@@ -10,7 +10,6 @@ from drf_spectacular.utils import (
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from cart.agent_token import CART_TOKEN_PARAMETER
 from cart.filters.item import CartItemFilter
@@ -24,8 +23,10 @@ from cart.serializers.item import (
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
+    UserBudgetThrottle,
 )
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -168,8 +169,8 @@ class CartItemViewSet(BaseModelViewSet):
             return [
                 CartMutationThrottle(),
                 CartMutationAnonThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         return super().get_throttles()
 

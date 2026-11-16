@@ -28,7 +28,6 @@ from rest_framework.exceptions import (
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.permissions import (
     IsOwnerOrAdmin,
@@ -38,11 +37,13 @@ from core.api.permissions import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
     OrderSpecimenThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
+    UserBudgetThrottle,
     VivaReturnThrottle,
 )
 from core.api.views import BaseModelViewSet
@@ -1433,8 +1434,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1511,8 +1512,8 @@ class OrderViewSet(BaseModelViewSet):
         methods=["POST"],
         url_path="retry-payment",
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1661,8 +1662,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],
@@ -1802,8 +1803,8 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["POST"],
         throttle_classes=[
-            AnonRateThrottle,
-            UserRateThrottle,
+            AnonIpRateThrottle,
+            UserBudgetThrottle,
             PaymentAttemptThrottle,
             PaymentAttemptAnonThrottle,
         ],

@@ -23,6 +23,7 @@ from django.test import Client
 from rest_framework import status
 
 from tests.utils.openapi import as_json_schema
+from tests.utils.redis import stopped_cache
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -387,6 +388,27 @@ def test_a_rate_limited_call(document, user, settings):
     assert first.status_code == status.HTTP_200_OK
     assert second.status_code == status.HTTP_429_TOO_MANY_REQUESTS
     assert_documented(document, "/auth/login", "post", second)
+
+
+def test_a_call_whose_limits_cannot_count(document, user, monkeypatch):
+    """Redis down: allauth's own limits (strict keys) raise inside its
+    view, and the answer is the documented 503, not a 500 or a pass."""
+    from allauth.core.internal import ratelimit
+
+    monkeypatch.setattr(ratelimit, "cache", stopped_cache())
+
+    response = _call(
+        Client(),
+        "post",
+        "/auth/login",
+        {"email": user.email, "password": PASSWORD},
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    body = assert_documented(document, "/auth/login", "post", response)
+    assert [error["code"] for error in body["errors"]] == [
+        "temporarily_unavailable"
+    ]
 
 
 def test_the_passkey_login_options_carry_the_session_token(document):

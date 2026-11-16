@@ -19,6 +19,8 @@ from typing import Any
 
 from allauth.headless.constants import Flow
 
+from core.caches import STRICT_CACHE_UNAVAILABLE_CODE
+
 Document = dict[str, Any]
 
 OUR_PATH_PREFIX = "/_allauth/app/v1"
@@ -220,6 +222,50 @@ def declare_rate_limit_answer(document: Document) -> None:
                 operation["responses"].setdefault("429", copy.deepcopy(answer))
 
 
+def declare_unavailable_answer(document: Document) -> None:
+    """Any operation can answer 503 ``temporarily_unavailable``: a security
+    control that cannot reach Redis (a rate limit, TOTP replay protection)
+    refuses the call rather than lift itself (``core.middleware.
+    strict_cache``). Ours, so the document cannot know it."""
+    _schemas(document)["UnavailableResponse"] = {
+        "type": "object",
+        "description": (
+            "A security control of the call cannot be checked right now, "
+            "so it is refused. Try again shortly."
+        ),
+        "properties": {
+            "status": {"type": "integer", "enum": [503]},
+            "errors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "enum": [STRICT_CACHE_UNAVAILABLE_CODE],
+                        },
+                        "message": {"type": "string"},
+                    },
+                    "required": ["code", "message"],
+                },
+            },
+        },
+        "required": ["status", "errors"],
+    }
+    answer = {
+        "description": "Temporarily unavailable.",
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/UnavailableResponse"}
+            }
+        },
+    }
+    for path in document["paths"].values():
+        for operation in path.values():
+            if isinstance(operation, dict) and "responses" in operation:
+                operation["responses"].setdefault("503", copy.deepcopy(answer))
+
+
 def _declares(document: Document, schema: dict[str, Any], key: str) -> bool:
     """Whether ``schema`` declares property ``key``, through ``$ref``,
     ``allOf`` and ``oneOf``."""
@@ -293,6 +339,7 @@ CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_totp_svg,
     name_totp_not_found_response,
     declare_rate_limit_answer,
+    declare_unavailable_answer,
     allow_session_meta_on_every_answer,
 )
 

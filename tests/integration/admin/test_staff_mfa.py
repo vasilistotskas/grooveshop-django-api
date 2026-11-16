@@ -21,6 +21,7 @@ from allauth.mfa.totp.internal.auth import (
     hotp_value,
 )
 from django.contrib.auth import SESSION_KEY
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, RequestFactory
@@ -104,6 +105,12 @@ def _reload(client):
 
 def _signed_in(client) -> bool:
     return SESSION_KEY in client.session
+
+
+def _locked(user) -> bool:
+    """Whether the next code attempt of *user* is refused."""
+    failures = cache.get(staff_mfa._failures_key(user), 0)
+    return failures >= staff_mfa.MAX_FAILURES
 
 
 def _enrol(user):
@@ -391,7 +398,7 @@ class TestPasswordThenCode:
         with _window(1):
             _answer(client, "code", _code(secret))
 
-        assert not staff_mfa.is_locked(user)
+        assert not _locked(user)
 
     def test_the_username_posted_with_a_code_is_ignored(self):
         user, secret, _ = self._enrolled()
@@ -545,7 +552,7 @@ class TestThePendingSignIn:
         form = response.context["form"]
         assert form.step is Step.ENROL
         assert not form.errors
-        assert not staff_mfa.is_locked(user)
+        assert not _locked(user)
 
     def test_an_account_switched_off_midway_stops_there(self):
         user = _superuser()
@@ -650,12 +657,32 @@ class TestReset:
         _password(client, user)
         for _ in range(staff_mfa.MAX_FAILURES):
             _answer(client, "code", "000000")
-        assert staff_mfa.is_locked(user)
+        assert _locked(user)
 
         call_command("reset_staff_mfa", user.email, stdout=StringIO())
 
-        assert not staff_mfa.is_locked(user)
+        assert not _locked(user)
 
     def test_an_unknown_email_is_an_error(self):
         with pytest.raises(CommandError):
             call_command("reset_staff_mfa", "nobody@example.com")
+
+
+class TestCacheDown:
+    def test_a_totp_code_whose_replay_cannot_be_recorded_is_refused(
+        self, monkeypatch
+    ):
+        """allauth records a used TOTP code in a strict cache key: with Redis
+        down the check raises, and the sign-in gets its own refusal, not an
+        uncoded 500."""
+        from allauth.mfa.totp.internal import auth as totp_auth
+
+        from tenant.staff_login_limits import StaffLoginUnavailable
+        from tests.utils.redis import stopped_cache
+
+        user = _superuser()
+        secret, _codes = _enrol(user)
+        monkeypatch.setattr(totp_auth, "cache", stopped_cache())
+
+        with _window(1), pytest.raises(StaffLoginUnavailable):
+            staff_mfa.verify_code(user, _code(secret))

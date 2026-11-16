@@ -29,10 +29,13 @@ from rest_framework.decorators import (
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import RecommendationEventThrottle
+from core.api.throttling import (
+    AnonIpRateThrottle,
+    RecommendationEventThrottle,
+    UserBudgetThrottle,
+)
 from core.sessions import persisted_session_key
 from recommendation.engine import SuggestionContext, suggest
 from recommendation.hydrate import hydrate_pairs
@@ -85,7 +88,7 @@ def _user_id(request) -> int | None:
         IsRecommendationsRuntimeEnabled,
     ]
 )
-@throttle_classes([AnonRateThrottle, UserRateThrottle])
+@throttle_classes([AnonIpRateThrottle, UserBudgetThrottle])
 def recommendations(request):
     query = RecommendationQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
@@ -144,7 +147,7 @@ def recommendations(request):
     [AllowAny, IsRecommendationsEnabled, IsRecommendationsRuntimeEnabled]
 )
 @throttle_classes(
-    [RecommendationEventThrottle, AnonRateThrottle, UserRateThrottle]
+    [RecommendationEventThrottle, AnonIpRateThrottle, UserBudgetThrottle]
 )
 def recommendation_event(request):
     serializer = RecommendationEventRequestSerializer(data=request.data)

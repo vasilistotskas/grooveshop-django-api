@@ -9,13 +9,14 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    AnonIpRateThrottle,
     GiftCardCheckThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
+    UserBudgetThrottle,
 )
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -127,22 +128,22 @@ class GiftCardViewSet(BaseModelViewSet):
             # nothing but must not be a free enumeration channel.
             return [
                 GiftCardCheckThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         if self.action == "check":
             # Balance check is a bearer-code oracle — budget it tightly.
             return [
                 GiftCardCheckThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         if self.action == "purchase":
             return [
                 PaymentAttemptThrottle(),
                 PaymentAttemptAnonThrottle(),
-                AnonRateThrottle(),
-                UserRateThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
             ]
         return super().get_throttles()
 

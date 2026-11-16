@@ -10350,6 +10350,9 @@ msgstr "Επαναφορά κωδικού πρόσβασης"
 msgid "Password reset code"
 msgstr "Κωδικός επαναφοράς κωδικού πρόσβασης"
 
+msgid "Password reset is temporarily unavailable. Try again shortly."
+msgstr "Η επαναφορά κωδικού δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά σε λίγο."
+
 msgid "Password reset link"
 msgstr "Σύνδεσμος επαναφοράς κωδικού πρόσβασης"
 
@@ -14302,6 +14305,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Template"
 msgstr "Πρότυπο"
 
+msgid "Temporarily unavailable"
+msgstr "Προσωρινά μη διαθέσιμο"
+
 msgid "Ten"
 msgstr "Δέκα"
 
@@ -15209,6 +15215,9 @@ msgstr "Αυτό το τρίμηνο"
 
 msgid "This Week"
 msgstr "Αυτήν την εβδομάδα"
+
+msgid "This action is temporarily unavailable. Try again shortly."
+msgstr "Η ενέργεια δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά σε λίγο."
 
 msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
 msgstr "Αυτή η διεύθυνση έχει απεγγραφεί από αυτά τα email, επομένως η ειδοποίηση δεν μπορεί να παραδοθεί."

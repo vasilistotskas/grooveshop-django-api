@@ -1,6 +1,6 @@
 """What the editor's link pickers ask: find a target, and name a stored one.
 
-A link setting holds ``{ref: {kind, id}}`` (``docs/builder.md``). The editor
+A link setting holds ``{ref: {kind, id}}`` (``docs/builder/documents.md``). The editor
 needs two things Django alone can answer: the targets that match what the
 person typed (``search``), and the name of the target a stored reference
 points at, whether or not it can still be linked (``labels``), so a block

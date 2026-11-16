@@ -66,7 +66,7 @@ SHARED_APPS = [
     # in public-schema auth migrations. Tenant schemas have their own copy.
     "user",
     # Email platform: a store's switches and opt-outs live in its schema,
-    # the platform's own in public (one model, ``docs/emails.md``).
+    # the platform's own in public (one model, ``docs/emails/sending.md``).
     "emails",
     # Session tracking rows must exist where the session's USER row
     # lives: platform staff are public-schema identities, so their

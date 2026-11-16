@@ -168,18 +168,14 @@ PARTIALLY_REFUNDED while part of the payment remains refundable, REFUNDED once
 nothing does. **Whatever hangs off the order's total is released only on
 REFUNDED, once, with the last refund**: the loyalty points
 (`loyalty.signals.handle_order_refunded_loyalty`, which is all-or-nothing and
-once per order). The gift-card redemption has no `order_refunded` receiver any
-more (`giftcard.signals.handle_order_refunded_giftcard` is gone): `refund_order`
-credits the cards itself, with the value of a refund beyond the provider's
-money (`GiftCardService.credit_refund`, [§7.2](refunds.md)), and a cancel
-returns the whole redemption (`giftcard.signals.handle_order_canceled_giftcard`
-→ `giftcard.tasks.credit_refund_to_gift_cards`). A refund is paid back by the
-provider first, and releasing the whole redemption on top handed back more
-than the refund was worth (a EUR 5 refund once put EUR 60 back on a gift
-card). The cards now get the value in parts, as each refund reaches past the
-provider's money: a card can be credited more than once for one order, never
-for more than it is still owed, which `credit_refund` reads under the card's
-row lock.
+once per order). Gift-card value does not go through `order_refunded`: there is no receiver for it.
+`refund_order` credits the cards itself, in parts, with the value of a refund
+beyond the provider's money (`GiftCardService.credit_refund`, called from
+`OrderService._return_stored_value`; [§7.2](refunds.md)). A card can be
+credited more than once for one order, never for more than it is still owed,
+which `credit_refund` reads under the card's row lock. A cancel returns the
+whole redemption (`giftcard.signals.handle_order_canceled_giftcard` →
+`giftcard.tasks.credit_refund_to_gift_cards`).
 The email, the toast, the history row and the Meta `Refund` event fire on every
 refund, partial Stripe dashboard refunds included (they used to be silent).
 

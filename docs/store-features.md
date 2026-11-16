@@ -213,8 +213,9 @@ token or a staff session is a platform identity, never a customer: both
 keep working, which support and GDPR requests need. Customers, their
 orders and addresses are kept; switching accounts back on restores every
 dependent feature as the store left it, and shoppers sign in again. The
-platform host is not a store: its `/accounts/` and `/_allauth/` are never
-gated.
+platform host is not a store: it does not mount `/accounts/` or
+`/_allauth/` at all (their social, session and authenticator tables exist in
+store schemas only), so the switch never reaches it.
 
 A client reads `features.customerAccounts`. The storefront stops asking
 for anything account-related and clears a stale session, and the agent

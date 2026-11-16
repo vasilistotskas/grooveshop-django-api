@@ -46,6 +46,12 @@ STOREFRONT_PATHS = [
     "/api/v1/notification/ids",
     "/api/v1/contact",
     "/api/v1/agent/me",
+    # A store's customer identity: allauth's pages and headless API read
+    # social, session and authenticator tables that exist in store schemas
+    # only, so on the public schema they answered 500 (issue #705).
+    "/accounts/login/",
+    "/_allauth/app/v1/config",
+    "/_allauth/app/v1/account/authenticators",
 ]
 
 # Shared infra + control-plane data. MUST resolve on BOTH hosts.

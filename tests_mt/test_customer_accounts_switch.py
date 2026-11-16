@@ -170,8 +170,9 @@ def platform_client(mt_public_tenant):
 
 def test_the_platform_host_is_never_gated(platform_client, accounts, caplog):
     """Even with the switch set off on the public schema: the platform is
-    not a store. (What its allauth routes then answer is theirs: the gate
-    is what this asserts.)"""
+    not a store, so the gate stays out of it. The identity routes are not
+    mounted there at all (``test_platform_host_routes``): a plain routing
+    404, never a refusal the gate logged."""
     accounts(False, schema=get_public_schema_name())
 
     with caplog.at_level(logging.INFO, logger="tenant.permissions"):
@@ -181,7 +182,7 @@ def test_the_platform_host_is_never_gated(platform_client, accounts, caplog):
         ]
 
     assert _refusals(caplog) == []
-    assert 404 not in statuses
+    assert statuses == [404, 404]
 
 
 @pytest.fixture

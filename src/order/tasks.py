@@ -30,7 +30,11 @@ from order.emails import (
     unreviewed_products,
 )
 from order.enum.payment_transaction import PaymentTransactionKind
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.models import (
     Order,
     OrderHistory,
@@ -469,6 +473,17 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         # No item prefetch: this email neither passes ``items`` into the
         # context nor renders a line table.
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
+
+        # A provider can settle the order between the failure and this run
+        # (a Viva retry that succeeds), and the email says nothing was
+        # charged.
+        if order.payment_status in SETTLED_PAYMENT_STATUSES:
+            logger.info(
+                "Payment failed email for order #%s not sent: payment %s",
+                order_id,
+                order.payment_status,
+            )
+            return True
 
         if not was_sent(send_email("order.payment_failed", order)):
             logger.info(

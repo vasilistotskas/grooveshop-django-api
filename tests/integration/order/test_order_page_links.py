@@ -23,7 +23,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from order.accounting.invoicing import _verification_url
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.invoice import Invoice
 from order.serializers.invoice import InvoiceDownloadResponseSerializer
@@ -214,7 +214,7 @@ class TestOrderEmails:
 
     def test_payment_failed(self, store, make, accounts, page):
         store(accounts=accounts)
-        order = make(language_code="en")
+        order = make(language_code="en", payment_status=PaymentStatus.FAILED)
 
         assert send_payment_failed_email.delay(order.id).get() is True
 

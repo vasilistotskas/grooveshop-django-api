@@ -17,7 +17,7 @@ structure must not vary per language.
 
 `src/builder/media_services.py` is the only writer. Only raster images (an
 SVG can carry script and has no size to reserve), held to the rule every
-image upload shares ([`docs/image-uploads.md`](image-uploads.md): the media
+image upload shares ([`docs/image-uploads.md`](../image-uploads.md): the media
 service's per-format byte caps and a pixel budget) (`file_too_large`,
 `unsupported_image_type`, `image_too_large`, `invalid_image`,
 `invalid_focal_point`, `unknown_locale`, `invalid_alt`). An import is cut
@@ -219,16 +219,17 @@ release: that is what brings the rewrite to visitors.
     moved`). A block left at an older version is moved by
     `persist_block_upgrades`, to be run first; anything else is fixed by
     publishing a page that validates.
-  - A version **in no release** is read again only if someone rolls back to
-    it. Where it did not validate before the run either, it can only be left
-    as it is: not rewritten, no backup. That has a consequence, so it is not a
-    default: the store stops until the version is named under `left` in the
-    decisions file, as the report names it. From then on each run prints
-    `decision: <version> is left as it is (<why>)` and exits 0, and the run
-    keeps it (`BuilderRewriteRun.decisions`), also when nothing else was
-    moved, so `builder_rewrite_backups` shows it later. The consequence: a
-    release rolled back to that version shows no image where it names one by
-    URL, once the storefront stops reading the old settings.
+  - A version **in no release** is read again only if someone rolls back to it or
+    publishes it alone (`publish_version`). Where it did not validate before
+    the run either, it can only be left as it is: not rewritten, no backup.
+    That has a consequence, so it is not a default: the store stops until the
+    version is named under `left` in the decisions file, as the report names
+    it. From then on each run prints `decision: <version> is left as it is
+    (<why>)` and exits 0, and the run keeps it (`BuilderRewriteRun.decisions`),
+    also when nothing else was moved, so `builder_rewrite_backups` shows it
+    later. The consequence: a release rolled back to that version shows no
+    image where it names one by URL, once the storefront stops reading the old
+    settings.
   - A version in no release that validated before the run and does not after
     it is the run's own doing. It always stops the store and cannot be left.
 - **A deleted page.** Nobody can open it in the editor, and one brought back

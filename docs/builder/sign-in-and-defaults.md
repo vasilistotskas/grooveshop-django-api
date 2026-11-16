@@ -59,7 +59,7 @@ Security properties, each with a test:
 
 The storefront owns the blocks, so these are pinned COPIES of its
 files (the media service's image limits are copied the same way, see
-[`docs/image-uploads.md`](image-uploads.md)):
+[`docs/image-uploads.md`](../image-uploads.md)):
 
 | Source | Copy | Used by |
 |---|---|---|

@@ -3,6 +3,53 @@
 
 
 
+## v3.248.1 (2026-11-16)
+
+### Bug fixes
+
+* fix(order): order links open a page the shopper can reach, guest or without accounts (#718) ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): order links open a page the shopper can reach, guest or without accounts
+
+The payment-failed email, the ACS out-for-delivery and BOX NOW at-locker
+emails and the receipt's pre-AADE QR all linked to /account/orders/{id}.
+A guest has no account to open it with (sign-in wall), and on a store
+with customer accounts off the storefront answers 404 for every
+/account/** path. They now go through order.storefront_links: the
+account page only for an account holder's order on a store that signs
+its shoppers in, the order confirmation /checkout/success/{uuid}
+otherwise. The two carrier templates take the link from the context, so
+it carries the email's language prefix the same way.
+
+Order.served_as_guest is the one rule behind both the links and the
+order API: a guest's order, or any order of a store without customer
+accounts, is opened with its uuid (within GUEST_ORDER_ACCESS_DAYS). The
+order view's object permission, IsOwnerOrAdminOrGuest (carrier label
+and tracking views), the cancel action and the receipt download link
+read it, so the uuid page the emails send an account holder to on such
+a store actually opens. Where accounts are on nothing changes.
+
+In-app notifications are read only signed in and keep the account page,
+through account_order_path, so the path lives in one place.
+
+Part of #198 ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): the payment-failed email no longer promises a retry
+
+Nothing in the storefront can retry a payment yet, so the email's "Retry
+Payment" button and its "click to retry" text promised what the linked
+order page cannot do. It now says what that page says: nothing was
+charged, the order is registered unpaid, contact the store to complete
+the payment, with a "View your order" link (order_url). The admin
+description of the email changes with it. The retry flow comes with
+#694, and the email will link it then.
+
+Part of #198 ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): a payment-failed email does not go out once the payment settled ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
+* fix(order): a canceled payment still gets the payment-failed email ([`23da7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23da7c94b02f4a6bd4622f0bcfbea808bdd3978f))
+
 ## v3.248.0 (2026-11-16)
 
 ### Chores

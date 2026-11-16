@@ -128,7 +128,9 @@ and says which file holds each § number used here.
   `shipment_cancel` and the order's history note
   ([§7.1](cancel.md)). A creation in flight (a claim younger than
   `_MINT_CLAIM_TTL_SECONDS`) refuses at once with a
-  `BoxNowBusyError`. The row is read again under its lock after the
+  `BoxNowBusyError`; a staff order cancel records nothing for that
+  refusal and stays pending ([§7.1.2](cancel.md)). The row is read again
+  under its lock after the
   lookup: a creation that saved a parcel meanwhile sends the cancel down
   the usual path, and a claim taken meanwhile refuses.
 - **An empty lookup is trusted only once an uncertain creation has
@@ -155,8 +157,9 @@ and says which file holds each § number used here.
   stamp is younger than
   `BOXNOW_CREATION_SETTLE_SECONDS` (settings/env, default 600), a cancel
   whose lookup lists nothing live refuses with a `BoxNowBusyError`
-  (a customer is told to try again; a staff cancel goes on with the order
-  and leaves the error in `shipment_cancel`) instead of a local cancel;
+  (a customer is told to try again; a staff cancel goes on with the
+  order, records nothing and stays pending until the creation has
+  settled, [§7.1.2](cancel.md)) instead of a local cancel;
   after it, the lookup is authoritative. The creation task's own retries
   refresh the stamp, and their `P410` take-over usually saves the parcel
   first. **Measured on BoxNow's stage environment (2026-11-15):** a parcel

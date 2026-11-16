@@ -333,9 +333,21 @@ What each failure does:
   `shipment_cancel`, staff get the history note and the admin action's
   message. The flag goes with the answer: nothing asks again by itself, and
   the voucher is staff's to cancel ("Cancel ACS voucher", "Cancel parcel
-  via BoxNow API"). A BoxNow creation still in flight or of uncertain
-  outcome is finished by its own task and sweep
-  ([§5.2](shipping-boxnow.md)).
+  via BoxNow API").
+- **The shipment is already being worked on** (`CarrierBusyError`: another
+  cancel of the voucher holds its claim, or a creation is in flight or
+  still settling). That is our own refusal, with no call to the courier, so
+  it is **not an answer**: nothing is recorded, no note is written and the
+  flag stays. The order the caller gets back has no `shipment_cancel` yet.
+  The call that is running records what the courier says, or the sweep
+  asks again on a later run, once the claim is gone (ACS's
+  `cancel_started_at` and both mint claims end after 300 s, a BoxNow
+  creation settles after `BOXNOW_CREATION_SETTLE_SECONDS`). A BoxNow
+  creation in flight or of uncertain outcome is also finished by its own
+  task and sweep ([§5.2](shipping-boxnow.md)), after which the cancel here
+  is a no-op that records `dispatched: true`. Before, the busy refusal was
+  recorded as the courier's error, with a staff note, even when the other
+  cancel then succeeded.
 - **The worker stops between the commit and the courier** (a deploy, an
   out-of-memory kill), or the answer cannot be written: the order is
   CANCELED and still carries the flag.
@@ -346,9 +358,17 @@ What each failure does:
   runs the same `cancel_attached_shipment`. Before #713 such a stop rolled
   the whole cancel back; without the sweep it would leave a canceled,
   refunded order with a live voucher.
-- **The sweep and a slow first attempt overlap.** Harmless: both carriers'
-  cancel is a no-op on a shipment already canceled, and only the first
-  answer is recorded (one history note).
+- **The sweep and a slow first attempt overlap, or two runs of the
+  sweep do.** The sweep takes no lock of its own, because every overlap
+  ends right without one: while the other cancel is in flight the second
+  is refused as busy (ACS's `cancel_started_at` claim), which records
+  nothing; BoxNow has no cancel claim, so both may call it, and BoxNow
+  ignores a cancel of a canceled parcel; once the shipment is CANCELED a
+  cancel is a no-op; and only the first answer is recorded (one history
+  note). An advisory lock would add a way to get stuck and remove no case.
+- **An answer with the flag still beside it** (a writer that put back a
+  copy of the metadata loaded before the answer): the next run removes the
+  flag without asking the courier again.
 - **A tracking sync runs at the same time.** It locks the order before the
   shipment ([§5](shipping.md)); the cancel holds the order alone, and the
   courier step holds the shipment alone. Nobody waits on someone who waits

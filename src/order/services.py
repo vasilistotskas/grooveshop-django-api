@@ -107,7 +107,11 @@ from pay_way.enum.settlement import PaySettlement
 from promotion.enum import BenefitType
 from promotion.services import CouponService, PromotionEngine
 from shipping.enum import FreeShippingSource
-from shipping.exceptions import CarrierError, CarrierUnavailableError
+from shipping.exceptions import (
+    CarrierBusyError,
+    CarrierError,
+    CarrierUnavailableError,
+)
 from tenant.internal import is_internal_caller
 from tenant.membership import bound_tenant
 from tenant.middleware import tenant_domain_set
@@ -4869,6 +4873,17 @@ class OrderService:
         left as a staff-only ``OrderHistory`` note. *order* gets the
         metadata as it was written.
 
+        **"Already running" is not an answer.** A
+        ``CarrierBusyError`` is our own refusal: another cancel of this
+        voucher holds its claim (the sweep beside a first attempt still
+        waiting for the courier, two runs of the sweep), or a creation
+        is in flight or still settling. Nothing was asked of the
+        courier, so nothing is recorded and the flag stays: the call
+        that is running records what the courier says, or the sweep
+        asks again once the claim is gone. Recording it would keep "a
+        cancel is already in progress" as the courier's answer, with a
+        staff note, while that other cancel succeeds.
+
         Never raises — the order is canceled whatever the courier, or
         the write of its answer, does. An answer that could not be
         written leaves the flag, so the sweep asks again; both carriers'
@@ -4878,39 +4893,55 @@ class OrderService:
 
         # A customer cancel asked the courier before the order moved and
         # recorded the answer: the courier is not asked a second time.
-        existing_cancellation = (order.metadata or {}).get("cancellation") or {}
-        if "shipment_cancel" in existing_cancellation:
+        # With no flag there is nothing to do; a flag beside an answer
+        # (a writer that put back a copy loaded before the answer) is
+        # removed below, or the sweep would take the order on every run.
+        metadata = order.metadata or {}
+        answered = "shipment_cancel" in (metadata.get("cancellation") or {})
+        if answered and SHIPMENT_CANCEL_PENDING_FLAG not in metadata:
             return
 
-        logger.info(
-            "Cascading order cancel to carrier voucher | order=%s reason=%r",
-            order.id,
-            reason,
-        )
-
-        info: dict[str, Any] = {}
-        try:
-            dispatched = ShippingService.cancel_shipment(order, reason=reason)
-            info = {
-                "attempted": True,
-                "dispatched": dispatched,
-            }
-        except Exception as exc:  # pragma: no cover - logged below
-            info = {
-                "attempted": True,
-                "dispatched": False,
-                "error": str(exc),
-            }
-            logger.warning(
-                "Order %s canceled, but courier voucher cancel failed: %s",
+        info: dict[str, Any] | None = None
+        if not answered:
+            logger.info(
+                "Cascading order cancel to carrier voucher | order=%s "
+                "reason=%r",
                 order.id,
-                exc,
-                exc_info=True,
+                reason,
             )
+            try:
+                dispatched = ShippingService.cancel_shipment(
+                    order, reason=reason
+                )
+                info = {
+                    "attempted": True,
+                    "dispatched": dispatched,
+                }
+            except CarrierBusyError as exc:
+                logger.info(
+                    "Order %s canceled; its shipment is already being "
+                    "worked on, so the courier was not asked and the "
+                    "cancel stays pending: %s",
+                    order.id,
+                    exc,
+                )
+                return
+            except Exception as exc:  # pragma: no cover - logged below
+                info = {
+                    "attempted": True,
+                    "dispatched": False,
+                    "error": str(exc),
+                }
+                logger.warning(
+                    "Order %s canceled, but courier voucher cancel failed: %s",
+                    order.id,
+                    exc,
+                    exc_info=True,
+                )
 
         try:
             recorded = cls._record_shipment_cancel(order, info)
-            if recorded and "error" in info:
+            if recorded and info is not None and "error" in info:
                 # The carrier outcome belongs where staff read about the
                 # order, not only in a metadata blob: the order is
                 # canceled (and refunded) while the parcel may still be
@@ -4928,23 +4959,29 @@ class OrderService:
                 )
         except Exception:
             logger.exception(
-                "Order %s is canceled and its courier was asked (%s), but "
-                "the answer could not be recorded; the pending-cancel "
-                "sweep asks again",
+                "Order %s is canceled, but the courier's answer to the "
+                "shipment cancel (%s) could not be recorded; the "
+                "pending-cancel sweep asks again",
                 order.id,
                 info,
             )
 
     @staticmethod
-    def _record_shipment_cancel(order: Order, info: dict[str, Any]) -> bool:
+    def _record_shipment_cancel(
+        order: Order, info: dict[str, Any] | None
+    ) -> bool:
         """Write the courier's answer on the order row as it is now.
 
         No lock was held while the courier answered, so the order may
         have changed: the metadata is read again under the row lock and
         the answer merged into it, never written from the copy the
-        caller loaded. The pending flag goes in the same write. Returns
-        False, and keeps what is there, when an answer is already
-        recorded (another run got here first).
+        caller loaded. Returns False, and keeps what is there, when an
+        answer is already recorded (another run got here first), and
+        when there is none to record (*info* is ``None``).
+
+        The pending flag goes in the same write, and only when the row
+        then holds an answer: a row with a flag and no answer is still
+        to be asked about.
 
         ``.update(...)`` writes the one column that changed and runs no
         ``post_save`` receiver.
@@ -4956,12 +4993,16 @@ class OrderService:
                 .values_list("metadata", flat=True)
                 .get()
             ) or {}
-            cancellation = metadata.setdefault("cancellation", {})
-            recorded = "shipment_cancel" not in cancellation
+            answered = "shipment_cancel" in (metadata.get("cancellation") or {})
+            recorded = info is not None and not answered
             if recorded:
-                cancellation["shipment_cancel"] = info
-            metadata.pop(SHIPMENT_CANCEL_PENDING_FLAG, None)
-            Order.objects.filter(pk=order.pk).update(metadata=metadata)
+                metadata.setdefault("cancellation", {})["shipment_cancel"] = (
+                    info
+                )
+            stale_flag = answered and SHIPMENT_CANCEL_PENDING_FLAG in metadata
+            if recorded or stale_flag:
+                metadata.pop(SHIPMENT_CANCEL_PENDING_FLAG, None)
+                Order.objects.filter(pk=order.pk).update(metadata=metadata)
         order.metadata = metadata
         return recorded
 

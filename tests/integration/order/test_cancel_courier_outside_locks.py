@@ -50,6 +50,9 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 WAIT = 10
 ASKED = {"attempted": True, "dispatched": True}
+NOTHING_PENDING = {"finished": 0, "still_pending": 0}
+ONE_FINISHED = {"finished": 1, "still_pending": 0}
+ONE_STILL_PENDING = {"finished": 0, "still_pending": 1}
 
 
 def _on_another_connection(read) -> Any:
@@ -355,7 +358,7 @@ class TestACancelWhoseWorkerStopped:
             monkeypatch, provider_code
         )
 
-        assert finish_pending_shipment_cancels() == {"asked": 0}
+        assert finish_pending_shipment_cancels() == NOTHING_PENDING
 
         assert courier.calls == []
         assert not _is_canceled(shipment)
@@ -368,7 +371,7 @@ class TestACancelWhoseWorkerStopped:
         )
         _age_the_cancel(shipment.order_id)
 
-        assert finish_pending_shipment_cancels() == {"asked": 1}
+        assert finish_pending_shipment_cancels() == ONE_FINISHED
 
         assert courier.calls == [UNLOCKED]
         assert _is_canceled(shipment)
@@ -376,8 +379,111 @@ class TestACancelWhoseWorkerStopped:
         assert metadata["cancellation"]["shipment_cancel"] == ASKED
         assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
         # Finished: the next run has nothing to do.
-        assert finish_pending_shipment_cancels() == {"asked": 0}
+        assert finish_pending_shipment_cancels() == NOTHING_PENDING
         assert len(courier.calls) == 1
+
+
+def _courier_notes(order_id: int) -> list[str]:
+    return [
+        row.new_value["note"]
+        for row in OrderHistory.objects.filter(
+            order_id=order_id, change_type="NOTE"
+        )
+        if "did not cancel the parcel" in row.new_value["note"]
+    ]
+
+
+class TestAShipmentAlreadyBeingWorkedOnIsNotAnAnswer:
+    """``CarrierBusyError`` is our own refusal, with no call to the
+    courier: recorded as the courier's answer it would stand, with a
+    staff note, while the cancel that is running succeeds."""
+
+    def test_the_sweep_beside_a_cancel_still_waiting_for_acs(self, monkeypatch):
+        shipment = _shipment("acs")
+        order_id = shipment.order_id
+        courier = _courier(monkeypatch, shipment)
+        second: list[dict[str, int]] = []
+
+        def the_sweep_runs_meanwhile() -> None:
+            _age_the_cancel(order_id)
+            second.append(finish_pending_shipment_cancels())
+
+        courier.during_call = lambda: _on_another_connection(
+            the_sweep_runs_meanwhile
+        )
+
+        canceled = _staff_cancel(shipment.order)
+
+        # The sweep was refused by the first cancel's claim and wrote
+        # nothing; the first cancel's answer is the one on the order.
+        assert second == [ONE_STILL_PENDING]
+        assert len(courier.calls) == 1
+        assert canceled.metadata["cancellation"]["shipment_cancel"] == ASKED
+        metadata = _metadata(order_id)
+        assert metadata["cancellation"]["shipment_cancel"] == ASKED
+        assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
+        assert _courier_notes(order_id) == []
+        assert _is_canceled(shipment)
+
+    def test_a_boxnow_creation_in_flight_keeps_the_cancel_pending(
+        self, monkeypatch
+    ):
+        shipment = BoxNowShipmentFactory(
+            order=_order("boxnow"),
+            metadata={"mint_started_at": timezone.now().isoformat()},
+        )
+        order_id = shipment.order_id
+        courier = _courier(monkeypatch, shipment)
+
+        canceled = _staff_cancel(shipment.order)
+
+        assert canceled.status == OrderStatus.CANCELED
+        assert courier.calls == []
+        metadata = _metadata(order_id)
+        assert metadata[SHIPMENT_CANCEL_PENDING_FLAG] is True
+        assert "shipment_cancel" not in metadata["cancellation"]
+        assert _courier_notes(order_id) == []
+
+        # Still in flight on the next run: still not an answer.
+        _age_the_cancel(order_id)
+        assert finish_pending_shipment_cancels() == ONE_STILL_PENDING
+        assert "shipment_cancel" not in _metadata(order_id)["cancellation"]
+
+        # The creation ends and finds the order canceled: it records the
+        # shipment CANCELED (``_persist_parcel``). The sweep's cancel is
+        # then a no-op, and that is the answer.
+        type(shipment).objects.filter(pk=shipment.pk).update(
+            parcel_state=BoxNowParcelState.CANCELED
+        )
+        assert finish_pending_shipment_cancels() == ONE_FINISHED
+        metadata = _metadata(order_id)
+        assert metadata["cancellation"]["shipment_cancel"] == ASKED
+        assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
+        assert _courier_notes(order_id) == []
+
+
+def test_a_flag_left_beside_an_answer_is_removed_without_asking_again(
+    monkeypatch,
+):
+    """Only a writer that puts back a copy of the metadata loaded before
+    the answer can leave this; the sweep must not take it forever."""
+    shipment = _shipment("acs")
+    order_id = shipment.order_id
+    courier = _courier(monkeypatch, shipment)
+    _staff_cancel(shipment.order)
+    assert len(courier.calls) == 1
+    Order.objects.filter(pk=order_id).update(
+        metadata={**_metadata(order_id), SHIPMENT_CANCEL_PENDING_FLAG: True}
+    )
+    _age_the_cancel(order_id)
+
+    assert finish_pending_shipment_cancels() == ONE_FINISHED
+
+    assert len(courier.calls) == 1
+    metadata = _metadata(order_id)
+    assert metadata["cancellation"]["shipment_cancel"] == ASKED
+    assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
+    assert finish_pending_shipment_cancels() == NOTHING_PENDING
 
 
 def _wait_for_a_blocked_backend() -> None:

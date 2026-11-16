@@ -2011,8 +2011,13 @@ def finish_pending_shipment_cancels(
     Only a cancel older than
     ``ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS`` is taken: a younger one
     may still be waiting for its courier. Safe to run beside it all the
-    same: both carriers' cancel is a no-op on a shipment already
-    canceled, and the first answer recorded is the one kept.
+    same, and beside another run of itself, so it takes no lock of its
+    own: a cancel the other one has in flight refuses this one as
+    already running (``CarrierBusyError``), which is not an answer and
+    leaves the flag; both carriers' cancel is a no-op on a shipment
+    already canceled; and the first answer recorded is the one kept.
+    The same holds for a creation in flight or still settling: the order
+    stays flagged and is asked about on a later run.
 
     Beat-scheduled through
     ``tenant.tasks.fanout_finish_pending_shipment_cancels``.
@@ -2026,11 +2031,11 @@ def finish_pending_shipment_cancels(
         status_updated_at__lt=cutoff,
     ).order_by("status_updated_at")[:max_per_run]
 
-    asked = 0
+    finished = still_pending = 0
     for order in pending:
         logger.warning(
-            "Order %s was canceled at %s and its courier was never asked "
-            "to cancel the shipment: asking now",
+            "Order %s was canceled at %s and holds no answer from its "
+            "courier to the shipment cancel: asking now",
             order.id,
             order.status_updated_at,
         )
@@ -2038,8 +2043,14 @@ def finish_pending_shipment_cancels(
         OrderService.cancel_attached_shipment(
             order, cancellation.get("reason", "")
         )
-        asked += 1
-    return {"asked": asked}
+        # ``order`` carries the metadata as written: the flag is gone
+        # once an answer is recorded, and stays for a shipment that is
+        # being worked on elsewhere.
+        if SHIPMENT_CANCEL_PENDING_FLAG in (order.metadata or {}):
+            still_pending += 1
+        else:
+            finished += 1
+    return {"finished": finished, "still_pending": still_pending}
 
 
 @celery_app.task(

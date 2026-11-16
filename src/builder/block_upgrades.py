@@ -222,22 +222,23 @@ def _title_into_heading(settings: Settings) -> Settings:
     return {**kept, "heading": text} if text else kept
 
 
-def _leave_out_defaults(defaults: dict[str, str]) -> Upgrade:
+def _leave_out_defaults(defaults: dict[str, str | tuple[str, ...]]) -> Upgrade:
     """A choice lost the value its section draws when the setting is left
     out (the editor's "Default"): a stored setting that holds that value
     goes, so the node draws what it drew. *defaults* names each setting by
     pointer (``/surface``, ``/products/stock`` inside a data setting) with
-    that value; any other value stays. The storefront's
-    ``upgradeLeavingOutDefaults``."""
+    that value, or the values where several draw the same look; any other
+    value stays. The storefront's ``upgradeLeavingOutDefaults``."""
 
     def upgrade(settings: Settings) -> Settings:
         kept = copy.deepcopy(settings)
-        for pointer, value in defaults.items():
+        for pointer, drawn in defaults.items():
+            values = (drawn,) if isinstance(drawn, str) else drawn
             *path, key = pointer[1:].split("/")
             holder: Any = kept
             for part in path:
                 holder = holder.get(part) if isinstance(holder, dict) else None
-            if isinstance(holder, dict) and holder.get(key) == value:
+            if isinstance(holder, dict) and holder.get(key) in values:
                 del holder[key]
         return kept
 
@@ -285,7 +286,7 @@ UPGRADES: dict[str, dict[int, Upgrade | SchemaUpgrade]] = {
     },
     "product_categories": {
         1: _product_categories(8),
-        2: _leave_out_defaults({**_SURFACE, "/layout": "tiles"}),
+        2: _leave_out_defaults({**_SURFACE, "/layout": ("tiles", "grid")}),
     },
     "offers_preview": {
         1: _offers(3),

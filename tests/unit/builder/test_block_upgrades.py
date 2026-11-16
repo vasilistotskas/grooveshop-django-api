@@ -515,3 +515,10 @@ class TestLeavingOutDefaults:
 
         assert self.upgrade(settings) == {"products": {}}
         assert settings == {"surface": "default", "products": {"stock": "any"}}
+
+    def test_every_value_that_draws_the_default_goes(self):
+        upgrade = _leave_out_defaults({"/layout": ("tiles", "grid")})
+
+        assert upgrade({"layout": "tiles"}) == {}
+        assert upgrade({"layout": "grid"}) == {}
+        assert upgrade({"layout": "slider"}) == {"layout": "slider"}

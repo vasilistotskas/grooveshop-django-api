@@ -6,9 +6,12 @@ they own can drift silently.
 The storefront owns the page builder's blocks, so what it produces about them
 is COPIED here:
 
-* ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``builder/
-  seed_catalogue.json``, a snapshot of its block catalogue for the default
-  schema: what a new store's seeds are read against, without a storefront;
+* ``catalogues``: ``test/fixtures/builder/catalogue/`` -> ``builder/
+  catalogues/``, a snapshot of its block catalogue as each design is served
+  it (``GET /api/builder/catalogue?schema=<design>``), one ``<design>.json``
+  per design and ``default.json`` for every store whose schema no design
+  names: what a new store's seeds are read against, without a storefront,
+  and what the builder tests hold every store's design to;
 * ``legacy-image-fields``: ``test/fixtures/builder/legacy-image-fields.json``
   -> ``builder/legacy_image_fields.json``, each block's old image settings, for
   ``manage.py migrate_builder_media``. Application data, like the seeds;
@@ -98,11 +101,11 @@ class Source:
 
 SOURCES: tuple[Source, ...] = (
     Source(
-        "catalogue",
+        "catalogues",
         STOREFRONT,
-        "test/fixtures/builder/catalogue.json",
-        "src/builder/seed_catalogue.json",
-        "blob",
+        "test/fixtures/builder/catalogue",
+        "src/builder/catalogues",
+        "tree",
     ),
     Source(
         "legacy-image-fields",

@@ -26,8 +26,8 @@ from builder.block_upgrades import (
     upgrade_translations,
 )
 from builder.published import localised
-from builder.seeding import seed_catalogue
 from builder.storefront import parse_catalogue
+from tests.utils.real_catalogues import block
 
 CASES: list[dict[str, Any]] = json.loads(
     (
@@ -59,7 +59,8 @@ def catalogue(*, translatable: tuple[str, ...] = (), **versions: int):
 
 
 def block_of(case: dict[str, Any]):
-    return seed_catalogue().get(case["before"]["type"].partition("@")[0])
+    # A design's own block (``contact_panel``) is in its design's catalogue.
+    return block(case["before"]["type"].partition("@")[0])
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["name"])
@@ -103,14 +104,14 @@ def test_an_empty_translation_goes_as_the_editor_takes_it_out():
         "type": "offers_preview@2",
         "settings": {"eyebrow": "Προσφορές", "offers": {"limit": 3}},
     }
-    definition = seed_catalogue().get("offers_preview")
+    definition = block("offers_preview")
 
     assert upgrade_translations(node, definition, {"/eyebrow": ""}) == {}
 
 
 def test_the_translations_of_a_node_already_current_stay_as_they_are():
     node = {"type": "testimonials@3", "settings": {"heading": "Λένε"}}
-    definition = seed_catalogue().get("testimonials")
+    definition = block("testimonials")
     translations = {"/heading": "They say", "/stale": "kept"}
 
     assert upgrade_translations(node, definition, translations) is translations

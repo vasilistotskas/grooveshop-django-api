@@ -11,9 +11,9 @@ Provisioning calls :func:`seed_store`, which stores each one as a document
 (number 1) holding them all: what the storefront reads from the first
 request. It makes no call to the storefront: a catalogue fetch that fails
 must not leave a store without its homepage. What a seed derives (block types,
-the dependency rows of its data settings) comes from ``seed_catalogue.json``,
-the storefront's catalogue pinned with the seeds, so the seeds and the blocks
-they are read against are always of one build.
+the dependency rows of its data settings) comes from the storefront's
+catalogue pinned with the seeds (``catalogues/``, :data:`SEED_CATALOGUE`), so
+the seeds and the blocks they are read against are always of one build.
 
 :func:`seed_with_content` releases richer content in the same files' shape
 (the demo store's pages, ``devtools/demo_pages``) on a store that holds
@@ -52,7 +52,17 @@ from builder.services import (
 )
 
 SEEDS = Path(__file__).parent / "seeds"
-SEED_CATALOGUE = Path(__file__).parent / "seed_catalogue.json"
+#: The storefront's catalogue as each design is served it (pinned):
+#: ``<design>.json`` is what ``GET /api/builder/catalogue?schema=<design>``
+#: answers, one file per tenant schema the storefront names a design for,
+#: and ``default.json`` what every other store is served.
+CATALOGUES = Path(__file__).parent / "catalogues"
+#: What the seeds are derived against: the default design's catalogue. The
+#: seeds go to every new store, so they may name only what every design
+#: draws, and that is what the default holds; a named design's catalogue
+#: adds its own blocks and page types to it. Every design's is held to the
+#: seeds by ``tests/unit/builder/test_seeds.py``.
+SEED_CATALOGUE = CATALOGUES / "default.json"
 
 NOTE = "Default content"
 #: The release that gives a new store its theme: made by the platform, like

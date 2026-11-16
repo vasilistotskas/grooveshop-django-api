@@ -131,6 +131,50 @@ now 1 copy and 2 connections. A worker running with `--events` through a 161 s
 alarm opened 15 connections before (its heartbeats reconnecting in a loop) and
 3 now; in both runs an acks_late task running across the alarm ran once.
 
+### A worker through a long alarm (#721)
+
+Two things still restarted or stopped a worker during an alarm, and RabbitMQ
+then redelivered every `acks_late` task it was running:
+
+- **Heartbeats missed on the event connection.** A worker opens its event
+  dispatcher's connection with `CELERY_BROKER_HEARTBEAT` and its event loop
+  checks that connection's heartbeats, but reads only the socket the
+  dispatcher started with. A block makes kombu replace that socket, and during
+  the hold nothing publishes on the new one, so nothing reads it. Once two
+  intervals passed without a read, the loop raised "Too many heartbeats
+  missed" and restarted the consumer, consuming connection included. With the
+  default hold (60 s, exactly two intervals) the question after each hold
+  usually read the socket in time, but each hold was a race: the check falls
+  every 15 s and the question waits up to 2 s for the next worker heartbeat,
+  so by those timings about one hold in fifteen lost it, and a long alarm
+  was likely to. A hold longer than two intervals lost every time. `core.broker.PublishingConnection`
+  never fails for a heartbeat it missed: nothing reads a publishing connection
+  between publishes. It still sends its heartbeats, and RabbitMQ still sends
+  its own, which is how the broker closes a connection kombu dropped while the
+  broker was not reading it. A dead broker is still found by the next
+  publish's write and confirm, and by the consuming connection's heartbeats.
+- **A refused question was fatal.** A worker that starts, or restarts its
+  consumer, says hello to its neighbours (Celery's `Mingle` step) with a
+  control broadcast. During the hold it was refused, and `Mingle` treats any
+  error but a connection error as fatal: "Unrecoverable error: BrokerBlocked"
+  and the process exited. A pod started during an alarm (a deploy, an
+  OOM-kill) restarted in a loop until it cleared.
+  `core.celery.GrooveShopControl` answers a broadcast that waits for replies
+  with none while the process holds (the worker goes on "all alone", a ping finds no
+  worker); a command that expects no reply (revoke, pool restart) still
+  raises.
+
+Measured on Linux against RabbitMQ 4.3.7: a worker as in production (`--events`,
+prefork, `acks_late`; concurrency 2) running two tasks across an alarm of
+about four minutes (three on the release before #719), and a worker started
+while the alarm is on:
+
+| | Before #719 | #719 | #719, hold 90 s | Now | Now, hold 90 s |
+|---|---|---|---|---|---|
+| consuming connection | closed by RabbitMQ ("missed heartbeats from client") a minute in | kept | consumer restarted 68 s in ("Too many heartbeats missed"), then the worker exited (`BrokerBlocked` in `Mingle`) | kept | kept |
+| each running task | ran twice | ran once | finished but could not be acked, so it was queued again | ran once | ran once |
+| a worker started during the alarm | waits in `Mingle` until it clears | exits at once (code 1) | | ready within a second, "all alone" | |
+
 The one message written is delivered once the alarm clears, and the row the
 sweep publishes is one more run. A task published through the helper must
 therefore be safe to run more than once, as it already must be for a row the

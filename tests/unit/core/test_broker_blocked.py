@@ -379,6 +379,48 @@ def test_a_publishing_connection_confirms_every_publish():
     assert connection.on_unblocked is broker._on_unblocked
 
 
+def _tick_as_the_worker_does(connection) -> None:
+    """One tick of ``celery.worker.loops._enable_amqheartbeats``: the worker
+    ticks a connection only when its negotiated heartbeat is not 0."""
+    if connection.get_heartbeat_interval():
+        connection.heartbeat_check(rate=2.0)
+
+
+def test_a_worker_misses_no_heartbeat_on_its_event_connection_after_a_block(
+    fake_broker,
+):
+    """#721. A worker opens its event dispatcher's connection with the
+    broker heartbeat (``Events.start``) and its event loop ticks that
+    connection's heartbeats, but reads only the socket the dispatcher
+    started with. A block makes kombu replace that socket, and during the
+    hold nothing reads the new one: two intervals later the tick raised
+    "Too many heartbeats missed", which restarts the consumer and drops its
+    consuming connection, so RabbitMQ redelivered every acks_late task
+    still running."""
+    connection = celery_app.connection_for_write(fake_broker.url, heartbeat=30)
+    connection.connect()
+    fake_broker.block()
+    try:
+        raised = _bounded(_publish_retrying_forever(connection))
+        assert isinstance(raised, BrokerBlocked), raised
+        assert fake_broker.connections == 2, "kombu replaced the connection"
+
+        sent = connection.connection.bytes_sent
+        now = time.monotonic()
+        for elapsed in (0, 61, 122):  # the hold passes, nothing is read
+            with mock.patch(
+                "amqp.connection.monotonic", return_value=now + elapsed
+            ):
+                _tick_as_the_worker_does(connection)
+
+        assert connection.connection.bytes_sent > sent, (
+            "heartbeats are still sent: RabbitMQ closes a dropped connection"
+            " when its own heartbeat to it fails"
+        )
+    finally:
+        connection.collect()  # a blocked broker never answers a close
+
+
 def test_a_question_that_fails_for_another_reason_asks_again(
     fake_broker, connection, settings
 ):
@@ -429,6 +471,30 @@ def test_the_producer_pool_refuses_without_taking_a_connection(
     assert all(isinstance(exc, BrokerBlocked) for exc in raised), raised
     assert fake_broker.published == ["celery"]
     assert fake_broker.connections == 2, "the blocked one and kombu's retry"
+
+
+def test_a_question_to_the_workers_gets_no_answer_while_held(
+    fake_broker, pooled_app
+):
+    """A worker that starts, or restarts its consumer, during an alarm says
+    hello to its neighbours (``Mingle``), which treats any error but a
+    connection error as fatal: the refusal made the worker exit with
+    "Unrecoverable error: BrokerBlocked" (#721). A question gets no answer
+    instead; a command that expects none still raises."""
+    with pytest.raises(Blocked):
+        broker._on_blocked("an earlier publish of this process was blocked")
+    answers: list[object] = []
+
+    def ask() -> None:
+        inspect = pooled_app.control.inspect(timeout=0.5)
+        answers.append(inspect.hello("celery@starting", []))
+        answers.append(pooled_app.control.ping(timeout=0.5))
+
+    assert _bounded(ask) is None
+    assert answers == [None, []], "nobody answered, nothing raised"
+    raised = _bounded(lambda: pooled_app.control.revoke("a-task-id"))
+    assert isinstance(raised, BrokerBlocked), raised
+    assert fake_broker.published == [], "nothing was written"
 
 
 def test_a_task_retry_during_a_block_waits_and_is_published_once(

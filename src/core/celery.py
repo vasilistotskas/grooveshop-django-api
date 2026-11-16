@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 from celery import Celery
+from celery.app.control import Control
 from celery.signals import (
     before_task_publish,
     setup_logging,
@@ -26,6 +27,33 @@ def config_loggers(*args, **kwargs):
     from django.conf import settings  # noqa: F401
 
 
+class GrooveShopControl(Control):
+    """Remote control whose questions get no answer while the broker blocks.
+
+    A broadcast that waits for replies (``ping``, ``inspect``, a worker's
+    ``hello`` to its neighbours) cannot be asked while this process holds
+    off a blocked broker (``core.broker``), so no worker answers it: it
+    returns no replies, as when no worker is up. Celery's own callers take
+    that as it is: a worker that starts, or restarts its consumer, during
+    an alarm goes on alone instead of exiting with "Unrecoverable error:
+    BrokerBlocked" (its ``Mingle`` step treats any other error as fatal,
+    #721). A command that expects no reply still raises the refusal, so a
+    revoke or a pool restart never fails silently.
+    """
+
+    def broadcast(
+        self, command: str, *args: Any, reply: bool = False, **kwargs: Any
+    ) -> Any:
+        from core.broker import BrokerBlocked
+
+        try:
+            return super().broadcast(command, *args, reply=reply, **kwargs)
+        except BrokerBlocked:
+            if not reply:
+                raise
+            return []
+
+
 class GrooveShopCelery(Celery):
     """Celery whose publishing connections stop while RabbitMQ blocks them.
 
@@ -36,7 +64,11 @@ class GrooveShopCelery(Celery):
     (``connection_for_read``) keeps kombu's own transport: a read that times
     out there makes the worker reconnect, and RabbitMQ then redelivers every
     task the worker was still running (``task_acks_late``).
+
+    Its remote control is ``GrooveShopControl``.
     """
+
+    control_cls = "core.celery:GrooveShopControl"
 
     def connection_for_write(self, url: Any = None, **kwargs: Any) -> Any:
         from core.broker import PublishingTransport

@@ -3,6 +3,32 @@
 
 
 
+## v3.249.4 (2026-11-16)
+
+### Documentation
+
+* docs(search): the engine-time docstring names relax_query ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
+### Refactoring
+
+* refactor(search): views.py into views/, params.py and analytics.py (#732) ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
+* refactor(search): views.py into views/, params.py and analytics.py
+
+Pure move of src/search/views.py by responsibility:
+
+- search/params.py: query-string parsing, the sort and facet allowlists,
+  language-code validation, relax_query
+- search/analytics.py: what a request tells SearchAnalyticsMiddleware
+  (record_engine_time, mark_count_only, COUNT_ONLY_MAX_LIMIT)
+- search/views/blog.py, product.py (with its facet helpers), click.py,
+  report.py (staff analytics report), trending.py
+
+Names that now cross a module lose their leading underscore;
+_relaxed_query becomes relax_query so it no longer collides with the
+view's local relaxed_query. No logic change, schema.yml unchanged. The
+importers, a test and the docs naming the old path move with it. ([`07ec160`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07ec160c09a877d27186b57b78298b899c3f14ef))
+
 ## v3.249.3 (2026-11-16)
 
 ### Chores

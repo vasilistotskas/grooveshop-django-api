@@ -3,6 +3,96 @@
 
 
 
+## v3.249.6 (2026-11-16)
+
+### Bug fixes
+
+* fix(order): a cancel asks the courier after it commits, with no row locked; carriers lock the order before the shipment (#734) ([`a7a59c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7a59c75f057cdd76971975328b1a849843c9bca))
+
+* fix(order): a cancel asks the courier after it commits, with no row locked
+
+OrderService._cancel_order_locked held the order's row lock and the locks
+of the products it restocked, and called the courier before it returned.
+For a staff or system cancel every one of those rows stayed locked across
+the carrier's HTTP calls (ACS_Delete_Voucher, BoxNow's lookup and cancel),
+the carriers' three-phase cancels released nothing, and
+idle_in_transaction_session_timeout could end the cancel half way (#713).
+The shipment was also locked after the order, while an ACS tracking poll
+locked the shipment first and then wrote the order: two connections
+reproduce the deadlock (#613).
+
+The cancel now commits first. It marks the order
+metadata['shipment_cancel_pending'] in the same save, and cancel_order
+registers cancel_attached_shipment with transaction.on_commit: at once
+for a caller with no transaction (the cancel endpoint, the admin action,
+which still read shipment_cancel on the order they get back), after the
+caller's own commit for the auto-cancel sweep, which cancels under its
+row lock. The courier's answer is merged into the order's metadata under
+its row lock, as the row is then, and the flag goes with it.
+
+A worker that stops between the commit and the courier leaves the flag.
+order.tasks.finish_pending_shipment_cancels (every 15 minutes, per store,
+suspended stores included) asks the courier for every canceled order that
+still carries it after ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS. Before,
+such a stop rolled the whole cancel back; without the sweep it would
+leave a canceled, refunded order with a live voucher.
+
+One lock order for an order and its shipment, in one place:
+shipping.locks.lock_with_order takes the order first. It replaces
+BoxNowService._lock_with_order and every joined
+select_for_update().select_related("order") in AcsService (the voucher
+creation's claim and save, the tracking poll, adopt, request again, close,
+COD received outside ACS), which locked the shipment's row first.
+AcsService.cancel_voucher never touches the order and now locks the
+shipment alone.
+
+What a courier's refusal or silence does to a staff cancel is unchanged:
+the order stays canceled, the error is recorded in shipment_cancel and in
+a staff note. No response shape changes.
+
+Closes #713
+Closes #613 ([`a7a59c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7a59c75f057cdd76971975328b1a849843c9bca))
+
+* fix(order): a shipment already being worked on is not the courier's answer
+
+cancel_attached_shipment recorded every failure of the courier step as
+the courier's answer and cleared the pending flag. A CarrierBusyError is
+our own refusal, with no call to the courier: another cancel of the
+voucher holds its claim (the sweep beside a first attempt still waiting
+for ACS, two runs of the sweep), or a creation is in flight or still
+settling. Recorded, "a cancel is already in progress" stood as the
+courier's error, with a staff note and the admin's error message, while
+the cancel that was running succeeded.
+
+It now records nothing for a busy refusal and leaves the flag: the call
+that is running records what the courier says, or
+finish_pending_shipment_cancels asks again once the claim is gone. The
+sweep therefore needs no lock of its own, and reports how many orders it
+finished and how many are still pending.
+
+An answer already on the order with the flag still beside it (a writer
+that put back metadata loaded before the answer) has the flag removed
+without a second call to the courier, so no order stays in the sweep.
+
+run_for_all_tenants states what include_suspended is for: retention
+sweeps, and finishing what a customer's money or parcel waits on. ([`a7a59c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7a59c75f057cdd76971975328b1a849843c9bca))
+
+* fix(order): the admin cancel says when the courier's answer is still pending
+
+A staff cancel that meets a shipment already being worked on records
+nothing and leaves the cancel pending, so the "Cancel selected orders"
+action showed only "marked as canceled". It now adds an informational
+message: the courier has not answered yet, it is asked again
+automatically within N minutes, and a refusal is noted in the order's
+history.
+
+N is shipment_cancel_wait_minutes(): the age at which the sweep takes a
+cancel (ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS) plus the time between
+two of its runs, now a named setting the beat entry reads
+(ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES).
+
+The API response is unchanged. ([`a7a59c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7a59c75f057cdd76971975328b1a849843c9bca))
+
 ## v3.249.5 (2026-11-16)
 
 ### Bug fixes

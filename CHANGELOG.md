@@ -3,6 +3,129 @@
 
 
 
+## v3.247.0 (2026-11-15)
+
+### Features
+
+* feat(order): remove the per-carrier label and cancel order routes (#717)
+
+The storefront downloads labels through the provider-agnostic
+shipment_label since v3.341.6, and nothing ever called the per-carrier
+cancel routes. shipment_label and shipment_cancel serve both BoxNow and
+ACS through the shipping registry, including the 503/409 answer to a
+carrier outage or a request already in progress, so the four
+per-carrier order actions go:
+
+- GET /api/v1/order/{id}/boxnow_label
+- GET /api/v1/order/{id}/acs_label
+- POST /api/v1/order/{id}/boxnow_cancel
+- POST /api/v1/order/{id}/acs_cancel
+
+Their actions, action configs, permission entries and URLs are
+removed, along with the import-linter ignores for the carrier services
+only they imported. The carrier-scoped shipping views and the admin
+actions are unchanged.
+
+The outage tests now cover the 503, the 409 and the carrier refusal on
+shipment_cancel for both carriers, and a test asserts the four routes
+answer 404. api-contract/ignore.txt accepts the four path removals
+until storefront v3.341.7, the release regenerated from this schema.
+
+Closes #581 ([`a28da4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a28da4d565ac68f5f9faf54a70dcd6550fa26413))
+
+## v3.246.5 (2026-11-15)
+
+### Bug fixes
+
+* fix(api-contract): refuse a response object made nullable beside allOf (#715) ([`5117690`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5117690ca001bdc6fb258b6b6da8eb08f5e46a9f))
+
+* fix(api-contract): refuse a response object made nullable beside allOf
+
+oasdiff's --flatten-allof drops a `nullable: true` that sits beside an
+`allOf` (oasdiff/oasdiff#1348, still open in the newest release), and
+that is the shape drf-spectacular emits for a nullable nested
+serializer. A required response object made nullable therefore came
+out of the gate as "No changes detected", while the live storefront's
+generated Zod schemas answer such a body with a 422 (found on #709).
+
+Every pairing now runs a second, unflattened pass that compares
+nullability only: every check the pinned oasdiff lists is `none`
+except the `*-became-nullable` / `*-became-not-nullable` checks whose
+level for the consumer (its levels file, else oasdiff's default) is
+ERR, written out so oasdiff does not lower them to a warning for
+sitting inside an `allOf`. The list is read from the image, and a
+listing with no such check fails the comparison instead of skipping
+it. ignore.txt applies to both passes. The change stays inside
+api-contract.sh, so the deploy gate and the storefront and gateway PR
+checks pick it up from the first Django release that carries it.
+
+A `compare CONSUMER DJANGO [LEVELS]` entry point pairs two documents,
+and tests/compare.sh runs it over fixtures (no network): both nullable
+shapes, the request direction, a required property removed inside an
+allOf, a consumer that tolerates null, and an accepted break.
+
+Closes #710 ([`5117690`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5117690ca001bdc6fb258b6b6da8eb08f5e46a9f))
+
+* fix(api-contract): run the nullability checks in the unflattened pass only
+
+Run in both passes, a nullability change the flattened pass also sees
+(a property of a component reached through an allOf, as in v3.166.2)
+was reported twice, in two wordings: `product/category` flattened,
+`product/allOf[#/components/schemas/Product]/category` unflattened. An
+ignore.txt line copied from one never matched the other, so an accepted
+break would still have been refused.
+
+split_levels now derives both passes' levels from the pinned image's
+check list: the flattened pass gets the consumer's levels with every
+nullability check at `none`, the unflattened pass only the nullability
+checks at ERR. Over the 76 released schema.yml pairs from v3.150.1 to
+v3.246.3 the two passes found the same nullability changes, none only
+flattened, so nothing is lost. A fixture pins the shape: reported once,
+accepted by the lines the pass printed.
+
+Refs #710 ([`5117690`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5117690ca001bdc6fb258b6b6da8eb08f5e46a9f))
+
+* fix(api-contract): keep nullability in the flattened pass across shapes
+
+Taking the nullability checks out of the flattened pass weakened the
+gate wherever the consumer's document and Django's are shaped
+differently. Unflattened oasdiff cannot follow a property from
+`$ref: X` to `allOf: [X]`. The gateway's contract, generated from Go
+types, has no allOf, so a feature flag made nullable in Django passed.
+The same happened for a storefront generated before Django wrapped a
+field.
+
+The flattened pass is again exactly what it was: every check, at the
+consumer's levels. The unflattened pass still runs only the
+nullability checks, and now prints only what the first pass did not
+see. A finding the first pass printed, or one an ignore.txt line
+accepts, is dropped. Both comparisons remove the `allOf[...]/`
+segments the unflattened pass puts in a property path, and match
+ignore.txt the way oasdiff's MatchIgnore does. So a change both passes
+see is printed once, and one accepted line covers both passes.
+
+A levels file that cannot be read now fails the check (exit 2) instead
+of falling back to oasdiff's defaults. A gateway PR that deleted its
+levels file would otherwise have dropped its raised levels silently.
+
+The fixtures add both cross-shape cases (the gateway contract's shape
+among them), the missing levels file, and one accepted line covering
+both passes.
+
+Refs #710 ([`5117690`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5117690ca001bdc6fb258b6b6da8eb08f5e46a9f))
+
+* fix(api-contract): accept a nested allOf finding copied as printed
+
+new_nullability_findings lower-cased an ignore.txt line before removing
+its `allOf[...]/` segments. The pattern is case-sensitive (`allOf`, as
+oasdiff prints it), so after tolower nothing was removed. A finding only
+the unflattened pass sees, inside a nested allOf
+(`parent/allOf[#/components/schemas/Parent]/user`), was then refused
+even with the line copied exactly as printed, as the README says to do.
+The segments are now removed first. A fixture pins it.
+
+Refs #710 ([`5117690`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5117690ca001bdc6fb258b6b6da8eb08f5e46a9f))
+
 ## v3.246.4 (2026-11-15)
 
 ### Bug fixes

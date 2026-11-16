@@ -1203,9 +1203,6 @@ msgstr "ACS pickup lists"
 msgid "ACS refused"
 msgstr "ACS refused"
 
-msgid "ACS rejected the cancellation."
-msgstr "ACS rejected the cancellation."
-
 #, python-format
 msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
 msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
@@ -1565,14 +1562,8 @@ msgstr "Admin who pressed the button; empty for the daily beat task. Id of a pla
 msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
-msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
-msgstr "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
-
 msgid "Admin-only. Provider-agnostic cancellation: looks up the order's shipping provider and dispatches to the carrier adapter. The provider's own rules apply (BoxNow only cancels parcels in NEW state; ACS only cancels vouchers not yet finalised in a pickup list)."
 msgstr "Admin-only. Provider-agnostic cancellation: looks up the order's shipping provider and dispatches to the carrier adapter. The provider's own rules apply (BoxNow only cancels parcels in NEW state; ACS only cancels vouchers not yet finalised in a pickup list)."
-
-msgid "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
-msgstr "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
 
 msgid "Adopt ACS voucher"
 msgstr "Adopt ACS voucher"
@@ -2430,9 +2421,6 @@ msgstr "BoxNow parcel state vocabulary (data.parcelState)"
 msgid "BoxNow partner identifier (digits only). Used by the storefront BoxNow widget. No platform fallback — empty disables BoxNow."
 msgstr "BoxNow partner identifier (digits only). Used by the storefront BoxNow widget. No platform fallback — empty disables BoxNow."
 
-msgid "BoxNow rejected the cancellation."
-msgstr "BoxNow rejected the cancellation."
-
 #, python-format
 msgid "BoxNow shipment %(parcel)s (order %(order)s)"
 msgstr "BoxNow shipment %(parcel)s (order %(order)s)"
@@ -2740,14 +2728,8 @@ msgstr "Cancel requested at"
 msgid "Cancel selected orders and restore stock"
 msgstr "Cancel selected orders and restore stock"
 
-msgid "Cancel the ACS shipment for an order"
-msgstr "Cancel the ACS shipment for an order"
-
 msgid "Cancel the ACS voucher"
 msgstr "Cancel the ACS voucher"
-
-msgid "Cancel the BoxNow shipment for an order"
-msgstr "Cancel the BoxNow shipment for an order"
 
 msgid "Cancel the carrier shipment for an order"
 msgstr "Cancel the carrier shipment for an order"
@@ -4484,12 +4466,6 @@ msgstr "Download a GDPR data export"
 
 msgid "Download shipping voucher (PDF)"
 msgstr "Download shipping voucher (PDF)"
-
-msgid "Download the ACS voucher label PDF for an order"
-msgstr "Download the ACS voucher label PDF for an order"
-
-msgid "Download the BoxNow parcel label PDF for an order"
-msgstr "Download the BoxNow parcel label PDF for an order"
 
 msgid "Download the carrier label PDF for an order"
 msgstr "Download the carrier label PDF for an order"
@@ -9066,17 +9042,11 @@ msgstr "Nine"
 msgid "No"
 msgstr "No"
 
-msgid "No ACS shipment or voucher found for this order."
-msgstr "No ACS shipment or voucher found for this order."
-
 msgid "No Active Reservations"
 msgstr "No Active Reservations"
 
 msgid "No Attribute"
 msgstr "No Attribute"
-
-msgid "No BoxNow shipment or parcel ID found for this order."
-msgstr "No BoxNow shipment or parcel ID found for this order."
 
 msgid "No CartItem matches the given query."
 msgstr "No CartItem matches the given query."
@@ -13889,12 +13859,6 @@ msgstr "Strategy chain"
 msgid "Strategy code → weight in 0..1. Missing codes default to 1.0. With \"Learn weights\" on, replaced nightly from each strategy's attach rate on this surface."
 msgstr "Strategy code → weight in 0..1. Missing codes default to 1.0. With \"Learn weights\" on, replaced nightly from each strategy's attach rate on this surface."
 
-msgid "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
-msgstr "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
-
-msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
-msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
-
 msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
 msgstr "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
 
@@ -15332,12 +15296,6 @@ msgstr "This mail can be safely ignored if you did not initiate this action."
 
 msgid "This order changed while the payment was being prepared. Reload it and try again."
 msgstr "This order changed while the payment was being prepared. Reload it and try again."
-
-msgid "This order does not have a BoxNow shipment."
-msgstr "This order does not have a BoxNow shipment."
-
-msgid "This order does not have an ACS shipment."
-msgstr "This order does not have an ACS shipment."
 
 msgid "This order has already been paid."
 msgstr "This order has already been paid."
@@ -17983,6 +17941,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 
+#~ msgid "ACS rejected the cancellation."
+#~ msgstr "ACS rejected the cancellation."
+
 #, python-format
 #~ msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
 #~ msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
@@ -18018,6 +17979,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 #~ msgstr "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 
+#~ msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
+#~ msgstr "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
+
+#~ msgid "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
+#~ msgstr "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
+
 #~ msgid "Already unsubscribed"
 #~ msgstr "Already unsubscribed"
 
@@ -18051,6 +18018,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 
+#~ msgid "BoxNow rejected the cancellation."
+#~ msgstr "BoxNow rejected the cancellation."
+
 #~ msgid "Built-in page"
 #~ msgstr "Built-in page"
 
@@ -18059,6 +18029,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Call to Action Banner"
 #~ msgstr "Call to Action Banner"
+
+#~ msgid "Cancel the ACS shipment for an order"
+#~ msgstr "Cancel the ACS shipment for an order"
+
+#~ msgid "Cancel the BoxNow shipment for an order"
+#~ msgstr "Cancel the BoxNow shipment for an order"
 
 #~ msgid "Clocked Schedules"
 #~ msgstr "Clocked Schedules"
@@ -18126,6 +18102,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Download a GDPR data export bundle"
 #~ msgstr "Download a GDPR data export bundle"
+
+#~ msgid "Download the ACS voucher label PDF for an order"
+#~ msgstr "Download the ACS voucher label PDF for an order"
+
+#~ msgid "Download the BoxNow parcel label PDF for an order"
+#~ msgstr "Download the BoxNow parcel label PDF for an order"
 
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"
@@ -18349,6 +18331,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Newsletter Signup"
 #~ msgstr "Newsletter Signup"
+
+#~ msgid "No ACS shipment or voucher found for this order."
+#~ msgstr "No ACS shipment or voucher found for this order."
+
+#~ msgid "No BoxNow shipment or parcel ID found for this order."
+#~ msgstr "No BoxNow shipment or parcel ID found for this order."
 
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
@@ -18574,6 +18562,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Story Timeline"
 #~ msgstr "Story Timeline"
 
+#~ msgid "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
+#~ msgstr "Streams the ACS label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet."
+
+#~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+#~ msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
@@ -18622,6 +18616,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "This download link has expired."
 #~ msgstr "This download link has expired."
+
+#~ msgid "This order does not have a BoxNow shipment."
+#~ msgstr "This order does not have a BoxNow shipment."
+
+#~ msgid "This order does not have an ACS shipment."
+#~ msgstr "This order does not have an ACS shipment."
 
 #~ msgid "This store already has page builder data."
 #~ msgstr "This store already has page builder data."

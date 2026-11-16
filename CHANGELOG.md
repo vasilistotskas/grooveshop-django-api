@@ -3,6 +3,71 @@
 
 
 
+## v3.248.2 (2026-11-16)
+
+### Bug fixes
+
+* fix(order): a payment poll records only what the provider settled on (#724) ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+* fix(order): a payment poll records only what the provider settled on
+
+A provider that could not be asked (network error, timeout, rate
+limit, outage, unreadable answer) was answered as FAILED by both
+providers' get_payment_status, and the poll stored it. The 30-minute
+sweep then cancels a PENDING order whose payment FAILED, so a shopper
+still paying could lose the order. get_payment_status now raises
+PaymentStatusUnavailableError and nothing is written:
+GET /order/{id}/payment_status answers 503
+payment_provider_unavailable, payment-first order creation refuses the
+intent as before (400 payment_verification), PaymentLedger.ensure_charge
+records no charge, and the Viva webhook verification raises for
+redelivery (its error-dict checks are gone with the dict).
+
+A polled "canceled" (a Stripe intent closed by a retry whose new
+intent failed to open, a Viva X) was stored as CANCELED on a PENDING
+order. That state is settled, so neither sweep bucket selected the
+order, its stock stayed reserved, and a later success was ignored as
+stale. A poll now records only an open payment's state: a canceled
+attempt is FAILED (still payable, swept after its window, stock
+released through cancel_order) and a refunded state is never written
+by a poll, since the ledger derives it. ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+### Chores
+
+* chore(api-contract): drop the per-carrier route overrides production no longer needs ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
+### Documentation
+
+* docs: split emails.md and builder.md into folders, fix refund-execution (#723) ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+* docs: split emails.md and builder.md into docs/emails/ and docs/builder/
+
+Both references were over 40,000 characters. Each is now a folder with an
+index.md that says which file to read for which change, like docs/order/:
+
+docs/emails/: index, types, sending, delivery
+docs/builder/: index, documents, publishing, media, sign-in-and-defaults
+
+The text is moved, not rewritten. The only edits are five cross-file
+pointers ("see Tests" now names its file) and the new titles and indexes.
+Every reference to the old files (CLAUDE rules, app map, other docs,
+comments and docstrings in src/) names the new file. The size guard in
+test_doc_references.py holds every file under docs/ to the limit; its list
+of files over the limit is gone.
+
+docs/order/refund-execution.md: the order_refunded paragraph no longer
+argues from the old gift-card design. It states that gift-card value is
+returned by refund_order itself (GiftCardService.credit_refund), not by a
+signal receiver. ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+* docs: fix relative links after the split and two refund and rewrite passages
+
+Links to docs/image-uploads.md from docs/builder/ gain ../, and the two guide links in the rules file resolve from .claude/rules/. A stored version in no release can also be reached by publish_version, the refund text says how the excess is split between cards and points, and an order paid only with a gift card gets a stored-value attempt instead of the no-provider-payment error. ([`bef7c60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bef7c60268744579d29aa2b125c2f249c0be69b8))
+
+### Testing
+
+* test(order): a payment-status read error is a raise, not a FAILED answer ([`295c70a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295c70aa1170522ed7605c7c2f41e19fb0f7e397))
+
 ## v3.248.1 (2026-11-16)
 
 ### Bug fixes

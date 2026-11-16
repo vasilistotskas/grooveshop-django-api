@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 import pytest
 from celery.schedules import crontab
 from django.conf import settings
+from django.db.models import Q
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -230,6 +231,76 @@ class TestTheOrderIsDecidedByTheSweep:
         from celery.exceptions import SoftTimeLimitExceeded
 
         assert issubclass(SoftTimeLimitExceeded, Exception)
+
+
+class TestTheSweepCancelsExactlyTheSharedDefinition:
+    """``auto_cancel_stuck_pending_orders`` cancels what
+    ``payment_hold.swept_orders`` holds once its time has come, and nothing
+    else, so ``paymentDecidedBy`` covers exactly what the sweep decides."""
+
+    def test_every_bucket_and_exclusion(self):
+        now = timezone.now()
+        past = now - timedelta(hours=2)
+        future = now + timedelta(hours=2)
+        cash = PayWayFactory.create_offline_payment()
+        failed = PaymentStatus.FAILED
+        orders = {
+            "pending_online_expired": _order(hold=past),
+            "failed_online_past_window": _order(
+                hold=past, updated=past, payment_status=failed
+            ),
+            "failed_cash_past_window": _order(
+                hold=past, updated=past, payment_status=failed, pay_way=cash
+            ),
+            "failed_no_pay_way_past_window": _order(
+                hold=past, updated=past, payment_status=failed, pay_way=None
+            ),
+            "failed_online_link_still_payable": _order(
+                hold=future, updated=past, payment_status=failed
+            ),
+            "failed_within_window": _order(
+                hold=past, updated=now, payment_status=failed
+            ),
+            "processing": _order(
+                hold=past, payment_status=PaymentStatus.PROCESSING
+            ),
+            "amount_mismatch": _order(
+                hold=past, metadata={AMOUNT_MISMATCH_FLAG: True}
+            ),
+            "settled": _order(
+                hold=past,
+                status=OrderStatus.PROCESSING,
+                payment_status=PaymentStatus.COMPLETED,
+            ),
+            "not_yet_due": _order(hold=future),
+        }
+        due = set(
+            payment_hold.swept_orders().filter(
+                Q(pk__in=payment_hold.expired_unpaid_online_orders(now))
+                | Q(pk__in=payment_hold.expired_failed_payment_orders(now))
+            )
+        )
+        # A Viva payment order stays payable until its hold ends, so the
+        # sweep keeps this one open (``close_payment``) though it is due.
+        kept_open = orders["failed_online_link_still_payable"]
+        assert kept_open in due
+
+        auto_cancel_stuck_pending_orders()
+
+        canceled = {
+            order
+            for order in orders.values()
+            if Order.objects.get(pk=order.pk).status == OrderStatus.CANCELED
+        }
+        assert canceled == due - {kept_open}
+        assert {name for name, o in orders.items() if o in canceled} == {
+            "pending_online_expired",
+            "failed_online_past_window",
+            "failed_cash_past_window",
+            "failed_no_pay_way_past_window",
+        }
+        kept_open.refresh_from_db()
+        assert kept_open.status == OrderStatus.PENDING
 
 
 class TestAnInstantAlreadyPastIsNeverPromised:

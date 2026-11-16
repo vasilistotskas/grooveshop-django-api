@@ -41,6 +41,7 @@ missed (``PublishingConnection``): a miss on the worker's event connection
 reconnected the consuming one too (#721).
 """
 
+import logging
 import os
 import threading
 import time
@@ -56,10 +57,23 @@ from django.conf import settings
 from kombu.exceptions import OperationalError
 from kombu.transport import pyamqp
 
+from core.caches import BurstLogger
+
+logger = logging.getLogger(__name__)
+
 #: The default exchange routes a message to the queue named by its routing
 #: key, and RabbitMQ lets no client declare a queue whose name starts with
 #: ``amq.``, so the question is dropped once the broker reads it.
 PROBE_ROUTING_KEY = "amq.grooveshop.blocked-probe"
+
+
+#: A remote control query answered by no worker because the broker blocks
+#: publishers (``core.celery.GrooveShopControl``).
+unanswered_query = BurstLogger(
+    "Remote control query %r answered by no worker: RabbitMQ blocks"
+    " publishers (%s similar answer(s) suppressed in the last %ss)",
+    target=logger,
+)
 
 
 class BrokerBlocked(OperationalError):

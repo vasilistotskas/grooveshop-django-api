@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import logging
 import socket
 import struct
 import threading
@@ -381,9 +382,12 @@ def test_a_publishing_connection_confirms_every_publish():
 
 def _tick_as_the_worker_does(connection) -> None:
     """One tick of ``celery.worker.loops._enable_amqheartbeats``: the worker
-    ticks a connection only when its negotiated heartbeat is not 0."""
+    ticks a connection only when its negotiated heartbeat is not 0, at
+    ``broker_heartbeat_checkrate`` ticks per interval."""
     if connection.get_heartbeat_interval():
-        connection.heartbeat_check(rate=2.0)
+        connection.heartbeat_check(
+            rate=celery_app.conf.broker_heartbeat_checkrate
+        )
 
 
 def test_a_worker_misses_no_heartbeat_on_its_event_connection_after_a_block(
@@ -473,14 +477,14 @@ def test_the_producer_pool_refuses_without_taking_a_connection(
     assert fake_broker.connections == 2, "the blocked one and kombu's retry"
 
 
-def test_a_question_to_the_workers_gets_no_answer_while_held(
-    fake_broker, pooled_app
+def test_a_query_to_the_workers_gets_no_answer_while_held(
+    fake_broker, pooled_app, caplog
 ):
     """A worker that starts, or restarts its consumer, during an alarm says
     hello to its neighbours (``Mingle``), which treats any error but a
     connection error as fatal: the refusal made the worker exit with
-    "Unrecoverable error: BrokerBlocked" (#721). A question gets no answer
-    instead; a command that expects none still raises."""
+    "Unrecoverable error: BrokerBlocked" (#721). A query gets no answer
+    instead, with a WARNING."""
     with pytest.raises(Blocked):
         broker._on_blocked("an earlier publish of this process was blocked")
     answers: list[object] = []
@@ -488,13 +492,57 @@ def test_a_question_to_the_workers_gets_no_answer_while_held(
     def ask() -> None:
         inspect = pooled_app.control.inspect(timeout=0.5)
         answers.append(inspect.hello("celery@starting", []))
+        answers.append(inspect.stats())
         answers.append(pooled_app.control.ping(timeout=0.5))
 
-    assert _bounded(ask) is None
-    assert answers == [None, []], "nobody answered, nothing raised"
-    raised = _bounded(lambda: pooled_app.control.revoke("a-task-id"))
+    with caplog.at_level(logging.WARNING, logger="core.broker"):
+        assert _bounded(ask) is None
+
+    assert answers == [None, None, []], "nobody answered, nothing raised"
+    assert "answered by no worker" in caplog.text
+    assert fake_broker.published == [], "nothing was written"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        lambda control: control.shutdown(reply=True, timeout=0.5),
+        lambda control: control.pool_restart(reply=True, timeout=0.5),
+        lambda control: control.revoke("a-task-id", reply=True, timeout=0.5),
+        lambda control: control.rate_limit("demo.task", "1/m"),
+    ],
+    ids=["shutdown", "pool_restart", "revoke", "rate_limit"],
+)
+def test_a_command_to_the_workers_still_raises_while_held(
+    fake_broker, pooled_app, command
+):
+    """An operator's command must not look delivered when it was not: the
+    ``celery control`` command line waits for replies too, so the refusal
+    is decided by the command, not by ``reply``."""
+    with pytest.raises(Blocked):
+        broker._on_blocked("an earlier publish of this process was blocked")
+
+    raised = _bounded(lambda: command(pooled_app.control))
+
     assert isinstance(raised, BrokerBlocked), raised
     assert fake_broker.published == [], "nothing was written"
+
+
+def test_a_heartbeat_that_cannot_be_written_still_fails():
+    """Only a heartbeat MISSED is forgiven on a publishing connection; one
+    the socket refuses is a dead connection, as before."""
+    connection = broker.PublishingConnection(host="127.0.0.1:1")
+    connection.heartbeat = 30
+    connection.heartbeat_tick(rate=3)  # the first tick only takes note
+    due = time.monotonic() + 11  # a heartbeat is due every 10 s
+    with (
+        mock.patch("amqp.connection.monotonic", return_value=due),
+        mock.patch.object(
+            connection, "send_heartbeat", side_effect=ConnectionResetError
+        ),
+        pytest.raises(ConnectionResetError),
+    ):
+        connection.heartbeat_tick(rate=3)
 
 
 def test_a_task_retry_during_a_block_waits_and_is_published_once(

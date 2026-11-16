@@ -144,10 +144,11 @@ then redelivered every `acks_late` task it was running:
   intervals passed without a read, the loop raised "Too many heartbeats
   missed" and restarted the consumer, consuming connection included. With the
   default hold (60 s, exactly two intervals) the question after each hold
-  usually read the socket in time, but each hold was a race: the check falls
-  every 15 s and the question waits up to 2 s for the next worker heartbeat,
-  so by those timings about one hold in fifteen lost it, and a long alarm
-  was likely to. A hold longer than two intervals lost every time. `core.broker.PublishingConnection`
+  usually read the socket in time, but each hold was a race between the
+  heartbeat check (every 10 s: `broker_heartbeat_checkrate` is 3 per 30 s
+  interval) and the question, which waits up to 2 s for the next worker
+  heartbeat. Two measured four-minute alarms did not lose it; a hold longer
+  than two intervals lost every time. `core.broker.PublishingConnection`
   never fails for a heartbeat it missed: nothing reads a publishing connection
   between publishes. It still sends its heartbeats, and RabbitMQ still sends
   its own, which is how the broker closes a connection kombu dropped while the
@@ -159,10 +160,16 @@ then redelivered every `acks_late` task it was running:
   error but a connection error as fatal: "Unrecoverable error: BrokerBlocked"
   and the process exited. A pod started during an alarm (a deploy, an
   OOM-kill) restarted in a loop until it cleared.
-  `core.celery.GrooveShopControl` answers a broadcast that waits for replies
-  with none while the process holds (the worker goes on "all alone", a ping finds no
-  worker); a command that expects no reply (revoke, pool restart) still
-  raises.
+  `core.celery.GrooveShopControl` answers a query (an `inspect` command in
+  `celery.worker.control`: `hello`, `ping`, `stats`, ...) with no replies
+  while the process holds, and logs a WARNING: the worker goes on "all
+  alone", a ping finds no worker. Such a worker skips `Mingle`'s sync of
+  revoked task ids and logical clocks with its neighbours, and `Mingle` does
+  not run again once the alarm clears; nothing in this codebase revokes
+  tasks. Every other command (`revoke`, `shutdown`, `pool_restart`,
+  `rate_limit`, ...) still raises, whether or not it waits for replies: the
+  `celery control` command line always does, and an operator must see that
+  it was not delivered.
 
 Measured on Linux against RabbitMQ 4.3.7: a worker as in production (`--events`,
 prefork, `acks_late`; concurrency 2) running two tasks across an alarm of

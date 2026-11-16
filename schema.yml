@@ -40129,10 +40129,16 @@ components:
           type: string
         provider:
           type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: 'When this payment link stops being payable: the expiry the
+            provider applied, which the order keeps as paymentHoldExpiresAt.'
       required:
       - amount
       - checkoutUrl
       - currency
+      - expiresAt
       - provider
       - sessionId
       - status
@@ -43121,6 +43127,30 @@ components:
             no earlier non-canceled order. Feeds the ``new_customer`` parameter of
             the Google Ads purchase conversion, which Google asks to be calculated
             rather than hardcoded.
+        paymentHoldExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 'When the order''s payment link stops being payable: the expiry
+            the provider applied to the last link opened, or, before any was opened,
+            the store''s hold counted from the order''s creation. Set for every order
+            waiting for an online payment (PENDING, online pay way, payment not final);
+            null for any other order.'
+        paymentDecidedBy:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 'When the store cancels the order, and releases its stock,
+            if it is still unpaid by then: the start of the first run of the unpaid-order
+            sweep after the payment link expired plus the store''s grace (for a failed
+            payment, also after the failure plus the store''s wait for a retry). The
+            cancel commits during that run, unless the provider then reports the payment
+            as processing, which keeps the order open for its outcome. Null when the
+            order does not wait for an online payment, and when it is not canceled
+            automatically: a payment the provider is already processing, or a charge
+            that did not match the total and waits for the store.'
       required:
       - acsShipment
       - amountDue
@@ -43166,6 +43196,8 @@ components:
       - orderTimeline
       - payWay
       - payWayKey
+      - paymentDecidedBy
+      - paymentHoldExpiresAt
       - paymentMethodFee
       - paymentStatusDisplay
       - phone

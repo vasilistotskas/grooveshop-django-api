@@ -12,24 +12,48 @@ the provider as the expiry of the payment link or session
 that instant plus a grace window has passed.
 
 Until a payment is opened, the hold runs from the order's creation.
+
+The order detail serves both instants (:func:`hold_ends` and
+:func:`decided_by`), so a client such as the agent gateway publishes when
+the link stops being payable and when the order will have been settled one
+way or the other, and keeps no window of its own.
 """
 
 from datetime import datetime, timedelta
 
+from celery.schedules import crontab
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import DateTimeField, ExpressionWrapper, F, QuerySet
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.store_settings import store_setting
-from order.enum.status import OrderStatus, PaymentStatus
-from order.models.order import Order
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
 from pay_way.enum.settlement import PaySettlement
 
 HOLD_SETTING = "ORDER_ONLINE_PAYMENT_HOLD_MINUTES"
 MAX_HOLD_SETTING = "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES"
 GRACE_SETTING = "ORDER_ONLINE_PAYMENT_GRACE_MINUTES"
+FAILED_SETTING = "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES"
 ALERT_SETTING = "ORDER_UNPAID_ONLINE_ALERT_THRESHOLD"
+
+#: The longest grace a store may keep. The grace is for a confirmation
+#: already on its way when the link expires; one that arrives after the
+#: cancel is still booked (``OrderService.record_payment_after_cancel``)
+#: and refunded. Past this, a longer grace only holds stock nobody can pay
+#: for any more.
+MAX_GRACE = timedelta(hours=1)
+
+#: The ``CELERY_BEAT_SCHEDULE`` entry that runs the sweep
+#: (``order.tasks.auto_cancel_stuck_pending_orders``, fanned out per store).
+SWEEP_ENTRY = "auto-cancel-stuck-pending-orders"
 
 #: Message of the line logged when the unpaid online orders pile up; the
 #: ``GrooveShopUnpaidOnlineOrdersSpike`` alert in grooveshop-infrastructure
@@ -75,12 +99,30 @@ def validate_max_hold_minutes_setting(value: object) -> bool:
     )
 
 
+def validate_grace_minutes_setting(value: object) -> bool:
+    """Validator for ``ORDER_ONLINE_PAYMENT_GRACE_MINUTES``.
+
+    A whole number of minutes from 0 to :data:`MAX_GRACE`. A negative grace
+    would release the stock before the payment link stops being payable,
+    which is what the hold exists to prevent.
+    """
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and timedelta(0) <= timedelta(minutes=value) <= MAX_GRACE
+    )
+
+
 def hold_window() -> timedelta:
     return timedelta(minutes=int(store_setting(HOLD_SETTING)))
 
 
 def grace_window() -> timedelta:
     return timedelta(minutes=int(store_setting(GRACE_SETTING)))
+
+
+def failed_window() -> timedelta:
+    return timedelta(minutes=int(store_setting(FAILED_SETTING)))
 
 
 def max_hold_window() -> timedelta:
@@ -111,11 +153,75 @@ def window_closed(
     return hold_limit(order) - (now or timezone.now()) <= minimum
 
 
+def hold_ends(order: Order) -> datetime:
+    """When *order*'s latest payment link stops being payable.
+
+    The expiry the provider applied to the last link opened, or, before any
+    was opened, the hold counted from the order's creation.
+    """
+    return order.payment_hold_expires_at or (order.created_at + hold_window())
+
+
 def hold_ended(order: Order, now: datetime | None = None) -> bool:
     """True when *order*'s hold, plus the grace window, has ended: the
     instant :func:`expired_unpaid_online_orders` selects on, for one order."""
-    ends = order.payment_hold_expires_at or (order.created_at + hold_window())
-    return ends < (now or timezone.now()) - grace_window()
+    return hold_ends(order) < (now or timezone.now()) - grace_window()
+
+
+def awaiting_payment(order: Order) -> bool:
+    """True when *order* holds its stock for an online payment.
+
+    The one-order form of ``OrderQuerySet.holding_stock_for_online_payment``:
+    a PENDING order of an online pay way whose payment is not final.
+    """
+    return (
+        order.status == OrderStatus.PENDING
+        and order.awaits_online_payment
+        and order.payment_status not in SETTLED_PAYMENT_STATUSES
+    )
+
+
+def _next_sweep(after: datetime) -> datetime:
+    """The first sweep run strictly after *after*, from the beat schedule.
+
+    Strictly: the sweep selects an order once its instant is in the past,
+    so a run that starts exactly at it does not.
+    """
+    schedule = settings.CELERY_BEAT_SCHEDULE[SWEEP_ENTRY]["schedule"]
+    if not isinstance(schedule, crontab):
+        raise ImproperlyConfigured(
+            f"The beat entry {SWEEP_ENTRY!r} must run on a crontab."
+        )
+    last_run_at, delta, _now = schedule.remaining_delta(after)
+    return last_run_at + delta
+
+
+def decided_by(order: Order) -> datetime | None:
+    """When the sweep cancels *order* if it is still unpaid by then.
+
+    The start of the first ``auto_cancel_stuck_pending_orders`` run that
+    selects the order (the cancel commits during that run): after the
+    hold plus the grace for a pending payment; for a failed one, after the
+    failure plus ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` as well, since
+    a link that can still be paid is closed only once its hold has ended
+    (a Stripe PaymentIntent is canceled sooner, so this is the latest).
+
+    ``None`` when the order does not hold stock for an online payment, and
+    when the sweep leaves it to a person or to the provider: a payment the
+    provider is processing waits for its final webhook, and an order with a
+    charge that did not match its total (``AMOUNT_MISMATCH_FLAG``) is never
+    canceled automatically.
+    """
+    if not awaiting_payment(order) or AMOUNT_MISMATCH_FLAG in (
+        order.metadata or {}
+    ):
+        return None
+    selected_after = hold_ends(order) + grace_window()
+    if order.payment_status == PaymentStatus.FAILED:
+        selected_after = max(selected_after, order.updated_at + failed_window())
+    elif order.payment_status != PaymentStatus.PENDING:
+        return None
+    return _next_sweep(selected_after)
 
 
 def unpaid_online_orders() -> QuerySet[Order]:

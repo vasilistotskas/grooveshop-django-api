@@ -10,6 +10,7 @@ and the functions it names may move freely with their modules.
 """
 
 from order.payment_hold import (
+    validate_grace_minutes_setting,
     validate_hold_minutes_setting,
     validate_max_hold_minutes_setting,
 )
@@ -17,6 +18,7 @@ from order.review_request import validate_review_request_delay_days_setting
 from order.stock import validate_reservation_ttl_minutes_setting
 
 __all__ = [
+    "validate_grace_minutes_setting",
     "validate_hold_minutes_setting",
     "validate_max_hold_minutes_setting",
     "validate_reservation_ttl_minutes_setting",

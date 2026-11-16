@@ -185,7 +185,8 @@ locks stock.
   while an order awaits its payment and a cancel leaves it alone. Orders
   stamped by migration `0083` carry `created_at + 24h`, so a retry on one older
   than the maximum is refused too.
-- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5) is added to
+- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5; the validator
+  accepts 0 to 60, `payment_hold.MAX_GRACE`) is added to
   the stored instant, and the 15 minute beat adds its own slack, so a
   confirmation already on its way reaches an open order. Only unpaid (`PENDING`
   / `PENDING`) orders of an `ONLINE` pay way are swept; COD and
@@ -204,6 +205,29 @@ locks stock.
   anything and takes the same wait. A payment that is not closed (that wait, or
   a Stripe intent that succeeded or is processing) leaves the order open for
   its webhook and counts `skipped_open`.
+- **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
+  the owner's and staff's `GET /order/{id}`, the guest route
+  `GET /order/uuid/{uuid}`, the agent gateway's
+  `GET /agent/internal/order/{uuid}`) serves two instants, both null unless
+  the order is `PENDING`, of an `ONLINE` pay way, with a payment that is not
+  final (`payment_hold.awaiting_payment`, the one-order form of
+  `holding_stock_for_online_payment`):
+  - `paymentHoldExpiresAt` (`payment_hold.hold_ends`): when the last link
+    stops being payable, `payment_hold_expires_at`, or `created_at` plus the
+    hold before any link was opened. Never null for such an order.
+  - `paymentDecidedBy` (`payment_hold.decided_by`): the start of the first
+    sweep run that selects the order, computed from the sweep's crontab in
+    `CELERY_BEAT_SCHEDULE` (`payment_hold.SWEEP_ENTRY`): the first run strictly
+    after the hold plus the grace, and for a FAILED payment after the later of
+    that and `updated_at` plus `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES` (a
+    Stripe PaymentIntent is closed sooner, so it is the latest). The cancel
+    commits during that run. Null where the sweep promises nothing: a payment
+    the provider is `PROCESSING`, and an order flagged `AMOUNT_MISMATCH_FLAG`.
+
+  `create_checkout_session` also returns `expiresAt`, the expiry the provider
+  applied to the link it just opened. The agent gateway publishes
+  `paymentDecidedBy` as the checkout's `expires_at`, so a platform polls until
+  Django has decided the order and keeps no window of its own.
 - **A payment that still arrives after the cancel** is not lost: Viva
   `_handle_payment_created` and Stripe `handle_payment_succeeded` /
   `checkout.session.completed` route it to

@@ -120,6 +120,12 @@ BROKER_PUBLISH_READ_TIMEOUT = (
 # so a shorter hold leaves more of them on a broker already short of
 # memory: one per minute per process that publishes.
 BROKER_BLOCKED_HOLD_SECONDS = float(getenv("BROKER_BLOCKED_HOLD_SECONDS", "60"))
+if not BROKER_BLOCKED_HOLD_SECONDS > 0:
+    # Without a hold, worker events and heartbeats (which kombu retries
+    # without end) reconnect to a blocked broker in a loop.
+    raise ImproperlyConfigured(
+        "BROKER_BLOCKED_HOLD_SECONDS must be more than 0 seconds."
+    )
 # How often kombu publishes a task again after a connection error, each
 # time on a new connection (``kombu.Connection.ensure``). One retry is what
 # a dead pooled connection needs: after a broker restart the first publish

@@ -44,7 +44,8 @@ producer, a worker's event dispatcher) with `core.broker.PublishingTransport`.
 Its connections confirm every publish and keep one state per process:
 
 - `connection.blocked` holds the process off the broker for
-  `BROKER_BLOCKED_HOLD_SECONDS` (60 s). The publish waiting for its confirm ends
+  `BROKER_BLOCKED_HOLD_SECONDS` (60 s; the settings refuse anything not above 0,
+  which would let events and heartbeats reconnect in a loop). The publish waiting for its confirm ends
   at once with py-amqp's `Blocked`, a recoverable connection error: kombu drops
   that connection without a close handshake and retries on a new one (the one
   retry of `CELERY_TASK_PUBLISH_RETRY_POLICY`, or kombu's endless retry for
@@ -60,14 +61,29 @@ Its connections confirm every publish and keep one state per process:
   next publish first asks again: an empty message to the default exchange with a
   routing key no queue can have (`amq.` names are reserved), which RabbitMQ
   drops. Blocked again, the hold starts over and the real message is never
-  written; confirmed, publishing resumes.
+  written; confirmed, publishing resumes. A question that fails for another
+  reason (a connection a restarted broker reset) leaves the hold passed, so
+  kombu's retry asks again on a new connection. One thread asks at a time; the
+  others are refused meanwhile.
+- A task published by a task the worker is running (`self.retry()`, `.delay()`,
+  a `dispatch_on_commit` inside a task) is never refused
+  (`GrooveShopCelery.send_task`, `core.broker.waiting_through_blocks`).
+  `Task.retry` turns a failed publish into `Reject(requeue=False)`, and an
+  `acks_late` message rejected that way is dropped: a refusal there loses the
+  task. Instead the message is written once and the publish waits for its
+  confirm through the block, as it did before #509, so the task runs once after
+  the alarm clears. The cost: a worker child that publishes during an alarm is
+  held until it clears, bounded by the task's time limit
+  (`CELERY_TASK_SOFT_TIME_LIMIT`), as before #509.
 
 So during an alarm a process writes one message, the publish that found out, and
 then nothing but one question per hold. Each question leaves one connection the
 broker no longer reads until the alarm clears; the hold is long so that a broker
 short of memory collects few of them, at the cost of publishing resuming up to a
 minute after the alarm clears (rows are swept, and beat sends a missed entry
-again after `scheduler.beat.PUBLISH_RETRY_SECONDS`).
+again after `scheduler.beat.PUBLISH_RETRY_SECONDS`). The hold does not grow
+with each block: fewer connections would be left, but after a long alarm
+publishing would resume minutes after it cleared.
 
 `read_timeout` (`BROKER_PUBLISH_READ_TIMEOUT`, 5 s, applied as `SO_RCVTIMEO`)
 bounds a reply the broker never sends without saying why, such as the confirm

@@ -47,12 +47,25 @@ class GrooveShopCelery(Celery):
         return super().connection_for_write(url, **kwargs)
 
     def send_task(self, *args: Any, **kwargs: Any) -> Any:
-        """Refuse a task while the broker blocks this process, before a
-        pooled connection is taken: the transport would refuse it too, but
-        kombu replaces a pooled connection after any failed publish, so each
-        refusal there costs a new connection to a broker short of memory."""
-        from core.broker import refuse_while_held
+        """Publish a task, deciding what a broker block does to it.
 
+        From a task the worker is running (``self.retry()``, ``.delay()``)
+        the publish is never refused: ``Task.retry`` turns a failed publish
+        into ``Reject(requeue=False)``, which drops an ``acks_late``
+        message, so the task waits through the block instead
+        (``core.broker.waiting_through_blocks``).
+
+        Anywhere else it is refused while the broker blocks this process,
+        before a pooled connection is taken: the transport would refuse it
+        too, but kombu replaces a pooled connection after any failed
+        publish, so each refusal there would cost a new connection to a
+        broker short of memory.
+        """
+        from core.broker import refuse_while_held, waiting_through_blocks
+
+        if self.current_worker_task is not None:
+            with waiting_through_blocks():
+                return super().send_task(*args, **kwargs)
         refuse_while_held()
         return super().send_task(*args, **kwargs)
 

@@ -12,20 +12,26 @@ worker events, heartbeats and control commands publish) through
 
 from __future__ import annotations
 
+import contextlib
+import importlib
 import socket
 import struct
 import threading
 import time
 from collections.abc import Callable, Iterator
+from unittest import mock
 
 import pytest
 from amqp import spec
 from amqp.exceptions import Blocked
 from amqp.serialization import dumps, loads
+from celery.exceptions import Retry
+from django.core.exceptions import ImproperlyConfigured
 from kombu.transport.pyamqp import Transport
 
 from core import broker, celery_app
 from core.broker import PROBE_ROUTING_KEY, BrokerBlocked
+from core.celery import GrooveShopCelery
 from core.retry import TRANSIENT_NETWORK_ERRORS
 
 _FRAME_END = b"\xce"
@@ -47,10 +53,16 @@ _BOUND_SECONDS = 10.0
 
 
 class FakeBroker:
-    """An AMQP server that confirms publishes until ``block()`` is called."""
+    """An AMQP server that confirms publishes until ``block()`` is called.
+
+    A blocked connection reads nothing more until ``unblock()``, which sends
+    it ``connection.unblocked`` and the confirm it held back, as RabbitMQ does
+    once its alarm clears.
+    """
 
     def __init__(self) -> None:
         self.blocking = False
+        self._released = threading.Event()
         self.published: list[str] = []
         self.connections = 0
         self._server = socket.create_server(("127.0.0.1", 0))
@@ -63,15 +75,25 @@ class FakeBroker:
         return f"amqp://guest:guest@{host}:{port}//"
 
     def block(self) -> None:
+        self._released.clear()
         self.blocking = True
 
     def unblock(self) -> None:
         self.blocking = False
+        self._released.set()
+
+    def restart(self) -> None:
+        """Drop every open connection, as a restarted broker does."""
+        for sock in self._sockets:
+            with contextlib.suppress(OSError):  # the client may have gone
+                sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+        self._sockets.clear()
 
     def close(self) -> None:
-        for sock in self._sockets:
-            sock.close()
+        self.restart()
         self._server.close()
+        self._released.set()
 
     def _accept(self) -> None:
         while True:
@@ -126,7 +148,8 @@ class FakeBroker:
                     if self.blocking:
                         # RabbitMQ stops reading a connection it blocks.
                         self._send(sock, 0, spec.Connection.Blocked)
-                        return
+                        self._released.wait()
+                        self._send(sock, 0, spec.Connection.Unblocked)
                     delivery_tags[channel] = delivery_tags.get(channel, 0) + 1
                     self._send(
                         sock,
@@ -349,3 +372,124 @@ def test_a_publishing_connection_confirms_every_publish():
     assert connection.confirm_publish is True
     assert connection.on_blocked is broker._on_blocked
     assert connection.on_unblocked is broker._on_unblocked
+
+
+def test_a_question_that_fails_for_another_reason_asks_again(
+    fake_broker, connection, settings
+):
+    """After a broker restart the question meets a connection the broker
+    reset. That says nothing about a block, so kombu's retry asks again on
+    a new connection instead of meeting a new hold."""
+    settings.BROKER_BLOCKED_HOLD_SECONDS = 0.2
+    fake_broker.block()
+    _bounded(_send_task(connection))
+    fake_broker.unblock()
+    fake_broker.restart()
+    time.sleep(0.3)
+
+    assert _bounded(_send_task(connection)) is None
+
+    assert fake_broker.published[-3:] == [
+        PROBE_ROUTING_KEY,
+        "celery",
+        "task.sent",
+    ]
+    assert not broker.broker_blocked()
+
+
+@pytest.fixture
+def pooled_app(fake_broker: FakeBroker, settings) -> Iterator[GrooveShopCelery]:
+    """An app publishing through its own producer pool, as the request path
+    and a worker's tasks do (``send_task`` without ``producer=``)."""
+    app = GrooveShopCelery("pooled", set_as_current=False)
+    # Not ``broker_url``, which $CELERY_BROKER_URL overrides.
+    app.conf.broker_write_url = fake_broker.url
+    app.conf.task_publish_retry_policy = (
+        settings.CELERY_TASK_PUBLISH_RETRY_POLICY
+    )
+    yield app
+    fake_broker.close()  # a blocked broker never answers the pool's close
+    app.close()
+
+
+def test_the_producer_pool_refuses_without_taking_a_connection(
+    fake_broker, pooled_app
+):
+    fake_broker.block()
+
+    raised = [
+        _bounded(lambda: pooled_app.send_task("demo.task")) for _ in range(4)
+    ]
+
+    assert all(isinstance(exc, BrokerBlocked) for exc in raised), raised
+    assert fake_broker.published == ["celery"]
+    assert fake_broker.connections == 2, "the blocked one and kombu's retry"
+
+
+def test_a_task_retry_during_a_block_waits_and_is_published_once(
+    fake_broker, pooled_app
+):
+    """``Task.retry`` turns a failed publish into ``Reject(requeue=False)``,
+    which drops an ``acks_late`` message. From a task the worker is running
+    the publish is never refused: it is written once and waits for its
+    confirm until the broker unblocks."""
+
+    @pooled_app.task(bind=True, name="demo.retrying")
+    def retrying(self):
+        raise AssertionError("not run here")
+
+    def retry_as_the_worker_does() -> None:
+        # The request stack is per thread, so it is pushed in this one.
+        retrying.push_request(
+            id="retrying-1",
+            args=[],
+            kwargs={},
+            retries=0,
+            called_directly=False,
+        )
+        try:
+            outcome.append(retrying.retry(countdown=1, throw=False))
+        finally:
+            retrying.pop_request()
+
+    with pytest.raises(Blocked):
+        broker._on_blocked("an earlier publish of this process was blocked")
+    fake_broker.block()
+    threading.Timer(0.5, fake_broker.unblock).start()
+    outcome: list[object] = []
+    started = time.monotonic()
+    with mock.patch.object(
+        GrooveShopCelery,
+        "current_worker_task",
+        new_callable=mock.PropertyMock,
+        return_value=retrying,
+    ):
+        raised = _bounded(retry_as_the_worker_does)
+
+    assert raised is None, raised
+    assert isinstance(outcome[0], Retry), outcome
+    assert time.monotonic() - started >= 0.5, "it waited for the broker"
+    assert fake_broker.published == ["celery"], "written once"
+    assert not broker.broker_blocked(), "connection.unblocked ended the hold"
+
+
+@pytest.fixture
+def settings_module(monkeypatch) -> Iterator[Callable[..., object]]:
+    import settings.celery as module
+
+    def reload(**env: str) -> object:
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        return importlib.reload(module)
+
+    yield reload
+    monkeypatch.undo()
+    importlib.reload(module)
+
+
+@pytest.mark.parametrize("hold", ["0", "-1", "nan"])
+def test_a_hold_must_be_longer_than_nothing(settings_module, hold):
+    """With no hold, worker events and heartbeats, which kombu retries
+    without end, would reconnect to a blocked broker in a loop."""
+    with pytest.raises(ImproperlyConfigured, match="BROKER_BLOCKED_HOLD"):
+        settings_module(BROKER_BLOCKED_HOLD_SECONDS=hold)

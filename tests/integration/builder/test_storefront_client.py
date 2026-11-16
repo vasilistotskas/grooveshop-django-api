@@ -115,10 +115,10 @@ def test_a_catalogue_that_cannot_be_read_is_logged_as_an_error(
         storefront.fetch_catalogue("shop")
 
     (record,) = [r for r in caplog.records if r.levelno == logging.ERROR]
-    message = record.getMessage()
-    assert "http://storefront.test" in message
-    assert "shop" in message
-    assert "KeyError" in message
+    storefront_url, schema, cause = record.args
+    assert storefront_url == "http://storefront.test"
+    assert schema == "shop"
+    assert isinstance(cause, KeyError)
     assert record.exc_info is not None
 
 

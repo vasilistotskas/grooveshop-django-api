@@ -63,6 +63,9 @@ class FakeBroker:
     def __init__(self) -> None:
         self.blocking = False
         self._released = threading.Event()
+        #: Set once a publish is held back, so a test unblocks only after
+        #: the broker really blocked (a fixed timer races a slow runner).
+        self.holding = threading.Event()
         self.published: list[str] = []
         self.connections = 0
         self._server = socket.create_server(("127.0.0.1", 0))
@@ -76,6 +79,7 @@ class FakeBroker:
 
     def block(self) -> None:
         self._released.clear()
+        self.holding.clear()
         self.blocking = True
 
     def unblock(self) -> None:
@@ -148,6 +152,7 @@ class FakeBroker:
                     if self.blocking:
                         # RabbitMQ stops reading a connection it blocks.
                         self._send(sock, 0, spec.Connection.Blocked)
+                        self.holding.set()
                         self._released.wait()
                         self._send(sock, 0, spec.Connection.Unblocked)
                     delivery_tags[channel] = delivery_tags.get(channel, 0) + 1
@@ -455,7 +460,13 @@ def test_a_task_retry_during_a_block_waits_and_is_published_once(
     with pytest.raises(Blocked):
         broker._on_blocked("an earlier publish of this process was blocked")
     fake_broker.block()
-    threading.Timer(0.5, fake_broker.unblock).start()
+
+    def unblock_once_held() -> None:
+        assert fake_broker.holding.wait(timeout=10), "the publish was held"
+        time.sleep(0.5)
+        fake_broker.unblock()
+
+    threading.Thread(target=unblock_once_held, daemon=True).start()
     outcome: list[object] = []
     started = time.monotonic()
     with mock.patch.object(

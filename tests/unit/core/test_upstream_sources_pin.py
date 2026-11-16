@@ -110,16 +110,16 @@ class TestGitHashes:
 
 class FakeGitHub:
     """The GitHub API reads the script makes, over two in-memory
-    repositories: the storefront's, holding its files (``catalogue``,
-    ``legacy-image-fields``, the cases) and one directory (``seeds``), and
-    the media service's,
+    repositories: the storefront's, holding its files
+    (``legacy-image-fields``, the cases) and two directories (``catalogues``,
+    ``seeds``), and the media service's,
     holding the ``image-limits`` file, all at the sources' upstream paths."""
 
     def __init__(
         self,
         *,
         seeds: dict[str, bytes],
-        catalogue: bytes = b'{"hash": "h"}\n',
+        catalogues: dict[str, bytes] | None = None,
         legacy_image_fields: bytes = b"{}\n",
         placement: bytes = b"[]\n",
         data_cases: bytes = b"[]\n",
@@ -127,8 +127,10 @@ class FakeGitHub:
         contrast_cases: bytes = b"{}\n",
         limits: bytes = b'{"maxFileBytes": {}}\n',
     ) -> None:
-        self.directories = {"seeds": seeds}
-        self.catalogue = catalogue
+        self.directories = {
+            "seeds": seeds,
+            "catalogue": catalogues or {"default.json": b'{"hash": "h"}\n'},
+        }
         self.legacy_image_fields = legacy_image_fields
         self.placement = placement
         self.data_cases = data_cases
@@ -162,13 +164,13 @@ class FakeGitHub:
 
     def _build(self) -> str:
         by_name = {s.name: s for s in sync.SOURCES}
-        # test/fixtures/builder/{catalogue.json,seeds}
+        # test/fixtures/builder/{catalogue,seeds,*.json}
         builder = self._tree(
             [
                 {
-                    "path": "catalogue.json",
-                    "type": "blob",
-                    "sha": self._blob(self.catalogue),
+                    "path": "catalogue",
+                    "type": "tree",
+                    "sha": self._directory(self.directories["catalogue"]),
                 },
                 {
                     "path": "legacy-image-fields.json",
@@ -262,7 +264,10 @@ class TestSyncing:
     def test_it_copies_every_source_and_pins_each(self, workspace):
         upstream = FakeGitHub(
             seeds={"one.json": b'{"x": 1}\n', "two.json": b"{}\n"},
-            catalogue=b'{"hash": "abc"}\n',
+            catalogues={
+                "default.json": b'{"hash": "abc"}\n',
+                "webside.json": b'{"hash": "def"}\n',
+            },
         )
         stale = local(workspace, "seeds") / "stale.json"
         stale.parent.mkdir(parents=True)
@@ -274,9 +279,12 @@ class TestSyncing:
             "one.json",
             "two.json",
         }
-        assert (
-            local(workspace, "catalogue").read_bytes() == b'{"hash": "abc"}\n'
-        )
+        assert sync.local_files(
+            next(s for s in sync.SOURCES if s.name == "catalogues")
+        ) == {
+            "default.json": b'{"hash": "abc"}\n',
+            "webside.json": b'{"hash": "def"}\n',
+        }
         assert local(workspace, "placement").read_bytes() == b"[]\n"
         assert local(workspace, "data-cases").read_bytes() == b"[]\n"
         assert local(workspace, "contrast-cases").read_bytes() == b"{}\n"
@@ -333,9 +341,9 @@ class TestChecking:
             (
                 {
                     "seeds": {"a.json": b"{}\n"},
-                    "catalogue": b'{"hash": "z"}\n',
+                    "catalogues": {"default.json": b'{"hash": "z"}\n'},
                 },
-                "catalogue",
+                "catalogues",
             ),
             ({"seeds": {"a.json": b'{"changed": true}\n'}}, "seeds"),
             (
@@ -369,9 +377,11 @@ class TestChecking:
         self, workspace, capsys
     ):
         upstream = self.synced(workspace, seeds={"a.json": b"{}\n"})
-        local(workspace, "catalogue").write_text('{"edited": true}\n')
+        (local(workspace, "catalogues") / "default.json").write_text(
+            '{"edited": true}\n'
+        )
 
         assert sync.check(upstream) == 1
-        assert "catalogue: the copy is not the pinned one" in (
+        assert "catalogues: the copy is not the pinned one" in (
             capsys.readouterr().out
         )

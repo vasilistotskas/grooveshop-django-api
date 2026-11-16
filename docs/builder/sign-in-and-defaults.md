@@ -63,7 +63,7 @@ files (the media service's image limits are copied the same way, see
 
 | Source | Copy | Used by |
 |---|---|---|
-| `test/fixtures/builder/catalogue.json` | `src/builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
+| `test/fixtures/builder/catalogue/` | `src/builder/catalogues/` | the block catalogue as each design is served it (`<design>.json`; `default.json` for every store whose schema no design names): `builder.seeding` derives the seeds against `default.json`, and the seeds, demo pages and real-catalogue tests run against each design's |
 | `test/fixtures/builder/seeds/` | `src/builder/seeds/` | `builder.seeding`: application data |
 
 `tests/fixtures/upstream-sources.lock.json` names each owner's commit and

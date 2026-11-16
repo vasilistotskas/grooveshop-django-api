@@ -1,14 +1,14 @@
 {
   "commits": {
-    "vasilistotskas/grooveshop-media-stream": "5707d654a0786736498f1c3a2e7b99fb69253517",
-    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "0276a7ee2299958f622b56bcf53ee8c2da023690"
+    "vasilistotskas/grooveshop-media-stream": "b2fbcf1e8a254a7674afd9cd08d8a5ab431bbd2f",
+    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "29073f91535256808de4a19194d0e31da28dfc1e"
   },
   "sources": {
-    "catalogue": {
+    "catalogues": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
-      "path": "test/fixtures/builder/catalogue.json",
-      "kind": "blob",
-      "sha": "b678ddc01d92b98e6ef1ecfa88d641a91fe17af3"
+      "path": "test/fixtures/builder/catalogue",
+      "kind": "tree",
+      "sha": "3a269d8a25efddccb68e93687a973448bc65f702"
     },
     "legacy-image-fields": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",

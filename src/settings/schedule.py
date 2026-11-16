@@ -381,6 +381,14 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_auto_cancel_stuck_pending_orders",
             "schedule": crontab(minute="*/15"),
         },
+        # A staff or system cancel asks the courier after it commits
+        # (#713); a worker that stopped in between left the order
+        # canceled with its voucher live. This asks the courier for those.
+        "finish-pending-shipment-cancels": {
+            "task": "tenant.tasks.fanout_finish_pending_shipment_cancels",
+            "schedule": crontab(minute="*/15"),
+            "options": {"queue": "celery", "expires": 300},
+        },
         # DELIVERED + paid → COMPLETED is applied inline by the carrier
         # poll and the COD reconcile; this sweep closes what lands
         # outside those two moments (a payment entered by hand, a

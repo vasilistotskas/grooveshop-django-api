@@ -60,7 +60,9 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   cancel, before or after: the order records
   `shipment_cancel = {attempted: false, dispatched: true}`
   (`SHIPMENT_ALREADY_CANCELED`), so no courier call runs inside the tracking
-  sync's transaction. An order whose status no longer allows a cancel raises
+  sync's transaction. That sync locked the order before the shipment
+  ([§5](shipping.md), lock order), so the cancel it runs waits on nobody
+  who waits on it. An order whose status no longer allows a cancel raises
   `OrderNotCancelableError`; any other `OrderCancellationError` is a cancel
   that failed on the way.
 - **Not a cancel path: a BoxNow `canceled` parcel event.** It records the
@@ -94,16 +96,21 @@ the courier's answer (§7.1.1) rather than silently skipping it.
 3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to
    `CANCELED` — `Order.settle_unpaid_payment`), records
    `metadata['cancellation']`.
-4. Staff / system only: cascades to the courier voucher via
-   `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H).
-   Records the dispatch outcome on metadata. A carrier rejection (e.g., voucher
-   already in pickup list) does not stop the cancel: it is logged, kept in
+   A staff / system cancel also sets `metadata['shipment_cancel_pending']`
+   in this save: the courier is still to be asked (§7.1.2). The transaction
+   commits here. It never calls the courier.
+4. Staff / system only, after the cancel has COMMITTED: cascades to the
+   courier voucher via `cancel_attached_shipment` →
+   `ShippingService.cancel_shipment` (PR #2 H), with no transaction open and
+   no row locked (§7.1.2). Records the dispatch outcome on metadata. A carrier
+   rejection (e.g., voucher already in pickup list) does not undo the cancel:
+   it is logged, kept in
    `metadata['cancellation']['shipment_cancel']['error']`, left as a staff-only
    `OrderHistory` NOTE
    (`Order canceled, but the courier did not cancel the parcel: …`), and the
    admin "Cancel selected orders" action raises an error message for it. For a
    customer cancel the courier already confirmed in step 0, so the outcome is
-   recorded up front and the cascade skips.
+   recorded up front, in step 3, and the cascade skips.
 5. After the cancel has COMMITTED, optional refund via `refund_order`
    (`OrderService._refund_canceled_order`; `refund_payment=True`, and the order
    is paid or the ledger still holds refundable money, so an order a provider's
@@ -288,6 +295,67 @@ Both carriers' cancel is idempotent on an already canceled shipment, so a
 customer who retries after a cancel that stopped half way is not refused
 (`BoxNowService.cancel_shipment` returns on a CANCELED parcel, as
 `AcsService.cancel_voucher` already did).
+
+### 7.1.2 A staff or system cancel asks the courier after it has committed
+
+`_cancel_order_locked` holds the order's row lock and the locks of every
+product it restocks. Until #713 it also called the courier before it
+returned: all those rows stayed locked across the carrier's HTTP calls
+(BoxNow's lookup and cancel, ACS's delete), the connection's
+`idle_in_transaction_session_timeout` could end the cancel half way, and
+the shipment was locked after the order while a tracking sync took the two
+the other way round (#613, a deadlock reproduced with two connections). Now:
+
+1. **The cancel commits first.** Step 3 writes
+   `metadata['shipment_cancel_pending'] = true`
+   (`SHIPMENT_CANCEL_PENDING_FLAG`) with the status, in one save. That flag
+   is the durable half of what follows.
+2. **Then the courier is asked.** `cancel_order` registers
+   `cancel_attached_shipment` with `transaction.on_commit`. A caller that
+   holds no transaction (the cancel endpoint, the admin action) gets it run
+   at once, before `cancel_order` returns, and reads
+   `metadata['cancellation']['shipment_cancel']` on the order it gets back,
+   as before. A caller that cancels inside its own transaction
+   (`auto_cancel_stuck_pending_orders`, under its row lock) gets it run when
+   that transaction commits. Either way no row is locked and no transaction
+   is open while the courier answers, so each carrier's cancel runs its own
+   three phases (lock, release, call, lock again).
+3. **The answer is merged into the row as it is then.** The order can change
+   while the courier answers, so `_record_shipment_cancel` reads the metadata
+   again under the order's row lock, adds `shipment_cancel`, removes the flag
+   and writes it, in one short transaction. The first answer recorded is the
+   one kept.
+
+What each failure does:
+
+- **The courier refuses, gives no answer, or is not configured.** As before:
+  the order stays canceled (and is refunded), the error is recorded in
+  `shipment_cancel`, staff get the history note and the admin action's
+  message. The flag goes with the answer: nothing asks again by itself, and
+  the voucher is staff's to cancel ("Cancel ACS voucher", "Cancel parcel
+  via BoxNow API"). A BoxNow creation still in flight or of uncertain
+  outcome is finished by its own task and sweep
+  ([§5.2](shipping-boxnow.md)).
+- **The worker stops between the commit and the courier** (a deploy, an
+  out-of-memory kill), or the answer cannot be written: the order is
+  CANCELED and still carries the flag.
+  `order.tasks.finish_pending_shipment_cancels` (every 15 minutes through
+  `tenant.tasks.fanout_finish_pending_shipment_cancels`, suspended stores
+  included) takes every CANCELED order with the flag whose cancel is older
+  than `ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS` (env, default 600) and
+  runs the same `cancel_attached_shipment`. Before #713 such a stop rolled
+  the whole cancel back; without the sweep it would leave a canceled,
+  refunded order with a live voucher.
+- **The sweep and a slow first attempt overlap.** Harmless: both carriers'
+  cancel is a no-op on a shipment already canceled, and only the first
+  answer is recorded (one history note).
+- **A tracking sync runs at the same time.** It locks the order before the
+  shipment ([§5](shipping.md)); the cancel holds the order alone, and the
+  courier step holds the shipment alone. Nobody waits on someone who waits
+  on them.
+
+`tests/integration/order/test_cancel_courier_outside_locks.py` looks at the
+database from a second connection while the courier is being asked.
 
 **`canBeCanceled`** (order list and detail) is
 `Order.can_be_canceled_by_customer`: the status rule (`Order.can_be_canceled`)

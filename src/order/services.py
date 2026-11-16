@@ -386,6 +386,14 @@ SHIPMENT_ALREADY_CANCELED: dict[str, Any] = {
     "dispatched": True,
 }
 
+# ``metadata['shipment_cancel_pending']`` of an order a staff or system
+# cancel committed and whose courier has not answered yet. It is written
+# with the cancel, in its transaction, and removed together with the
+# courier's answer (``cancel_attached_shipment``), which is asked for only
+# after that commit. A worker that stops in between leaves the flag, and
+# ``order.tasks.finish_pending_shipment_cancels`` asks the courier then.
+SHIPMENT_CANCEL_PENDING_FLAG = "shipment_cancel_pending"
+
 LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
     "The store's terms of use or privacy policy cannot be shown right "
     "now, so the order cannot be placed. Please contact the store."
@@ -2965,6 +2973,14 @@ class OrderService:
         ``metadata['cancellation']['shipment_cancel']`` and in a staff
         history note. The default is the strict one, so a caller that
         forgets to choose is held to the courier's answer.
+
+        That later ask runs once the cancel has COMMITTED
+        (:meth:`cancel_attached_shipment`), so no order, product or
+        shipment row is locked while the courier answers. A caller that
+        holds no transaction reads the answer on the order it gets back.
+        One that cancels inside its own transaction (the auto-cancel
+        sweep, under its row lock) gets the order back before the
+        courier is asked: the ask follows that transaction's commit.
         """
         customer_asked_courier = (
             customer_initiated and not shipment_already_canceled
@@ -2994,6 +3010,14 @@ class OrderService:
             ):
                 cls._note_shipment_canceled_without_order(order)
             raise
+        if shipment_cancel is None:
+            # ``on_commit`` runs this at once when no transaction is open
+            # (every caller but the auto-cancel sweep), and after the
+            # caller's own commit otherwise: either way the courier is
+            # never asked while a row lock is held.
+            transaction.on_commit(
+                lambda: cls.cancel_attached_shipment(canceled, reason)
+            )
         # The cancel is committed; the refund is its own claim, call and
         # record (``refund_order``), so no transaction is open while the
         # provider answers.
@@ -3367,11 +3391,16 @@ class OrderService:
             }
             if shipment_cancel is not None:
                 # The courier already confirmed (a customer cancel asks it
-                # first). Recording the outcome here is also what stops
-                # the cascade below from asking the carrier a second time.
+                # first), or the shipment was canceled before the order:
+                # the courier is not asked again.
                 order.metadata["cancellation"]["shipment_cancel"] = (
                     shipment_cancel
                 )
+            else:
+                # The courier is asked once this transaction has
+                # committed. The flag is the durable half of that: it
+                # commits with the cancel and goes with the answer.
+                order.metadata[SHIPMENT_CANCEL_PENDING_FLAG] = True
 
             order.save(
                 update_fields=["status", "status_updated_at", "metadata"]
@@ -3387,11 +3416,9 @@ class OrderService:
                 old_status,
             )
 
-            # Cascade to the courier voucher before returning, so every
-            # caller reads ``metadata.cancellation.shipment_cancel`` on
-            # the order it gets back.
-            cls.cancel_attached_shipment(order, reason)
-
+            # No courier call here: this transaction holds the order's
+            # row lock and the locks of the products it restocked.
+            # ``cancel_order`` asks the courier after the commit.
             return order
 
         except Exception as e:
@@ -4813,10 +4840,24 @@ class OrderService:
 
     @classmethod
     def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
-        """Best-effort: cancel the courier voucher when the order is canceled.
+        """Best-effort: cancel the courier voucher of a canceled order.
 
-        Called by :meth:`cancel_order`, the only path that cancels an
-        order, so every cancel reaches the carrier.
+        The staff / system half of :meth:`cancel_order`, the only path
+        that cancels an order, so every cancel reaches the carrier. A
+        customer cancel asks the courier first
+        (:meth:`_ask_courier_to_cancel`) and is refused when the courier
+        refuses.
+
+        **Runs with no transaction open**, after the cancel committed:
+        ``cancel_order`` registers it with ``transaction.on_commit``, and
+        ``order.tasks.finish_pending_shipment_cancels`` runs it for an
+        order whose worker stopped before it got here
+        (:data:`SHIPMENT_CANCEL_PENDING_FLAG`). The carrier cancels are
+        three-phase (lock, release, call, lock again), which only holds
+        when nothing around them keeps a transaction open: called inside
+        the cancel's own, every row that cancel locked stayed locked
+        across the courier's HTTP round trip, and the shipment was
+        locked after the order (#713, #613).
 
         Routed through ``ShippingService.cancel_shipment`` so each
         carrier enforces its own cancellability rules. Common
@@ -4825,14 +4866,13 @@ class OrderService:
         ``order.metadata['cancellation']['shipment_cancel']`` so the
         admin can see why the cascade didn't reach the courier and
         coordinate the in-transit return out of band. A refusal is also
-        left as a staff-only ``OrderHistory`` note.
+        left as a staff-only ``OrderHistory`` note. *order* gets the
+        metadata as it was written.
 
-        This is the staff / system path: a customer cancel asks the
-        courier first (:meth:`_ask_courier_to_cancel`) and is refused
-        when the courier refuses.
-
-        Never raises — order cancellation must be allowed to complete
-        even when the courier-side cancel fails.
+        Never raises — the order is canceled whatever the courier, or
+        the write of its answer, does. An answer that could not be
+        written leaves the flag, so the sweep asks again; both carriers'
+        cancel is a no-op on a shipment already canceled.
         """
         from shipping.services import ShippingService
 
@@ -4868,29 +4908,62 @@ class OrderService:
                 exc_info=True,
             )
 
-        if not order.metadata:
-            order.metadata = {}
-        cancellation = order.metadata.setdefault("cancellation", {})
-        cancellation["shipment_cancel"] = info
+        try:
+            recorded = cls._record_shipment_cancel(order, info)
+            if recorded and "error" in info:
+                # The carrier outcome belongs where staff read about the
+                # order, not only in a metadata blob: the order is
+                # canceled (and refunded) while the parcel may still be
+                # delivered.
+                from order.models.history import OrderHistory
 
-        # ``.update(...)`` writes the one column that changed and runs no
-        # ``post_save`` receiver.
-        Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
-
-        if "error" in info:
-            # The carrier outcome belongs where staff read about the
-            # order, not only in a metadata blob: the order is canceled
-            # (and refunded) while the parcel may still be delivered.
-            from order.models.history import OrderHistory
-
-            OrderHistory.log_note(
-                order=order,
-                note=(
-                    "Order canceled, but the courier did not cancel the "
-                    f"parcel: {info['error']}. The parcel may still be "
-                    "delivered; arrange its return with the courier."
-                ),
+                OrderHistory.log_note(
+                    order=order,
+                    note=(
+                        "Order canceled, but the courier did not cancel "
+                        f"the parcel: {info['error']}. The parcel may "
+                        "still be delivered; arrange its return with the "
+                        "courier."
+                    ),
+                )
+        except Exception:
+            logger.exception(
+                "Order %s is canceled and its courier was asked (%s), but "
+                "the answer could not be recorded; the pending-cancel "
+                "sweep asks again",
+                order.id,
+                info,
             )
+
+    @staticmethod
+    def _record_shipment_cancel(order: Order, info: dict[str, Any]) -> bool:
+        """Write the courier's answer on the order row as it is now.
+
+        No lock was held while the courier answered, so the order may
+        have changed: the metadata is read again under the row lock and
+        the answer merged into it, never written from the copy the
+        caller loaded. The pending flag goes in the same write. Returns
+        False, and keeps what is there, when an answer is already
+        recorded (another run got here first).
+
+        ``.update(...)`` writes the one column that changed and runs no
+        ``post_save`` receiver.
+        """
+        with transaction.atomic():
+            metadata: dict[str, Any] = (
+                Order.objects.select_for_update()
+                .filter(pk=order.pk)
+                .values_list("metadata", flat=True)
+                .get()
+            ) or {}
+            cancellation = metadata.setdefault("cancellation", {})
+            recorded = "shipment_cancel" not in cancellation
+            if recorded:
+                cancellation["shipment_cancel"] = info
+            metadata.pop(SHIPMENT_CANCEL_PENDING_FLAG, None)
+            Order.objects.filter(pk=order.pk).update(metadata=metadata)
+        order.metadata = metadata
+        return recorded
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:

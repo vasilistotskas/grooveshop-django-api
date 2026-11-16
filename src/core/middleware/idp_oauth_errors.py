@@ -9,6 +9,12 @@ issuer's token request with none, or naming no store), escaped as an
 uncoded 500. RFC 8707 section 2 defines ``invalid_target`` for exactly
 this: "The requested resource is invalid, missing, unknown, or malformed."
 
+Any ``ValidationError`` on those two routes is mapped, because
+``get_resources`` is the only code that raises one there today
+(allauth's ``views.py``: ``DeviceCodeView`` and ``TokenView.post``, the
+``get_resources`` calls before the oauthlib server runs); recheck this
+on every allauth upgrade.
+
 This answers it in OAuth's body, as the strict-cache 503 does for the same
 routes (``core.middleware.strict_cache``). The authorize view handles the
 same exception itself, with an error page, so it is not matched here.

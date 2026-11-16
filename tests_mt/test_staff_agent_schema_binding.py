@@ -592,3 +592,45 @@ def test_a_store_issuer_answers_a_malformed_resource_with_invalid_target(
 
     assert response.status_code == 400, response.content
     assert response.json()["error"] == "invalid_target"
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_code_stays_redeemable_after_a_refused_resource(
+    mt_public_tenant, mt_tenant
+):
+    """The refusal comes before oauthlib looks at the code, so a client
+    that sent a bad or missing resource can retry with the right one."""
+    client, client_id, code, verifier = _authorization_code(
+        mt_tenant, "mt-staff-retry@example.com"
+    )
+
+    missing = _exchange(client, client_id, code, verifier)
+    bad = _exchange(
+        client, client_id, code, verifier, resource="not-an-absolute-uri"
+    )
+    assert missing.status_code == bad.status_code == 400
+    assert missing.json()["error"] == bad.json()["error"] == "invalid_target"
+
+    redeemed = _exchange(
+        client, client_id, code, verifier, resource=_resource(mt_tenant)
+    )
+
+    assert redeemed.status_code == 200, redeemed.content
+
+
+def test_a_store_issuer_refuses_another_stores_resource(mt_tenant, mt_tenant_b):
+    other = f"https://{mt_tenant_b.get_primary_domain().domain}/mcp"
+
+    response = TenantClient(mt_tenant).post(
+        "/identity/o/api/token",
+        {
+            "grant_type": "authorization_code",
+            "client_id": "x",
+            "resource": other,
+        },
+        secure=True,
+    )
+
+    assert response.status_code == 400, response.content
+    assert response.json()["error"] == "invalid_target"
+    assert "this store" in response.json()["error_description"]

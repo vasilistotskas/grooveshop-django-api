@@ -3,6 +3,63 @@
 
 
 
+## v3.248.0 (2026-11-16)
+
+### Chores
+
+* chore(builder): pin the upstream copies to storefront main with #483 ([`06f7a1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06f7a1e208f328d5f0fa100fe90cefcb240833fc))
+
+### Features
+
+* feat(builder): a refused theme publish names the contrast rule (#714) ([`06f7a1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06f7a1e208f328d5f0fa100fe90cefcb240833fc))
+
+* feat(builder): a refused theme publish names the contrast rule
+
+The storefront's catalogue now names every theme contrast rule in every
+language (`label`). Django reads it and requires it: a rule not named in
+every language of LANGUAGES is a catalogue refused when it is read, like
+any other malformed rule. The editor's `fix` text is not read.
+
+`insufficient_contrast` is worded with the rule's name in the language of
+the request ("The colour pair "Text, light" has a contrast of 2.56:1,
+below the required 4.5:1"), in the publish and the publish check alike,
+instead of the rule's id. The problem's params keep `rule` (the id the
+editor leads to) and add the name in every language (`label-el`,
+`label-en`), so `message_for` words a kept failure again in the language
+of whoever reads it, as the scheduled-publish failure email does.
+
+The storefront's catalogue, seeds and contrast cases are re-copied with
+the named rules and the two accent-as-small-text warning rules
+(storefront#466), which Django evaluates as data with no code change.
+
+Closes #686 ([`06f7a1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06f7a1e208f328d5f0fa100fe90cefcb240833fc))
+
+* feat(builder): read a mixed contrast side and log an unreadable catalogue
+
+A contrast rule's side can now be a colour as the page draws it mixed,
+`{mix, toward, percent}`: CSS `color-mix(in oklab, ...)`. `mix_oklab`
+computes it as the storefront's `mixOklab` does (CSS Color 4's matrices,
+clipped to sRGB, rounded to 8 bits), held to the shared `mixes` vectors
+of `contrast-cases.json`; a rule is reported at the pointer its mix reads.
+The storefront's dark accent-as-small-text rules judge the accent mixed
+toward white, as drawn on the store's own grounds.
+
+A catalogue the storefront serves and Django cannot read (a storefront
+older than the shape this release requires) is now logged at ERROR by
+`fetch_catalogue`, with the storefront, the schema and the cause: every
+save, publish, schedule, preview link and provisioning step refuses until
+it is fixed. Provisioning's theme step logs a store left without its
+theme document at ERROR, naming it, besides reporting the failed step.
+
+The storefront's catalogue and contrast cases are re-copied from
+storefront#483.
+
+Refs #686 ([`06f7a1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06f7a1e208f328d5f0fa100fe90cefcb240833fc))
+
+### Testing
+
+* test(builder): read the unreadable-catalogue log record by its arguments ([`06f7a1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06f7a1e208f328d5f0fa100fe90cefcb240833fc))
+
 ## v3.247.0 (2026-11-15)
 
 ### Features

@@ -22,7 +22,7 @@ def record_engine_time(request, milliseconds) -> None:
     removed again.
 
     ACCUMULATED, not assigned. A query that returns nothing is retried
-    once with its leading word dropped (``relaxed_query``), so the
+    once with its leading word dropped (``relax_query``), so the
     honest answer to "how long did the engine spend on this request" is
     every pass, not the last one.
 

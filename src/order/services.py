@@ -1,4 +1,5 @@
 import logging
+import math
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -397,6 +398,18 @@ SHIPMENT_ALREADY_CANCELED: dict[str, Any] = {
 # after that commit. A worker that stops in between leaves the flag, and
 # ``order.tasks.finish_pending_shipment_cancels`` asks the courier then.
 SHIPMENT_CANCEL_PENDING_FLAG = "shipment_cancel_pending"
+
+
+def shipment_cancel_wait_minutes() -> int:
+    """The longest a canceled order left with
+    :data:`SHIPMENT_CANCEL_PENDING_FLAG` waits before
+    ``finish_pending_shipment_cancels`` asks its courier: the age the
+    sweep takes a cancel at, plus the time between two of its runs."""
+    return (
+        math.ceil(settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS / 60)
+        + settings.ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES
+    )
+
 
 LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
     "The store's terms of use or privacy policy cannot be shown right "

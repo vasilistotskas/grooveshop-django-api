@@ -108,7 +108,11 @@ from order.refunds.refund_lines import (
     pending_request,
     plan_pieces,
 )
-from order.services import OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    OrderService,
+    shipment_cancel_wait_minutes,
+)
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
@@ -2725,6 +2729,27 @@ class OrderAdmin(BaseModelAdmin):
                         )
                         % {"order_id": order.id, "error": courier_error},
                         level="error",
+                    )
+                elif SHIPMENT_CANCEL_PENDING_FLAG in (canceled.metadata or {}):
+                    # The shipment is being worked on elsewhere (another
+                    # cancel, a creation in flight), so the courier has
+                    # not answered and nothing is recorded yet. Not an
+                    # error: the sweep asks again by itself.
+                    self.message_user(
+                        request,
+                        _(
+                            "Order %(order_id)s was canceled. Its parcel "
+                            "is already being worked on at the courier, "
+                            "so the courier's answer to the cancel is not "
+                            "recorded yet. The courier is asked again "
+                            "automatically within %(minutes)s minutes, "
+                            "and a refusal is noted in the order's "
+                            "history."
+                        )
+                        % {
+                            "order_id": order.id,
+                            "minutes": shipment_cancel_wait_minutes(),
+                        },
                     )
                 if refund_info and refund_info.get("dispute_open"):
                     self.message_user(

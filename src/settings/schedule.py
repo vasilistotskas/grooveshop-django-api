@@ -32,6 +32,11 @@ SCHEDULE_PRESETS = {
     "every_hour": crontab(minute="0"),
 }
 
+# Minutes between two runs of ``finish-pending-shipment-cancels``. A name,
+# because staff are told how long a cancel left pending waits at most
+# (``order.services.shipment_cancel_wait_minutes``). It must divide 60.
+ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES = 15
+
 # The nightly pg_dump (and the pruning of its output) is production's
 # disaster-recovery copy. An environment that is itself a refreshable,
 # anonymised clone of production (staging) sets this to False: it then
@@ -386,7 +391,9 @@ def get_celery_beat_schedule():
         # canceled with its voucher live. This asks the courier for those.
         "finish-pending-shipment-cancels": {
             "task": "tenant.tasks.fanout_finish_pending_shipment_cancels",
-            "schedule": crontab(minute="*/15"),
+            "schedule": crontab(
+                minute=f"*/{ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES}"
+            ),
             "options": {"queue": "celery", "expires": 300},
         },
         # DELIVERED + paid → COMPLETED is applied inline by the carrier

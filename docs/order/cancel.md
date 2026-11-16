@@ -338,7 +338,12 @@ What each failure does:
   cancel of the voucher holds its claim, or a creation is in flight or
   still settling). That is our own refusal, with no call to the courier, so
   it is **not an answer**: nothing is recorded, no note is written and the
-  flag stays. The order the caller gets back has no `shipment_cancel` yet.
+  flag stays. The order the caller gets back has no `shipment_cancel` yet,
+  and the API response is the same without it. The admin "Cancel selected
+  orders" action says so in an informational message, with the longest the
+  cancel waits for the sweep (`shipment_cancel_wait_minutes`: the sweep's
+  age threshold plus `ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES`, the time
+  between two runs).
   The call that is running records what the courier says, or the sweep
   asks again on a later run, once the claim is gone (ACS's
   `cancel_started_at` and both mint claims end after 300 s, a BoxNow

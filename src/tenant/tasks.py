@@ -14,7 +14,7 @@ from core.retry import (
     TRANSIENT_NETWORK_ERRORS,
 )
 from core.tasks import MonitoredTask, safe_task_arguments
-from tenant.celery import TenantTask, run_for_all_tenants
+from tenant.celery import TenantTask, describe_error, run_for_all_tenants
 
 if TYPE_CHECKING:
     from core.cache.edge import MediaPurge
@@ -662,13 +662,12 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     stood for was not done.
 
     One sweep runs at a time, and the publishes run outside any transaction.
-    A publish can wait without end: while RabbitMQ blocks publishers (a memory
-    or disk alarm) the producer waits for its confirm, and closing the channel
-    after a failed publish waits too. Measured against a broker with its
-    memory alarm on: still waiting after 75 s, with a publish timeout or
-    without. No lease is long enough for that, and a transaction would be
-    ended by ``idle_in_transaction_session_timeout``, so a sweep holds a
-    session-level advisory lock and a sweep that finds it held does nothing.
+    A broker that stops answering holds a publish for one or more
+    ``BROKER_PUBLISH_READ_TIMEOUT`` waits before it fails
+    (docs/deferred-dispatch.md). A lease would have to outlive that, and a
+    transaction could be ended by ``idle_in_transaction_session_timeout``,
+    so a sweep holds a session-level advisory lock and a sweep that finds it
+    held does nothing.
     The lock goes with the session if the worker dies, and the next sweep
     sends again at most the one row that was going out.
 
@@ -770,7 +769,7 @@ def _redispatch_due() -> dict[str, int]:
         except Exception as exc:
             broker_down = isinstance(exc, TRANSIENT_NETWORK_ERRORS)
             row.attempts += 1
-            row.last_error = f"{type(exc).__name__}: {exc}"[:255]
+            row.last_error = describe_error(exc)[:255]
             row.next_attempt_at = now + timedelta(
                 seconds=min(
                     settings.DEFERRED_DISPATCH_BACKOFF_SECONDS

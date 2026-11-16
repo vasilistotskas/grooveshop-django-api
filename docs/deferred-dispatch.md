@@ -27,15 +27,126 @@ never reaches the caller:
    row older than `DEFERRED_DISPATCH_RETENTION_DAYS` is deleted with an `ERROR`
    (the work was not done) and its masked payload in the log.
 
-One sweep runs at a time, and it publishes outside any transaction. A publish
-can wait without end: while RabbitMQ blocks publishers (a memory or disk alarm)
-the producer waits for its confirm, and closing the channel after a failed publish
-waits too, which a publish timeout does not cover. Measured on a local broker with
-its memory alarm on: still waiting after 75 s, with a 3 s publish timeout or
-without. A transaction held across that would be ended by
-`idle_in_transaction_session_timeout` and send every row already published a
-second time, and any lease could be outlived. So a sweep holds a session-level
-advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
+## When the broker blocks publishers
+
+While RabbitMQ blocks publishers (a memory or disk alarm) it stops reading a
+connection as soon as that connection publishes, and sends nothing back but
+`connection.blocked`, on that connection alone: the publish confirm never comes,
+and neither does the `Close-Ok` kombu waits for when it closes the connection,
+which a publish `timeout=` does not cover. A connection that has not published
+since the alarm started is told nothing (measured on RabbitMQ 4.3.7: an idle
+connection and one opened during the alarm received no frame until each
+published). Without a bound a request that published waited without end (#509).
+
+`core.celery.GrooveShopCelery.connection_for_write` opens every connection the
+app publishes on (the producer pool behind tasks and control commands, beat's
+producer, a worker's event dispatcher) with `core.broker.PublishingTransport`.
+Its connections confirm every publish and keep one state per process:
+
+- `connection.blocked` holds the process off the broker for
+  `BROKER_BLOCKED_HOLD_SECONDS` (60 s; the settings refuse anything not a finite
+  number above 0: 0 would let events and heartbeats reconnect in a loop, an
+  endless hold would refuse every publish for good). The publish waiting for its confirm ends
+  at once with py-amqp's `Blocked`, a recoverable connection error: kombu drops
+  that connection without a close handshake and retries on a new one (the one
+  retry of `CELERY_TASK_PUBLISH_RETRY_POLICY`, or kombu's endless retry for
+  events, heartbeats and control commands).
+- While the hold lasts, a publish is refused before it writes, with
+  `BrokerBlocked`, a kombu `OperationalError` that kombu does not retry and
+  `dispatch_on_commit` keeps as a row. The retry above ends there.
+  `GrooveShopCelery.send_task` refuses a task before it takes a pooled
+  connection, since kombu replaces a pooled connection after any failed
+  publish.
+- `connection.unblocked` ends the hold. RabbitMQ sends it only on the
+  connection it blocked, which kombu has dropped, so once the hold passes the
+  next publish first asks again: an empty message to the default exchange with a
+  routing key no queue can have (`amq.` names are reserved), which RabbitMQ
+  drops. Blocked again, the hold starts over and the real message is never
+  written; confirmed, publishing resumes. A question that fails for another
+  reason (a connection a restarted broker reset) leaves the hold passed, so
+  kombu's retry asks again on a new connection. One thread asks at a time; the
+  others are refused meanwhile.
+- A task published by a task the worker is running (`self.retry()`, `.delay()`,
+  a `dispatch_on_commit` inside a task) is never refused
+  (`GrooveShopCelery.send_task`, `core.broker.waiting_through_blocks`).
+  `Task.retry` turns a failed publish into `Reject(requeue=False)`, and an
+  `acks_late` message rejected that way is dropped: a refusal there loses the
+  task. Instead the message is written once and the publish waits for its
+  confirm through the block, as it did before #509, so the task runs once after
+  the alarm clears. The cost: a worker child that publishes during an alarm is
+  held until it clears, bounded by the task's time limit
+  (`CELERY_TASK_SOFT_TIME_LIMIT`), as before #509. The tasks that run every
+  minute and always publish (`fanout_*`, `redispatch_deferred_tasks`, builder
+  publishes) take every child within about a minute of an alarm, so the
+  workers stop draining queues until it clears. An alarm caused by a backlog
+  does not clear by itself: free broker memory or raise its watermark.
+
+So during an alarm a process writes one message, the publish that found out, and
+then nothing but one question per hold. Each question leaves one connection the
+broker no longer reads until the alarm clears; the hold is long so that a broker
+short of memory collects few of them, at the cost of publishing resuming up to a
+minute after the alarm clears (rows are swept, and beat sends a missed entry
+again after `scheduler.beat.PUBLISH_RETRY_SECONDS`). The hold does not grow
+with each block: fewer connections would be left, but after a long alarm
+publishing would resume minutes after it cleared.
+
+`read_timeout` (`BROKER_PUBLISH_READ_TIMEOUT`, 5 s, applied as `SO_RCVTIMEO`)
+bounds a reply the broker never sends without saying why, such as the confirm
+of a connection it blocked without `connection.blocked`. Writes need no option
+of their own: the `TCP_USER_TIMEOUT` py-amqp sets by default already ends a
+write the broker stops taking. A read that timed out is recorded as
+`OperationalError: timed out` (`tenant.celery.describe_error`: kombu's own text
+for it is empty).
+
+A worker's consuming connection (`connection_for_read`) keeps kombu's own
+transport. A read timeout there makes the worker drop the connection, and
+RabbitMQ then redelivers every task the worker is still running
+(`task_acks_late`). `tests/unit/core/test_broker_blocked.py` drives Celery's
+publish paths against a fake broker that blocks like RabbitMQ and counts what it
+received; `tests/unit/core/test_celery_publishing_connections.py` checks the
+read and write bounds against a peer that never answers.
+
+Every synchronous reply on a publishing connection must arrive within the read
+timeout: a confirm, a declare, a channel open. Measured through the app's
+publishing connection, 2000 persistent 1 KiB messages to a durable queue, with
+the broker limited to half a CPU as in production: median 1.0 ms, p99 42 ms,
+slowest 49 ms. The 5 s default leaves a hundred times that.
+
+Measured on Linux against RabbitMQ 4.3.7 with its memory alarm on, one web
+process: a `dispatch_on_commit`, then five `apply_async` and two
+`control.ping(timeout=3)`:
+
+| | Before (on_blocked ended the confirm wait, connection kept) | `core.broker` |
+|---|---|---|
+| `dispatch_on_commit` | 10.5 s, row kept | 0.02 s, row kept |
+| each `apply_async` | 10.2 s | 0.00 s, nothing written |
+| each `control.ping` | 10.2 s | 0.04 s |
+| connections opened during the alarm | 9, all held by the broker until it cleared | 4 |
+| task messages delivered after the alarm | 6 | 1 (the publish that found out) |
+
+Beat, with an entry due every 10 s, through a 120 s alarm: before, each attempt
+after the first wrote on the kept blocked connection, waited out the read
+timeout, reconnected and wrote again (8 copies delivered, 4 connections opened);
+now 1 copy and 2 connections. A worker running with `--events` through a 161 s
+alarm opened 15 connections before (its heartbeats reconnecting in a loop) and
+3 now; in both runs an acks_late task running across the alarm ran once.
+
+The one message written is delivered once the alarm clears, and the row the
+sweep publishes is one more run. A task published through the helper must
+therefore be safe to run more than once, as it already must be for a row the
+sweep replays.
+
+The read timeout is set on Linux only, where every deployment runs: py-amqp packs
+the value as a POSIX `timeval`, which Windows reads as milliseconds, so a Windows
+host has no read bound (the hold and the refusal still apply).
+
+## One sweep at a time
+
+One sweep runs at a time, and it publishes outside any transaction. A publish to
+a broker that stops answering holds it for the read timeout above. A transaction held across that
+could be ended by `idle_in_transaction_session_timeout` and send every row
+already published a second time, and any lease could be outlived. So a sweep
+holds a session-level advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
 The lock ends with the session if the worker dies; the next sweep then sends again
 at most the one row that was going out.
 

@@ -75,7 +75,9 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   `src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
-- the Celery app (`src/core/celery.py`), `MonitoredTask` and the system
+- the Celery app (`src/core/celery.py`) and the transport its publishing
+  connections use while RabbitMQ blocks publishers (`src/core/broker.py`,
+  `docs/deferred-dispatch.md`), `MonitoredTask` and the system
   tasks (`src/core/tasks.py`), the retry sets (`src/core/retry.py`) and
   the retention helper (`src/core/retention.py`);
 - the cache backend (`src/core/caches.py`) and the cache surface registry

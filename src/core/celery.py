@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from celery import Celery
 from celery.signals import (
@@ -25,8 +26,52 @@ def config_loggers(*args, **kwargs):
     from django.conf import settings  # noqa: F401
 
 
+class GrooveShopCelery(Celery):
+    """Celery whose publishing connections stop while RabbitMQ blocks them.
+
+    Celery opens every connection it publishes on through
+    ``connection_for_write``: the producer pool behind tasks and control
+    commands, beat's producer, a worker's event dispatcher. Those use
+    ``core.broker.PublishingTransport``. A worker's consuming connection
+    (``connection_for_read``) keeps kombu's own transport: a read that times
+    out there makes the worker reconnect, and RabbitMQ then redelivers every
+    task the worker was still running (``task_acks_late``).
+    """
+
+    def connection_for_write(self, url: Any = None, **kwargs: Any) -> Any:
+        from core.broker import PublishingTransport
+
+        # ``Celery.connection()`` passes ``transport`` itself, as ``None``
+        # unless its caller chose one.
+        kwargs["transport"] = kwargs.get("transport") or PublishingTransport
+        return super().connection_for_write(url, **kwargs)
+
+    def send_task(self, *args: Any, **kwargs: Any) -> Any:
+        """Publish a task, deciding what a broker block does to it.
+
+        From a task the worker is running (``self.retry()``, ``.delay()``)
+        the publish is never refused: ``Task.retry`` turns a failed publish
+        into ``Reject(requeue=False)``, which drops an ``acks_late``
+        message, so the task waits through the block instead
+        (``core.broker.waiting_through_blocks``).
+
+        Anywhere else it is refused while the broker blocks this process,
+        before a pooled connection is taken: the transport would refuse it
+        too, but kombu replaces a pooled connection after any failed
+        publish, so each refusal there would cost a new connection to a
+        broker short of memory.
+        """
+        from core.broker import refuse_while_held, waiting_through_blocks
+
+        if self.current_worker_task is not None:
+            with waiting_through_blocks():
+                return super().send_task(*args, **kwargs)
+        refuse_while_held()
+        return super().send_task(*args, **kwargs)
+
+
 def create_celery_app():
-    tasker = Celery("core")
+    tasker = GrooveShopCelery("core")
 
     # Every Celery option lives in settings/celery.py under the CELERY_
     # namespace.

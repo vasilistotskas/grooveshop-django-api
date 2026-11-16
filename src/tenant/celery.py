@@ -273,6 +273,27 @@ def dispatch_on_commit(
 _ERROR_LENGTH = 255
 
 
+def describe_error(error: BaseException) -> str:
+    """``Type: reason`` for a failed publish, with a reason that says something.
+
+    kombu re-raises a connection error as ``OperationalError(str(exc))`` from
+    it, and the socket timeout py-amqp raises carries no text, so a publish
+    to a blocked broker read ``OperationalError: `` and nothing more. An
+    error without text is described by its cause (``raise ... from``), and a
+    bare timeout as ``timed out``, the text Python's own socket timeout has.
+    """
+    reason = ""
+    link: BaseException | None = error
+    last = error
+    while link is not None and not reason:
+        reason = str(link) or (
+            "timed out" if isinstance(link, TimeoutError) else ""
+        )
+        last = link
+        link = link.__cause__
+    return f"{type(error).__name__}: {reason or type(last).__name__}"
+
+
 def defer_dispatch(
     task: Any,
     call: Mapping[str, Any],
@@ -298,11 +319,10 @@ def defer_dispatch(
         "options": dict(options),
     }
     logger.error(
-        "Publishing %s failed after its change committed (%s: %s); it is "
+        "Publishing %s failed after its change committed (%s); it is "
         "kept and published again by the sweep",
         name,
-        type(error).__name__,
-        error,
+        describe_error(error),
         extra={"task": name, "schema": headers.get("_schema_name", "")},
     )
     try:
@@ -315,7 +335,7 @@ def defer_dispatch(
                 json.dumps(payload["options"], cls=DjangoJSONEncoder)
             ),
             schema_name=str(headers.get("_schema_name", ""))[:63],
-            last_error=f"{type(error).__name__}: {error}"[:_ERROR_LENGTH],
+            last_error=describe_error(error)[:_ERROR_LENGTH],
             next_attempt_at=timezone.now(),
         )
     except Exception:

@@ -3,6 +3,84 @@
 
 
 
+## v3.249.2 (2026-11-16)
+
+### Bug fixes
+
+* fix(core): security limits refuse with a coded 503 while Redis is down; staff pages sign in at the host's admin (#728) ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): security limits refuse with a coded 503 while Redis is down
+
+The allauth rate-limit middleware failed open on any cache error, so a
+Redis outage lifted the per-address bound on login, 2FA and login-code
+confirmation, while allauth's own limits on the same routes failed
+closed with an uncoded 500.
+
+One rule now covers every security limit, written beside
+STRICT_KEY_PREFIXES in core.caches: its keys are strict, the cache
+raises instead of reporting no history, and the owner of the answer
+refuses with 503 and a stable code.
+
+- AllAuthRateLimitMiddleware counts under the strict namespace and
+  answers 503 rate_limit_unavailable in allauth's envelope; its
+  process_exception gives allauth's own strict keys (rate limits, TOTP
+  replay, IdP codes) the same answer instead of a 500.
+- Fail-closed DRF throttles raise RateLimitUnavailable (503
+  rate_limit_unavailable) instead of a 429 with a guessed Retry-After.
+- The staff password-reset budget lets a Redis error reach the view,
+  which answers 503 on the form; other errors are no longer swallowed.
+- allauth-schema.yml declares the 503 on every operation.
+
+Closes #727 ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): staff pages send a signed-out visitor to the host's admin login
+
+The editor's image upload and Rosetta sent a signed-out visitor to
+LOGIN_URL, allauth's shopper sign-in: a page the platform host is
+losing, and on a store host one that signs staff in as a customer who
+may not upload.
+
+STAFF_LOGIN_URL names "admin:login", reversed per request in the host's
+URL conf. Both admin sites are instances of the admin application, so
+it is the platform admin's login on the platform host and the store
+admin's on a store host. upload_image and ROSETTA_LOGIN_URL use it;
+LOGIN_URL keeps meaning allauth's page, which allauth reads.
+
+Closes #726 ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): one coded 503 on every route a security store cannot be reached
+
+The review of the fail-closed rule found the coded answer only on
+/_allauth/: the IdP, allauth's account pages and any other route still
+answered an uncoded 500 when a strict cache key raised.
+
+- core.middleware.strict_cache answers REDIS_UNAVAILABLE from any view,
+  once, in the route's shape: allauth's envelope on its headless API,
+  OAuth's error on the IdP's API, {detail, code} on a DRF view, an HTML
+  page elsewhere. 503, code temporarily_unavailable (OAuth's own).
+  Fail-closed throttles re-raise to it; the allauth limiter calls it.
+- Viva's webhook GET budget fails open only while a verification key is
+  stored; without one each answer calls Viva, so it fails closed, and
+  only the cache's unavailability is caught.
+- Every throttle keys an anonymous caller on client_ip_or_peer
+  (ResilientThrottleMixin.get_ident), StaffLoginThrottle and the
+  anon/user defaults included: AnonIpRateThrottle and the new
+  UserBudgetThrottle replace DRF's classes in every view and in
+  DEFAULT_THROTTLE_CLASSES, and a test keeps rest_framework.throttling
+  out of every other module.
+- staff_mfa checks TOTP replay under refuse_when_cache_is_down; the
+  unused is_locked is gone.
+- Full-stack tests with the default cache stopped: allauth API, IdP
+  token, accounts page, DRF route, Viva handshake. ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* fix(core): a refused request logs its Redis failure's traceback; the DRF throttle ban covers every import form ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+### Testing
+
+* test(core): the DRF outage test asserts the refusal's message ([`77dee68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77dee689c5b9b720e5b22a48702c710335c34ccf))
+
+* test(core): unblock the fake broker only once it holds the publish (#731) ([`5a698e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a698e3005dfd58c260cee1ddd72c0cf4751c610))
+
 ## v3.249.1 (2026-11-16)
 
 ### Bug fixes

@@ -6,7 +6,7 @@ broken or degraded in a way nothing surfaced:
 * Meilisearch indexes were created WITHOUT their settings, so
   ``filterableAttributes`` stayed at the engine default ``[]`` while
   every storefront search sends a filter — the engine rejects it and
-  ``search/views.py`` turns that into HTTP 400. Settings only arrived
+  ``search/views/`` turn that into HTTP 400. Settings only arrived
   with the nightly fanout sync or the next deploy's PreSync hook, a
   window of up to ~24h with no working search at all.
 * No ``django.contrib.sites`` Site row was created, so per-tenant

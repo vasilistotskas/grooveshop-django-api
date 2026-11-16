@@ -1,6 +1,6 @@
 # Product search facets: counts and ranges
 
-`GET /api/v1/search/product` (`src/search/views.py: product_meili_search`) can
+`GET /api/v1/search/product` (`src/search/views/product.py: product_meili_search`) can
 answer a whole filter sidebar in one request. The `facets` parameter lists
 the facet fields to return (`category`, `brand`, `attribute_values`,
 `effective_price`, `likes_count`, `view_count`, `price_range`,
@@ -76,7 +76,7 @@ make is pinned by `tests/integration/search/test_product_search_sidebar_facets.p
 ## Facet reads are not searches
 
 A request that asks for facets and for at most one product
-(`_COUNT_ONLY_MAX_LIMIT` in `src/search/views.py`) is a facet read: the
-shopper sees nothing to click. `_mark_count_only` flags it on the request
+(`COUNT_ONLY_MAX_LIMIT` in `src/search/analytics.py`) is a facet read: the
+shopper sees nothing to click. `mark_count_only` flags it on the request
 and `SearchAnalyticsMiddleware` does not record a `SearchQuery` for it. A
 request for results, with or without facets, is a search.

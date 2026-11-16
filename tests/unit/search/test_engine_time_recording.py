@@ -18,7 +18,7 @@ import pytest
 from django.test import RequestFactory
 from rest_framework.request import Request
 
-from search.views import _record_engine_time
+from search.analytics import record_engine_time
 
 
 @pytest.fixture
@@ -28,27 +28,27 @@ def http_request():
 
 class TestRecordEngineTime:
     def test_records_a_value(self, http_request):
-        _record_engine_time(http_request, 12)
+        record_engine_time(http_request, 12)
         assert http_request.search_processing_time_ms == 12
 
     def test_accumulates_across_calls(self, http_request):
         """A relaxed-query retry is a second engine call, not a replacement."""
-        _record_engine_time(http_request, 12)
-        _record_engine_time(http_request, 7)
+        record_engine_time(http_request, 12)
+        record_engine_time(http_request, 7)
         assert http_request.search_processing_time_ms == 19
 
     def test_zero_is_a_measurement_not_an_absence(self, http_request):
         """Meilisearch reports 0 ms routinely on a small index."""
-        _record_engine_time(http_request, 0)
+        record_engine_time(http_request, 0)
         assert http_request.search_processing_time_ms == 0
 
     def test_none_is_skipped(self, http_request):
-        _record_engine_time(http_request, None)
+        record_engine_time(http_request, None)
         assert not hasattr(http_request, "search_processing_time_ms")
 
     def test_garbage_is_skipped_without_raising(self, http_request):
         """A malformed engine payload must never break the search response."""
-        _record_engine_time(http_request, "not-a-number")
+        record_engine_time(http_request, "not-a-number")
         assert not hasattr(http_request, "search_processing_time_ms")
 
 
@@ -66,7 +66,7 @@ class TestReachesTheUnderlyingRequest:
     ):
         drf_request = Request(http_request)
 
-        _record_engine_time(drf_request, 15)
+        record_engine_time(drf_request, 15)
 
         # What the middleware actually holds:
         assert http_request.search_processing_time_ms == 15
@@ -74,8 +74,8 @@ class TestReachesTheUnderlyingRequest:
     def test_accumulates_across_the_wrapper(self, http_request):
         drf_request = Request(http_request)
 
-        _record_engine_time(drf_request, 15)
-        _record_engine_time(drf_request, 5)
+        record_engine_time(drf_request, 15)
+        record_engine_time(drf_request, 5)
 
         assert http_request.search_processing_time_ms == 20
 

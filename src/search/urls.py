@@ -1,13 +1,11 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from search.views import (
-    blog_post_meili_search,
-    product_meili_search,
-    search_analytics,
-    search_click,
-    search_trending,
-)
+from search.views.blog import blog_post_meili_search
+from search.views.click import search_click
+from search.views.product import product_meili_search
+from search.views.report import search_analytics
+from search.views.trending import search_trending
 
 urlpatterns = [
     path(

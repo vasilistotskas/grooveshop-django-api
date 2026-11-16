@@ -788,7 +788,7 @@ class ProductTranslation(
             return False
 
     class MeiliMeta:
-        # Exactly the fields ``search.views`` filters or facets on. Each
+        # Exactly the fields ``search.views.product`` filters or facets on. Each
         # one is indexed for filtering, so a field nothing filters by
         # (``name``, ``stock``, ``discount_percent``, ``master_id``,
         # ``attributes``, ``category_name``) stays out; it is still
@@ -871,7 +871,7 @@ class ProductTranslation(
             "attributes",
             "attribute_data",
         )
-        # The four ``sort`` values of ``search.views``. ``discount_percent``
+        # The four ``sort`` values of ``search.params``. ``discount_percent``
         # ranks through ``ranking_rules`` below, which needs no sortable
         # entry.
         sortable_fields = (

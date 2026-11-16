@@ -31,7 +31,7 @@ from order.emails import (
 )
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
-    SETTLED_PAYMENT_STATUSES,
+    CHARGED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
@@ -474,10 +474,10 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         # context nor renders a line table.
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        # A provider can settle the order between the failure and this run
+        # A provider can charge the order between the failure and this run
         # (a Viva retry that succeeds), and the email says nothing was
-        # charged.
-        if order.payment_status in SETTLED_PAYMENT_STATUSES:
+        # charged. A canceled payment took nothing, so it still sends.
+        if order.payment_status in CHARGED_PAYMENT_STATUSES:
             logger.info(
                 "Payment failed email for order #%s not sent: payment %s",
                 order_id,

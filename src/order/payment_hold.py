@@ -28,6 +28,7 @@ from django.db.models import DateTimeField, ExpressionWrapper, F, QuerySet
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.celery import celery_app
 from core.store_settings import store_setting
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -37,6 +38,7 @@ from order.enum.status import (
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
 from pay_way.enum.settlement import PaySettlement
+from scheduler.models import PeriodicTask
 
 HOLD_SETTING = "ORDER_ONLINE_PAYMENT_HOLD_MINUTES"
 MAX_HOLD_SETTING = "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES"
@@ -196,21 +198,44 @@ def _next_sweep(after: datetime) -> datetime:
     return last_run_at + delta
 
 
+def _sweep_time_limit() -> timedelta:
+    """How long one store's sweep may run before the worker kills it.
+
+    The worker's hard time limit (``CELERY_TASK_TIME_LIMIT``), which the
+    prefork pool enforces from the moment a task starts executing. The
+    sweep sets no limit of its own (a test holds it to that), and the
+    fanout sends each store's run with none. The soft limit does not end
+    the run: the sweep catches ``Exception`` per order, and
+    ``SoftTimeLimitExceeded`` is one.
+    """
+    seconds = celery_app.conf.task_time_limit
+    if not seconds:
+        raise ImproperlyConfigured(
+            "The unpaid-order sweep needs a hard time limit to promise "
+            "when an order is decided (CELERY_TASK_TIME_LIMIT)."
+        )
+    return timedelta(seconds=seconds)
+
+
 def decided_by(order: Order) -> datetime | None:
-    """When the sweep cancels *order* if it is still unpaid by then.
+    """The latest instant by which the sweep has canceled *order*, if it
+    is still unpaid.
 
-    The start of the first ``auto_cancel_stuck_pending_orders`` run that
-    selects the order (the cancel commits during that run): after the
-    hold plus the grace for a pending payment; for a failed one, after the
-    failure plus ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` as well, since
-    a link that can still be paid is closed only once its hold has ended
-    (a Stripe PaymentIntent is canceled sooner, so this is the latest).
+    The first ``auto_cancel_stuck_pending_orders`` run that selects the
+    order, plus that run's hard time limit, by which every cancel it makes
+    has committed. The run comes after the hold plus the grace for a
+    pending payment; for a failed one, after the failure plus
+    ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` as well, since a link that
+    can still be paid is closed only once its hold has ended (a Stripe
+    PaymentIntent is canceled sooner, so this is the latest). Time a
+    store's run waits in the queue before it starts is bounded by nothing
+    and is not counted.
 
-    ``None`` when the order does not hold stock for an online payment, and
-    when the sweep leaves it to a person or to the provider: a payment the
-    provider is processing waits for its final webhook, and an order with a
-    charge that did not match its total (``AMOUNT_MISMATCH_FLAG``) is never
-    canceled automatically.
+    ``None`` when nothing will decide the order: it does not hold stock
+    for an online payment; the sweep is switched off
+    (``scheduler.PeriodicTask``); the provider is processing the payment,
+    which waits for its final webhook; a charge did not match the total
+    (``AMOUNT_MISMATCH_FLAG``), which is never canceled automatically.
     """
     if not awaiting_payment(order) or AMOUNT_MISMATCH_FLAG in (
         order.metadata or {}
@@ -221,7 +246,9 @@ def decided_by(order: Order) -> datetime | None:
         selected_after = max(selected_after, order.updated_at + failed_window())
     elif order.payment_status != PaymentStatus.PENDING:
         return None
-    return _next_sweep(selected_after)
+    if not PeriodicTask.objects.is_on(SWEEP_ENTRY):
+        return None
+    return _next_sweep(selected_after) + _sweep_time_limit()
 
 
 def unpaid_online_orders() -> QuerySet[Order]:

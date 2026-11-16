@@ -1,9 +1,10 @@
 """The order tells its client how long it can be paid and when it is decided.
 
 ``paymentHoldExpiresAt`` is when the payment link stops being payable and
-``paymentDecidedBy`` the start of the sweep run that cancels the order if it
-is still unpaid. The agent gateway publishes them to the platform that placed
-the order, so it holds no window of its own (issue #636).
+``paymentDecidedBy`` the latest instant by which the sweep has canceled the
+order if it is still unpaid: the run that selects it, plus that run's hard
+time limit. The agent gateway publishes them to the platform that placed the
+order, so it holds no window of its own (issue #636).
 """
 
 from __future__ import annotations
@@ -26,12 +27,17 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.attribution import OrderAttribution
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
+from order.tasks import auto_cancel_stuck_pending_orders
 from pay_way.factories import PayWayFactory
+from scheduler.models import PeriodicTask
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 SECRET = "gateway-secret"
+
+#: The sweep sets no limit of its own, so the worker's applies.
+LIMIT = timedelta(seconds=settings.CELERY_TASK_TIME_LIMIT)
 
 
 def _set(name: str, value: int) -> None:
@@ -48,6 +54,12 @@ def _windows():
     _set(payment_hold.GRACE_SETTING, 5)
     _set(payment_hold.MAX_HOLD_SETTING, 60)
     _set(payment_hold.FAILED_SETTING, 30)
+
+
+@pytest.fixture(autouse=True)
+def _sweep_on():
+    """Beat's row for the sweep, switched on, as beat creates it."""
+    PeriodicTask.objects.create(name=payment_hold.SWEEP_ENTRY)
 
 
 @pytest.fixture
@@ -100,33 +112,46 @@ class TestTheOrderIsDecidedByTheSweep:
         # 0:07 + 5 grace = 0:12, so the 0:15 run.
         order = _order(hold=hour + timedelta(minutes=7))
 
-        assert payment_hold.decided_by(order) == hour + timedelta(minutes=15)
+        assert (
+            payment_hold.decided_by(order)
+            == hour + timedelta(minutes=15) + LIMIT
+        )
 
     def test_a_run_at_the_very_instant_does_not_select_it(self, hour):
         # 0:10 + 5 = 0:15: the sweep selects only what ended before it ran.
         order = _order(hold=hour + timedelta(minutes=10))
 
-        assert payment_hold.decided_by(order) == hour + timedelta(minutes=30)
+        assert (
+            payment_hold.decided_by(order)
+            == hour + timedelta(minutes=30) + LIMIT
+        )
 
     def test_the_store_chooses_the_grace(self, hour):
         _set(payment_hold.GRACE_SETTING, 20)
         order = _order(hold=hour + timedelta(minutes=7))
 
-        assert payment_hold.decided_by(order) == hour + timedelta(minutes=30)
+        assert (
+            payment_hold.decided_by(order)
+            == hour + timedelta(minutes=30) + LIMIT
+        )
 
     def test_with_no_link_it_runs_from_the_order(self, hour):
         # 0:00 + 30 hold + 5 grace = 0:35, so the 0:45 run.
         order = _order(created=hour)
 
-        assert payment_hold.decided_by(order) == hour + timedelta(minutes=45)
+        assert (
+            payment_hold.decided_by(order)
+            == hour + timedelta(minutes=45) + LIMIT
+        )
 
     def test_it_is_the_run_the_sweep_selects_the_order_in(self, hour):
         order = _order(hold=hour + timedelta(minutes=7))
         decided = payment_hold.decided_by(order)
         assert decided is not None
-        run_before = decided - timedelta(minutes=15)
+        run = decided - LIMIT
+        run_before = run - timedelta(minutes=15)
 
-        selected = payment_hold.expired_unpaid_online_orders(now=decided)
+        selected = payment_hold.expired_unpaid_online_orders(now=run)
         not_yet = payment_hold.expired_unpaid_online_orders(now=run_before)
 
         assert order in selected
@@ -141,7 +166,10 @@ class TestTheOrderIsDecidedByTheSweep:
             payment_status=PaymentStatus.FAILED,
         )
 
-        assert payment_hold.decided_by(order) == hour + timedelta(minutes=45)
+        assert (
+            payment_hold.decided_by(order)
+            == hour + timedelta(minutes=45) + LIMIT
+        )
 
     def test_a_failed_payment_waits_for_the_link_too(self, hour):
         # The failure 0:00 (+30 = 0:30), the link until 0:47 (+5 = 0:52).
@@ -151,7 +179,9 @@ class TestTheOrderIsDecidedByTheSweep:
             payment_status=PaymentStatus.FAILED,
         )
 
-        assert payment_hold.decided_by(order) == hour + timedelta(hours=1)
+        assert (
+            payment_hold.decided_by(order) == hour + timedelta(hours=1) + LIMIT
+        )
 
     def test_the_sweep_runs_on_the_declared_schedule(self):
         entry = settings.CELERY_BEAT_SCHEDULE[payment_hold.SWEEP_ENTRY]
@@ -161,8 +191,45 @@ class TestTheOrderIsDecidedByTheSweep:
         )
         assert isinstance(entry["schedule"], crontab)
 
+    def test_the_sweep_runs_under_the_worker_s_time_limit(self):
+        # Celery gives a task the worker's limit unless it sets its own. One
+        # of its own would be what the worker enforces, and decided_by
+        # would have to read it instead.
+        assert auto_cancel_stuck_pending_orders.time_limit == (
+            payment_hold.celery_app.conf.task_time_limit
+        )
+
+    def test_the_worker_s_time_limit_is_the_margin(self, hour):
+        # 0:07 + 5 grace = 0:12, so the 0:15 run, plus what the worker reads.
+        order = _order(hold=hour + timedelta(minutes=7))
+        limit = payment_hold.celery_app.conf.task_time_limit
+
+        assert payment_hold.decided_by(order) == (
+            hour + timedelta(minutes=15) + timedelta(seconds=limit)
+        )
+        assert timedelta(seconds=limit) == LIMIT
+
+    def test_the_sweep_s_soft_limit_does_not_end_the_run(self):
+        # The run catches Exception per order, so only the hard limit counts.
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        assert issubclass(SoftTimeLimitExceeded, Exception)
+
 
 class TestNothingIsPromisedTheSweepWillNotDo:
+    def test_the_sweep_is_switched_off(self, hour):
+        PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).switch_off()
+        order = _order(hold=hour + timedelta(minutes=7))
+
+        assert payment_hold.decided_by(order) is None
+        assert payment_hold.hold_ends(order) == hour + timedelta(minutes=7)
+
+    def test_beat_has_not_created_its_row(self, hour):
+        PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).delete()
+        order = _order(hold=hour + timedelta(minutes=7))
+
+        assert payment_hold.decided_by(order) is None
+
     def test_a_payment_the_provider_is_processing(self, hour):
         order = _order(
             hold=hour + timedelta(minutes=7),
@@ -245,8 +312,17 @@ class TestTheOrderDetailServesBoth:
             hour + timedelta(minutes=37)
         )
         assert self._instant(body["paymentDecidedBy"]) == (
-            hour + timedelta(minutes=45)
+            hour + timedelta(minutes=45) + LIMIT
         )
+
+    def test_the_sweep_switched_off(self, hour):
+        PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).switch_off()
+        order = _order(created=hour, hold=hour + timedelta(minutes=37))
+
+        body = self._guest(order)
+
+        assert body["paymentHoldExpiresAt"] is not None
+        assert body["paymentDecidedBy"] is None
 
     @pytest.mark.parametrize("read", ["_guest", "_gateway"])
     def test_a_paid_order(self, hour, read):

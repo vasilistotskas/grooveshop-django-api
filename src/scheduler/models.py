@@ -10,9 +10,17 @@ from datetime import datetime
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_tenants.utils import get_public_schema_name, schema_context
 
 
 class PeriodicTaskQuerySet(models.QuerySet):
+    def is_on(self, name: str) -> bool:
+        """Whether beat sends the entry *name*: its row exists and is
+        switched on. The rows live in the public schema, whichever store
+        asks; a row beat has not created yet has never been sent."""
+        with schema_context(get_public_schema_name()):
+            return self.filter(name=name, enabled=True).exists()
+
     def switch_on(self) -> int:
         """Stamp ``resumed_at``, so the slots missed while off are not sent."""
         return self.filter(enabled=False).update(

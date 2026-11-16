@@ -215,14 +215,26 @@ locks stock.
   - `paymentHoldExpiresAt` (`payment_hold.hold_ends`): when the last link
     stops being payable, `payment_hold_expires_at`, or `created_at` plus the
     hold before any link was opened. Never null for such an order.
-  - `paymentDecidedBy` (`payment_hold.decided_by`): the start of the first
-    sweep run that selects the order, computed from the sweep's crontab in
+  - `paymentDecidedBy` (`payment_hold.decided_by`): the latest instant by
+    which the sweep has canceled the order if it is still unpaid. It is the
+    first sweep run that selects the order, from the sweep's crontab in
     `CELERY_BEAT_SCHEDULE` (`payment_hold.SWEEP_ENTRY`): the first run strictly
     after the hold plus the grace, and for a FAILED payment after the later of
     that and `updated_at` plus `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES` (a
-    Stripe PaymentIntent is closed sooner, so it is the latest). The cancel
-    commits during that run. Null where the sweep promises nothing: a payment
-    the provider is `PROCESSING`, and an order flagged `AMOUNT_MISMATCH_FLAG`.
+    Stripe PaymentIntent is closed sooner, so it is the latest). To it is added
+    the run's hard time limit, the worker's `CELERY_TASK_TIME_LIMIT` (the
+    sweep sets none of its own, and a test holds it to that; the worker
+    command passes no `--time-limit`): the prefork pool kills a run that
+    passes it,
+    counted from when the run starts, so every cancel the run makes has
+    committed by then. The soft limit does not end the run (the sweep catches
+    `Exception` per order, `SoftTimeLimitExceeded` included). A per-store run
+    sent by the fanout carries no `expires`, so the time it waits in the queue
+    before it starts is bounded by nothing and is not counted. Null where
+    nothing will decide the order: the sweep's `scheduler.PeriodicTask` row is
+    switched off or not created yet (`PeriodicTask.objects.is_on`, which
+    `emails.gates.ScheduleGate` reads too), a payment the provider is
+    `PROCESSING`, and an order flagged `AMOUNT_MISMATCH_FLAG`.
 
   `create_checkout_session` also returns `expiresAt`, the expiry the provider
   applied to the link it just opened. The agent gateway publishes

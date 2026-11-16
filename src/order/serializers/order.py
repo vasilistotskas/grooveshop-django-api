@@ -489,17 +489,18 @@ class OrderDetailSerializer(OrderSerializer):
     )
     payment_decided_by = serializers.SerializerMethodField(
         help_text=(
-            "When the store cancels the order, and releases its stock, if "
-            "it is still unpaid by then: the start of the first run of the "
-            "unpaid-order sweep after the payment link expired plus the "
-            "store's grace (for a failed payment, also after the failure "
-            "plus the store's wait for a retry). The cancel commits during "
-            "that run, unless the provider then reports the payment as "
-            "processing, which keeps the order open for its outcome. Null "
-            "when the order does not wait for an online payment, and when "
-            "it is not canceled automatically: a payment the provider is "
-            "already processing, or a charge that did not match the total "
-            "and waits for the store."
+            "The latest instant by which the store has canceled the order, "
+            "and released its stock, if it is still unpaid: the first run "
+            "of the unpaid-order sweep after the payment link expired plus "
+            "the store's grace (for a failed payment, also after the "
+            "failure plus the store's wait for a retry), plus the longest "
+            "that run may take. A client can stop waiting on the order "
+            "then. If the provider reports the payment as processing "
+            "during that run, the order stays open for its outcome. Null "
+            "when nothing will decide the order: it does not wait for an "
+            "online payment, the sweep is switched off, the provider is "
+            "already processing the payment, or a charge did not match the "
+            "total and waits for the store."
         )
     )
 

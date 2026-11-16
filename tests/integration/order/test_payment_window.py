@@ -64,11 +64,12 @@ def _sweep_on():
 
 @pytest.fixture
 def hour() -> datetime:
-    """A whole hour in the recent past: the sweep runs at :00, :15, :30, :45
-    (every zone the schedule may run in is offset by whole hours)."""
+    """A whole hour still to come, so every instant a test builds on it is
+    ahead of the clock: the sweep runs at :00, :15, :30, :45 (every zone
+    the schedule may run in is offset by whole hours)."""
     return timezone.now().replace(
         minute=0, second=0, microsecond=0
-    ) - timedelta(hours=2)
+    ) + timedelta(hours=2)
 
 
 def _order(*, created=None, hold=None, updated=None, **kwargs):
@@ -183,6 +184,21 @@ class TestTheOrderIsDecidedByTheSweep:
             payment_hold.decided_by(order) == hour + timedelta(hours=1) + LIMIT
         )
 
+    def test_a_failure_with_no_online_pay_way_is_decided_too(self, hour):
+        # The failed bucket takes any pay way, and cancels at once what has
+        # no payment to close; the hold bounds it from above.
+        for pay_way in (None, PayWayFactory.create_offline_payment()):
+            order = _order(
+                hold=hour + timedelta(minutes=7),
+                updated=hour + timedelta(minutes=10),
+                payment_status=PaymentStatus.FAILED,
+                pay_way=pay_way,
+            )
+            decided = payment_hold.decided_by(order)
+            assert decided == hour + timedelta(minutes=45) + LIMIT
+            run = decided - LIMIT
+            assert order in payment_hold.expired_failed_payment_orders(now=run)
+
     def test_the_sweep_runs_on_the_declared_schedule(self):
         entry = settings.CELERY_BEAT_SCHEDULE[payment_hold.SWEEP_ENTRY]
 
@@ -214,6 +230,33 @@ class TestTheOrderIsDecidedByTheSweep:
         from celery.exceptions import SoftTimeLimitExceeded
 
         assert issubclass(SoftTimeLimitExceeded, Exception)
+
+
+class TestAnInstantAlreadyPastIsNeverPromised:
+    def test_the_sweep_switched_off_across_the_hold_end(self, hour):
+        # The 0:15 run that would have selected it was missed while the
+        # sweep was off, and a resumed sweep sends no missed slot.
+        rows = PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY)
+        rows.switch_off()
+        order = _order(hold=hour + timedelta(minutes=7))
+        assert payment_hold.decided_by(order) is None
+        rows.switch_on()
+
+        read_at = hour + timedelta(minutes=50)
+
+        assert payment_hold.decided_by(order, now=read_at) == (
+            hour + timedelta(hours=1) + LIMIT
+        )
+
+    def test_a_run_that_left_the_order_open(self, hour):
+        # Due at the 0:15 run, still PENDING at 0:31: the 0:45 run.
+        order = _order(hold=hour + timedelta(minutes=7))
+
+        decided = payment_hold.decided_by(
+            order, now=hour + timedelta(minutes=31)
+        )
+
+        assert decided == hour + timedelta(minutes=45) + LIMIT
 
 
 class TestNothingIsPromisedTheSweepWillNotDo:

@@ -489,18 +489,20 @@ class OrderDetailSerializer(OrderSerializer):
     )
     payment_decided_by = serializers.SerializerMethodField(
         help_text=(
-            "The latest instant by which the store has canceled the order, "
-            "and released its stock, if it is still unpaid: the first run "
-            "of the unpaid-order sweep after the payment link expired plus "
-            "the store's grace (for a failed payment, also after the "
-            "failure plus the store's wait for a retry), plus the longest "
-            "that run may take. A client can stop waiting on the order "
-            "then. If the provider reports the payment as processing "
-            "during that run, the order stays open for its outcome. Null "
-            "when nothing will decide the order: it does not wait for an "
-            "online payment, the sweep is switched off, the provider is "
-            "already processing the payment, or a charge did not match the "
-            "total and waits for the store."
+            "When the store's scheduled unpaid-order sweep, running "
+            "normally, will have decided the order: canceled it, and "
+            "released its stock, if it is still unpaid. It is the next "
+            "sweep run after the payment link expired plus the store's "
+            "grace (for a failed payment, also after the failure plus the "
+            "store's wait for a retry), plus the longest that run may "
+            "take. It moves later if the sweep is paused or a run is cut "
+            "short, and is never an instant already past. If the provider "
+            "reports the payment as processing during that run, the order "
+            "stays open for its outcome. Null when nothing will decide the "
+            "order: the sweep does not cancel it (it does not wait for a "
+            "payment, the provider is already processing one, or a charge "
+            "did not match the total and waits for the store), or the "
+            "sweep is switched off."
         )
     )
 

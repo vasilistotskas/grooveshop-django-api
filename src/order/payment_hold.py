@@ -217,38 +217,40 @@ def _sweep_time_limit() -> timedelta:
     return timedelta(seconds=seconds)
 
 
-def decided_by(order: Order) -> datetime | None:
-    """The latest instant by which the sweep has canceled *order*, if it
-    is still unpaid.
+def decided_by(order: Order, now: datetime | None = None) -> datetime | None:
+    """When the scheduled sweep will have decided *order*, running normally.
 
-    The first ``auto_cancel_stuck_pending_orders`` run that selects the
+    The next ``auto_cancel_stuck_pending_orders`` run that selects the
     order, plus that run's hard time limit, by which every cancel it makes
-    has committed. The run comes after the hold plus the grace for a
-    pending payment; for a failed one, after the failure plus
-    ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` as well, since a link that
-    can still be paid is closed only once its hold has ended (a Stripe
-    PaymentIntent is canceled sooner, so this is the latest). Time a
-    store's run waits in the queue before it starts is bounded by nothing
-    and is not counted.
+    has committed. The sweep selects a pending payment once the hold plus
+    the grace has passed; a failed one once the failure plus
+    ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` has passed too, since a
+    link that can still be paid is closed only once its hold has ended (a
+    Stripe PaymentIntent, or an order with no pay way, is canceled sooner,
+    so this is the latest). The run is never one already past: an order
+    whose time came while the sweep was off, beat or the workers were
+    down, or a run left it (a row another run held, an error) is decided
+    by the next run after *now*. So the instant moves later whenever the
+    sweep is paused or a run is cut short. Time a store's run waits in the
+    queue before it starts is bounded by nothing and is not counted.
 
-    ``None`` when nothing will decide the order: it does not hold stock
-    for an online payment; the sweep is switched off
-    (``scheduler.PeriodicTask``); the provider is processing the payment,
-    which waits for its final webhook; a charge did not match the total
-    (``AMOUNT_MISMATCH_FLAG``), which is never canceled automatically.
+    ``None`` when nothing will decide the order: the sweep never selects
+    it (:func:`swept_orders`), or the sweep is switched off
+    (``scheduler.PeriodicTask``).
     """
-    if not awaiting_payment(order) or AMOUNT_MISMATCH_FLAG in (
-        order.metadata or {}
-    ):
+    # Both buckets select PENDING orders only, so any other answers without
+    # a query; the rest is the sweep's own querysets.
+    if order.status != OrderStatus.PENDING:
+        return None
+    if not swept_orders().filter(pk=order.pk).exists():
+        return None
+    if not PeriodicTask.objects.is_on(SWEEP_ENTRY):
         return None
     selected_after = hold_ends(order) + grace_window()
     if order.payment_status == PaymentStatus.FAILED:
         selected_after = max(selected_after, order.updated_at + failed_window())
-    elif order.payment_status != PaymentStatus.PENDING:
-        return None
-    if not PeriodicTask.objects.is_on(SWEEP_ENTRY):
-        return None
-    return _next_sweep(selected_after) + _sweep_time_limit()
+    now = now or timezone.now()
+    return _next_sweep(max(selected_after, now)) + _sweep_time_limit()
 
 
 def unpaid_online_orders() -> QuerySet[Order]:
@@ -261,6 +263,46 @@ def unpaid_online_orders() -> QuerySet[Order]:
         status=OrderStatus.PENDING,
         payment_status=PaymentStatus.PENDING,
         pay_way__settlement=PaySettlement.ONLINE,
+    )
+
+
+def failed_payment_orders() -> QuerySet[Order]:
+    """PENDING orders whose last payment attempt failed, of any pay way.
+
+    The sweep's second bucket: a failed attempt does not end the payment
+    (another card on the same PaymentIntent, a retry on the same Viva
+    payment order), so the order waits
+    ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` for one.
+    """
+    return Order.objects.filter(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.FAILED
+    )
+
+
+def expired_failed_payment_orders(
+    now: datetime | None = None,
+) -> QuerySet[Order]:
+    """Failed-payment orders not retried within the store's wait."""
+    now = now or timezone.now()
+    return failed_payment_orders().filter(updated_at__lt=now - failed_window())
+
+
+def amount_mismatch_orders() -> QuerySet[Order]:
+    """Orders with a confirmed charge that did not match their total.
+
+    The Viva webhook refuses to mark such an order paid and stamps
+    ``AMOUNT_MISMATCH_FLAG`` instead. The sweep never cancels one: it would
+    close a CHARGED order without a refund. It needs a person.
+    """
+    return Order.objects.filter(metadata__has_key=AMOUNT_MISMATCH_FLAG)
+
+
+def swept_orders() -> QuerySet[Order]:
+    """Every order the sweep cancels once its time has come: its two
+    buckets, less what it never cancels. The same definitions the sweep
+    selects with, so :func:`decided_by` cannot promise more or less."""
+    return (unpaid_online_orders() | failed_payment_orders()).exclude(
+        pk__in=amount_mismatch_orders().values("pk")
     )
 
 

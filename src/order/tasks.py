@@ -43,7 +43,6 @@ from order.models import (
     RefundNotification,
 )
 from order.models.order import (
-    AMOUNT_MISMATCH_FLAG,
     status_update_reservation_key,
 )
 from order.payment import get_payment_provider_class
@@ -1825,16 +1824,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     StockManager.increment_stock and releases any outstanding
     StockReservation records.
     """
-    failed_minutes = store_setting("ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES")
-
     now = timezone.now()
-    failed_cutoff = now - timedelta(minutes=failed_minutes)
 
-    failed_qs = Order.objects.filter(
-        status=OrderStatus.PENDING,
-        payment_status=PaymentStatus.FAILED,
-        updated_at__lt=failed_cutoff,
-    ).select_related("pay_way")
+    failed_qs = payment_hold.expired_failed_payment_orders(now).select_related(
+        "pay_way"
+    )
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
     # pays, sometimes for days (measured ACS lag ~4 days), so cancelling
@@ -1851,9 +1845,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     # the total moved) and stamps AMOUNT_MISMATCH_FLAG instead. Cancelling
     # it here would close a CHARGED order with refund_payment=False and
     # email the customer that it was cancelled. It needs a human.
-    charged = Order.objects.filter(
-        metadata__has_key=AMOUNT_MISMATCH_FLAG
-    ).values_list("id", flat=True)
+    charged = payment_hold.amount_mismatch_orders().values_list("id", flat=True)
     charged_ids = list(charged)
     if charged_ids:
         logger.warning(

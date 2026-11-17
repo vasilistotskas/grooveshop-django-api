@@ -35,9 +35,13 @@ task's time limit (``waiting_through_blocks``).
 
 Only the connections Celery opens through ``connection_for_write`` use this
 transport. A worker's consuming connection keeps kombu's own: its reads must
-not time out, or RabbitMQ redelivers every task the worker is running.
+not time out, or RabbitMQ redelivers every task the worker is running. For
+the same reason a publishing connection never fails for heartbeats it
+missed (``PublishingConnection``): a miss on the worker's event connection
+reconnected the consuming one too (#721).
 """
 
+import logging
 import os
 import threading
 import time
@@ -48,15 +52,28 @@ from typing import Any
 
 import amqp
 from amqp import spec
-from amqp.exceptions import Blocked, MessageNacked
+from amqp.exceptions import Blocked, ConnectionForced, MessageNacked
 from django.conf import settings
 from kombu.exceptions import OperationalError
 from kombu.transport import pyamqp
+
+from core.caches import BurstLogger
+
+logger = logging.getLogger(__name__)
 
 #: The default exchange routes a message to the queue named by its routing
 #: key, and RabbitMQ lets no client declare a queue whose name starts with
 #: ``amq.``, so the question is dropped once the broker reads it.
 PROBE_ROUTING_KEY = "amq.grooveshop.blocked-probe"
+
+
+#: A remote control query answered by no worker because the broker blocks
+#: publishers (``core.celery.GrooveShopControl``).
+unanswered_query = BurstLogger(
+    "Remote control query %r answered by no worker: RabbitMQ blocks"
+    " publishers (%s similar answer(s) suppressed in the last %ss)",
+    target=logger,
+)
 
 
 class BrokerBlocked(OperationalError):
@@ -206,6 +223,21 @@ class PublishingConnection(pyamqp.Connection):
     ``read_timeout`` (``BROKER_PUBLISH_READ_TIMEOUT``) bounds any reply the
     broker never sends, such as the confirm of a connection it blocked
     without saying so.
+
+    Missed heartbeats never fail it (#721). Nothing reads a publishing
+    connection between publishes, so what it received says nothing about
+    the broker. A worker opens its event dispatcher's connection with
+    ``broker_heartbeat`` and its event loop checks that connection's
+    heartbeats, but reads only the socket the dispatcher started with.
+    After a block kombu replaces that socket and, during the hold, nothing
+    publishes on the new one, so nothing reads it: once two intervals
+    passed the loop raised "Too many heartbeats missed", restarted the
+    consumer, and RabbitMQ redelivered every ``acks_late`` task the worker
+    was running. The heartbeats are still sent, and RabbitMQ still sends
+    its own, which is how it closes a connection kombu dropped while the
+    broker was not reading it. A dead broker is still found: by the write
+    and the confirm of the next publish, and by the consuming connection's
+    own heartbeats.
     """
 
     Channel = PublishingChannel
@@ -223,6 +255,15 @@ class PublishingConnection(pyamqp.Connection):
                 "on_unblocked": _on_unblocked,
             }
         )
+
+    def heartbeat_tick(self, rate: int = 2) -> None:
+        """Send a heartbeat when one is due; never fail for one missed."""
+        try:
+            super().heartbeat_tick(rate=rate)
+        except ConnectionForced:
+            # Raised only when nothing was received for two intervals,
+            # after the heartbeat due was sent.
+            return
 
 
 class PublishingTransport(pyamqp.Transport):

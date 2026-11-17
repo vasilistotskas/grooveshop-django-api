@@ -49,7 +49,11 @@ from order.models.order import (
 from order.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
 from order.review_request import awaiting_review_request, delivery_window
-from order.services import SHIPMENT_CANCEL_PENDING_FLAG, OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    OrderService,
+    shipment_cancel_retry_until,
+)
 from recommendation.order_email import record_impression
 from tenant.celery import dispatch_on_commit
 
@@ -2019,6 +2023,15 @@ def finish_pending_shipment_cancels(
     The same holds for a creation in flight or still settling: the order
     stays flagged and is asked about on a later run.
 
+    It also asks again for a courier that gave no answer
+    (``CarrierUnavailableError``), on every run until
+    ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the cancel, when
+    ``cancel_attached_shipment`` records the last failure for staff.
+    A courier that gives no answer in a run is not asked about its other
+    orders in that run: during an outage each would wait out the same
+    timeout and keep the run, and the worker, busy for nothing. An order
+    whose retries are over is still asked once, so it gets its answer.
+
     Beat-scheduled through
     ``tenant.tasks.fanout_finish_pending_shipment_cancels``.
     """
@@ -2032,7 +2045,15 @@ def finish_pending_shipment_cancels(
     ).order_by("status_updated_at")[:max_per_run]
 
     finished = still_pending = 0
+    silent_couriers: set[int] = set()
+    now = timezone.now()
     for order in pending:
+        if (
+            order.shipping_provider_id in silent_couriers
+            and now < shipment_cancel_retry_until(order)
+        ):
+            still_pending += 1
+            continue
         logger.warning(
             "Order %s was canceled at %s and holds no answer from its "
             "courier to the shipment cancel: asking now",
@@ -2040,9 +2061,11 @@ def finish_pending_shipment_cancels(
             order.status_updated_at,
         )
         cancellation = (order.metadata or {}).get("cancellation") or {}
-        OrderService.cancel_attached_shipment(
+        unanswered = OrderService.cancel_attached_shipment(
             order, cancellation.get("reason", "")
         )
+        if unanswered and order.shipping_provider_id is not None:
+            silent_couriers.add(order.shipping_provider_id)
         # ``order`` carries the metadata as written: the flag is gone
         # once an answer is recorded, and stays for a shipment that is
         # being worked on elsewhere.

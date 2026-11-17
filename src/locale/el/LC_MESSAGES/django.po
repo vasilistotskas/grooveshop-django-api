@@ -9879,6 +9879,10 @@ msgid "Order %(order_id)s was canceled, but a dispute is open on its payment, so
 msgstr "Η παραγγελία %(order_id)s ακυρώθηκε, αλλά υπάρχει ανοιχτή αμφισβήτηση στην πληρωμή της, οπότε η επιστροφή χρημάτων περιμένει μέχρι να κλείσει η αμφισβήτηση. Επιστρέψτε τα χρήματα τότε."
 
 #, python-format
+msgid "Order %(order_id)s was canceled, but the courier gave no answer to the parcel cancel (%(error)s). It is asked again automatically every %(every)s minutes for up to %(hours)s hours, and the order's history says if it never answers."
+msgstr "Η παραγγελία %(order_id)s ακυρώθηκε, αλλά ο courier δεν απάντησε στην ακύρωση του δέματος (%(error)s). Θα ερωτάται ξανά αυτόματα κάθε %(every)s λεπτά για έως %(hours)s ώρες, και το ιστορικό της παραγγελίας θα το αναφέρει αν δεν απαντήσει ποτέ."
+
+#, python-format
 msgid "Order %(order_id)s was canceled. Its parcel is already being worked on at the courier, so the courier's answer to the cancel is not recorded yet. The courier is asked again automatically within %(minutes)s minutes, and a refusal is noted in the order's history."
 msgstr "Η παραγγελία %(order_id)s ακυρώθηκε. Το δέμα της βρίσκεται ήδη υπό επεξεργασία στον courier, οπότε η απάντηση του courier στην ακύρωση δεν έχει καταγραφεί ακόμη. Ο courier θα ερωτηθεί ξανά αυτόματα μέσα σε %(minutes)s λεπτά, και τυχόν άρνηση σημειώνεται στο ιστορικό της παραγγελίας."
 

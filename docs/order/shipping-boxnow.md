@@ -174,7 +174,9 @@ and says which file holds each § number used here.
 - **A canceled order never gets a live parcel.** A staff or system order
   cancel goes on when the courier step is refused
   (`OrderService.cancel_attached_shipment` never raises): while a creation
-  of uncertain outcome settles, or one is in flight. The order's status is
+  of uncertain outcome settles, or one is in flight, and while BoxNow gives
+  no answer (the cancel stays pending and is asked again,
+  [cancel §7.1.2](cancel.md)). The order's status is
   that cancel's durable record, and the creation reads it at both ends.
   Before phase 1, a canceled order's shipment with no parcel is not
   created: `create_shipment_for_order` runs `cancel_shipment` instead

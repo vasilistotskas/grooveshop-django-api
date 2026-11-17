@@ -3,6 +3,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -110,6 +111,7 @@ from order.refunds.refund_lines import (
 )
 from order.services import (
     SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
     OrderService,
     shipment_cancel_wait_minutes,
 )
@@ -2729,6 +2731,32 @@ class OrderAdmin(BaseModelAdmin):
                         )
                         % {"order_id": order.id, "error": courier_error},
                         level="error",
+                    )
+                elif unanswered := (canceled.metadata or {}).get(
+                    SHIPMENT_CANCEL_UNANSWERED_KEY
+                ):
+                    # The courier gave no answer: the sweep asks again
+                    # by itself, and staff hear back only if it never
+                    # answers. A warning, since the parcel is still live.
+                    self.message_user(
+                        request,
+                        _(
+                            "Order %(order_id)s was canceled, but the "
+                            "courier gave no answer to the parcel cancel "
+                            "(%(error)s). It is asked again automatically "
+                            "every %(every)s minutes for up to %(hours)s "
+                            "hours, and the order's history says if it "
+                            "never answers."
+                        )
+                        % {
+                            "order_id": order.id,
+                            "error": unanswered.get("last_error", ""),
+                            "every": (
+                                settings.ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES
+                            ),
+                            "hours": settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS,
+                        },
+                        level="warning",
                     )
                 elif SHIPMENT_CANCEL_PENDING_FLAG in (canceled.metadata or {}):
                     # The shipment is being worked on elsewhere (another

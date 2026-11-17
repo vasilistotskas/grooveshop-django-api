@@ -36,7 +36,11 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.history import OrderHistory
-from order.services import OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
+    OrderService,
+)
 from shipping.models import ShippingProvider
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
@@ -1129,6 +1133,9 @@ class TestAParcelCreatedForAShipmentCanceledMeanwhile:
 
 
 class TestStaffAreToldWhenBoxNowCannotBeAsked:
+    """BoxNow giving no answer says nothing about the parcel: the cancel
+    stays pending for the sweep to ask again, and staff are told so."""
+
     def test_a_staff_cancel_goes_through_and_leaves_a_note(self, http):
         order = _paid_order(
             shipping_provider=ShippingProvider.objects.get(code="boxnow"),
@@ -1147,16 +1154,18 @@ class TestStaffAreToldWhenBoxNowCannotBeAsked:
         assert canceled.status == OrderStatus.CANCELED
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
-        shipment_cancel = canceled.metadata["cancellation"]["shipment_cancel"]
-        assert shipment_cancel["dispatched"] is False
-        assert "error" in shipment_cancel
+        assert "shipment_cancel" not in canceled.metadata["cancellation"]
+        assert canceled.metadata[SHIPMENT_CANCEL_PENDING_FLAG] is True
+        unanswered = canceled.metadata[SHIPMENT_CANCEL_UNANSWERED_KEY]
+        assert unanswered["attempts"] == 1
+        assert "503" in unanswered["last_error"]
         notes = [
             row.new_value["note"]
             for row in OrderHistory.objects.filter(
                 order=order, change_type="NOTE"
             )
         ]
-        assert any("may still be delivered" in note for note in notes)
+        assert any("asked again automatically" in note for note in notes)
 
 
 class TestACanceledOrderGetsNoLiveParcel:

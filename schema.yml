@@ -45788,11 +45788,13 @@ components:
               properties:
                 comment:
                   type: string
+                  maxLength: 1000
             en:
               type: object
               properties:
                 comment:
                   type: string
+                  maxLength: 1000
     PatchedProductWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -49728,11 +49730,13 @@ components:
               properties:
                 comment:
                   type: string
+                  maxLength: 1000
             en:
               type: object
               properties:
                 comment:
                   type: string
+                  maxLength: 1000
       required:
       - product
       - rate

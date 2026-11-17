@@ -87,6 +87,20 @@ def _staff_member(email: str, tenant, role: str):
     return user
 
 
+def _join_team(email: str, tenant, role: str = "staff") -> None:
+    """Put an existing staff member on another store's team too."""
+    from tenant.models import UserTenantMembership
+    from user.models import UserAccount
+
+    with schema_context(get_public_schema_name()):
+        UserTenantMembership.objects.create(
+            user=UserAccount.objects.get(email=email),
+            tenant=tenant,
+            role=role,
+            is_active=True,
+        )
+
+
 def _mint(user, *, resource: str | None, scopes: list[str]) -> str:
     """An access token in the schema the connection is bound to."""
     from allauth.idp.oidc.models import Client, Token
@@ -597,9 +611,9 @@ def test_a_refresh_naming_another_store_is_invalid_target(
 ):
     """A refresh never widens its grant (RFC 8707 section 2.2), even to a
     store the person is on the team of."""
-    client, client_id, first = _connected(
-        mt_tenant, "mt-staff-refresh-other@example.com"
-    )
+    email = "mt-staff-refresh-other@example.com"
+    client, client_id, first = _connected(mt_tenant, email)
+    _join_team(email, mt_tenant_b)
 
     refreshed = _refresh(
         client,

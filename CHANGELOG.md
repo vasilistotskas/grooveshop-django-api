@@ -3,6 +3,99 @@
 
 
 
+## v3.251.0 (2026-11-17)
+
+### Bug fixes
+
+* fix(order): paymentDecidedBy follows the sweep's own querysets and never names a past run
+
+decided_by took the run after the order's due instant, never after the
+read, so an order whose run was missed (the sweep switched off, beat or
+the workers down) or that a run left open reported an instant already
+past while still PENDING. It now takes the next run after the later of
+the two.
+
+Which orders it covers comes from the querysets the sweep selects with:
+payment_hold.swept_orders (unpaid_online_orders and the new
+failed_payment_orders, less amount_mismatch_orders), which the sweep now
+uses too. A FAILED order of any pay way, which the sweep cancels, was
+reported null.
+
+The description says what the instant is: when the scheduled sweep,
+running normally, will have decided the order, later if the sweep is
+paused or a run is cut short.
+
+An order not PENDING answers without a query; test_order_detail_queries
+now reads a paid order instead of the factory's random status, whose
+unpaid draws also read when the sweep decides them. ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+* fix(order): paymentDecidedBy follows beat across a clock change and an undeclared entry
+
+_next_sweep stepped once with the crontab's remaining_delta, which works on
+the Athens wall clock and drops the fold. Read inside the repeated autumn
+hour (2026-10-25T01:05Z) it returned 00:15Z, a run already past, so
+paymentDecidedBy was 00:45Z; and the time limit was added on the wall clock,
+so a read at 00:20Z gave 02:00Z instead of 01:00Z. It now steps through the
+same slots until one is after the input, compared in UTC, and returns UTC:
+the run beat really sends (it sends none in the repeated hour).
+
+PeriodicTask.objects.is_on now also requires the entry to be declared in
+CELERY_BEAT_SCHEDULE. An entry a deploy removed keeps its enabled row until
+beat restarts, and decided_by then raised KeyError on the schedule lookup,
+failing the order detail with a 500; ScheduleGate closes for it too.
+
+docs/order/cancel.md says which orders each instant is set for: a FAILED
+payment of any pay way has paymentDecidedBy without paymentHoldExpiresAt. ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+### Features
+
+* feat(order): expose the payment link's expiry and when the order is decided (#737) ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+* feat(order): expose the payment link's expiry and when the order is decided
+
+The order detail now serves paymentHoldExpiresAt (when the last payment
+link stops being payable, or the hold from creation before any link)
+and paymentDecidedBy (the start of the first unpaid-order sweep run
+that cancels the order if it is still unpaid), both null unless the
+order waits for an online payment. paymentDecidedBy is computed from
+the sweep's crontab in CELERY_BEAT_SCHEDULE, so a client such as the
+agent gateway publishes it and keeps no hold, grace or sweep number of
+its own. It is null where the sweep promises nothing: a payment the
+provider is processing, and an order flagged with an amount mismatch.
+
+create_checkout_session also returns expiresAt, the expiry the provider
+applied to the link it opened.
+
+ORDER_ONLINE_PAYMENT_GRACE_MINUTES gets a validator (0 to 60 minutes):
+a negative grace would release the stock before the link stops being
+payable.
+
+Closes #636 ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+* feat(order): bound paymentDecidedBy by the sweep's time limit and null it while the sweep is off
+
+paymentDecidedBy now adds the run's hard time limit
+(CELERY_TASK_TIME_LIMIT, which the prefork pool enforces from the start
+of a run; the sweep sets none of its own, a test holds it to that) to
+the selecting sweep run, so it is the latest instant by which every
+cancel of that run has committed, not the run's start.
+
+It is null while the sweep's scheduler.PeriodicTask row is switched off
+or not created yet: nothing will decide the order then.
+PeriodicTask.objects.is_on reads that row in the public schema, and
+emails.gates.ScheduleGate now uses it too. ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+### Testing
+
+* test(order): pin the unpaid-order sweep to payment_hold.swept_orders
+
+For orders covering every bucket and exclusion, the set
+auto_cancel_stuck_pending_orders cancels equals swept_orders() due at the
+same instant, less the one close_payment keeps open, so paymentDecidedBy
+and the sweep cannot drift apart. ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
+* test(order): pin the clock-change cases to Athens; ScheduleGate doc names the declared entry ([`e14e2e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e14e2e7d4c98f459edc978cff90bc075a0237448))
+
 ## v3.250.1 (2026-11-17)
 
 ### Bug fixes

@@ -10,6 +10,9 @@
 
 from __future__ import annotations
 
+import socketserver
+import threading
+import time
 from datetime import timedelta
 from email.utils import format_datetime
 from unittest.mock import Mock, patch
@@ -327,6 +330,52 @@ class AttemptTests(TestCase):
         self.assertEqual(event.status, Status.FAILED)
         self.assertEqual(event.last_error, "order deleted")
 
+    def test_a_gateway_fault_on_the_last_attempt_fails_the_event_and_stops(
+        self, post
+    ):
+        last = settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS - 1
+        for side_effect, outcome in (
+            (requests.ConnectionError("refused"), outbox.Outcome.UNREACHABLE),
+            (_response(403), outbox.Outcome.MISCONFIGURED),
+        ):
+            with self.subTest(outcome=outcome):
+                if isinstance(side_effect, Exception):
+                    post.side_effect = side_effect
+                else:
+                    post.side_effect = None
+                    post.return_value = side_effect
+                event = self.event(attempts=last)
+
+                self.assertEqual(outbox.attempt(event.pk), outcome)
+                event.refresh_from_db()
+                self.assertEqual(event.status, Status.FAILED)
+                event.delete()
+
+    def test_an_attempt_a_manual_retry_superseded_writes_nothing(self, post):
+        # The last attempt is in flight when staff send the event again:
+        # its failure must not end the fresh cycle.
+        event = self.event(attempts=settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS - 1)
+
+        def answer_after_a_manual_retry(body):
+            outbox.retry_now(AgentOrderEvent.objects.filter(pk=event.pk))
+            return 503, {}
+
+        with (
+            patch("agent.tasks.deliver_agent_order_event"),
+            patch(
+                "agent.outbox._post", side_effect=answer_after_a_manual_retry
+            ),
+        ):
+            outcome = outbox.attempt(event.pk)
+
+        self.assertEqual(outcome, outbox.Outcome.SKIPPED)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.attempts, 0)
+        self.assertIsNone(event.finished_at)
+        self.assertIsNone(event.claim)
+        self.assertEqual(event.last_error, "")
+
     def test_an_unreachable_gateway_is_attempted_again(self, post):
         post.side_effect = requests.ConnectionError("refused")
         event = self.event()
@@ -479,6 +528,20 @@ class SweepTests(TestCase):
 
         self.assertEqual(counts, {outbox.Outcome.DELIVERED: 1})
 
+    def test_a_gateway_fault_that_ends_events_still_stops_the_run(self, post):
+        post.side_effect = requests.ConnectionError("refused")
+        for order in self.orders:
+            self.event(
+                order, attempts=settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS - 1
+            )
+
+        with self.assertLogs("agent.outbox", level="ERROR") as logs:
+            counts = outbox.deliver_due()
+
+        self.assertEqual(counts, {outbox.Outcome.UNREACHABLE: 1})
+        post.assert_called_once()
+        self.assertEqual(len(logs.records), 1)
+
     @override_settings(AGENT_ORDER_EVENT_SWEEP_BATCH=1)
     def test_a_run_takes_at_most_a_batch(self, post):
         post.return_value = _response(204)
@@ -598,3 +661,59 @@ def test_a_sweep_run_ends_before_the_next_one_starts():
     assert entry["schedule"] == SCHEDULE_PRESETS["every_minute"]
     assert longest_run < timedelta(minutes=1).total_seconds()
     assert longest_run < settings.CELERY_TASK_SOFT_TIME_LIMIT
+
+
+class _TricklingGateway(socketserver.BaseRequestHandler):
+    """Answers a status line, then a header byte at a time: every wait
+    for the next byte is short, the whole answer never ends."""
+
+    stop = threading.Event()
+
+    def handle(self) -> None:
+        self.request.recv(65536)
+        self.request.sendall(b"HTTP/1.1 200 OK\r\n")
+        while not self.stop.wait(0.1):
+            try:
+                self.request.sendall(b"X")
+            except OSError:
+                return
+
+
+class CallDeadlineTests(TestCase):
+    def setUp(self):
+        _TricklingGateway.stop.clear()
+        self.server = socketserver.ThreadingTCPServer(
+            ("127.0.0.1", 0), _TricklingGateway
+        )
+        self.server.daemon_threads = True
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.addCleanup(_TricklingGateway.stop.set)
+        with override_settings(AGENT_GATEWAY_INTERNAL_URL=""):
+            self.order = _order()
+
+    def test_a_trickling_answer_ends_at_connect_plus_read(self):
+        host, port = self.server.server_address
+        connect, read = 0.5, 1.0
+        event = AgentOrderEvent.objects.create(
+            order=self.order, event_type=EventType.UPDATED
+        )
+
+        with override_settings(
+            AGENT_GATEWAY_INTERNAL_URL=f"http://{host}:{port}",
+            AGENT_ORDER_EVENT_CONNECT_TIMEOUT=connect,
+            AGENT_ORDER_EVENT_READ_TIMEOUT=read,
+        ):
+            started = time.monotonic()
+            outcome = outbox.attempt(event.pk)
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(outcome, outbox.Outcome.UNREACHABLE)
+        # Each byte comes well within the read timeout; only the deadline
+        # ends the call.
+        self.assertGreaterEqual(elapsed, connect + read)
+        self.assertLess(elapsed, connect + read + 1)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.last_error, "TimeoutError")

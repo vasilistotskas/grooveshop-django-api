@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
+from collections.abc import Mapping
 from datetime import UTC, timedelta
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
 from http import HTTPStatus
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import requests
 from django.conf import settings
@@ -140,9 +142,10 @@ def attempt(event_id: UUID | str) -> Outcome:
     """Send one event to the gateway once, if it is due, and record the
     outcome on its row.
 
-    The row is claimed first by moving its next attempt to the time a
-    failure would set, so a second worker finds it not due, and a worker
-    that dies mid-call leaves it to be attempted then.
+    The row is claimed first: its next attempt moves to the time a failure
+    would set, so a second worker finds it not due and a worker that dies
+    mid-call leaves it to be attempted then, and ``claim`` gets a token
+    that every later write of this attempt names (``_settle``).
     """
     if not settings.AGENT_GATEWAY_INTERNAL_URL:
         return Outcome.SKIPPED
@@ -151,6 +154,7 @@ def attempt(event_id: UUID | str) -> Outcome:
         return Outcome.SKIPPED
     now = timezone.now()
     number = event.attempts + 1
+    token = uuid4()
     claimed = AgentOrderEvent.objects.filter(
         pk=event.pk,
         status=AgentOrderEventStatus.PENDING,
@@ -160,52 +164,99 @@ def attempt(event_id: UUID | str) -> Outcome:
         attempts=number,
         last_attempt_at=now,
         next_attempt_at=now + retry_delay(number),
+        claim=token,
     )
     if not claimed:
         return Outcome.SKIPPED
     if number > settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS:
         # Only a worker that died during the last attempt leaves this.
-        return _give_up(event, event.last_error)
+        return _give_up(event, token, event.last_error, Outcome.FAILED)
 
     order = _order_state(event.order_id)
     if order is None:
         # Deleted for good between the claim and this read. A deleted
         # order takes its events with it, so this row is normally gone
         # too; nothing is left to render either way.
-        return _give_up(event, "order deleted")
+        return _give_up(event, token, "order deleted", Outcome.FAILED)
 
     try:
-        response = requests.post(
-            f"{settings.AGENT_GATEWAY_INTERNAL_URL.rstrip('/')}"
-            f"{ORDER_EVENTS_PATH}",
-            json=_body(event, order),
-            headers={
-                "X-Internal-Token": settings.AGENT_GATEWAY_INTERNAL_SECRET
-            },
-            timeout=(
-                settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT,
-                settings.AGENT_ORDER_EVENT_READ_TIMEOUT,
-            ),
+        status, headers = _post(_body(event, order))
+    except (requests.RequestException, TimeoutError) as error:
+        return _failed(
+            event, token, number, type(error).__name__, Outcome.UNREACHABLE
         )
-    except requests.RequestException as error:
-        return _failed(event, number, type(error).__name__, Outcome.UNREACHABLE)
 
-    status = response.status_code
     if 200 <= status < 300:
-        AgentOrderEvent.objects.filter(pk=event.pk).update(
+        if _settle(
+            event,
+            token,
             status=AgentOrderEventStatus.DELIVERED,
             finished_at=timezone.now(),
             last_error="",
-        )
-        return Outcome.DELIVERED
+        ):
+            return Outcome.DELIVERED
+        return Outcome.SKIPPED
     error = f"HTTP {status}"
     if status in DEPLOYMENT_FAULTS:
-        return _failed(event, number, error, Outcome.MISCONFIGURED)
+        return _failed(event, token, number, error, Outcome.MISCONFIGURED)
     if is_permanent_http_status(status):
-        return _give_up(event, error)
+        return _give_up(event, token, error, Outcome.FAILED)
     return _failed(
-        event, number, error, Outcome.RETRY, retry_after=_retry_after(response)
+        event,
+        token,
+        number,
+        error,
+        Outcome.RETRY,
+        retry_after=_retry_after(headers),
     )
+
+
+def _post(body: dict[str, str]) -> tuple[int, Mapping[str, str]]:
+    """POST an event and return the answer's status and headers, within
+    connect + read timeouts in total.
+
+    requests' read timeout bounds each wait for the next bytes, not the
+    whole answer (urllib3's ``Timeout`` documents the same of ``total``),
+    so a gateway answering a byte at a time could hold a sweep run past
+    its budget. The call runs in a daemon thread that is abandoned once
+    the deadline passes (it ends with its own socket timeout), and the
+    body is never read: the status and ``Retry-After`` are the answer.
+    Raises ``TimeoutError`` at the deadline, and what the call raises.
+    """
+    connect = settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT
+    read = settings.AGENT_ORDER_EVENT_READ_TIMEOUT
+    answer: list[tuple[int, Mapping[str, str]]] = []
+    failure: list[BaseException] = []
+
+    def call() -> None:
+        try:
+            response = requests.post(
+                f"{settings.AGENT_GATEWAY_INTERNAL_URL.rstrip('/')}"
+                f"{ORDER_EVENTS_PATH}",
+                json=body,
+                headers={
+                    "X-Internal-Token": settings.AGENT_GATEWAY_INTERNAL_SECRET
+                },
+                timeout=(connect, read),
+                stream=True,
+            )
+            try:
+                answer.append((response.status_code, response.headers))
+            finally:
+                response.close()
+        except BaseException as error:
+            failure.append(error)
+
+    worker = threading.Thread(
+        target=call, name="agent-order-event", daemon=True
+    )
+    worker.start()
+    worker.join(connect + read)
+    if failure:
+        raise failure[0]
+    if not answer:
+        raise TimeoutError(f"no answer within {connect + read} s")
+    return answer[0]
 
 
 def _order_state(order_id: int) -> dict | None:
@@ -220,12 +271,12 @@ def _order_state(order_id: int) -> dict | None:
     )
 
 
-def _retry_after(response: requests.Response) -> timedelta | None:
+def _retry_after(headers: Mapping[str, str]) -> timedelta | None:
     """The wait a ``Retry-After`` header asks for (delta-seconds or an
     HTTP date), at least ``AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS`` and
     at most ``AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS``; None without
     a usable one."""
-    value = response.headers.get("Retry-After", "").strip()
+    value = headers.get("Retry-After", "").strip()
     if not value:
         return None
     if value.isdigit():
@@ -260,8 +311,20 @@ def _body(event: AgentOrderEvent, order: dict) -> dict[str, str]:
     }
 
 
+def _settle(event: AgentOrderEvent, token: UUID, **fields: object) -> bool:
+    """Write an attempt's result, if the attempt still holds the row. A
+    manual retry clears the claim, so a superseded attempt writes nothing
+    over the fresh cycle."""
+    return bool(
+        AgentOrderEvent.objects.filter(pk=event.pk, claim=token).update(
+            **fields
+        )
+    )
+
+
 def _failed(
     event: AgentOrderEvent,
+    token: UUID,
     number: int,
     error: str,
     outcome: Outcome,
@@ -270,13 +333,16 @@ def _failed(
 ) -> Outcome:
     """A failed attempt a retry can fix. The claim already set the next
     attempt by the backoff; a ``Retry-After`` replaces it. The last
-    attempt gives up instead, whatever the failure."""
+    attempt gives up instead, whatever the failure, and still reports a
+    gateway-wide fault so the sweep run stops."""
     if number >= settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS:
-        return _give_up(event, error)
+        terminal = outcome if outcome in STOPS_THE_RUN else Outcome.FAILED
+        return _give_up(event, token, error, terminal)
     fields: dict[str, object] = {"last_error": error}
     if retry_after is not None:
         fields["next_attempt_at"] = timezone.now() + retry_after
-    AgentOrderEvent.objects.filter(pk=event.pk).update(**fields)
+    if not _settle(event, token, **fields):
+        return Outcome.SKIPPED
     # A deployment fault is an operator's to fix: ERROR, once per run,
     # since the run stops on it (``deliver_due``).
     log = logger.error if outcome is Outcome.MISCONFIGURED else logger.warning
@@ -290,19 +356,26 @@ def _failed(
     return outcome
 
 
-def _give_up(event: AgentOrderEvent, error: str) -> Outcome:
-    AgentOrderEvent.objects.filter(pk=event.pk).update(
+def _give_up(
+    event: AgentOrderEvent, token: UUID, error: str, outcome: Outcome
+) -> Outcome:
+    """Make the row ``failed``. Returns ``outcome``: ``FAILED``, or the
+    gateway-wide fault of the last attempt, which stops the sweep run."""
+    if not _settle(
+        event,
+        token,
         status=AgentOrderEventStatus.FAILED,
         finished_at=timezone.now(),
         last_error=error,
-    )
+    ):
+        return Outcome.SKIPPED
     logger.error(
         "Agent order event %s (order %s) failed for good: %s",
         event.pk,
         event.order_id,
         error,
     )
-    return Outcome.FAILED
+    return outcome
 
 
 def deliver_due() -> dict[str, int]:
@@ -344,20 +417,26 @@ def deliver_due() -> dict[str, int]:
 def retry_now(events: QuerySet[AgentOrderEvent]) -> int:
     """Send these events again now, with a fresh set of attempts.
 
-    A delivered event is left as it is: the platform already has it.
-    Returns how many were queued.
+    Each row is reset by an update that itself refuses a delivered row,
+    so one delivered after the selection is left as it is, and only the
+    rows reset are queued. The reset clears the claim: an attempt still in
+    flight writes nothing over the new cycle (``_settle``). Returns how
+    many were queued.
     """
-    event_ids = list(
-        events.exclude(status=AgentOrderEventStatus.DELIVERED).values_list(
-            "pk", flat=True
+    queued = 0
+    for event_id in list(events.values_list("pk", flat=True)):
+        reset = (
+            AgentOrderEvent.objects.filter(pk=event_id)
+            .exclude(status=AgentOrderEventStatus.DELIVERED)
+            .update(
+                status=AgentOrderEventStatus.PENDING,
+                attempts=0,
+                next_attempt_at=timezone.now(),
+                finished_at=None,
+                claim=None,
+            )
         )
-    )
-    AgentOrderEvent.objects.filter(pk__in=event_ids).update(
-        status=AgentOrderEventStatus.PENDING,
-        attempts=0,
-        next_attempt_at=timezone.now(),
-        finished_at=None,
-    )
-    for event_id in event_ids:
-        _queue_attempt(event_id)
-    return len(event_ids)
+        if reset:
+            _queue_attempt(event_id)
+            queued += 1
+    return queued

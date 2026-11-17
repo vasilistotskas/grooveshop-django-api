@@ -64,6 +64,10 @@ class AgentOrderEvent(models.Model):
     last_error = models.CharField(
         _("Last error"), max_length=255, blank=True, default=""
     )
+    # The attempt that holds the row: set by its claim, cleared by a manual
+    # retry. Every write an attempt makes after its call names it, so an
+    # attempt the retry superseded changes nothing.
+    claim = models.UUIDField(_("Claim"), null=True, blank=True, editable=False)
 
     class Meta(TypedModelMeta):
         verbose_name = _("Agent order event")

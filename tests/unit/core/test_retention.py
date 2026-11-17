@@ -8,12 +8,15 @@ lives.
 from __future__ import annotations
 
 from datetime import timedelta
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from allauth.usersessions.models import UserSession
 from django.contrib.admin.models import ADDITION, LogEntry
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.sessions.models import Session
+from django.db import transaction
 from django.test import override_settings
 from django.utils import timezone
 from extra_settings.models import Setting
@@ -63,6 +66,26 @@ class TestDeleteInBatches:
         query.clicks.create(result_id="1", result_type="product", position=0)
 
         assert delete_in_batches(SearchQuery.objects.all()) == 1
+
+    def test_keeps_a_row_that_stopped_being_stale_before_the_delete(self):
+        row = _search_query("blank")
+        stale = SearchQuery.objects.filter(query="blank")
+
+        def a_writer_renews_the_row_first():
+            # Between the batch read and the delete, another writer makes
+            # the row no longer match the sweep.
+            SearchQuery.objects.filter(pk=row.pk).update(query="renewed")
+            return real_atomic()
+
+        real_atomic = transaction.atomic
+        with patch(
+            "core.retention.transaction",
+            SimpleNamespace(atomic=a_writer_renews_the_row_first),
+        ):
+            deleted = delete_in_batches(stale)
+
+        assert deleted == 0
+        assert SearchQuery.objects.filter(pk=row.pk).exists()
 
     def test_touches_nothing_outside_the_queryset(self):
         stale = _search_query("a")

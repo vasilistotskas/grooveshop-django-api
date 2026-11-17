@@ -3253,6 +3253,9 @@ msgstr "City name"
 msgid "City name for nearest-locker lookup"
 msgstr "City name for nearest-locker lookup"
 
+msgid "Claim"
+msgstr "Claim"
+
 msgid "Claim deadline"
 msgstr "Claim deadline"
 

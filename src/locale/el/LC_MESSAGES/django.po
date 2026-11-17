@@ -3260,6 +3260,9 @@ msgstr "Όνομα πόλης"
 msgid "City name for nearest-locker lookup"
 msgstr "Όνομα πόλης για αναζήτηση πλησιέστερου locker"
 
+msgid "Claim"
+msgstr "Δέσμευση"
+
 msgid "Claim deadline"
 msgstr "Προθεσμία δέσμευσης"
 

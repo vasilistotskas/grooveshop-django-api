@@ -76,7 +76,13 @@ The gateway's answer decides the row:
 | `2xx` | `delivered` |
 | 401, 403, 404 (`agent.outbox.DEPLOYMENT_FAULTS`): a wrong shared secret, one being rotated, or a wrong URL | attempted again on the backoff; an `ERROR` log line, and the sweep run stops |
 | another `4xx` but 408 and 429 (`core.retry.is_permanent_http_status`), such as 400 or 422 | `failed` at once |
-| anything else, or no connection within `AGENT_ORDER_EVENT_CONNECT_TIMEOUT` (3 s) or no answer within `AGENT_ORDER_EVENT_READ_TIMEOUT` (30 s, above the 25 s the gateway bounds its answer by) | attempted again |
+| anything else, or no connection within `AGENT_ORDER_EVENT_CONNECT_TIMEOUT` (3 s), or no complete status line and headers within connect + `AGENT_ORDER_EVENT_READ_TIMEOUT` (30 s, above the 25 s the gateway bounds its answer by) | attempted again |
+
+The timeouts are a total deadline. requests' read timeout bounds each wait
+for the next bytes, not the whole answer (urllib3's `Timeout` documents the
+same of its `total`), so the call runs in a daemon thread that is abandoned
+when connect + read have passed; it ends on its own socket timeout. The body
+is never read: the status and `Retry-After` are the answer.
 
 A retryable answer with a `Retry-After` (delta-seconds or an HTTP date)
 sets the next attempt to what it asks, at least
@@ -105,7 +111,10 @@ the same answer.
 - **One attempt at a time.** An attempt first claims its row by moving
   `next_attempt_at` to when a failure would set it, so a second worker finds
   it not due, and a worker that dies in the call leaves it to be attempted
-  then. An attempt is a database update before the call and one after; no
+  then. The claim also writes a token to `claim`, and every write the
+  attempt makes after its call is conditional on it: a manual retry clears
+  the token, so an attempt it superseded changes nothing in the new cycle.
+  An attempt is a database update before the call and one after; no
   transaction or lock is held across the call.
 - **In order.** An event waits while an earlier event of its order is still
   `pending`; a `failed` one holds nothing back. The sweep takes due events one
@@ -116,7 +125,8 @@ the same answer.
   `AGENT_ORDER_EVENT_BACKOFF_CAP_SECONDS` (a day), varied by
   `AGENT_ORDER_EVENT_BACKOFF_JITTER` (10%) of itself: about 2.8 days from the
   first attempt to the last. The last failure makes the row `failed`, with an
-  `ERROR` log line.
+  `ERROR` log line; when it was the gateway itself (unreachable, or 401,
+  403, 404) the run still stops there.
 
 ## The task the outbox replaced
 
@@ -131,14 +141,20 @@ runs as `occurredAt`). Remove it in the release after this one.
 `Audit & Logs → Agent Order Events`, for superusers: every row read-only,
 with its attempts, next attempt and last error. **Send again now** puts the
 selected `failed` or `pending` events back to `pending` with a fresh set of
-attempts and queues an attempt for each; a `delivered` event is not sent
-again.
+attempts and queues an attempt for each. The reset is one update per row
+that itself refuses a `delivered` row, so an event delivered after the
+selection is not sent again, and only the rows it reset are queued. A
+`pending` event whose attempt is in flight can be sent twice under the same
+`Webhook-Id`, which a platform dedupes.
 
 ## Retention
 
 `purge-expired-agent-order-events` (daily, per store, suspended stores
 included) deletes `delivered` and `failed` events that finished more than
 `AGENT_ORDER_EVENT_RETENTION_DAYS` (30) days ago, through
-`core.retention.delete_in_batches`. A `pending` event is never deleted. An
+`core.retention.delete_in_batches`, which reads each batch again under row
+locks with the sweep's filters before deleting it: an event sent again from
+the admin between the two reads is `pending` by then and kept. A `pending`
+event is never deleted. An
 event goes with its order. The staging refresh deletes every row
 (`devtools.anonymise.rules`): they are production's to send.

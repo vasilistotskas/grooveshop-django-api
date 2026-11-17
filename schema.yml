@@ -43152,8 +43152,17 @@ components:
             during that run, the order stays open for its outcome. Null when nothing
             will decide the order: the sweep does not cancel it (it does not wait
             for a payment, the provider is already processing one, or a charge did
-            not match the total and waits for the store), or the sweep is switched
-            off.'
+            not match the total and waits for the store, which paymentAwaitsReview
+            tells apart), or the sweep is switched off.'
+        paymentAwaitsReview:
+          type: boolean
+          readOnly: true
+          description: 'True when the provider confirmed a charge that did not match
+            the order''s total and the order is still undecided (PENDING, payment
+            not final): the money has left the customer, the order was not marked
+            paid, and the store reconciles it by hand. Do not offer a new payment
+            link. False for any other order, including one whose mismatch the store
+            has since settled, canceled or refunded.'
       required:
       - acsShipment
       - amountDue
@@ -43199,6 +43208,7 @@ components:
       - orderTimeline
       - payWay
       - payWayKey
+      - paymentAwaitsReview
       - paymentDecidedBy
       - paymentHoldExpiresAt
       - paymentMethodFee

@@ -313,12 +313,39 @@ def amount_mismatch_orders() -> QuerySet[Order]:
     return Order.objects.filter(metadata__has_key=AMOUNT_MISMATCH_FLAG)
 
 
+def payment_review_orders() -> QuerySet[Order]:
+    """Orders whose mismatched charge still waits for the store.
+
+    Flagged (:func:`amount_mismatch_orders`) and still undecided: PENDING,
+    with a payment that is not final. The flag is never cleared, so an
+    order the store has since settled, canceled or refunded leaves this
+    set through its own state: its status moves on from PENDING, or its
+    payment reaches one of ``SETTLED_PAYMENT_STATUSES``.
+    """
+    return (
+        amount_mismatch_orders()
+        .filter(status=OrderStatus.PENDING)
+        .exclude(payment_status__in=SETTLED_PAYMENT_STATUSES)
+    )
+
+
+def awaits_payment_review(order: Order) -> bool:
+    """True when *order* is in :func:`payment_review_orders`: a charge did
+    not match its total and nothing but a person will decide it."""
+    # Unflagged orders answer without a query; the rest is the queryset.
+    if AMOUNT_MISMATCH_FLAG not in (order.metadata or {}):
+        return False
+    return payment_review_orders().filter(pk=order.pk).exists()
+
+
 def swept_orders() -> QuerySet[Order]:
     """Every order the sweep cancels once its time has come: its two
-    buckets, less what it never cancels. The same definitions the sweep
-    selects with, so :func:`decided_by` cannot promise more or less."""
+    buckets, less what it never cancels (:func:`payment_review_orders`).
+    The same definitions the sweep selects with, so :func:`decided_by`
+    cannot promise more or less, and an order the buckets hold has either
+    a deadline or a charge waiting for review."""
     return (unpaid_online_orders() | failed_payment_orders()).exclude(
-        pk__in=amount_mismatch_orders().values("pk")
+        pk__in=payment_review_orders().values("pk")
     )
 
 

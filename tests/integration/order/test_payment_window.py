@@ -552,6 +552,96 @@ class TestTheOrderDetailServesBoth:
         assert body["paymentDecidedBy"] is None
 
 
+class TestAChargeThatWaitsForTheStoreIsToldApart:
+    """``paymentAwaitsReview`` tells a mismatched charge the store must
+    reconcile from an order no sweep decides for another reason (#739)."""
+
+    _guest = TestTheOrderDetailServesBoth._guest
+    _gateway = TestTheOrderDetailServesBoth._gateway
+
+    @pytest.mark.parametrize("read", ["_guest", "_gateway"])
+    @pytest.mark.parametrize(
+        "payment_status",
+        [PaymentStatus.PENDING, PaymentStatus.FAILED, PaymentStatus.PROCESSING],
+    )
+    def test_a_flagged_undecided_order(self, hour, read, payment_status):
+        order = _order(
+            created=hour,
+            hold=hour + timedelta(minutes=37),
+            payment_status=payment_status,
+            metadata={AMOUNT_MISMATCH_FLAG: True},
+        )
+
+        body = getattr(self, read)(order)
+
+        assert body["paymentAwaitsReview"] is True
+        assert body["paymentDecidedBy"] is None
+        assert order in payment_hold.payment_review_orders()
+
+    @pytest.mark.parametrize(
+        ("status", "payment_status"),
+        [
+            # Settled by hand: marked paid, then fulfilled.
+            (OrderStatus.PENDING, PaymentStatus.COMPLETED),
+            (OrderStatus.PROCESSING, PaymentStatus.COMPLETED),
+            # Canceled: ``Order.settle_unpaid_payment`` closes the payment.
+            (OrderStatus.CANCELED, PaymentStatus.CANCELED),
+            # Refunded.
+            (OrderStatus.CANCELED, PaymentStatus.REFUNDED),
+            (OrderStatus.PENDING, PaymentStatus.REFUNDED),
+            (OrderStatus.REFUNDED, PaymentStatus.REFUNDED),
+        ],
+    )
+    def test_a_flagged_order_the_store_has_decided(
+        self, hour, status, payment_status
+    ):
+        order = _order(
+            created=hour,
+            hold=hour + timedelta(minutes=37),
+            status=status,
+            payment_status=payment_status,
+            metadata={AMOUNT_MISMATCH_FLAG: True},
+        )
+
+        body = self._guest(order)
+
+        assert body["paymentAwaitsReview"] is False
+        assert order not in payment_hold.payment_review_orders()
+
+    def test_a_flagged_order_canceled_by_the_store(self, hour):
+        order = _order(
+            created=hour,
+            hold=hour + timedelta(minutes=37),
+            metadata={AMOUNT_MISMATCH_FLAG: True},
+        )
+        assert payment_hold.awaits_payment_review(order) is True
+
+        order.status = OrderStatus.CANCELED
+        order.save()
+        order.refresh_from_db()
+
+        assert AMOUNT_MISMATCH_FLAG in order.metadata
+        assert order.payment_status == PaymentStatus.CANCELED
+        assert self._guest(order)["paymentAwaitsReview"] is False
+
+    def test_an_unflagged_order_with_the_sweep_switched_off(self, hour):
+        PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).switch_off()
+        order = _order(created=hour, hold=hour + timedelta(minutes=37))
+
+        body = self._guest(order)
+
+        assert body["paymentDecidedBy"] is None
+        assert body["paymentAwaitsReview"] is False
+
+    def test_an_unflagged_order_the_sweep_decides(self, hour):
+        order = _order(created=hour, hold=hour + timedelta(minutes=37))
+
+        body = self._guest(order)
+
+        assert body["paymentDecidedBy"] is not None
+        assert body["paymentAwaitsReview"] is False
+
+
 class TestTheCheckoutSessionReturnsTheLinkExpiry:
     def test_expires_at(self):
         user = UserAccountFactory(num_addresses=0)

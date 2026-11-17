@@ -48,7 +48,11 @@ from order.models.order import (
 from order.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
 from order.review_request import awaiting_review_request, delivery_window
-from order.services import SHIPMENT_CANCEL_PENDING_FLAG, OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    OrderService,
+    shipment_cancel_retry_until,
+)
 from recommendation.order_email import record_impression
 from tenant.celery import dispatch_on_commit
 
@@ -2011,20 +2015,55 @@ def finish_pending_shipment_cancels(
     The same holds for a creation in flight or still settling: the order
     stays flagged and is asked about on a later run.
 
+    It also asks again for a courier that gave no answer
+    (``CarrierUnavailableError``), on every run until
+    ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the cancel, when
+    ``cancel_attached_shipment`` records the last failure for staff.
+    A courier that gives no answer in a run is not asked about its other
+    orders in that run: during an outage each would wait out the same
+    timeout and keep the run, and the worker, busy for nothing. An order
+    whose retries are over is still asked once, so it gets its answer;
+    "over" is read when the order comes up, since the courier calls
+    before it take time.
+
+    *max_per_run* bounds the couriers asked in one run, not the orders
+    looked at: the orders a silent courier holds are passed over without a
+    call, so however many it holds they never keep another courier's
+    pending cancels from being asked. The candidates are read as ids and
+    times only, oldest first, and each order asked is loaded then, fresh.
+
     Beat-scheduled through
     ``tenant.tasks.fanout_finish_pending_shipment_cancels``.
     """
     cutoff = timezone.now() - timedelta(
         seconds=settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS
     )
-    pending = Order.objects.filter(
-        status=OrderStatus.CANCELED,
-        metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG,
-        status_updated_at__lt=cutoff,
-    ).order_by("status_updated_at")[:max_per_run]
+    pending = (
+        Order.objects.filter(
+            status=OrderStatus.CANCELED,
+            metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG,
+            status_updated_at__lt=cutoff,
+        )
+        .order_by("status_updated_at")
+        .values_list("pk", "shipping_provider_id", "status_updated_at")
+    )
 
-    finished = still_pending = 0
-    for order in pending:
+    finished = still_pending = asked = 0
+    silent_couriers: set[int] = set()
+    for pk, provider_id, canceled_at in pending:
+        if asked >= max_per_run or (
+            provider_id in silent_couriers
+            and timezone.now() < shipment_cancel_retry_until(canceled_at)
+        ):
+            still_pending += 1
+            continue
+        order = Order.objects.filter(
+            pk=pk, metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG
+        ).first()
+        if order is None:
+            # Answered meanwhile, by the first attempt or another run.
+            continue
+        asked += 1
         logger.warning(
             "Order %s was canceled at %s and holds no answer from its "
             "courier to the shipment cancel: asking now",
@@ -2032,9 +2071,11 @@ def finish_pending_shipment_cancels(
             order.status_updated_at,
         )
         cancellation = (order.metadata or {}).get("cancellation") or {}
-        OrderService.cancel_attached_shipment(
+        unanswered = OrderService.cancel_attached_shipment(
             order, cancellation.get("reason", "")
         )
+        if unanswered and order.shipping_provider_id is not None:
+            silent_couriers.add(order.shipping_provider_id)
         # ``order`` carries the metadata as written: the flag is gone
         # once an answer is recorded, and stays for a shipment that is
         # being worked on elsewhere.

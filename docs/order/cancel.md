@@ -108,9 +108,10 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    `metadata['cancellation']['shipment_cancel']['error']`, left as a staff-only
    `OrderHistory` NOTE
    (`Order canceled, but the courier did not cancel the parcel: …`), and the
-   admin "Cancel selected orders" action raises an error message for it. For a
-   customer cancel the courier already confirmed in step 0, so the outcome is
-   recorded up front, in step 3, and the cascade skips.
+   admin "Cancel selected orders" action raises an error message for it. A
+   courier that gives no answer is asked again for a while instead (§7.1.2).
+   For a customer cancel the courier already confirmed in step 0, so the
+   outcome is recorded up front, in step 3, and the cascade skips.
 5. After the cancel has COMMITTED, optional refund via `refund_order`
    (`OrderService._refund_canceled_order`; `refund_payment=True`, and the order
    is paid or the ledger still holds refundable money, so an order a provider's
@@ -382,12 +383,35 @@ the other way round (#613, a deadlock reproduced with two connections). Now:
 
 What each failure does:
 
-- **The courier refuses, gives no answer, or is not configured.** As before:
-  the order stays canceled (and is refunded), the error is recorded in
-  `shipment_cancel`, staff get the history note and the admin action's
-  message. The flag goes with the answer: nothing asks again by itself, and
-  the voucher is staff's to cancel ("Cancel ACS voucher", "Cancel parcel
-  via BoxNow API").
+- **The courier refuses** (a plain `CarrierError`: the voucher is in a
+  pickup list, the parcel is at a locker). That is its answer, and asking
+  again gets the same one: the order stays canceled (and is refunded), the
+  error is recorded in `shipment_cancel`, staff get the history note and the
+  admin action's error message. The flag goes with the answer, and the
+  return is staff's to arrange.
+- **The courier gives no answer** (`CarrierUnavailableError`: unreachable,
+  timed out, HTTP 5xx, an auth-layer rejection, missing credentials). That
+  says nothing about the parcel, so it is not recorded as the answer while
+  the retries last: the flag stays, the attempt is counted in
+  `metadata['shipment_cancel_unanswered']` (`since`, `attempts`,
+  `last_error`; `SHIPMENT_CANCEL_UNANSWERED_KEY`), and the sweep below
+  asks again on each run. Staff are told at once, in one history note
+  (`Order canceled, but the courier gave no answer to the parcel cancel:
+  …`) and the admin action's warning, that the parcel is still live and
+  can be collected meanwhile (a courier unreachable for us may still be
+  doing pickups), so they call the courier when it must not ship; the
+  retries stop it without them otherwise. Until `ORDER_SHIPMENT_CANCEL_RETRY_HOURS` (env,
+  default 24; 0 asks once) after the cancel: then the last failure is
+  recorded in `shipment_cancel` like a refusal, with the "did not cancel
+  the parcel" note, and the voucher is staff's to cancel ("Cancel ACS
+  voucher", "Cancel parcel via BoxNow API"). Before, the first timeout was
+  final, and the parcel of a canceled order stayed live unless staff
+  noticed the note. A courier that gives no answer in a sweep run is not
+  asked about its other orders in that run (each would wait out the same
+  timeout); an order whose retries are over (read when it comes up, not
+  when the run starts) is still asked once. The run's limit
+  (`max_per_run`, 100) counts courier calls, not orders looked at, so a
+  silent courier's backlog never keeps another courier's cancels waiting.
 - **The shipment is already being worked on** (`CarrierBusyError`: another
   cancel of the voucher holds its claim, or a creation is in flight or
   still settling). That is our own refusal, with no call to the courier, so
@@ -414,7 +438,8 @@ What each failure does:
   `tenant.tasks.fanout_finish_pending_shipment_cancels`, suspended stores
   included) takes every CANCELED order with the flag whose cancel is older
   than `ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS` (env, default 600) and
-  runs the same `cancel_attached_shipment`. Before #713 such a stop rolled
+  runs the same `cancel_attached_shipment` (which also asks again for a
+  courier that gave no answer, above). Before #713 such a stop rolled
   the whole cancel back; without the sweep it would leave a canceled,
   refunded order with a live voucher.
 - **The sweep and a slow first attempt overlap, or two runs of the

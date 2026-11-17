@@ -141,6 +141,14 @@ REFUND_RECONCILE_AFTER_MINUTES = int(
 ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS = int(
     getenv("ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS", "600")
 )
+# Hours after a staff or system order cancel during which a courier that
+# gives no answer to the shipment cancel (unreachable, timed out, failing on
+# its side) is asked again by that same sweep. Once they pass, the last
+# failure is recorded as the courier's answer and staff take over. A refusal
+# is an answer at once and is never asked again. 0 asks once.
+ORDER_SHIPMENT_CANCEL_RETRY_HOURS = int(
+    getenv("ORDER_SHIPMENT_CANCEL_RETRY_HOURS", "24")
+)
 # Retention sweeps (``core.retention``): primary keys deleted per statement.
 RETENTION_PURGE_BATCH_SIZE = int(getenv("RETENTION_PURGE_BATCH_SIZE", "1000"))
 # Days a ``CachePurgeLog`` audit row (public schema, every store's purges)

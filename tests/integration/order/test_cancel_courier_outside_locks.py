@@ -7,7 +7,8 @@ stayed locked across the carrier's HTTP round trip, and the shipment was
 locked after the order while a tracking sync took the two the other way
 round. The cancel now commits first. The courier is asked afterwards, with
 no transaction open, and a cancel whose worker stopped in between is
-finished by ``finish_pending_shipment_cancels``.
+finished by ``finish_pending_shipment_cancels``, which also asks again,
+for a while, a courier that gave no answer.
 
 These tests commit for real and look at the database from a second
 connection, at the moment the carrier's HTTP boundary is called.
@@ -20,23 +21,32 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from django.contrib.admin.sites import AdminSite
+from django.contrib.auth import get_user_model
 from django.db import OperationalError, connection, transaction
-from django.utils import timezone
+from django.test import RequestFactory
+from django.utils import timezone, translation
 
+from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.services import SHIPMENT_CANCEL_PENDING_FLAG, OrderService
+from order.services import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
+    OrderService,
+)
 from order.stock import StockManager
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
     finish_pending_shipment_cancels,
 )
 from pay_way.factories import PayWayFactory
-from shipping.exceptions import CarrierUnavailableError
+from shipping.exceptions import CarrierError, CarrierUnavailableError
 from shipping.models import ShippingProvider
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
@@ -236,12 +246,12 @@ class TestTheCourierIsAskedAfterTheCancelCommitted:
         assert metadata["cancellation"]["shipment_cancel"] == ASKED
         assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
 
-    def test_a_courier_that_gives_no_answer_leaves_the_order_canceled(
+    def test_a_courier_that_refuses_is_the_answer_at_once(
         self, monkeypatch, provider_code
     ):
         shipment = _shipment(provider_code)
         courier = _courier(
-            monkeypatch, shipment, error=CarrierUnavailableError("timed out")
+            monkeypatch, shipment, error=CarrierError("already picked up")
         )
 
         canceled = _staff_cancel(shipment.order)
@@ -251,14 +261,11 @@ class TestTheCourierIsAskedAfterTheCancelCommitted:
         metadata = _metadata(shipment.order_id)
         outcome = metadata["cancellation"]["shipment_cancel"]
         assert outcome["dispatched"] is False
-        assert "timed out" in outcome["error"]
+        assert "already picked up" in outcome["error"]
         # The answer is recorded, so nothing is left for the sweep.
         assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
-        assert OrderHistory.objects.filter(
-            order_id=shipment.order_id,
-            change_type="NOTE",
-            new_value__note__icontains="did not cancel the parcel",
-        ).exists()
+        assert SHIPMENT_CANCEL_UNANSWERED_KEY not in metadata
+        assert len(_courier_notes(shipment.order_id)) == 1
 
     def test_the_answer_is_written_beside_what_changed_meanwhile(
         self, monkeypatch, provider_code
@@ -383,14 +390,162 @@ class TestACancelWhoseWorkerStopped:
         assert len(courier.calls) == 1
 
 
-def _courier_notes(order_id: int) -> list[str]:
+def _notes(order_id: int, containing: str) -> list[str]:
     return [
         row.new_value["note"]
         for row in OrderHistory.objects.filter(
             order_id=order_id, change_type="NOTE"
         )
-        if "did not cancel the parcel" in row.new_value["note"]
+        if containing in row.new_value["note"]
     ]
+
+
+def _courier_notes(order_id: int) -> list[str]:
+    return _notes(order_id, "did not cancel the parcel")
+
+
+def _no_answer_notes(order_id: int) -> list[str]:
+    return _notes(order_id, "gave no answer to the parcel cancel")
+
+
+def _age_past_the_retries(order_id: int) -> None:
+    Order.objects.filter(pk=order_id).update(
+        status_updated_at=timezone.now()
+        - timedelta(hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS)
+        - timedelta(seconds=1)
+    )
+
+
+@pytest.mark.parametrize("provider_code", ["acs", "boxnow"])
+class TestACourierThatGivesNoAnswer:
+    """``CarrierUnavailableError`` says nothing about the parcel: the
+    cancel stays pending and the sweep asks again, until
+    ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the cancel."""
+
+    @staticmethod
+    def _canceled_while_silent(monkeypatch, provider_code):
+        shipment = _shipment(provider_code)
+        courier = _courier(
+            monkeypatch, shipment, error=CarrierUnavailableError("timed out")
+        )
+        canceled = _staff_cancel(shipment.order)
+        return shipment, courier, canceled
+
+    def test_the_order_is_canceled_and_the_cancel_stays_pending(
+        self, monkeypatch, provider_code
+    ):
+        shipment, courier, canceled = self._canceled_while_silent(
+            monkeypatch, provider_code
+        )
+
+        assert courier.calls == [UNLOCKED]
+        assert canceled.status == OrderStatus.CANCELED
+        metadata = _metadata(shipment.order_id)
+        assert "shipment_cancel" not in metadata["cancellation"]
+        assert metadata[SHIPMENT_CANCEL_PENDING_FLAG] is True
+        unanswered = metadata[SHIPMENT_CANCEL_UNANSWERED_KEY]
+        assert unanswered["attempts"] == 1
+        assert "timed out" in unanswered["last_error"]
+        # The caller reads the same on the order it gets back.
+        assert canceled.metadata[SHIPMENT_CANCEL_UNANSWERED_KEY] == unanswered
+        # Staff are told it is being retried, and that the parcel is
+        # live until then.
+        notes = _no_answer_notes(shipment.order_id)
+        assert len(notes) == 1
+        assert "still live" in notes[0]
+        assert _courier_notes(shipment.order_id) == []
+
+    def test_the_sweep_asks_again_and_tells_staff_only_once(
+        self, monkeypatch, provider_code
+    ):
+        shipment, courier, _canceled = self._canceled_while_silent(
+            monkeypatch, provider_code
+        )
+        _age_the_cancel(shipment.order_id)
+
+        assert finish_pending_shipment_cancels() == ONE_STILL_PENDING
+
+        assert len(courier.calls) == 2
+        metadata = _metadata(shipment.order_id)
+        assert metadata[SHIPMENT_CANCEL_UNANSWERED_KEY]["attempts"] == 2
+        assert metadata[SHIPMENT_CANCEL_PENDING_FLAG] is True
+        assert len(_no_answer_notes(shipment.order_id)) == 1
+        assert _courier_notes(shipment.order_id) == []
+
+    def test_the_courier_answers_on_a_later_run(
+        self, monkeypatch, provider_code
+    ):
+        shipment, courier, _canceled = self._canceled_while_silent(
+            monkeypatch, provider_code
+        )
+        _age_the_cancel(shipment.order_id)
+        courier.error = None
+
+        assert finish_pending_shipment_cancels() == ONE_FINISHED
+
+        assert courier.calls == [UNLOCKED, UNLOCKED]
+        assert _is_canceled(shipment)
+        metadata = _metadata(shipment.order_id)
+        assert metadata["cancellation"]["shipment_cancel"] == ASKED
+        assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
+        assert SHIPMENT_CANCEL_UNANSWERED_KEY not in metadata
+        assert _courier_notes(shipment.order_id) == []
+        assert finish_pending_shipment_cancels() == NOTHING_PENDING
+
+    def test_staff_take_over_once_the_retries_are_over(
+        self, monkeypatch, provider_code
+    ):
+        shipment, courier, _canceled = self._canceled_while_silent(
+            monkeypatch, provider_code
+        )
+        _age_past_the_retries(shipment.order_id)
+
+        assert finish_pending_shipment_cancels() == ONE_FINISHED
+
+        assert len(courier.calls) == 2
+        metadata = _metadata(shipment.order_id)
+        outcome = metadata["cancellation"]["shipment_cancel"]
+        assert outcome["dispatched"] is False
+        assert "timed out" in outcome["error"]
+        assert SHIPMENT_CANCEL_PENDING_FLAG not in metadata
+        assert SHIPMENT_CANCEL_UNANSWERED_KEY not in metadata
+        assert len(_courier_notes(shipment.order_id)) == 1
+        assert finish_pending_shipment_cancels() == NOTHING_PENDING
+
+
+def test_a_silent_courier_is_asked_once_per_run(monkeypatch):
+    """During an outage every order of that courier would wait out the
+    same timeout: the run asks the first and leaves the rest for the next
+    run. The first here is one whose retries are over: its last attempt
+    gets no answer either, so the others wait too."""
+    first, second, over = (_shipment("acs") for _ in range(3))
+    courier = _courier(
+        monkeypatch, first, error=CarrierUnavailableError("timed out")
+    )
+    for shipment in (first, second, over):
+        _staff_cancel(shipment.order)
+    assert len(courier.calls) == 3
+    _age_past_the_retries(over.order_id)
+    for shipment in (first, second):
+        _age_the_cancel(shipment.order_id)
+
+    # Oldest first: ``over`` is asked, gets no answer and is recorded for
+    # staff; ``first`` and ``second`` wait for the next run.
+    assert finish_pending_shipment_cancels() == {
+        "finished": 1,
+        "still_pending": 2,
+    }
+
+    assert len(courier.calls) == 4
+    assert (
+        _metadata(first.order_id)[SHIPMENT_CANCEL_UNANSWERED_KEY]["attempts"]
+        == 1
+    )
+    assert (
+        _metadata(second.order_id)[SHIPMENT_CANCEL_UNANSWERED_KEY]["attempts"]
+        == 1
+    )
+    assert len(_courier_notes(over.order_id)) == 1
 
 
 class TestAShipmentAlreadyBeingWorkedOnIsNotAnAnswer:
@@ -560,3 +715,105 @@ def test_an_acs_tracking_poll_and_a_staff_cancel_do_not_deadlock(monkeypatch):
     assert _committed_status(order_id) == OrderStatus.CANCELED
     assert _is_canceled(shipment)
     assert _metadata(order_id)["cancellation"]["shipment_cancel"] == ASKED
+
+
+def _canceled_at(order_id: int, minutes_ago: int) -> None:
+    Order.objects.filter(pk=order_id).update(
+        status_updated_at=timezone.now()
+        - timedelta(seconds=settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS)
+        - timedelta(minutes=minutes_ago)
+    )
+
+
+def test_a_silent_courier_never_keeps_another_from_being_asked(monkeypatch):
+    """The run's limit counts courier calls: older orders of a silent
+    courier, passed over without a call, do not fill it."""
+    silent = [_shipment("acs") for _ in range(3)]
+    answering = _shipment("boxnow")
+    _courier(monkeypatch, silent[0], error=CarrierUnavailableError("timed out"))
+    for shipment in (*silent, answering):
+        _staff_cancel(shipment.order)
+    for minutes_ago, shipment in enumerate(reversed(silent), start=10):
+        _canceled_at(shipment.order_id, minutes_ago)
+    _canceled_at(answering.order_id, 1)
+    boxnow = Courier(answering)
+    monkeypatch.setattr("shipping_boxnow.services.BoxNowClient", boxnow)
+
+    assert finish_pending_shipment_cancels(max_per_run=2) == {
+        "finished": 1,
+        "still_pending": 3,
+    }
+
+    assert boxnow.calls == [UNLOCKED]
+    assert _is_canceled(answering)
+    assert SHIPMENT_CANCEL_PENDING_FLAG not in _metadata(answering.order_id)
+
+
+def test_the_retries_are_over_when_the_order_comes_up(monkeypatch):
+    """Another courier's call can take long enough for a later order's
+    retries to end meanwhile: that order then gets its last attempt, not
+    a pass for its courier being silent earlier in the run."""
+    first, later_one = _shipment("acs"), _shipment("acs")
+    slow = _shipment("boxnow")
+    acs = _courier(
+        monkeypatch, first, error=CarrierUnavailableError("timed out")
+    )
+    for shipment in (first, slow, later_one):
+        _staff_cancel(shipment.order)
+    _canceled_at(first.order_id, 3)
+    _canceled_at(slow.order_id, 2)
+    _canceled_at(later_one.order_id, 1)
+    real_now = timezone.now
+    ahead = timedelta(0)
+    monkeypatch.setattr(timezone, "now", lambda: real_now() + ahead)
+    boxnow = Courier(slow)
+
+    def the_call_outlasts_the_retries() -> None:
+        nonlocal ahead
+        # Past ``later_one``'s retries, which end two minutes after
+        # ``first``'s: ``first`` was asked well within its own.
+        ahead = timedelta(
+            hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS, minutes=-1
+        )
+
+    boxnow.during_call = the_call_outlasts_the_retries
+    monkeypatch.setattr("shipping_boxnow.services.BoxNowClient", boxnow)
+
+    assert finish_pending_shipment_cancels() == {
+        "finished": 2,
+        "still_pending": 1,
+    }
+
+    # ``first``: the ACS courier silent, within its retries. ``slow``:
+    # answered. ``later_one``: its retries were over when it came up, so
+    # ACS was asked once more and the failure recorded for staff.
+    assert len(boxnow.calls) == 1
+    assert len(acs.calls) == 5
+    assert SHIPMENT_CANCEL_PENDING_FLAG in _metadata(first.order_id)
+    outcome = _metadata(later_one.order_id)["cancellation"]["shipment_cancel"]
+    assert "timed out" in outcome["error"]
+    assert len(_courier_notes(later_one.order_id)) == 1
+
+
+def test_the_admin_cancel_says_the_courier_is_asked_again(monkeypatch):
+    """Staff read at once that the parcel is still live and that nothing
+    is theirs to do yet; a refusal is an error message instead."""
+    shipment = _shipment("acs")
+    _courier(monkeypatch, shipment, error=CarrierUnavailableError("timed out"))
+    request = RequestFactory().get("/")
+    request.user = get_user_model()(id=1, username="staff", is_superuser=True)
+
+    with (
+        translation.override("en"),
+        patch.object(OrderAdmin, "message_user") as message,
+    ):
+        OrderAdmin(Order, AdminSite()).mark_as_canceled(
+            request, Order.objects.filter(pk=shipment.order_id)
+        )
+
+    assert message.call_count == 2
+    text = str(message.call_args_list[-1].args[1])
+    assert "gave no answer" in text
+    assert "still live" in text
+    assert "timed out" in text
+    assert message.call_args_list[-1].kwargs == {"level": "warning"}

@@ -3,6 +3,7 @@ import math
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
@@ -398,6 +399,23 @@ SHIPMENT_ALREADY_CANCELED: dict[str, Any] = {
 # after that commit. A worker that stops in between leaves the flag, and
 # ``order.tasks.finish_pending_shipment_cancels`` asks the courier then.
 SHIPMENT_CANCEL_PENDING_FLAG = "shipment_cancel_pending"
+
+# ``metadata['shipment_cancel_unanswered']`` of a pending cancel whose
+# courier gave no answer (``CarrierUnavailableError``): ``since`` (the
+# first such attempt), ``attempts`` and ``last_error``. It stays beside
+# :data:`SHIPMENT_CANCEL_PENDING_FLAG` while the sweep asks again, for
+# ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the cancel, and goes with it
+# once an answer is recorded.
+SHIPMENT_CANCEL_UNANSWERED_KEY = "shipment_cancel_unanswered"
+
+
+def shipment_cancel_retry_until(canceled_at: datetime | None) -> datetime:
+    """When the courier of a pending shipment cancel made at *canceled_at*
+    (the order's ``status_updated_at``) stops being asked again after
+    giving no answer."""
+    return (canceled_at or timezone.now()) + timedelta(
+        hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS
+    )
 
 
 def shipment_cancel_wait_minutes() -> int:
@@ -4856,7 +4874,7 @@ class OrderService:
         )
 
     @classmethod
-    def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
+    def cancel_attached_shipment(cls, order: Order, reason: str) -> bool:
         """Best-effort: cancel the courier voucher of a canceled order.
 
         The staff / system half of :meth:`cancel_order`, the only path
@@ -4897,6 +4915,23 @@ class OrderService:
         cancel is already in progress" as the courier's answer, with a
         staff note, while that other cancel succeeds.
 
+        **No answer is not an answer either, for a while.** A
+        ``CarrierUnavailableError`` (the courier unreachable, timed out,
+        failing on its side, refusing our credentials) says nothing about
+        the parcel. Until ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the
+        cancel the flag stays, the attempt is counted in
+        :data:`SHIPMENT_CANCEL_UNANSWERED_KEY`, staff get one history note
+        saying the parcel is still live (a courier that is down for us
+        may still collect it) and that the courier is being asked again,
+        and the sweep asks on each run. After that the last failure is recorded as the answer,
+        with the usual note, and the parcel is staff's. A courier's
+        refusal is recorded at once: asking again gets the same answer.
+
+        Returns True when the courier gave no answer, whether the cancel
+        is left for the sweep to ask again or its retries are over; False
+        otherwise. The sweep asks that courier about no other order in
+        its run either way.
+
         Never raises — the order is canceled whatever the courier, or
         the write of its answer, does. An answer that could not be
         written leaves the flag, so the sweep asks again; both carriers'
@@ -4912,9 +4947,10 @@ class OrderService:
         metadata = order.metadata or {}
         answered = "shipment_cancel" in (metadata.get("cancellation") or {})
         if answered and SHIPMENT_CANCEL_PENDING_FLAG not in metadata:
-            return
+            return False
 
         info: dict[str, Any] | None = None
+        no_answer = False
         if not answered:
             logger.info(
                 "Cascading order cancel to carrier voucher | order=%s "
@@ -4938,7 +4974,28 @@ class OrderService:
                     order.id,
                     exc,
                 )
-                return
+                return False
+            except CarrierUnavailableError as exc:
+                if timezone.now() < shipment_cancel_retry_until(
+                    order.status_updated_at
+                ):
+                    cls._note_unanswered_shipment_cancel(order, exc)
+                    return True
+                no_answer = True
+                info = {
+                    "attempted": True,
+                    "dispatched": False,
+                    "error": str(exc),
+                }
+                logger.warning(
+                    "Order %s canceled, and its courier gave no answer to "
+                    "the voucher cancel for %s hours; staff take it over: "
+                    "%s",
+                    order.id,
+                    settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS,
+                    exc,
+                    exc_info=True,
+                )
             except Exception as exc:  # pragma: no cover - logged below
                 info = {
                     "attempted": True,
@@ -4978,6 +5035,83 @@ class OrderService:
                 order.id,
                 info,
             )
+        return no_answer
+
+    @classmethod
+    def _note_unanswered_shipment_cancel(
+        cls, order: Order, exc: CarrierUnavailableError
+    ) -> None:
+        """Count an attempt at a pending shipment cancel that the courier
+        gave no answer to, and tell staff the first time.
+
+        Written under the order's row lock, merged into the metadata as it
+        is then (as :meth:`_record_shipment_cancel`), and only while the
+        cancel is still pending with no answer: a run that recorded an
+        answer meanwhile wins. *order* gets the metadata as written.
+        Never raises: the count is for staff, and the sweep asks again
+        with or without it.
+        """
+        try:
+            with transaction.atomic():
+                metadata: dict[str, Any] = (
+                    Order.objects.select_for_update()
+                    .filter(pk=order.pk)
+                    .values_list("metadata", flat=True)
+                    .get()
+                ) or {}
+                answered = "shipment_cancel" in (
+                    metadata.get("cancellation") or {}
+                )
+                if answered or SHIPMENT_CANCEL_PENDING_FLAG not in metadata:
+                    order.metadata = metadata
+                    return
+                previous = metadata.get(SHIPMENT_CANCEL_UNANSWERED_KEY) or {}
+                attempts = int(previous.get("attempts", 0)) + 1
+                metadata[SHIPMENT_CANCEL_UNANSWERED_KEY] = {
+                    "since": previous.get("since")
+                    or timezone.now().isoformat(),
+                    "attempts": attempts,
+                    "last_error": str(exc),
+                }
+                Order.objects.filter(pk=order.pk).update(metadata=metadata)
+                order.metadata = metadata
+                logger.warning(
+                    "Order %s canceled, but its courier gave no answer to "
+                    "the voucher cancel (attempt %s); asking again until "
+                    "%s: %s",
+                    order.id,
+                    attempts,
+                    shipment_cancel_retry_until(
+                        order.status_updated_at
+                    ).isoformat(),
+                    exc,
+                )
+                if attempts == 1:
+                    from order.models.history import OrderHistory
+
+                    every = settings.ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES
+                    hours = settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS
+                    OrderHistory.log_note(
+                        order=order,
+                        note=(
+                            "Order canceled, but the courier gave no "
+                            f"answer to the parcel cancel: {exc}. The "
+                            "parcel is still live and can be picked up "
+                            "meanwhile: call the courier if it must not "
+                            "ship. The cancel is also asked again "
+                            f"automatically every {every} minutes for up "
+                            f"to {hours} hours; a note follows here if it "
+                            "never answers."
+                        ),
+                    )
+        except Exception:
+            logger.exception(
+                "Order %s is canceled and its courier gave no answer to "
+                "the shipment cancel (%s); the attempt could not be "
+                "counted, and the pending-cancel sweep asks again",
+                order.id,
+                exc,
+            )
 
     @staticmethod
     def _record_shipment_cancel(
@@ -4992,9 +5126,9 @@ class OrderService:
         answer is already recorded (another run got here first), and
         when there is none to record (*info* is ``None``).
 
-        The pending flag goes in the same write, and only when the row
-        then holds an answer: a row with a flag and no answer is still
-        to be asked about.
+        The pending flag, and the count of unanswered attempts beside it,
+        go in the same write, and only when the row then holds an answer:
+        a row with a flag and no answer is still to be asked about.
 
         ``.update(...)`` writes the one column that changed and runs no
         ``post_save`` receiver.
@@ -5015,6 +5149,7 @@ class OrderService:
             stale_flag = answered and SHIPMENT_CANCEL_PENDING_FLAG in metadata
             if recorded or stale_flag:
                 metadata.pop(SHIPMENT_CANCEL_PENDING_FLAG, None)
+                metadata.pop(SHIPMENT_CANCEL_UNANSWERED_KEY, None)
                 Order.objects.filter(pk=order.pk).update(metadata=metadata)
         order.metadata = metadata
         return recorded

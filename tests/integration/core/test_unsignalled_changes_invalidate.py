@@ -30,7 +30,7 @@ from core.cache.invalidation import (
     connect_surface_invalidation,
     disconnect_surface_invalidation,
 )
-from product.admin import ProductReviewAdmin
+from product.admin.review import ProductReviewAdmin
 from product.enum.review import ReviewStatus
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory

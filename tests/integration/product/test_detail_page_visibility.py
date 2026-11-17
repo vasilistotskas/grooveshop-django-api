@@ -13,7 +13,7 @@ dedicated endpoints beside them:
   any product by id. The view is `AllowAny`, so every unreleased draft
   was readable — name, price and SEO copy — at a sequential id.
   `for_list()` has always applied `.active()`; only the detail path was
-  open. `product/admin.py`'s "duplicate product" action creates exactly
+  open. `product/admin/product.py`'s "duplicate product" action creates exactly
   such drafts, describing them as out of the storefront.
 """
 

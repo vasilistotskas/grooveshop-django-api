@@ -27,7 +27,8 @@ from django.test import RequestFactory
 from djmoney.money import Money
 from extra_settings.models import Setting
 
-from product.admin import ProductAdmin, ProductPriceSpellInline
+from product.admin.product import ProductAdmin
+from product.admin.product_inlines import ProductPriceSpellInline
 from product.factories import ProductFactory
 from product.factories.category import ProductCategoryFactory
 from product.models.price_spell import ProductPriceSpell

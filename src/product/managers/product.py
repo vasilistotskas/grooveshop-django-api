@@ -59,6 +59,29 @@ def likes_count_expression(product: str = "pk") -> Coalesce:
     )
 
 
+def active_reserved_quantity_expression(product: str = "pk") -> Coalesce:
+    """The units held by a product's active stock reservations, 0 without any.
+
+    Active is ``StockReservationQuerySet.active`` (not consumed, not
+    expired), the one definition the checkout and the admin share. A
+    subquery, like ``likes_count_expression``, so it adds no join to a
+    changelist that already filters on other relations.
+    """
+    from order.models.stock_reservation import StockReservation
+
+    return Coalesce(
+        Subquery(
+            StockReservation.objects.active()
+            .filter(product=OuterRef(product))
+            .order_by()
+            .annotate(total=Func(F("quantity"), function="SUM"))
+            .values("total"),
+            output_field=IntegerField(),
+        ),
+        0,
+    )
+
+
 def _approved_reviews(product: str):
     from product.models.review import ProductReview
 
@@ -127,6 +150,12 @@ class ProductQuerySet(
     def with_review_average(self) -> Self:
         """Annotate with the average rating of approved reviews."""
         return self.annotate(review_average=review_average_expression())
+
+    def with_active_reserved_quantity(self) -> Self:
+        """Annotate with the units held by active stock reservations."""
+        return self.annotate(
+            active_reserved_quantity=active_reserved_quantity_expression()
+        )
 
     def active(self) -> Self:
         return self.filter(active=True).exclude_deleted()

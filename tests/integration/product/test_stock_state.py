@@ -19,7 +19,8 @@ from django.urls import reverse
 from django.utils.translation import gettext
 
 from admin.dashboard.store import queries, widgets
-from product.admin import ProductAdmin, StockStatusFilter
+from product.admin.filters import StockStatusFilter
+from product.admin.product import ProductAdmin
 from product.enum.stock import StockState
 from product.factories.product import ProductFactory
 from product.models.product import Product

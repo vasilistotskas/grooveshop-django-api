@@ -1,7 +1,7 @@
 """
 Unit tests for payment method fee calculation.
 
-Tests the calculate_payment_method_fee method in OrderService to ensure
+Tests the calculate_payment_method_fee method in OrderQuoteService to ensure
 it correctly calculates fees based on PayWay configuration and free thresholds.
 """
 
@@ -11,19 +11,19 @@ import pytest
 from django.conf import settings
 from djmoney.money import Money
 
-from order.services import OrderService
+from order.checkout.quote import OrderQuoteService
 from pay_way.factories import PayWayFactory
 
 
 @pytest.mark.django_db
 class TestCalculatePaymentMethodFee:
-    """Test OrderService.calculate_payment_method_fee method."""
+    """Test OrderQuoteService.calculate_payment_method_fee method."""
 
     def test_no_payment_method_returns_zero(self):
         """Test that None pay_way returns zero fee."""
         order_value = Money(Decimal("50.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=None,
             order_value=order_value,
         )
@@ -36,7 +36,7 @@ class TestCalculatePaymentMethodFee:
         pay_way = PayWayFactory(cost=0)
         order_value = Money(Decimal("50.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -51,7 +51,7 @@ class TestCalculatePaymentMethodFee:
         )
         order_value = Money(Decimal("50.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -67,7 +67,7 @@ class TestCalculatePaymentMethodFee:
         )
         order_value = Money(Decimal("100.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -82,7 +82,7 @@ class TestCalculatePaymentMethodFee:
         )
         order_value = Money(Decimal("50.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -97,7 +97,7 @@ class TestCalculatePaymentMethodFee:
         )
         order_value = Money(Decimal("1000.00"), settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -124,7 +124,7 @@ class TestCalculatePaymentMethodFee:
         )
         order_value = Money(order_amount, settings.DEFAULT_CURRENCY)
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -136,7 +136,7 @@ class TestCalculatePaymentMethodFee:
         pay_way = PayWayFactory(cost=Decimal("3.50"))
         order_value = Money(Decimal("50.00"), "EUR")
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_value,
         )
@@ -162,7 +162,7 @@ class TestCalculatePaymentMethodFee:
         # Order subtotal (items + shipping)
         order_subtotal = Money(Decimal("96.00"), "EUR")
 
-        fee = OrderService.calculate_payment_method_fee(
+        fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way=pay_way,
             order_value=order_subtotal,
         )

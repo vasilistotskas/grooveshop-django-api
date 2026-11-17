@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import pytest
 from djmoney.money import Money
 
-from order.services import OrderService
+from order.checkout.quote import OrderQuoteService
 
 pytestmark = pytest.mark.django_db
 
@@ -24,7 +24,7 @@ def _pay_way(cost, *, free_threshold=None):
 
 
 def test_a_matching_currency_charges_the_fee():
-    fee = OrderService.calculate_payment_method_fee(
+    fee = OrderQuoteService.calculate_payment_method_fee(
         _pay_way(Money(Decimal("3.50"), "EUR")),
         Money(Decimal("45.00"), "EUR"),
     )
@@ -33,7 +33,7 @@ def test_a_matching_currency_charges_the_fee():
 
 
 def test_a_mismatched_currency_charges_nothing():
-    fee = OrderService.calculate_payment_method_fee(
+    fee = OrderQuoteService.calculate_payment_method_fee(
         _pay_way(Money(Decimal("3.50"), "USD")),
         Money(Decimal("45.00"), "EUR"),
     )
@@ -44,7 +44,7 @@ def test_a_mismatched_currency_charges_nothing():
 
 
 def test_the_free_threshold_still_applies():
-    fee = OrderService.calculate_payment_method_fee(
+    fee = OrderQuoteService.calculate_payment_method_fee(
         _pay_way(
             Money(Decimal("3.50"), "EUR"),
             free_threshold=Money(Decimal("40.00"), "EUR"),

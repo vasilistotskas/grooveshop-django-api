@@ -88,10 +88,11 @@ accepting Cyprus orders at the Greek flat rate.
 - **One basis for every "free above X".**
   `ShippingRate.free_shipping_threshold`
   and `PayWay.free_threshold` are both compared with
-  `OrderService.threshold_value(cart_total, discount_total)`: the products
-  after promotion and coupon discounts, excluding shipping and the pay-way
-  fee (loyalty points and gift cards are payment, not discounts, and do not
-  move it). Every caller of `OrderService.shipping_cost` and
+  `OrderQuoteService.threshold_value(cart_total, discount_total)`
+  (`src/order/checkout/quote.py`): the products after promotion and
+  coupon discounts, excluding shipping and the pay-way fee (loyalty
+  points and gift cards are payment, not discounts, and do not move it).
+  Every caller of `OrderQuoteService.shipping_cost` and
   `calculate_payment_method_fee` passes it: both order-creation paths, the
   payment-first verification step and the cart's create-payment-intent
   preview, so the preview and the order cannot disagree. The cart response
@@ -105,7 +106,7 @@ accepting Cyprus orders at the Greek flat rate.
   `live_quote()` hook (ACS's weight-banded `ACS_Price_Calculation`,
   gated on `ACS_DYNAMIC_PRICING_ENABLED`; every other carrier returns
   `None` and the rate's stored `price` wins), and is
-  `OrderService.shipping_cost`'s only pricing path — no generic
+  `OrderQuoteService.shipping_cost`'s only pricing path — no generic
   fallback survives it.
 - **`ShippingCarrierInterface.live_quote(rate, country_code, region_id,
   weight_grams, currency)`** replaces the old
@@ -140,7 +141,7 @@ accepting Cyprus orders at the Greek flat rate.
   `shippable_country_codes()` entry) when no `country_code` is given,
   echoing whichever it used, and lists `free_threshold_rates(country)`.
 - **One distance to free shipping: the cart's `freeShippingProgress`.**
-  `OrderService.free_shipping_progress(cart, promotion_result)` decides it
+  `OrderQuoteService.free_shipping_progress(cart, promotion_result)` decides it
   with the two rules `shipping_cost` charges with, so the cart can never
   promise what checkout will not give:
   - a live free-shipping promotion waives every carrier

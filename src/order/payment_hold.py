@@ -19,7 +19,7 @@ the link stops being payable and when the order will have been settled one
 way or the other, and keeps no window of its own.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from celery.schedules import crontab
 from django.conf import settings
@@ -184,18 +184,32 @@ def awaiting_payment(order: Order) -> bool:
 
 
 def _next_sweep(after: datetime) -> datetime:
-    """The first sweep run strictly after *after*, from the beat schedule.
+    """The first sweep run strictly after *after*, in UTC.
 
     Strictly: the sweep selects an order once its instant is in the past,
     so a run that starts exactly at it does not.
+
+    Beat finds each run from the one before it with the crontab's
+    ``remaining_delta``, which reads the wall clock of the beat zone
+    (``CELERY_TIMEZONE``) and places a slot in a repeated hour at its
+    first occurrence. So beat sends no run in the hour the clock goes back
+    (``docs/scheduler.md``), and the slot that follows an instant inside
+    that hour is one already past. Stepping through the same slots until
+    one is after *after*, compared in UTC, gives the run beat sends. The
+    run is returned in UTC so that what is added to it counts real time,
+    not the wall clock across a change.
     """
     schedule = settings.CELERY_BEAT_SCHEDULE[SWEEP_ENTRY]["schedule"]
     if not isinstance(schedule, crontab):
         raise ImproperlyConfigured(
             f"The beat entry {SWEEP_ENTRY!r} must run on a crontab."
         )
-    last_run_at, delta, _now = schedule.remaining_delta(after)
-    return last_run_at + delta
+    after = after.astimezone(UTC)
+    run = after
+    while run <= after:
+        last_run_at, delta, _now = schedule.remaining_delta(run)
+        run = (last_run_at + delta).astimezone(UTC)
+    return run
 
 
 def _sweep_time_limit() -> timedelta:
@@ -235,8 +249,10 @@ def decided_by(order: Order, now: datetime | None = None) -> datetime | None:
     queue before it starts is bounded by nothing and is not counted.
 
     ``None`` when nothing will decide the order: the sweep never selects
-    it (:func:`swept_orders`), or the sweep is switched off
-    (``scheduler.PeriodicTask``).
+    it (:func:`swept_orders`), or the sweep is off: switched off
+    (``scheduler.PeriodicTask``) or no longer declared in
+    ``CELERY_BEAT_SCHEDULE`` (``PeriodicTask.objects.is_on``, asked before
+    :func:`_next_sweep` reads the entry).
     """
     # Both buckets select PENDING orders only, so any other answers without
     # a query; the rest is the sweep's own querysets.

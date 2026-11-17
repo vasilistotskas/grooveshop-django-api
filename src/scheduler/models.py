@@ -7,6 +7,7 @@ ran, which is what lets beat send a tick it missed while restarting.
 
 from datetime import datetime
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -15,9 +16,15 @@ from django_tenants.utils import get_public_schema_name, schema_context
 
 class PeriodicTaskQuerySet(models.QuerySet):
     def is_on(self, name: str) -> bool:
-        """Whether beat sends the entry *name*: its row exists and is
-        switched on. The rows live in the public schema, whichever store
-        asks; a row beat has not created yet has never been sent."""
+        """Whether beat sends the entry *name*: the settings declare it
+        (``CELERY_BEAT_SCHEDULE``) and its row exists and is switched on.
+        The rows live in the public schema, whichever store asks; a row
+        beat has not created yet has never been sent. The row of an entry
+        the settings no longer declare stays until beat next starts and
+        deletes it, and the schedule it was sent on is gone with the
+        entry, so it is off from the deploy that removes it."""
+        if name not in settings.CELERY_BEAT_SCHEDULE:
+            return False
         with schema_context(get_public_schema_name()):
             return self.filter(name=name, enabled=True).exists()
 

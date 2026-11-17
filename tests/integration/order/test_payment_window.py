@@ -9,7 +9,7 @@ order, so it holds no window of its own (issue #636).
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 import pytest
@@ -209,9 +209,12 @@ class TestTheOrderIsDecidedByTheSweep:
         assert isinstance(entry["schedule"], crontab)
 
     def test_the_sweep_runs_under_the_worker_s_time_limit(self):
-        # Celery gives a task the worker's limit unless it sets its own. One
-        # of its own would be what the worker enforces, and decided_by
-        # would have to read it instead.
+        # The worker kills a run at the task's ``time_limit`` when the
+        # message carries none (celery.worker.request), and the fanout
+        # sends none. ``Task.bind`` fills the attribute from
+        # ``task_time_limit``, which decided_by reads, when the task sets
+        # none, so this reads the limit the worker enforces: one of the
+        # task's own would show here, and decided_by would have to read it.
         assert auto_cancel_stuck_pending_orders.time_limit == (
             payment_hold.celery_app.conf.task_time_limit
         )
@@ -330,7 +333,60 @@ class TestAnInstantAlreadyPastIsNeverPromised:
         assert decided == hour + timedelta(minutes=45) + LIMIT
 
 
+class TestTheRunIsTheOneBeatSendsAcrossAClockChange:
+    """Beat steps through the slots on the Athens wall clock: it sends no
+    run in the hour the clock goes back, and the slot in the missing spring
+    hour runs at 04:00 (``docs/scheduler.md``,
+    ``tests/integration/scheduler/test_beat.py``)."""
+
+    @pytest.mark.parametrize(
+        ("read_at", "run"),
+        [
+            pytest.param(
+                datetime(2026, 10, 25, 1, 5, tzinfo=UTC),
+                datetime(2026, 10, 25, 2, 0, tzinfo=UTC),
+                id="inside-the-repeated-hour",
+            ),
+            pytest.param(
+                datetime(2026, 10, 25, 0, 50, tzinfo=UTC),
+                datetime(2026, 10, 25, 2, 0, tzinfo=UTC),
+                id="the-last-run-before-the-repeated-hour-has-passed",
+            ),
+            pytest.param(
+                datetime(2026, 10, 25, 0, 20, tzinfo=UTC),
+                datetime(2026, 10, 25, 0, 30, tzinfo=UTC),
+                id="the-limit-counts-real-time-across-the-change",
+            ),
+            pytest.param(
+                datetime(2026, 3, 29, 0, 50, tzinfo=UTC),
+                datetime(2026, 3, 29, 1, 0, tzinfo=UTC),
+                id="into-the-missing-spring-hour",
+            ),
+        ],
+    )
+    def test_the_run_beat_sends(self, read_at, run):
+        order = _order(hold=read_at - timedelta(hours=1))
+
+        decided = payment_hold.decided_by(order, now=read_at)
+
+        assert decided == run + LIMIT
+        assert decided > read_at
+
+
 class TestNothingIsPromisedTheSweepWillNotDo:
+    def test_the_entry_is_no_longer_declared(self, hour, settings):
+        # A deploy removed the entry; its enabled row stays until beat
+        # next starts.
+        settings.CELERY_BEAT_SCHEDULE = {
+            name: entry
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if name != payment_hold.SWEEP_ENTRY
+        }
+        order = _order(hold=hour + timedelta(minutes=7))
+
+        assert payment_hold.decided_by(order) is None
+        assert payment_hold.hold_ends(order) == hour + timedelta(minutes=7)
+
     def test_the_sweep_is_switched_off(self, hour):
         PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).switch_off()
         order = _order(hold=hour + timedelta(minutes=7))
@@ -431,6 +487,19 @@ class TestTheOrderDetailServesBoth:
 
     def test_the_sweep_switched_off(self, hour):
         PeriodicTask.objects.filter(name=payment_hold.SWEEP_ENTRY).switch_off()
+        order = _order(created=hour, hold=hour + timedelta(minutes=37))
+
+        body = self._guest(order)
+
+        assert body["paymentHoldExpiresAt"] is not None
+        assert body["paymentDecidedBy"] is None
+
+    def test_the_entry_no_longer_declared(self, hour, settings):
+        settings.CELERY_BEAT_SCHEDULE = {
+            name: entry
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if name != payment_hold.SWEEP_ENTRY
+        }
         order = _order(created=hour, hold=hour + timedelta(minutes=37))
 
         body = self._guest(order)

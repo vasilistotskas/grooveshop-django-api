@@ -75,7 +75,10 @@ switches an entry off or on, and runs one by hand. `enabled` survives a restart.
 Switching on sends no slot missed while off (`resumed_at`). A run by hand is not
 recorded as a run, so it does not move the next slot.
 
-`emails.gates.ScheduleGate` reads `enabled`, and "did it run?" is `last_run_at`.
+`emails.gates.ScheduleGate` and `paymentDecidedBy` (`docs/order/cancel.md`) ask
+`PeriodicTask.objects.is_on`: the settings declare the entry and its row is
+enabled. An entry a deploy removed is off at once, though its row stays until
+beat restarts. "Did it run?" is `last_run_at`.
 
 ## Running one beat
 
@@ -88,7 +91,7 @@ that way locally too.
 | File | Role |
 |---|---|
 | `src/scheduler/beat.py` | The scheduler |
-| `src/scheduler/models.py` | `PeriodicTask`, `switch_on`, `switch_off` |
+| `src/scheduler/models.py` | `PeriodicTask`, `is_on`, `switch_on`, `switch_off` |
 | `src/scheduler/admin.py` | The console screen and its actions |
 | `src/settings/schedule.py` | `CELERY_BEAT_SCHEDULE` |
 | `src/settings/celery.py` | `CELERY_BEAT_SCHEDULER` |

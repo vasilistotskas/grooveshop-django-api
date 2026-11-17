@@ -271,6 +271,14 @@ class TestTheSweepCancelsExactlyTheSharedDefinition:
             "amount_mismatch": _order(
                 hold=past, metadata={AMOUNT_MISMATCH_FLAG: True}
             ),
+            # A mismatched charge, then a failed retry: still waits for
+            # the store, so the failed bucket must leave it too.
+            "amount_mismatch_then_failed": _order(
+                hold=past,
+                updated=past,
+                payment_status=failed,
+                metadata={AMOUNT_MISMATCH_FLAG: True},
+            ),
             "settled": _order(
                 hold=past,
                 status=OrderStatus.PROCESSING,

@@ -3,6 +3,67 @@
 
 
 
+## v3.252.4 (2026-11-17)
+
+### Documentation
+
+* docs(product): the admin package's registration order does not matter ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+### Performance improvements
+
+* perf(product): the product changelist no longer prefetches stock reservations
+
+ProductAdmin.get_queryset prefetched every listed product's active stock
+reservations into active_reservations_list, an attribute no template,
+list column, inline or export reads (the reservation summary and the
+reservation filter query the table themselves). It cost one query on
+every load of the list. A test now fails if the list reads the
+reservation table again. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+### Refactoring
+
+* refactor(product): admin package split; write actions call product services (#745) ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+* refactor(product): split the product admin into a package
+
+src/product/admin.py held fourteen model admins, their filters, inlines
+and the stock-history report page in 2,510 lines. It is now
+src/product/admin/, one module per model admin:
+
+- filters.py: the product changelist filters and the review status filter
+- variants.py: the badge colour maps shared by the admins
+- attribute.py, attribute_value.py, category.py, category_image.py,
+  brand.py, favourite.py, image.py, review.py, variant_group.py
+- product_inlines.py: the inlines of the product form
+- stock_history.py: the stock log dataset and the stock-history report
+  view, now a mixin of ProductAdmin
+- product.py: ProductAdmin
+
+The package's __init__ imports the modules so Django's admin
+autodiscovery registers them in the same order as before. The code is
+moved as it was: the only changed lines are imports and the base class
+list of ProductAdmin. Every importer in the tests moves to the module
+that now defines the name; nothing is re-exported. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+* refactor(product): the admin's write actions call product services
+
+The bulk discount, clear discount and duplicate-as-draft actions of
+ProductAdmin carried the rules themselves. They now call
+ProductService (src/product/services.py): set_discount and
+clear_discount save each product in pk order and never use
+queryset.update(), duplicate_as_draft builds the draft and raises
+ProductDuplicationError when no copy suffix is free. The admin keeps
+the form, the messages and the redirects.
+
+The active-reservation predicate was written out six times in the
+admin. All of them now read StockReservationQuerySet.active, and the
+reservation-status filter reads it through
+ProductQuerySet.with_active_reserved_quantity. That filter filtered on
+stockreservation__..., which is not the reverse name of
+StockReservation.product (related_name is stock_reservations), so
+choosing any of its three options raised FieldError and the list
+answered ?e=1. It lists the right products now. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
 ## v3.252.3 (2026-11-17)
 
 ### Bug fixes

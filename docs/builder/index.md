@@ -4,7 +4,7 @@ A store's theme, section groups (header, footer, ...), templates and pages
 are **documents**: versioned JSON that the store's staff edit in the
 storefront's visual editor and publish together. Source: `src/builder/`
 (`models.py`, `services.py`, `validation.py`, `storefront.py`,
-`references.py`, `published.py`, `views.py`, `rendering.py`,
+`references.py`, `published.py`, `views/` (one module per resource), `rendering.py`,
 `media_services.py`, `media_api.py`), the
 `builder` cache surface in `src/core/cache/surfaces.py`,
 `src/tenant/role_scopes.py`. The code wins over this page.

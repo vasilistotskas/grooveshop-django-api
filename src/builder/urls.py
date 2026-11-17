@@ -1,53 +1,85 @@
 from django.urls import path
 
-from builder import media_api, session_api, views
+from builder import media_api, session_api
+from builder.views.documents import (
+    CheckpointView,
+    DiscardView,
+    DocumentListView,
+    DocumentView,
+    DraftView,
+    RestoreView,
+    VersionListView,
+    VersionView,
+)
+from builder.views.features import FeaturesView
+from builder.views.links import LinkLabelsView, LinkSearchView, LinkTargetsView
+from builder.views.presence import PresenceView
+from builder.views.previews import (
+    PreviewLinkListView,
+    PreviewLinkView,
+    PreviewResolveView,
+    SharedPreviewView,
+)
+from builder.views.public import PublishedIndexView, PublishedPageView
+from builder.views.publish import (
+    PublishCheckView,
+    PublishVersionView,
+    PublishView,
+    ReleaseListView,
+    RollbackView,
+)
+from builder.views.schedules import (
+    ScheduleAcknowledgeView,
+    ScheduleListView,
+    ScheduleView,
+)
 
 app_name = "builder"
 
 urlpatterns = [
     path(
         "builder/documents",
-        views.DocumentListView.as_view(),
+        DocumentListView.as_view(),
         name="document-list",
     ),
     path(
         "builder/documents/<str:key>",
-        views.DocumentView.as_view(),
+        DocumentView.as_view(),
         name="document-detail",
     ),
     path(
         "builder/documents/<str:key>/draft",
-        views.DraftView.as_view(),
+        DraftView.as_view(),
         name="document-draft",
     ),
     path(
         "builder/documents/<str:key>/discard",
-        views.DiscardView.as_view(),
+        DiscardView.as_view(),
         name="document-discard",
     ),
     path(
         "builder/documents/<str:key>/checkpoint",
-        views.CheckpointView.as_view(),
+        CheckpointView.as_view(),
         name="document-checkpoint",
     ),
     path(
         "builder/documents/<str:key>/versions",
-        views.VersionListView.as_view(),
+        VersionListView.as_view(),
         name="version-list",
     ),
     path(
         "builder/documents/<str:key>/versions/<int:number>",
-        views.VersionView.as_view(),
+        VersionView.as_view(),
         name="version-detail",
     ),
     path(
         "builder/documents/<str:key>/versions/<int:number>/restore",
-        views.RestoreView.as_view(),
+        RestoreView.as_view(),
         name="version-restore",
     ),
     path(
         "builder/documents/<str:key>/versions/<int:number>/publish",
-        views.PublishVersionView.as_view(),
+        PublishVersionView.as_view(),
         name="version-publish",
     ),
     path(
@@ -87,84 +119,84 @@ urlpatterns = [
     ),
     path(
         "builder/schedules",
-        views.ScheduleListView.as_view(),
+        ScheduleListView.as_view(),
         name="schedule-list",
     ),
     path(
         "builder/schedules/<int:pk>",
-        views.ScheduleView.as_view(),
+        ScheduleView.as_view(),
         name="schedule-detail",
     ),
     path(
         "builder/schedules/<int:pk>/acknowledge",
-        views.ScheduleAcknowledgeView.as_view(),
+        ScheduleAcknowledgeView.as_view(),
         name="schedule-acknowledge",
     ),
-    path("builder/publish", views.PublishView.as_view(), name="publish"),
+    path("builder/publish", PublishView.as_view(), name="publish"),
     path(
         "builder/publish/check",
-        views.PublishCheckView.as_view(),
+        PublishCheckView.as_view(),
         name="publish-check",
     ),
-    path("builder/rollback", views.RollbackView.as_view(), name="rollback"),
+    path("builder/rollback", RollbackView.as_view(), name="rollback"),
     path(
         "builder/releases",
-        views.ReleaseListView.as_view(),
+        ReleaseListView.as_view(),
         name="release-list",
     ),
     path(
         "builder/published",
-        views.PublishedIndexView.as_view(),
+        PublishedIndexView.as_view(),
         name="published-index",
     ),
     path(
         "builder/preview/resolve",
-        views.PreviewResolveView.as_view(),
+        PreviewResolveView.as_view(),
         name="preview-resolve",
     ),
     path(
         "builder/preview-links",
-        views.PreviewLinkListView.as_view(),
+        PreviewLinkListView.as_view(),
         name="preview-link-list",
     ),
     path(
         "builder/preview-links/<int:pk>",
-        views.PreviewLinkView.as_view(),
+        PreviewLinkView.as_view(),
         name="preview-link-detail",
     ),
     path(
         "builder/preview/<str:token>/<slug:page_key>",
-        views.SharedPreviewView.as_view(),
+        SharedPreviewView.as_view(),
         name="preview-shared",
     ),
     path(
         "builder/presence",
-        views.PresenceView.as_view(),
+        PresenceView.as_view(),
         name="presence",
     ),
     path(
         "builder/features",
-        views.FeaturesView.as_view(),
+        FeaturesView.as_view(),
         name="features",
     ),
     path(
         "builder/link-targets",
-        views.LinkTargetsView.as_view(),
+        LinkTargetsView.as_view(),
         name="link-targets",
     ),
     path(
         "builder/link-search",
-        views.LinkSearchView.as_view(),
+        LinkSearchView.as_view(),
         name="link-search",
     ),
     path(
         "builder/link-labels",
-        views.LinkLabelsView.as_view(),
+        LinkLabelsView.as_view(),
         name="link-labels",
     ),
     path(
         "builder/published/<slug:page_key>",
-        views.PublishedPageView.as_view(),
+        PublishedPageView.as_view(),
         name="published",
     ),
 ]

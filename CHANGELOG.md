@@ -3,6 +3,47 @@
 
 
 
+## v3.250.1 (2026-11-17)
+
+### Bug fixes
+
+* fix(core): a broker alarm no longer restarts or stops a Celery worker (#735) ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
+* fix(core): a broker alarm no longer restarts or stops a Celery worker
+
+A worker's event loop checks the heartbeats of its event dispatcher's
+connection but reads only the socket the dispatcher started with. After
+a block kombu replaces that socket and, during the hold, nothing reads
+the new one: two intervals later the loop raised "Too many heartbeats
+missed" and restarted the consumer, and RabbitMQ redelivered every
+acks_late task still running. With the default hold each hold was a
+race; a hold over two intervals lost every time. A publishing
+connection now never fails for a heartbeat it missed; it still sends
+them, so RabbitMQ still closes a connection kombu dropped.
+
+The restart itself was fatal: Mingle's hello broadcast was refused by
+the hold, and Celery treats any error but a connection error there as
+unrecoverable, so the worker exited, and one started during an alarm
+crash-looped. GrooveShopControl answers a broadcast that waits for
+replies with none while the process holds; a command that expects no
+reply still raises.
+
+Closes #721 ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
+* fix(core): only remote control queries go unanswered during a broker hold
+
+GrooveShopControl decided by the reply flag, so a shutdown, pool
+restart or revoke sent from the celery control command line (which
+always waits for replies) was answered "No nodes replied" during a
+hold instead of failing. It now decides by the command: only an
+inspect command (hello, ping, stats, ...) gets no replies, with a
+rate-limited WARNING; every control command still raises
+BrokerBlocked.
+
+The docs give the real heartbeat check rate (3 per interval), say what
+a worker that starts alone during an alarm skips, and a test pins that
+a heartbeat the socket refuses still fails a publishing connection. ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
 ## v3.250.0 (2026-11-17)
 
 ### Bug fixes

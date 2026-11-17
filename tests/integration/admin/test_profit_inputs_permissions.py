@@ -199,7 +199,7 @@ class TestCostPriceOnTheProductPage:
         assert "cost_price" not in self._form_fields(user, product)
 
     def test_the_cost_never_reaches_an_exported_file(self, tenant):
-        from product.admin import ProductAdmin
+        from product.admin.product import ProductAdmin
         from product.models import Product
 
         exported = {

@@ -24,7 +24,7 @@ from core.cache.invalidation import (
     connect_surface_invalidation,
     disconnect_surface_invalidation,
 )
-from product.admin import ProductAdmin
+from product.admin.product import ProductAdmin
 from product.factories.product import ProductFactory
 from product.models.product import Product
 from promotion.admin import PromotionAdmin

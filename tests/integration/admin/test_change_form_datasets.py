@@ -16,7 +16,7 @@ from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction
 from order.factories import OrderFactory
 from order.models.stock_log import StockLog
-from product.admin import StockLogDatasetAdmin
+from product.admin.stock_history import StockLogDatasetAdmin
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 

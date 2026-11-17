@@ -7,22 +7,24 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.utils import translation
 
-from product.admin import (
+from admin.filters import LikesCountFilter
+from product.admin.category import (
+    ProductCategoryAdmin,
+    ProductCategoryImageInline,
+)
+from product.admin.category_image import ProductCategoryImageAdmin
+from product.admin.favourite import ProductFavouriteAdmin
+from product.admin.filters import (
     DiscountStatusFilter,
-    LikesCountFilter,
     PopularityFilter,
     PriceRangeFilter,
-    ProductAdmin,
-    ProductCategoryAdmin,
-    ProductCategoryImageAdmin,
-    ProductCategoryImageInline,
-    ProductFavouriteAdmin,
-    ProductImageAdmin,
-    ProductImageInline,
-    ProductReviewAdmin,
     ReviewAverageFilter,
     StockStatusFilter,
 )
+from product.admin.image import ProductImageAdmin
+from product.admin.product import ProductAdmin
+from product.admin.product_inlines import ProductImageInline
+from product.admin.review import ProductReviewAdmin
 from product.enum.category import CategoryImageTypeEnum
 from product.factories import (
     ProductCategoryFactory,

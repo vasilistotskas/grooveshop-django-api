@@ -12,7 +12,8 @@ from rest_framework import status
 
 from admin.base import BaseTranslatableTabularInline
 from core.api.serializers import ContentObjectRelatedField
-from product.admin import ProductAdmin, ProductHighlightInline
+from product.admin.product import ProductAdmin
+from product.admin.product_inlines import ProductHighlightInline
 from product.factories.highlight import ProductHighlightFactory
 from product.factories.product import ProductFactory
 from product.models import Product, ProductHighlight

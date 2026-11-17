@@ -187,7 +187,9 @@ The catalogue. Models under `src/product/models/`: `Product`,
 `Attribute`, `AttributeValue`, `ProductAttribute`, `ProductVariantGroup`,
 `ProductReview`, `ProductFavourite`, `ProductAlert`, `ProductRelation`,
 `ProductHighlight` and `ProductPriceSpell`. Views under
-`src/product/views/`, one module per model. Pricing is a package
+`src/product/views/`, one module per model; the admin is the package
+`src/product/admin/`, one module per model admin (the report page of a
+product's stock movements is `stock_history.py`). Pricing is a package
 (`src/product/pricing/`); `src/product/tasks.py` holds the product alerts
 and the price-record reconciliation. The stock quantity is a column on
 `Product`, but stock is reserved and released in `src/order/stock.py`.

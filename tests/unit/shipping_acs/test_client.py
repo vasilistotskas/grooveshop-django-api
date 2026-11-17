@@ -9,15 +9,19 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3 import HTTPSConnectionPool
 from urllib3.exceptions import (
     MaxRetryError,
     NameResolutionError,
     NewConnectionError,
     ProtocolError,
+    ReadTimeoutError,
     SSLError,
 )
 
-from shipping_acs.client import _RETRY_CONFIG, AcsClient
+from shipping.carrier_http import CARRIER_RETRY
+from shipping_acs.client import AcsClient
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
@@ -101,14 +105,41 @@ class TestConfig:
 
 
 class TestRetryPolicy:
+    def test_default_session_mounts_the_carriers_retry(self):
+        client = _make_client(session=None)
+
+        for prefix in ("https://", "http://"):
+            adapter = client._session.adapters[prefix]
+            assert isinstance(adapter, HTTPAdapter)
+            assert adapter.max_retries is CARRIER_RETRY
+
+    @pytest.mark.parametrize("status", [500, 502, 503, 504])
+    def test_a_post_is_not_sent_again_after_a_5xx(self, status):
+        assert CARRIER_RETRY.is_retry("POST", status) is False
+        assert (
+            CARRIER_RETRY.is_retry("POST", status, has_retry_after=True)
+            is False
+        )
+
+    def test_a_post_is_not_sent_again_after_its_answer_was_lost(self):
+        pool = HTTPSConnectionPool("webservices.acscourier.net")
+        errors = [
+            ReadTimeoutError(pool, "/ACSRestServices/api/ACSAutoRest", "read"),
+            ProtocolError("Connection aborted."),
+        ]
+
+        for error in errors:
+            with pytest.raises(type(error)):
+                CARRIER_RETRY.increment(method="POST", error=error)
+
     def test_a_post_is_not_sent_again_after_an_error_of_unknown_timing(self):
         # Neither a connect nor a read error: urllib3 retries it for any
         # method unless ``other`` is 0, and the voucher may have been made.
         with pytest.raises(MaxRetryError):
-            _RETRY_CONFIG.increment(method="POST", error=SSLError("tls"))
+            CARRIER_RETRY.increment(method="POST", error=SSLError("tls"))
 
     def test_a_post_is_sent_again_when_the_connection_was_refused(self):
-        after = _RETRY_CONFIG.increment(
+        after = CARRIER_RETRY.increment(
             method="POST", error=NewConnectionError(None, "refused")
         )
 

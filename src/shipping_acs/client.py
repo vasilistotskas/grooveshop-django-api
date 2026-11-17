@@ -22,10 +22,9 @@ from typing import Any
 
 import requests
 from django.conf import settings
-from requests.adapters import HTTPAdapter
 from urllib3.exceptions import MaxRetryError, NewConnectionError
-from urllib3.util.retry import Retry
 
+from shipping.carrier_http import CARRIER_RETRY, carrier_session
 from shipping_acs import voucher_hold
 from shipping_acs.concurrency import acs_request_slot
 from shipping_acs.exceptions import (
@@ -49,35 +48,28 @@ TRACKING_SUMMARY_ALIAS = "ACS_Trackingsummary"
 TRACKING_DETAILS_ALIAS = "ACS_TrackingDetails"
 TRACKING_ALIASES = (TRACKING_SUMMARY_ALIAS, TRACKING_DETAILS_ALIAS)
 
-# Retry only on connection errors (no request was ever delivered, so
-# no risk of duplicate mutation on the ACS side). 5xx and read-timeout
-# responses are NOT retried at the HTTP layer because every ACS call
-# is a POST and write aliases like ``ACS_Create_Voucher`` are not
-# idempotent — a second voucher request for one order has minted a
+# Every ACS call is a POST, so under the carriers' one retry rule
+# (``shipping.carrier_http.CARRIER_RETRY``) only a request that never
+# connected is sent again: no request was ever delivered, so no risk of
+# duplicate mutation on the ACS side. 5xx and read-timeout responses are
+# NOT sent again because write aliases like ``ACS_Create_Voucher`` are
+# not idempotent — a second voucher request for one order has minted a
 # second voucher in stage (order 682, 2026-04-29). The caller decides:
 # ``_exchange`` raises ``AcsOutcomeUnknownError`` for every failure
 # after the request may have left, and
 # ``AcsService.create_voucher_for_order`` records such a voucher
 # request as one of unknown outcome that nothing sends again.
-_RETRY_CONFIG = Retry(
-    total=3,
-    connect=3,
-    read=0,
-    status=0,
-    other=0,
-    backoff_factor=0.5,
-    raise_on_status=False,
-)
 
 
 def worst_case_request_seconds(timeout: float) -> float:
     """Longest one ``_call`` can hold the connection to ACS.
 
     ``requests`` applies ``timeout`` to the connect and to each read
-    separately, and ``_RETRY_CONFIG`` re-attempts a failed connect
-    ``min(total, connect)`` times with urllib3's backoff in between (none
-    before the first retry, ``factor * 2 ** (n - 1)`` capped at
-    ``backoff_max`` after the n-th error). Every attempt can spend the
+    separately, and ``CARRIER_RETRY`` re-attempts a failed connect
+    ``min(total, connect)`` times (``total`` when ``connect`` is unset)
+    with urllib3's backoff in between (none before the first retry,
+    ``factor * 2 ** (n - 1)`` capped at ``backoff_max`` after the n-th
+    error). Every attempt can spend the
     whole connect timeout, then the one read that gets an answer can spend
     the read timeout. The slot lease in ``shipping_acs.concurrency`` is
     this figure, so it outlives any request by construction. DNS
@@ -85,11 +77,13 @@ def worst_case_request_seconds(timeout: float) -> float:
     chunk per ``timeout`` is not bounded by it; the holder-token release
     keeps an expired lease harmless to the next holder either way.
     """
-    retries = min(_RETRY_CONFIG.total or 0, _RETRY_CONFIG.connect or 0)
+    total = CARRIER_RETRY.total or 0
+    connect = CARRIER_RETRY.connect
+    retries = total if connect is None else min(total, connect)
     backoff = sum(
         min(
-            _RETRY_CONFIG.backoff_max,
-            _RETRY_CONFIG.backoff_factor * 2 ** (errors - 1),
+            CARRIER_RETRY.backoff_max,
+            CARRIER_RETRY.backoff_factor * 2 ** (errors - 1),
         )
         for errors in range(2, retries + 1)
     )
@@ -179,13 +173,7 @@ class AcsClient:
                 f"Missing required Tenant ACS fields: {', '.join(missing)}"
             )
 
-        if session is not None:
-            self._session = session
-        else:
-            self._session = requests.Session()
-            adapter = HTTPAdapter(max_retries=_RETRY_CONFIG)
-            self._session.mount("https://", adapter)
-            self._session.mount("http://", adapter)
+        self._session = session if session is not None else carrier_session()
 
     # ------------------------------------------------------------------
     # Internal call helper

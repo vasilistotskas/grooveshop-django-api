@@ -25,6 +25,13 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **One HTTP retry rule.** Both clients build their `requests` session
+  with `carrier_session` (`src/shipping/carrier_http.py`), whose
+  `CARRIER_RETRY` sends a request again only when it never connected
+  (any method) or when it is a GET (after a 5xx or a lost answer too). A
+  POST or PUT that may have reached the courier is never sent again: the
+  client raises its own error and the caller decides (§5.1, §5.2). Every
+  ACS call is a POST, so ACS only gets a failed connect re-sent.
 - **Lock order: the order, then the shipment.** A carrier path that
   needs both rows (it reads the order under the lock, writes it, or
   inserts a row that references it) takes them through

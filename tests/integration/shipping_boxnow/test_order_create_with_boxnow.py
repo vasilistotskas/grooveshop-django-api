@@ -172,7 +172,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
         self.addCleanup(setattr, connection, "tenant", previous)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_creates_shipment_row(
@@ -214,7 +214,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         assert shipment.locker_external_id == "4"
         assert shipment.compartment_size == 1
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_accepts_cod_payway(
@@ -258,7 +258,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         shipment = BoxNowShipment.objects.get(order=order)
         assert shipment.payment_mode == BoxNowPaymentMode.COD.value
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_rejects_courier_cod_payway(
@@ -310,7 +310,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "A rejected order must not leave a shipment row behind"
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_requires_locker_id(
@@ -341,7 +341,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         body_str = str(response.json()).lower()
         assert "locker" in body_str or "boxnow" in body_str
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_rejected_when_boxnow_disabled_globally(
@@ -409,7 +409,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_client_sent_compartment_size_is_ignored(
@@ -433,7 +433,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         shipment = BoxNowShipment.objects.get()
         assert shipment.compartment_size == 1
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_compartment_size_is_derived_and_sent_to_boxnow(
@@ -475,7 +475,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             sent["items"][0]["compartmentSize"] == BoxNowCompartmentSize.MEDIUM
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_cart_that_fits_no_compartment_is_refused_at_checkout(

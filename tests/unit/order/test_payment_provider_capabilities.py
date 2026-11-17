@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
-from order.payment import (
+from order.payments.payment import (
     PaymentProvider,
     StripePaymentProvider,
     VivaWalletPaymentProvider,

@@ -28,7 +28,7 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from shipping_acs.admin import AcsShipmentAdmin
 from shipping_acs.enum.charge_type import AcsChargeType

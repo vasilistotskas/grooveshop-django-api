@@ -22,7 +22,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory

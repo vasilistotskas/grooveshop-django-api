@@ -58,16 +58,18 @@ class FakeStripeRefunds:
                 return_value=CREDENTIALS,
             ),
             mock.patch(
-                "order.payment.stripe.Refund.create", side_effect=self._create
+                "order.payments.payment.stripe.Refund.create",
+                side_effect=self._create,
             ),
             mock.patch(
-                "order.payment.stripe.Refund.list", side_effect=self._list
+                "order.payments.payment.stripe.Refund.list",
+                side_effect=self._list,
             ),
             mock.patch(
-                "order.payment.stripe.Refund.retrieve",
+                "order.payments.payment.stripe.Refund.retrieve",
                 side_effect=self._retrieve,
             ),
-            mock.patch("order.payment.Refund.sync_from_stripe_data"),
+            mock.patch("order.payments.payment.Refund.sync_from_stripe_data"),
         ]
 
     def __enter__(self) -> Self:

@@ -34,7 +34,7 @@ from order.models import (
     OrderItem,
 )
 from order.models.refund_attempt import RefundAttemptStatus
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from tests.integration.order.test_mydata_lifecycle import (
     _credits,
@@ -330,7 +330,7 @@ class TestTheBackfill:
         assert credit_allocation.headroom_total(order) == Decimal("70.00")
 
     def test_a_chargeback_decision_gets_what_deciding_it_gave(self):
-        from order.chargebacks import decide_chargebacks
+        from order.accounting.chargebacks import decide_chargebacks
         from tests.integration.order.test_chargeback_credit import (
             _chargeback,
         )
@@ -1239,7 +1239,7 @@ class TestOneRuleForUndecided:
         assert not _credits(order).exists()
 
     def test_two_decisions_decided_in_one_pass_note_the_cap_once(self):
-        from order.chargebacks import decide_chargebacks
+        from order.accounting.chargebacks import decide_chargebacks
         from order.models.payment_transaction import PaymentTransaction
         from user.factories import UserAccountFactory
 
@@ -1676,7 +1676,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
         payment of 100 given back, then staff say the goods came back. The
         customer kept 70 of goods: the credits total 30, whichever of the
         receipt and the decision came first."""
-        from order.chargebacks import decide_chargebacks
+        from order.accounting.chargebacks import decide_chargebacks
         from order.tasks import allocate_credit_sources
         from user.factories import UserAccountFactory
 
@@ -1712,7 +1712,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
     def test_a_chargeback_whose_goods_were_kept_never_eats_a_duplicate(self):
         """Goods kept means the receipt stands: the money the dispute took
         is sale money lost, and the duplicate given back is all excess."""
-        from order.chargebacks import decide_chargebacks
+        from order.accounting.chargebacks import decide_chargebacks
         from order.tasks import allocate_credit_sources
         from user.factories import UserAccountFactory
 
@@ -1745,7 +1745,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
         )
 
     def test_the_overcharge_does_not_depend_on_the_chargeback_decision(self):
-        from order.chargebacks import decide_chargebacks
+        from order.accounting.chargebacks import decide_chargebacks
         from user.factories import UserAccountFactory
 
         order = _order(lines=(("24", "100.00"),))

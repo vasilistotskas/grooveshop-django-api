@@ -197,7 +197,7 @@ def _create_online():
     country = _country_with_rate(delivery_days_min=1, delivery_days_max=3)
 
     with (
-        patch("order.payment.get_payment_provider") as provider,
+        patch("order.payments.payment.get_payment_provider") as provider,
         patch("order.services.timezone.now", return_value=MONDAY_10_ATHENS),
     ):
         provider.return_value.get_payment_status.return_value = (

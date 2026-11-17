@@ -116,7 +116,7 @@ def _offline_checkout(cart):
 def _payment_first_checkout(cart, user):
     country = CountryFactory()
     enable_rate(country)
-    with patch("order.payment.get_payment_provider") as provider:
+    with patch("order.payments.payment.get_payment_provider") as provider:
         provider.return_value.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
             {"payment_id": "pi_test_123", "status": "succeeded"},

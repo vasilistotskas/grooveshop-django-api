@@ -563,7 +563,7 @@ invalid-mutable-override = "ignore"
 # can't satisfy each TypedDict field individually. ty (since 0.0.33)
 # emits one diagnostic per field, producing ~75 errors per call site.
 [[tool.ty.overrides]]
-include = ["src/order/payment.py"]
+include = ["src/order/payments/payment.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
@@ -787,17 +787,17 @@ name = "order credit documents are imported by neither allocation nor ledger"
 type = "forbidden"
 source_modules = [
     "order.accounting.credit_allocation",
-    "order.payment_ledger",
+    "order.payments.payment_ledger",
 ]
 forbidden_modules = ["order.accounting.credit_documents"]
 allow_indirect_imports = true
 
-# The subpackages that exist so far (#566); `payments` joins when it moves.
-# A layer contract also forbids indirect chains. The two ignored edges are
-# the chains that held when it was written: credit documents queue their
-# task through `order.tasks`, which imports the refund reconciliation, and
-# checkout's one lazy import of the order models reaches, through the model
-# graph, every app and so accounting.
+# The subpackages that exist so far (#566). A layer contract also forbids
+# indirect chains. The two ignored edges are the chains that held when it
+# was written: credit documents queue their task through `order.tasks`,
+# which imports the refund reconciliation, and checkout's one lazy import of
+# the order models reaches, through the model graph, every app and so
+# accounting.
 [[tool.importlinter.contracts]]
 name = "order subpackages: reporting and refunds over accounting over checkout"
 type = "layers"
@@ -811,3 +811,24 @@ ignore_imports = [
     "order.accounting.credit_documents -> order.tasks",
     "order.checkout.discounts -> order.models.item",
 ]
+
+# `payments` sits below accounting, refunds and reporting, beside checkout
+# (#658: accounting -> payments). Every payments module imports the order
+# models, which reach every app and so every subpackage, so the layers
+# contract above cannot hold it without one ignored chain per module: this
+# contract checks its direct imports. The one ignored edge is the ledger
+# booking a refund's allocation (#658), removed by #569.
+[[tool.importlinter.contracts]]
+name = "order payments import neither accounting, refunds, reporting nor checkout"
+type = "forbidden"
+source_modules = ["order.payments"]
+forbidden_modules = [
+    "order.accounting",
+    "order.checkout",
+    "order.refunds",
+    "order.reporting",
+]
+ignore_imports = [
+    "order.payments.payment_ledger -> order.accounting.credit_allocation",
+]
+allow_indirect_imports = true

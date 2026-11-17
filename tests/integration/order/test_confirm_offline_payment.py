@@ -29,7 +29,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory

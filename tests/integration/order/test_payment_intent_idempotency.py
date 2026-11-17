@@ -145,7 +145,7 @@ class _Checkout:
 
 @pytest.mark.django_db
 class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_one_order_and_one_stock_decrement(self, mock_get_provider):
         mock_get_provider.return_value = _provider_reporting(
             PaymentStatus.PENDING
@@ -165,7 +165,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
         ), "each product is decremented once, for the one order"
         assert first.items.count() == 2
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_repeat_is_answered_when_the_first_order_took_the_last_units(
         self, mock_get_provider
     ):
@@ -188,7 +188,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
         assert second.pk == first.pk
         assert self._stock() == (0, 0)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_repeat_does_not_send_a_second_confirmation(
         self, mock_get_provider
     ):
@@ -204,7 +204,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
 
         admin_email.assert_not_called()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_repeat_is_answered_without_asking_the_provider(
         self, mock_get_provider
     ):
@@ -229,7 +229,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
         mock_get_provider.assert_not_called()
         provider.get_payment_status.assert_not_called()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_locked_lookup_catches_a_first_submit_that_raced_the_other(
         self, mock_get_provider
     ):
@@ -265,7 +265,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
 
 @pytest.mark.django_db
 class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_another_carts_order_is_not_handed_out(self, mock_get_provider):
         """Answering with it would show one shopper another's order."""
         mock_get_provider.return_value = _provider_reporting(
@@ -287,7 +287,7 @@ class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
         ) == [first.pk]
         assert self._stock() == (18, 14)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_canceled_orders_intent_is_not_reused(self, mock_get_provider):
         mock_get_provider.return_value = _provider_reporting(
             PaymentStatus.PENDING
@@ -300,7 +300,7 @@ class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
 
         assert Order.objects.filter(payment_id=PAYMENT_INTENT_ID).count() == 1
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_deleted_orders_intent_is_not_reused(self, mock_get_provider):
         """The unique index covers soft-deleted rows too."""
         mock_get_provider.return_value = _provider_reporting(
@@ -319,7 +319,7 @@ class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
             == 1
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_two_carts_racing_for_one_intent_are_answered_like_the_sequential_case(
         self, mock_get_provider
     ):
@@ -359,7 +359,7 @@ class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
         [None, "some_other_constraint"],
         ids=["no driver diagnostics", "another constraint"],
     )
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_any_other_integrity_error_is_still_invalid_order_data(
         self, mock_get_provider, cause
     ):
@@ -403,7 +403,7 @@ class TestPaymentIdIsUniqueInTheDatabase:
 class TestRacingSubmitsEndWithOneOrder(_Checkout):
     """Real commits on real connections: the cart row lock is the point."""
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_two_threads_one_cart_one_intent(self, mock_get_provider):
         mock_get_provider.return_value = _provider_reporting(
             PaymentStatus.PENDING

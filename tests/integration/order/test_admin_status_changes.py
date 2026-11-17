@@ -23,8 +23,8 @@ from djmoney.money import Money
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.inventory.stock import StockManager
 from order.models.order import Order
-from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.viva import CANCEL_REFUSED, FakeVivaApi

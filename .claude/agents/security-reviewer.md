@@ -29,7 +29,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 
 ### 3. Stock & Payment Atomicity
 - `StockManager.reserve_stock()` / `release_reservation()` / `convert_reservation_to_sale()` / `decrement_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
-- `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `src/settings/store_settings.py`, validated by `order.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
+- `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `src/settings/store_settings.py`, validated by `order.inventory.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
 - Viva Wallet webhooks (`src/order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
 - Order status transitions: verify they follow the expected lifecycle (no skipping states)

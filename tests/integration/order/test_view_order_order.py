@@ -193,7 +193,9 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "shipping_kind": "home_delivery",
         }
 
-        with patch("order.payment.get_payment_provider") as mock_get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_get_provider:
             mock_get_provider.return_value.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
                 {"status": "succeeded"},

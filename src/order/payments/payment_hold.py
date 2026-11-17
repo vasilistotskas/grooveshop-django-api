@@ -36,7 +36,10 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
-from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
+from order.payments.payment import (
+    StripePaymentProvider,
+    VivaWalletPaymentProvider,
+)
 from pay_way.enum.settlement import PaySettlement
 from scheduler.models import PeriodicTask
 

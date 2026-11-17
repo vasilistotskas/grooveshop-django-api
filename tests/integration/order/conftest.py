@@ -53,7 +53,8 @@ def refund_states():
             "tenant.credentials.stripe_credentials", return_value=CREDENTIALS
         ),
         mock.patch(
-            "order.payment.stripe.Refund.retrieve", side_effect=retrieve
+            "order.payments.payment.stripe.Refund.retrieve",
+            side_effect=retrieve,
         ),
     ):
         yield CURRENT_REFUND_STATUS

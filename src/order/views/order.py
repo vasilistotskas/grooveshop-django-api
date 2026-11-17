@@ -53,7 +53,6 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from order import payment_hold
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
@@ -82,12 +81,13 @@ from order.exceptions import (
 from order.filters import OrderFilter
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment import (
+from order.payments import payment_hold
+from order.payments.payment import (
     get_payment_provider,
     provider_supports,
     registered_provider_codes,
 )
-from order.payment_binding import PaymentPurpose
+from order.payments.payment_binding import PaymentPurpose
 from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,

@@ -33,6 +33,7 @@ from django.utils import timezone, translation
 
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
+from order.inventory.stock import StockManager
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.services import (
@@ -40,7 +41,6 @@ from order.services import (
     SHIPMENT_CANCEL_UNANSWERED_KEY,
     OrderService,
 )
-from order.stock import StockManager
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
     finish_pending_shipment_cancels,

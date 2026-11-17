@@ -43,7 +43,7 @@ The admin order list's **Payment Method** column
 (`OrderAdmin.payment_method_label`) is the one exception, because staff
 want the PSP, not the pay-way name (Viva's seeded pay way is keyed
 `CREDIT_CARD`): it shows `payment_provider_label(pay_way.provider_code)`
-(`src/order/payment.py`, the provider class's `display_name`, never an
+(`src/order/payments/payment.py`, the provider class's `display_name`, never an
 instance) and falls back to `get_pay_way_key_display()` for a method no
 provider registers, such as cash on delivery. Both are in memory
 (`pay_way` is `list_select_related`), so the column costs no query.

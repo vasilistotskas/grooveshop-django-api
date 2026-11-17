@@ -10,7 +10,10 @@ from __future__ import annotations
 import pytest
 from extra_settings.models import Setting
 
-from order.stock import StockManager, validate_reservation_ttl_minutes_setting
+from order.inventory.stock import (
+    StockManager,
+    validate_reservation_ttl_minutes_setting,
+)
 
 
 @pytest.mark.parametrize("value", [0, -5, True, "30", None])

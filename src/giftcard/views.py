@@ -36,8 +36,8 @@ from giftcard.serializers import (
     GiftCardSerializer,
 )
 from giftcard.services import GiftCardError, GiftCardService
-from order.payment import provider_supports
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import provider_supports
+from order.payments.payment_binding import PaymentPurpose
 from tenant.permissions import (
     IsCatalogueEnabled,
     IsGiftCardsEnabled,
@@ -190,7 +190,7 @@ class GiftCardViewSet(BaseModelViewSet):
         completed by the Viva webhook's gift-card branch). Offline
         payment makes no sense for an email-delivered voucher.
         """
-        from order.payment import get_payment_provider
+        from order.payments.payment import get_payment_provider
         from pay_way.services import PayWayService
 
         if not GiftCardService.is_enabled():

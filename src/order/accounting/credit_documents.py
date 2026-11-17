@@ -83,7 +83,7 @@ from order.models.refund_attempt import (
     RefundAttemptStatus,
 )
 from order.models.retail_credit import CreditReason
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)

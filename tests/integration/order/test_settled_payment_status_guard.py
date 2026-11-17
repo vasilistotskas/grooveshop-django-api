@@ -47,7 +47,9 @@ def _order(payment_status):
 def _provider_says(status):
     provider = Mock()
     provider.get_payment_status.return_value = (status, {"id": "pi_test_123"})
-    return patch("order.payment.get_payment_provider", return_value=provider)
+    return patch(
+        "order.payments.payment.get_payment_provider", return_value=provider
+    )
 
 
 @pytest.mark.parametrize("settled", sorted(SETTLED_PAYMENT_STATUSES))
@@ -97,7 +99,9 @@ def _stripe_says_paid(order, amount=None):
             "currency": str(owed.currency),
         },
     )
-    return patch("order.payment.get_payment_provider", return_value=provider)
+    return patch(
+        "order.payments.payment.get_payment_provider", return_value=provider
+    )
 
 
 def test_polling_still_advances_an_unsettled_order():

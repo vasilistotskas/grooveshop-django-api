@@ -512,7 +512,7 @@ class TestPaymentFirstPath:
         country = CountryFactory()
         enable_rate(country, price=SHIPPING, free_shipping_threshold=None)
 
-        with patch("order.payment.get_payment_provider") as provider:
+        with patch("order.payments.payment.get_payment_provider") as provider:
             provider.return_value.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
                 {"payment_id": "pi_scoped", "status": "succeeded"},

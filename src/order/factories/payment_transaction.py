@@ -6,7 +6,7 @@ from djmoney.money import Money
 
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.models.payment_transaction import PaymentTransaction
-from order.payment import StripePaymentProvider
+from order.payments.payment import StripePaymentProvider
 
 
 class PaymentTransactionFactory(factory.django.DjangoModelFactory):

@@ -125,7 +125,9 @@ class _Cart:
             PaymentStatus.COMPLETED,
             {},
         )
-        with patch("order.payment.get_payment_provider", return_value=provider):
+        with patch(
+            "order.payments.payment.get_payment_provider", return_value=provider
+        ):
             return OrderService.create_order_from_cart(
                 legal_acceptance=checkout_acceptance(),
                 cart=self.cart,

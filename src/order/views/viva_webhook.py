@@ -25,7 +25,6 @@ from django_tenants.utils import (
 
 from core.caches import REDIS_UNAVAILABLE
 from core.client_ip import client_ip_or_peer
-from order.disputes import announce_chargeback
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -33,7 +32,8 @@ from order.enum.status import (
 )
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment import order_viva_codes
+from order.payments.disputes import announce_chargeback
+from order.payments.payment import order_viva_codes
 from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
@@ -356,7 +356,7 @@ def _check_source_ip(request) -> tuple[bool, str]:
 
 
 def _verify_transaction(transaction_id):
-    from order.payment import VivaWalletPaymentProvider
+    from order.payments.payment import VivaWalletPaymentProvider
 
     try:
         provider = VivaWalletPaymentProvider()
@@ -508,7 +508,7 @@ def _verify_viva_reversal(
     verification is UNAVAILABLE, including a response with no readable
     amount.
     """
-    from order.payment import VIVA_STATUS_FINISHED
+    from order.payments.payment import VIVA_STATUS_FINISHED
 
     if not transaction_id:
         logger.error(
@@ -949,7 +949,7 @@ def _process_gift_card_purchase_event(
     from giftcard.enum import GiftCardPurchaseStatus
     from giftcard.services import GiftCardService
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import (
+    from order.payments.payment import (
         VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
         VIVA_REFUND_TRANSACTION_TYPE_IDS,
     )
@@ -1206,7 +1206,7 @@ def _flag_amount_mismatch(
 ) -> None:
     """Record a verified charge whose amount does not match the order, and
     page staff (``OrderService.flag_payment_mismatch``)."""
-    from order.payment import VivaWalletPaymentProvider
+    from order.payments.payment import VivaWalletPaymentProvider
     from order.services import OrderService
 
     OrderService.flag_payment_mismatch(
@@ -1414,8 +1414,8 @@ def _handle_payment_created(order, event_data, transaction_id):
 
     from djmoney.money import Money
 
-    from order.payment import VivaWalletPaymentProvider
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment import VivaWalletPaymentProvider
+    from order.payments.payment_ledger import PaymentLedger
     from order.services import OrderService
 
     # The money is in, whatever state the order is in: a canceled order or
@@ -1450,7 +1450,7 @@ def _handle_payment_created(order, event_data, transaction_id):
         OrderService.record_payment_after_cancel(
             order, payment_id=transaction_id, payment_method="viva_wallet"
         )
-        from order.payment_events import publish_payment_status
+        from order.payments.payment_events import publish_payment_status
 
         publish_payment_status(order)
         return None
@@ -1539,7 +1539,7 @@ def _handle_payment_created(order, event_data, transaction_id):
         },
     )
 
-    from order.payment_events import publish_payment_status
+    from order.payments.payment_events import publish_payment_status
 
     publish_payment_status(order)
 
@@ -1578,8 +1578,8 @@ def _handle_transaction_price_calculated(order, event_data, transaction_id):
 
     from order.enum.payment_transaction import PaymentFeeSource
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import VivaWalletPaymentProvider, alpha_currency
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment import VivaWalletPaymentProvider, alpha_currency
+    from order.payments.payment_ledger import PaymentLedger
 
     if not transaction_id:
         logger.error(
@@ -1688,7 +1688,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
         },
     )
 
-    from order.payment_events import publish_payment_status
+    from order.payments.payment_events import publish_payment_status
 
     publish_payment_status(order)
 
@@ -1728,11 +1728,11 @@ def _handle_reversal_created(order, event_data, transaction_id):
     from djmoney.money import Money
 
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import (
+    from order.payments.payment import (
         VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
         VIVA_REFUND_TRANSACTION_TYPE_IDS,
     )
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment_ledger import PaymentLedger
     from order.signals import order_refunded
 
     logger.info(
@@ -1822,8 +1822,8 @@ def _viva_charge_for(order, payment_id: str):
     """
     from order.enum.payment_transaction import PaymentTransactionKind
     from order.models.payment_transaction import PaymentTransaction
-    from order.payment import VivaWalletPaymentProvider
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment import VivaWalletPaymentProvider
+    from order.payments.payment_ledger import PaymentLedger
 
     if not payment_id:
         return None
@@ -1871,8 +1871,8 @@ def _record_viva_chargeback(order, charge, amount):
     ``None`` when it was booked or announced now.
     """
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import VivaWalletPaymentProvider
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment import VivaWalletPaymentProvider
+    from order.payments.payment_ledger import PaymentLedger
 
     reference = charge.provider_reference
     if (order.metadata or {}).get("dispute_resolved_id") == reference:
@@ -1921,7 +1921,7 @@ def _tenants_holding_sale(tenants, sale_id: str) -> list:
     from giftcard.models import GiftCardPurchase
     from order.enum.payment_transaction import PaymentTransactionKind
     from order.models.payment_transaction import PaymentTransaction
-    from order.payment import VivaWalletPaymentProvider
+    from order.payments.payment import VivaWalletPaymentProvider
 
     holders = []
     for tenant in tenants:
@@ -2048,7 +2048,7 @@ def _process_dispute_event_in_tenant(
     from djmoney.money import Money
 
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import (
+    from order.payments.payment import (
         VIVA_DISPUTE_LOST_STATUS_ID,
         VIVA_DISPUTE_OPEN_STATUS_IDS,
         VIVA_DISPUTE_WON_STATUS_ID,
@@ -2186,7 +2186,7 @@ def _follow_gift_card_dispute(purchase, raw_status: str, sale_id: str) -> str:
     """
     from giftcard.services import GiftCardService
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import (
+    from order.payments.payment import (
         VIVA_DISPUTE_LOST_STATUS_ID,
         VIVA_DISPUTE_OPEN_STATUS_IDS,
     )
@@ -2208,7 +2208,7 @@ def _note_viva_dispute_opened(order, dispute_id: str, raw_status: str):
     is what refuses a refund while the dispute is open
     (``PaymentLedger.dispute_open``)."""
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import VivaWalletPaymentProvider
+    from order.payments.payment import VivaWalletPaymentProvider
     from order.tasks import send_dispute_notification_email
 
     metadata = dict(order.metadata or {})

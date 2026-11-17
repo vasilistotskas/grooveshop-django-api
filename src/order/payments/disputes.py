@@ -11,7 +11,7 @@ from tenant.celery import dispatch_on_commit
 
 if TYPE_CHECKING:
     from order.models.order import Order
-    from order.payment_ledger import ChargebackOutcome
+    from order.payments.payment_ledger import ChargebackOutcome
 
 
 def announce_chargeback(

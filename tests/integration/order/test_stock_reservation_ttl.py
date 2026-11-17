@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.utils import timezone
 
-from order.stock import StockManager
+from order.inventory.stock import StockManager
 from product.factories import ProductFactory
 
 

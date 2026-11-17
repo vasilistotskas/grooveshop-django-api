@@ -193,7 +193,7 @@ product's stock movements is `stock_history.py`). Pricing is a package
 (`src/product/pricing/`); `src/product/tasks.py` holds the product alerts
 and the price-record reconciliation; `src/product/services.py` the catalogue
 writes the admin's actions call (the bulk discount, the duplicate as draft). The stock quantity is a column on
-`Product`, but stock is reserved and released in `src/order/stock.py`.
+`Product`, but stock is reserved and released in `src/order/inventory/stock.py`.
 Read `docs/product-pricing.md` and `docs/api/products.md`.
 
 ### `order/`
@@ -209,9 +209,9 @@ covers what you are changing. Models under `src/order/models/`: `Order`,
 and `VivaWebhookEvent`.
 
 Entry points: `src/order/services.py` (creation, the state machine,
-cancel, refund), `src/order/stock.py` (`StockManager`),
-`src/order/payment.py` (the payment providers),
-`src/order/payment_ledger.py` (`PaymentLedger`),
+cancel, refund), `src/order/inventory/stock.py` (`StockManager`),
+`src/order/payments/payment.py` (the payment providers),
+`src/order/payments/payment_ledger.py` (`PaymentLedger`),
 `src/order/signals/handlers.py` (the side effects of a change),
 `src/order/tasks.py`, `src/order/emails.py`, `src/order/communications/notifications.py`
 (live toasts), `src/order/accounting/mydata/` and `src/order/views/`.
@@ -397,6 +397,6 @@ changed as a `PendingUrl` row, and `submit_pending_urls`
 
 Stripe is dj-stripe (`djstripe` in `TENANT_APPS`, its webhook under
 `stripe/` in `src/core/urls.py`). Viva Wallet is
-`src/order/views/viva_webhook.py` and `src/order/payment_events.py`. Both
+`src/order/views/viva_webhook.py` and `src/order/payments/payment_events.py`. Both
 read their credentials from the `Tenant` row through
 `src/tenant/credentials.py`. Read `docs/order/payments.md`.

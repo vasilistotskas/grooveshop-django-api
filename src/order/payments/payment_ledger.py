@@ -534,7 +534,7 @@ class PaymentLedger:
         and points share by repeating its amount, a lines refund by its
         retry) or pointed to Record refund outcome.
         """
-        from order.payment import registered_provider_codes
+        from order.payments.payment import registered_provider_codes
 
         if cls.refundable_value(order) > 0:
             return True
@@ -1311,7 +1311,7 @@ class PaymentLedger:
         ``None`` when the provider cannot confirm a capture (it has logged
         why): nothing is recorded and the caller refuses.
         """
-        from order.payment import get_payment_provider
+        from order.payments.payment import get_payment_provider
 
         existing = PaymentTransaction.objects.filter(
             order=order,

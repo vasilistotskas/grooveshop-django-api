@@ -25,9 +25,9 @@ from order.exceptions import (
     OrderNotCancelableError,
 )
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.inventory.stock import StockManager
 from order.models import OrderItem, PaymentTransaction
 from order.services import OrderService
-from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.staff import stamp_platform_identity

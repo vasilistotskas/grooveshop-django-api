@@ -52,8 +52,8 @@ from emails.recipients import Recipient, customer_of
 from emails.types import EmailType, Kind, RenderEnv
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
-from order.payment import payment_provider_label
-from order.payment_ledger import PaymentLedger
+from order.payments.payment import payment_provider_label
+from order.payments.payment_ledger import PaymentLedger
 from order.storefront_links import order_page_url
 from pay_way.enum.settlement import PaySettlement
 from product.models.review import ProductReview

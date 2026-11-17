@@ -1,10 +1,10 @@
 """Whether a save moved a product between available and sold out.
 
-Every sale saves ``stock`` alone (``order/stock.py``), so a save of ``stock``
-and ``updated_at`` is bookkeeping: the cached pages and the page builder's
-lists are not purged for it. The one such save that changes what they show is
-the one that sells a product out or brings it back, because the product list
-puts products in stock first (``availability_priority`` in
+Every sale saves ``stock`` alone (``order/inventory/stock.py``), so a save of
+``stock`` and ``updated_at`` is bookkeeping: the cached pages and the page
+builder's lists are not purged for it. The one such save that changes what
+they show is the one that sells a product out or brings it back, because the
+product list puts products in stock first (``availability_priority`` in
 ``product.views.product``) and a builder list can leave sold-out ones out.
 
 The stored stock is read by a ``pre_save`` that also reads the stored

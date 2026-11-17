@@ -117,7 +117,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         )
         return provider
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_creates_the_order_for_the_signed_in_shopper(
         self, mock_get_provider
     ):
@@ -142,7 +142,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             PAYMENT_INTENT_ID
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_creates_a_guest_order_from_the_guest_cart(self, mock_get_provider):
         mock_get_provider.return_value = self._provider_confirming_payment()
 
@@ -159,7 +159,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             [(self.product1.id, 1)],
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_repeat_submit_answers_with_the_first_order(
         self, mock_get_provider
     ):
@@ -188,7 +188,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         self.product2.refresh_from_db()
         self.assertEqual((self.product1.stock, self.product2.stock), (8, 4))
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_an_intent_that_belongs_to_another_cart_is_refused(
         self, mock_get_provider
     ):
@@ -209,7 +209,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             Order.objects.filter(payment_id=PAYMENT_INTENT_ID).count(), 1
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_view_does_not_wrap_the_provider_call_in_a_transaction(
         self, mock_get_provider
     ):

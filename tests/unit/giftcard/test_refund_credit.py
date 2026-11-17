@@ -29,7 +29,7 @@ from giftcard.services import GiftCardService
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.models.order import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals import order_canceled, order_refunded
 from order.views.viva_webhook import _process_event_in_tenant

@@ -31,8 +31,8 @@ from giftcard.services import GiftCardService
 from order.exceptions import PaymentVerificationError
 from order.factories.order import OrderFactory
 from order.models.order import Order
-from order.payment import StripePaymentProvider
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import StripePaymentProvider
+from order.payments.payment_binding import PaymentPurpose
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -313,7 +313,9 @@ class TestEveryIntentWeCreateIsBound:
 
 class TestTheReverseAndTheOtherIntentKinds:
     def test_a_checkout_session_binds_its_intent_to_the_order(self, stripe):
-        with patch("order.payment.stripe.checkout.Session.create") as create:
+        with patch(
+            "order.payments.payment.stripe.checkout.Session.create"
+        ) as create:
             create.return_value.id = "cs_1"
             create.return_value.url = "https://checkout.example/cs_1"
             create.return_value.expires_at = 1_800_000_000

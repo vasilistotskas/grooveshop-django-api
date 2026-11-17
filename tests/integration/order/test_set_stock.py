@@ -4,8 +4,8 @@ import pytest
 
 from order.enum.stock_log_reason import StockLogReason
 from order.exceptions import ProductNotFoundError
+from order.inventory.stock import StockManager
 from order.models import StockLog
-from order.stock import StockManager
 from product.factories import ProductFactory
 from product.models.product import Product
 

@@ -8,7 +8,7 @@ from django.dispatch import Signal, receiver
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.signals import (
     order_canceled,
     order_charged_back,

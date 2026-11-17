@@ -97,7 +97,7 @@ class TestIntentIsReadOutsideTheTransaction:
         provider.get_payment_status.side_effect = read
         return provider
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_no_row_is_locked_before_the_provider_answers(
         self, mock_get_provider
     ):
@@ -133,7 +133,7 @@ class TestIntentIsReadOutsideTheTransaction:
             "pass for an order creation that locks nothing"
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_an_intent_matching_the_server_total_is_accepted(
         self, mock_get_provider
     ):
@@ -154,7 +154,7 @@ class TestIntentIsReadOutsideTheTransaction:
         assert order.payment_id == "pi_matching"
         assert order.amount_due == reference.amount_due
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_server_total_is_recomputed_inside_the_transaction(
         self, mock_get_provider
     ):
@@ -184,7 +184,7 @@ class TestIntentIsReadOutsideTheTransaction:
             "a refused order must not keep the stock it took"
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_intent_currency_is_rechecked_inside_the_transaction(
         self, mock_get_provider
     ):

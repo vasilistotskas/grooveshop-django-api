@@ -25,7 +25,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -338,7 +338,7 @@ class TestWhatTheProviderAnswers:
         order = _order()
 
         with mock.patch(
-            "order.payment.get_payment_provider",
+            "order.payments.payment.get_payment_provider",
             side_effect=ImproperlyConfigured("no key"),
         ):
             result = OrderService.refund_order(order, amount=_eur("40.00"))
@@ -351,7 +351,7 @@ class TestWhatTheProviderAnswers:
         )
 
     def test_the_viva_provider_itself_reports_that_outcome_as_unknown(self):
-        from order.payment import VivaWalletPaymentProvider
+        from order.payments.payment import VivaWalletPaymentProvider
 
         body = {**CANCEL_SUCCESS, "TransactionId": None}
 

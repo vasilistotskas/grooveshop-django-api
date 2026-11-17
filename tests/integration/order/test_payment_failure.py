@@ -10,9 +10,9 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.factories.order import OrderFactory
+from order.inventory.stock import StockManager
 from order.models.order import Order
 from order.services import OrderService
-from order.stock import StockManager
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
     send_payment_failed_email,
@@ -50,7 +50,7 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
         # Patch the TTL to ensure reservations don't expire during slow
         # test executions.
         self.patcher = patch(
-            "order.stock.StockManager.get_reservation_ttl_minutes",
+            "order.inventory.stock.StockManager.get_reservation_ttl_minutes",
             return_value=60,
         )
         self.patcher.start()
@@ -366,7 +366,7 @@ class TestAutoCancelReleasesStockAfterGracePeriod:
         from unittest.mock import patch
 
         with patch(
-            "order.stock.StockManager.get_reservation_ttl_minutes",
+            "order.inventory.stock.StockManager.get_reservation_ttl_minutes",
             return_value=60,
         ):
             reservation = StockManager.reserve_stock(

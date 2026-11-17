@@ -114,7 +114,7 @@ def test_the_payment_first_order_line_inherits_the_cart_line_impression():
     # until this call.
     enable_rate(country)
 
-    with patch("order.payment.get_payment_provider") as provider:
+    with patch("order.payments.payment.get_payment_provider") as provider:
         provider.return_value.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
             {"payment_id": "pi_test_123", "status": "succeeded"},

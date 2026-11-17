@@ -27,7 +27,7 @@ from rest_framework.test import APITestCase
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
-from order.payment import StripePaymentProvider
+from order.payments.payment import StripePaymentProvider
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 
@@ -50,7 +50,7 @@ class ConfirmDelegatedPaymentProviderTestCase(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     def test_charges_token_with_confirmed_payment_intent(
         self, mock_create
     ) -> None:
@@ -59,7 +59,9 @@ class ConfirmDelegatedPaymentProviderTestCase(TestCase):
         mock_pi.status = "succeeded"
         mock_create.return_value = mock_pi
 
-        with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
+        with mock.patch(
+            "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+        ):
             provider = StripePaymentProvider()
             success, data = provider.confirm_delegated_payment(
                 amount=Money(
@@ -87,7 +89,7 @@ class ConfirmDelegatedPaymentProviderTestCase(TestCase):
             "agent_spt_0e35c7e5-8a5d-4f6e-9be1-2be929e14a41",
         )
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     def test_stripe_error_returns_failure(self, mock_create) -> None:
         mock_create.side_effect = stripe.StripeError("token expired")
         provider = StripePaymentProvider()

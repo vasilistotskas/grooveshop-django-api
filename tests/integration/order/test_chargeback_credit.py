@@ -23,16 +23,16 @@ from django.test import RequestFactory
 from djmoney.money import Money
 
 from admin.dashboard.store import queries
+from order.accounting.chargebacks import (
+    ChargebackDecisionError,
+    decide_chargebacks,
+)
 from order.accounting.credit_documents import create_pending_credits
 from order.accounting.invoicing import ReceiptNotIssuable, generate_invoice
 from order.admin import (
     ChargebackDecisionFilter,
     OrderAdmin,
     PaymentTransactionInline,
-)
-from order.chargebacks import (
-    ChargebackDecisionError,
-    decide_chargebacks,
 )
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus
@@ -46,7 +46,7 @@ from order.models import (
 )
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from tests.integration.order.test_mydata_lifecycle import (
     _credits,
     _eur,

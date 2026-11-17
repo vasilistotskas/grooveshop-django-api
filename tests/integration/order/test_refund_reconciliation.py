@@ -31,7 +31,7 @@ from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.refunds.refund_reconciliation import record_outcome
 from order.services import OrderService
 from order.tasks import reconcile_pending_refunds

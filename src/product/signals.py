@@ -99,7 +99,8 @@ def post_create_historical_record_callback(
         )
 
     if old_stock != new_stock:
-        # Detect if this is a programmatic stock operation from order/stock.py
+        # Detect if this is a programmatic stock operation from
+        # order/inventory/stock.py
         # Programmatic operations use save(update_fields=['stock', 'updated_at'])
         # Admin changes typically update multiple fields or use save() without update_fields
         history_change_reason = getattr(

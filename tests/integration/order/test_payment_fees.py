@@ -23,12 +23,12 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import PaymentTransaction, PendingPaymentFee
 from order.models.viva_webhook_event import VivaWebhookEvent
-from order.payment import VivaWalletPaymentProvider
-from order.payment_fees import (
+from order.payments.payment import VivaWalletPaymentProvider
+from order.payments.payment_fees import (
     record_stripe_charge_fee,
     record_stripe_fee_for_intent,
 )
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.signals.handlers import handle_stripe_charge_fee
 from order.views.viva_webhook import (
     VIVA_TRANSACTION_PRICE_CALCULATED,
@@ -440,7 +440,7 @@ def _charge(**overrides):
 def _synced(fee, currency="eur", balance_transaction=True):
     bt = SimpleNamespace(fee=fee, currency=currency)
     return patch(
-        "order.payment_fees.Charge.sync_from_stripe_data",
+        "order.payments.payment_fees.Charge.sync_from_stripe_data",
         return_value=SimpleNamespace(
             balance_transaction=bt if balance_transaction else None
         ),
@@ -450,7 +450,7 @@ def _synced(fee, currency="eur", balance_transaction=True):
 @pytest.fixture
 def stripe_key():
     with patch(
-        "order.payment_fees.stripe_credentials",
+        "order.payments.payment_fees.stripe_credentials",
         return_value={"secret_key": "sk_test_x"},
     ):
         yield
@@ -526,7 +526,7 @@ class TestStripeFee:
 
         with (
             patch(
-                "order.payment_fees.stripe.Charge.retrieve",
+                "order.payments.payment_fees.stripe.Charge.retrieve",
                 return_value=SimpleNamespace(to_dict=_charge),
             ) as retrieve,
             _synced(175),
@@ -546,7 +546,9 @@ class TestStripeFee:
             source=PaymentFeeSource.STRIPE_BALANCE_TRANSACTION,
         )
 
-        with patch("order.payment_fees.stripe.Charge.retrieve") as retrieve:
+        with patch(
+            "order.payments.payment_fees.stripe.Charge.retrieve"
+        ) as retrieve:
             record_stripe_fee_for_intent("pi_stripe_fee", "ch_fee_1")
 
         retrieve.assert_not_called()
@@ -555,7 +557,7 @@ class TestStripeFee:
         row = PaymentTransactionFactory(provider_reference="pi_stripe_fee")
 
         with patch(
-            "order.payment_fees.stripe.Charge.retrieve",
+            "order.payments.payment_fees.stripe.Charge.retrieve",
             side_effect=stripe.APIConnectionError("down"),
         ):
             record_stripe_fee_for_intent("pi_stripe_fee", "ch_fee_1")

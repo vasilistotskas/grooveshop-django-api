@@ -47,7 +47,7 @@ TTL_SECONDS = 600
 BATCH = 64
 
 #: Saves that change nothing a page shows (the same rule as the product
-#: surface: ``order/stock.py`` saves ``stock`` on every sale).
+#: surface: ``order/inventory/stock.py`` saves ``stock`` on every sale).
 _IGNORED_UPDATE_FIELDS = frozenset({"stock", "updated_at"})
 
 

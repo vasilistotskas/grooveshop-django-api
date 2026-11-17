@@ -33,7 +33,7 @@ from order.factories.item import OrderItemFactory
 from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
-from order.payment_ledger import (
+from order.payments.payment_ledger import (
     MANUAL_REFUND_PROVIDER,
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,

@@ -109,9 +109,9 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
     """dj-stripe's admin pages: a platform superuser's, nobody else's.
 
     dj-stripe mirrors a store's Stripe account into its schema. The
-    store's payments run through its orders (``order.payment``); only the
-    platform reads or works the mirror (the sidebar's "Stripe" menu is a
-    superuser's). ``tenant.role_scopes`` grants no store role anything on
+    store's payments run through its orders (``order.payments.payment``);
+    only the platform reads or works the mirror (the sidebar's "Stripe" menu
+    is a superuser's). ``tenant.role_scopes`` grants no store role anything on
     it, and this keeps the pages a superuser's whoever else holds a
     permission.
 

@@ -5,9 +5,9 @@ import pytest
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
+from order.inventory.stock import StockManager
 from order.models import Order, StockLog
 from order.services import OrderService
-from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.legal import checkout_acceptance
@@ -36,7 +36,9 @@ class TestPaymentConfirmationConvertsReservations:
         reservation → stock-decrement conversion, not payment amount
         validation (covered elsewhere).
         """
-        with patch("order.payment.get_payment_provider") as mock_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_provider:
             mock_instance = Mock()
             mock_instance.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,

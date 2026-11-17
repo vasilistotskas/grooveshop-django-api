@@ -36,8 +36,8 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
-from order.payment import ProviderRefund, get_payment_provider
-from order.payment_ledger import PaymentLedger, is_cash_collection
+from order.payments.payment import ProviderRefund, get_payment_provider
+from order.payments.payment_ledger import PaymentLedger, is_cash_collection
 from order.services import OrderService
 
 if TYPE_CHECKING:

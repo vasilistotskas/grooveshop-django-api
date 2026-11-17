@@ -11,8 +11,8 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import OrderCancellationError, PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
+from order.inventory.stock import StockManager
 from order.services import OrderService, RefundResult
-from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -121,7 +121,7 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(quote(_eur("49.99")), _eur("5.00"))
         self.assertEqual(quote(_eur("500.00")), _eur("0.00"))
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_refund_order_full(self, mock_get_provider):
         order = OrderFactory(
             payment_status=PaymentStatus.COMPLETED,
@@ -154,7 +154,7 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(refund.amount, _eur("100.00"))
         self.assertEqual(refund.description, "Test refund")
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_refund_order_partial(self, mock_get_provider):
         order = OrderFactory(
             payment_status=PaymentStatus.COMPLETED,
@@ -202,7 +202,7 @@ class OrderServiceTestCase(TestCase):
             "This order has not been paid yet.", str(context.exception)
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_get_payment_status_persists_the_provider_status(
         self, mock_get_provider
     ):

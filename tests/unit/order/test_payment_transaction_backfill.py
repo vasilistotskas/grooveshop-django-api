@@ -25,7 +25,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.payment_transaction import PaymentTransaction
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from pay_way.factories import PayWayFactory
 
 pytestmark = pytest.mark.django_db

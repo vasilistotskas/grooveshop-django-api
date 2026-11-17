@@ -695,8 +695,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # cancellable on the very next run, with no grace at all.
         #
         # Fixed here rather than at ~35 call sites so it cannot be missed
-        # again — order/stock.py and the shipping services already pass
-        # "updated_at" by hand, which is the convention Order's own saves
+        # again — order/inventory/stock.py and the shipping services already
+        # pass "updated_at" by hand, which is the convention Order's own saves
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing
         # update_fields=["status"] would otherwise drop that write while

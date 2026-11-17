@@ -20,7 +20,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
-from order.payment_ledger import (
+from order.payments.payment_ledger import (
     MANUAL_REFUND_PROVIDER,
     PaymentLedger,
     is_cash_collection,
@@ -335,7 +335,9 @@ class TestRecording:
             theirs, amount=_eur("50.00"), provider="stripe", reference="pi_x"
         )
 
-        with caplog.at_level(logging.ERROR, logger="order.payment_ledger"):
+        with caplog.at_level(
+            logging.ERROR, logger="order.payments.payment_ledger"
+        ):
             row, created = PaymentLedger.record_charge(
                 mine, amount=_eur("50.00"), provider="stripe", reference="pi_x"
             )

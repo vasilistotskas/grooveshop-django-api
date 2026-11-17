@@ -33,9 +33,9 @@ from djmoney.money import Money
 from cart.models.cart import Cart
 from cart.models.item import CartItem
 from order.enum.status import PaymentStatus
+from order.inventory.stock import StockManager
 from order.models.stock_reservation import StockReservation
 from order.services import OrderService
-from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -190,7 +190,9 @@ class TestCheckoutLocksProductsInPkOrder:
         )
         provider = Mock()
         provider.get_payment_status.return_value = (PaymentStatus.PENDING, {})
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value = provider
             return OrderService.create_order_from_cart(
                 legal_acceptance=checkout_acceptance(),

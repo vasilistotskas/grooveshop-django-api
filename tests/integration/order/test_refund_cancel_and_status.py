@@ -30,7 +30,7 @@ from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -256,7 +256,7 @@ class TestAPaidOrderTheLedgerNeverRecorded:
         request = RequestFactory().post("/admin/order/order/")
         request.user = UserAccountFactory(is_staff=True, is_superuser=True)
 
-        with patch("order.payment.get_payment_provider") as provider:
+        with patch("order.payments.payment.get_payment_provider") as provider:
             offered = admin.has_refund_permission(request, object_id=order.pk)
 
         assert offered is True

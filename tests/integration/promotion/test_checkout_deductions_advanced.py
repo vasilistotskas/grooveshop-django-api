@@ -169,7 +169,7 @@ class TestGiftInjection:
         """The last unit is in stock when the cart is priced, but another
         shopper's reservation holds it by the time the order is written:
         the gift is skipped and recorded, the paid goods still ship."""
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         gift_product = ProductFactory(
             price=Money(Decimal(15), "EUR"),
@@ -229,7 +229,7 @@ class TestLoyaltyPaymentIntentParity:
         self, enable_promotions, checkout
     ):
         from loyalty.models.transaction import PointsTransaction
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         user = checkout["user"]
         PointsTransaction.objects.create(
@@ -260,7 +260,9 @@ class TestLoyaltyPaymentIntentParity:
             weight_grams=0,
         ).amount + Decimal("95.00")
 
-        with patch("order.payment.get_payment_provider") as mock_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_provider:
             instance = Mock()
             instance.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
@@ -291,7 +293,7 @@ class TestLoyaltyPaymentIntentParity:
     ):
         from loyalty.models.transaction import PointsTransaction
         from order.exceptions import PaymentAmountMismatchError
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         user = checkout["user"]
         PointsTransaction.objects.create(
@@ -318,7 +320,9 @@ class TestLoyaltyPaymentIntentParity:
             weight_grams=0,
         ).amount + Decimal("100.00")
 
-        with patch("order.payment.get_payment_provider") as mock_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_provider:
             instance = Mock()
             instance.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,

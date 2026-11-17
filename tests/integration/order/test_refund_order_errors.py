@@ -4,7 +4,7 @@ refund leg of ``OrderService.cancel_order`` (``order/services.py``).
 The happy paths are covered in ``test_service_order.py`` and
 ``test_partial_refunds.py``; this module pins what happens when a refund
 cannot or does not go through. Only the PSP
-(``order.payment.get_payment_provider``) is mocked.
+(``order.payments.payment.get_payment_provider``) is mocked.
 """
 
 from __future__ import annotations
@@ -61,7 +61,9 @@ class TestRefundOrderRefusals:
     def test_amount_above_the_refundable_is_refused_before_the_provider(self):
         order = _paid_order()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
                 OrderService.refund_order(
                     order, amount=Money(Decimal("50.01"), "EUR")
@@ -77,7 +79,9 @@ class TestRefundOrderRefusals:
         order = _paid_order()
         amount = Money(Decimal("50.00"), "EUR")
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             provider = get_provider.return_value
             provider.refund_payment.return_value = (
                 True,
@@ -101,7 +105,9 @@ class TestRefundOrderRefusals:
     def test_an_amount_that_is_not_positive_is_refused(self, amount):
         order = _paid_order()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
                 OrderService.refund_order(
                     order, amount=Money(Decimal(amount), "EUR")
@@ -117,7 +123,9 @@ class TestRefundOrderRefusals:
         captured anything, so there is nothing to refund through one."""
         order = _paid_order(payment_id="")
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
                 OrderService.refund_order(order)
 
@@ -134,7 +142,9 @@ class TestRefundOrderRefusals:
         order = _paid_order(payment_status=PaymentStatus.PENDING)
         order.payment_transactions.all().delete()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
                 OrderService.refund_order(order)
 
@@ -156,7 +166,9 @@ class TestRefundOrderRefusals:
 
     def test_a_fully_refunded_order_is_refused(self):
         order = _paid_order()
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.return_value = (
                 True,
                 {"refund_id": "re_1", "amount": "50.00"},
@@ -173,7 +185,9 @@ class TestRefundOrderRefusals:
         order = _paid_order()
 
         with (
-            patch("order.payment.get_payment_provider") as get_provider,
+            patch(
+                "order.payments.payment.get_payment_provider"
+            ) as get_provider,
             patch("order.services.order_refunded.send") as refunded_signal,
         ):
             get_provider.return_value.refund_payment.return_value = (
@@ -201,7 +215,9 @@ class TestCancelOrderWhenTheRefundFails:
     def test_declined_refund_still_cancels_and_reports_the_failure(self):
         order = _cancellable_paid_order()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.return_value = (
                 False,
                 {"error": "stripe said: insufficient balance acct_123"},
@@ -227,7 +243,9 @@ class TestCancelOrderWhenTheRefundFails:
     def test_provider_exception_still_cancels_and_reports_the_failure(self):
         order = _cancellable_paid_order()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.side_effect = RuntimeError(
                 "stripe timeout"
             )
@@ -255,7 +273,9 @@ class TestCancelOrderWhenTheRefundFails:
             provider_reference="pi_second",
         )
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.side_effect = [
                 (True, {"refund_id": "re_1", "amount": "50.00"}),
                 (False, {"error": "stripe said: declined acct_123"}),
@@ -275,7 +295,9 @@ class TestCancelOrderWhenTheRefundFails:
     def test_refund_payment_false_never_calls_the_provider(self):
         order = _cancellable_paid_order()
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             _canceled, refund_info = OrderService.cancel_order(
                 order, refund_payment=False
             )
@@ -294,7 +316,9 @@ class TestCancelOrderWhenTheRefundFails:
         client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
         client.force_authenticate(user=user)
 
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.return_value = (
                 False,
                 {"error": "stripe said: insufficient balance acct_123"},

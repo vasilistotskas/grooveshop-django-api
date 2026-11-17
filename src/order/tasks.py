@@ -21,7 +21,10 @@ from core.store_settings import store_setting
 from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 from emails.transport import Attachment
-from order import payment_hold
+from order.communications.review_request import (
+    awaiting_review_request,
+    delivery_window,
+)
 from order.emails import (
     STATUS_EMAIL_KEYS,
     OrderDispute,
@@ -45,9 +48,9 @@ from order.models import (
 from order.models.order import (
     status_update_reservation_key,
 )
-from order.payment import get_payment_provider_class
+from order.payments import payment_hold
+from order.payments.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
-from order.review_request import awaiting_review_request, delivery_window
 from order.services import (
     SHIPMENT_CANCEL_PENDING_FLAG,
     OrderService,
@@ -1644,7 +1647,7 @@ def cleanup_expired_stock_reservations() -> int:
         int: Number of expired reservations that were cleaned up
     """
     try:
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         count = StockManager.cleanup_expired_reservations()
 
@@ -2173,7 +2176,8 @@ def send_checkout_abandonment_emails() -> int:
 def send_review_request_emails() -> dict[str, int]:
     """Remind customers to review an order, once, a few days after delivery.
 
-    Which orders is ``order.review_request.awaiting_review_request`` (the
+    Which orders is
+    ``order.communications.review_request.awaiting_review_request`` (the
     store's ``REVIEW_REQUEST_DELAY_DAYS``; 0 is off). Each order is CLAIMED
     first, by stamping ``Order.review_request_sent_at`` where it is still
     empty, so two overlapping runs cannot both mail it. The claim is kept

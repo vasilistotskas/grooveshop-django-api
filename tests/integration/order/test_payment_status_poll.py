@@ -40,12 +40,15 @@ from order.exceptions import (
     PaymentVerificationError,
 )
 from order.factories.order import OrderFactory
+from order.inventory.stock import StockManager
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
-from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
-from order.payment_ledger import PaymentLedger
+from order.payments.payment import (
+    StripePaymentProvider,
+    VivaWalletPaymentProvider,
+)
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
-from order.stock import StockManager
 from order.tasks import auto_cancel_stuck_pending_orders
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -98,7 +101,9 @@ def _provider_says(polled):
         polled,
         {"payment_id": PAYMENT_ID, "provider": "stripe"},
     )
-    return patch("order.payment.get_payment_provider", return_value=provider)
+    return patch(
+        "order.payments.payment.get_payment_provider", return_value=provider
+    )
 
 
 class TestAProviderThatCannotBeAskedIsNotAnOutcome:
@@ -221,7 +226,10 @@ class TestAProviderThatCannotBeAskedIsNotAnOutcome:
         )
 
         with (
-            patch("order.payment.get_payment_provider", return_value=provider),
+            patch(
+                "order.payments.payment.get_payment_provider",
+                return_value=provider,
+            ),
             pytest.raises(PaymentVerificationError),
         ):
             OrderService._retrieve_payment_intent(PAYMENT_ID, pay_way)
@@ -233,7 +241,9 @@ class TestAProviderThatCannotBeAskedIsNotAnOutcome:
             PAYMENT_ID
         )
 
-        with patch("order.payment.get_payment_provider", return_value=provider):
+        with patch(
+            "order.payments.payment.get_payment_provider", return_value=provider
+        ):
             charge = PaymentLedger.ensure_charge(
                 order, provider_code="stripe", payment_id=PAYMENT_ID
             )

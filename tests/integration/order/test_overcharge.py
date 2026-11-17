@@ -29,8 +29,8 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment_binding import PaymentPurpose, binding_metadata
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_binding import PaymentPurpose, binding_metadata
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_checkout_completed,

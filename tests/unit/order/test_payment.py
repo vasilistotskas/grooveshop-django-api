@@ -6,13 +6,13 @@ from djmoney.money import Money
 from djstripe.models import PaymentIntent
 
 from order.enum.status import PaymentStatus
-from order.payment import (
+from order.payments.payment import (
     StripePaymentProvider,
     VivaWalletPaymentProvider,
     get_payment_provider,
     money_from_minor_units,
 )
-from order.payment_binding import PaymentPurpose
+from order.payments.payment_binding import PaymentPurpose
 
 
 class PaymentModuleTestCase(TestCase):
@@ -73,8 +73,8 @@ class PaymentModuleTestCase(TestCase):
         with self.assertRaises(ImproperlyConfigured):
             StripePaymentProvider()
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.logger")
     def test_stripe_process_payment(self, mock_logger, mock_stripe_create):
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_order_id_mock"
@@ -83,7 +83,9 @@ class PaymentModuleTestCase(TestCase):
         mock_payment_intent.next_action = None
         mock_stripe_create.return_value = mock_payment_intent
 
-        with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
+        with mock.patch(
+            "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+        ):
             provider = StripePaymentProvider()
             amount = Money(
                 amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
@@ -103,8 +105,8 @@ class PaymentModuleTestCase(TestCase):
             )
             self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
 
-    @mock.patch("order.payment.stripe.Refund.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.Refund.create")
+    @mock.patch("order.payments.payment.logger")
     def test_stripe_refund_payment(self, mock_logger, mock_stripe_refund):
         mock_refund = mock.Mock()
         mock_refund.id = "re_test_payment_id_mock"
@@ -113,7 +115,7 @@ class PaymentModuleTestCase(TestCase):
         mock_refund.currency = "eur"
         mock_stripe_refund.return_value = mock_refund
 
-        with mock.patch("order.payment.Refund.sync_from_stripe_data"):
+        with mock.patch("order.payments.payment.Refund.sync_from_stripe_data"):
             provider = StripePaymentProvider()
             payment_id = "test_payment_id"
             amount = Money(
@@ -137,9 +139,9 @@ class PaymentModuleTestCase(TestCase):
                 "order-1-refund-1",
             )
 
-    @mock.patch("order.payment.stripe.PaymentIntent.retrieve")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.retrieve")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.logger")
     def test_stripe_get_payment_status(
         self, mock_logger, mock_sync, mock_retrieve
     ):
@@ -157,7 +159,7 @@ class PaymentModuleTestCase(TestCase):
         mock_sync.return_value = mock_djstripe_pi
 
         with mock.patch(
-            "order.payment.PaymentIntent.objects.get",
+            "order.payments.payment.PaymentIntent.objects.get",
             side_effect=PaymentIntent.DoesNotExist,
         ):
             provider = StripePaymentProvider()
@@ -260,8 +262,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_with_comprehensive_metadata(
         self, mock_sync, mock_stripe_create
     ):
@@ -310,8 +312,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         self.assertEqual(metadata["customer_email"], "customer@example.com")
         self.assertEqual(metadata["source"], "django_app")
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_with_idempotency_key(
         self, mock_sync, mock_stripe_create
     ):
@@ -356,8 +358,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
             f"order_{order_uuid}",
         )
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_without_idempotency_key(
         self, mock_sync, mock_stripe_create
     ):
@@ -394,8 +396,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         call_kwargs = mock_stripe_create.call_args[1]
         self.assertNotIn("idempotency_key", call_kwargs)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_with_cart_item_ids_as_string(
         self, mock_sync, mock_stripe_create
     ):
@@ -433,8 +435,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         metadata = call_kwargs["metadata"]
         self.assertEqual(metadata["cart_item_ids"], "101,102,103")
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_without_optional_metadata(
         self, mock_sync, mock_stripe_create
     ):
@@ -477,8 +479,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         self.assertNotIn("cart_item_ids", metadata)
         self.assertNotIn("customer_email", metadata)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_with_all_parameters(
         self, mock_sync, mock_stripe_create
     ):
@@ -536,8 +538,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         # Check customer ID
         self.assertEqual(call_kwargs["customer"], "cus_test_123")
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
     def test_process_payment_with_empty_cart_item_ids_list(
         self, mock_sync, mock_stripe_create
     ):
@@ -632,8 +634,8 @@ class MinorUnitsTestCase(TestCase):
     def test_stripe_refund_request_uses_the_currency_exponent(self):
         with (
             mock.patch("tenant.credentials.stripe_credentials") as creds,
-            mock.patch("order.payment.stripe.Refund.create") as create,
-            mock.patch("order.payment.Refund.sync_from_stripe_data"),
+            mock.patch("order.payments.payment.stripe.Refund.create") as create,
+            mock.patch("order.payments.payment.Refund.sync_from_stripe_data"),
         ):
             creds.return_value = {"secret_key": "sk_test_dummy"}
             create.return_value = mock.Mock(
@@ -652,8 +654,12 @@ class MinorUnitsTestCase(TestCase):
     def test_stripe_payment_status_amount_is_in_major_units(self):
         with (
             mock.patch("tenant.credentials.stripe_credentials") as creds,
-            mock.patch("order.payment.stripe.PaymentIntent.retrieve") as get,
-            mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
+            mock.patch(
+                "order.payments.payment.stripe.PaymentIntent.retrieve"
+            ) as get,
+            mock.patch(
+                "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+            ),
         ):
             creds.return_value = {"secret_key": "sk_test_dummy"}
             get.return_value = mock.Mock(
@@ -683,8 +689,8 @@ class StripeRefundStatusTestCase(TestCase):
     def _refund(self, status):
         with (
             mock.patch("tenant.credentials.stripe_credentials") as creds,
-            mock.patch("order.payment.stripe.Refund.create") as create,
-            mock.patch("order.payment.Refund.sync_from_stripe_data"),
+            mock.patch("order.payments.payment.stripe.Refund.create") as create,
+            mock.patch("order.payments.payment.Refund.sync_from_stripe_data"),
         ):
             creds.return_value = {"secret_key": "sk_test_dummy"}
             create.return_value = mock.Mock(

@@ -22,7 +22,6 @@ from order.communications.notifications import (
     notify_payment_confirmed_live,
     notify_payment_failed_live,
 )
-from order.disputes import announce_chargeback
 from order.emails import RefundFailed
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
@@ -35,12 +34,16 @@ from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import RefundAttempt
-from order.payment import StripePaymentProvider, money_from_minor_units
-from order.payment_fees import (
+from order.payments.disputes import announce_chargeback
+from order.payments.payment import StripePaymentProvider, money_from_minor_units
+from order.payments.payment_fees import (
     record_stripe_charge_fee,
     record_stripe_fee_for_intent,
 )
-from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.payments.payment_ledger import (
+    PAYMENT_AMOUNT_TOLERANCE,
+    PaymentLedger,
+)
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -770,7 +773,8 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 @djstripe_receiver(["charge.succeeded", "charge.updated"])
 @with_tenant_schema_from_event
 def handle_stripe_charge_fee(sender, **kwargs):
-    """Record what Stripe charged for a payment (``order.payment_fees``).
+    """Record what Stripe charged for a payment
+    (``order.payments.payment_fees``).
 
     ``charge.updated`` is as much a fee event as ``charge.succeeded``: a
     payment method that settles later attaches its balance transaction then.
@@ -1686,7 +1690,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         order.metadata[f"webhook_processed_{event_id}"] = True
 
         if payment_status == "paid" and payment_intent_id:
-            from order.payment_events import publish_payment_status
+            from order.payments.payment_events import publish_payment_status
             from shipping.services import ShippingService
 
             order.metadata["stripe_checkout_session_id"] = session_id

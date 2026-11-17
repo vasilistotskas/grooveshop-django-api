@@ -96,9 +96,12 @@ from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from order.accounting import credit_allocation
+from order.accounting.chargebacks import (
+    ChargebackDecisionError,
+    decide_chargebacks,
+)
 from order.accounting.credit_documents import create_pending_credits
 from order.accounting.taxation import ChargeKind, order_vat_lines
-from order.chargebacks import ChargebackDecisionError, decide_chargebacks
 from order.checkout.discounts import discounted_line_gross
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
@@ -118,7 +121,10 @@ from order.models.refund_attempt import (
     RefundAttemptKind,
     RefundAttemptStatus,
 )
-from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.payments.payment_ledger import (
+    PAYMENT_AMOUNT_TOLERANCE,
+    PaymentLedger,
+)
 from order.refunds import refund_reconciliation
 from order.refunds.refund_lines import (
     covered_units,
@@ -1631,7 +1637,7 @@ def test_the_settlement_never_credits_a_chargeback_staff_did_not_decide(
     with no decision the settlement waits (and the order is on the
     chargeback worklist), goods returned credits the 107.63 once, goods kept
     credits nothing, ever."""
-    from order.chargebacks import decide_chargebacks
+    from order.accounting.chargebacks import decide_chargebacks
     from tests.integration.order.test_mydata_lifecycle import _receipt
 
     order = _order(lines=(("24", "100.00"), ("13", "119.62")))

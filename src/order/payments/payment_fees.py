@@ -27,8 +27,8 @@ from djstripe.models import Charge
 
 from order.enum.payment_transaction import PaymentFeeSource
 from order.models.payment_transaction import PaymentTransaction
-from order.payment import StripePaymentProvider, money_from_minor_units
-from order.payment_ledger import PaymentLedger
+from order.payments.payment import StripePaymentProvider, money_from_minor_units
+from order.payments.payment_ledger import PaymentLedger
 from tenant.credentials import stripe_credentials
 
 logger = logging.getLogger(__name__)

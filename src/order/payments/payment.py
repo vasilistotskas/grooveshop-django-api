@@ -20,7 +20,7 @@ from djstripe.models import PaymentIntent, Refund
 
 from order.enum.status import PaymentStatus
 from order.exceptions import PaymentStatusUnavailableError
-from order.payment_binding import PaymentPurpose, binding_metadata
+from order.payments.payment_binding import PaymentPurpose, binding_metadata
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -158,7 +158,7 @@ class PaymentProvider(ABC):
         no return, processing or succeeded): the order must stay open for
         its webhook.
         """
-        from order import payment_hold
+        from order.payments import payment_hold
 
         return payment_hold.hold_ended(order)
 

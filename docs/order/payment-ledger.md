@@ -6,7 +6,7 @@ and says which file holds each § number used here.
 ## 7.3 The payment ledger (`PaymentTransaction`)
 
 `src/order/models/payment_transaction.py`, written only through
-`src/order/payment_ledger.py` (`PaymentLedger`). Append-only, like
+`src/order/payments/payment_ledger.py` (`PaymentLedger`). Append-only, like
 `GiftCardTransaction`: a row is never deleted and, but for its provider `fee`
 (below), never updated, and `Order` → ledger is `PROTECT` (deleting an order
 for real has to remove its ledger first, as the demo reset does).

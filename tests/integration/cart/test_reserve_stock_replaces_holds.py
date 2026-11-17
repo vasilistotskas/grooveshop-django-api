@@ -27,9 +27,9 @@ from cart.services import CartService
 from country.factories import CountryFactory
 from order.enum.status import PaymentStatus
 from order.exceptions import CartStockUnavailableError
+from order.inventory.stock import StockManager
 from order.models import StockLog, StockReservation
 from order.services import OrderService
-from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.legal import checkout_acceptance
@@ -233,7 +233,7 @@ class TestOrderCreationAfterReReserve:
         first_ids = _reserve(client).data["reservation_ids"]
         current_ids = _reserve(client).data["reservation_ids"]
 
-        with patch("order.payment.get_payment_provider") as provider:
+        with patch("order.payments.payment.get_payment_provider") as provider:
             provider.return_value = Mock(
                 get_payment_status=Mock(
                     return_value=(PaymentStatus.COMPLETED, {"status": "ok"})

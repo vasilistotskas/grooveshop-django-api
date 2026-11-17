@@ -56,15 +56,15 @@ from order.exceptions import (
     InvalidOrderDataError,
     StockReservationError,
 )
+from order.inventory.stock import StockManager
 from order.models import StockReservation
-from order.payment import provider_supports
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import provider_supports
+from order.payments.payment_binding import PaymentPurpose
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderLegalAcceptanceService,
     OrderService,
 )
-from order.stock import StockManager
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from promotion.serializers import CartCouponSerializer
@@ -1202,8 +1202,9 @@ class CartViewSet(BaseModelViewSet):
             # (public) publishable key it permits retrieve, confirm and
             # cancel on that PaymentIntent. Anyone able to read the log
             # stream could cancel a customer's in-flight payment or
-            # confirm it with their own payment method. `order/payment.py`
-            # is already careful to log only the id and status.
+            # confirm it with their own payment method.
+            # `order/payments/payment.py` is already careful to log only the
+            # id and status.
             logger.info(
                 "Payment intent creation result: success=%s, intent=%s, "
                 "status=%s",

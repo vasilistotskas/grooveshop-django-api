@@ -172,7 +172,7 @@ class TestOrderAttributionOnCreate(APITestCase):
             "instagram",
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_payment_first_path_keeps_the_carts_source_too(
         self, mock_get_provider, *_mocks
     ):
@@ -293,7 +293,7 @@ class TestOrderAttributionOnCreate(APITestCase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert not OrderAttribution.objects.exists()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_payment_first_path_records_it_too(
         self, mock_get_provider, *_mocks
     ):

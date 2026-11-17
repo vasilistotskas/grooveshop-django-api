@@ -4,7 +4,7 @@
 
 The merchant toggle (``GIFT_CARDS_ENABLED`` extra-setting) is patched
 per test; the PSPs are the only other thing mocked — the provider's
-tenant-credential check and ``order.payment.get_payment_provider``.
+tenant-credential check and ``order.payments.payment.get_payment_provider``.
 """
 
 from __future__ import annotations
@@ -24,8 +24,11 @@ from rest_framework.test import APIClient
 from giftcard.enum import GiftCardPurchaseStatus, GiftCardStatus
 from giftcard.factories import GiftCardFactory, GiftCardPurchaseFactory
 from giftcard.models import GiftCardPurchase
-from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import (
+    StripePaymentProvider,
+    VivaWalletPaymentProvider,
+)
+from order.payments.payment_binding import PaymentPurpose
 from tenant.models import Tenant
 from user.factories.account import UserAccountFactory
 
@@ -162,7 +165,7 @@ def _stripe(provider: Mock):
             StripePaymentProvider, "is_configured_for_tenant", return_value=True
         ),
         patch(
-            "order.payment.get_payment_provider", return_value=provider
+            "order.payments.payment.get_payment_provider", return_value=provider
         ) as get_provider,
     ):
         yield get_provider
@@ -177,7 +180,7 @@ def _viva(provider: Mock):
             return_value=True,
         ),
         patch(
-            "order.payment.get_payment_provider", return_value=provider
+            "order.payments.payment.get_payment_provider", return_value=provider
         ) as get_provider,
     ):
         yield get_provider
@@ -235,7 +238,10 @@ class TestPurchaseRefusals:
                 "is_configured_for_tenant",
                 return_value=False,
             ),
-            patch("order.payment.get_payment_provider", return_value=provider),
+            patch(
+                "order.payments.payment.get_payment_provider",
+                return_value=provider,
+            ),
         ):
             response = _client().post(
                 PURCHASE_URL,

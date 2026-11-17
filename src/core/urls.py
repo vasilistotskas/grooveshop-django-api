@@ -64,8 +64,10 @@ app_name = "core"
 # (``CUSTOMER_ACCOUNTS_ENABLED``) ``tenant.middleware.
 # CustomerAccountsMiddleware`` answers 404 for every view mounted by these
 # three groups (``CUSTOMER_IDENTITY_VIEWS``, below), so a route allauth adds
-# in an upgrade is refused with them. Each group is spliced into the host
-# groups that follow, where it always was.
+# in an upgrade is refused with them. Each group is spliced into the
+# STOREFRONT host groups that follow: the platform host (the public schema)
+# has none of the tables these routes read, and platform staff sign in at
+# the platform admin's own login and ``tenant.staff_api``.
 # ---------------------------------------------------------------------------
 
 # allauth headless endpoints must be at the root (not inside i18n_patterns)
@@ -100,9 +102,11 @@ _customer_identity_storefront_patterns = [
 ]
 
 # allauth's pages: the sign-in the IdP's authorize step sends a shopper to,
-# and the social providers' callbacks. Locale-prefixed. The platform host
-# serves them too, for the platform's own sign-in, which no store switch
-# reaches.
+# and the social providers' callbacks. Locale-prefixed, store hosts only:
+# they list the social providers, whose tables (``socialaccount_*``) exist
+# in store schemas alone, so on the platform host (the public schema) the
+# sign-in answered 500. Platform staff sign in at the platform admin's own
+# login (``tenant.urls_public``), never through allauth's pages.
 _customer_identity_i18n_patterns = [
     path("accounts/", include("allauth.urls")),
 ]
@@ -128,8 +132,7 @@ CUSTOMER_IDENTITY_VIEWS = frozenset(
 # Root-mounted (outside i18n_patterns), served on BOTH hosts: locale
 # machinery, payment/shipping webhook receivers (POST-only, no data
 # exposure; the sender targets whichever host the webhook was registered
-# with, so the receiver stays available on both), and the allauth
-# headless-auth endpoints.
+# with, so the receiver stays available on both).
 _root_shared_patterns = [
     path("robots.txt", robots_txt, name="robots-txt"),
     path("i18n/setlang/", set_language, name="set_language"),
@@ -149,25 +152,26 @@ _root_shared_patterns = [
         ResendWebhookView.as_view(),
         name="resend-webhook",
     ),
-    *_customer_identity_root_patterns,
 ]
 
 # Root-mounted, STOREFRONT only: agent-facing scoped resources (a store's
-# orders/loyalty for an authenticated AI agent). Outside i18n_patterns for
-# the same reason as the IdP endpoints.
+# orders/loyalty for an authenticated AI agent), allauth's headless API
+# (its sessions, authenticators and providers are store-schema tables, so
+# on the platform host's public schema it answered 500) and the IdP.
+# Outside i18n_patterns for the same reason as the IdP endpoints.
 _root_storefront_patterns = [
     path("api/v1/", include("agent.urls")),
+    *_customer_identity_root_patterns,
     *_customer_identity_storefront_patterns,
 ]
 
-# Locale-prefixed, served on BOTH hosts: admin + editor infra (the platform
-# admin login flow relies on ``accounts/``; unfold/tinymce/rosetta/image
-# upload are admin dependencies) and shared reference/control-plane data
-# (country/region, tenant resolve + memberships, health, settings, schema).
+# Locale-prefixed, served on BOTH hosts: editor infra (unfold, rosetta and
+# the image upload the admin's rich-text editor posts to) and shared
+# reference/control-plane data (country/region, tenant resolve +
+# memberships, health, settings, schema).
 _shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
     path("upload_image", upload_image, name="upload_image"),
-    *_customer_identity_i18n_patterns,
     # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
     # registers for the translation form; Django resolves the first match
     # so this override takes priority over the default `TranslationFormView`.
@@ -177,7 +181,6 @@ _shared_i18n_patterns = [
         name="rosetta-form",
     ),
     path("rosetta/", include("rosetta.urls")),
-    path("tinymce/", include("tinymce.urls")),
     path("api/v1/", include("country.urls")),
     path("api/v1/", include("region.urls")),
     path("api/v1/", include("tenant.urls")),
@@ -268,6 +271,7 @@ urlpatterns = (
     + _root_storefront_patterns
     + i18n_patterns(
         *_storefront_admin_i18n_patterns,
+        *_customer_identity_i18n_patterns,
         *_shared_i18n_patterns,
         *_storefront_i18n_patterns,
         prefix_default_language=False,

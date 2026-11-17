@@ -193,7 +193,8 @@ locks stock.
   while an order awaits its payment and a cancel leaves it alone. Orders
   stamped by migration `0083` carry `created_at + 24h`, so a retry on one older
   than the maximum is refused too.
-- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5) is added to
+- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5; the validator
+  accepts 0 to 60, `payment_hold.MAX_GRACE`) is added to
   the stored instant, and the 15 minute beat adds its own slack, so a
   confirmation already on its way reaches an open order. Only unpaid (`PENDING`
   / `PENDING`) orders of an `ONLINE` pay way are swept; COD and
@@ -212,6 +213,59 @@ locks stock.
   anything and takes the same wait. A payment that is not closed (that wait, or
   a Stripe intent that succeeded or is processing) leaves the order open for
   its webhook and counts `skipped_open`.
+- **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
+  the owner's and staff's `GET /order/{id}`, the guest route
+  `GET /order/uuid/{uuid}`, the agent gateway's
+  `GET /agent/internal/order/{uuid}`) serves two instants, each null for
+  the orders it does not describe, and the two sets differ:
+  - `paymentHoldExpiresAt` (`payment_hold.hold_ends`): when the last link
+    stops being payable, `payment_hold_expires_at`, or `created_at` plus the
+    hold before any link was opened. Set for every order that is `PENDING`,
+    of an `ONLINE` pay way, with a payment that is not final
+    (`payment_hold.awaiting_payment`, the one-order form of
+    `holding_stock_for_online_payment`), and null for any other.
+  - `paymentDecidedBy` (`payment_hold.decided_by`): when the scheduled sweep,
+    running normally, will have decided the order (canceled it if it is
+    still unpaid). It is computed on every read, from the same querysets the
+    sweep selects with (`payment_hold.swept_orders`: `unpaid_online_orders`
+    and `failed_payment_orders`, less `amount_mismatch_orders`), so it is
+    set for exactly the orders the sweep cancels: a `PENDING` order with a
+    FAILED payment of any pay way (cash on delivery, or none) included, so
+    it can be set where `paymentHoldExpiresAt` is null. The run is the next
+    one in the sweep's crontab
+    (`CELERY_BEAT_SCHEDULE`, `payment_hold.SWEEP_ENTRY`) strictly after the
+    hold plus the grace, for a FAILED payment after the later of that and
+    `updated_at` plus `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES` (a Stripe
+    PaymentIntent or an order with no pay way is closed sooner, so it is the
+    latest), and never before the read: an order whose run was missed (the
+    sweep switched off, which sends no missed slot on resuming; beat or the
+    workers down) or that a run left open (a row another run held, an
+    error) gets the next run. So the instant moves later whenever the sweep
+    is paused or a run is cut short. The run is the one beat sends
+    (`payment_hold._next_sweep` steps through the crontab's own slots and
+    compares them in UTC): beat reads Athens wall time, so in the hour the
+    clock goes back it sends no run and an order due then waits for the run
+    after it, and a slot in the missing spring hour runs at 04:00
+    (`docs/scheduler.md`, Time zones). To the run is added its hard time
+    limit, the worker's `CELERY_TASK_TIME_LIMIT` (the sweep sets none of its
+    own, and a test holds it to that; the worker command passes no
+    `--time-limit`): the prefork pool kills a run that passes it, counted
+    from when the run starts, so every cancel the run makes has committed by
+    then. The soft limit does not end the run (the sweep catches `Exception`
+    per order, `SoftTimeLimitExceeded` included). A per-store run sent by the
+    fanout carries no `expires`, so the time it waits in the queue before it
+    starts is bounded by nothing and is not counted. Null where nothing will
+    decide the order: the sweep does not cancel it (a payment the provider
+    is `PROCESSING`, an order flagged `AMOUNT_MISMATCH_FLAG`), or its
+    `scheduler.PeriodicTask` row is switched off or not created yet, or the
+    settings no longer declare the entry while its row waits for beat to
+    restart and delete it (`PeriodicTask.objects.is_on`, which
+    `emails.gates.ScheduleGate` reads too).
+
+  `create_checkout_session` also returns `expiresAt`, the expiry the provider
+  applied to the link it just opened. The agent gateway publishes
+  `paymentDecidedBy` as the checkout's `expires_at`, so a platform polls until
+  Django has decided the order and keeps no window of its own.
 - **A payment that still arrives after the cancel** is not lost: Viva
   `_handle_payment_created` and Stripe `handle_payment_succeeded` /
   `checkout.session.completed` route it to

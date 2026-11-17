@@ -3,6 +3,94 @@
 
 
 
+## v3.250.1 (2026-11-17)
+
+### Bug fixes
+
+* fix(core): a broker alarm no longer restarts or stops a Celery worker (#735) ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
+* fix(core): a broker alarm no longer restarts or stops a Celery worker
+
+A worker's event loop checks the heartbeats of its event dispatcher's
+connection but reads only the socket the dispatcher started with. After
+a block kombu replaces that socket and, during the hold, nothing reads
+the new one: two intervals later the loop raised "Too many heartbeats
+missed" and restarted the consumer, and RabbitMQ redelivered every
+acks_late task still running. With the default hold each hold was a
+race; a hold over two intervals lost every time. A publishing
+connection now never fails for a heartbeat it missed; it still sends
+them, so RabbitMQ still closes a connection kombu dropped.
+
+The restart itself was fatal: Mingle's hello broadcast was refused by
+the hold, and Celery treats any error but a connection error there as
+unrecoverable, so the worker exited, and one started during an alarm
+crash-looped. GrooveShopControl answers a broadcast that waits for
+replies with none while the process holds; a command that expects no
+reply still raises.
+
+Closes #721 ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
+* fix(core): only remote control queries go unanswered during a broker hold
+
+GrooveShopControl decided by the reply flag, so a shutdown, pool
+restart or revoke sent from the celery control command line (which
+always waits for replies) was answered "No nodes replied" during a
+hold instead of failing. It now decides by the command: only an
+inspect command (hello, ping, stats, ...) gets no replies, with a
+rate-limited WARNING; every control command still raises
+BrokerBlocked.
+
+The docs give the real heartbeat check rate (3 per interval), say what
+a worker that starts alone during an alarm skips, and a test pins that
+a heartbeat the socket refuses still fails a publishing connection. ([`c608a8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c608a8bc83bd7c69855ea6172f77160a6858b8ed))
+
+## v3.250.0 (2026-11-17)
+
+### Bug fixes
+
+* fix(core): do not mount a store's identity routes on the platform host
+
+allauth's sign-in page lists the social providers, and its headless API
+reads sessions and authenticators; those tables exist in store schemas
+only, so on the platform host (the public schema) GET /accounts/login/
+and every /_allauth/ route answered 500. Platform staff sign in at the
+platform admin's own login, never through these routes, so they now
+belong to the store hosts alone, like the OIDC provider already did.
+
+tinymce's three legacy routes (flatpages link list, compressor,
+filebrowser) answered 500 on every host and nothing reverses them with
+the settings in use, so the include is dropped.
+
+A tests_mt walk of the platform URL conf asserts no anonymous GET answers
+500, bar the Viva verification refusal that has no platform account. ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Chores
+
+* chore(api-contract): accept the review comment bound until the storefront regenerates; drop the expired per-carrier lines ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+* chore(api-contract): ship the review comment bound storefront first instead of accepting it ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Documentation
+
+* docs(core): the shared routes' comment no longer names tinymce ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Features
+
+* feat(product): bound a review comment's length; stop serving store identity routes on the platform host (#725) ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+* feat(product): bound the length of a review's comment
+
+COMMENT_MAX_LENGTH (1000, what the storefront's review form already
+allows) is the one bound: the translated model field carries it as
+max_length and a validator, so the admin form, full_clean and the write
+serializer's translations all refuse a longer comment. The schema
+publishes maxLength on the request bodies only; the responses are not
+bounded, so a comment stored before the bound still reads whole.
+
+The migration changes no database object (no-op SQL). The request-side
+maxLength is accepted in api-contract/ignore.txt until the storefront
+regenerates from it. ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
 ## v3.249.6 (2026-11-16)
 
 ### Bug fixes

@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ImproperlyConfigured
 from django_stubs_ext import StrOrPromise
-from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.store_settings import declared_default, store_setting
 from tenant.features import STORE_FEATURES, feature_on
@@ -85,7 +84,4 @@ class ScheduleGate(Gate):
     def is_open(self) -> bool:
         from scheduler.models import PeriodicTask
 
-        with schema_context(get_public_schema_name()):
-            return PeriodicTask.objects.filter(
-                name=self.entry, enabled=True
-            ).exists()
+        return PeriodicTask.objects.is_on(self.entry)

@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 from celery import Celery
+from celery.app.control import Control
 from celery.signals import (
     before_task_publish,
     setup_logging,
@@ -26,6 +27,51 @@ def config_loggers(*args, **kwargs):
     from django.conf import settings  # noqa: F401
 
 
+def _is_query(command: str) -> bool:
+    """Whether a remote control command only reads a worker's state.
+
+    Celery registers each command as ``inspect`` (``ping``, ``hello``,
+    ``stats``, ``active``, ...) or ``control`` (``revoke``, ``shutdown``,
+    ``pool_restart``, ``rate_limit``, ...) in ``celery.worker.control``;
+    a name it does not know counts as a command.
+    """
+    from celery.worker.control import Panel
+
+    info = Panel.meta.get(command)
+    return info is not None and info.type == "inspect"
+
+
+class GrooveShopControl(Control):
+    """Remote control whose queries get no answer while the broker blocks.
+
+    A query (an ``inspect`` command: ``ping``, ``stats``, a worker's
+    ``hello`` to its neighbours) cannot be asked while this process holds
+    off a blocked broker (``core.broker``), so no worker answers it: it
+    returns no replies, as when no worker is up, with a WARNING. A worker
+    that starts, or restarts its consumer, during an alarm therefore goes
+    on alone instead of exiting with "Unrecoverable error: BrokerBlocked"
+    (its ``Mingle`` step treats any other error as fatal, #721). It skips
+    the sync of revoked task ids and clocks with its neighbours, and
+    ``Mingle`` does not run again once the alarm clears.
+
+    Every other command (``revoke``, ``shutdown``, ``pool_restart``,
+    ``rate_limit``, ...) still raises the refusal, whether or not it waits
+    for replies: the ``celery control`` command line always does, and an
+    operator must see that it was not delivered.
+    """
+
+    def broadcast(self, command: str, *args: Any, **kwargs: Any) -> Any:
+        from core.broker import BrokerBlocked, unanswered_query
+
+        try:
+            return super().broadcast(command, *args, **kwargs)
+        except BrokerBlocked:
+            if not _is_query(command):
+                raise
+            unanswered_query.report(command)
+            return []
+
+
 class GrooveShopCelery(Celery):
     """Celery whose publishing connections stop while RabbitMQ blocks them.
 
@@ -36,7 +82,11 @@ class GrooveShopCelery(Celery):
     (``connection_for_read``) keeps kombu's own transport: a read that times
     out there makes the worker reconnect, and RabbitMQ then redelivers every
     task the worker was still running (``task_acks_late``).
+
+    Its remote control is ``GrooveShopControl``.
     """
+
+    control_cls = "core.celery:GrooveShopControl"
 
     def connection_for_write(self, url: Any = None, **kwargs: Any) -> Any:
         from core.broker import PublishingTransport

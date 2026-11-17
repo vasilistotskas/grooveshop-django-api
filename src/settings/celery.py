@@ -75,6 +75,12 @@ CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")
 
 # Connection settings
+# AMQP heartbeats, in seconds, of a worker's consuming connection and its
+# event connection (the only ones opened with it). RabbitMQ closes the
+# consuming one after two missed intervals and redelivers every acks_late
+# task the worker is still running. On the event connection a miss is never
+# fatal: nothing reads it between publishes
+# (``core.broker.PublishingConnection``, #721).
 CELERY_BROKER_HEARTBEAT = 30
 CELERY_BROKER_POOL_LIMIT = 50
 CELERY_BROKER_TRANSPORT_OPTIONS = {

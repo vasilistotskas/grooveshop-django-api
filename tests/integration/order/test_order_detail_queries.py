@@ -14,6 +14,7 @@ import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
@@ -25,7 +26,15 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def order_with_lines():
     user = UserAccountFactory(num_addresses=0)
-    order = OrderFactory(user=user, num_order_items=0)
+    # A paid order, not the factory's random status: an order still waiting
+    # for its payment also reads when the sweep decides it (two queries,
+    # ``payment_hold.decided_by``), which this bound is not about.
+    order = OrderFactory(
+        user=user,
+        num_order_items=0,
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.COMPLETED,
+    )
     for _ in range(3):
         OrderItemFactory(
             order=order, product=ProductFactory(num_images=0, num_reviews=0)

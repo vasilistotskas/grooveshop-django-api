@@ -357,7 +357,6 @@ class ProductAdmin(
         return form
 
     def get_queryset(self, request):
-        from order.models.stock_reservation import StockReservation
 
         # Only apply expensive annotations when filtering/sorting requires
         # them. The ``else`` branches used to annotate unconditionally
@@ -395,14 +394,6 @@ class ProductAdmin(
             qs = qs.with_review_average()
 
         # Optimize related queries
-        active_reservations = Prefetch(
-            "stock_reservations",
-            queryset=StockReservation.objects.active().only(
-                "id", "product_id", "quantity"
-            ),
-            to_attr="active_reservations_list",
-        )
-
         main_images = Prefetch(
             "images",
             queryset=ProductImage.objects.filter(is_main=True).only(
@@ -424,7 +415,6 @@ class ProductAdmin(
             "category", "vat", "variant_group"
         ).prefetch_related(
             main_images,
-            active_reservations,
             variant_siblings,
             "variant_group__translations",
         )

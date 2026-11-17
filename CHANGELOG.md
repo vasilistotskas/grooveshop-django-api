@@ -3,6 +3,39 @@
 
 
 
+## v3.252.6 (2026-11-17)
+
+### Chores
+
+* chore(order): the checkout contract comment counts the chains a layers contract would ignore ([`c1f0a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1f0a35c13fbb05f8673571153ed10471baec04f))
+
+### Refactoring
+
+* refactor(order): move the quote cluster into OrderQuoteService (order/checkout) (#748) ([`c1f0a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1f0a35c13fbb05f8673571153ed10471baec04f))
+
+* refactor(order): move the quote cluster into OrderQuoteService (order/checkout)
+
+The first service cluster out of OrderService (#567). threshold_value,
+free_shipping_progress, shipping_cost and calculate_payment_method_fee,
+with the FreeShippingProgress result they return, move unchanged to
+OrderQuoteService in order/checkout/quote.py. The one total #635 builds
+lands on this class next.
+
+Callers name the new class: both order-creation paths in OrderService,
+the create-payment-intent view and the cart serializer's
+free_threshold_value and free_shipping_progress fields. No re-export or
+delegating method is left on OrderService; every test reference,
+mock.patch string and doc reference names the new path.
+
+checkout leaves the order layers contract for a forbidden contract that
+checks its direct imports, as payments did in #746: the quote prices with
+the cart, promotion and shipping apps, which reach the order models and
+through them every subpackage, so the layers contract could only hold it
+with one ignored chain per module. The checkout discounts edge it ignored
+goes with it.
+
+Closes #567. ([`c1f0a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1f0a35c13fbb05f8673571153ed10471baec04f))
+
 ## v3.252.5 (2026-11-17)
 
 ### Refactoring

@@ -6,7 +6,7 @@ or kind, silently dropping to a generic Setting-based fallback that
 could disagree with the order-create verification step's per-carrier
 figure. ``ShippingRate`` closes that gap structurally rather than by
 convention: there is no longer a second "generic" pricing path to
-drift from — ``OrderService.shipping_cost`` is the ONLY calculation
+drift from — ``OrderQuoteService.shipping_cost`` is the ONLY calculation
 both the create-payment-intent view and order creation call, so they
 cannot disagree on the same (provider, kind, country) triple. These
 tests pin what's left to regress:
@@ -27,8 +27,8 @@ from djmoney.money import Money
 
 from cart.serializers.cart import CartCreatePaymentIntentRequestSerializer
 from country.factories import CountryFactory
+from order.checkout.quote import OrderQuoteService
 from order.exceptions import InvalidOrderDataError
-from order.services import OrderService
 from shipping.models import ShippingProvider
 from tests.utils.shipping import enable_rate
 
@@ -116,7 +116,7 @@ def test_serializer_accepts_full_payload():
 
 def test_pi_and_order_create_calcs_agree_at_every_price_point():
     """Contract: the create-payment-intent view and the order-create
-    verification step both call ``OrderService.shipping_cost`` with
+    verification step both call ``OrderQuoteService.shipping_cost`` with
     the same args — there is nothing left to make them disagree.
     Anchored anyway so a future refactor that gives one call site its
     own pricing path regresses loudly.
@@ -130,13 +130,13 @@ def test_pi_and_order_create_calcs_agree_at_every_price_point():
     )
 
     for total in (Decimal("10.00"), Decimal("29.99"), Decimal("30.00")):
-        pi_calc = OrderService.shipping_cost(
+        pi_calc = OrderQuoteService.shipping_cost(
             order_value=Money(total, "EUR"),
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
         )
-        order_calc = OrderService.shipping_cost(
+        order_calc = OrderQuoteService.shipping_cost(
             order_value=Money(total, "EUR"),
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
@@ -148,13 +148,13 @@ def test_pi_and_order_create_calcs_agree_at_every_price_point():
         )
 
     # Below the threshold: charges the rate. At/above: free.
-    assert OrderService.shipping_cost(
+    assert OrderQuoteService.shipping_cost(
         order_value=Money(Decimal("10.00"), "EUR"),
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",
         shipping_kind="home_delivery",
     ).amount == Decimal("3.50")
-    assert OrderService.shipping_cost(
+    assert OrderQuoteService.shipping_cost(
         order_value=Money(Decimal("30.00"), "EUR"),
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",
@@ -165,7 +165,7 @@ def test_pi_and_order_create_calcs_agree_at_every_price_point():
 def test_home_delivery_without_explicit_code_resolves_to_the_active_carrier():
     """``home_delivery`` is provider-agnostic at the form level, so the
     storefront sends no ``shipping_provider_code`` — both order-create
-    and PI calc receive None. ``OrderService.shipping_cost`` must
+    and PI calc receive None. ``OrderQuoteService.shipping_cost`` must
     auto-resolve to the active home-delivery provider for the
     destination country (mirroring ``_resolve_shipping_provider``'s FK
     resolution), so the cost matches the carrier the order will
@@ -179,7 +179,7 @@ def test_home_delivery_without_explicit_code_resolves_to_the_active_carrier():
         free_shipping_threshold=Decimal("30.00"),
     )
 
-    quote = OrderService.shipping_cost(
+    quote = OrderQuoteService.shipping_cost(
         order_value=Money(Decimal("10.00"), "EUR"),
         country_id=country.alpha_2,
         shipping_kind="home_delivery",
@@ -198,7 +198,7 @@ def test_no_active_provider_raises_invalid_order_data_error():
         is_active=False
     )
     with pytest.raises(InvalidOrderDataError):
-        OrderService.shipping_cost(
+        OrderQuoteService.shipping_cost(
             order_value=Money(Decimal("35.00"), "EUR"),
             country_id=country.alpha_2,
             shipping_kind="home_delivery",
@@ -226,7 +226,7 @@ def test_free_shipping_info_min_matches_carrier_at_threshold():
     assert min_threshold == Decimal("30.00")
 
     # At the boundary, the carrier with the min threshold ships free.
-    quote = OrderService.shipping_cost(
+    quote = OrderQuoteService.shipping_cost(
         order_value=Money(min_threshold, "EUR"),
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",

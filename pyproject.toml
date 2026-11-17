@@ -1,5 +1,5 @@
 [project]
-version = "3.252.5"
+version = "3.252.6"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -793,24 +793,32 @@ forbidden_modules = ["order.accounting.credit_documents"]
 allow_indirect_imports = true
 
 # The subpackages that exist so far (#566). A layer contract also forbids
-# indirect chains. The two ignored edges are the chains that held when it
-# was written: credit documents queue their task through `order.tasks`,
-# which imports the refund reconciliation, and checkout's one lazy import of
-# the order models reaches, through the model graph, every app and so
-# accounting.
+# indirect chains. The ignored edge is the chain that held when it was
+# written: credit documents queue their task through `order.tasks`, which
+# imports the refund reconciliation.
 [[tool.importlinter.contracts]]
-name = "order subpackages: reporting and refunds over accounting over checkout"
+name = "order subpackages: reporting and refunds over accounting"
 type = "layers"
 containers = ["order"]
 layers = [
     "reporting | refunds",
     "accounting",
-    "checkout",
 ]
 ignore_imports = [
     "order.accounting.credit_documents -> order.tasks",
-    "order.checkout.discounts -> order.models.item",
 ]
+
+# `checkout` sits below accounting, refunds and reporting. The quote
+# (#567) prices with the cart, promotion and shipping apps, which reach the
+# order models and through them every subpackage, so a layers contract
+# would need one ignored chain per app the quote imports (three): this
+# contract checks its direct imports, as the payments one below does.
+[[tool.importlinter.contracts]]
+name = "order checkout imports neither accounting, refunds nor reporting"
+type = "forbidden"
+source_modules = ["order.checkout"]
+forbidden_modules = ["order.accounting", "order.refunds", "order.reporting"]
+allow_indirect_imports = true
 
 # `payments` sits below accounting, refunds and reporting, beside checkout
 # (#658: accounting -> payments). Every payments module imports the order

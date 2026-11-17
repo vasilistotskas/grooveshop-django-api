@@ -6,6 +6,7 @@ from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
+from order.checkout.quote import OrderQuoteService
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import OrderCancellationError, PaymentError
@@ -111,7 +112,7 @@ class OrderServiceTestCase(TestCase):
         )
 
         def quote(order_value):
-            return OrderService.shipping_cost(
+            return OrderQuoteService.shipping_cost(
                 order_value=order_value,
                 country_id=order.country_id,
                 shipping_provider_code="flat_rate",

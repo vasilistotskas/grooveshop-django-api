@@ -811,8 +811,8 @@ ignore_imports = [
 # `checkout` sits below accounting, refunds and reporting. The quote
 # (#567) prices with the cart, promotion and shipping apps, which reach the
 # order models and through them every subpackage, so a layers contract
-# cannot hold checkout without one ignored chain per module: this contract
-# checks its direct imports, as the payments one below does.
+# would need one ignored chain per app the quote imports (three): this
+# contract checks its direct imports, as the payments one below does.
 [[tool.importlinter.contracts]]
 name = "order checkout imports neither accounting, refunds nor reporting"
 type = "forbidden"

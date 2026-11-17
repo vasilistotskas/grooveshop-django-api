@@ -3,6 +3,36 @@
 
 
 
+## v3.252.1 (2026-11-17)
+
+### Documentation
+
+* docs(shipping): link the shared retry rule section from the BoxNow page ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
+### Refactoring
+
+* refactor(shipping): one HTTP session and retry rule for both carrier clients (#740) ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
+* refactor(shipping): one HTTP session and retry rule for both carrier clients
+
+AcsClient and BoxNowClient each built a requests session with their own
+urllib3 Retry. Since #607 both follow the same rule: a request that never
+connected is sent again whatever its method, a GET also after a 5xx or a
+lost answer, and a POST or PUT never once it may have reached the
+courier. Two copies of that rule could drift apart again.
+
+shipping.carrier_http now holds the rule once (CARRIER_RETRY, the BoxNow
+config) and the session factory both clients use (carrier_session). ACS
+sends only POSTs, for which the ACS config (connect=3, read=0, status=0)
+and CARRIER_RETRY answer every error sequence and every status alike, so
+nothing an ACS call retries changes. worst_case_request_seconds reads the
+connect budget from CARRIER_RETRY, taking total when connect is unset,
+and still gives 78 s at the 15 s default.
+
+The client retry tests now ask CARRIER_RETRY, and the ACS tests also pin
+that a POST is not sent again after a 5xx or a lost answer and that the
+default session mounts the shared adapter. ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
 ## v3.252.0 (2026-11-17)
 
 ### Bug fixes

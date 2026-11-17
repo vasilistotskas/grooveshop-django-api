@@ -264,16 +264,23 @@ AGENT_GATEWAY_INTERNAL_URL = getenv("AGENT_GATEWAY_INTERNAL_URL", "")
 # Must equal the gateway's ``INTERNAL_EVENTS_SECRET`` env value.
 AGENT_GATEWAY_INTERNAL_SECRET = getenv("AGENT_GATEWAY_INTERNAL_SECRET", "")
 
-# Per-request timeout for order events sent to the gateway.
+# Per-request timeout for the other calls to the gateway (the catalogue
+# feed invalidation, ``core.cache.gateway``). Order events have their own.
 AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
 # The order events owed to the gateway (``agent.AgentOrderEvent``,
 # ``docs/agent-order-events.md``). An event is attempted at most
 # MAX_ATTEMPTS times; after failed attempt n the next waits
 # BACKOFF_SECONDS * 2**(n-1), at most BACKOFF_CAP_SECONDS, varied by
 # +/- BACKOFF_JITTER of itself. The defaults make 10 attempts over about
-# 2.8 days (Standard Webhooks' schedule spans about 3). The sweep attempts
-# at most SWEEP_BATCH events per store and run, and a delivered or failed
-# event is deleted RETENTION_DAYS after it finished.
+# 2.8 days (Standard Webhooks' schedule spans about 3). A retryable answer
+# with a Retry-After waits what it asks, at least RETRY_AFTER_MIN_SECONDS
+# and at most RETRY_AFTER_CAP_SECONDS. Each call waits CONNECT_TIMEOUT to
+# connect and READ_TIMEOUT for the answer: the gateway delivers to the
+# platform within the call and bounds its answer at 25 s. The sweep
+# attempts at most SWEEP_BATCH events per store and run, and takes no new
+# event once a run has spent SWEEP_BUDGET_SECONDS; budget + connect + read
+# stays under the minute between runs (tests/unit/agent). A delivered or
+# failed event is deleted RETENTION_DAYS after it finished.
 AGENT_ORDER_EVENT_MAX_ATTEMPTS = int(
     getenv("AGENT_ORDER_EVENT_MAX_ATTEMPTS", "10")
 )
@@ -286,8 +293,23 @@ AGENT_ORDER_EVENT_BACKOFF_CAP_SECONDS = int(
 AGENT_ORDER_EVENT_BACKOFF_JITTER = float(
     getenv("AGENT_ORDER_EVENT_BACKOFF_JITTER", "0.1")
 )
+AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS = int(
+    getenv("AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS", "30")
+)
+AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS = int(
+    getenv("AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS", "3600")
+)
+AGENT_ORDER_EVENT_CONNECT_TIMEOUT = float(
+    getenv("AGENT_ORDER_EVENT_CONNECT_TIMEOUT", "3")
+)
+AGENT_ORDER_EVENT_READ_TIMEOUT = float(
+    getenv("AGENT_ORDER_EVENT_READ_TIMEOUT", "30")
+)
 AGENT_ORDER_EVENT_SWEEP_BATCH = int(
     getenv("AGENT_ORDER_EVENT_SWEEP_BATCH", "100")
+)
+AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS = float(
+    getenv("AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS", "25")
 )
 AGENT_ORDER_EVENT_RETENTION_DAYS = int(
     getenv("AGENT_ORDER_EVENT_RETENTION_DAYS", "30")

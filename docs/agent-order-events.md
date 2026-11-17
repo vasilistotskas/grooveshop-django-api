@@ -25,14 +25,32 @@ An order is an agent's when its `OrderAttribution` says so
 | `created` | the order's attribution row is written, in its creation transaction | `agent.signals.record_agent_order_created` |
 | `updated` | a save changes the order's status or payment status, or sets its tracking number and carrier | `order.signals.handlers.handle_order_post_save` |
 
-Each event is a row written in the transaction of its change, so it exists
-exactly when the change committed. A change made with `QuerySet.update()`
-sends no signal and records no event.
+The row is written by the save's `post_save` receiver, so it commits or
+rolls back with the change only when the save runs inside a transaction:
+`ATOMIC_REQUESTS` is off and `Order.save` opens none of its own. The call
+sites that change these fields do run inside one:
+
+- order creation: `OrderService._create_order_for_verified_intent` (behind
+  `create_order_from_cart`) and `OrderService.create_order_from_cart_offline`,
+  both `@transaction.atomic`, the attribution row included;
+- status: `OrderService.update_order_status`, `_cancel_order_locked` (behind
+  `cancel_order`) and `add_tracking_info`, all `@transaction.atomic`;
+- payment: `OrderService.handle_payment_succeeded`, `handle_payment_failed`,
+  `confirm_offline_payment` and `settle_cod_payment` (`@transaction.atomic`),
+  Stripe's `checkout.session.completed` handler and Viva's
+  `_process_event_in_tenant` (`with transaction.atomic()`);
+- the admin's change form (Django wraps it in a transaction).
+
+A save outside any transaction commits the order first and writes the event
+in its own statement right after, so a process killed between the two loses
+that event. A change made with `QuerySet.update()` sends no signal and
+records no event.
 
 ## The row is the webhook's identity
 
 - `id` (a UUIDv7) is the `Webhook-Id` and `occurred_at` the
-  `Webhook-Timestamp`. Both are sent unchanged on every attempt, so a
+  `Webhook-Timestamp`. `occurred_at` is set when the row is written: inside
+  the change's transaction, before it commits. Both are sent unchanged on every attempt, so a
   platform tells a retry from a new event (Standard Webhooks; UCP's order
   capability, ucp#659).
 - The order's state is read when the event is sent, not stored with it: the
@@ -47,24 +65,42 @@ shared secret in `X-Internal-Token` and this body:
 |---|---|
 | `eventId` | the row's id: the `Webhook-Id` |
 | `eventType` | `created` or `updated` |
-| `occurredAt` | when the change committed, ISO 8601 in UTC: the `Webhook-Timestamp` |
+| `occurredAt` | when the row was written (inside the change's transaction, before its commit), ISO 8601 in UTC: the `Webhook-Timestamp` |
 | `schemaName` | the store |
-| `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now |
+| `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now, soft-deleted or not |
 
 The gateway's answer decides the row:
 
 | Answer | Row |
 |---|---|
 | `2xx` | `delivered` |
-| `4xx` other than 408 and 429 (`core.retry.is_permanent_http_status`) | `failed` at once |
-| anything else, or no answer within `AGENT_GATEWAY_HTTP_TIMEOUT` | attempted again |
+| 401, 403, 404 (`agent.outbox.DEPLOYMENT_FAULTS`): a wrong shared secret, one being rotated, or a wrong URL | attempted again on the backoff; an `ERROR` log line, and the sweep run stops |
+| another `4xx` but 408 and 429 (`core.retry.is_permanent_http_status`), such as 400 or 422 | `failed` at once |
+| anything else, or no connection within `AGENT_ORDER_EVENT_CONNECT_TIMEOUT` (3 s) or no answer within `AGENT_ORDER_EVENT_READ_TIMEOUT` (30 s, above the 25 s the gateway bounds its answer by) | attempted again |
+
+A retryable answer with a `Retry-After` (delta-seconds or an HTTP date)
+sets the next attempt to what it asks, at least
+`AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS` (30) and at most
+`AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS` (an hour), in place of the
+backoff. The gateway sends one when an "Order created" event arrives before
+it has stored its order link, which it writes only once the order-creation
+response reaches it. The sweep's minute sets the real delay. Every attempt
+counts towards the maximum, whatever its answer.
+
+An order deleted for good fails its pending event at once (`last_error`
+"order deleted"); a soft-deleted order is still the platform's order, and its
+events are delivered.
 
 The first attempt is queued when the change commits (`dispatch_on_commit`).
 Every attempt after it is the sweep's: `deliver-due-agent-order-events` runs
 every minute, per store and suspended stores included (the platform still
 learns what became of an order it placed), and attempts at most
-`AGENT_ORDER_EVENT_SWEEP_BATCH` due events. A run stops when the gateway
-cannot be reached, since every other event would wait out the same timeout.
+`AGENT_ORDER_EVENT_SWEEP_BATCH` due events. It takes no new event once it has
+spent `AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS` (25 s), so a run lasts at most
+the budget plus one call's timeouts, under the minute between runs, and slow
+answers cannot stack runs. A run stops when the gateway cannot be reached or
+refuses the call itself (401, 403, 404), since every other event would get
+the same answer.
 
 - **One attempt at a time.** An attempt first claims its row by moving
   `next_attempt_at` to when a failure would set it, so a second worker finds
@@ -81,6 +117,14 @@ cannot be reached, since every other event would wait out the same timeout.
   `AGENT_ORDER_EVENT_BACKOFF_JITTER` (10%) of itself: about 2.8 days from the
   first attempt to the last. The last failure makes the row `failed`, with an
   `ERROR` log line.
+
+## The task the outbox replaced
+
+The release before queued `order.tasks.push_order_event_to_gateway` on
+every order change. It stays registered for one release: a message still
+queued or on a retry countdown during the deploy, and a `DeferredDispatch`
+row naming it, records the change as an `updated` event (with the time it
+runs as `occurredAt`). Remove it in the release after this one.
 
 ## The admin
 

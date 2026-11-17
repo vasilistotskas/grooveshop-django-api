@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import logging
 import random
-from datetime import timedelta
+import time
+from datetime import UTC, timedelta
+from email.utils import parsedate_to_datetime
 from enum import StrEnum
+from http import HTTPStatus
 from uuid import UUID
 
 import requests
@@ -39,6 +42,14 @@ logger = logging.getLogger(__name__)
 ORDER_EVENTS_PATH = "/internal/events/order-status"
 
 
+#: Answers about the deployment, not the event: a wrong shared secret (one
+#: being rotated, say) or a wrong gateway URL. Fixing the deployment fixes
+#: them, so the event is retried like an outage, never failed for them.
+DEPLOYMENT_FAULTS = frozenset(
+    {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN, HTTPStatus.NOT_FOUND}
+)
+
+
 class Outcome(StrEnum):
     """What one call to ``attempt`` did."""
 
@@ -50,8 +61,15 @@ class Outcome(StrEnum):
     RETRY = "retry"
     #: The gateway could not be reached: attempted again later.
     UNREACHABLE = "unreachable"
+    #: The gateway refused the call itself (``DEPLOYMENT_FAULTS``):
+    #: attempted again later.
+    MISCONFIGURED = "misconfigured"
     #: Refused for good, or out of attempts.
     FAILED = "failed"
+
+
+#: Outcomes that would be the same for every other row: a sweep run stops.
+STOPS_THE_RUN = frozenset({Outcome.UNREACHABLE, Outcome.MISCONFIGURED})
 
 
 def record_order_created(order_id: int) -> None:
@@ -149,14 +167,12 @@ def attempt(event_id: UUID | str) -> Outcome:
         # Only a worker that died during the last attempt leaves this.
         return _give_up(event, event.last_error)
 
-    order = (
-        Order.objects.filter(pk=event.order_id)
-        .values("uuid", "status", "payment_status", "tracking_number")
-        .first()
-    )
+    order = _order_state(event.order_id)
     if order is None:
-        # Deleted since: its events went with it.
-        return Outcome.SKIPPED
+        # Deleted for good between the claim and this read. A deleted
+        # order takes its events with it, so this row is normally gone
+        # too; nothing is left to render either way.
+        return _give_up(event, "order deleted")
 
     try:
         response = requests.post(
@@ -166,23 +182,68 @@ def attempt(event_id: UUID | str) -> Outcome:
             headers={
                 "X-Internal-Token": settings.AGENT_GATEWAY_INTERNAL_SECRET
             },
-            timeout=settings.AGENT_GATEWAY_HTTP_TIMEOUT,
+            timeout=(
+                settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT,
+                settings.AGENT_ORDER_EVENT_READ_TIMEOUT,
+            ),
         )
     except requests.RequestException as error:
-        outcome = _failed(event, number, type(error).__name__)
-        return Outcome.UNREACHABLE if outcome is Outcome.RETRY else outcome
+        return _failed(event, number, type(error).__name__, Outcome.UNREACHABLE)
 
-    if 200 <= response.status_code < 300:
+    status = response.status_code
+    if 200 <= status < 300:
         AgentOrderEvent.objects.filter(pk=event.pk).update(
             status=AgentOrderEventStatus.DELIVERED,
             finished_at=timezone.now(),
             last_error="",
         )
         return Outcome.DELIVERED
-    error = f"HTTP {response.status_code}"
-    if is_permanent_http_status(response.status_code):
+    error = f"HTTP {status}"
+    if status in DEPLOYMENT_FAULTS:
+        return _failed(event, number, error, Outcome.MISCONFIGURED)
+    if is_permanent_http_status(status):
         return _give_up(event, error)
-    return _failed(event, number, error)
+    return _failed(
+        event, number, error, Outcome.RETRY, retry_after=_retry_after(response)
+    )
+
+
+def _order_state(order_id: int) -> dict | None:
+    """The order as the gateway is told of it, or None once it is deleted
+    for good. A soft-deleted order is still the order the platform placed:
+    its events are delivered."""
+    return (
+        Order.objects.all_with_deleted()
+        .filter(pk=order_id)
+        .values("uuid", "status", "payment_status", "tracking_number")
+        .first()
+    )
+
+
+def _retry_after(response: requests.Response) -> timedelta | None:
+    """The wait a ``Retry-After`` header asks for (delta-seconds or an
+    HTTP date), at least ``AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS`` and
+    at most ``AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS``; None without
+    a usable one."""
+    value = response.headers.get("Retry-After", "").strip()
+    if not value:
+        return None
+    if value.isdigit():
+        seconds = float(value)
+    else:
+        try:
+            when = parsedate_to_datetime(value)
+        except TypeError, ValueError:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - timezone.now()).total_seconds()
+    return timedelta(
+        seconds=min(
+            max(seconds, settings.AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS),
+            settings.AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS,
+        )
+    )
 
 
 def _body(event: AgentOrderEvent, order: dict) -> dict[str, str]:
@@ -199,20 +260,34 @@ def _body(event: AgentOrderEvent, order: dict) -> dict[str, str]:
     }
 
 
-def _failed(event: AgentOrderEvent, number: int, error: str) -> Outcome:
-    """A failed attempt a retry can fix: the next one is already set,
-    unless this was the last."""
+def _failed(
+    event: AgentOrderEvent,
+    number: int,
+    error: str,
+    outcome: Outcome,
+    *,
+    retry_after: timedelta | None = None,
+) -> Outcome:
+    """A failed attempt a retry can fix. The claim already set the next
+    attempt by the backoff; a ``Retry-After`` replaces it. The last
+    attempt gives up instead, whatever the failure."""
     if number >= settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS:
         return _give_up(event, error)
-    AgentOrderEvent.objects.filter(pk=event.pk).update(last_error=error)
-    logger.warning(
+    fields: dict[str, object] = {"last_error": error}
+    if retry_after is not None:
+        fields["next_attempt_at"] = timezone.now() + retry_after
+    AgentOrderEvent.objects.filter(pk=event.pk).update(**fields)
+    # A deployment fault is an operator's to fix: ERROR, once per run,
+    # since the run stops on it (``deliver_due``).
+    log = logger.error if outcome is Outcome.MISCONFIGURED else logger.warning
+    log(
         "Agent order event %s (order %s) attempt %s failed: %s",
         event.pk,
         event.order_id,
         number,
         error,
     )
-    return Outcome.RETRY
+    return outcome
 
 
 def _give_up(event: AgentOrderEvent, error: str) -> Outcome:
@@ -231,17 +306,26 @@ def _give_up(event: AgentOrderEvent, error: str) -> Outcome:
 
 
 def deliver_due() -> dict[str, int]:
-    """Attempt every due event of this store, at most a batch per run.
+    """Attempt every due event of this store, within a batch and a time
+    budget per run.
 
     Rows are taken one at a time, so an event that waited behind an
     earlier one of its order goes out in the same run once that one is
-    delivered. The run stops when the gateway cannot be reached: every
-    other row would wait out the same timeout.
+    delivered. A run takes no new row once it has spent
+    ``AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS``, so slow answers cannot
+    stack runs, and stops when the gateway cannot be reached or refuses
+    the call itself: every other row would get the same answer.
     """
     counts: dict[str, int] = {}
     if not settings.AGENT_GATEWAY_INTERNAL_URL:
         return counts
+    started = time.monotonic()
     for _ in range(settings.AGENT_ORDER_EVENT_SWEEP_BATCH):
+        if (
+            time.monotonic() - started
+            >= settings.AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS
+        ):
+            break
         event_id = (
             _due()
             .order_by("next_attempt_at", "occurred_at")
@@ -252,7 +336,7 @@ def deliver_due() -> dict[str, int]:
             break
         outcome = attempt(event_id)
         counts[outcome] = counts.get(outcome, 0) + 1
-        if outcome is Outcome.UNREACHABLE:
+        if outcome in STOPS_THE_RUN:
             break
     return counts
 

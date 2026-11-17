@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from email.utils import format_datetime
 from unittest.mock import Mock, patch
 
 import requests
@@ -29,6 +30,8 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
+from order.tasks import push_order_event_to_gateway
+from settings.schedule import SCHEDULE_PRESETS
 
 GATEWAY_URL = "http://agent-gateway-service"
 SECRET = "test-internal-secret"
@@ -41,9 +44,12 @@ gateway = override_settings(
 )
 
 
-def _response(status_code: int) -> Mock:
+def _response(status_code: int, **headers: str) -> Mock:
     response = Mock()
     response.status_code = status_code
+    response.headers = {
+        name.replace("_", "-"): value for name, value in headers.items()
+    }
     return response
 
 
@@ -217,10 +223,15 @@ class AttemptTests(TestCase):
 
     def test_the_gateways_answer_decides_the_state(self, post):
         answers = {
-            403: (outbox.Outcome.FAILED, Status.FAILED),
             400: (outbox.Outcome.FAILED, Status.FAILED),
+            422: (outbox.Outcome.FAILED, Status.FAILED),
+            401: (outbox.Outcome.MISCONFIGURED, Status.PENDING),
+            403: (outbox.Outcome.MISCONFIGURED, Status.PENDING),
+            404: (outbox.Outcome.MISCONFIGURED, Status.PENDING),
+            408: (outbox.Outcome.RETRY, Status.PENDING),
             429: (outbox.Outcome.RETRY, Status.PENDING),
             500: (outbox.Outcome.RETRY, Status.PENDING),
+            503: (outbox.Outcome.RETRY, Status.PENDING),
         }
         for code, (outcome, state) in answers.items():
             with self.subTest(code=code):
@@ -232,6 +243,89 @@ class AttemptTests(TestCase):
                 self.assertEqual(event.status, state)
                 self.assertEqual(event.last_error, f"HTTP {code}")
                 event.delete()
+
+    def test_a_deployment_fault_is_retried_on_the_backoff_and_logged(
+        self, post
+    ):
+        post.return_value = _response(403)
+        event = self.event()
+
+        with self.assertLogs("agent.outbox", level="ERROR") as logs:
+            outcome = outbox.attempt(event.pk)
+
+        self.assertEqual(outcome, outbox.Outcome.MISCONFIGURED)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.PENDING)
+        # One attempt spent, the next on the ordinary backoff.
+        self.assertEqual(event.attempts, 1)
+        self.assertEqual(
+            event.next_attempt_at - event.last_attempt_at,
+            timedelta(seconds=BACKOFF),
+        )
+        self.assertIn("HTTP 403", logs.output[0])
+
+    def test_retry_after_sets_the_next_attempt_within_its_bounds(self, post):
+        floor = settings.AGENT_ORDER_EVENT_RETRY_AFTER_MIN_SECONDS
+        cap = settings.AGENT_ORDER_EVENT_RETRY_AFTER_CAP_SECONDS
+        in_two_minutes = format_datetime(
+            timezone.now() + timedelta(minutes=2), usegmt=True
+        )
+        waits = {
+            "45": 45,
+            "1": floor,
+            str(cap * 10): cap,
+            in_two_minutes: 120,
+            "soon": BACKOFF,
+        }
+        for header, seconds in waits.items():
+            with self.subTest(retry_after=header):
+                post.return_value = _response(503, Retry_After=header)
+                event = self.event()
+
+                before = timezone.now()
+                outbox.attempt(event.pk)
+                event.refresh_from_db()
+
+                wait = (event.next_attempt_at - before).total_seconds()
+                self.assertAlmostEqual(wait, seconds, delta=3)
+                event.delete()
+
+    def test_a_call_waits_the_outbox_timeouts(self, post):
+        post.return_value = _response(204)
+        event = self.event()
+
+        outbox.attempt(event.pk)
+
+        self.assertEqual(
+            post.call_args.kwargs["timeout"],
+            (
+                settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT,
+                settings.AGENT_ORDER_EVENT_READ_TIMEOUT,
+            ),
+        )
+
+    def test_a_soft_deleted_orders_event_is_delivered(self, post):
+        post.return_value = _response(204)
+        event = self.event()
+        self.order.delete()
+        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.DELIVERED)
+        self.assertEqual(
+            post.call_args.kwargs["json"]["orderUuid"], str(self.order.uuid)
+        )
+
+    def test_an_order_deleted_for_good_fails_its_event_at_once(self, post):
+        event = self.event()
+
+        with patch("agent.outbox._order_state", return_value=None):
+            outcome = outbox.attempt(event.pk)
+
+        self.assertEqual(outcome, outbox.Outcome.FAILED)
+        post.assert_not_called()
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.FAILED)
+        self.assertEqual(event.last_error, "order deleted")
 
     def test_an_unreachable_gateway_is_attempted_again(self, post):
         post.side_effect = requests.ConnectionError("refused")
@@ -360,6 +454,31 @@ class SweepTests(TestCase):
         self.assertEqual(outbox.deliver_due(), {})
         post.assert_not_called()
 
+    def test_the_run_stops_on_a_deployment_fault_and_logs_it_once(self, post):
+        post.return_value = _response(401)
+        for order in self.orders:
+            self.event(order)
+
+        with self.assertLogs("agent.outbox", level="ERROR") as logs:
+            counts = outbox.deliver_due()
+
+        self.assertEqual(counts, {outbox.Outcome.MISCONFIGURED: 1})
+        post.assert_called_once()
+        self.assertEqual(len(logs.records), 1)
+
+    def test_a_run_takes_no_new_event_once_its_budget_is_spent(self, post):
+        post.return_value = _response(204)
+        for order in self.orders:
+            self.event(order)
+        budget = settings.AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS
+        # Start, the first check, then a check after a slow first call.
+        clock = iter([0.0, 0.0, budget])
+
+        with patch("agent.outbox.time.monotonic", side_effect=clock):
+            counts = outbox.deliver_due()
+
+        self.assertEqual(counts, {outbox.Outcome.DELIVERED: 1})
+
     @override_settings(AGENT_ORDER_EVENT_SWEEP_BATCH=1)
     def test_a_run_takes_at_most_a_batch(self, post):
         post.return_value = _response(204)
@@ -435,3 +554,47 @@ class PurgeTests(TestCase):
         self.assertEqual(
             kept, {rows["recent delivered"].pk, rows["old pending"].pk}
         )
+
+
+@gateway
+@patch("agent.tasks.deliver_agent_order_event")
+class RemovedPushTaskTests(TestCase):
+    """The old task's messages, queued by the release before, still reach
+    the gateway through the outbox for one release."""
+
+    def test_an_agent_orders_change_is_recorded(self, task):
+        order = _order()
+
+        push_order_event_to_gateway(order.id)
+
+        self.assertEqual(
+            list(
+                AgentOrderEvent.objects.filter(order=order)
+                .order_by("occurred_at", "pk")
+                .values_list("event_type", flat=True)
+            ),
+            [EventType.CREATED, EventType.UPDATED],
+        )
+
+    def test_an_order_no_agent_placed_records_nothing(self, task):
+        order = _order(OrderSourceType.DIRECT)
+
+        push_order_event_to_gateway(order.id)
+
+        self.assertFalse(AgentOrderEvent.objects.filter(order=order).exists())
+
+
+def test_a_sweep_run_ends_before_the_next_one_starts():
+    """A run takes no new event after its budget, and the event it took
+    last can wait the whole connect and read timeouts: together they stay
+    under the minute between runs and the task's time limit."""
+    longest_run = (
+        settings.AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS
+        + settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT
+        + settings.AGENT_ORDER_EVENT_READ_TIMEOUT
+    )
+    entry = settings.CELERY_BEAT_SCHEDULE["deliver-due-agent-order-events"]
+
+    assert entry["schedule"] == SCHEDULE_PRESETS["every_minute"]
+    assert longest_run < timedelta(minutes=1).total_seconds()
+    assert longest_run < settings.CELERY_TASK_SOFT_TIME_LIMIT

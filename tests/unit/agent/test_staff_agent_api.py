@@ -11,9 +11,11 @@ from __future__ import annotations
 import secrets
 from datetime import date, timedelta
 
+from allauth.core.context import request_context
 from allauth.idp.oidc.models import Client, Token
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -440,6 +442,23 @@ class StaffIssuerAdapterTestCase(APITestCase):
         ):
             with self.assertRaises(ValidationError, msg=uris):
                 adapter.validate_resource_uris(uris=uris)
+
+    def test_only_a_refresh_may_name_no_resource(self) -> None:
+        """A refresh's grant holds the store; allauth binds the token to it
+        when the request names none. Every other request must name it."""
+        for grant_type, allowed in (
+            (Client.GrantType.REFRESH_TOKEN, True),
+            (Client.GrantType.AUTHORIZATION_CODE, False),
+        ):
+            request = RequestFactory().post(
+                "/identity/o/api/token", {"grant_type": grant_type}
+            )
+            with self.subTest(grant_type), request_context(request):
+                if allowed:
+                    AgentOIDCAdapter().validate_resource_uris(uris=[])
+                else:
+                    with self.assertRaises(ValidationError):
+                        AgentOIDCAdapter().validate_resource_uris(uris=[])
 
     def test_a_suspended_store_is_not_a_resource(self) -> None:
         Tenant.objects.filter(pk=self.tenant.pk).update(is_active=False)

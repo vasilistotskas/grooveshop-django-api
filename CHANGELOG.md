@@ -3,6 +3,32 @@
 
 
 
+## v3.252.3 (2026-11-17)
+
+### Bug fixes
+
+* fix(agent): a staff refresh without resource keeps its grant's store (#744) ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
+* fix(agent): a staff refresh without resource keeps its grant's store
+
+The staff issuer refused every token request that named no resource,
+the refresh_token grant included, so an MCP connector that omits the
+resource on refresh (RFC 8707 makes it optional) could never refresh and
+staff had to connect the AI app again whenever its access token expired.
+
+On the refresh_token grant only, AgentOIDCAdapter.validate_resource_uris
+now lets a request without resource through. allauth already records the
+grant's resource on the refresh token and, when the request names none,
+issues the access token (and the rotated refresh token) for that resource;
+a request naming a resource outside the grant is still refused by allauth
+with invalid_target (RFC 8707 section 2.2). The authorization code
+request keeps requiring the resource on the staff issuer, and store
+issuers are unchanged. ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
+### Testing
+
+* test(agent): the refused refresh names a store the person is also on the team of ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
 ## v3.252.2 (2026-11-17)
 
 ### Documentation

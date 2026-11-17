@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from celery.schedules import crontab
@@ -337,7 +338,23 @@ class TestTheRunIsTheOneBeatSendsAcrossAClockChange:
     """Beat steps through the slots on the Athens wall clock: it sends no
     run in the hour the clock goes back, and the slot in the missing spring
     hour runs at 04:00 (``docs/scheduler.md``,
-    ``tests/integration/scheduler/test_beat.py``)."""
+    ``tests/integration/scheduler/test_beat.py``).
+
+    The instants are Athens's 2026 transitions, so the entry's crontab is
+    pinned to Athens here: ``CELERY_TIMEZONE`` comes from ``TIME_ZONE``,
+    which a local ``.env`` may set to another zone."""
+
+    @pytest.fixture(autouse=True)
+    def _athens_beat(self, settings):
+        entry = settings.CELERY_BEAT_SCHEDULE[payment_hold.SWEEP_ENTRY]
+        cls, args, kwargs = entry["schedule"].__reduce__()
+        pinned = cls(*args, **(kwargs or {}))
+        # ``tz`` is a cached property read from the app: set it first.
+        pinned.tz = ZoneInfo("Europe/Athens")
+        settings.CELERY_BEAT_SCHEDULE = {
+            **settings.CELERY_BEAT_SCHEDULE,
+            payment_hold.SWEEP_ENTRY: {**entry, "schedule": pinned},
+        }
 
     @pytest.mark.parametrize(
         ("read_at", "run"),

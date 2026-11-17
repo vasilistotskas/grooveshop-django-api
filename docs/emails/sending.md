@@ -106,7 +106,7 @@ and `is_open()`. All are frozen, keyword-only dataclasses.
 | `FeatureGate(feature=...)` | `tenant.features.feature_on(feature)`; the name must be in `STORE_FEATURES` (checked when the gate is built). |
 | `StoreSwitchGate(setting=...)` | a server-side store setting is on (`MYDATA_ENABLED`); the name must be declared in `EXTRA_SETTINGS_DEFAULTS`. |
 | `CarrierGate(carrier=...)` | the `ShippingProvider` with that code is active. |
-| `ScheduleGate(entry=...)` | the `scheduler.PeriodicTask` of that name is enabled (read in `public`). |
+| `ScheduleGate(entry=...)` | the `scheduler.PeriodicTask` of that name is enabled (read in `public`) and the entry is declared in `CELERY_BEAT_SCHEDULE` (a row a deploy removed stays until beat restarts). |
 
 ## The store's switch
 

@@ -217,7 +217,9 @@ locks stock.
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's
   `GET /agent/internal/order/{uuid}`) serves two instants, each null for
-  the orders it does not describe, and the two sets differ:
+  the orders it does not describe, and the two sets differ (a third field,
+  `paymentAwaitsReview`, tells a charge waiting for the store apart from the
+  other nulls of `paymentDecidedBy`, `docs/order/payments.md`):
   - `paymentHoldExpiresAt` (`payment_hold.hold_ends`): when the last link
     stops being payable, `payment_hold_expires_at`, or `created_at` plus the
     hold before any link was opened. Set for every order that is `PENDING`,
@@ -228,7 +230,8 @@ locks stock.
     running normally, will have decided the order (canceled it if it is
     still unpaid). It is computed on every read, from the same querysets the
     sweep selects with (`payment_hold.swept_orders`: `unpaid_online_orders`
-    and `failed_payment_orders`, less `amount_mismatch_orders`), so it is
+    and `failed_payment_orders`, less `payment_review_orders`; the sweep
+    selects its due orders through `swept_orders` itself), so it is
     set for exactly the orders the sweep cancels: a `PENDING` order with a
     FAILED payment of any pay way (cash on delivery, or none) included, so
     it can be set where `paymentHoldExpiresAt` is null. The run is the next
@@ -256,7 +259,8 @@ locks stock.
     fanout carries no `expires`, so the time it waits in the queue before it
     starts is bounded by nothing and is not counted. Null where nothing will
     decide the order: the sweep does not cancel it (a payment the provider
-    is `PROCESSING`, an order flagged `AMOUNT_MISMATCH_FLAG`), or its
+    is `PROCESSING`, an order flagged `AMOUNT_MISMATCH_FLAG` and still
+    undecided, which `paymentAwaitsReview` reports true), or its
     `scheduler.PeriodicTask` row is switched off or not created yet, or the
     settings no longer declare the entry while its row waits for beat to
     restart and delete it (`PeriodicTask.objects.is_on`, which

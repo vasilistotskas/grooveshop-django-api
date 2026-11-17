@@ -20,7 +20,12 @@ from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
-from order.payment_hold import awaiting_payment, decided_by, hold_ends
+from order.payment_hold import (
+    awaiting_payment,
+    awaits_payment_review,
+    decided_by,
+    hold_ends,
+)
 from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemDetailSerializer,
@@ -501,8 +506,19 @@ class OrderDetailSerializer(OrderSerializer):
             "stays open for its outcome. Null when nothing will decide the "
             "order: the sweep does not cancel it (it does not wait for a "
             "payment, the provider is already processing one, or a charge "
-            "did not match the total and waits for the store), or the "
-            "sweep is switched off."
+            "did not match the total and waits for the store, which "
+            "paymentAwaitsReview tells apart), or the sweep is switched off."
+        )
+    )
+    payment_awaits_review = serializers.SerializerMethodField(
+        help_text=(
+            "True when the provider confirmed a charge that did not match "
+            "the order's total and the order is still undecided (PENDING, "
+            "payment not final): the money has left the customer, the "
+            "order was not marked paid, and the store reconciles it by "
+            "hand. Do not offer a new payment link. False for any other "
+            "order, including one whose mismatch the store has since "
+            "settled, canceled or refunded."
         )
     )
 
@@ -522,6 +538,9 @@ class OrderDetailSerializer(OrderSerializer):
         if instant is None:
             return None
         return serializers.DateTimeField().to_representation(instant)
+
+    def get_payment_awaits_review(self, obj: Order) -> bool:
+        return awaits_payment_review(obj)
 
     @extend_schema_field(
         {
@@ -1003,6 +1022,7 @@ class OrderDetailSerializer(OrderSerializer):
             "is_first_order",
             "payment_hold_expires_at",
             "payment_decided_by",
+            "payment_awaits_review",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,
@@ -1018,6 +1038,7 @@ class OrderDetailSerializer(OrderSerializer):
             "loyalty_points_to_earn",
             "payment_hold_expires_at",
             "payment_decided_by",
+            "payment_awaits_review",
         )
 
 

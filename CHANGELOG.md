@@ -3,6 +3,104 @@
 
 
 
+## v3.252.1 (2026-11-17)
+
+### Documentation
+
+* docs(shipping): link the shared retry rule section from the BoxNow page ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
+### Refactoring
+
+* refactor(shipping): one HTTP session and retry rule for both carrier clients (#740) ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
+* refactor(shipping): one HTTP session and retry rule for both carrier clients
+
+AcsClient and BoxNowClient each built a requests session with their own
+urllib3 Retry. Since #607 both follow the same rule: a request that never
+connected is sent again whatever its method, a GET also after a 5xx or a
+lost answer, and a POST or PUT never once it may have reached the
+courier. Two copies of that rule could drift apart again.
+
+shipping.carrier_http now holds the rule once (CARRIER_RETRY, the BoxNow
+config) and the session factory both clients use (carrier_session). ACS
+sends only POSTs, for which the ACS config (connect=3, read=0, status=0)
+and CARRIER_RETRY answer every error sequence and every status alike, so
+nothing an ACS call retries changes. worst_case_request_seconds reads the
+connect budget from CARRIER_RETRY, taking total when connect is unset,
+and still gives 78 s at the 15 s default.
+
+The client retry tests now ask CARRIER_RETRY, and the ACS tests also pin
+that a POST is not sent again after a 5xx or a lost answer and that the
+default session mounts the shared adapter. ([`80922e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80922e19ef9b62c3ea838bfca5c23fdc9ca30201))
+
+## v3.252.0 (2026-11-17)
+
+### Bug fixes
+
+* fix(order): the unpaid-order sweep selects through swept_orders
+
+auto_cancel_stuck_pending_orders excluded every order ever flagged
+AMOUNT_MISMATCH_FLAG on its own, while paymentDecidedBy is computed
+from payment_hold.swept_orders(), which excludes only the flagged
+orders still undecided. They agreed only because both buckets select
+PENDING orders with a payment that is not final. The sweep now selects
+its due orders through swept_orders() itself, so the two cannot drift.
+The rows it cancels or skips are unchanged.
+
+Its "Skipping auto-cancel" warning listed every flagged order on each
+run, settled, canceled and refunded ones included. It now lists
+payment_review_orders(), the charges that still wait for the store.
+amount_mismatch_orders() had no caller left besides that queryset and
+is folded into it. ([`3de90ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3de90ea1adf305956f6aa17d032360ea80f231f4))
+
+### Documentation
+
+* docs(order): cancel.md names payment_review_orders and paymentAwaitsReview
+
+The paymentDecidedBy section named amount_mismatch_orders as what
+swept_orders leaves out, and listed a flagged order as a null reason
+without the field that now tells it apart. ([`3de90ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3de90ea1adf305956f6aa17d032360ea80f231f4))
+
+### Features
+
+* feat(order): paymentAwaitsReview tells a mismatched charge from an order with no sweep (#743) ([`3de90ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3de90ea1adf305956f6aa17d032360ea80f231f4))
+
+* feat(order): paymentAwaitsReview tells a mismatched charge from an order with no sweep
+
+paymentDecidedBy is null both when a confirmed charge did not match the
+order's total (the order waits for a person and must not be offered a
+new payment link) and when the store's unpaid-order sweep is switched
+off (the payment page is live). A client could not tell them apart.
+
+The order detail now serves paymentAwaitsReview: true while the order
+carries AMOUNT_MISMATCH_FLAG and is still undecided, PENDING with a
+payment not in SETTLED_PAYMENT_STATUSES. The flag is never cleared, so
+an order the store has since settled, canceled or refunded reads false
+through its own state. payment_hold.payment_review_orders() holds that
+definition; awaits_payment_review() asks it for one order and
+swept_orders() excludes it, so within the sweep's buckets an order has
+either a deadline or a charge waiting for review. ([`3de90ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3de90ea1adf305956f6aa17d032360ea80f231f4))
+
+### Testing
+
+* test(order): the sweep leaves a flagged order whose retry failed
+
+A mismatched charge followed by a failed retry puts a flagged order in
+the failed-payment bucket. Nothing held that the bucket leaves it to the
+store: without the swept_orders filter on that bucket the sweep would
+cancel it with refund_payment=False, and every test still passed. ([`3de90ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3de90ea1adf305956f6aa17d032360ea80f231f4))
+
+## v3.251.2 (2026-11-17)
+
+### Bug fixes
+
+* fix(deps): tornado 6.6.1 for Flower (open redirect via triple-slash paths) (#742)
+
+GHSA-5cjw-f85j-cv6r: tornado 6.6.0's RedirectHandler fix missed paths that
+start with three or more slashes, which browsers follow as a redirect to
+another host. Flower, which production serves, is the only package that
+pulls tornado in. Only tornado moves in uv.lock. ([`86be2d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86be2d4eec3a27405245501dad24b25df0e729e6))
+
 ## v3.251.1 (2026-11-17)
 
 ### Bug fixes

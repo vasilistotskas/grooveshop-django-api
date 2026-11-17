@@ -9,9 +9,8 @@ from typing import Any
 
 import requests
 from django.conf import settings
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
+from shipping.carrier_http import carrier_session
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowAuthError,
@@ -21,22 +20,18 @@ from shipping_boxnow.exceptions import (
 
 logger = logging.getLogger("shipping_boxnow.client")
 
-# What the HTTP layer may send a second time (the same rule as
-# ``shipping_acs/client.py``, by method because BoxNow has GETs):
-#
-# - a request that never connected is sent again, whatever its method:
-#   nothing reached BoxNow;
-# - a GET is also sent again after a 5xx or a lost answer (read timeout,
-#   connection reset): it changes nothing at BoxNow;
-# - a POST or PUT is never sent again once it may have reached BoxNow.
-#   The 5xx or the timeout becomes ``BoxNowRetryableError`` and the
-#   caller decides. For the parcel creation the caller is
-#   ``create_boxnow_shipment_for_order``: ``autoretry_for`` re-runs it
-#   on ``BoxNowRetryableError``, and ``create_shipment_for_order``
-#   releases its mint claim on any error, so the re-run sends the same
-#   ``orderNumber`` again. If the first request did create the parcel,
-#   BoxNow answers P410 and ``BoxNowService._take_over_existing_parcel``
-#   finds it by ``orderNumber`` and saves it.
+# What the HTTP layer may send a second time is
+# ``shipping.carrier_http.CARRIER_RETRY``: a request that never connected
+# and a GET are sent again, a POST or PUT never once it may have reached
+# BoxNow. The 5xx or the timeout of a write becomes
+# ``BoxNowRetryableError`` and the caller decides. For the parcel
+# creation the caller is ``create_boxnow_shipment_for_order``:
+# ``autoretry_for`` re-runs it on ``BoxNowRetryableError``, and
+# ``create_shipment_for_order`` releases its mint claim on any error, so
+# the re-run sends the same ``orderNumber`` again. If the first request
+# did create the parcel, BoxNow answers P410 and
+# ``BoxNowService._take_over_existing_parcel`` finds it by
+# ``orderNumber`` and saves it.
 #
 # Why, from the BoxNow API Manual v7.2 (Partner API 1.65):
 #
@@ -57,25 +52,6 @@ logger = logging.getLogger("shipping_boxnow.client")
 #   manual does not say whether they may be repeated.
 # - The manual has no retry guidance, no idempotency key and no 5xx
 #   semantics for any of these.
-#
-# urllib3 sorts an error by when it happened. A connect error (a connect
-# timeout or a refused connection) means the request never reached
-# BoxNow and is retried for any method. A read error (a read timeout or
-# a dropped connection) means it may have, so ``allowed_methods`` decides
-# and a POST or PUT is never sent again. Every other error (a TLS
-# failure, say) is retried for any method unless ``other`` is 0, because
-# urllib3 does not check the method for it: ``other=0`` stops it, and a
-# GET therefore gets no retry after such an error either. A 5xx is
-# retried only for a method in ``allowed_methods``. Back-off between
-# attempts: 0 s, 1 s, 2 s.
-_RETRY_CONFIG = Retry(
-    total=3,
-    other=0,
-    backoff_factor=0.5,
-    status_forcelist=[500, 502, 503, 504],
-    allowed_methods=["GET"],
-    raise_on_status=False,  # we inspect status ourselves
-)
 
 
 #: The store's rate-limit marker (cache keys are per tenant): the epoch
@@ -172,13 +148,7 @@ class BoxNowClient:
                 f"Missing required Tenant BoxNow fields: {', '.join(missing)}"
             )
 
-        if session is not None:
-            self._session = session
-        else:
-            self._session = requests.Session()
-            adapter = HTTPAdapter(max_retries=_RETRY_CONFIG)
-            self._session.mount("https://", adapter)
-            self._session.mount("http://", adapter)
+        self._session = session if session is not None else carrier_session()
 
         # Cache key scoped to environment and partner_id: a stage token is
         # not valid on the production API, so flipping the tenant's mode
@@ -340,7 +310,8 @@ class BoxNowClient:
         except requests.Timeout as exc:
             # A read timeout means the request MAY have been processed.
             # The HTTP layer did not send a POST or PUT again (see
-            # ``_RETRY_CONFIG``); the caller decides what a retry means.
+            # ``shipping.carrier_http``); the caller decides what a retry
+            # means.
             raise BoxNowRetryableError(
                 0,
                 message=f"BoxNow timeout after {self.timeout}s: {exc}",

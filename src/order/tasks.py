@@ -1830,8 +1830,18 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     """
     now = timezone.now()
 
-    failed_qs = payment_hold.expired_failed_payment_orders(now).select_related(
-        "pay_way"
+    # Every order is selected through ``payment_hold.swept_orders``, the
+    # definition ``paymentDecidedBy`` is computed from, so the two cannot
+    # drift. It leaves out an order a provider confirmed a charge for
+    # that did not match its total (usually a shopper paying on a stale
+    # checkout tab after the total moved): cancelling it here would close
+    # a CHARGED order with refund_payment=False and email the customer
+    # that it was cancelled. It needs a human.
+    swept = payment_hold.swept_orders().values("pk")
+    failed_qs = (
+        payment_hold.expired_failed_payment_orders(now)
+        .filter(pk__in=swept)
+        .select_related("pay_way")
     )
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
@@ -1839,27 +1849,22 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     # them would kill live orders. ``expired_unpaid_online_orders``
     # selects the online ones; an order with no pay_way at all (NULL) is
     # treated as offline-equivalent.
-    pending_qs = payment_hold.expired_unpaid_online_orders(now).select_related(
-        "pay_way"
+    pending_qs = (
+        payment_hold.expired_unpaid_online_orders(now)
+        .filter(pk__in=swept)
+        .select_related("pay_way")
     )
 
-    # Never auto-cancel an order Viva confirmed a charge for. The webhook
-    # refuses to mark such an order paid when the amount does not match
-    # the total (usually a shopper paying on a stale checkout tab after
-    # the total moved) and stamps AMOUNT_MISMATCH_FLAG instead. Cancelling
-    # it here would close a CHARGED order with refund_payment=False and
-    # email the customer that it was cancelled. It needs a human.
-    charged = payment_hold.amount_mismatch_orders().values_list("id", flat=True)
-    charged_ids = list(charged)
-    if charged_ids:
+    review_ids = list(
+        payment_hold.payment_review_orders().values_list("id", flat=True)
+    )
+    if review_ids:
         logger.warning(
-            "Skipping auto-cancel for %s order(s) with a confirmed Viva "
-            "charge that did not match the order total: %s",
-            len(charged_ids),
-            charged_ids,
+            "Skipping auto-cancel for %s order(s) with a confirmed charge "
+            "that did not match the order total: %s",
+            len(review_ids),
+            review_ids,
         )
-        failed_qs = failed_qs.exclude(id__in=charged_ids)
-        pending_qs = pending_qs.exclude(id__in=charged_ids)
 
     canceled_failed = 0
     canceled_pending = 0

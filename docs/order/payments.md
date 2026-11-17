@@ -71,7 +71,15 @@ match is booked on the ledger (the money moved) but does not pay the order:
 `OrderService.flag_payment_mismatch` stamps `AMOUNT_MISMATCH_FLAG` (which
 also keeps `auto_cancel_stuck_pending_orders` away from it), notes the order
 and mails `ops.payment_mismatch`; the Viva amount/currency refusals
-use the same function.
+use the same function. The flag is never cleared, so while the order is
+still undecided (PENDING, payment not in `SETTLED_PAYMENT_STATUSES`;
+`payment_hold.payment_review_orders`) the order detail serves
+`paymentAwaitsReview: true` and `paymentDecidedBy: null`: a client must not
+offer a new payment link. Once the store settles, cancels or refunds the
+order, `paymentAwaitsReview` reads false. A null `paymentDecidedBy` with
+`paymentAwaitsReview: false` is an order no sweep decides for another reason
+(the sweep switched off, a payment the provider is processing, an order that
+waits for no online payment).
 
 **A poll never writes `COMPLETED` itself.** `GET /order/{id}/payment_status`
 (`OrderService.get_payment_status`) does not write the provider's status onto

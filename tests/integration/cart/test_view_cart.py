@@ -70,11 +70,11 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         url = reverse("cart-create-payment-intent")
         with (
             patch(
-                "cart.views.cart.OrderService.shipping_cost",
+                "cart.views.cart.OrderQuoteService.shipping_cost",
                 return_value=Money("0.00", "EUR"),
             ),
             patch(
-                "cart.views.cart.OrderService.calculate_payment_method_fee",
+                "cart.views.cart.OrderQuoteService.calculate_payment_method_fee",
                 return_value=Money("0.00", "EUR"),
             ),
             patch(

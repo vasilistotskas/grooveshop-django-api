@@ -200,9 +200,9 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_free_threshold_value(self, obj: Cart):
-        from order.services import OrderService
+        from order.checkout.quote import OrderQuoteService
 
-        return OrderService.threshold_value(
+        return OrderQuoteService.threshold_value(
             obj.total_price, self._promotion_result(obj).discount_total
         ).amount
 
@@ -279,9 +279,9 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         }
     )
     def get_free_shipping_progress(self, obj: Cart) -> dict | None:
-        from order.services import OrderService
+        from order.checkout.quote import OrderQuoteService
 
-        progress = OrderService.free_shipping_progress(
+        progress = OrderQuoteService.free_shipping_progress(
             obj, self._promotion_result(obj)
         )
         if progress is None:

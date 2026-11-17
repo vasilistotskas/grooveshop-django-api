@@ -340,10 +340,13 @@ What each failure does:
   says nothing about the parcel, so it is not recorded as the answer while
   the retries last: the flag stays, the attempt is counted in
   `metadata['shipment_cancel_unanswered']` (`since`, `attempts`,
-  `last_error`; `SHIPMENT_CANCEL_UNANSWERED_KEY`), staff get one history
-  note (`Order canceled, but the courier gave no answer to the parcel
-  cancel: …`) and the admin action's warning, and the sweep below asks
-  again on each run. Until `ORDER_SHIPMENT_CANCEL_RETRY_HOURS` (env,
+  `last_error`; `SHIPMENT_CANCEL_UNANSWERED_KEY`), and the sweep below
+  asks again on each run. Staff are told at once, in one history note
+  (`Order canceled, but the courier gave no answer to the parcel cancel:
+  …`) and the admin action's warning, that the parcel is still live and
+  can be collected meanwhile (a courier unreachable for us may still be
+  doing pickups), so they call the courier when it must not ship; the
+  retries stop it without them otherwise. Until `ORDER_SHIPMENT_CANCEL_RETRY_HOURS` (env,
   default 24; 0 asks once) after the cancel: then the last failure is
   recorded in `shipment_cancel` like a refusal, with the "did not cancel
   the parcel" note, and the voucher is staff's to cancel ("Cancel ACS

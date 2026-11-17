@@ -2736,17 +2736,19 @@ class OrderAdmin(BaseModelAdmin):
                     SHIPMENT_CANCEL_UNANSWERED_KEY
                 ):
                     # The courier gave no answer: the sweep asks again
-                    # by itself, and staff hear back only if it never
-                    # answers. A warning, since the parcel is still live.
+                    # by itself, but the parcel is live meanwhile and may
+                    # be collected, so staff are told so now.
                     self.message_user(
                         request,
                         _(
                             "Order %(order_id)s was canceled, but the "
                             "courier gave no answer to the parcel cancel "
-                            "(%(error)s). It is asked again automatically "
-                            "every %(every)s minutes for up to %(hours)s "
-                            "hours, and the order's history says if it "
-                            "never answers."
+                            "(%(error)s). The parcel is still live and can "
+                            "be picked up meanwhile: call the courier if it "
+                            "must not ship. The cancel is also asked again "
+                            "automatically every %(every)s minutes for up "
+                            "to %(hours)s hours, and the order's history "
+                            "says if it never answers."
                         )
                         % {
                             "order_id": order.id,

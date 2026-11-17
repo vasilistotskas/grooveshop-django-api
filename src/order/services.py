@@ -4921,8 +4921,9 @@ class OrderService:
         the parcel. Until ``ORDER_SHIPMENT_CANCEL_RETRY_HOURS`` after the
         cancel the flag stays, the attempt is counted in
         :data:`SHIPMENT_CANCEL_UNANSWERED_KEY`, staff get one history note
-        saying the courier is being asked again, and the sweep asks on
-        each run. After that the last failure is recorded as the answer,
+        saying the parcel is still live (a courier that is down for us
+        may still collect it) and that the courier is being asked again,
+        and the sweep asks on each run. After that the last failure is recorded as the answer,
         with the usual note, and the parcel is staff's. A courier's
         refusal is recorded at once: asking again gets the same answer.
 
@@ -5086,10 +5087,13 @@ class OrderService:
                         order=order,
                         note=(
                             "Order canceled, but the courier gave no "
-                            f"answer to the parcel cancel: {exc}. It is "
-                            f"asked again automatically every {every} "
-                            f"minutes for up to {hours} hours; a note "
-                            "follows here if it never answers."
+                            f"answer to the parcel cancel: {exc}. The "
+                            "parcel is still live and can be picked up "
+                            "meanwhile: call the courier if it must not "
+                            "ship. The cancel is also asked again "
+                            f"automatically every {every} minutes for up "
+                            f"to {hours} hours; a note follows here if it "
+                            "never answers."
                         ),
                     )
         except Exception:

@@ -448,8 +448,11 @@ class TestACourierThatGivesNoAnswer:
         assert "timed out" in unanswered["last_error"]
         # The caller reads the same on the order it gets back.
         assert canceled.metadata[SHIPMENT_CANCEL_UNANSWERED_KEY] == unanswered
-        # Staff are told it is being retried, not that it failed.
-        assert len(_no_answer_notes(shipment.order_id)) == 1
+        # Staff are told it is being retried, and that the parcel is
+        # live until then.
+        notes = _no_answer_notes(shipment.order_id)
+        assert len(notes) == 1
+        assert "still live" in notes[0]
         assert _courier_notes(shipment.order_id) == []
 
     def test_the_sweep_asks_again_and_tells_staff_only_once(
@@ -732,5 +735,6 @@ def test_the_admin_cancel_says_the_courier_is_asked_again(monkeypatch):
     assert message.call_count == 2
     text = str(message.call_args_list[-1].args[1])
     assert "gave no answer" in text
+    assert "still live" in text
     assert "timed out" in text
     assert message.call_args_list[-1].kwargs == {"level": "warning"}

@@ -326,6 +326,14 @@ BUILDERS: dict[str, Callable[[], object]] = {
     "meta_capi.MetaCapiEventLog": lambda: __import__(
         "meta_capi.models", fromlist=["MetaCapiEventLog"]
     ).MetaCapiEventLog.objects.create(event_name="Purchase", event_id=_uid()),
+    "agent.AgentOrderEvent": lambda: __import__(
+        "agent.models", fromlist=["AgentOrderEvent"]
+    ).AgentOrderEvent.objects.create(
+        order=__import__(
+            "order.factories.order", fromlist=["OrderFactory"]
+        ).OrderFactory(num_order_items=0),
+        event_type=_first_choice("agent.AgentOrderEvent", "event_type"),
+    ),
     "extra_settings.Setting": lambda: __import__(
         "extra_settings.models", fromlist=["Setting"]
     ).Setting.objects.create(

@@ -213,6 +213,20 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_purge_expired_pending_payment_fees",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
+        "deliver-due-agent-order-events": {
+            # Fanout: AgentOrderEvent is per-tenant. Attempts the order
+            # events owed to the agent gateway whose next attempt is due
+            # (``agent.outbox``). Cheap when idle: one indexed query per
+            # store.
+            "task": "tenant.tasks.fanout_deliver_due_agent_order_events",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
+        },
+        "purge-expired-agent-order-events": {
+            # Fanout: deletes delivered and failed agent order events
+            # finished more than AGENT_ORDER_EVENT_RETENTION_DAYS ago.
+            "task": "tenant.tasks.fanout_purge_expired_agent_order_events",
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+        },
         "purge-expired-meta-capi-event-logs": {
             # Fanout: MetaCapiEventLog is per-tenant. Deletes delivery
             # rows older than META_CAPI_EVENT_LOG_RETENTION_DAYS.

@@ -1,5 +1,8 @@
 Download Social Avatar
 Send Notification Task
+agent.tasks.deliver_agent_order_event
+agent.tasks.deliver_due_agent_order_events
+agent.tasks.purge_expired_agent_order_events
 b2b.tasks.send_admin_new_business_profile_email
 b2b.tasks.send_business_profile_status_email
 builder.tasks.purge_expired_preview_links
@@ -75,7 +78,6 @@ order.tasks.finish_pending_shipment_cancels
 order.tasks.generate_order_invoice
 order.tasks.issue_pending_credits
 order.tasks.purge_expired_pending_payment_fees
-order.tasks.push_order_event_to_gateway
 order.tasks.reconcile_pending_refunds
 order.tasks.send_admin_new_order_email
 order.tasks.send_checkout_abandonment_emails
@@ -150,6 +152,7 @@ tenant.tasks.fanout_clear_expired_notifications
 tenant.tasks.fanout_clear_expired_sessions
 tenant.tasks.fanout_clear_old_history
 tenant.tasks.fanout_complete_paid_delivered_orders
+tenant.tasks.fanout_deliver_due_agent_order_events
 tenant.tasks.fanout_deliver_scheduled_gift_cards
 tenant.tasks.fanout_expire_gift_cards
 tenant.tasks.fanout_finish_pending_shipment_cancels
@@ -162,6 +165,7 @@ tenant.tasks.fanout_process_points_expiration
 tenant.tasks.fanout_purge_expired_acs_api_calls
 tenant.tasks.fanout_purge_expired_acs_tracking_events
 tenant.tasks.fanout_purge_expired_admin_log_entries
+tenant.tasks.fanout_purge_expired_agent_order_events
 tenant.tasks.fanout_purge_expired_attachment_files
 tenant.tasks.fanout_purge_expired_boxnow_parcel_events
 tenant.tasks.fanout_purge_expired_builder_preview_links

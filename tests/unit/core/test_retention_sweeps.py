@@ -233,6 +233,11 @@ _FANOUTS = [
         "core.tasks.purge_expired_admin_log_entries",
         "purge-expired-admin-log-entries-tenants",
     ),
+    (
+        "fanout_purge_expired_agent_order_events",
+        "agent.tasks.purge_expired_agent_order_events",
+        "purge-expired-agent-order-events",
+    ),
 ]
 
 

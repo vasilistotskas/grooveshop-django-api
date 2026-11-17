@@ -70,6 +70,11 @@ def carry_key_to_name(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("pay_way", "0028_field_verbose_names"),
+        # order 0055 reads PayWayTranslation.name, which this migration
+        # takes out of state: it must run first. Without this edge the
+        # plan held only by the order in which the graph was walked, and a
+        # new leaf depending on the latest order migration reversed it.
+        ("order", "0055_order_pay_way_key_snapshot"),
     ]
 
     operations = [

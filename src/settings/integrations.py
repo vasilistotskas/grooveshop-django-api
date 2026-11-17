@@ -254,17 +254,44 @@ META_CAPI_PARTNER_AGENT = getenv(
 
 # ---------- Agent gateway (grooveshop-agent-gateway) ----------
 # Cluster-internal base URL of the agent gateway service. Empty (the
-# default) means the agent surface is off: order events are not pushed
-# and the gateway-aware cart throttle behaves like a plain anon throttle.
+# default) means the agent surface is off: no agent order event is
+# recorded and the gateway-aware cart throttle behaves like a plain anon
+# throttle.
 AGENT_GATEWAY_INTERNAL_URL = getenv("AGENT_GATEWAY_INTERNAL_URL", "")
 # Shared secret between Django and the gateway, used in BOTH directions:
-# sent as ``X-Internal-Token`` on order-event pushes and verified against
+# sent as ``X-Internal-Token`` with order events and verified against
 # the gateway's ``X-Internal-Gateway`` header on inbound cart mutations.
 # Must equal the gateway's ``INTERNAL_EVENTS_SECRET`` env value.
 AGENT_GATEWAY_INTERNAL_SECRET = getenv("AGENT_GATEWAY_INTERNAL_SECRET", "")
 
-# Per-request timeout for order-event pushes to the gateway.
+# Per-request timeout for order events sent to the gateway.
 AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
+# The order events owed to the gateway (``agent.AgentOrderEvent``,
+# ``docs/agent-order-events.md``). An event is attempted at most
+# MAX_ATTEMPTS times; after failed attempt n the next waits
+# BACKOFF_SECONDS * 2**(n-1), at most BACKOFF_CAP_SECONDS, varied by
+# +/- BACKOFF_JITTER of itself. The defaults make 10 attempts over about
+# 2.8 days (Standard Webhooks' schedule spans about 3). The sweep attempts
+# at most SWEEP_BATCH events per store and run, and a delivered or failed
+# event is deleted RETENTION_DAYS after it finished.
+AGENT_ORDER_EVENT_MAX_ATTEMPTS = int(
+    getenv("AGENT_ORDER_EVENT_MAX_ATTEMPTS", "10")
+)
+AGENT_ORDER_EVENT_BACKOFF_SECONDS = int(
+    getenv("AGENT_ORDER_EVENT_BACKOFF_SECONDS", "600")
+)
+AGENT_ORDER_EVENT_BACKOFF_CAP_SECONDS = int(
+    getenv("AGENT_ORDER_EVENT_BACKOFF_CAP_SECONDS", "86400")
+)
+AGENT_ORDER_EVENT_BACKOFF_JITTER = float(
+    getenv("AGENT_ORDER_EVENT_BACKOFF_JITTER", "0.1")
+)
+AGENT_ORDER_EVENT_SWEEP_BATCH = int(
+    getenv("AGENT_ORDER_EVENT_SWEEP_BATCH", "100")
+)
+AGENT_ORDER_EVENT_RETENTION_DAYS = int(
+    getenv("AGENT_ORDER_EVENT_RETENTION_DAYS", "30")
+)
 # Master flag for agent-delegated Stripe payments (the ACP/UCP tokenized
 # SharedPaymentToken flow). Off until Stripe Agentic Commerce enrollment
 # completes — the confirm endpoint returns a clean "not enabled" error.

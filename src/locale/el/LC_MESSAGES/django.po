@@ -135,6 +135,10 @@ msgid "%(count)d confirmation emails were queued."
 msgstr "Μπήκαν σε αναμονή %(count)d email επιβεβαίωσης."
 
 #, python-format
+msgid "%(count)d events queued; delivered events are not sent again."
+msgstr "Μπήκαν σε αναμονή %(count)d συμβάντα· τα συμβάντα που έχουν ήδη παραδοθεί δεν αποστέλλονται ξανά."
+
+#, python-format
 msgid "%(count)d item"
 msgid_plural "%(count)d items"
 msgstr[0] "%(count)d είδος"
@@ -1600,8 +1604,17 @@ msgstr "Ενεργοποιημένο Εμπόριο AI Πρακτόρων"
 msgid "Agent Hosted Payment Selection"
 msgstr "Επιλογή Hosted Πληρωμής από AI Πράκτορα"
 
+msgid "Agent Order Events"
+msgstr "Συμβάντα παραγγελιών πρακτόρων AI"
+
 msgid "Agent Stripe Delegated Payments"
 msgstr "Εξουσιοδοτημένες Πληρωμές Stripe μέσω AI Πράκτορα"
+
+msgid "Agent order event"
+msgstr "Συμβάν παραγγελίας πράκτορα AI"
+
+msgid "Agent order events"
+msgstr "Συμβάντα παραγγελιών πρακτόρων AI"
 
 msgid "Agent-delegated payments are not enabled for this store."
 msgstr "Οι εξουσιοδοτημένες πληρωμές μέσω πράκτορα δεν είναι ενεργοποιημένες για αυτό το κατάστημα."
@@ -6320,6 +6333,9 @@ msgstr "Οικονομική σύνοψη"
 msgid "Fine-grained event identifier. See ``notification.enum.NotificationTypeEnum`` for the full catalogue. Left blank for ad-hoc admin broadcasts."
 msgstr "Λεπτομερές αναγνωριστικό συμβάντος. Δείτε ``notification.enum.NotificationTypeEnum`` για τον πλήρη κατάλογο. Αφήνεται κενό για περιστασιακές ανακοινώσεις διαχειριστή."
 
+msgid "Finished at"
+msgstr "Ολοκληρώθηκε στις"
+
 msgid "First 150 characters of the comment content"
 msgstr "Οι πρώτοι 150 χαρακτήρες του περιεχομένου του σχολίου"
 
@@ -7953,6 +7969,9 @@ msgstr "Τελευταίο re-engagement email"
 
 msgid "Last Synced At"
 msgstr "Τελευταίος συγχρονισμός"
+
+msgid "Last attempt at"
+msgstr "Τελευταία προσπάθεια"
 
 msgid "Last carrier event"
 msgstr "Τελευταίο γεγονός μεταφορέα"
@@ -10072,6 +10091,9 @@ msgstr "Πηγή παραγγελίας"
 
 msgid "Order total"
 msgstr "Σύνολο παραγγελίας"
+
+msgid "Order updated"
+msgstr "Η παραγγελία ενημερώθηκε"
 
 #, python-brace-format
 msgid "Order with ID {order_id} not found"
@@ -12914,6 +12936,9 @@ msgstr "Όνομα πωλητή / ΑΦΜ / διεύθυνση, καταγεγρ�
 
 msgid "Send a contact message to the site administrators."
 msgstr "Αποστολή μηνύματος επικοινωνίας στους διαχειριστές του ιστότοπου."
+
+msgid "Send again now"
+msgstr "Αποστολή ξανά τώρα"
 
 msgid "Send as the X-Cart-Token header."
 msgstr "Στείλτε το ως κεφαλίδα X-Cart-Token."
@@ -16688,6 +16713,9 @@ msgstr "Είμαστε στην ευχάριστη θέση να επιβεβα�
 
 msgid "Webhook Endpoints"
 msgstr "Endpoints webhook"
+
+msgid "Webhook ID"
+msgstr "ID webhook"
 
 msgid "Webhook Message ID"
 msgstr "ID μηνύματος webhook"

@@ -1,11 +1,10 @@
 import logging
 from datetime import timedelta
 
-import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 
 from core import celery_app
@@ -14,7 +13,6 @@ from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_DB_ERRORS,
     TRANSIENT_ERRORS,
-    TRANSIENT_HTTP_ERRORS,
     is_permanent_failure,
 )
 from core.store_settings import store_setting
@@ -2220,75 +2218,6 @@ def send_review_request_emails() -> dict[str, int]:
             failed,
         )
     return {"sent": sent, "skipped": skipped, "failed": failed}
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    bind=True,
-    autoretry_for=TRANSIENT_HTTP_ERRORS,
-    retry_backoff=10,
-    retry_backoff_max=600,
-    retry_jitter=True,
-    max_retries=5,
-    ignore_result=True,
-)
-def push_order_event_to_gateway(self, order_id: int) -> None:
-    """POST an order/payment status event to the agent gateway.
-
-    Wired to ``handle_order_post_save`` via ``on_commit`` whenever an
-    order's ``status``, ``payment_status`` or tracking info changes.
-    The gateway matches the order UUID against its agent checkout
-    sessions (completing UCP/ACP sessions and forwarding signed order
-    webhooks to platforms); orders placed outside agent checkouts are
-    ACKed with 204 and go no further.
-
-    Fully isolated from order processing: an unset
-    ``AGENT_GATEWAY_INTERNAL_URL`` no-ops, transport errors and gateway
-    5xx retry with backoff (the gateway answers 503 when it wants a
-    retry), and a 4xx is logged and dropped.
-    """
-    base_url = settings.AGENT_GATEWAY_INTERNAL_URL
-    if not base_url:
-        return
-
-    # Read via .values() — refresh_from_db(fields=...) leaves other
-    # columns deferred and Order.__init__ recurses through the manager
-    # when snapshotting the _original_* fields.
-    row = (
-        Order.objects.filter(pk=order_id)
-        .values("uuid", "status", "payment_status", "tracking_number")
-        .first()
-    )
-    if row is None:
-        logger.warning("Order %s vanished before gateway event push", order_id)
-        return
-
-    response = requests.post(
-        f"{base_url.rstrip('/')}/internal/events/order-status",
-        json={
-            # The task runs inside the schema captured at dispatch
-            # (MonitoredTask extends TenantTask), so the active
-            # connection names the tenant this order belongs to.
-            "schemaName": connection.schema_name,
-            "orderUuid": str(row["uuid"]),
-            "status": row["status"],
-            "paymentStatus": row["payment_status"],
-            "trackingNumber": row["tracking_number"] or "",
-        },
-        headers={"X-Internal-Token": settings.AGENT_GATEWAY_INTERNAL_SECRET},
-        timeout=settings.AGENT_GATEWAY_HTTP_TIMEOUT,
-    )
-    if response.status_code >= 500:
-        # Gateway asks for a retry (e.g. Redis briefly down) — surface
-        # as HTTPError so autoretry_for picks it up.
-        response.raise_for_status()
-    elif response.status_code >= 400:
-        logger.error(
-            "Gateway rejected order event for order %s: %s %s",
-            order_id,
-            response.status_code,
-            response.text[:200],
-        )
 
 
 @celery_app.task(

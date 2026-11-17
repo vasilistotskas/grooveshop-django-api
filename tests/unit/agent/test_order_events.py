@@ -1,0 +1,437 @@
+"""The order events owed to the agent gateway (``agent.outbox``).
+
+- Recording: an order an agent placed gets an "Order created" event in
+  its creation transaction, and an "Order updated" event for each save
+  that changed its status, payment status or tracking; nothing else does.
+- Delivery: one attempt sends the row's id and event time, unchanged on
+  every retry, and the gateway's answer decides the row's state.
+- The sweep, the manual retry and the retention purge.
+"""
+
+from __future__ import annotations
+
+from datetime import timedelta
+from unittest.mock import Mock, patch
+
+import requests
+from django.conf import settings
+from django.db import connection, transaction
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from agent import outbox
+from agent.models import AgentOrderEvent
+from agent.models import AgentOrderEventStatus as Status
+from agent.models import AgentOrderEventType as EventType
+from agent.tasks import purge_expired_agent_order_events
+from order.enum.attribution import OrderSourceType
+from order.enum.status import OrderStatus, PaymentStatus
+from order.factories.order import OrderFactory
+from order.models.attribution import OrderAttribution
+from order.models.order import Order
+
+GATEWAY_URL = "http://agent-gateway-service"
+SECRET = "test-internal-secret"
+BACKOFF = 600
+gateway = override_settings(
+    AGENT_GATEWAY_INTERNAL_URL=GATEWAY_URL,
+    AGENT_GATEWAY_INTERNAL_SECRET=SECRET,
+    AGENT_ORDER_EVENT_BACKOFF_SECONDS=BACKOFF,
+    AGENT_ORDER_EVENT_BACKOFF_JITTER=0,
+)
+
+
+def _response(status_code: int) -> Mock:
+    response = Mock()
+    response.status_code = status_code
+    return response
+
+
+def _order(source_type: str | None = OrderSourceType.AGENT) -> Order:
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
+    order.tracking_number = ""
+    order.shipping_carrier = ""
+    order.save()
+    if source_type is not None:
+        OrderAttribution.objects.create(
+            order=order, source_type=source_type, source="ucp"
+        )
+    # Re-read so the _original_* snapshots match the row.
+    return Order.objects.get(pk=order.pk)
+
+
+@gateway
+@patch("agent.tasks.deliver_agent_order_event")
+class RecordTests(TestCase):
+    def events(self, order: Order) -> list[str]:
+        return list(
+            AgentOrderEvent.objects.filter(order=order)
+            .order_by("occurred_at", "pk")
+            .values_list("event_type", flat=True)
+        )
+
+    def test_an_agent_order_records_order_created(self, task):
+        order = _order()
+
+        event = AgentOrderEvent.objects.get(order=order)
+        self.assertEqual(event.event_type, EventType.CREATED)
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.attempts, 0)
+        task.apply_async.assert_called_once_with(
+            args=[str(event.pk)],
+            headers={"_schema_name": connection.schema_name},
+        )
+
+    def test_each_tracked_change_records_one_update(self, task):
+        changes = {
+            "status": {"status": OrderStatus.PROCESSING},
+            "payment status": {"payment_status": PaymentStatus.COMPLETED},
+            "tracking": {
+                "tracking_number": "ABC123",
+                "shipping_carrier": "ELTA",
+            },
+            "status and payment together": {
+                "status": OrderStatus.PROCESSING,
+                "payment_status": PaymentStatus.COMPLETED,
+            },
+        }
+        for name, fields in changes.items():
+            with self.subTest(name):
+                order = _order()
+                for field, value in fields.items():
+                    setattr(order, field, value)
+                order.save()
+
+                self.assertEqual(
+                    self.events(order), [EventType.CREATED, EventType.UPDATED]
+                )
+
+    def test_an_unrelated_save_records_nothing(self, task):
+        order = _order()
+
+        order.customer_notes = "please ring the bell"
+        order.save()
+
+        self.assertEqual(self.events(order), [EventType.CREATED])
+
+    def test_an_order_no_agent_placed_records_nothing(self, task):
+        for source_type in (OrderSourceType.DIRECT, None):
+            with self.subTest(source_type=source_type):
+                order = _order(source_type)
+
+                order.status = OrderStatus.PROCESSING
+                order.save()
+
+                self.assertEqual(self.events(order), [])
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_URL="")
+    def test_nothing_is_recorded_without_the_gateway(self, task):
+        order = _order()
+
+        order.status = OrderStatus.PROCESSING
+        order.save()
+
+        self.assertEqual(self.events(order), [])
+        task.apply_async.assert_not_called()
+
+    def test_a_change_that_rolls_back_leaves_no_event(self, task):
+        order = _order()
+
+        with self.assertRaises(RuntimeError), transaction.atomic():
+            order.status = OrderStatus.PROCESSING
+            order.save()
+            raise RuntimeError
+
+        self.assertEqual(self.events(order), [EventType.CREATED])
+
+
+@gateway
+@patch("agent.outbox.requests.post")
+class AttemptTests(TestCase):
+    def setUp(self):
+        with override_settings(AGENT_GATEWAY_INTERNAL_URL=""):
+            self.order = _order()
+
+    def event(self, **fields) -> AgentOrderEvent:
+        return AgentOrderEvent.objects.create(
+            order=self.order, event_type=EventType.UPDATED, **fields
+        )
+
+    def make_due(self, event: AgentOrderEvent) -> None:
+        AgentOrderEvent.objects.filter(pk=event.pk).update(
+            next_attempt_at=timezone.now()
+        )
+
+    def test_a_delivered_event_is_finished(self, post):
+        post.return_value = _response(204)
+        event = self.event()
+
+        outcome = outbox.attempt(event.pk)
+
+        self.assertEqual(outcome, outbox.Outcome.DELIVERED)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.DELIVERED)
+        self.assertEqual(event.attempts, 1)
+        self.assertIsNotNone(event.finished_at)
+        args, kwargs = post.call_args
+        self.assertEqual(args[0], f"{GATEWAY_URL}/internal/events/order-status")
+        self.assertEqual(kwargs["headers"], {"X-Internal-Token": SECRET})
+        self.assertEqual(
+            kwargs["json"],
+            {
+                "eventId": str(event.pk),
+                "eventType": EventType.UPDATED.value,
+                "occurredAt": event.occurred_at.isoformat(),
+                "schemaName": connection.schema_name,
+                "orderUuid": str(self.order.uuid),
+                "status": OrderStatus.PENDING.value,
+                "paymentStatus": PaymentStatus.PENDING.value,
+                "trackingNumber": "",
+            },
+        )
+
+    def test_a_retry_sends_the_same_id_and_time(self, post):
+        post.side_effect = [_response(503), _response(204)]
+        event = self.event()
+
+        first = outbox.attempt(event.pk)
+        event.refresh_from_db()
+        self.assertEqual(first, outbox.Outcome.RETRY)
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.last_error, "HTTP 503")
+        self.assertEqual(
+            event.next_attempt_at - event.last_attempt_at,
+            timedelta(seconds=BACKOFF),
+        )
+        self.make_due(event)
+        second = outbox.attempt(event.pk)
+
+        self.assertEqual(second, outbox.Outcome.DELIVERED)
+        bodies = [call.kwargs["json"] for call in post.call_args_list]
+        self.assertEqual(
+            {(body["eventId"], body["occurredAt"]) for body in bodies},
+            {(str(event.pk), event.occurred_at.isoformat())},
+        )
+
+    def test_the_gateways_answer_decides_the_state(self, post):
+        answers = {
+            403: (outbox.Outcome.FAILED, Status.FAILED),
+            400: (outbox.Outcome.FAILED, Status.FAILED),
+            429: (outbox.Outcome.RETRY, Status.PENDING),
+            500: (outbox.Outcome.RETRY, Status.PENDING),
+        }
+        for code, (outcome, state) in answers.items():
+            with self.subTest(code=code):
+                post.return_value = _response(code)
+                event = self.event()
+
+                self.assertEqual(outbox.attempt(event.pk), outcome)
+                event.refresh_from_db()
+                self.assertEqual(event.status, state)
+                self.assertEqual(event.last_error, f"HTTP {code}")
+                event.delete()
+
+    def test_an_unreachable_gateway_is_attempted_again(self, post):
+        post.side_effect = requests.ConnectionError("refused")
+        event = self.event()
+
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.UNREACHABLE)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.last_error, "ConnectionError")
+
+    def test_the_last_failed_attempt_gives_up(self, post):
+        post.return_value = _response(503)
+        event = self.event(attempts=settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS - 1)
+
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.FAILED)
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.FAILED)
+        self.assertEqual(
+            event.attempts, settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS
+        )
+        self.assertIsNotNone(event.finished_at)
+
+    def test_a_row_left_after_its_last_attempt_is_not_sent_again(self, post):
+        # A worker that died during the last attempt leaves it pending.
+        event = self.event(attempts=settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS)
+
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.FAILED)
+        post.assert_not_called()
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.FAILED)
+
+    def test_an_event_not_due_is_not_sent(self, post):
+        event = self.event(next_attempt_at=timezone.now() + timedelta(hours=1))
+
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.SKIPPED)
+        post.assert_not_called()
+
+    def test_a_claimed_event_is_not_sent_twice(self, post):
+        post.return_value = _response(503)
+        event = self.event()
+
+        outbox.attempt(event.pk)
+        again = outbox.attempt(event.pk)
+
+        self.assertEqual(again, outbox.Outcome.SKIPPED)
+        post.assert_called_once()
+
+    def test_an_event_waits_behind_an_earlier_one_of_its_order(self, post):
+        post.return_value = _response(204)
+        earlier = self.event()
+        later = self.event()
+
+        self.assertEqual(outbox.attempt(later.pk), outbox.Outcome.SKIPPED)
+        outbox.attempt(earlier.pk)
+        self.assertEqual(outbox.attempt(later.pk), outbox.Outcome.DELIVERED)
+
+    def test_a_failed_earlier_event_holds_nothing_back(self, post):
+        post.return_value = _response(204)
+        self.event(status=Status.FAILED)
+        later = self.event()
+
+        self.assertEqual(outbox.attempt(later.pk), outbox.Outcome.DELIVERED)
+
+
+class ScheduleTests(TestCase):
+    @override_settings(AGENT_ORDER_EVENT_BACKOFF_JITTER=0)
+    def test_about_ten_attempts_over_about_three_days(self):
+        attempts = settings.AGENT_ORDER_EVENT_MAX_ATTEMPTS
+        span = sum(
+            (outbox.retry_delay(number) for number in range(1, attempts)),
+            timedelta(),
+        )
+
+        self.assertEqual(attempts, 10)
+        self.assertGreater(span, timedelta(days=2.5))
+        self.assertLess(span, timedelta(days=3.5))
+
+    def test_jitter_stays_within_its_fraction(self):
+        jitter = settings.AGENT_ORDER_EVENT_BACKOFF_JITTER
+        base = settings.AGENT_ORDER_EVENT_BACKOFF_SECONDS
+
+        for _ in range(50):
+            seconds = outbox.retry_delay(1).total_seconds()
+            self.assertGreaterEqual(seconds, base * (1 - jitter))
+            self.assertLessEqual(seconds, base * (1 + jitter))
+
+
+@gateway
+@patch("agent.outbox.requests.post")
+class SweepTests(TestCase):
+    def setUp(self):
+        with override_settings(AGENT_GATEWAY_INTERNAL_URL=""):
+            self.orders = [_order(), _order()]
+
+    def event(self, order: Order, **fields) -> AgentOrderEvent:
+        return AgentOrderEvent.objects.create(
+            order=order, event_type=EventType.UPDATED, **fields
+        )
+
+    def test_an_orders_events_go_out_in_order_in_one_run(self, post):
+        post.return_value = _response(204)
+        first = self.event(self.orders[0])
+        second = self.event(self.orders[0])
+
+        counts = outbox.deliver_due()
+
+        self.assertEqual(counts, {outbox.Outcome.DELIVERED: 2})
+        sent = [call.kwargs["json"]["eventId"] for call in post.call_args_list]
+        self.assertEqual(sent, [str(first.pk), str(second.pk)])
+
+    def test_the_run_stops_when_the_gateway_is_unreachable(self, post):
+        post.side_effect = requests.ConnectionError("refused")
+        for order in self.orders:
+            self.event(order)
+
+        counts = outbox.deliver_due()
+
+        self.assertEqual(counts, {outbox.Outcome.UNREACHABLE: 1})
+        post.assert_called_once()
+
+    def test_an_event_not_due_waits(self, post):
+        self.event(
+            self.orders[0], next_attempt_at=timezone.now() + timedelta(hours=1)
+        )
+
+        self.assertEqual(outbox.deliver_due(), {})
+        post.assert_not_called()
+
+    @override_settings(AGENT_ORDER_EVENT_SWEEP_BATCH=1)
+    def test_a_run_takes_at_most_a_batch(self, post):
+        post.return_value = _response(204)
+        for order in self.orders:
+            self.event(order)
+
+        self.assertEqual(outbox.deliver_due(), {outbox.Outcome.DELIVERED: 1})
+
+
+@gateway
+@patch("agent.tasks.deliver_agent_order_event")
+class RetryNowTests(TestCase):
+    def test_a_failed_event_is_queued_with_fresh_attempts(self, task):
+        with override_settings(AGENT_GATEWAY_INTERNAL_URL=""):
+            order = _order()
+        failed = AgentOrderEvent.objects.create(
+            order=order,
+            event_type=EventType.UPDATED,
+            status=Status.FAILED,
+            attempts=10,
+            finished_at=timezone.now(),
+            next_attempt_at=timezone.now() + timedelta(days=1),
+        )
+        delivered = AgentOrderEvent.objects.create(
+            order=order,
+            event_type=EventType.CREATED,
+            status=Status.DELIVERED,
+            finished_at=timezone.now(),
+        )
+
+        queued = outbox.retry_now(AgentOrderEvent.objects.all())
+
+        self.assertEqual(queued, 1)
+        failed.refresh_from_db()
+        delivered.refresh_from_db()
+        self.assertEqual(failed.status, Status.PENDING)
+        self.assertEqual(failed.attempts, 0)
+        self.assertIsNone(failed.finished_at)
+        self.assertLessEqual(failed.next_attempt_at, timezone.now())
+        self.assertEqual(delivered.status, Status.DELIVERED)
+        task.apply_async.assert_called_once_with(
+            args=[str(failed.pk)],
+            headers={"_schema_name": connection.schema_name},
+        )
+
+
+class PurgeTests(TestCase):
+    def test_finished_events_past_retention_are_deleted(self):
+        order = _order(None)
+        old = timezone.now() - timedelta(
+            days=settings.AGENT_ORDER_EVENT_RETENTION_DAYS + 1
+        )
+        rows = {
+            name: AgentOrderEvent.objects.create(
+                order=order,
+                event_type=EventType.UPDATED,
+                status=state,
+                finished_at=finished_at,
+                occurred_at=old,
+            )
+            for name, state, finished_at in (
+                ("old delivered", Status.DELIVERED, old),
+                ("old failed", Status.FAILED, old),
+                ("recent delivered", Status.DELIVERED, timezone.now()),
+                ("old pending", Status.PENDING, None),
+            )
+        }
+
+        result = purge_expired_agent_order_events()
+
+        self.assertEqual(result, {"deleted": 2})
+        kept = set(AgentOrderEvent.objects.values_list("pk", flat=True))
+        self.assertEqual(
+            kept, {rows["recent delivered"].pk, rows["old pending"].pk}
+        )

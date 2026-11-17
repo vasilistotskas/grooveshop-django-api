@@ -130,6 +130,10 @@ msgid "%(count)d confirmation emails were queued."
 msgstr "%(count)d confirmation emails were queued."
 
 #, python-format
+msgid "%(count)d events queued; delivered events are not sent again."
+msgstr "%(count)d events queued; delivered events are not sent again."
+
+#, python-format
 msgid "%(count)d item"
 msgid_plural "%(count)d items"
 msgstr[0] "%(count)d item"
@@ -1595,8 +1599,17 @@ msgstr "Agent Commerce Enabled"
 msgid "Agent Hosted Payment Selection"
 msgstr "Agent Hosted Payment Selection"
 
+msgid "Agent Order Events"
+msgstr "Agent Order Events"
+
 msgid "Agent Stripe Delegated Payments"
 msgstr "Agent Stripe Delegated Payments"
+
+msgid "Agent order event"
+msgstr "Agent order event"
+
+msgid "Agent order events"
+msgstr "Agent order events"
 
 msgid "Agent-delegated payments are not enabled for this store."
 msgstr "Agent-delegated payments are not enabled for this store."
@@ -6315,6 +6328,9 @@ msgstr "Financial Summary"
 msgid "Fine-grained event identifier. See ``notification.enum.NotificationTypeEnum`` for the full catalogue. Left blank for ad-hoc admin broadcasts."
 msgstr "Fine-grained event identifier. See ``notification.enum.NotificationTypeEnum`` for the full catalogue. Left blank for ad-hoc admin broadcasts."
 
+msgid "Finished at"
+msgstr "Finished at"
+
 msgid "First 150 characters of the comment content"
 msgstr "First 150 characters of the comment content"
 
@@ -7945,6 +7961,9 @@ msgstr "Last Re-engagement Email At"
 
 msgid "Last Synced At"
 msgstr "Last Synced At"
+
+msgid "Last attempt at"
+msgstr "Last attempt at"
 
 msgid "Last carrier event"
 msgstr "Last carrier event"
@@ -10065,6 +10084,9 @@ msgstr "Order source"
 
 msgid "Order total"
 msgstr "Order total"
+
+msgid "Order updated"
+msgstr "Order updated"
 
 #, python-brace-format
 msgid "Order with ID {order_id} not found"
@@ -12908,6 +12930,9 @@ msgstr "Seller name / VAT ID / address captured at issue time."
 
 msgid "Send a contact message to the site administrators."
 msgstr "Send a contact message to the site administrators."
+
+msgid "Send again now"
+msgstr "Send again now"
 
 msgid "Send as the X-Cart-Token header."
 msgstr "Send as the X-Cart-Token header."
@@ -16686,6 +16711,9 @@ msgstr "We're delighted to confirm that your order has been completed successful
 
 msgid "Webhook Endpoints"
 msgstr "Webhook Endpoints"
+
+msgid "Webhook ID"
+msgstr "Webhook ID"
 
 msgid "Webhook Message ID"
 msgstr "Webhook Message ID"

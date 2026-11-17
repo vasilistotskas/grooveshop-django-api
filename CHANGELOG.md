@@ -3,6 +3,17 @@
 
 
 
+## v3.251.2 (2026-11-17)
+
+### Bug fixes
+
+* fix(deps): tornado 6.6.1 for Flower (open redirect via triple-slash paths) (#742)
+
+GHSA-5cjw-f85j-cv6r: tornado 6.6.0's RedirectHandler fix missed paths that
+start with three or more slashes, which browsers follow as a redirect to
+another host. Flower, which production serves, is the only package that
+pulls tornado in. Only tornado moves in uv.lock. ([`86be2d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86be2d4eec3a27405245501dad24b25df0e729e6))
+
 ## v3.251.1 (2026-11-17)
 
 ### Bug fixes

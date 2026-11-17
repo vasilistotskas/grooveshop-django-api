@@ -4927,8 +4927,10 @@ class OrderService:
         with the usual note, and the parcel is staff's. A courier's
         refusal is recorded at once: asking again gets the same answer.
 
-        Returns True when the courier gave no answer and the cancel is
-        left for the sweep to ask again, False otherwise.
+        Returns True when the courier gave no answer, whether the cancel
+        is left for the sweep to ask again or its retries are over; False
+        otherwise. The sweep asks that courier about no other order in
+        its run either way.
 
         Never raises — the order is canceled whatever the courier, or
         the write of its answer, does. An answer that could not be
@@ -4948,6 +4950,7 @@ class OrderService:
             return False
 
         info: dict[str, Any] | None = None
+        no_answer = False
         if not answered:
             logger.info(
                 "Cascading order cancel to carrier voucher | order=%s "
@@ -4978,6 +4981,7 @@ class OrderService:
                 ):
                     cls._note_unanswered_shipment_cancel(order, exc)
                     return True
+                no_answer = True
                 info = {
                     "attempted": True,
                     "dispatched": False,
@@ -5031,7 +5035,7 @@ class OrderService:
                 order.id,
                 info,
             )
-        return False
+        return no_answer
 
     @classmethod
     def _note_unanswered_shipment_cancel(

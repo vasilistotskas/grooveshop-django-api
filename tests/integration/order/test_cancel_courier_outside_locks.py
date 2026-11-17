@@ -516,7 +516,8 @@ class TestACourierThatGivesNoAnswer:
 def test_a_silent_courier_is_asked_once_per_run(monkeypatch):
     """During an outage every order of that courier would wait out the
     same timeout: the run asks the first and leaves the rest for the next
-    run, but still asks one whose retries are over."""
+    run. The first here is one whose retries are over: its last attempt
+    gets no answer either, so the others wait too."""
     first, second, over = (_shipment("acs") for _ in range(3))
     courier = _courier(
         monkeypatch, first, error=CarrierUnavailableError("timed out")
@@ -528,17 +529,17 @@ def test_a_silent_courier_is_asked_once_per_run(monkeypatch):
     for shipment in (first, second):
         _age_the_cancel(shipment.order_id)
 
-    # Oldest first: ``over`` is asked and answered for staff, ``first``
-    # finds the courier silent, and ``second`` waits for the next run.
+    # Oldest first: ``over`` is asked, gets no answer and is recorded for
+    # staff; ``first`` and ``second`` wait for the next run.
     assert finish_pending_shipment_cancels() == {
         "finished": 1,
         "still_pending": 2,
     }
 
-    assert len(courier.calls) == 5
+    assert len(courier.calls) == 4
     assert (
         _metadata(first.order_id)[SHIPMENT_CANCEL_UNANSWERED_KEY]["attempts"]
-        == 2
+        == 1
     )
     assert (
         _metadata(second.order_id)[SHIPMENT_CANCEL_UNANSWERED_KEY]["attempts"]
@@ -769,7 +770,7 @@ def test_the_retries_are_over_when_the_order_comes_up(monkeypatch):
 
     def the_call_outlasts_the_retries() -> None:
         nonlocal ahead
-        # Past ``later_one``'s retries, which end a minute after
+        # Past ``later_one``'s retries, which end two minutes after
         # ``first``'s: ``first`` was asked well within its own.
         ahead = timedelta(
             hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS, minutes=-1

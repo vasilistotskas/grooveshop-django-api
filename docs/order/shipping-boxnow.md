@@ -9,7 +9,7 @@ and says which file holds each § number used here.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
   have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,
-  the rule both carriers share, §5): only a request that never connected,
+  the rule both carriers share, [§5](shipping.md)): only a request that never connected,
   or a GET after a 5xx or a lost answer, is sent again. A 5xx or a timeout
   on a write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
   a second creation for one `orderNumber` with `P410` (manual v7.2, §3.4

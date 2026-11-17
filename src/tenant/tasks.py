@@ -140,6 +140,16 @@ def fanout_auto_cancel_stuck_pending_orders():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_finish_pending_shipment_cancels():
+    # Suspended stores too: a canceled order's voucher may be live at the
+    # courier whatever the store's status.
+    return run_for_all_tenants(
+        "order.tasks.finish_pending_shipment_cancels",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
 def fanout_complete_paid_delivered_orders():
     return run_for_all_tenants("order.tasks.complete_paid_delivered_orders")
 

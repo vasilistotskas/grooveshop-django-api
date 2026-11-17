@@ -259,7 +259,8 @@ the cross-service view is
   `ShippingProvider`, the per-store `ShippingRate` table
   (`src/shipping/models/rate.py`: the only source of a shipping price,
   availability and weight cap), `ShippingService`
-  (`src/shipping/services.py`) and the operational alerts
+  (`src/shipping/services.py`), the one lock order for an order and its
+  shipment (`src/shipping/locks.py`) and the operational alerts
   (`src/shipping/alerts.py`). Read `docs/order/shipping.md`.
 - `shipping_acs/`: `AcsShipment`, `AcsPickupList`, `AcsPickupListRun`,
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,
@@ -349,7 +350,11 @@ authorization server through `allauth.idp`. Staff tokens come from the
 platform's staff issuer on `STAFF_CONNECT_HOST` (`src/agent/staff.py`,
 `src/agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc`
 is in `SHARED_APPS` too, so staff tokens live in `public` and customers'
-tokens in each store's schema. It has no doc in this repository; the
+tokens in each store's schema. A refused `resource` at either issuer's
+token endpoint (or a store's device-code endpoint) is OAuth's
+`invalid_target`, not allauth's 500 (`src/core/middleware/idp_oauth_errors.py`);
+the staff issuer requires the `resource` on the token request too, as MCP
+clients send it. It has no doc in this repository; the
 cross-service views are
 `grooveshop-docs/src/dev/flows/agentic-commerce.md` and
 `grooveshop-docs/src/dev/flows/staff-mcp.md`.

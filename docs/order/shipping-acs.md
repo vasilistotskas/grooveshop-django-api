@@ -197,9 +197,17 @@ and says which file holds each § number used here.
   a
   hardcoded fallback here.
 - Polling: `poll_shipment_tracking` runs in two phases (read,
-  no lock; API call, no transaction; persist with
-  `select_for_update`) — survives slow ACS responses without
-  losing `last_polled_at`.
+  no lock; API call, no transaction; persist under the order's and the
+  shipment's row locks) — survives slow ACS responses without
+  losing `last_polled_at`. The persist writes the order (a status
+  change, or the cancel of an order whose shipment was canceled before
+  it left), so it locks the order first
+  (`shipping.locks.lock_with_order`, [§5](shipping.md)): before #613 it
+  locked the shipment first and could deadlock with a staff cancel.
+- Cancel: `AcsService.cancel_voucher` is three-phase too (claim under the
+  shipment's lock, `ACS_Delete_Voucher` with no transaction, save) and
+  locks the shipment alone. An order cancel calls it after its own
+  transaction has committed ([§7.1.2](cancel.md)).
 - COD: `reconcile_cod_payouts` runs daily, upserts `AcsCodPayout`
   rows from the ACS COD beneficiary endpoint, and flips
   `Order.payment_status` for matched vouchers. **Wire schema**: the

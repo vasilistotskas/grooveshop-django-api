@@ -124,6 +124,13 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
             # A staff token binds exactly one store's staff MCP server;
             # whether the person may connect it is decided at consent,
             # where the person is known (``agent.staff_connect``).
+            # The token request names it too, as MCP clients must: with
+            # none there is no store to bind the token to (RFC 8707
+            # section 2.1 lets an issuer refuse it with ``invalid_target``).
+            if not uris:
+                raise ValidationError(
+                    "A resource is required: a store's staff MCP server."
+                )
             if len(uris) != 1 or store_for_staff_resource(uris[0]) is None:
                 raise ValidationError(
                     "Resource is not a store's staff MCP server."

@@ -49,7 +49,7 @@ from order.models.order import (
 from order.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
 from order.review_request import awaiting_review_request, delivery_window
-from order.services import OrderService
+from order.services import SHIPMENT_CANCEL_PENDING_FLAG, OrderService
 from recommendation.order_email import record_impression
 from tenant.celery import dispatch_on_commit
 
@@ -1984,6 +1984,73 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         "skipped_open": skipped_open,
         "errors": errors,
     }
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=TRANSIENT_ERRORS,
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def finish_pending_shipment_cancels(
+    *, max_per_run: int = 100
+) -> dict[str, int]:
+    """Ask the courier to cancel the shipment of every canceled order
+    that never got that far (#713).
+
+    A staff or system cancel commits first and asks the courier
+    afterwards, with no row locked (``OrderService.cancel_order``). A
+    worker that stops between the two leaves the order CANCELED, and
+    refunded, with a voucher the courier still holds. The cancel marks
+    the order in its own transaction
+    (``SHIPMENT_CANCEL_PENDING_FLAG``), so that state is found here and
+    finished by the same ``cancel_attached_shipment``, which records the
+    courier's answer and removes the flag.
+
+    Only a cancel older than
+    ``ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS`` is taken: a younger one
+    may still be waiting for its courier. Safe to run beside it all the
+    same, and beside another run of itself, so it takes no lock of its
+    own: a cancel the other one has in flight refuses this one as
+    already running (``CarrierBusyError``), which is not an answer and
+    leaves the flag; both carriers' cancel is a no-op on a shipment
+    already canceled; and the first answer recorded is the one kept.
+    The same holds for a creation in flight or still settling: the order
+    stays flagged and is asked about on a later run.
+
+    Beat-scheduled through
+    ``tenant.tasks.fanout_finish_pending_shipment_cancels``.
+    """
+    cutoff = timezone.now() - timedelta(
+        seconds=settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS
+    )
+    pending = Order.objects.filter(
+        status=OrderStatus.CANCELED,
+        metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG,
+        status_updated_at__lt=cutoff,
+    ).order_by("status_updated_at")[:max_per_run]
+
+    finished = still_pending = 0
+    for order in pending:
+        logger.warning(
+            "Order %s was canceled at %s and holds no answer from its "
+            "courier to the shipment cancel: asking now",
+            order.id,
+            order.status_updated_at,
+        )
+        cancellation = (order.metadata or {}).get("cancellation") or {}
+        OrderService.cancel_attached_shipment(
+            order, cancellation.get("reason", "")
+        )
+        # ``order`` carries the metadata as written: the flag is gone
+        # once an answer is recorded, and stays for a shipment that is
+        # being worked on elsewhere.
+        if SHIPMENT_CANCEL_PENDING_FLAG in (order.metadata or {}):
+            still_pending += 1
+        else:
+            finished += 1
+    return {"finished": finished, "still_pending": still_pending}
 
 
 @celery_app.task(

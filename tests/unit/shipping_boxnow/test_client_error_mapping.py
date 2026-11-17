@@ -28,7 +28,8 @@ from urllib3.exceptions import (
     SSLError,
 )
 
-from shipping_boxnow.client import _RETRY_CONFIG, BoxNowClient
+from shipping.carrier_http import CARRIER_RETRY
+from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowAuthError,
@@ -103,13 +104,13 @@ class TestConstruction:
         for prefix in ("https://", "http://"):
             adapter = client._session.adapters[prefix]
             assert isinstance(adapter, HTTPAdapter)
-            assert adapter.max_retries is _RETRY_CONFIG
+            assert adapter.max_retries is CARRIER_RETRY
 
 
 class TestRetryPolicy:
     """What the HTTP layer may send a second time.
 
-    urllib3 asks ``_RETRY_CONFIG`` before every re-send (``is_retry``
+    urllib3 asks ``CARRIER_RETRY`` before every re-send (``is_retry``
     for a status, ``increment`` for an error), so these ask it the same
     questions without a socket.
     """
@@ -117,7 +118,7 @@ class TestRetryPolicy:
     @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
     @pytest.mark.parametrize("status", [500, 502, 503, 504])
     def test_a_write_is_not_sent_again_after_a_5xx(self, method, status):
-        assert _RETRY_CONFIG.is_retry(method, status) is False
+        assert CARRIER_RETRY.is_retry(method, status) is False
 
     @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
     def test_a_write_is_not_sent_again_after_its_answer_was_lost(self, method):
@@ -129,7 +130,7 @@ class TestRetryPolicy:
 
         for error in errors:
             with pytest.raises(type(error)):
-                _RETRY_CONFIG.increment(method=method, error=error)
+                CARRIER_RETRY.increment(method=method, error=error)
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
     def test_an_error_of_unknown_timing_is_not_sent_again(self, method):
@@ -137,10 +138,10 @@ class TestRetryPolicy:
         # retries it for every method unless ``other`` is 0, and the
         # request might have reached BoxNow.
         with pytest.raises(MaxRetryError):
-            _RETRY_CONFIG.increment(method=method, error=SSLError("tls"))
+            CARRIER_RETRY.increment(method=method, error=SSLError("tls"))
 
     def test_a_refused_connection_is_sent_again(self):
-        after = _RETRY_CONFIG.increment(
+        after = CARRIER_RETRY.increment(
             method="POST", error=NewConnectionError(None, "refused")
         )
 
@@ -148,7 +149,7 @@ class TestRetryPolicy:
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
     def test_a_request_that_never_connected_is_sent_again(self, method):
-        after = _RETRY_CONFIG.increment(
+        after = CARRIER_RETRY.increment(
             method=method, error=ConnectTimeoutError("connect timed out")
         )
 
@@ -156,10 +157,10 @@ class TestRetryPolicy:
 
     @pytest.mark.parametrize("status", [500, 502, 503, 504])
     def test_a_read_is_sent_again_after_a_5xx(self, status):
-        assert _RETRY_CONFIG.is_retry("GET", status) is True
+        assert CARRIER_RETRY.is_retry("GET", status) is True
 
     def test_a_read_is_sent_again_after_its_answer_was_lost(self):
-        after = _RETRY_CONFIG.increment(
+        after = CARRIER_RETRY.increment(
             method="GET", error=ProtocolError("Connection aborted.")
         )
 

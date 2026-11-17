@@ -8,10 +8,10 @@ and says which file holds each § number used here.
 - **REST + webhook** for tracking events.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
-  have reached BoxNow** (`_RETRY_CONFIG` in `src/shipping_boxnow/client.py`,
-  the same rule as ACS): only a request that never connected, or a GET
-  after a 5xx or a lost answer, is sent again. A 5xx or a timeout on a
-  write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
+  have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,
+  the rule both carriers share, §5): only a request that never connected,
+  or a GET after a 5xx or a lost answer, is sent again. A 5xx or a timeout
+  on a write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
   a second creation for one `orderNumber` with `P410` (manual v7.2, §3.4
   and §5), so a re-sent creation could only turn a parcel that exists into
   a reported refusal. The caller for the creation is the Celery task

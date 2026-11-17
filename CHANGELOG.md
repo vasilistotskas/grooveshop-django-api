@@ -3,6 +3,50 @@
 
 
 
+## v3.251.1 (2026-11-17)
+
+### Bug fixes
+
+* fix(order): a courier that gives no answer to a staff cancel is asked again (#738) ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
+* fix(order): a courier that gives no answer to a staff cancel is asked again
+
+A staff or system cancel asks the courier to cancel the shipment after
+the cancel commits. A CarrierUnavailableError (unreachable, timed out,
+HTTP 5xx, an auth-layer rejection, missing credentials) was recorded as
+the courier's final answer: the flag went, nothing asked again, and the
+parcel of a canceled, refunded order stayed live unless staff noticed
+the history note and cancelled it by hand.
+
+No answer says nothing about the parcel, so it is no longer final while
+the retries last. The cancel stays pending (shipment_cancel_pending), the
+attempt is counted in metadata['shipment_cancel_unanswered'] (since,
+attempts, last_error), staff get one history note and a warning from the
+admin cancel action, and finish_pending_shipment_cancels asks again on
+every run. Once ORDER_SHIPMENT_CANCEL_RETRY_HOURS (env, default 24; 0
+asks once) have passed since the cancel, the last failure is recorded as
+the answer with the usual "did not cancel the parcel" note, and the
+parcel is staff's. A refusal (a plain CarrierError) is still the answer
+at once: asking again gets the same one.
+
+A courier that gives no answer in a sweep run is not asked about its
+other orders in that run, so an outage costs one timeout per courier per
+run instead of one per order; an order whose retries are over is still
+asked once, so it gets its answer.
+
+The API response is unchanged: shipment_cancel stays absent while the
+cancel is pending, as for a shipment already being worked on. ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
+* fix(order): tell staff at once that a parcel is live while its cancel is retried ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
+* fix(order): the pending-cancel sweep's limit counts courier calls, and a retry deadline is read when its order comes up ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
+* fix(order): a courier silent on an order whose retries are over is not asked again in the run ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
+### Testing
+
+* test(order): read the admin cancel message in English ([`912a0a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/912a0a25039617717ca673c7a911f7d3b0ba4b89))
+
 ## v3.251.0 (2026-11-17)
 
 ### Bug fixes

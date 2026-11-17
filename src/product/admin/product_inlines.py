@@ -121,10 +121,10 @@ class StockReservationInline(TabularInline):
 
     def get_queryset(self, request):
         """Only show active (non-expired, non-consumed) reservations."""
-        qs = super().get_queryset(request)
-        now = timezone.now()
         return (
-            qs.filter(expires_at__gt=now, consumed=False)
+            super()
+            .get_queryset(request)
+            .active()
             .select_related("reserved_by", "order")
             .order_by("-created_at")
         )

@@ -77,6 +77,7 @@ deployment settings.
 | Path | How it records | Source |
 |---|---|---|
 | `Product.save()` touching price, markdown or VAT | plans before the save so the derived columns ride the same UPDATE, writes the spells after it; takes no lock of its own (constraint-guarded) | `src/product/models/product.py`, `src/product/pricing/service.py: plan_for_save, record_spells` |
+| The admin's "Apply custom discount" and "Clear discount" bulk actions | save each product in pk order (never `update()`), so the save path above runs for every row | `src/product/services.py: ProductService.set_discount, clear_discount` |
 | A `Vat` rate edit | task re-prices the rate's products in batches, then reindexes them | `src/product/signals.py`, `src/product/tasks.py: sync_price_records` |
 | An unconditional automatic promotion starting, ending or being edited, or a usage limit reached | the offer queue's drain task re-records the products in its scope before reindexing them | `src/promotion/offer_sync.py: refresh_products`, `src/promotion/signals.py` |
 | A promotion window opening or closing | the 5-minute window sweep | `src/promotion/offer_sync.py: refresh_window_changes` |

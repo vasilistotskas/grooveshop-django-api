@@ -1,9 +1,6 @@
 from datetime import timedelta
-from decimal import Decimal
-from uuid import uuid4
 
 from django.contrib import admin, messages
-from django.db import transaction
 from django.db.models import Count, Prefetch, Sum
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -68,6 +65,7 @@ from product.models.product import (
     COST_PRICE_PERMISSION,
     Product,
 )
+from product.services import ProductDuplicationError, ProductService
 from tag.admin import TaggedItemInline
 
 
@@ -397,12 +395,11 @@ class ProductAdmin(
             qs = qs.with_review_average()
 
         # Optimize related queries
-        now = timezone.now()
         active_reservations = Prefetch(
             "stock_reservations",
-            queryset=StockReservation.objects.filter(
-                expires_at__gt=now, consumed=False
-            ).only("id", "product_id", "quantity"),
+            queryset=StockReservation.objects.active().only(
+                "id", "product_id", "quantity"
+            ),
             to_attr="active_reservations_list",
         )
 
@@ -542,8 +539,8 @@ class ProductAdmin(
 
         now = timezone.now()
 
-        active_reservations = StockReservation.objects.filter(
-            product=obj, expires_at__gt=now, consumed=False
+        active_reservations = StockReservation.objects.active().filter(
+            product=obj
         )
         reservation_count = active_reservations.count()
         reserved_qty = (
@@ -674,28 +671,7 @@ class ProductAdmin(
         if not form.cleaned_data["apply_to_inactive"]:
             queryset = queryset.filter(active=True)
 
-        # Saved one at a time, not `queryset.update()`. A bulk UPDATE
-        # emits no `post_save`, so simple-history writes no row,
-        # `post_create_historical_record_callback` never runs,
-        # `product_price_lowered` is never sent, and NOT ONE price-drop
-        # alert reaches the customers who explicitly subscribed to it.
-        # `final_price` and `discount_percent` are also indexed
-        # Meilisearch fields, so search kept the pre-discount price until
-        # an unrelated save. The cost is bounded by the operator's
-        # selection, which the confirmation page shows.
-        updated = 0
-        with transaction.atomic():
-            # Locked in pk order, on the product table alone: a selection
-            # of many products and a checkout over some of them share
-            # rows, and two transactions that take shared rows in
-            # different orders deadlock (see
-            # ``StockManager.lock_products``).
-            for product in queryset.order_by("pk").select_for_update(
-                of=("self",)
-            ):
-                product.discount_percent = discount_percent
-                product.save(update_fields=["discount_percent"])
-                updated += 1
+        updated = ProductService.set_discount(queryset, discount_percent)
 
         self.message_user(
             request,
@@ -717,19 +693,7 @@ class ProductAdmin(
         icon="cancel",
     )
     def clear_discount(self, request, queryset):
-        # Saved individually for the same reason as
-        # `apply_custom_discount` — see the comment there. Clearing a
-        # discount RAISES the price, so no alert is due, but
-        # `final_price` is an indexed Meilisearch field and search would
-        # otherwise keep advertising the discounted one.
-        updated = 0
-        with transaction.atomic():
-            for product in queryset.order_by("pk").select_for_update(
-                of=("self",)
-            ):
-                product.discount_percent = Decimal("0.0")
-                product.save(update_fields=["discount_percent"])
-                updated += 1
+        updated = ProductService.clear_discount(queryset)
         self.message_user(
             request,
             ngettext(
@@ -748,14 +712,8 @@ class ProductAdmin(
         variant=ActionVariant.INFO,
     )
     def duplicate_product_row(self, request, object_id):
-        """Clone the row into an inactive draft and open it for editing.
-
-        We deliberately do NOT copy translations, images, attributes,
-        or stock — the catalog team uses the duplicate as a starting
-        skeleton. ``slug`` and ``sku`` get a ``-copy-<n>`` suffix so
-        the unique constraints hold; ``active=False`` keeps the draft
-        out of the storefront until edits are finished.
-        """
+        """Clone the row into an inactive draft and open it for editing
+        (``ProductService.duplicate_as_draft`` holds the rules)."""
 
         try:
             original = Product.objects.get(pk=object_id)
@@ -763,54 +721,15 @@ class ProductAdmin(
             messages.error(request, _("Product not found."))
             return redirect("admin:product_product_changelist")
 
-        clone = Product.objects.get(pk=object_id)
-        clone.pk = None
-        clone.id = None
-        # `uuid` is deliberately NOT touched. The comment here used to
-        # say "regenerates", but `UUIDModel.uuid` is
-        # `UUIDField(default=uuid4, unique=True)` with no `null=True` —
-        # an explicit None OVERRIDES the default, so the INSERT sent
-        # NULL and every use of this action died with
-        # `IntegrityError: null value in column "uuid"`. Leaving the
-        # attribute alone is what actually regenerates it: with `pk`
-        # cleared the row is an insert, and `uuid` already holds the
-        # original's value, so it must be reset to a fresh one.
-        clone.uuid = uuid4()
-        # Unique per product: the copy is not the other system's product.
-        clone.external_reference = None
-        clone.active = False
-        clone.stock = 0
-        clone.view_count = 0
-        clone.low_stock_alert_sent = False
-
-        # Append a numeric suffix to slug/sku until both are unique.
-        n = 1
-        base_slug = original.slug
-        base_sku = getattr(original, "sku", "") or ""
-        while True:
-            candidate_slug = f"{base_slug}-copy-{n}"
-            candidate_sku = f"{base_sku}-COPY-{n}" if base_sku else ""
-            slug_taken = Product.objects.filter(slug=candidate_slug).exists()
-            sku_taken = (
-                bool(candidate_sku)
-                and Product.objects.filter(sku=candidate_sku).exists()
+        try:
+            clone = ProductService.duplicate_as_draft(original)
+        except ProductDuplicationError:
+            messages.error(
+                request,
+                _("Couldn't find a free slug — try renaming the source."),
             )
-            if not slug_taken and not sku_taken:
-                clone.slug = candidate_slug
-                if candidate_sku:
-                    clone.sku = candidate_sku
-                break
-            n += 1
-            if n > 100:
-                messages.error(
-                    request,
-                    _("Couldn't find a free slug — try renaming the source."),
-                )
-                return redirect(
-                    "admin:product_product_change", object_id=object_id
-                )
+            return redirect("admin:product_product_change", object_id=object_id)
 
-        clone.save()
         messages.success(
             request,
             _(

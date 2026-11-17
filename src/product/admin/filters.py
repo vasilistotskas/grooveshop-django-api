@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import F, Q, Sum
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
@@ -151,34 +151,19 @@ class StockReservationStatusFilter(DropdownFilter):
         ]
 
     def queryset(self, request, queryset):
-        filter_value = self.value()
-        now = timezone.now()
-
-        if filter_value == "has_reservations":
-            # Products with active (non-expired, non-consumed) reservations
-            return queryset.filter(
-                stockreservation__expires_at__gt=now,
-                stockreservation__consumed=False,
-            ).distinct()
-        elif filter_value == "no_reservations":
-            # Products without any active reservations
-            return queryset.exclude(
-                stockreservation__expires_at__gt=now,
-                stockreservation__consumed=False,
-            )
-        elif filter_value == "high_reservations":
-            # Products where reserved quantity > 50% of stock
-            # Annotate with reserved quantity and filter
-            queryset = queryset.annotate(
-                reserved_qty=Sum(
-                    "stockreservation__quantity",
-                    filter=Q(
-                        stockreservation__expires_at__gt=now,
-                        stockreservation__consumed=False,
-                    ),
+        match self.value():
+            case "has_reservations":
+                return queryset.with_active_reserved_quantity().filter(
+                    active_reserved_quantity__gt=0
                 )
-            )
-            return queryset.filter(reserved_qty__gt=F("stock") * 0.5)
+            case "no_reservations":
+                return queryset.with_active_reserved_quantity().filter(
+                    active_reserved_quantity=0
+                )
+            case "high_reservations":
+                return queryset.with_active_reserved_quantity().filter(
+                    active_reserved_quantity__gt=F("stock") * 0.5
+                )
 
         return queryset
 

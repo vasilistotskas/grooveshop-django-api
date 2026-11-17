@@ -191,7 +191,8 @@ The catalogue. Models under `src/product/models/`: `Product`,
 `src/product/admin/`, one module per model admin (the report page of a
 product's stock movements is `stock_history.py`). Pricing is a package
 (`src/product/pricing/`); `src/product/tasks.py` holds the product alerts
-and the price-record reconciliation. The stock quantity is a column on
+and the price-record reconciliation; `src/product/services.py` the catalogue
+writes the admin's actions call (the bulk discount, the duplicate as draft). The stock quantity is a column on
 `Product`, but stock is reserved and released in `src/order/stock.py`.
 Read `docs/product-pricing.md` and `docs/api/products.md`.
 

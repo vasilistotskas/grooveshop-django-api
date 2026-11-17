@@ -50,6 +50,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from order.checkout.quote import OrderQuoteService
 from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
     CartStockUnavailableError,
@@ -63,7 +64,6 @@ from order.payments.payment_binding import PaymentPurpose
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderLegalAcceptanceService,
-    OrderService,
 )
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
@@ -1032,10 +1032,10 @@ class CartViewSet(BaseModelViewSet):
         ] + PromotionEngine.gift_pairs(promo_result)
         cart_weight_grams = compute_total_weight_grams(cart_items)
         try:
-            threshold_value = OrderService.threshold_value(
+            threshold_value = OrderQuoteService.threshold_value(
                 cart_total, promo_result.discount_total
             )
-            shipping_cost = OrderService.shipping_cost(
+            shipping_cost = OrderQuoteService.shipping_cost(
                 order_value=threshold_value,
                 country_id=country_id,
                 region_id=region_id,
@@ -1065,7 +1065,7 @@ class CartViewSet(BaseModelViewSet):
             + shipping_cost.amount,
             cart_total.currency,
         )
-        payment_fee = OrderService.calculate_payment_method_fee(
+        payment_fee = OrderQuoteService.calculate_payment_method_fee(
             pay_way, threshold_value
         )
         cart_total = Money(

@@ -152,7 +152,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
 
         ``BoxNowCarrier.is_kind_enabled()`` gates on tenant credentials
         (``shipping_boxnow/services.py::is_configured``) — since
-        ``OrderService.shipping_cost`` now resolves the rate through
+        ``OrderQuoteService.shipping_cost`` now resolves the rate through
         the real carrier adapter, a BoxNow pickup_point order needs one
         bound, same as the live checkout flow does.
         """

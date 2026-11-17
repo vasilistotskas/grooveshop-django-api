@@ -16,6 +16,7 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
+from order.checkout.quote import OrderQuoteService
 from order.enum.status import PaymentStatus
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -251,7 +252,7 @@ class TestLoyaltyPaymentIntentParity:
 
         # Expected charge: 100 items − 5.00 loyalty (500 pts @ 100/EUR)
         # + generic shipping (free ≥ threshold at 100 EUR carts).
-        expected_total = OrderService.shipping_cost(
+        expected_total = OrderQuoteService.shipping_cost(
             order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,
@@ -311,7 +312,7 @@ class TestLoyaltyPaymentIntentParity:
             cost=Money(Decimal(0), "EUR"),
             free_threshold=Money(Decimal(0), "EUR"),
         )
-        undiscounted = OrderService.shipping_cost(
+        undiscounted = OrderQuoteService.shipping_cost(
             order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,

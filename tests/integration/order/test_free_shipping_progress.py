@@ -1,11 +1,11 @@
-"""``OrderService.free_shipping_progress``: ONE distance to free shipping.
+"""``OrderQuoteService.free_shipping_progress``: ONE distance to free shipping.
 
 Staging webside, 2026-10-28, a cart of one 19,99 € item: the promotion
 teaser said "add 19,01 € to unlock «free shipping from 39 €»" while the
 store's bar said "add 30,01 € for free shipping" (the carrier's 50 €
 threshold). Both were read from different places; checkout honours the
 cheaper one. The progress is now decided by the rules checkout prices
-shipping with (``OrderService.shipping_cost``): a free-shipping promotion
+shipping with (``OrderQuoteService.shipping_cost``): a free-shipping promotion
 waives every carrier, a carrier's threshold zeroes that carrier, and the
 cart is told the cheapest route that holds.
 """
@@ -28,7 +28,7 @@ from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
 from country.factories import CountryFactory
 from country.models import Country
-from order.services import FreeShippingProgress, OrderService
+from order.checkout.quote import FreeShippingProgress, OrderQuoteService
 from product.factories import ProductCategoryFactory, ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionCodeFactory, PromotionFactory
@@ -136,7 +136,7 @@ def _free_shipping_promotion(**fields):
 
 
 def _progress(cart, country) -> FreeShippingProgress | None:
-    return OrderService.free_shipping_progress(
+    return OrderQuoteService.free_shipping_progress(
         cart,
         PromotionEngine.evaluate(cart),
         country_code=country.alpha_2,
@@ -240,7 +240,7 @@ def test_without_a_country_the_first_shipping_country_is_judged(
     Country.objects.filter(pk=country.pk).update(sort_order=-1)
     cart = _cart(("19.99", 1))
 
-    progress = OrderService.free_shipping_progress(
+    progress = OrderQuoteService.free_shipping_progress(
         cart, PromotionEngine.evaluate(cart)
     )
 

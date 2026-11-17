@@ -550,7 +550,7 @@ class ShippingService:
         storefront shows where there is no cart to judge (a product
         page, a visitor who has not added anything). How far a CART is
         from free shipping is the cart's own ``free_shipping_progress``
-        (``OrderService.free_shipping_progress``), never this: it also
+        (``OrderQuoteService.free_shipping_progress``), never this: it also
         weighs the free-shipping promotions and what the cart weighs.
         The semantics keep marketing honest:
 
@@ -923,7 +923,7 @@ class ShippingService:
     ) -> Money:
         """Gate on availability, weight cap and parcel size, then price.
 
-        The single entry point ``OrderService.shipping_cost`` and the
+        The single entry point ``OrderQuoteService.shipping_cost`` and the
         create-payment-intent view use — replaces the old
         ``calculate_shipping_cost`` dispatcher. Raises
         :class:`~shipping.exceptions.ShippingUnavailableError` /

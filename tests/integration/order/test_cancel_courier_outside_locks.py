@@ -29,7 +29,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.db import OperationalError, connection, transaction
 from django.test import RequestFactory
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
@@ -721,7 +721,10 @@ def test_the_admin_cancel_says_the_courier_is_asked_again(monkeypatch):
     request = RequestFactory().get("/")
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
 
-    with patch.object(OrderAdmin, "message_user") as message:
+    with (
+        translation.override("en"),
+        patch.object(OrderAdmin, "message_user") as message,
+    ):
         OrderAdmin(Order, AdminSite()).mark_as_canceled(
             request, Order.objects.filter(pk=shipment.order_id)
         )

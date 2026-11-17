@@ -303,27 +303,23 @@ def expired_failed_payment_orders(
     return failed_payment_orders().filter(updated_at__lt=now - failed_window())
 
 
-def amount_mismatch_orders() -> QuerySet[Order]:
-    """Orders with a confirmed charge that did not match their total.
-
-    The Viva webhook refuses to mark such an order paid and stamps
-    ``AMOUNT_MISMATCH_FLAG`` instead. The sweep never cancels one: it would
-    close a CHARGED order without a refund. It needs a person.
-    """
-    return Order.objects.filter(metadata__has_key=AMOUNT_MISMATCH_FLAG)
-
-
 def payment_review_orders() -> QuerySet[Order]:
     """Orders whose mismatched charge still waits for the store.
 
-    Flagged (:func:`amount_mismatch_orders`) and still undecided: PENDING,
-    with a payment that is not final. The flag is never cleared, so an
-    order the store has since settled, canceled or refunded leaves this
-    set through its own state: its status moves on from PENDING, or its
-    payment reaches one of ``SETTLED_PAYMENT_STATUSES``.
+    A provider confirmed a charge that did not match the order's total, so
+    the payment handler refused to mark the order paid and stamped
+    ``AMOUNT_MISMATCH_FLAG`` instead (``OrderService.flag_payment_mismatch``).
+    The sweep never cancels one: it would close a CHARGED order without a
+    refund. It needs a person.
+
+    Flagged and still undecided: PENDING, with a payment that is not final.
+    The flag is never cleared, so an order the store has since settled,
+    canceled or refunded leaves this set through its own state: its status
+    moves on from PENDING, or its payment reaches one of
+    ``SETTLED_PAYMENT_STATUSES``.
     """
     return (
-        amount_mismatch_orders()
+        Order.objects.filter(metadata__has_key=AMOUNT_MISMATCH_FLAG)
         .filter(status=OrderStatus.PENDING)
         .exclude(payment_status__in=SETTLED_PAYMENT_STATUSES)
     )

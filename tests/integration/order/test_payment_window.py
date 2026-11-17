@@ -306,6 +306,55 @@ class TestTheSweepCancelsExactlyTheSharedDefinition:
         kept_open.refresh_from_db()
         assert kept_open.status == OrderStatus.PENDING
 
+    def test_the_sweep_selects_through_the_shared_definition(self):
+        """Narrow ``swept_orders`` and the sweep follows: it holds no
+        exclusion of its own that could drift from ``paymentDecidedBy``."""
+        past = timezone.now() - timedelta(hours=2)
+        kept = _order(hold=past)
+        swept = _order(hold=past)
+        shared = payment_hold.swept_orders
+
+        with patch.object(
+            payment_hold,
+            "swept_orders",
+            lambda: shared().exclude(pk=kept.pk),
+        ):
+            auto_cancel_stuck_pending_orders()
+
+        kept.refresh_from_db()
+        swept.refresh_from_db()
+        assert kept.status == OrderStatus.PENDING
+        assert swept.status == OrderStatus.CANCELED
+
+    def test_the_warning_lists_only_charges_waiting_for_the_store(self, caplog):
+        past = timezone.now() - timedelta(hours=2)
+        flag = {AMOUNT_MISMATCH_FLAG: True}
+        waiting = _order(hold=past, metadata=flag)
+        _order(
+            hold=past,
+            metadata=flag,
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        _order(
+            hold=past,
+            metadata=flag,
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.CANCELED,
+        )
+
+        with caplog.at_level("WARNING", logger="order.tasks"):
+            auto_cancel_stuck_pending_orders()
+
+        skips = [
+            r
+            for r in caplog.records
+            if r.msg.startswith("Skipping auto-cancel")
+        ]
+        assert [r.args for r in skips] == [(1, [waiting.pk])]
+        waiting.refresh_from_db()
+        assert waiting.status == OrderStatus.PENDING
+
 
 class TestAnInstantAlreadyPastIsNeverPromised:
     def test_the_sweep_switched_off_across_the_hold_end(self, hour):
@@ -632,6 +681,14 @@ class TestAChargeThatWaitsForTheStoreIsToldApart:
 
         assert body["paymentDecidedBy"] is None
         assert body["paymentAwaitsReview"] is False
+
+    def test_an_unflagged_order_asks_the_database_nothing(
+        self, hour, django_assert_num_queries
+    ):
+        order = _order(created=hour, hold=hour + timedelta(minutes=37))
+
+        with django_assert_num_queries(0):
+            assert payment_hold.awaits_payment_review(order) is False
 
     def test_an_unflagged_order_the_sweep_decides(self, hour):
         order = _order(created=hour, hold=hour + timedelta(minutes=37))

@@ -127,7 +127,13 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
             # The token request names it too, as MCP clients must: with
             # none there is no store to bind the token to (RFC 8707
             # section 2.1 lets an issuer refuse it with ``invalid_target``).
+            # A refresh is the exception: its grant already holds the
+            # store, and allauth issues the token for the grant's
+            # resource when the request names none, and refuses one
+            # outside it with ``invalid_target`` (RFC 8707 section 2.2).
             if not uris:
+                if self._is_refresh_request():
+                    return
                 raise ValidationError(
                     "A resource is required: a store's staff MCP server."
                 )
@@ -142,3 +148,12 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
                 raise ValidationError(
                     "Resource is not this store's MCP server."
                 )
+
+    def _is_refresh_request(self) -> bool:
+        """Whether the request served is a refresh_token grant."""
+        return (
+            self.request is not None
+            and self.request.method == "POST"
+            and self.request.POST.get("grant_type")
+            == Client.GrantType.REFRESH_TOKEN
+        )

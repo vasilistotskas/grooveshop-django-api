@@ -354,7 +354,8 @@ tokens in each store's schema. A refused `resource` at either issuer's
 token endpoint (or a store's device-code endpoint) is OAuth's
 `invalid_target`, not allauth's 500 (`src/core/middleware/idp_oauth_errors.py`);
 the staff issuer requires the `resource` on the token request too, as MCP
-clients send it. It has no doc in this repository; the
+clients send it, except on a refresh, which without one keeps the store its
+grant was connected to and naming another is still `invalid_target`. It has no doc in this repository; the
 cross-service views are
 `grooveshop-docs/src/dev/flows/agentic-commerce.md` and
 `grooveshop-docs/src/dev/flows/staff-mcp.md`.

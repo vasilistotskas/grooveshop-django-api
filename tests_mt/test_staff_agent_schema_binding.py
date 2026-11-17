@@ -518,37 +518,98 @@ def test_a_code_exchange_without_a_resource_is_invalid_target_not_a_500(
     assert "required" in token.json()["error_description"]
 
 
-@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
-def test_a_refresh_is_held_to_the_same_resource_rule(
-    mt_public_tenant, mt_tenant
-):
-    client, client_id, code, verifier = _authorization_code(
-        mt_tenant, "mt-staff-refresh@example.com"
-    )
+def _connected(mt_tenant, email: str) -> tuple[HttpClient, str, dict[str, str]]:
+    """A staff connection to *mt_tenant*: the connect client, the client
+    id and the first token response."""
+    client, client_id, code, verifier = _authorization_code(mt_tenant, email)
     first = _exchange(
         client, client_id, code, verifier, resource=_resource(mt_tenant)
     )
     assert first.status_code == 200, first.content
-    refresh = {
-        "grant_type": "refresh_token",
-        "refresh_token": first.json()["refresh_token"],
-        "client_id": client_id,
-    }
+    return client, client_id, first.json()
 
-    without = client.post("/identity/o/api/token", refresh, secure=True)
-    assert without.status_code == 400, without.content
-    assert without.json()["error"] == "invalid_target"
 
-    refreshed = client.post(
+def _refresh(client: HttpClient, client_id: str, refresh_token: str, **extra):
+    return client.post(
         "/identity/o/api/token",
-        {**refresh, "resource": _resource(mt_tenant)},
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            **extra,
+        },
         secure=True,
     )
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_refresh_without_a_resource_keeps_its_grants_store(
+    mt_public_tenant, mt_tenant
+):
+    """RFC 8707 leaves the resource to the client on a refresh, and some
+    MCP connectors omit it there: the token is issued for the store the
+    grant was connected to, as is the refresh token that replaces it."""
+    from allauth.idp.oidc.models import Token
+
+    client, client_id, first = _connected(
+        mt_tenant, "mt-staff-refresh-bare@example.com"
+    )
+
+    refreshed = _refresh(client, client_id, first["refresh_token"])
+
+    assert refreshed.status_code == 200, refreshed.content
+    access_token = refreshed.json()["access_token"]
+    with schema_context(get_public_schema_name()):
+        issued = Token.objects.lookup(Token.Type.ACCESS_TOKEN, access_token)
+        assert issued is not None
+        assert issued.get_resources() == [_resource(mt_tenant)]
+    orders = _get(mt_tenant, "agent-staff-orders", access_token)
+    assert orders.status_code == 200, orders.content
+
+    again = _refresh(client, client_id, refreshed.json()["refresh_token"])
+    assert again.status_code == 200, again.content
+    orders = _get(mt_tenant, "agent-staff-orders", again.json()["access_token"])
+    assert orders.status_code == 200, orders.content
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_refresh_naming_its_grants_store_is_issued(
+    mt_public_tenant, mt_tenant
+):
+    client, client_id, first = _connected(
+        mt_tenant, "mt-staff-refresh-same@example.com"
+    )
+
+    refreshed = _refresh(
+        client, client_id, first["refresh_token"], resource=_resource(mt_tenant)
+    )
+
     assert refreshed.status_code == 200, refreshed.content
     orders = _get(
         mt_tenant, "agent-staff-orders", refreshed.json()["access_token"]
     )
     assert orders.status_code == 200, orders.content
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_refresh_naming_another_store_is_invalid_target(
+    mt_public_tenant, mt_tenant, mt_tenant_b
+):
+    """A refresh never widens its grant (RFC 8707 section 2.2), even to a
+    store the person is on the team of."""
+    client, client_id, first = _connected(
+        mt_tenant, "mt-staff-refresh-other@example.com"
+    )
+
+    refreshed = _refresh(
+        client,
+        client_id,
+        first["refresh_token"],
+        resource=_resource(mt_tenant_b),
+    )
+
+    assert refreshed.status_code == 400, refreshed.content
+    assert refreshed.json()["error"] == "invalid_target"
 
 
 @override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)

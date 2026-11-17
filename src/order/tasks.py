@@ -2022,7 +2022,15 @@ def finish_pending_shipment_cancels(
     A courier that gives no answer in a run is not asked about its other
     orders in that run: during an outage each would wait out the same
     timeout and keep the run, and the worker, busy for nothing. An order
-    whose retries are over is still asked once, so it gets its answer.
+    whose retries are over is still asked once, so it gets its answer;
+    "over" is read when the order comes up, since the courier calls
+    before it take time.
+
+    *max_per_run* bounds the couriers asked in one run, not the orders
+    looked at: the orders a silent courier holds are passed over without a
+    call, so however many it holds they never keep another courier's
+    pending cancels from being asked. The candidates are read as ids and
+    times only, oldest first, and each order asked is loaded then, fresh.
 
     Beat-scheduled through
     ``tenant.tasks.fanout_finish_pending_shipment_cancels``.
@@ -2030,22 +2038,32 @@ def finish_pending_shipment_cancels(
     cutoff = timezone.now() - timedelta(
         seconds=settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS
     )
-    pending = Order.objects.filter(
-        status=OrderStatus.CANCELED,
-        metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG,
-        status_updated_at__lt=cutoff,
-    ).order_by("status_updated_at")[:max_per_run]
+    pending = (
+        Order.objects.filter(
+            status=OrderStatus.CANCELED,
+            metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG,
+            status_updated_at__lt=cutoff,
+        )
+        .order_by("status_updated_at")
+        .values_list("pk", "shipping_provider_id", "status_updated_at")
+    )
 
-    finished = still_pending = 0
+    finished = still_pending = asked = 0
     silent_couriers: set[int] = set()
-    now = timezone.now()
-    for order in pending:
-        if (
-            order.shipping_provider_id in silent_couriers
-            and now < shipment_cancel_retry_until(order)
+    for pk, provider_id, canceled_at in pending:
+        if asked >= max_per_run or (
+            provider_id in silent_couriers
+            and timezone.now() < shipment_cancel_retry_until(canceled_at)
         ):
             still_pending += 1
             continue
+        order = Order.objects.filter(
+            pk=pk, metadata__has_key=SHIPMENT_CANCEL_PENDING_FLAG
+        ).first()
+        if order is None:
+            # Answered meanwhile, by the first attempt or another run.
+            continue
+        asked += 1
         logger.warning(
             "Order %s was canceled at %s and holds no answer from its "
             "courier to the shipment cancel: asking now",

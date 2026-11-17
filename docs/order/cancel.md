@@ -408,7 +408,10 @@ What each failure does:
   final, and the parcel of a canceled order stayed live unless staff
   noticed the note. A courier that gives no answer in a sweep run is not
   asked about its other orders in that run (each would wait out the same
-  timeout); an order whose retries are over is still asked once.
+  timeout); an order whose retries are over (read when it comes up, not
+  when the run starts) is still asked once. The run's limit
+  (`max_per_run`, 100) counts courier calls, not orders looked at, so a
+  silent courier's backlog never keeps another courier's cancels waiting.
 - **The shipment is already being worked on** (`CarrierBusyError`: another
   cancel of the voucher holds its claim, or a creation is in flight or
   still settling). That is our own refusal, with no call to the courier, so

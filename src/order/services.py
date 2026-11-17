@@ -409,11 +409,11 @@ SHIPMENT_CANCEL_PENDING_FLAG = "shipment_cancel_pending"
 SHIPMENT_CANCEL_UNANSWERED_KEY = "shipment_cancel_unanswered"
 
 
-def shipment_cancel_retry_until(order: Order) -> datetime:
-    """When the courier of *order*'s pending shipment cancel stops being
-    asked again after giving no answer."""
-    canceled_at = order.status_updated_at or timezone.now()
-    return canceled_at + timedelta(
+def shipment_cancel_retry_until(canceled_at: datetime | None) -> datetime:
+    """When the courier of a pending shipment cancel made at *canceled_at*
+    (the order's ``status_updated_at``) stops being asked again after
+    giving no answer."""
+    return (canceled_at or timezone.now()) + timedelta(
         hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS
     )
 
@@ -4973,7 +4973,9 @@ class OrderService:
                 )
                 return False
             except CarrierUnavailableError as exc:
-                if timezone.now() < shipment_cancel_retry_until(order):
+                if timezone.now() < shipment_cancel_retry_until(
+                    order.status_updated_at
+                ):
                     cls._note_unanswered_shipment_cancel(order, exc)
                     return True
                 info = {
@@ -5075,7 +5077,9 @@ class OrderService:
                     "%s: %s",
                     order.id,
                     attempts,
-                    shipment_cancel_retry_until(order).isoformat(),
+                    shipment_cancel_retry_until(
+                        order.status_updated_at
+                    ).isoformat(),
                     exc,
                 )
                 if attempts == 1:

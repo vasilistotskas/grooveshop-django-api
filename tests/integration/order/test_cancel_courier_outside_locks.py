@@ -716,6 +716,84 @@ def test_an_acs_tracking_poll_and_a_staff_cancel_do_not_deadlock(monkeypatch):
     assert _metadata(order_id)["cancellation"]["shipment_cancel"] == ASKED
 
 
+def _canceled_at(order_id: int, minutes_ago: int) -> None:
+    Order.objects.filter(pk=order_id).update(
+        status_updated_at=timezone.now()
+        - timedelta(seconds=settings.ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS)
+        - timedelta(minutes=minutes_ago)
+    )
+
+
+def test_a_silent_courier_never_keeps_another_from_being_asked(monkeypatch):
+    """The run's limit counts courier calls: older orders of a silent
+    courier, passed over without a call, do not fill it."""
+    silent = [_shipment("acs") for _ in range(3)]
+    answering = _shipment("boxnow")
+    _courier(monkeypatch, silent[0], error=CarrierUnavailableError("timed out"))
+    for shipment in (*silent, answering):
+        _staff_cancel(shipment.order)
+    for minutes_ago, shipment in enumerate(reversed(silent), start=10):
+        _canceled_at(shipment.order_id, minutes_ago)
+    _canceled_at(answering.order_id, 1)
+    boxnow = Courier(answering)
+    monkeypatch.setattr("shipping_boxnow.services.BoxNowClient", boxnow)
+
+    assert finish_pending_shipment_cancels(max_per_run=2) == {
+        "finished": 1,
+        "still_pending": 3,
+    }
+
+    assert boxnow.calls == [UNLOCKED]
+    assert _is_canceled(answering)
+    assert SHIPMENT_CANCEL_PENDING_FLAG not in _metadata(answering.order_id)
+
+
+def test_the_retries_are_over_when_the_order_comes_up(monkeypatch):
+    """Another courier's call can take long enough for a later order's
+    retries to end meanwhile: that order then gets its last attempt, not
+    a pass for its courier being silent earlier in the run."""
+    first, later_one = _shipment("acs"), _shipment("acs")
+    slow = _shipment("boxnow")
+    acs = _courier(
+        monkeypatch, first, error=CarrierUnavailableError("timed out")
+    )
+    for shipment in (first, slow, later_one):
+        _staff_cancel(shipment.order)
+    _canceled_at(first.order_id, 3)
+    _canceled_at(slow.order_id, 2)
+    _canceled_at(later_one.order_id, 1)
+    real_now = timezone.now
+    ahead = timedelta(0)
+    monkeypatch.setattr(timezone, "now", lambda: real_now() + ahead)
+    boxnow = Courier(slow)
+
+    def the_call_outlasts_the_retries() -> None:
+        nonlocal ahead
+        # Past ``later_one``'s retries, which end a minute after
+        # ``first``'s: ``first`` was asked well within its own.
+        ahead = timedelta(
+            hours=settings.ORDER_SHIPMENT_CANCEL_RETRY_HOURS, minutes=-1
+        )
+
+    boxnow.during_call = the_call_outlasts_the_retries
+    monkeypatch.setattr("shipping_boxnow.services.BoxNowClient", boxnow)
+
+    assert finish_pending_shipment_cancels() == {
+        "finished": 2,
+        "still_pending": 1,
+    }
+
+    # ``first``: the ACS courier silent, within its retries. ``slow``:
+    # answered. ``later_one``: its retries were over when it came up, so
+    # ACS was asked once more and the failure recorded for staff.
+    assert len(boxnow.calls) == 1
+    assert len(acs.calls) == 5
+    assert SHIPMENT_CANCEL_PENDING_FLAG in _metadata(first.order_id)
+    outcome = _metadata(later_one.order_id)["cancellation"]["shipment_cancel"]
+    assert "timed out" in outcome["error"]
+    assert len(_courier_notes(later_one.order_id)) == 1
+
+
 def test_the_admin_cancel_says_the_courier_is_asked_again(monkeypatch):
     """Staff read at once that the parcel is still live and that nothing
     is theirs to do yet; a refusal is an error message instead."""

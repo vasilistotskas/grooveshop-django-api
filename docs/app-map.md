@@ -187,9 +187,12 @@ The catalogue. Models under `src/product/models/`: `Product`,
 `Attribute`, `AttributeValue`, `ProductAttribute`, `ProductVariantGroup`,
 `ProductReview`, `ProductFavourite`, `ProductAlert`, `ProductRelation`,
 `ProductHighlight` and `ProductPriceSpell`. Views under
-`src/product/views/`, one module per model. Pricing is a package
+`src/product/views/`, one module per model; the admin is the package
+`src/product/admin/`, one module per model admin (the report page of a
+product's stock movements is `stock_history.py`). Pricing is a package
 (`src/product/pricing/`); `src/product/tasks.py` holds the product alerts
-and the price-record reconciliation. The stock quantity is a column on
+and the price-record reconciliation; `src/product/services.py` the catalogue
+writes the admin's actions call (the bulk discount, the duplicate as draft). The stock quantity is a column on
 `Product`, but stock is reserved and released in `src/order/inventory/stock.py`.
 Read `docs/product-pricing.md` and `docs/api/products.md`.
 
@@ -356,7 +359,8 @@ tokens in each store's schema. A refused `resource` at either issuer's
 token endpoint (or a store's device-code endpoint) is OAuth's
 `invalid_target`, not allauth's 500 (`src/core/middleware/idp_oauth_errors.py`);
 the staff issuer requires the `resource` on the token request too, as MCP
-clients send it. It has no doc in this repository; the
+clients send it, except on a refresh, which without one keeps the store its
+grant was connected to and naming another is still `invalid_target`. It has no doc in this repository; the
 cross-service views are
 `grooveshop-docs/src/dev/flows/agentic-commerce.md` and
 `grooveshop-docs/src/dev/flows/staff-mcp.md`.

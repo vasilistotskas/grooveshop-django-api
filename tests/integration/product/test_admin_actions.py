@@ -30,7 +30,7 @@ from django.contrib.admin.sites import AdminSite
 from django.db.models.signals import post_save
 from django.test import RequestFactory
 
-from product.admin import ProductAdmin
+from product.admin.product import ProductAdmin
 from product.factories.product import ProductFactory
 from product.models.product import Product
 

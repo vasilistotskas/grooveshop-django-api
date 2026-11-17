@@ -9,7 +9,7 @@ from measurement.measures import Distance
 
 from core.forms.measurement import MeasurementWidget
 from core.units import DistanceUnits
-from product.admin import ProductAdmin
+from product.admin.product import ProductAdmin
 from product.factories import ProductFactory
 from product.models import Product
 

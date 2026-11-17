@@ -18,7 +18,7 @@ from admin.base import BaseModelAdmin, unfold_filter_for
 from admin.filters import LikesCountFilter, RelatedDropdownFilter
 from admin.platform_site import platform_admin_site
 from order.models.order import Order
-from product.admin import ProductAdmin
+from product.admin.product import ProductAdmin
 from product.models.product import Product
 from tenant.models import Tenant
 from tests.utils.store_settings import switch_every_feature_on

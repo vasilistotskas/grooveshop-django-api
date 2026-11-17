@@ -90,7 +90,7 @@ def test_the_admin_action_reindexes_what_it_deactivated():
     from django.contrib.auth import get_user_model
     from django.test import RequestFactory
 
-    from product.admin import ProductAdmin
+    from product.admin.product import ProductAdmin
 
     products = [
         ProductFactory(active=True, num_images=0, num_reviews=0)

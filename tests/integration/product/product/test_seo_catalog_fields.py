@@ -9,7 +9,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from product.admin import ProductAdmin, ProductCategoryAdmin
+from product.admin.category import ProductCategoryAdmin
+from product.admin.product import ProductAdmin
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
 from product.serializers.category import ProductCategorySerializer

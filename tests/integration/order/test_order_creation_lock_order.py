@@ -349,7 +349,7 @@ class TestOtherMultiProductTransactionsLockInPkOrder:
         from django.contrib.admin.sites import AdminSite
         from django.test import RequestFactory
 
-        from product.admin import ProductAdmin
+        from product.admin.product import ProductAdmin
         from product.models.product import Product
 
         operator = UserAccountFactory.create(

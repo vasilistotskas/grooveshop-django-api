@@ -5,12 +5,10 @@ from django.urls import reverse
 from django.utils import translation
 
 from admin.base import BaseTranslatableTabularInline
-from product.admin import (
-    ProductAdmin,
-    ProductCategoryImageAdmin,
-    ProductImageAdmin,
-    ProductImageInline,
-)
+from product.admin.category_image import ProductCategoryImageAdmin
+from product.admin.image import ProductImageAdmin
+from product.admin.product import ProductAdmin
+from product.admin.product_inlines import ProductImageInline
 from product.factories.category_image import ProductCategoryImageFactory
 from product.factories.image import ProductImageFactory
 from product.models import Product, ProductCategoryImage, ProductImage

@@ -15,7 +15,7 @@ from django.db import connection
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 
-from product.admin import ProductAdmin
+from product.admin.product import ProductAdmin
 from product.factories.product import ProductFactory
 from product.models.product import Product
 from user.factories.account import UserAccountFactory

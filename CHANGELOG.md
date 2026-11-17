@@ -3,6 +3,93 @@
 
 
 
+## v3.252.4 (2026-11-17)
+
+### Documentation
+
+* docs(product): the admin package's registration order does not matter ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+### Performance improvements
+
+* perf(product): the product changelist no longer prefetches stock reservations
+
+ProductAdmin.get_queryset prefetched every listed product's active stock
+reservations into active_reservations_list, an attribute no template,
+list column, inline or export reads (the reservation summary and the
+reservation filter query the table themselves). It cost one query on
+every load of the list. A test now fails if the list reads the
+reservation table again. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+### Refactoring
+
+* refactor(product): admin package split; write actions call product services (#745) ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+* refactor(product): split the product admin into a package
+
+src/product/admin.py held fourteen model admins, their filters, inlines
+and the stock-history report page in 2,510 lines. It is now
+src/product/admin/, one module per model admin:
+
+- filters.py: the product changelist filters and the review status filter
+- variants.py: the badge colour maps shared by the admins
+- attribute.py, attribute_value.py, category.py, category_image.py,
+  brand.py, favourite.py, image.py, review.py, variant_group.py
+- product_inlines.py: the inlines of the product form
+- stock_history.py: the stock log dataset and the stock-history report
+  view, now a mixin of ProductAdmin
+- product.py: ProductAdmin
+
+The package's __init__ imports the modules so Django's admin
+autodiscovery registers them in the same order as before. The code is
+moved as it was: the only changed lines are imports and the base class
+list of ProductAdmin. Every importer in the tests moves to the module
+that now defines the name; nothing is re-exported. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+* refactor(product): the admin's write actions call product services
+
+The bulk discount, clear discount and duplicate-as-draft actions of
+ProductAdmin carried the rules themselves. They now call
+ProductService (src/product/services.py): set_discount and
+clear_discount save each product in pk order and never use
+queryset.update(), duplicate_as_draft builds the draft and raises
+ProductDuplicationError when no copy suffix is free. The admin keeps
+the form, the messages and the redirects.
+
+The active-reservation predicate was written out six times in the
+admin. All of them now read StockReservationQuerySet.active, and the
+reservation-status filter reads it through
+ProductQuerySet.with_active_reserved_quantity. That filter filtered on
+stockreservation__..., which is not the reverse name of
+StockReservation.product (related_name is stock_reservations), so
+choosing any of its three options raised FieldError and the list
+answered ?e=1. It lists the right products now. ([`407f663`](https://github.com/vasilistotskas/grooveshop-django-api/commit/407f663fa49b784c77807f8825b06faf007b645d))
+
+## v3.252.3 (2026-11-17)
+
+### Bug fixes
+
+* fix(agent): a staff refresh without resource keeps its grant's store (#744) ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
+* fix(agent): a staff refresh without resource keeps its grant's store
+
+The staff issuer refused every token request that named no resource,
+the refresh_token grant included, so an MCP connector that omits the
+resource on refresh (RFC 8707 makes it optional) could never refresh and
+staff had to connect the AI app again whenever its access token expired.
+
+On the refresh_token grant only, AgentOIDCAdapter.validate_resource_uris
+now lets a request without resource through. allauth already records the
+grant's resource on the refresh token and, when the request names none,
+issues the access token (and the rotated refresh token) for that resource;
+a request naming a resource outside the grant is still refused by allauth
+with invalid_target (RFC 8707 section 2.2). The authorization code
+request keeps requiring the resource on the staff issuer, and store
+issuers are unchanged. ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
+### Testing
+
+* test(agent): the refused refresh names a store the person is also on the team of ([`dd87e43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd87e43ca1edbc73f6849549a823045cdb4b1e66))
+
 ## v3.252.2 (2026-11-17)
 
 ### Documentation

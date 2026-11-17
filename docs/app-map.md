@@ -318,7 +318,7 @@ templates, pages, each with a draft), immutable `BuilderVersion` and
 `BuilderRelease`, `BuilderScheduledPublish`, `BuilderPreviewLink`, the
 derived `BuilderReference` index and the media library (`MediaAsset`).
 It serves the staff API and the public read of the current release
-(`src/builder/views.py`); the writes go through
+(`src/builder/views/`, one module per resource); the writes go through
 `src/builder/services.py`. The block catalogue is the storefront's. Read
 `docs/builder/index.md`.
 

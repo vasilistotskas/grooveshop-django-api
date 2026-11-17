@@ -40129,10 +40129,16 @@ components:
           type: string
         provider:
           type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: 'When this payment link stops being payable: the expiry the
+            provider applied, which the order keeps as paymentHoldExpiresAt.'
       required:
       - amount
       - checkoutUrl
       - currency
+      - expiresAt
       - provider
       - sessionId
       - status
@@ -43121,6 +43127,33 @@ components:
             no earlier non-canceled order. Feeds the ``new_customer`` parameter of
             the Google Ads purchase conversion, which Google asks to be calculated
             rather than hardcoded.
+        paymentHoldExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 'When the order''s payment link stops being payable: the expiry
+            the provider applied to the last link opened, or, before any was opened,
+            the store''s hold counted from the order''s creation. Set for every order
+            waiting for an online payment (PENDING, online pay way, payment not final);
+            null for any other order.'
+        paymentDecidedBy:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 'When the store''s scheduled unpaid-order sweep, running normally,
+            will have decided the order: canceled it, and released its stock, if it
+            is still unpaid. It is the next sweep run after the payment link expired
+            plus the store''s grace (for a failed payment, also after the failure
+            plus the store''s wait for a retry), plus the longest that run may take.
+            It moves later if the sweep is paused or a run is cut short, and is never
+            an instant already past. If the provider reports the payment as processing
+            during that run, the order stays open for its outcome. Null when nothing
+            will decide the order: the sweep does not cancel it (it does not wait
+            for a payment, the provider is already processing one, or a charge did
+            not match the total and waits for the store), or the sweep is switched
+            off.'
       required:
       - acsShipment
       - amountDue
@@ -43166,6 +43199,8 @@ components:
       - orderTimeline
       - payWay
       - payWayKey
+      - paymentDecidedBy
+      - paymentHoldExpiresAt
       - paymentMethodFee
       - paymentStatusDisplay
       - phone

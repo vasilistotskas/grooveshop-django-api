@@ -67,17 +67,34 @@ class TestCarrierGate:
 
 
 class TestScheduleGate:
-    def test_it_is_open_only_while_the_beat_entry_is_enabled(self):
-        gate = ScheduleGate(entry="probe-entry", label="Scheduled job")
+    PROBE = "probe-entry"
+
+    def _declare(self, settings) -> None:
+        settings.CELERY_BEAT_SCHEDULE = {
+            **settings.CELERY_BEAT_SCHEDULE,
+            self.PROBE: {"task": "probe.task", "schedule": 60},
+        }
+
+    def test_it_is_open_only_while_the_beat_entry_is_enabled(self, settings):
+        self._declare(settings)
+        gate = ScheduleGate(entry=self.PROBE, label="Scheduled job")
         assert gate.is_open() is False
 
         with schema_context(get_public_schema_name()):
-            entry = PeriodicTask.objects.create(
-                name="probe-entry", enabled=False
-            )
+            entry = PeriodicTask.objects.create(name=self.PROBE, enabled=False)
         assert gate.is_open() is False
 
         entry.enabled = True
         entry.save()
 
         assert gate.is_open() is True
+
+    def test_an_entry_the_settings_no_longer_declare_is_closed(self):
+        # Beat deletes the row only when it next starts; until then the
+        # enabled row outlives the entry that a deploy removed.
+        with schema_context(get_public_schema_name()):
+            PeriodicTask.objects.create(name=self.PROBE, enabled=True)
+
+        gate = ScheduleGate(entry=self.PROBE, label="Scheduled job")
+
+        assert gate.is_open() is False

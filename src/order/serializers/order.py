@@ -20,6 +20,7 @@ from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
+from order.payment_hold import awaiting_payment, decided_by, hold_ends
 from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemDetailSerializer,
@@ -476,6 +477,51 @@ class OrderDetailSerializer(OrderSerializer):
         )
     )
     phone = PhoneNumberField(read_only=True)
+    payment_hold_expires_at = serializers.SerializerMethodField(
+        help_text=(
+            "When the order's payment link stops being payable: the expiry "
+            "the provider applied to the last link opened, or, before any "
+            "was opened, the store's hold counted from the order's "
+            "creation. Set for every order waiting for an online payment "
+            "(PENDING, online pay way, payment not final); null for any "
+            "other order."
+        )
+    )
+    payment_decided_by = serializers.SerializerMethodField(
+        help_text=(
+            "When the store's scheduled unpaid-order sweep, running "
+            "normally, will have decided the order: canceled it, and "
+            "released its stock, if it is still unpaid. It is the next "
+            "sweep run after the payment link expired plus the store's "
+            "grace (for a failed payment, also after the failure plus the "
+            "store's wait for a retry), plus the longest that run may "
+            "take. It moves later if the sweep is paused or a run is cut "
+            "short, and is never an instant already past. If the provider "
+            "reports the payment as processing during that run, the order "
+            "stays open for its outcome. Null when nothing will decide the "
+            "order: the sweep does not cancel it (it does not wait for a "
+            "payment, the provider is already processing one, or a charge "
+            "did not match the total and waits for the store), or the "
+            "sweep is switched off."
+        )
+    )
+
+    @extend_schema_field(
+        {"type": "string", "format": "date-time", "nullable": True}
+    )
+    def get_payment_hold_expires_at(self, obj: Order) -> str | None:
+        if not awaiting_payment(obj):
+            return None
+        return serializers.DateTimeField().to_representation(hold_ends(obj))
+
+    @extend_schema_field(
+        {"type": "string", "format": "date-time", "nullable": True}
+    )
+    def get_payment_decided_by(self, obj: Order) -> str | None:
+        instant = decided_by(obj)
+        if instant is None:
+            return None
+        return serializers.DateTimeField().to_representation(instant)
 
     @extend_schema_field(
         {
@@ -955,6 +1001,8 @@ class OrderDetailSerializer(OrderSerializer):
             "meta_event_ids",
             "currency",
             "is_first_order",
+            "payment_hold_expires_at",
+            "payment_decided_by",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,
@@ -968,6 +1016,8 @@ class OrderDetailSerializer(OrderSerializer):
             "shipment",
             "shipment_provider_code",
             "loyalty_points_to_earn",
+            "payment_hold_expires_at",
+            "payment_decided_by",
         )
 
 
@@ -1803,6 +1853,13 @@ class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
     amount = serializers.CharField()
     currency = serializers.CharField()
     provider = serializers.CharField()
+    expires_at = serializers.DateTimeField(
+        help_text=(
+            "When this payment link stops being payable: the expiry the "
+            "provider applied, which the order keeps as "
+            "paymentHoldExpiresAt."
+        )
+    )
 
 
 class ConfirmAgentPaymentRequestSerializer(serializers.Serializer):

@@ -122,12 +122,15 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "ORDER_ONLINE_PAYMENT_GRACE_MINUTES",
         "type": "int",
         "value": 5,
+        "validator": (
+            "order.setting_validators.validate_grace_minutes_setting"
+        ),
         "description": (
             "How long after its payment link expires an unpaid "
             "online-payment order is kept before it is canceled, so a "
             "payment confirmation still on its way reaches an open "
             "order. A confirmation after the cancel is still booked, but "
-            "needs a refund."
+            "needs a refund. Between 0 and 60."
         ),
     },
     {

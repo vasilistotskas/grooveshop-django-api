@@ -294,7 +294,7 @@ and says which file holds each § number used here.
     while the token is still the holder's, so a lease that ran out and
     was taken by another worker is never deleted from under it. The
     lease is `client.worst_case_request_seconds` (every connect attempt
-    of `_RETRY_CONFIG` at `ACS_HTTP_TIMEOUT`, urllib3's backoff, then
+    of `CARRIER_RETRY` at `ACS_HTTP_TIMEOUT`, urllib3's backoff, then
     one read: 78 s at the 15 s default), derived, not configured. A
     killed worker frees its slot when the lease ends.
   - **Full cap.** A call waits up to `ACS_SLOT_WAIT_SECONDS`, then raises

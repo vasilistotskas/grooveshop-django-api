@@ -3,6 +3,39 @@
 
 
 
+## v3.252.5 (2026-11-17)
+
+### Refactoring
+
+* refactor(order): move the payment, stock and review-request modules into subpackages (#746)
+
+The third and last move of #566. The payment modules go to
+order.payments (payment, payment_ledger, payment_hold, payment_fees,
+payment_binding, payment_events, disputes), stock to order.inventory and
+review_request to order.communications. chargebacks goes to
+order.accounting rather than payments: it records the staff decision on a
+lost dispute and books its credit allocation and credit documents, and it
+imports nothing from payments, so beside the accounting modules it obeys
+the direction #658 settled (accounting -> payments) with no exception.
+
+stock, review_request and payment_hold could move now because the stored
+validator paths name order.setting_validators (#703, #706); only that
+module's imports change. Migrations still only mention the old paths in
+comments and are left untouched.
+
+A new forbidden contract keeps order.payments from importing accounting,
+refunds, reporting or checkout. It checks direct imports: every payments
+module imports the order models, which reach every subpackage, so the
+layers contract cannot hold it. Its one ignored edge is the ledger
+calling the credit allocation when it books a refund (#658), removed by
+#569 together with the function-local imports in credit_allocation.
+
+No re-export shim: every importer, mock.patch string, logger name in a
+test and doc reference names the new paths. No module defines a Celery
+task, so no task name is pinned.
+
+Closes #566. ([`2da32d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2da32d3b4901f7747aad6f1c6a872cdb8403eb41))
+
 ## v3.252.4 (2026-11-17)
 
 ### Documentation

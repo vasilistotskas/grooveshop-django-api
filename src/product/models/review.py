@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxLengthValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext
@@ -10,6 +11,11 @@ from parler.models import TranslatableModel, TranslatedFields
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from product.enum.review import RateEnum, ReviewStatus
 from product.managers.review import ProductReviewManager, purchase_items
+
+#: The longest comment a review may carry, in characters. It is what the
+#: storefront's review form already allows; every reader (the list, the
+#: admin, the agent gateway's chat tool) holds the text whole.
+COMMENT_MAX_LENGTH = 1000
 
 
 class ProductReview(
@@ -36,7 +42,13 @@ class ProductReview(
         default=ReviewStatus.NEW,
     )
     translations = TranslatedFields(
-        comment=models.TextField(_("Comment"), blank=True, null=True)
+        comment=models.TextField(
+            _("Comment"),
+            max_length=COMMENT_MAX_LENGTH,
+            validators=[MaxLengthValidator(COMMENT_MAX_LENGTH)],
+            blank=True,
+            null=True,
+        )
     )
 
     objects: ProductReviewManager = ProductReviewManager()

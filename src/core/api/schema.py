@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from django.conf import settings
@@ -37,16 +37,23 @@ class AutoSchema(SpectacularAutoSchema):
 
 
 def generate_schema_multi_lang(
-    model_instance, fields: Sequence[str] | None = None
+    model_instance,
+    fields: Sequence[str] | None = None,
+    max_lengths: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     """The ``translations`` object: per language, every translated field,
-    or only ``fields`` when a serializer emits a subset."""
+    or only ``fields`` when a serializer emits a subset.
+
+    ``max_lengths`` publishes ``maxLength`` for a field: pass it for a
+    serializer that WRITES the field, never one that reads it, since a
+    bound on a response schema rejects text stored before the bound."""
     translated_fields = (
         list(fields)
         if fields is not None
         else model_instance._parler_meta.get_all_fields()
     )
     languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
+    bounds = max_lengths or {}
 
     if not translated_fields or not languages:
         return {"type": "object", "properties": {}}
@@ -60,7 +67,14 @@ def generate_schema_multi_lang(
         language["code"]: {
             "type": "object",
             "properties": {
-                translated_field: {"type": "string"}
+                translated_field: {
+                    "type": "string",
+                    **(
+                        {"maxLength": bounds[translated_field]}
+                        if translated_field in bounds
+                        else {}
+                    ),
+                }
                 for translated_field in translated_fields
             },
         }

@@ -113,12 +113,27 @@ def run_for_all_tenants(
     # fire: it would burn the carrier API budget and mutate a frozen
     # tenant's data. Mirrors the webhook resolvers' suspended_at filter.
     #
-    # ``include_suspended`` is for RETENTION sweeps, and only those.
+    # ``include_suspended`` is for two kinds of work, and only those.
     # The reasoning above is about work a frozen store should not pay
-    # for; it does not transfer to deleting data the platform promised
-    # to delete. A suspended tenant whose sweeps never ran would keep
-    # abandoned uploads and expired files indefinitely, which is a
-    # data-protection failure rather than a saving.
+    # for, and neither kind is that:
+    #
+    # - RETENTION sweeps. Deleting data the platform promised to delete
+    #   does not stop with the store. A suspended tenant whose sweeps
+    #   never ran would keep abandoned uploads and expired files
+    #   indefinitely, which is a data-protection failure rather than a
+    #   saving.
+    # - Finishing something a CUSTOMER's money or parcel waits on, which
+    #   was started before the store was suspended: a refund still
+    #   pending at the provider (``reconcile_pending_refunds``), the
+    #   books of money already moved (``allocate_credit_sources``), a
+    #   BoxNow creation of uncertain outcome
+    #   (``settle_uncertain_boxnow_creations``), the courier's cancel for
+    #   an order already canceled (``finish_pending_shipment_cancels``).
+    #   Left undone, the customer's refund hangs or a canceled order's
+    #   parcel is delivered.
+    #
+    # Anything that starts new work for the store (polls, syncs, mail)
+    # stays off.
     #
     # ``is_active`` stays required either way: an inactive tenant may
     # be mid-offboarding and its schema may already be gone.

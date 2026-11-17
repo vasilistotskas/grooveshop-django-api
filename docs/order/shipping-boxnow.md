@@ -128,7 +128,9 @@ and says which file holds each § number used here.
   `shipment_cancel` and the order's history note
   ([§7.1](cancel.md)). A creation in flight (a claim younger than
   `_MINT_CLAIM_TTL_SECONDS`) refuses at once with a
-  `BoxNowBusyError`. The row is read again under its lock after the
+  `BoxNowBusyError`; a staff order cancel records nothing for that
+  refusal and stays pending ([§7.1.2](cancel.md)). The row is read again
+  under its lock after the
   lookup: a creation that saved a parcel meanwhile sends the cancel down
   the usual path, and a claim taken meanwhile refuses.
 - **An empty lookup is trusted only once an uncertain creation has
@@ -155,8 +157,9 @@ and says which file holds each § number used here.
   stamp is younger than
   `BOXNOW_CREATION_SETTLE_SECONDS` (settings/env, default 600), a cancel
   whose lookup lists nothing live refuses with a `BoxNowBusyError`
-  (a customer is told to try again; a staff cancel goes on with the order
-  and leaves the error in `shipment_cancel`) instead of a local cancel;
+  (a customer is told to try again; a staff cancel goes on with the
+  order, records nothing and stays pending until the creation has
+  settled, [§7.1.2](cancel.md)) instead of a local cancel;
   after it, the lookup is authoritative. The creation task's own retries
   refresh the stamp, and their `P410` take-over usually saves the parcel
   first. **Measured on BoxNow's stage environment (2026-11-15):** a parcel
@@ -181,9 +184,9 @@ and says which file holds each § number used here.
   creation was sent. In phase 3, `_persist_parcel` treats an order canceled
   meanwhile like a shipment canceled meanwhile: the row is recorded
   CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
-  cancelled at BoxNow. Its locked `select_related` join takes the order
-  row too, so an order cancel still in its transaction is waited for and
-  then seen.
+  cancelled at BoxNow. It locks the order row first
+  (`shipping.locks.lock_with_order`), so an order cancel still in its
+  transaction is waited for and then seen.
 - **A sweep settles creations that stayed uncertain** (#712). The
   creation task's retries back off for about 30 seconds, far inside
   `BOXNOW_CREATION_SETTLE_SECONDS`, and the tracking poll only reads
@@ -244,17 +247,17 @@ and says which file holds each § number used here.
   dispatches nothing, a poll already dispatched makes no call (the next
   batch polls it again), and the settle sweep skips its run; a sweep run
   that meets a 429 stops there.
-- **Lock order: the order, then the shipment.** An order cancel locks
-  the order and then cancels the shipment (`OrderService._cancel_order_locked`
-  → `cancel_shipment`). Every BoxNow path that locks both takes them in
-  that order (`BoxNowService._lock_with_order`: the creation's phase 1,
-  `_persist_parcel`, the settle sweep, the webhook and the tracking poll),
+- **Lock order: the order, then the shipment** ([§5](shipping.md)).
+  Every BoxNow path that locks both takes them through
+  `shipping.locks.lock_with_order`: the creation's phase 1,
+  `_persist_parcel`, the settle sweep, the webhook and the tracking poll,
   so no two of them wait on each other the other way round
   (`TestEveryPathLocksTheOrderFirst` and `TestTheSweepLocksTheOrderFirst`
   fail for any path that goes back to a joined
-  `select_for_update().select_related("order")`). #713 (the order cancel
-  calls the courier inside its own transaction) keeps this order when it
-  moves that call out.
+  `select_for_update().select_related("order")`). `cancel_shipment` locks
+  the shipment alone, and an order cancel calls it after its own
+  transaction has committed ([§7.1.2](cancel.md)), so it never runs under
+  the order's lock.
 - **The tracking poll asks in the shipment's payment mode** (#691).
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources

@@ -3,6 +3,53 @@
 
 
 
+## v3.250.0 (2026-11-17)
+
+### Bug fixes
+
+* fix(core): do not mount a store's identity routes on the platform host
+
+allauth's sign-in page lists the social providers, and its headless API
+reads sessions and authenticators; those tables exist in store schemas
+only, so on the platform host (the public schema) GET /accounts/login/
+and every /_allauth/ route answered 500. Platform staff sign in at the
+platform admin's own login, never through these routes, so they now
+belong to the store hosts alone, like the OIDC provider already did.
+
+tinymce's three legacy routes (flatpages link list, compressor,
+filebrowser) answered 500 on every host and nothing reverses them with
+the settings in use, so the include is dropped.
+
+A tests_mt walk of the platform URL conf asserts no anonymous GET answers
+500, bar the Viva verification refusal that has no platform account. ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Chores
+
+* chore(api-contract): accept the review comment bound until the storefront regenerates; drop the expired per-carrier lines ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+* chore(api-contract): ship the review comment bound storefront first instead of accepting it ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Documentation
+
+* docs(core): the shared routes' comment no longer names tinymce ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+### Features
+
+* feat(product): bound a review comment's length; stop serving store identity routes on the platform host (#725) ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
+* feat(product): bound the length of a review's comment
+
+COMMENT_MAX_LENGTH (1000, what the storefront's review form already
+allows) is the one bound: the translated model field carries it as
+max_length and a validator, so the admin form, full_clean and the write
+serializer's translations all refuse a longer comment. The schema
+publishes maxLength on the request bodies only; the responses are not
+bounded, so a comment stored before the bound still reads whole.
+
+The migration changes no database object (no-op SQL). The request-side
+maxLength is accepted in api-contract/ignore.txt until the storefront
+regenerates from it. ([`3a6783e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6783ea5ea68837aff9630d95c9fd525e84567b))
+
 ## v3.249.6 (2026-11-16)
 
 ### Bug fixes

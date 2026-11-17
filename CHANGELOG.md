@@ -3,6 +3,38 @@
 
 
 
+## v3.252.2 (2026-11-17)
+
+### Documentation
+
+* docs(builder): the views package keeps its HTTP-surface docstring; the builder guide names views/ ([`948f96c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/948f96c0f0aeadcab8a357e535013b4eb9ca848f))
+
+### Refactoring
+
+* refactor(builder): views.py into views/, one module per resource (#741) ([`948f96c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/948f96c0f0aeadcab8a357e535013b4eb9ca848f))
+
+* refactor(builder): views.py into views/, one module per resource
+
+Pure move of src/builder/views.py (1,176 lines) by resource:
+
+- builder/schema.py: the OpenAPI fragments the views share (TAGS, the
+  locale and If-Match parameters, the error-body maps)
+- builder/views/base.py: StaffView, StaffListView, expected_revision, etagged
+- builder/views/documents.py: documents, drafts, versions, restore
+- builder/views/publish.py: publish, publish check, publish version,
+  rollback, releases
+- builder/views/schedules.py: scheduled publishes
+- builder/views/links.py: link targets, link search, link labels
+- builder/views/previews.py: live preview, share-preview links and the
+  public shared-preview read
+- builder/views/presence.py, features.py, public.py: presence, the
+  feature states, the public reads of the current release
+
+Names that now cross a module lose their leading underscore (_IF_MATCH
+is IF_MATCH, _etagged is etagged). No logic change, schema.yml
+unchanged; the URL conf imports each view from its module and the
+app map names the new path. ([`948f96c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/948f96c0f0aeadcab8a357e535013b4eb9ca848f))
+
 ## v3.252.1 (2026-11-17)
 
 ### Documentation

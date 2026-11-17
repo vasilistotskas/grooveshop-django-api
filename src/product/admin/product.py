@@ -357,7 +357,6 @@ class ProductAdmin(
         return form
 
     def get_queryset(self, request):
-
         # Only apply expensive annotations when filtering/sorting requires
         # them. The ``else`` branches used to annotate unconditionally
         # "to avoid attribute errors", but that fired both joins

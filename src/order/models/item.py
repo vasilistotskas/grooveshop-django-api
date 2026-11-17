@@ -276,7 +276,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         """
         from django.db import transaction
 
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         with transaction.atomic():
             # The order first, then the line: the admin action restocks

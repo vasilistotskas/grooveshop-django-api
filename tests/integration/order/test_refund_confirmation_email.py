@@ -23,7 +23,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory, PaymentTransaction, RefundNotification
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.tasks import _claim_refund_email, send_refund_confirmation_email
 from pay_way.factories import PayWayFactory

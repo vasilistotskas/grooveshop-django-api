@@ -8,8 +8,8 @@ from stripe._error import (
     APIError,
 )
 
-from order.payment import StripePaymentProvider
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import StripePaymentProvider
+from order.payments.payment_binding import PaymentPurpose
 
 
 @pytest.mark.django_db

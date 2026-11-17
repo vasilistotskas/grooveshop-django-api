@@ -1,7 +1,7 @@
 """A product that sells out or comes back is an edit of what the storefront
 shows; an ordinary sale is not.
 
-Every order saves ``stock`` alone (``order/stock.py``) and the product
+Every order saves ``stock`` alone (``order/inventory/stock.py``) and the product
 surfaces ignore that save, so the cached listing is not emptied on each
 sale. The one such save that changes what a page shows is the one that moves
 a product between available and sold out: the listing puts sold-out products

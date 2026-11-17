@@ -62,6 +62,7 @@ from order.exceptions import (
     StockReservationError,
     UnpaidOrderLimitError,
 )
+from order.inventory.stock import StockManager
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
@@ -78,17 +79,17 @@ from order.models.refund_attempt import (
 )
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
-from order.payment import (
+from order.payments.payment import (
     StripePaymentProvider,
     provider_supports,
     registered_provider_codes,
 )
-from order.payment_binding import (
+from order.payments.payment_binding import (
     SUBJECT_KEY,
     PaymentPurpose,
     binding_mismatch,
 )
-from order.payment_ledger import (
+from order.payments.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
     PAYMENT_AMOUNT_TOLERANCE,
     REPAYMENT_REFERENCE_MAX_LENGTH,
@@ -101,7 +102,6 @@ from order.signals import (
     order_stored_value_returned,
     order_stripe_payment_polled,
 )
-from order.stock import StockManager
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
@@ -672,7 +672,7 @@ class OrderService:
         """
         if not promo_result.gift_items:
             return
-        from order.stock import StockManager
+        from order.inventory.stock import StockManager
 
         skipped = []
         for gift in promo_result.gift_items:
@@ -825,7 +825,7 @@ class OrderService:
         PENDING and PROCESSING are accepted: the provider's webhook
         settles the order once the charge completes.
         """
-        from order.payment import get_payment_provider
+        from order.payments.payment import get_payment_provider
 
         if not payment_intent_id:
             raise InvalidOrderDataError(
@@ -864,8 +864,8 @@ class OrderService:
 
         An intent proves that money moved, not what for. The server writes
         the purpose, the cart uuid and the tenant on every intent it
-        creates (``order.payment_binding``), so an intent made for a gift
-        card, for another shopper's cart, for an existing order or for
+        creates (``order.payments.payment_binding``), so an intent made for a
+        gift card, for another shopper's cart, for an existing order or for
         another tenant cannot be presented here: one payment would
         otherwise buy a gift card AND a paid order.
 
@@ -3128,7 +3128,7 @@ class OrderService:
                 "message": "Payment refunded successfully",
             }
         # ``declined["error"]`` carries raw provider exception text (see
-        # order/payment.py) — log it, never return it (CodeQL
+        # order/payments/payment.py) — log it, never return it (CodeQL
         # py/stack-trace-exposure).
         logger.error(
             "Refund failed for canceled order %s: %s",
@@ -4236,7 +4236,7 @@ class OrderService:
         """Steps 2 and 3 of :meth:`refund_order` for one share."""
         from django.core.exceptions import ImproperlyConfigured
 
-        from order.payment import get_payment_provider
+        from order.payments.payment import get_payment_provider
 
         if attempt.kind == RefundAttemptKind.STORED_VALUE:
             return cls._return_stored_value(order, attempt, reason)
@@ -4545,7 +4545,7 @@ class OrderService:
                 _("This order has no payment method configured.")
             )
 
-        from order.payment import get_payment_provider
+        from order.payments.payment import get_payment_provider
 
         provider = get_payment_provider(order.pay_way.provider_code)
         payment_status_enum, status_data = provider.get_payment_status(
@@ -5455,8 +5455,8 @@ class OrderService:
     @staticmethod
     def _bound_order_uuid(metadata: Mapping[str, str] | None) -> UUID | None:
         """The order an intent was created for, when its own metadata (set
-        by the server, ``order.payment_binding``) binds it to an existing
-        order of this store; ``None`` for any other intent."""
+        by the server, ``order.payments.payment_binding``) binds it to an
+        existing order of this store; ``None`` for any other intent."""
         subject = (metadata or {}).get(SUBJECT_KEY)
         if not subject:
             return None
@@ -5502,7 +5502,7 @@ class OrderService:
         from django.db.models import Prefetch
 
         from order.models.history import OrderHistory
-        from order.payment_events import publish_payment_status
+        from order.payments.payment_events import publish_payment_status
 
         # ``of=("self",)`` restricts the row lock to the Order table.
         # Without it Postgres rejects the query with ``FOR UPDATE cannot
@@ -5667,7 +5667,7 @@ class OrderService:
     def handle_payment_failed(
         cls, payment_intent_id: str
     ) -> PaymentEventOutcome | None:
-        from order.payment_events import publish_payment_status
+        from order.payments.payment_events import publish_payment_status
 
         # ``of=("self",)`` — see ``handle_payment_succeeded`` for why.
         order = (

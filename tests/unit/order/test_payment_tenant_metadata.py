@@ -17,8 +17,8 @@ import pytest
 from django.conf import settings
 from djmoney.money import Money
 
-from order.payment import StripePaymentProvider
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import StripePaymentProvider
+from order.payments.payment_binding import PaymentPurpose
 
 
 @pytest.fixture
@@ -47,8 +47,8 @@ def _stub_stripe_payment_intent():
 
 
 class TestProcessPaymentMetadata:
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     def test_includes_tenant_schema_in_metadata(
         self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
@@ -68,8 +68,8 @@ class TestProcessPaymentMetadata:
         assert metadata["tenant_schema"] == "webside"
         assert metadata["order_id"] == "order-1"
 
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     def test_includes_stripe_connect_id_when_present(
         self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
@@ -89,8 +89,8 @@ class TestProcessPaymentMetadata:
         metadata = mock_create.call_args.kwargs["metadata"]
         assert metadata["tenant_stripe_account"] == "acct_123"
 
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     def test_omits_stripe_connect_id_when_blank(
         self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
@@ -110,8 +110,8 @@ class TestProcessPaymentMetadata:
         metadata = mock_create.call_args.kwargs["metadata"]
         assert "tenant_stripe_account" not in metadata
 
-    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     @mock.patch("tenant.credentials.stripe_credentials")
     def test_defaults_to_public_when_no_tenant(
         self,
@@ -147,8 +147,8 @@ class TestProcessPaymentMetadata:
 
 
 class TestRefundMetadata:
-    @mock.patch("order.payment.Refund.sync_from_stripe_data")
-    @mock.patch("order.payment.stripe.Refund.create")
+    @mock.patch("order.payments.payment.Refund.sync_from_stripe_data")
+    @mock.patch("order.payments.payment.stripe.Refund.create")
     def test_includes_tenant_schema(
         self, mock_refund, _mock_sync, amount, bind_tenant_and_schema
     ):
@@ -167,7 +167,7 @@ class TestRefundMetadata:
 
 
 class TestCheckoutSessionMetadata:
-    @mock.patch("order.payment.stripe.checkout.Session.create")
+    @mock.patch("order.payments.payment.stripe.checkout.Session.create")
     def test_session_and_payment_intent_both_tagged(
         self, mock_session, amount, bind_tenant_and_schema
     ):

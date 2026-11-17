@@ -63,8 +63,8 @@ def product(mt_tenant):
 def test_the_stock_log_names_the_staff_member_not_the_shopper(
     mt_tenant, staff, shopper_with_the_staff_id, product
 ):
+    from order.inventory.stock import StockManager
     from order.models.stock_log import StockLog
-    from order.stock import StockManager
 
     with schema_context(mt_tenant.schema_name):
         StockManager.adjust_stock(product, 3, performed_by=staff)
@@ -87,8 +87,8 @@ def test_a_page_of_rows_resolves_its_staff_in_one_public_query(
 ):
     from django.test.utils import CaptureQueriesContext
 
+    from order.inventory.stock import StockManager
     from order.models.stock_log import StockLog
-    from order.stock import StockManager
 
     with schema_context(mt_tenant.schema_name):
         for _ in range(3):
@@ -142,7 +142,7 @@ def test_a_staff_id_the_store_has_no_user_for_is_stored(mt_tenant):
 def test_a_shopper_on_the_api_is_not_recorded_as_staff(mt_tenant, product):
     """Only the staff backend stamps an identity: a shopper's id read as a
     staff id would name an unrelated staff member."""
-    from order.stock import StockManager
+    from order.inventory.stock import StockManager
     from user.models import UserAccount
 
     with schema_context(mt_tenant.schema_name):

@@ -18,7 +18,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django_tenants.utils import schema_context
 
-from order.payment import get_payment_provider
+from order.payments.payment import get_payment_provider
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 
@@ -71,7 +71,7 @@ def test_online_codes_match_the_payment_provider_registry(mt_tenant):
         except ValueError as exc:
             pytest.fail(
                 f"{pay_way.provider_code!r} is not registered in "
-                f"order.payment.get_payment_provider: {exc}"
+                f"order.payments.payment.get_payment_provider: {exc}"
             )
 
 

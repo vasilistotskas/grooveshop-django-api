@@ -25,7 +25,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.models import Invoice, Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.mydata import mydata_enabled

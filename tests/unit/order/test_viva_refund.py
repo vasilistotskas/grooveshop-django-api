@@ -15,7 +15,7 @@ from decimal import Decimal
 import pytest
 from djmoney.money import Money
 
-from order.payment import VivaWalletPaymentProvider
+from order.payments.payment import VivaWalletPaymentProvider
 from tests.utils.viva import (
     CANCEL_ALREADY_CANCELLED,
     CANCEL_REFUSED,

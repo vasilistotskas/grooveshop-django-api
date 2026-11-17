@@ -25,7 +25,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.payments import CAPTURED
@@ -457,10 +457,12 @@ class TestACaptureTheLedgerNeverRecorded:
         with (
             FakeStripeRefunds() as stripe_api,
             mock.patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 return_value=intent,
             ) as retrieve,
-            mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
+            mock.patch(
+                "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+            ),
         ):
             first = OrderService.refund_order(order, amount=_eur("20.00"))
             second = OrderService.refund_order(order, amount=_eur("30.00"))
@@ -489,10 +491,12 @@ class TestACaptureTheLedgerNeverRecorded:
         with (
             FakeStripeRefunds() as stripe_api,
             mock.patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 return_value=intent,
             ),
-            mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
+            mock.patch(
+                "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+            ),
         ):
             result = OrderService.refund_order(order)
 

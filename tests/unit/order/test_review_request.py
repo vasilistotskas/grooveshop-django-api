@@ -19,15 +19,15 @@ from extra_settings.models import Setting
 
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut, EmailSwitch
-from order.enum.status import OrderStatus, PaymentStatus
-from order.factories.item import OrderItemFactory
-from order.factories.order import OrderFactory
-from order.models import Order, OrderHistory
-from order.review_request import (
+from order.communications.review_request import (
     MAX_DELAY_DAYS,
     delivery_window,
     validate_review_request_delay_days_setting,
 )
+from order.enum.status import OrderStatus, PaymentStatus
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
+from order.models import Order, OrderHistory
 from order.tasks import send_review_request_emails
 from product.enum.review import ReviewStatus
 from product.factories.product import ProductFactory

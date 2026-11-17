@@ -24,8 +24,8 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory
 from order.models.refund_attempt import RefundAttemptStatus
-from order.payment import REFUND_ATTEMPT_METADATA_KEY
-from order.payment_ledger import PaymentLedger
+from order.payments.payment import REFUND_ATTEMPT_METADATA_KEY
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_charge_refunded,
@@ -202,7 +202,7 @@ class TestRefundWebhook:
 
         with (
             patch(
-                "order.payment.stripe.Refund.retrieve",
+                "order.payments.payment.stripe.Refund.retrieve",
                 side_effect=stripe.APIConnectionError("down"),
             ),
             pytest.raises(stripe.APIConnectionError),
@@ -332,7 +332,9 @@ class TestRefundWebhook:
         """Stripe also notifies the refund ``refund_order`` just made, under
         its refund id; the ledger already holds it."""
         order = _order("pi_in_app_1", amount_due=Money("50.00", "EUR"))
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.return_value = (
                 True,
                 {"refund_id": "re_in_app_1", "amount": "15.00"},
@@ -351,7 +353,9 @@ class TestRefundWebhook:
         order = _order("pi_mixed_1", amount_due=Money("50.00", "EUR"))
 
         _deliver("re_mixed_dashboard", "pi_mixed_1", 500)
-        with patch("order.payment.get_payment_provider") as get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as get_provider:
             get_provider.return_value.refund_payment.return_value = (
                 True,
                 {"refund_id": "re_mixed_in_app", "amount": "5.00"},

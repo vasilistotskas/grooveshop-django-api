@@ -23,12 +23,12 @@ from django.utils import timezone
 from extra_settings.models import Setting
 from rest_framework.test import APIClient
 
-from order import payment_hold
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.attribution import OrderAttribution
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
+from order.payments import payment_hold
 from order.tasks import auto_cancel_stuck_pending_orders
 from pay_way.factories import PayWayFactory
 from scheduler.models import PeriodicTask

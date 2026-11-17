@@ -62,7 +62,7 @@ courier or carrier; the order stays DELIVERED until the payout is
 reconciled). An online-paid order is COMPLETED milliseconds after the
 carrier reports it delivered, before this mail is sent.
 
-**The review reminder** (`order.review_request`, `src/order/review_request.py`,
+**The review reminder** (`order.review_request`, `src/order/communications/review_request.py`,
 `order.tasks.send_review_request_emails`) is the second invitation, sent
 once, `REVIEW_REQUEST_DELAY_DAYS` days (store setting, default `0`, off: a
 store chooses to send it,

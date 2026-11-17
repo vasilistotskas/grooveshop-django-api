@@ -5,8 +5,8 @@ API domain (``https://<tenant-api-domain>/stripe/webhook/<uuid>/``), so
 ``TenantMainMiddleware`` has already selected the tenant schema before
 dj-stripe verifies and processes the event. Every Stripe object we
 create is additionally stamped with ``metadata.tenant_schema`` inside
-``order/payment.py`` — these helpers extract that value and re-enter the
-schema explicitly, which keeps the handlers correct as defense in depth
+``order/payments/payment.py`` — these helpers extract that value and re-enter
+the schema explicitly, which keeps the handlers correct as defense in depth
 (and for any event replayed outside a tenant request context).
 """
 

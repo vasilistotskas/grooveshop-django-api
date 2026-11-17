@@ -22,7 +22,7 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.factories.payment_transaction import PaymentTransactionFactory
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement

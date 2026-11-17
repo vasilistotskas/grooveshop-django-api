@@ -16,7 +16,9 @@ import pytest
 from django.conf import settings
 from django.utils.module_loading import import_string
 
-from order import payment_hold, review_request, stock
+from order.communications import review_request
+from order.inventory import stock
+from order.payments import payment_hold
 
 ORDER_VALIDATORS = {
     "validate_hold_minutes_setting": payment_hold,

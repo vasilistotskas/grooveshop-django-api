@@ -6,14 +6,14 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
-from order import payment_hold
 from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import OrderChangedDuringPaymentError
 from order.models import Order
-from order.payment import get_payment_provider
-from order.payment_binding import PaymentPurpose
+from order.payments import payment_hold
+from order.payments.payment import get_payment_provider
+from order.payments.payment_binding import PaymentPurpose
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -44,7 +44,7 @@ class PayWayService:
         by the hosted-checkout capability gate rather than being
         silently hidden from the shopper here.
         """
-        from order.payment import get_payment_provider_class
+        from order.payments.payment import get_payment_provider_class
 
         provider_class = get_payment_provider_class(provider_code)
         if provider_class is None:

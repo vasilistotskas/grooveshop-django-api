@@ -1601,8 +1601,8 @@ class TestGuestCheckoutsAreCleared:
     def _guest_order_holding_stock():
         from order.enum.status import OrderStatus, PaymentStatus
         from order.factories.order import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models.stock_reservation import StockReservation
-        from order.stock import StockManager
         from product.factories.product import ProductFactory
 
         # Outside the seeded catalogue, so ``_restore_demo_stock`` cannot
@@ -1679,8 +1679,8 @@ class TestGuestCheckoutsAreCleared:
 
         from order.enum.status import OrderStatus, PaymentStatus
         from order.factories.order import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models.stock_log import StockLog
-        from order.stock import StockManager
         from product.factories.product import ProductFactory
 
         product = ProductFactory(

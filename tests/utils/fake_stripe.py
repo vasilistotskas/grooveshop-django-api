@@ -52,9 +52,14 @@ class FakeStripe:
 def fake_stripe():
     stripe = FakeStripe()
     with (
-        patch("order.payment.stripe.PaymentIntent.create", stripe.create),
-        patch("order.payment.stripe.PaymentIntent.retrieve", stripe.retrieve),
-        patch("order.payment.PaymentIntent.sync_from_stripe_data"),
+        patch(
+            "order.payments.payment.stripe.PaymentIntent.create", stripe.create
+        ),
+        patch(
+            "order.payments.payment.stripe.PaymentIntent.retrieve",
+            stripe.retrieve,
+        ),
+        patch("order.payments.payment.PaymentIntent.sync_from_stripe_data"),
         patch(
             "tenant.credentials.stripe_credentials",
             return_value={

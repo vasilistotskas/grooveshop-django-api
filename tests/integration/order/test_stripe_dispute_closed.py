@@ -26,7 +26,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory, RefundNotification
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.signals import order_charged_back
 from order.signals.handlers import (
     handle_stripe_dispute_closed,
@@ -226,7 +226,7 @@ class TestDisputeLost:
         )
 
         with patch(
-            "order.payment_ledger.PaymentLedger.ensure_charge",
+            "order.payments.payment_ledger.PaymentLedger.ensure_charge",
             return_value=None,
         ):
             with pytest.raises(RuntimeError, match=DISPUTE):

@@ -155,7 +155,9 @@ class TestRefundOrderConcurrencyGuard:
             payment_status=PaymentStatus.REFUNDED
         )
 
-        with patch("order.payment.get_payment_provider") as mock_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_provider:
             with pytest.raises(PaymentError):
                 OrderService.refund_order(order, reason="dup")
 
@@ -172,7 +174,9 @@ class TestRefundOrderConcurrencyGuard:
             provider_reference="re_race_1",
         )
 
-        with patch("order.payment.get_payment_provider") as mock_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_provider:
             with pytest.raises(PaymentError, match=r"\(20\.00\)"):
                 OrderService.refund_order(
                     order, amount=Money("30.00", "EUR"), reason="dup"

@@ -135,7 +135,7 @@ and the courier, and nothing catches it afterwards. Always go through
 An online-payment order reserves its stock at creation, so how long it may wait
 for its payment is how long anyone can lock stock without paying. The hold is
 **short, and ends exactly when the payment can no longer succeed**
-(`src/order/payment_hold.py`). Releasing earlier would let a payment succeed on
+(`src/order/payments/payment_hold.py`). Releasing earlier would let a payment succeed on
 an order whose stock is gone (a paid-but-canceled order,
 [§2.2](state-machines.md) `record_payment_after_cancel`); releasing later only
 locks stock.

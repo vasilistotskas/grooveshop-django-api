@@ -139,7 +139,7 @@ the session's `amount_total` under the session's PaymentIntent id, so the
 
 ### 4.2a Stripe fee (`charge.succeeded`, `charge.updated`)
 
-`src/order/payment_fees.py`. A Stripe fee is the `fee` of the charge's balance
+`src/order/payments/payment_fees.py`. A Stripe fee is the `fee` of the charge's balance
 transaction, which dj-stripe syncs with the charge
 (`Charge.sync_from_stripe_data`, `Charge.balance_transaction`).
 `handle_stripe_charge_fee` writes it onto the CHARGE row keyed on the
@@ -329,7 +329,7 @@ amount does not once the sale was partly refunded). A capped entry says so in
 the red history line ("Chargeback €70.00 (disputed €100.00, €30.00 already
 returned)"). When nothing is left no row is written, but the history entry
 ("Chargeback of €X not recorded: nothing is left on the payment") and the staff
-email still go out, once (`order.disputes.announce_chargeback`; Viva remembers
+email still go out, once (`order.payments.disputes.announce_chargeback`; Viva remembers
 it in `metadata["dispute_resolved_id"]`, because each wallet movement of a
 dispute is an event of its own).
 

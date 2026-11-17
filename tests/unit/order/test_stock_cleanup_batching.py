@@ -17,9 +17,9 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
+from order.inventory.stock import StockManager
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
-from order.stock import StockManager
 from product.factories.product import ProductFactory
 
 pytestmark = pytest.mark.django_db

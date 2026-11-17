@@ -8,8 +8,8 @@ from order.exceptions import (
     InsufficientStockError,
     ProductNotFoundError,
 )
+from order.inventory.stock import StockManager
 from order.models import StockLog, StockReservation
-from order.stock import StockManager
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
 
@@ -690,7 +690,7 @@ class TestStockManagerConvertReservationToSale:
         from unittest.mock import patch
 
         self.patcher = patch(
-            "order.stock.StockManager.get_reservation_ttl_minutes",
+            "order.inventory.stock.StockManager.get_reservation_ttl_minutes",
             return_value=60,
         )
         self.patcher.start()

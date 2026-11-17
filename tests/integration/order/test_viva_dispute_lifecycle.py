@@ -25,7 +25,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.views.viva_webhook import (
     _handle_account_transaction_event,

@@ -279,7 +279,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             "shipping_kind": "home_delivery",
         }
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_online_flow_accepted_with_valid_data(

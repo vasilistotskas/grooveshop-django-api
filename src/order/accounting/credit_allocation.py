@@ -699,7 +699,7 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
     # release serving after the migration): what it put back onto cards is
     # payment the receipt holds. One that moved before an existing receipt
     # is netted by it and owes none, like every other source.
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment_ledger import PaymentLedger
 
     receipts = dict(
         Invoice.objects.filter(**scope).values_list("order_id", "created_at")
@@ -775,7 +775,7 @@ def allocate_order(order: Order) -> int:
     cost is that a younger source waits too, until the claim resolves and
     the next run decides both.
     """
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment_ledger import PaymentLedger
 
     done = 0
     pending = sorted(
@@ -896,7 +896,7 @@ def acknowledge_uncovered(order: Order, *, user) -> int:
 def _blocks(order: Order, owing: Owing, claim: RefundAttempt) -> bool:
     """Whether *claim* (PENDING) keeps *owing* undecided: whether releasing
     it alone, with no refund, would change what the source owes."""
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment_ledger import PaymentLedger
 
     if claim.pk in owing.exclude:
         return False
@@ -976,7 +976,7 @@ def excess_holders(
     """The PENDING provider claims that hold part of the order's duplicate
     payment that a refund of *amount* claimed now would take: releasing
     one alone would leave it more excess."""
-    from order.payment_ledger import PaymentLedger
+    from order.payments.payment_ledger import PaymentLedger
 
     held = min(PaymentLedger.refundable_excess(order, exclude=exclude), amount)
     return [

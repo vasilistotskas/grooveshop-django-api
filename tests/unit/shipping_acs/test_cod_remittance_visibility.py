@@ -414,8 +414,8 @@ def test_a_retired_voucher_cancels_the_order_properly(capsys):
     handed over; the order sat at PROCESSING with its unit still counted
     as sold. The replay must run the real cancel — stock back, payment
     settled, cancellation recorded — not a bare status flip."""
+    from order.inventory.stock import StockManager
     from order.models import OrderItem
-    from order.stock import StockManager
     from product.factories import ProductFactory
 
     product = ProductFactory(stock=10)

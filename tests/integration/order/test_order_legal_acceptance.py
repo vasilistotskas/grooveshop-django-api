@@ -170,7 +170,7 @@ class TestOrderLegalAcceptanceOnCreate(APITestCase):
 
         assert self._accepted(response)["terms"][2] == "<p>Όροι</p>"
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_the_payment_first_path_records_them_too(
         self, mock_get_provider, *_mocks
     ):
@@ -239,7 +239,7 @@ class TestOrderLegalAcceptanceOnCreate(APITestCase):
         assert not Order.objects.exists()
         assert not OrderLegalAcceptance.objects.exists()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_a_missing_text_refuses_before_the_payment_is_looked_up(
         self, mock_get_provider, *_mocks
     ):

@@ -23,7 +23,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment_binding import PaymentPurpose
+from order.payments.payment_binding import PaymentPurpose
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory

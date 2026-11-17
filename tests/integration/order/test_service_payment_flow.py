@@ -117,7 +117,7 @@ class TestCreateOrderFromCart:
             legal_acceptance=checkout_acceptance(), **kwargs
         )
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_creates_a_pending_order_from_the_cart(self, mock_get_provider):
         mock_get_provider.return_value = _provider_reporting(
             PaymentStatus.COMPLETED
@@ -151,7 +151,7 @@ class TestCreateOrderFromCart:
 
         assert not Order.objects.filter(user=self.user).exists()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_incomplete_shipping_address_is_refused(self, mock_get_provider):
         # The provider is asked about the intent BEFORE the order
         # transaction opens (no PSP call under the cart lock), so it must
@@ -165,7 +165,7 @@ class TestCreateOrderFromCart:
 
         assert not Order.objects.filter(user=self.user).exists()
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_failed_payment_intent_is_refused(self, mock_get_provider):
         mock_get_provider.return_value = _provider_reporting(
             PaymentStatus.FAILED
@@ -177,7 +177,7 @@ class TestCreateOrderFromCart:
         assert "invalid state" in str(exc_info.value).lower()
         assert "FAILED" in str(exc_info.value)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_insufficient_stock_is_refused_and_moves_no_stock(
         self, mock_get_provider
     ):
@@ -204,7 +204,7 @@ class TestCreateOrderFromCart:
             product.refresh_from_db()
             assert product.stock == stock
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_converts_the_carts_reservations_into_the_sale(
         self, mock_get_provider
     ):
@@ -237,7 +237,7 @@ class TestCreateOrderFromCart:
         self.product2.refresh_from_db()
         assert (self.product1.stock, self.product2.stock) == (18, 14)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_without_reservations_decrements_stock_directly(
         self, mock_get_provider
     ):
@@ -252,7 +252,7 @@ class TestCreateOrderFromCart:
         self.product2.refresh_from_db()
         assert (self.product1.stock, self.product2.stock) == (18, 14)
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_cart_clears_at_creation_for_an_offline_pay_way(
         self, mock_get_provider
     ):
@@ -272,7 +272,7 @@ class TestCreateOrderFromCart:
         assert self.cart.items.count() == 0
         assert order.items.count() == 2
 
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_cart_survives_until_a_hosted_payment_completes(
         self, mock_get_provider
     ):

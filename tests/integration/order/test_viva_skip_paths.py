@@ -223,7 +223,7 @@ def test_viva_numeric_currency_codes_normalise():
     """Grounded in Viva's Payment API spec
     (https://developer.viva.com/apis-for-payments/payment-api/):
     Retrieve Transaction returns ``currencyCode: "978"``."""
-    from order.payment import alpha_currency
+    from order.payments.payment import alpha_currency
 
     assert alpha_currency("978") == "EUR"
     assert alpha_currency("840") == "USD"

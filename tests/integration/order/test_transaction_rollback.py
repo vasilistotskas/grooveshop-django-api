@@ -8,10 +8,10 @@ from djmoney.money import Money
 from cart.models import Cart, CartItem
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
+from order.inventory.stock import StockManager
 from order.models import Order, OrderItem
 from order.models.stock_log import StockLog
 from order.services import OrderService
-from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.legal import checkout_acceptance
@@ -65,7 +65,7 @@ class TestTransactionFailuresRollbackCompletely:
             "stock_log_save_fails",
         ],
     )
-    @patch("order.payment.get_payment_provider")
+    @patch("order.payments.payment.get_payment_provider")
     def test_order_creation_rollback_on_failure(
         self,
         mock_get_provider,
@@ -349,7 +349,7 @@ class TestTransactionFailuresRollbackCompletely:
 
         # Patch StockManager.increment_stock to raise exception
         with patch(
-            "order.stock.StockManager.increment_stock",
+            "order.inventory.stock.StockManager.increment_stock",
             side_effect=Exception("Stock increment failed"),
         ):
             # Service should NOT raise - it logs the error and continues
@@ -526,7 +526,9 @@ class TestTransactionFailuresRollbackCompletely:
         payment_intent_id = f"pi_test_multi_{timezone.now().timestamp()}"
 
         # Mock payment provider
-        with patch("order.payment.get_payment_provider") as mock_get_provider:
+        with patch(
+            "order.payments.payment.get_payment_provider"
+        ) as mock_get_provider:
             mock_provider = Mock()
             mock_provider.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,

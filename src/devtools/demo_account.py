@@ -1530,10 +1530,10 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
     from django.db.models import F, Sum
 
     from order.exceptions import StockReservationError
+    from order.inventory.stock import StockManager
     from order.models.order import Order
     from order.models.stock_log import StockLog
     from order.models.stock_reservation import StockReservation
-    from order.stock import StockManager
     from product.models import Product
     from promotion.models.redemption import PromotionRedemption
 

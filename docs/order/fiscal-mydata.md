@@ -185,7 +185,7 @@ reversed in fact, and art. 12(4) (a credit "in the case of discounts or
 refunds") applies. Nothing on the ledger tells the two apart, so an order with
 a CHARGEBACK row offers the "Settle chargeback (goods)" action: «Το προϊόν
 επιστράφηκε / δεν παραδόθηκε» or «Ο πελάτης κράτησε το προϊόν».
-`order.chargebacks.decide_chargebacks` writes one `ChargebackDecision` per
+`order.accounting.chargebacks.decide_chargebacks` writes one `ChargebackDecision` per
 CHARGEBACK row (no row = undecided), for every chargeback of the order, with
 `decided_by`, `decided_at` and a note in the order history. Returned goes
 through the one credit path: `create_pending_credits` credits each such

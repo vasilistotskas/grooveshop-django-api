@@ -59,8 +59,8 @@ class TestCancelOrderWithStockManager:
         """A line whose stock was taken and a line whose stock was not, on
         one order: only the first comes back."""
         from order.factories import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models import OrderItem
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         taken = ProductFactory(stock=10)
@@ -94,8 +94,8 @@ class TestCancelOrderWithStockManager:
         """The restore is derived from the order's own net movement, so a
         second pass finds nothing outstanding."""
         from order.factories import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models import OrderItem
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         product = ProductFactory(stock=10)
@@ -134,8 +134,8 @@ class TestCancelOrderWithStockManager:
         those units, and the (already consumed) reservation id in the
         metadata does not make the cancel fail."""
         from order.factories import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models import OrderItem, StockReservation
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         product = ProductFactory(stock=5)
@@ -177,8 +177,8 @@ class TestAdjustStockAuditRow:
     order by summing its rows — so a row must record what MOVED."""
 
     def test_a_floored_decrement_logs_only_what_moved(self):
+        from order.inventory.stock import StockManager
         from order.models import StockLog
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         product = ProductFactory(stock=2)
@@ -198,8 +198,8 @@ class TestAdjustStockAuditRow:
         assert "floored" in log.reason
 
     def test_an_unfloored_adjustment_is_logged_verbatim(self):
+        from order.inventory.stock import StockManager
         from order.models import StockLog
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         product = ProductFactory(stock=10)
@@ -217,8 +217,8 @@ class TestAdjustStockAuditRow:
         """The two defects compose: an over-large admin edit followed by
         a cancellation."""
         from order.factories import OrderFactory
+        from order.inventory.stock import StockManager
         from order.models import OrderItem
-        from order.stock import StockManager
         from product.factories import ProductFactory
 
         product = ProductFactory(stock=2)

@@ -60,7 +60,7 @@ from order.models.refund_attempt import (
     RefundAttemptStatus,
     RefundReason,
 )
-from order.payment_ledger import PaymentLedger
+from order.payments.payment_ledger import PaymentLedger
 from order.refunds.refund_lines import held_values, plan_pieces
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata

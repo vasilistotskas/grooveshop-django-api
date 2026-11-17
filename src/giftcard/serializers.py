@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from giftcard.models import GiftCard, GiftCardTransaction
 from giftcard.providers import DEFAULT_GIFT_CARD_PROVIDER
-from order.payment import registered_provider_codes
+from order.payments.payment import registered_provider_codes
 
 
 class GiftCardCheckRequestSerializer(serializers.Serializer):

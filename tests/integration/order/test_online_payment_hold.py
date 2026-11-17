@@ -22,13 +22,16 @@ from djmoney.money import Money
 from extra_settings.models import Setting
 from rest_framework.test import APIClient
 
-from order import payment_hold
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
+from order.inventory.stock import StockManager
 from order.models.order import Order
-from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
-from order.payment_binding import PaymentPurpose
-from order.stock import StockManager
+from order.payments import payment_hold
+from order.payments.payment import (
+    StripePaymentProvider,
+    VivaWalletPaymentProvider,
+)
+from order.payments.payment_binding import PaymentPurpose
 from order.tasks import auto_cancel_stuck_pending_orders
 from order.views.viva_webhook import _handle_payment_created
 from pay_way.enum.settlement import PaySettlement
@@ -120,7 +123,7 @@ class TestTheExpiryReachesTheProvider:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.checkout.Session.create",
+                "order.payments.payment.stripe.checkout.Session.create",
                 return_value=session,
             ) as create,
         ):
@@ -149,7 +152,7 @@ class TestTheExpiryReachesTheProvider:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.checkout.Session.create",
+                "order.payments.payment.stripe.checkout.Session.create",
                 return_value=session,
             ) as create,
         ):
@@ -470,7 +473,7 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
             ) as cancel,
         ):
@@ -489,11 +492,11 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 side_effect=stripe.InvalidRequestError("busy", "id"),
             ),
             patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 return_value=Mock(status="succeeded"),
             ),
         ):
@@ -510,7 +513,7 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 side_effect=stripe.APIConnectionError("down"),
             ),
         ):
@@ -525,7 +528,9 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         _age(order, hold_expires=timezone.now() - timedelta(minutes=6))
         with (
             _provider_with_stripe_key(),
-            patch("order.payment.stripe.PaymentIntent.cancel") as cancel,
+            patch(
+                "order.payments.payment.stripe.PaymentIntent.cancel"
+            ) as cancel,
         ):
             auto_cancel_stuck_pending_orders()
 
@@ -551,7 +556,7 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
             ) as cancel,
         ):
@@ -567,11 +572,11 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 side_effect=stripe.InvalidRequestError("canceled", "id"),
             ),
             patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 return_value=Mock(status="canceled"),
             ),
         ):
@@ -588,11 +593,11 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 side_effect=stripe.InvalidRequestError("succeeded", "id"),
             ),
             patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 return_value=Mock(status="succeeded"),
             ),
         ):
@@ -608,7 +613,7 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 side_effect=stripe.APIConnectionError("down"),
             ),
         ):
@@ -626,7 +631,7 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
             ),
         ):
@@ -701,10 +706,11 @@ class TestARetryClosesThePaymentItReplaces:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payment.stripe.PaymentIntent.cancel", **(cancel or {})
+                "order.payments.payment.stripe.PaymentIntent.cancel",
+                **(cancel or {}),
             ) as cancelled,
             patch(
-                "order.payment.stripe.PaymentIntent.retrieve",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 **(retrieve or {}),
             ),
             patch.object(

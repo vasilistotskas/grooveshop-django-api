@@ -159,8 +159,8 @@ class CartServiceTest(TestCase):
         clear them either: it matches on `reserved_by` (null for a
         guest) or the CURRENT cart's uuid, and neither still applies.
         """
+        from order.inventory.stock import StockManager
         from order.models.stock_reservation import StockReservation
-        from order.stock import StockManager
 
         product = ProductFactory(num_images=0, num_reviews=0, stock=3)
         guest_cart = CartFactory(user=None, num_cart_items=0)

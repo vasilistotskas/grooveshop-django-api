@@ -19,11 +19,11 @@ class PaymentTransaction(models.Model):
 
     Append-only: a row is never updated or deleted, and a correction is
     another row. The order's financial state is DERIVED from these rows
-    (``order.payment_ledger.PaymentLedger``), so the amount collected, the
-    amount refunded, what can still be refunded and what the customer
-    still owes each have one source and cannot drift apart the way the
-    old ``metadata["refunds"]`` list could. ``Order.amount_due`` is what
-    the order costs, never what was paid.
+    (``order.payments.payment_ledger.PaymentLedger``), so the amount
+    collected, the amount refunded, what can still be refunded and what the
+    customer still owes each have one source and cannot drift apart the way
+    the old ``metadata["refunds"]`` list could. ``Order.amount_due`` is
+    what the order costs, never what was paid.
 
     The one column written after the row exists is ``fee``: what the
     provider charged for the movement, which it reports later than the

@@ -20,7 +20,7 @@ from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
-from order.payment_hold import (
+from order.payments.payment_hold import (
     awaiting_payment,
     awaits_payment_review,
     decided_by,

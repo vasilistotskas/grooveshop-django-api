@@ -35,7 +35,7 @@ Two entry points in `src/order/services.py` (the legacy
   prices loyalty and gift cards under their own locks). Order of checks
   therefore changed: a cart that cannot be checked out costs one provider
   read first, with no lock.
-- **The intent must be this cart's** (`src/order/payment_binding.py`,
+- **The intent must be this cart's** (`src/order/payments/payment_binding.py`,
   `OrderService._verify_intent_binding`). An intent proves that money moved,
   not what for, so each intent is tied to its purpose. Every PaymentIntent we
   create now carries server-set metadata

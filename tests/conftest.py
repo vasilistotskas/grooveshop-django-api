@@ -556,7 +556,7 @@ def _reset_payment_events_redis_client():
     ``patch('redis.Redis')`` mocks aren't bypassed by a stale instance
     saved by an earlier test in the same process.
     """
-    import order.payment_events as payment_events_module
+    import order.payments.payment_events as payment_events_module
 
     payment_events_module._redis_client = None
     yield
@@ -898,11 +898,11 @@ def trust_intent_binding():
     """Let a test whose mocked provider returns a bare intent create an order.
 
     ``OrderService.create_order_from_cart`` refuses an intent whose
-    server-set metadata does not name the cart (``order.payment_binding``).
-    Tests about something else (stock, totals, attribution) mock the
-    provider with no metadata; this accepts their intent so they stay about
-    that. The refusal itself is covered, unpatched, in
-    ``tests/integration/order/test_payment_binding.py``.
+    server-set metadata does not name the cart
+    (``order.payments.payment_binding``). Tests about something else (stock,
+    totals, attribution) mock the provider with no metadata; this accepts
+    their intent so they stay about that. The refusal itself is covered,
+    unpatched, in ``tests/integration/order/test_payment_binding.py``.
     """
     from unittest.mock import patch
 

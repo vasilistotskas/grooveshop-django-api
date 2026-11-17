@@ -58,16 +58,16 @@ from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
 from core.forms.choices import BLANK_CHOICE_LABEL
 from order.accounting import credit_allocation
+from order.accounting.chargebacks import (
+    ChargebackDecisionError,
+    decide_chargebacks,
+)
 from order.accounting.invoicing import (
     ReceiptNotIssuable,
     generate_invoice,
     receipt_issuable,
 )
 from order.accounting.taxation import breakdown_by_rate, order_vat_lines
-from order.chargebacks import (
-    ChargebackDecisionError,
-    decide_chargebacks,
-)
 from order.checkout.attribution import source_label
 from order.checkout.discounts import discounted_line_gross
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -96,8 +96,8 @@ from order.models.refund_attempt import RefundAttempt, RefundReason
 from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
-from order.payment import payment_provider_label
-from order.payment_ledger import (
+from order.payments.payment import payment_provider_label
+from order.payments.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
@@ -928,7 +928,7 @@ class RestockReturnedForm(BaseDialogForm):
 class ChargebackDecisionForm(BaseDialogForm):
     """The "Settle chargeback" dialog of an order: what became of the goods
     of a lost dispute. The decision applies to every chargeback of the
-    order (``order.chargebacks.decide_chargebacks``)."""
+    order (``order.accounting.chargebacks.decide_chargebacks``)."""
 
     OUTCOME_RETURNED = "returned"
     OUTCOME_KEPT = "kept"

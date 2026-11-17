@@ -5,8 +5,8 @@ import pytest
 from django.conf import settings
 from djmoney.money import Money
 
-from order.payment import StripePaymentProvider
-from order.payment_binding import PaymentPurpose
+from order.payments.payment import StripePaymentProvider
+from order.payments.payment_binding import PaymentPurpose
 
 
 class StripePaymentAmountTestCase(TestCase):
@@ -27,8 +27,8 @@ class StripePaymentAmountTestCase(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.logger")
     def test_process_payment_converts_to_cents(
         self, mock_logger, mock_stripe_create
     ):
@@ -40,7 +40,9 @@ class StripePaymentAmountTestCase(TestCase):
         mock_pi.next_action = None
         mock_stripe_create.return_value = mock_pi
 
-        with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
+        with mock.patch(
+            "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+        ):
             provider = StripePaymentProvider()
             amount = Money(Decimal("10.50"), settings.DEFAULT_CURRENCY)
             provider.process_payment(
@@ -53,8 +55,8 @@ class StripePaymentAmountTestCase(TestCase):
             call_kwargs = mock_stripe_create.call_args[1]
             self.assertEqual(call_kwargs["amount"], 1050)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.logger")
     def test_process_payment_small_amount_above_minimum(
         self, mock_logger, mock_stripe_create
     ):
@@ -66,7 +68,9 @@ class StripePaymentAmountTestCase(TestCase):
         mock_pi.next_action = None
         mock_stripe_create.return_value = mock_pi
 
-        with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
+        with mock.patch(
+            "order.payments.payment.PaymentIntent.sync_from_stripe_data"
+        ):
             provider = StripePaymentProvider()
             amount = Money(Decimal("0.65"), settings.DEFAULT_CURRENCY)
             success, _data = provider.process_payment(
@@ -80,8 +84,8 @@ class StripePaymentAmountTestCase(TestCase):
             call_kwargs = mock_stripe_create.call_args[1]
             self.assertEqual(call_kwargs["amount"], 65)
 
-    @mock.patch("order.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.logger")
     def test_process_payment_below_stripe_minimum_fails(
         self, mock_logger, mock_stripe_create
     ):
@@ -105,8 +109,8 @@ class StripePaymentAmountTestCase(TestCase):
         self.assertFalse(success)
         self.assertIn("error", data)
 
-    @mock.patch("order.payment.stripe.checkout.Session.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.checkout.Session.create")
+    @mock.patch("order.payments.payment.logger")
     def test_checkout_session_splits_shipping_from_total(
         self, mock_logger, mock_session_create
     ):
@@ -147,8 +151,8 @@ class StripePaymentAmountTestCase(TestCase):
             300,
         )
 
-    @mock.patch("order.payment.stripe.checkout.Session.create")
-    @mock.patch("order.payment.logger")
+    @mock.patch("order.payments.payment.stripe.checkout.Session.create")
+    @mock.patch("order.payments.payment.logger")
     def test_checkout_session_no_shipping_when_free(
         self, mock_logger, mock_session_create
     ):

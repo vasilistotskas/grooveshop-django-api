@@ -1,11 +1,11 @@
-"""Unit tests for order.payment_events."""
+"""Unit tests for order.payments.payment_events."""
 
 from __future__ import annotations
 
 import json
 from unittest.mock import MagicMock, patch
 
-from order.payment_events import (
+from order.payments.payment_events import (
     PAYMENT_STATUS_CHANNEL_PREFIX,
     payment_status_channel,
     publish_payment_status,
@@ -36,11 +36,12 @@ def test_publish_payment_status_fires_redis_publish_with_expected_payload():
     order.payment_id = "pi_123"
 
     # Redis is lazy-imported inside _publish, so patch at its source
-    # (redis.Redis) rather than as an attribute of order.payment_events.
+    # (redis.Redis) rather than as an attribute of
+    # order.payments.payment_events.
     with (
         patch("redis.Redis") as redis_cls,
         patch(
-            "order.payment_events.transaction.on_commit",
+            "order.payments.payment_events.transaction.on_commit",
             side_effect=lambda cb: cb(),
         ),
     ):
@@ -77,7 +78,7 @@ def test_publish_payment_status_swallows_redis_errors():
             side_effect=RuntimeError("redis down"),
         ),
         patch(
-            "order.payment_events.transaction.on_commit",
+            "order.payments.payment_events.transaction.on_commit",
             side_effect=lambda cb: cb(),
         ),
     ):

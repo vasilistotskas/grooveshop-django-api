@@ -414,7 +414,7 @@ class LoyaltyService:
         # the store undoing the order but the customer taking the money back
         # through their bank, so the points they spent on it stay spent
         # (owner decision, 2026-10-17). The earned points still come off.
-        from order.payment_ledger import PaymentLedger
+        from order.payments.payment_ledger import PaymentLedger
 
         redeemed_total = (
             redeem_transactions.aggregate(total=Sum("points"))["total"] or 0

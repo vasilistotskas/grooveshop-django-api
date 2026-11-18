@@ -382,8 +382,9 @@ def fanout_purge_expired_pending_payment_fees():
 
 # Order events owed to the agent gateway, for every store it can resolve:
 # an active one (``tenant/resolve``), a leftover ``suspended_at`` or not.
-# ``run_for_all_tenants`` never reaches an inactive store, and
-# ``agent.outbox._store_is_active`` holds its events at every attempt.
+# The run reaches a suspended store too, where
+# ``agent.outbox._store_is_active`` holds its events: the run stops at its
+# first event, with no attempt spent.
 @celery_app.task(base=TenantTask)
 def fanout_deliver_due_agent_order_events():
     return run_for_all_tenants(

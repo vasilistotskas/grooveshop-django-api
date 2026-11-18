@@ -63,6 +63,37 @@ class TestEagerTaskBindsItsStore:
 
         assert result["schema"] == "public"
 
+    def test_a_task_whose_store_was_destroyed_does_not_run(self):
+        """Queued for a store whose destroy committed before a worker took
+        it: its schema is gone, so the search path would fall through to
+        public's tables."""
+        from django.utils import timezone
+
+        from tenant.models import TenantArchive
+
+        TenantArchive.objects.create(
+            schema_name="destroyed_store",
+            tenant_name="Destroyed",
+            destroyed_at=timezone.now(),
+        )
+
+        result = probe_task.apply_async(
+            headers={"_schema_name": "destroyed_store"}
+        ).get()
+
+        assert result is None
+
+    def test_a_schema_with_no_store_row_still_runs_bare(self):
+        result = probe_task.apply_async(
+            headers={"_schema_name": "rowless_schema"}
+        ).get()
+
+        assert result == {
+            "schema": "rowless_schema",
+            "is_row": False,
+            "pk": None,
+        }
+
 
 class TestWorkerRequestCarriesTheSchema:
     def test_a_worker_message_header_reaches_request_headers(self):

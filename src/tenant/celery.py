@@ -69,11 +69,25 @@ class TenantTask(Task):
         # unconfigured regardless of what the tenant actually has set.
         # ``tenant_context(tenant)`` sets ``connection.tenant`` to the
         # real row instead.
-        from tenant.models import Tenant
+        from tenant.models import Tenant, TenantArchive
 
         try:
             tenant = Tenant.objects.get(schema_name=schema_name)
         except Tenant.DoesNotExist:
+            # The store was destroyed after the task was queued: a fan-out
+            # reaches suspended stores, which are the ones that can be
+            # destroyed, and ``destroy_tenant`` records each one it drops in
+            # ``TenantArchive``. With the schema gone the search path falls
+            # through to public, so the task would read and write the
+            # platform's own tables of every app the two share.
+            if TenantArchive.objects.filter(schema_name=schema_name).exists():
+                logger.warning(
+                    "TenantTask: the store of schema=%s was destroyed; %s "
+                    "not run",
+                    schema_name,
+                    self.name,
+                )
+                return None
             logger.warning(
                 "TenantTask: no Tenant row for schema=%s — falling back to "
                 "a bare schema context (tenant.credentials.* will read as "
@@ -93,7 +107,10 @@ def run_for_all_tenants(
     include_suspended: bool = False,
     **kwargs: Any,
 ) -> list[dict[str, str]]:
-    """Fan-out a task to all active tenant schemas.
+    """Fan-out a task to every active store, or every store.
+
+    ``include_suspended`` reaches suspended stores too
+    (``Tenant.objects.stores()`` against ``Tenant.objects.active()``).
 
     Returns JSON-serializable dispatch records, NOT ``AsyncResult``
     objects. Celery encodes a task's return value into the result
@@ -135,13 +152,15 @@ def run_for_all_tenants(
     # Anything that starts new work for the store (polls, syncs, mail)
     # stays off.
     #
-    # ``is_active`` stays required either way: an inactive tenant may
-    # be mid-offboarding and its schema may already be gone.
-    tenants = Tenant.objects.filter(is_active=True).exclude(
-        schema_name="public"
+    # A store being destroyed needs no filter: ``destroy_tenant`` drops
+    # its schema and deletes its row in one transaction, so every row read
+    # here has its schema. A task queued just before that commits finds
+    # neither, and ``TenantTask`` does not run it.
+    tenants = (
+        Tenant.objects.stores()
+        if include_suspended
+        else Tenant.objects.active()
     )
-    if not include_suspended:
-        tenants = tenants.filter(suspended_at__isnull=True)
     for tenant in tenants:
         from core import celery_app
 

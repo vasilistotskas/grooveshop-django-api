@@ -11,6 +11,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
+from django_tenants.utils import get_public_schema_name
 from knox.models import AbstractAuthToken
 from simple_history.models import HistoricalRecords
 
@@ -69,6 +70,25 @@ class SuspendedReason(models.TextChoices):
 
     MANUAL = "manual", _("Manual")
     BILLING = "billing", _("Billing")
+
+
+class TenantQuerySet(models.QuerySet):
+    """Which stores a piece of work reaches, read from the lifecycle's state.
+
+    ``tenant.lifecycle`` keeps a store row in one of two states: active, or
+    suspended (``is_active`` false, ``suspended_at`` stamped). Destroying a
+    store drops its schema and deletes its row in one transaction
+    (``destroy_tenant``), so there is no row left behind for a store being
+    removed, and every row these return is a store whose schema exists.
+    """
+
+    def stores(self) -> TenantQuerySet:
+        """Every store, active or suspended: each row but the platform's."""
+        return self.exclude(schema_name=get_public_schema_name())
+
+    def active(self) -> TenantQuerySet:
+        """The stores that are neither suspended nor switched off."""
+        return self.stores().filter(is_active=True, suspended_at__isnull=True)
 
 
 class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
@@ -1200,6 +1220,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
 
     auto_create_schema = True
+
+    objects = TenantQuerySet.as_manager()
 
     def save(self, *args, **kwargs):
         """Bump ``cache_generation`` in the same UPDATE as the write.

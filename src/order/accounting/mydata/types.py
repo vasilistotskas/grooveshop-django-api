@@ -65,6 +65,26 @@ CLASSIFICATION_TYPE_RETAIL_GOODS = "E3_561_003"
 CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_1"
 
 
+# ── Movement indication (myDATA REST API v2.0.2) ─────────────────
+# A receipt that is also the movement document (``isDeliveryNote``) states
+# why the goods move (annex 8.14, ``movePurpose`` 1 = «Πώληση») and, per
+# goods line, the unit its quantity counts (annex 8.13, ``measurementUnit``
+# 1 = «Τεμάχια»). AADE's ``AddressType`` caps ``street`` and ``city`` at
+# 150 characters.
+MOVE_PURPOSE_SALE = 1
+MEASUREMENT_UNIT_PIECES = 1
+ADDRESS_TEXT_MAX_LENGTH = 150
+
+# ── transmissionFailure (AadeBookInvoiceType, v2.0.2) ─────────────
+# xs:byte 1-4 in the XSD. The REST API documentation (§5, the invoice
+# table): 1, 2 and 4 are for documents sent by a licensed provider; 3,
+# «Απώλεια διασύνδεσης», is the one value an ERP may send. Α.1233/2026 annex
+# §12.1: a movement document issued during a loss of connection is issued
+# «με διακριτή ένδειξη για την απώλεια διασύνδεσης» and transmitted as soon
+# as the connection is back.
+TRANSMISSION_FAILURE_ERP_CONNECTION_LOST = 3
+
+
 # ── AADE error codes we branch on explicitly ─────────────────────
 # Full catalogue lives in the AADE portal; we only name-check the
 # ones with custom handling. Everything else is treated as a

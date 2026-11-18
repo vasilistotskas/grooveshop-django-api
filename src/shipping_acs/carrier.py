@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping.interfaces import (
+    PostalAddress,
+    ShippingCarrierInterface,
+    register_provider,
+)
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -68,6 +72,23 @@ class AcsCarrier(ShippingCarrierInterface):
 
     def shipment_for_order(self, order: Order):
         return getattr(order, "acs_shipment", None)
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
+        if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
+            return None
+        station = shipment.station_destination
+        if station is None or not (station.postal_code and station.city):
+            raise ValueError(
+                "The address of ACS station "
+                f"{shipment.station_destination_external_id} "
+                f"{shipment.station_branch_destination} is not known."
+            )
+        return PostalAddress(
+            street=station.address_line_1,
+            number="",
+            postal_code=station.postal_code,
+            city=station.city,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

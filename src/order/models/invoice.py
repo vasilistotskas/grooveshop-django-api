@@ -396,6 +396,41 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             "Buyer name / email / billing address captured at issue time."
         ),
     )
+    movement = models.JSONField(
+        _("Movement"),
+        default=dict,
+        db_default={},
+        blank=True,
+        help_text=_(
+            "The movement indication the receipt was sent to myDATA with: "
+            "dispatch date and time, loading and delivery address. Empty "
+            "for a receipt without one (an order that does not move "
+            "through a carrier)."
+        ),
+    )
+    transmission_failed_at = models.DateTimeField(
+        _("Issued Without Connection At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the receipt, which carries a movement indication, could "
+            "not be transmitted to myDATA because AADE did not answer. It "
+            "is then sent with AADE's loss-of-connection indication "
+            "(transmissionFailure 3) until it is registered, and the "
+            "parcel ships meanwhile."
+        ),
+    )
+    cancel_requested_at = models.DateTimeField(
+        _("Cancel Requested At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the order was canceled before its parcel left the store: "
+            "the receipt, never handed to the customer, is canceled in "
+            "myDATA instead of credited, unless the courier could not stop "
+            "the parcel."
+        ),
+    )
     currency = models.CharField(
         _("Currency"),
         max_length=10,
@@ -432,13 +467,22 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         """True when the PDF has been generated and stored."""
         return bool(self.document_file and self.document_file.name)
 
+    def awaits_the_parcel(self) -> bool:
+        """True for a receipt with movement indication whose parcel has not
+        left yet: it is not handed to the customer before it does, so an
+        order canceled meanwhile can have it canceled in myDATA, which
+        AADE allows only for a document never used (Α.1138/2020 annex)."""
+        return bool(self.movement) and self.order.shipped_at is None
+
     def is_deliverable(self) -> bool:
         """True when the receipt may reach the customer: AADE registered it
-        (CONFIRMED, with its MARK) and its PDF is stored. A receipt that is
+        (CONFIRMED, with its MARK), its PDF is stored, and the parcel it
+        moves with has left (:meth:`awaits_the_parcel`). A receipt that is
         pending, rejected or cancelled is not a valid tax document, so it
         is never offered for download."""
         return (
             self.mydata_status == MyDataStatus.CONFIRMED
             and self.mydata_mark is not None
             and self.has_document()
+            and not self.awaits_the_parcel()
         )

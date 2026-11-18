@@ -1210,7 +1210,9 @@ class StoreAlerts(DashboardWidget):
         ]
 
     def _mydata(self) -> list[dict[str, Any]]:
+        from order.accounting.movement import loading_address
         from order.accounting.mydata.config import load_config
+        from order.models.invoice import Invoice, MyDataStatus
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.
@@ -1274,6 +1276,55 @@ class StoreAlerts(DashboardWidget):
                     link=(
                         self.changelist_url("tenant.Tenant"),
                         _("Fix in settings"),
+                    ),
+                )
+            )
+        offline = Invoice.objects.filter(
+            transmission_failed_at__isnull=False, mydata_mark__isnull=True
+        ).exclude(
+            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
+        waiting = offline.count()
+        if waiting:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cloud_sync",
+                    _("Receipts issued while myDATA was unreachable"),
+                    ngettext(
+                        "%(count)s receipt was issued under AADE's "
+                        "loss-of-connection procedure and is not registered "
+                        "yet. Its parcel ships as usual; it is sent again "
+                        "automatically once myDATA answers.",
+                        "%(count)s receipts were issued under AADE's "
+                        "loss-of-connection procedure and are not registered "
+                        "yet. Their parcels ship as usual; they are sent "
+                        "again automatically once myDATA answers.",
+                        waiting,
+                    )
+                    % {"count": waiting},
+                )
+            )
+        try:
+            loading_address()
+        except ValueError:
+            alerts.append(
+                _alert(
+                    "danger",
+                    "local_shipping",
+                    _("Courier receipts cannot be sent: no dispatch point"),
+                    _(
+                        "A courier or locker order's receipt names the place "
+                        "its parcel leaves from, and is refused until it is "
+                        "set. Fill in MYDATA_LOADING_POSTAL_CODE and "
+                        "MYDATA_LOADING_CITY (and the street), then send the "
+                        "refused receipts again from their orders."
+                    ),
+                    link=(
+                        self.changelist_url(
+                            "extra_settings.Setting", "q=MYDATA_LOADING_"
+                        ),
+                        _("Open the dispatch point settings"),
                     ),
                 )
             )

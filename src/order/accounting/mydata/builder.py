@@ -16,6 +16,13 @@ Invoices (1.1) and credit invoices (5.1) are not built here: AADE decision
 Α.1128/2025 art. 1(2) takes them off the ERP channel (see
 ``order.accounting.mydata.types``).
 
+The receipt of an order that moves through a carrier also carries its
+movement indication (``order.accounting.movement``): ``dispatchDate``,
+``dispatchTime``, ``movePurpose``, ``otherDeliveryNoteHeader`` (loading and
+delivery address) and ``isDeliveryNote`` in the header, and the quantity
+and its unit on each goods line. Shipping and the payment fee are no
+goods, so their lines carry none.
+
 Element ordering inside ``<invoice>`` is fixed by AADE's schema:
 ``issuer, counterpart, paymentMethods, invoiceHeader, invoiceDetails,
 taxesTotals, invoiceSummary`` — see the notes at each element for what the
@@ -39,17 +46,21 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from order.accounting.mydata.types import (
+    ADDRESS_TEXT_MAX_LENGTH,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
     INVOICE_TYPE_RETAIL_CREDIT,
     INVOICE_TYPE_RETAIL_RECEIPT,
+    MEASUREMENT_UNIT_PIECES,
+    MOVE_PURPOSE_SALE,
     PAYMENT_METHOD_CASH,
     PAYMENT_METHOD_POS_CARD,
     PAYMENT_METHOD_WEB_BANKING,
+    TRANSMISSION_FAILURE_ERP_CONNECTION_LOST,
     VAT_CATEGORY_0,
     VAT_CATEGORY_3,
     VAT_CATEGORY_4,
@@ -61,9 +72,13 @@ from order.accounting.mydata.types import (
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
 from order.accounting.mydata.uid import build_uid
-from order.accounting.taxation import order_vat_lines
+from order.accounting.taxation import ChargeKind, order_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
+
+if TYPE_CHECKING:
+    from order.accounting.movement import ReceiptMovement
+    from shipping.interfaces import PostalAddress
 
 # VAT rate → AADE ``vatCategory``. Strict whitelist per v1.0.10 annex
 # 8.x; unknown rates are treated as a bug upstream (in master data)
@@ -120,6 +135,7 @@ def _emit_detail(
     parent: Element,
     *,
     line_number: int,
+    quantity: int | None,
     line_net: Decimal,
     line_vat: Decimal,
     rate: Decimal,
@@ -134,6 +150,9 @@ def _emit_detail(
     ``vatCategory=7`` (error 217)."""
     row = SubElement(parent, "invoiceDetails")
     SubElement(row, "lineNumber").text = str(line_number)
+    if quantity is not None:
+        SubElement(row, "quantity").text = str(quantity)
+        SubElement(row, "measurementUnit").text = str(MEASUREMENT_UNIT_PIECES)
     SubElement(row, "netValue").text = _money(line_net)
     SubElement(row, "vatCategory").text = str(_vat_category(rate))
     SubElement(row, "vatAmount").text = _money(line_vat)
@@ -191,6 +210,9 @@ class BuiltInvoice:
     invoice_type: str
     series: str
     aa: int
+    #: The receipt's movement indication, persisted with the identity
+    #: fields (``Invoice.movement``); ``None`` for a document without one.
+    movement: ReceiptMovement | None = None
 
 
 def _pick_payment_type(invoice: Any) -> int:
@@ -277,11 +299,13 @@ def _payment_rows(invoice: Any) -> list[tuple[int, Decimal]]:
 
 @dataclass(frozen=True)
 class _Line:
-    """One ``invoiceDetails`` row: a rate and its net and VAT, to the cent."""
+    """One ``invoiceDetails`` row: a rate and its net and VAT, to the cent,
+    and for goods the quantity sold."""
 
     rate: Decimal
     net: Decimal
     vat: Decimal
+    quantity: int | None = None
 
     @property
     def gross(self) -> Decimal:
@@ -295,9 +319,18 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
     travel with. Order-level discounts are already allocated across the
     goods; gift-card amounts are payment and never reduce a taxable
     value."""
+    items = list(invoice.order.items.all())
+    quantities = {item.pk: item.quantity for item in items}
     lines = [
-        _Line(rate=line.rate, net=line.net, vat=line.vat)
-        for line in order_vat_lines(invoice.order)
+        _Line(
+            rate=line.rate,
+            net=line.net,
+            vat=line.vat,
+            quantity=quantities[line.item_pk]
+            if line.kind == ChargeKind.GOODS
+            else None,
+        )
+        for line in order_vat_lines(invoice.order, items)
     ]
     if sum((line.gross for line in lines), Decimal(0)) == Decimal(
         invoice.total.amount
@@ -305,7 +338,8 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
         return lines
     # A receipt issued net of money refunded before it (``order.accounting.invoicing``)
     # is documented by the breakdown frozen on its row, one line per rate:
-    # the order's own lines would add up to the sale it no longer is.
+    # the order's own lines would add up to the sale it no longer is. Such
+    # a line mixes goods with shipping, so it states no quantity.
     return [
         _Line(
             rate=Decimal(row["rate"]),
@@ -342,6 +376,7 @@ def build_receipt_xml(
     issuer_country: str,
     branch: int,
     series_prefix: str,
+    movement: ReceiptMovement | None = None,
 ) -> BuiltInvoice:
     """The ``InvoicesDoc`` for an order's retail receipt (11.1).
 
@@ -355,6 +390,8 @@ def build_receipt_xml(
     :param branch: AADE branch number — 0 for main branch.
     :param series_prefix: Configured series prefix; combined with the
         document year to form ``series``.
+    :param movement: The movement indication of a receipt whose order
+        moves through a carrier (``order.accounting.movement``).
     """
     return _build(
         invoice,
@@ -365,6 +402,7 @@ def build_receipt_xml(
         issuer_country=issuer_country,
         branch=branch,
         series_prefix=series_prefix,
+        movement=movement,
     )
 
 
@@ -403,6 +441,7 @@ def _build(
     issuer_country: str,
     branch: int,
     series_prefix: str,
+    movement: ReceiptMovement | None = None,
 ) -> BuiltInvoice:
     issue_date: date = document.issue_date
     year = issue_date.year
@@ -436,6 +475,13 @@ def _build(
     )
     invoice_el = SubElement(root, "invoice")
 
+    # A receipt issued while myDATA could not be reached carries AADE's
+    # loss-of-connection indication; it precedes ``issuer`` in the schema.
+    if getattr(document, "transmission_failed_at", None) is not None:
+        SubElement(invoice_el, "transmissionFailure").text = str(
+            TRANSMISSION_FAILURE_ERP_CONNECTION_LOST
+        )
+
     issuer = SubElement(invoice_el, "issuer")
     SubElement(issuer, "vatNumber").text = issuer_vat
     SubElement(issuer, "country").text = issuer_country
@@ -451,6 +497,8 @@ def _build(
     SubElement(header, "issueDate").text = issue_date.isoformat()
     SubElement(header, "invoiceType").text = invoice_type
     SubElement(header, "currency").text = document.currency or "EUR"
+    if movement is not None:
+        _emit_movement(header, movement)
 
     # One row per settlement source; amounts MUST sum to totalGrossValue.
     pm_container = SubElement(invoice_el, "paymentMethods")
@@ -475,6 +523,7 @@ def _build(
         _emit_detail(
             invoice_el,
             line_number=line_number,
+            quantity=line.quantity if movement is not None else None,
             line_net=line.net,
             line_vat=line.vat,
             rate=line.rate,
@@ -515,7 +564,41 @@ def _build(
         invoice_type=invoice_type,
         series=series,
         aa=aa,
+        movement=movement,
     )
+
+
+def _emit_movement(header: Element, movement: ReceiptMovement) -> None:
+    """The header's movement indication, in the schema's order:
+    ``dispatchDate``, ``dispatchTime`` and ``movePurpose`` after
+    ``currency``, then ``otherDeliveryNoteHeader`` and ``isDeliveryNote``
+    (``InvoiceHeaderType``, v2.0.2)."""
+    SubElement(header, "dispatchDate").text = movement.dispatch_date.isoformat()
+    if movement.dispatch_time is not None:
+        SubElement(
+            header, "dispatchTime"
+        ).text = movement.dispatch_time.isoformat(timespec="seconds")
+    SubElement(header, "movePurpose").text = str(MOVE_PURPOSE_SALE)
+    other = SubElement(header, "otherDeliveryNoteHeader")
+    _emit_address(other, "loadingAddress", movement.loading)
+    _emit_address(other, "deliveryAddress", movement.delivery)
+    SubElement(header, "isDeliveryNote").text = "true"
+
+
+def _emit_address(parent: Element, tag: str, address: PostalAddress) -> None:
+    """An ``AddressType``: street and number when known, the postcode
+    without spaces, the city."""
+    element = SubElement(parent, tag)
+    if address.street:
+        SubElement(element, "street").text = address.street[
+            :ADDRESS_TEXT_MAX_LENGTH
+        ]
+    if address.number:
+        SubElement(element, "number").text = address.number
+    SubElement(element, "postalCode").text = "".join(
+        address.postal_code.split()
+    )
+    SubElement(element, "city").text = address.city[:ADDRESS_TEXT_MAX_LENGTH]
 
 
 def _derive_aa_from_document_number(number: str) -> int:

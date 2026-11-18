@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.exceptions import ShippingProviderNotFoundError
@@ -33,6 +34,18 @@ if TYPE_CHECKING:
     from pay_way.enum.settlement import PaySettlement
     from shipping.enum import ShippingKind
     from shipping.models import ShippingRate
+
+
+@dataclass(frozen=True)
+class PostalAddress:
+    """A place goods are loaded at or delivered to, as AADE's
+    ``AddressType`` holds one: the street and its number are optional,
+    the postcode and the city are not."""
+
+    street: str
+    number: str
+    postal_code: str
+    city: str
 
 
 class ShippingCarrierInterface(ABC):
@@ -126,6 +139,16 @@ class ShippingCarrierInterface(ABC):
     @abstractmethod
     def shipment_for_order(self, order: Order) -> Any | None:
         """Return the provider's shipment row attached to ``order`` or None."""
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
+        """The address of the pickup point (a locker, a station) the parcel
+        goes to, or ``None`` when it goes to the buyer's own address.
+
+        The receipt's delivery address (``order.accounting.movement``).
+        Raises ``ValueError`` when the parcel goes to a pickup point whose
+        address is not known.
+        """
+        return None
 
     @abstractmethod
     def serialize_shipment(

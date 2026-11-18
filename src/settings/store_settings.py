@@ -1039,6 +1039,57 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 30,
         "description": "HTTP request timeout in seconds. AADE endpoints are sometimes slow under load — 30s is the usual sweet spot.",
     },
+    # The dispatch point (Τόπος Φόρτωσης) a courier or locker order's
+    # receipt declares as its loading address: the receipt with movement
+    # indication (Α.1123/2024 Annex ΙΙ §7.3, order.accounting.movement).
+    {
+        "name": "MYDATA_LOADING_STREET",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "Street of the place the store's parcels leave from (Τόπος "
+            "Φόρτωσης). A courier or locker order's receipt is issued with "
+            "movement indication and names it as the loading address. "
+            "Optional for AADE, up to 150 characters."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_NUMBER",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "Street number of the place the store's parcels leave from. "
+            "Optional for AADE."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_POSTAL_CODE",
+        "type": "string",
+        "value": "",
+        "validator": (
+            "order.setting_validators.validate_loading_postal_code_setting"
+        ),
+        "description": (
+            "Postcode of the place the store's parcels leave from (a Greek "
+            "postcode). Required, with MYDATA_LOADING_CITY, while the "
+            "platform issues the store's receipts: until both are set a "
+            "courier or locker order's receipt cannot be sent to AADE, and "
+            "its parcel waits."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_CITY",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "City of the place the store's parcels leave from. Required, "
+            "with MYDATA_LOADING_POSTAL_CODE, while the platform issues the "
+            "store's receipts; up to 150 characters."
+        ),
+    },
     {
         "name": "ANNOUNCEMENT_BAR",
         "type": "json",

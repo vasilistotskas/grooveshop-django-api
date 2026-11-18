@@ -1021,8 +1021,10 @@ def generate_order_invoice(self, order_id: int) -> bool:
     """Issue the order's retail receipt (myDATA 11.1): the row and its PDF,
     then the submission to AADE (``send_invoice_to_mydata``).
 
-    Dispatched when the order ships (``handle_order_shipped``, while
-    ``MyDataConfig.issues_automatically``) or by staff from the order.
+    Dispatched when a carrier's voucher or parcel is created, before the
+    pickup (``issue_receipt_for_pickup``), when the order
+    ships (``handle_order_shipped``, for an order no carrier takes), both
+    while ``MyDataConfig.issues_automatically``, or by staff from the order.
     Exactly once per order: ``order.accounting.invoicing.generate_invoice`` returns
     the existing row, and an order whose receipt already carries a MARK
     has nothing left to issue. ``generate_invoice`` refuses an order that
@@ -1386,9 +1388,199 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         note=f"Receipt {invoice.invoice_number} registered with myDATA "
         f"(MARK={response.invoice_mark})",
     )
-    dispatch_on_commit(send_invoice_email, [order_id])
+    if not invoice.awaits_the_parcel():
+        # A receipt with movement reaches the customer when its parcel
+        # leaves (``handle_order_shipped``), so that an order canceled
+        # before then can have it canceled in myDATA.
+        dispatch_on_commit(send_invoice_email, [order_id])
     dispatch_on_commit(issue_pending_credits, [order_id])
     return True
+
+
+def issue_receipt_for_pickup(order_id: int) -> None:
+    """A carrier's voucher or parcel was created for the order: issue its
+    receipt now, before the pickup, with movement indication
+    (``order.accounting.movement``). Called by every carrier's creation task.
+
+    Only where the platform issues the store's receipts by itself
+    (``MyDataConfig.issues_automatically``); a store that issues by hand
+    does it from the order, and a store that issues outside the platform
+    sees nothing change. Shipping never waits for it: a myDATA that does
+    not answer leaves the receipt issued under AADE's loss-of-connection
+    procedure (``Invoice.transmission_failed_at``), transmitted again by
+    ``retry_receipts_with_mydata``.
+    """
+    from order.accounting.mydata.config import load_config
+
+    if load_config().issues_automatically():
+        dispatch_on_commit(generate_order_invoice, [order_id])
+
+
+@celery_app.task(base=MonitoredTask)
+def retry_receipts_with_mydata() -> int:
+    """Take up every receipt whose business with myDATA is unfinished: shipping
+    never waits for it, so this sweep is how it gets done.
+
+    - A receipt issued while myDATA could not be reached
+      (``Invoice.transmission_failed_at``, sent with ``transmissionFailure`` 3,
+      «Απώλεια διασύνδεσης») is sent again (``send_invoice_to_mydata``),
+      whose own retries an outage outlasts.
+    - A receipt set aside because its order was canceled before the parcel
+      left (``Invoice.cancel_requested_at``) is settled
+      (``settle_canceled_receipt``): its courier may have answered since, or
+      myDATA may answer again.
+
+    The state is the guarantee: rows are found by it once
+    ``MYDATA_RETRY_AFTER_MINUTES`` passed since they were last touched, and
+    AADE's duplicate check (error 228, the same uid) makes a send that
+    overlaps a late retry harmless.
+    """
+    from order.accounting.mydata.config import load_config
+    from order.models.invoice import Invoice, MyDataStatus
+
+    if not load_config().is_ready():
+        return 0
+    cutoff = timezone.now() - timedelta(
+        minutes=settings.MYDATA_RETRY_AFTER_MINUTES
+    )
+    settled = Invoice.objects.filter(updated_at__lte=cutoff).exclude(
+        mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+    )
+    batch = settings.MYDATA_RETRY_SWEEP_BATCH
+    to_send = list(
+        settled.filter(
+            transmission_failed_at__isnull=False, mydata_mark__isnull=True
+        )
+        .order_by("id")
+        .values_list("order_id", flat=True)[:batch]
+    )
+    to_cancel = list(
+        settled.filter(cancel_requested_at__isnull=False)
+        .exclude(order_id__in=to_send)
+        .order_by("id")
+        .values_list("order_id", flat=True)[:batch]
+    )
+    for order_id in to_send:
+        send_invoice_to_mydata.apply_async(args=[order_id])
+    for order_id in to_cancel:
+        settle_canceled_receipt.apply_async(args=[order_id])
+    if to_send or to_cancel:
+        logger.warning(
+            "Queued %s receipt(s) issued while myDATA was unreachable and "
+            "%s of canceled orders",
+            len(to_send),
+            len(to_cancel),
+        )
+    return len(to_send) + len(to_cancel)
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=120
+)
+def settle_canceled_receipt(self, order_id: int) -> str:
+    """Settle the receipt of an order canceled before its parcel left
+    (``invoicing.hold_receipt_for_cancel``), once the courier answered the
+    cancel (``metadata['cancellation']['shipment_cancel']``, the answer the
+    cancel paths record):
+
+    - the courier stopped the parcel, or there was none to stop: the sale
+      and the movement never happened and the receipt was never handed to
+      the customer, so it is canceled in myDATA (``CancelInvoice``) and no
+      credit document follows;
+    - the courier refused, or never answered: the parcel may be on its way,
+      so the receipt stands and the credit path takes it
+      (``issue_pending_credits``), as for any refund after a receipt.
+
+    Shipping never waits on this. No answer from myDATA is retried here and
+    by ``retry_receipts_with_mydata``; a refusal is noted for staff with
+    AADE's reason and the receipt goes to the credit path. Returns what
+    became of it.
+    """
+    from order.accounting.mydata import (
+        MyDataError,
+        MyDataTransportError,
+        cancel_document,
+    )
+    from order.models.invoice import Invoice, MyDataStatus
+
+    order = Order.objects.filter(pk=order_id).first()
+    invoice = Invoice.objects.filter(
+        order_id=order_id, cancel_requested_at__isnull=False
+    ).first()
+    if (
+        order is None
+        or invoice is None
+        or invoice.mydata_status == MyDataStatus.CANCELED
+    ):
+        return "nothing_to_settle"
+    answer = ((order.metadata or {}).get("cancellation") or {}).get(
+        "shipment_cancel"
+    )
+    if answer is None:
+        # A staff or system cancel asks the courier after its commit: the
+        # sweeps (``finish_pending_shipment_cancels`` once it answered,
+        # ``retry_receipts_with_mydata``) come back to it.
+        return "courier_not_answered"
+    if "error" in answer:
+        _credit_receipt_instead(
+            order,
+            invoice,
+            f"the courier did not stop the parcel ({answer['error']})",
+        )
+        return "credited"
+    if not invoice.mydata_mark:
+        # Still to be registered (issued while myDATA was unreachable):
+        # it is sent first, and canceled on a later run.
+        return "awaiting_mark"
+    try:
+        response = cancel_document(invoice)
+    except MyDataTransportError as exc:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc) from exc
+        return "myDATA_unreachable"
+    except MyDataError as exc:
+        logger.error(
+            "myDATA refused to cancel receipt %s of canceled order #%s: %s",
+            invoice.invoice_number,
+            order_id,
+            exc,
+        )
+        _credit_receipt_instead(
+            order,
+            invoice,
+            f"myDATA refused to cancel it: {exc.code} {exc.message}",
+        )
+        return "credited"
+    if response is None:
+        return "myDATA_not_ready"
+    OrderHistory.log_note(
+        order=order,
+        note=(
+            f"Receipt {invoice.invoice_number} canceled in myDATA: the order "
+            "was canceled before its parcel left (cancellation MARK="
+            f"{response.cancellation_mark})"
+        ),
+    )
+    return "canceled"
+
+
+def _credit_receipt_instead(order: Order, invoice, reason: str) -> None:
+    """The receipt of a canceled order stands after all: release it to the
+    credit path and tell staff why."""
+    from order.models.invoice import Invoice
+
+    Invoice.objects.filter(pk=invoice.pk).update(
+        cancel_requested_at=None, updated_at=timezone.now()
+    )
+    OrderHistory.log_note(
+        order=order,
+        note=(
+            f"Receipt {invoice.invoice_number} of the canceled order is not "
+            f"canceled in myDATA: {reason}. A credit document is issued "
+            "instead."
+        ),
+    )
+    dispatch_on_commit(issue_pending_credits, [order.id])
 
 
 @celery_app.task(
@@ -2089,6 +2281,9 @@ def finish_pending_shipment_cancels(
             still_pending += 1
         else:
             finished += 1
+            # The courier's answer decides the receipt set aside for
+            # cancel (``settle_canceled_receipt``; nothing to do without).
+            dispatch_on_commit(settle_canceled_receipt, [order.id])
     return {"finished": finished, "still_pending": still_pending}
 
 

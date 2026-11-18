@@ -263,6 +263,10 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             "delivery_request_id": shipment.delivery_request_id,
         },
     )
+    # The receipt, with movement indication, before the pickup.
+    from order.tasks import issue_receipt_for_pickup
+
+    issue_receipt_for_pickup(order_id)
     return {
         "status": "ok",
         "order_id": order_id,

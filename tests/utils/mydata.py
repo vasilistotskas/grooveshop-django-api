@@ -114,6 +114,9 @@ def _doc(xml_bytes: bytes) -> SimpleNamespace:
 
     summary = invoice.find(f"{AADE_NS}invoiceSummary")
     return SimpleNamespace(
+        xml=xml_bytes,
+        is_delivery_note=text(header, "isDeliveryNote") == "true",
+        transmission_failure=text(invoice, "transmissionFailure"),
         invoice_type=text(header, "invoiceType"),
         correlated=text(header, "correlatedInvoices"),
         series=text(header, "series"),

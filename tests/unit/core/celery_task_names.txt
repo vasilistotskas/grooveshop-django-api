@@ -79,6 +79,7 @@ order.tasks.generate_order_invoice
 order.tasks.issue_pending_credits
 order.tasks.purge_expired_pending_payment_fees
 order.tasks.reconcile_pending_refunds
+order.tasks.retry_receipts_with_mydata
 order.tasks.send_admin_new_order_email
 order.tasks.send_checkout_abandonment_emails
 order.tasks.send_credit_email
@@ -92,6 +93,7 @@ order.tasks.send_payment_failed_email
 order.tasks.send_refund_confirmation_email
 order.tasks.send_review_request_emails
 order.tasks.send_shipping_notification_email
+order.tasks.settle_canceled_receipt
 product.tasks.check_low_stock_products
 product.tasks.notify_back_in_stock_favourites_live
 product.tasks.purge_unconfirmed_guest_alerts
@@ -186,6 +188,7 @@ tenant.tasks.fanout_reindex_offer_window_changes
 tenant.tasks.fanout_release_due_publications
 tenant.tasks.fanout_rescan_pending_contact_attachments
 tenant.tasks.fanout_reset_demo_stores
+tenant.tasks.fanout_retry_receipts_with_mydata
 tenant.tasks.fanout_run_due_builder_publishes
 tenant.tasks.fanout_send_checkout_abandonment_emails
 tenant.tasks.fanout_send_gift_card_expiry_reminders

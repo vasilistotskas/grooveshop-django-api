@@ -80,6 +80,13 @@ CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
     getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
 )
 CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# A receipt whose business with myDATA is unfinished (issued while it could
+# not be reached, or of an order canceled before its parcel left;
+# ``order.tasks.retry_receipts_with_mydata``) is taken up again once this
+# many minutes passed since it was last touched (its own tasks retry for
+# about ten), at most this many of each kind per store and run.
+MYDATA_RETRY_AFTER_MINUTES = int(getenv("MYDATA_RETRY_AFTER_MINUTES", "15"))
+MYDATA_RETRY_SWEEP_BATCH = int(getenv("MYDATA_RETRY_SWEEP_BATCH", "100"))
 # The review reminder (``order.tasks.send_review_request_emails``) runs
 # daily: an order delivered up to this many days earlier than its due day
 # is still reminded, so a run that did not happen costs nothing.

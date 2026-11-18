@@ -13,7 +13,7 @@ from djstripe.models import Event
 from agent.outbox import record_order_changed
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
-from order.accounting.invoicing import receipt_issuable
+from order.accounting.invoicing import hold_receipt_for_cancel, receipt_issuable
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.communications.notifications import (
     notify_order_created_live,
@@ -30,6 +30,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.history import OrderHistory
+from order.models.invoice import Invoice
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
@@ -63,11 +64,13 @@ from order.tasks import (
     generate_order_invoice,
     send_admin_new_order_email,
     send_dispute_notification_email,
+    send_invoice_email,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
     send_refund_confirmation_email,
     send_shipping_notification_email,
+    settle_canceled_receipt,
 )
 from pay_way.enum.settlement import PaySettlement
 from tenant.celery import dispatch_on_commit
@@ -544,9 +547,34 @@ def handle_order_shipped(
     # send_order_status_update_email (uses the shipped template)
 
     # The retail receipt is issued when the shipment starts (ΕΛΠ art.
-    # 13(a)). Idempotent: ``generate_order_invoice`` issues it once.
+    # 13(a)). Idempotent: ``generate_order_invoice`` issues it once, so an
+    # order a carrier took, whose receipt was issued when its voucher or
+    # parcel was created (``issue_receipt_for_pickup``), gets nothing more.
     if receipt_issuable(order) and load_mydata_config().issues_automatically():
         dispatch_on_commit(generate_order_invoice, [order.id])
+    # A receipt with movement indication registered before the pickup
+    # reaches the customer now that the parcel left
+    # (``Invoice.awaits_the_parcel``). The email task sends it once.
+    if (
+        Invoice.objects.filter(order_id=order.id, mydata_mark__isnull=False)
+        .exclude(movement={})
+        .exists()
+    ):
+        dispatch_on_commit(send_invoice_email, [order.id])
+
+
+@receiver(order_canceled, dispatch_uid="order.hold_receipt_of_canceled_order")
+def hold_receipt_of_canceled_order(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """A carrier order canceled before its parcel left: its receipt is set
+    aside to be canceled in myDATA (``hold_receipt_for_cancel``), in the
+    cancel's own transaction so no credit is issued for it meanwhile, and
+    settled once the cancel committed (``settle_canceled_receipt``, again
+    by the ``retry_receipts_with_mydata`` sweep while the courier has not
+    answered)."""
+    if hold_receipt_for_cancel(order):
+        dispatch_on_commit(settle_canceled_receipt, [order.id])
 
 
 @receiver(order_delivered, dispatch_uid="order.handle_order_delivered")

@@ -285,6 +285,10 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
         shipment.voucher_no,
         extra={"order_id": order_id, "voucher_no": shipment.voucher_no},
     )
+    # The receipt, with movement indication, before the pickup.
+    from order.tasks import issue_receipt_for_pickup
+
+    issue_receipt_for_pickup(order_id)
     return {
         "status": "ok",
         "order_id": order_id,

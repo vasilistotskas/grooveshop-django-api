@@ -55,16 +55,18 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from order.accounting import credit_allocation
+from order.accounting.movement import ReceiptMovement
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.accounting.taxation import breakdown_by_rate, order_vat_lines
 from order.checkout.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
-from order.models.invoice import Invoice, InvoiceCounter
+from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.order import Order
 from order.models.retail_credit import RetailCredit
 from order.storefront_links import order_page_url
 from pay_way.enum.pay_way import PayWayEnum
+from shipping.services import ShippingService
 from tenant.membership import is_demo_store
 
 logger = logging.getLogger(__name__)
@@ -92,14 +94,60 @@ RECEIPT_ISSUING_STATUSES = frozenset(
     }
 )
 
+#: Statuses in which an order's carrier shipment is created: a parcel that
+#: moves through a carrier gets its receipt here, before the carrier takes
+#: it (``order.tasks.issue_receipt_for_pickup``).
+PRE_SHIPMENT_STATUSES = frozenset({OrderStatus.PENDING, OrderStatus.PROCESSING})
+
 
 def receipt_issuable(order: Order) -> bool:
     """True when the platform issues this order's retail receipt now: a
     receipt order (an invoice order never gets one) whose goods have
-    shipped."""
+    shipped, or whose parcel waits for its carrier: a courier or locker
+    sale's receipt is issued with movement indication before the movement
+    starts (``order.accounting.movement``), once nothing is owed online."""
+    if order.document_type != OrderDocumentTypeEnum.RECEIPT.value:
+        return False
+    if order.status in RECEIPT_ISSUING_STATUSES:
+        return True
     return (
-        order.document_type == OrderDocumentTypeEnum.RECEIPT.value
-        and order.status in RECEIPT_ISSUING_STATUSES
+        order.status in PRE_SHIPMENT_STATUSES
+        and not order.awaits_online_payment
+        and ShippingService.moves_by_carrier(order)
+    )
+
+
+def hold_receipt_for_cancel(order: Order) -> bool:
+    """Set aside the receipt of an order canceled before its parcel left:
+    it is to be canceled in myDATA, not credited.
+
+    The receipt of a carrier order is issued when its voucher or parcel is
+    created and is not handed to the customer before the parcel leaves
+    (``Invoice.awaits_the_parcel``), so the sale and the movement it
+    documents never happened and the document was never used: the case
+    ``CancelInvoice`` is lawful for (Α.1138/2020 annex, «μη χρήση»). Only
+    where the platform issues the store's receipts. Credits wait while it
+    is set (``credit_documents.create_pending_credits``), and
+    ``order.tasks.settle_canceled_receipt`` decides once the courier
+    answered the cancel: canceled in myDATA, or released to the credit
+    path when the courier may hold the parcel. Returns whether a receipt
+    was set aside.
+    """
+    if (
+        order.shipped_at is not None
+        or not ShippingService.moves_by_carrier(order)
+        or not load_mydata_config().is_ready()
+    ):
+        return False
+    now = timezone.now()
+    return bool(
+        Invoice.objects.filter(
+            order_id=order.pk, cancel_requested_at__isnull=True
+        )
+        .exclude(
+            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
+        .update(cancel_requested_at=now, updated_at=now)
     )
 
 
@@ -465,6 +513,11 @@ def _build_context(
         # see the legal registration number next to the invoice number.
         "mydata_mark": invoice.mydata_mark,
         "specimen": specimen,
+        # What the receipt was sent to myDATA with as its movement
+        # indication, printed with the parcel's addresses and dispatch.
+        "movement": ReceiptMovement.from_json(invoice.movement)
+        if invoice.movement
+        else None,
     }
 
 

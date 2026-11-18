@@ -125,6 +125,23 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    `refund_info["dispute_open"]` is true, the history says the refund waits
    until the dispute closes, and the admin cancel action says the same.
 
+**The receipt of an order canceled before its parcel left** (#747). Where the
+platform issues the store's receipts, a courier or locker order's receipt
+(with movement indication) is registered when its voucher or parcel is
+created and handed to the customer only when the parcel leaves. So every
+cancel path above (customer, staff, the auto-cancel sweep, ACS's dead
+shipment) reaches `order_canceled`, whose receiver sets that receipt aside in
+the cancel's own transaction (`Invoice.cancel_requested_at`); no credit is
+issued for it meanwhile. Once the courier's answer is recorded (step 0 for a
+customer, step 4 or `finish_pending_shipment_cancels` otherwise),
+`order.tasks.settle_canceled_receipt` cancels the receipt in myDATA when the
+courier stopped the parcel or there was none, and releases it to the refund
+and credit path when the courier refused or never answered, since the goods
+may be moving. myDATA's silence is retried by `retry_receipts_with_mydata`,
+its refusal is noted with AADE's reason and the receipt is credited instead;
+the cancel and the refund never wait for either. Detail:
+[§7.4](fiscal-mydata.md).
+
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record
 and the courier, and nothing catches it afterwards. Always go through

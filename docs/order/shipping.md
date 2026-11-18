@@ -25,6 +25,13 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **The receipt follows the voucher, never the other way round.** Once a
+  voucher or parcel exists, its creation task calls
+  `order.tasks.issue_receipt_for_pickup`: for a store whose receipts the
+  platform issues, the receipt with movement indication is issued before the
+  pickup ([§7.4](fiscal-mydata.md)). Nothing in shipping waits for myDATA: a
+  receipt AADE does not answer for is issued under its loss-of-connection
+  procedure and sent again later.
 - **One HTTP retry rule.** Both clients build their `requests` session
   with `carrier_session` (`src/shipping/carrier_http.py`), whose
   `CARRIER_RETRY` sends a request again only when it never connected

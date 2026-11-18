@@ -34,6 +34,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
+from order.accounting.movement import receipt_movement
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
 from order.accounting.mydata.config import load_config
@@ -137,10 +138,15 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         invoice_type=built.invoice_type,
         series=built.series,
         aa=built.aa,
+        movement=built.movement.as_json() if built.movement else None,
     )
 
     client = MyDataClient(config)
-    response_bytes = client.send_invoices(built.xml_bytes)
+    try:
+        response_bytes = client.send_invoices(built.xml_bytes)
+    except MyDataTransportError:
+        _record_connection_lost(invoice, built)
+        raise
     response = parse_response_doc(response_bytes)
     row = response.first()
 
@@ -190,10 +196,27 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # REJECTED and skip all retries). Leave ``mydata_status=SUBMITTED``
         # and raise the retryable transport error so the Celery task's
         # backoff and the manual-resubmit path keep working (G0260).
+        _record_connection_lost(invoice, built)
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
+
+
+def _record_connection_lost(invoice: Any, built: Any) -> None:
+    """Mark a receipt with movement indication that AADE did not answer for
+    as issued under the loss-of-connection procedure (Α.1233/2026 annex
+    §12.1): its parcel ships anyway, every later transmission carries
+    ``transmissionFailure`` 3, and
+    ``order.tasks.retry_receipts_with_mydata`` sends it until it is
+    registered. Once, at the first failure."""
+    if built.movement is None or invoice.transmission_failed_at is not None:
+        return
+    now = timezone.now()
+    type(invoice)._default_manager.filter(
+        pk=invoice.pk, transmission_failed_at__isnull=True
+    ).update(transmission_failed_at=now, updated_at=now)
+    invoice.transmission_failed_at = now
 
 
 def cancel_document(invoice: Any) -> ResponseRow | None:
@@ -403,7 +426,10 @@ def recover_mark_for_document(invoice: Any) -> bool:
 
 def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
     """Build the payload for the document: a credit (11.4) for a
-    :class:`RetailCredit`, otherwise the order's receipt (11.1)."""
+    :class:`RetailCredit`, otherwise the order's receipt (11.1), with its
+    movement indication when the order moves through a carrier
+    (``order.accounting.movement``; a ``ValueError`` there is a terminal
+    BUILD failure like any other)."""
     if isinstance(invoice, RetailCredit):
         return build_credit_xml(
             invoice,
@@ -418,6 +444,7 @@ def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
         issuer_country="GR",
         branch=config.issuer_branch,
         series_prefix=config.invoice_series_prefix,
+        movement=receipt_movement(invoice),
     )
 
 
@@ -434,8 +461,11 @@ def _persist_submission_intent(
     invoice_type: str,
     series: str,
     aa: int,
+    movement: dict[str, Any] | None = None,
 ) -> None:
-    """Lock + save the identity fields before the HTTP round-trip."""
+    """Lock + save the identity fields before the HTTP round-trip, and a
+    receipt's movement indication with them (``Invoice.movement``), so the
+    PDF registered after it prints what AADE received."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -453,19 +483,21 @@ def _persist_submission_intent(
             locked.mydata_submitted_at = timezone.now()
         locked.mydata_error_code = ""
         locked.mydata_error_message = ""
-        locked.save(
-            update_fields=[
-                "mydata_uid",
-                "mydata_invoice_type",
-                "mydata_series",
-                "mydata_aa",
-                "mydata_status",
-                "mydata_submitted_at",
-                "mydata_error_code",
-                "mydata_error_message",
-                "updated_at",
-            ]
-        )
+        fields = [
+            "mydata_uid",
+            "mydata_invoice_type",
+            "mydata_series",
+            "mydata_aa",
+            "mydata_status",
+            "mydata_submitted_at",
+            "mydata_error_code",
+            "mydata_error_message",
+            "updated_at",
+        ]
+        if movement is not None:
+            locked.movement = movement
+            fields.append("movement")
+        locked.save(update_fields=fields)
     # Mirror onto the in-memory instance so the caller sees the
     # updated fields without re-fetching.
     invoice.mydata_uid = uid
@@ -473,6 +505,8 @@ def _persist_submission_intent(
     invoice.mydata_series = series
     invoice.mydata_aa = aa
     invoice.mydata_status = MyDataStatus.SUBMITTED
+    if movement is not None:
+        invoice.movement = movement
 
 
 def _persist_success(invoice: Any, row: ResponseRow) -> None:

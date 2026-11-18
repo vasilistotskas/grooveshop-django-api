@@ -15,7 +15,11 @@ from django.db.models import Q
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping.interfaces import (
+    PostalAddress,
+    ShippingCarrierInterface,
+    register_provider,
+)
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
@@ -79,6 +83,28 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
     def shipment_for_order(self, order: Order):
         return getattr(order, "boxnow_shipment", None)
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress:
+        """The locker's address as BOX NOW lists it. Its destinations carry
+        no city field: the city is ``addressLine2`` (BOX NOW API manual
+        v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
+        "ΑΘΗΝΑ"``)."""
+        from shipping_boxnow.models import BoxNowLocker
+
+        locker = BoxNowLocker.objects.filter(
+            external_id=shipment.locker_external_id
+        ).first()
+        if locker is None or not (locker.postal_code and locker.address_line_2):
+            raise ValueError(
+                "The address of BOX NOW locker "
+                f"{shipment.locker_external_id} is not known."
+            )
+        return PostalAddress(
+            street=locker.address_line_1,
+            number="",
+            postal_code=locker.postal_code,
+            city=locker.address_line_2,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

@@ -139,8 +139,8 @@ msgid "%(count)d confirmation emails were queued."
 msgstr "Μπήκαν σε αναμονή %(count)d email επιβεβαίωσης."
 
 #, python-format
-msgid "%(count)d events queued; delivered events are not sent again."
-msgstr "Μπήκαν σε αναμονή %(count)d συμβάντα· τα συμβάντα που έχουν ήδη παραδοθεί δεν αποστέλλονται ξανά."
+msgid "%(count)d events queued; delivered events and events of deleted orders are not sent again."
+msgstr "Μπήκαν σε αναμονή %(count)d συμβάντα· τα συμβάντα που έχουν ήδη παραδοθεί και τα συμβάντα διαγραμμένων παραγγελιών δεν αποστέλλονται ξανά."
 
 #, python-format
 msgid "%(count)d item"

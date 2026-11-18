@@ -3,6 +3,43 @@
 
 
 
+## v3.253.1 (2026-11-18)
+
+### Bug fixes
+
+* fix(core): check each migration's deferred foreign keys while a store is provisioned (#751) ([`91e1a15`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91e1a154185a5ff9abc1a6d46e0c54b0762e7cdb))
+
+* fix(core): check each migration's deferred foreign keys while a store is provisioned
+
+Provisioning a store replays the whole migration history inside the
+caller's transaction (Tenant.save with auto_create_schema, from
+tenant_create and the platform admin), so each migration is a savepoint
+and nothing commits until the end. Django creates foreign keys
+DEFERRABLE INITIALLY DEFERRED, so the rows a data migration writes are
+checked at commit, and PostgreSQL refuses to ALTER or DROP a table whose
+checks are still queued.
+
+shipping.0011 writes ShippingRate rows and shipping.0017 alters the
+table. Until v3.253.0, knox.0006 ran between them, and its
+"UPDATE ... ; SET CONSTRAINTS ALL IMMEDIATE" (Django's
+sql_update_with_default) flushed the queued checks by chance. The new
+agent.0001 leaf depends on the latest order migration, which changed the
+order the graph is walked in; 0017 then followed 0011 directly, and
+every new store failed with "cannot ALTER TABLE shipping_shippingrate
+because it has pending trigger events".
+
+TENANT_BASE_MIGRATE_COMMAND now names core.db.migrate_command.Command, a
+migrate command that runs the connection's check_constraints() (SET
+CONSTRAINTS ALL IMMEDIATE, then ALL DEFERRED) after each migration when a
+transaction is open. Each migration then starts as it would in a
+transaction of its own, whatever the graph's order. Runs without an outer
+transaction (a deploy) are unchanged. A tests_mt test provisions a store
+inside one transaction. ([`91e1a15`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91e1a154185a5ff9abc1a6d46e0c54b0762e7cdb))
+
+### Documentation
+
+* docs(migrations): an atomic=False migration runs straight in the provisioning transaction ([`91e1a15`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91e1a154185a5ff9abc1a6d46e0c54b0762e7cdb))
+
 ## v3.253.0 (2026-11-18)
 
 ### Bug fixes

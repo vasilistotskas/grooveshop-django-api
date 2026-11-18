@@ -36,10 +36,8 @@ proven visitor instead, and no module outside this one imports
 ``rest_framework.throttling`` (``tests/unit/core/test_throttle_outage.py``).
 """
 
-import hashlib
 import hmac
 import logging
-import uuid
 from collections.abc import Iterable, Mapping
 from contextlib import suppress
 from typing import ClassVar
@@ -119,21 +117,22 @@ class ResilientThrottleMixin:
         return super().allow_request(request, view)  # type: ignore[misc]
 
 
-def _gateway_ident(request) -> str | None:
+def _gateway_ident(request, *, order: bool = False) -> str | None:
     """The cart or order to throttle on when the agent gateway calls.
 
     The gateway authenticates itself with the ``X-Internal-Gateway``
     shared secret (its ``INTERNAL_EVENTS_SECRET``). Returns ``None`` —
-    meaning "throttle normally" — unless the secret is configured,
-    matches, and the request names a cart (cart writes, order creation)
-    or an order (``?uuid=``, the payment-link calls). A cart token and an
-    order uuid both open what they name, so each is keyed by its hash.
+    meaning "throttle normally", on the address — unless the secret is
+    configured, matches, and the request names a cart that exists in this
+    store (a cart token, or ``X-Cart-Id``) or, for the payment-link calls
+    that ask with ``order``, an order that does (``?uuid=``). A cart token
+    and an order uuid both open what they name, so each is keyed by its
+    hash. What counts as existing, and how each id is read, is
+    ``cart.agent_token.existing_gateway_subject``: an id that names nothing
+    must not open a budget of its own, or a client making ids up would
+    never meet a limit.
 
-    A cart or an order is keyed by the uuid it parses to, the parse the
-    cart lookup itself makes (``core.cart_id.cart_uuid_from_request``): upper case,
-    no hyphens, braces and ``urn:uuid:`` all name one cart, so one
-    cart cannot take a fresh budget by changing how it spells its id.
-    A value that is no uuid names nothing and is keyed on the address.
+    Settled once per request: every throttle of the view asks.
     """
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
     provided = request.headers.get("X-Internal-Gateway", "")
@@ -147,23 +146,18 @@ def _gateway_ident(request) -> str | None:
         secret.encode("utf-8", "surrogateescape"),
     ):
         return None
-    # Imported here, not at the top: ``DEFAULT_THROTTLE_CLASSES`` names
-    # this module, so DRF imports it while ``rest_framework.views`` is
-    # still loading, and ``cart.agent_token`` reaches drf-spectacular,
-    # which needs ``APIView`` (a circular import at start-up).
-    from cart.agent_token import cart_token_from_request, hash_cart_token
+    settled = getattr(request, "_gateway_idents", None)
+    if settled is None:
+        settled = request._gateway_idents = {}
+    if order not in settled:
+        # Imported here, not at the top: ``DEFAULT_THROTTLE_CLASSES`` names
+        # this module, so DRF imports it while ``rest_framework.views`` is
+        # still loading, and ``cart.agent_token`` reaches drf-spectacular,
+        # which needs ``APIView`` (a circular import at start-up).
+        from cart.agent_token import existing_gateway_subject
 
-    token = cart_token_from_request(request)
-    if token:
-        # The token names the cart; key on its hash, never the token.
-        return hash_cart_token(token)
-    if cart_uuid := cart_uuid_from_request(request):
-        return str(cart_uuid)
-    try:
-        order_uuid = uuid.UUID(request.GET.get("uuid", ""))
-    except ValueError:
-        return None
-    return "order:" + hashlib.sha256(order_uuid.hex.encode()).hexdigest()
+        settled[order] = existing_gateway_subject(request, order=order)
+    return settled[order]
 
 
 class GatewayIdentMixin(ResilientThrottleMixin):
@@ -177,13 +171,19 @@ class GatewayIdentMixin(ResilientThrottleMixin):
     keeps the proven visitor. DRF asks ``get_ident`` only for a caller
     who is not signed in, so a signed-in agent is keyed on its account.
 
+    Only a cart or order that exists earns the key, never a bare id
+    (``_gateway_ident``); a throttle that guards the order payment calls
+    sets ``gateway_names_order``, which cart routes never do.
+
     The rule lives here, once, for both halves of a pair
     (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it),
     for ``GiftCardCodeThrottle`` and for ``CouponApplyThrottle``.
     """
 
+    gateway_names_order: ClassVar[bool] = False
+
     def get_ident(self, request) -> str:
-        if ident := _gateway_ident(request):
+        if ident := _gateway_ident(request, order=self.gateway_names_order):
             return f"gw:{ident}"
         return super().get_ident(request)
 
@@ -299,6 +299,7 @@ class GatewayAnonThrottle(GatewayIdentMixin, AnonIpRateThrottle):
 class PaymentAttemptThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
+    gateway_names_order = True
 
 
 class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
@@ -307,6 +308,7 @@ class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
 
     scope = "payment_anon"
     fail_closed = True
+    gateway_names_order = True
 
 
 class OrderCreateThrottle(GatewayIdentMixin, UserRateThrottle):
@@ -388,13 +390,13 @@ class CouponApplyThrottle(GatewayIdentMixin, UserOrIpRateThrottle):
     brute-forceable code oracle (valid/invalid distinguishes codes).
 
     Behind the verified gateway secret the caller is the cart the request
-    names (``GatewayIdentMixin``, as ``GiftCardCodeThrottle``): the UCP
-    and ACP coupon calls of every buyer of a platform arrive from the
-    platform's address, so per address one buyer's attempts would spend
-    everyone's. Guessing stays bounded: a cart is minted by a cart write,
-    which carries no cart yet and so is budgeted per address
-    (``cart_mutation``), and a request that names no cart, or names one
-    without the secret, is keyed on the address as before.
+    names, when that cart exists (``GatewayIdentMixin``, as
+    ``GiftCardCodeThrottle``): the UCP and ACP coupon calls of every buyer
+    of a platform arrive from the platform's address, so per address one
+    buyer's attempts would spend everyone's. Guessing stays bounded: a
+    request that names no cart, a cart that does not exist (the apply
+    creates one) or no secret is keyed on the address as before, and a
+    cart is minted by a cart write, which is budgeted per address.
     """
 
     scope = "coupon_apply"

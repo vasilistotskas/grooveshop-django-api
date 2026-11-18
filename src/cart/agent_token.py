@@ -36,6 +36,8 @@ from rest_framework import status
 from rest_framework.exceptions import APIException
 
 from core.api.tokens import is_auth_token_live
+from core.canonical_uuid import canonical_uuid
+from core.cart_id import cart_uuid_from_request
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -143,3 +145,42 @@ def resolve_cart_token(token: str) -> Cart:
     if cart is None:
         raise CartTokenInvalid
     return cart
+
+
+def existing_gateway_subject(
+    request: Request | HttpRequest, *, order: bool = False
+) -> str | None:
+    """The cart (and, with ``order``, the order) an agent gateway call
+    names, as a key to budget it on, only when it EXISTS in this store.
+
+    A name that resolves to nothing earns nothing: a client that makes up
+    ids would otherwise take a fresh budget for each one, and the cart
+    writes that create a cart when the named one is missing (a cart-item
+    create, a coupon apply) would escape the per-address burst limit. So
+    ``None`` means "budget it on the address", and what counts as existing
+    is what the cart service resolves:
+
+    * a cart token that was minted and has not expired, keyed by its hash;
+    * a guest cart, by the uuid the cart lookup parses (any spelling);
+    * with ``order``, the order whose uuid ``?uuid=`` spells in its
+      canonical form, the one form guest authorization accepts
+      (``core.canonical_uuid``), keyed by its hash. Cart routes never ask
+      for it: their ``?uuid=`` names nothing.
+    """
+    from cart.models import Cart
+    from order.models import Order
+
+    token = cart_token_from_request(request)
+    if token and cache.get(_cache_key(token)) is not None:
+        return hash_cart_token(token)
+    if (cart_uuid := cart_uuid_from_request(request)) is not None and (
+        Cart.objects.guest_carts().filter(uuid=cart_uuid).exists()
+    ):
+        return str(cart_uuid)
+    order_uuid = canonical_uuid(request.GET.get("uuid")) if order else None
+    if (
+        order_uuid is not None
+        and Order.objects.filter(uuid=order_uuid).exists()
+    ):
+        return "order:" + hashlib.sha256(str(order_uuid).encode()).hexdigest()
+    return None

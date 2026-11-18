@@ -16,6 +16,7 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.canonical_uuid import canonical_uuid
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import (
     MetaDataModel,
@@ -957,7 +958,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         paying, the confirmation, a delivery. Past it the store reads the order
         for them.
         """
-        if not request_uuid or str(self.uuid) != str(request_uuid):
+        canonical = canonical_uuid(request_uuid)
+        if canonical is None or str(self.uuid) != str(canonical):
             return False
         return timezone.now() < self.created_at + timedelta(
             days=settings.GUEST_ORDER_ACCESS_DAYS

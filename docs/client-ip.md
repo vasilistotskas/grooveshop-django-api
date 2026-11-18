@@ -29,26 +29,45 @@ budgets are not keyed on the address alone. A request carrying the agent
 gateway's secret is identified by the cart or order it names
 (`GatewayIdentMixin.get_ident`, `_gateway_ident`), because every buyer of
 an AI platform arrives from the platform's address. The rule lives once, in
-that mixin, and every pair of cart, order and payment budgets uses it:
-the anonymous half (`GatewayAnonThrottle`) and the signed-in half
+that mixin, and every pair of cart, order and payment budgets uses it: the
+anonymous half (`GatewayAnonThrottle`) and the signed-in half
 (`CartMutationThrottle`, `OrderCreateThrottle`, `PaymentAttemptThrottle`,
 whose `UserRateThrottle` keys a caller who is not signed in on
-`get_ident`). The cart or order is keyed by the uuid it parses to
-(`core.cart_id.cart_uuid_from_request`, the parse the cart lookup makes), so
-upper case, no hyphens, braces or `urn:uuid:` are one cart, not a fresh
-budget each; an id that is no uuid names nothing and falls back to the
-address. Without the secret the address is the key, so a forged
-`X-Cart-Id` buys no budget. The coupon budget
-(`CouponApplyThrottle`) takes the same rule: the UCP and ACP coupon calls
-of every buyer of a platform come from the platform's address, so per
-address they would spend one budget. Guessing stays bounded because a
-cart is minted by a cart write, which names no cart yet and is budgeted
-per address (`cart_mutation`). And the gift-card guessing budget
-(`GiftCardCodeThrottle`) is keyed on the signed-in customer, else the
+`get_ident`), the coupon budget (`CouponApplyThrottle`) and the gift-card
+guessing budget (`GiftCardCodeThrottle`).
+
+**The address is the key unless the secret verifies and the request names
+something that exists.** What counts is settled once per request, by
+`cart.agent_token.existing_gateway_subject`: a cart token that was minted
+and has not expired (keyed by its hash); else a guest cart, by the uuid the
+cart lookup parses (`core.cart_id.cart_uuid_from_request`, so upper case, no
+hyphens, braces or `urn:uuid:` are one cart); else, only for the payment
+throttles (`gateway_names_order`), an order (keyed by its hash). A cart
+route's `?uuid=` names no order and is ignored. An id that is no uuid, names
+no cart or order, or comes without the secret is keyed on the address, as
+before the gateway rule. The cart writes create a cart when the one they
+name does not resolve (a cart-item create, a coupon apply), so an id that
+earned a budget just by being well formed would let a client that makes ids
+up escape the per-address burst limit on cart creation and the tight coupon
+guessing limit. For the coupon budget, guessing stays bounded for the same
+reason: a cart is minted by a cart write, which names no cart yet and is
+budgeted per address (`cart_mutation`).
+
+**Two readings of an order uuid, one rule.** A cache key could accept any
+spelling, but guest authorization (`Order.opens_for_guest`) accepts only the
+canonical string (lower case, hyphenated), and the payment budget must charge
+exactly what authorization can accept, or refused spellings would use up the
+budget of a corrected retry. Both go through `core.canonical_uuid`: a
+non-canonical spelling is keyed on the address, never on the order. (A
+cart's id is different: the cart lookup itself accepts every spelling, so
+the throttle follows it.)
+
+The gift-card guessing budget is keyed on the signed-in customer, else the
 gateway's cart, else the address, and counts only codes new to the cart
 (`docs/order/creation.md` §3.0). The BoxNow nearest-locker budget stays
 per address: the endpoint calls BOX NOW live and the gateway's call names
-no cart. `edge_client_ip` itself never falls back to
+no cart.
+`edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
 (`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is

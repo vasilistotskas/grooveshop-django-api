@@ -163,8 +163,8 @@ TENANT_APPS = [
     # The storefront page builder: versioned documents, releases and the
     # staff API (the block catalogue is the storefront's, ``builder.storefront``)
     "builder",
-    # Agent surface (OIDC-bearer API over tenant-schema data; no models
-    # of its own — placed here because everything it serves is per-store)
+    # Agent surface (OIDC-bearer API over tenant-schema data, and the
+    # order events owed to the agent gateway — per-store, like the orders)
     "agent",
     "shipping",
     "shipping_boxnow",

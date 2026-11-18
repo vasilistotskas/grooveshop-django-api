@@ -282,6 +282,7 @@ state, which is the guarantee for it:
 | Task | Sweep |
 |---|---|
 | `contact.tasks.scan_contact_attachment` | `rescan_pending_attachments` queues every attachment still `PENDING` after `CONTACT_SCAN_PENDING_AFTER_MINUTES` (a fan-out beat entry every 30 minutes) |
+| `agent.tasks.deliver_agent_order_event` | `deliver_due_agent_order_events` attempts every `AgentOrderEvent` still `pending` whose next attempt is due (a fan-out beat entry every minute, `docs/agent-order-events.md`) |
 
 A task that has no such state (a transactional e-mail, a live notification) is
 covered by the table for a publish that fails; a process killed in that

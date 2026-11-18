@@ -552,6 +552,7 @@ def store_sidebar(request: Any) -> list[Item]:
                             "meta_capi.MetaCapiEventLog",
                             _("Meta CAPI Event Log"),
                         ),
+                        page("agent.AgentOrderEvent", _("Agent Order Events")),
                         page("user.UserDataExport", _("User Data Exports")),
                     ],
                 ),

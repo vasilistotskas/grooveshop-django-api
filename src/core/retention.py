@@ -8,6 +8,7 @@ batch bounds both. The batch size is ``settings.RETENTION_PURGE_BATCH_SIZE``.
 from __future__ import annotations
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 
 
@@ -17,14 +18,27 @@ def delete_in_batches(stale: QuerySet) -> int:
     Goes through the ORM, never a raw statement, so cascades and the
     signals that remove a row's files still run. Returns the number of
     ``stale``'s own model rows deleted, not the cascaded ones.
+
+    Each batch is read under row locks (``FOR UPDATE`` of ``stale``'s own
+    table, waiting for a writer that holds one) and deleted in the same
+    transaction: a row another writer made no longer stale before the
+    read (a knox token renewed, an outbox event sent again) is not read,
+    and none read can change until the delete commits.
     """
     model = stale.model
     batch_size = settings.RETENTION_PURGE_BATCH_SIZE
     deleted = 0
-    while pks := list(stale.values_list("pk", flat=True)[:batch_size]):
-        _, per_model = model._base_manager.filter(pk__in=pks).delete()
+    while True:
+        with transaction.atomic():
+            pks = list(
+                stale.select_for_update(of=("self",)).values_list(
+                    "pk", flat=True
+                )[:batch_size]
+            )
+            if not pks:
+                return deleted
+            _, per_model = model._base_manager.filter(pk__in=pks).delete()
         deleted += per_model.get(model._meta.label, 0)
-    return deleted
 
 
 def purge_orphaned_user_sessions() -> int:

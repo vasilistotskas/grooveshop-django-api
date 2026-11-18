@@ -143,6 +143,17 @@ class TestFanoutTaskWrappers:
         )
 
     @pytest.mark.django_db
+    def test_fanout_deliver_due_agent_order_events(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_deliver_due_agent_order_events()
+
+        run.assert_called_once_with(
+            "agent.tasks.deliver_due_agent_order_events", include_suspended=True
+        )
+
+    @pytest.mark.django_db
     def test_fanout_send_checkout_abandonment_emails(self):
         from tenant import tasks as tenant_tasks
 

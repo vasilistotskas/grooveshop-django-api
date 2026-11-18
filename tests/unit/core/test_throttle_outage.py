@@ -43,6 +43,7 @@ FAIL_CLOSED = {
     "OrderCreateAnonThrottle",
     "CouponApplyThrottle",
     "GiftCardCheckThrottle",
+    "GiftCardCodeThrottle",
     "B2BProfileSubmitThrottle",
     "NewsletterSubscribeThrottle",
     "ProductAlertCreateThrottle",

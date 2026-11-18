@@ -24,7 +24,14 @@ every DRF throttle: they are all defined in `src/core/api/throttling.py`,
 whose `ResilientThrottleMixin.get_ident` is `client_ip_or_peer`, the
 `anon`/`user` defaults too (`AnonIpRateThrottle`, `UserBudgetThrottle`).
 DRF's own classes take the rightmost hop alone, the shared peer, and no
-module imports them (`tests/unit/core/test_throttle_outage.py`). `edge_client_ip` itself never falls back to
+module imports them (`tests/unit/core/test_throttle_outage.py`). Two
+budgets are not keyed on the address alone. A request carrying the agent
+gateway's secret is keyed on the cart or order it names
+(`GatewayAnonThrottle`, `_gateway_ident`): every buyer of an AI platform
+arrives from the platform's address. And the gift-card guessing budget
+(`GiftCardCodeThrottle`) is keyed on the signed-in customer, else the
+gateway's cart, else the address, and counts only codes new to the cart
+(`docs/order/creation.md` §3.0). `edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
 (`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is

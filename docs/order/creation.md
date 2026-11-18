@@ -110,13 +110,23 @@ caller:
     `cart_quote` / `cart_quote_anon` (`CartQuoteThrottle`,
     `CartQuoteAnonThrottle`: per cart for the gateway), not by the cart's
     write budget.
-  - **Gift-card codes spend the balance check's budget.** The quote, the
-    payment intent and order creation each say what a card settles (or
-    that the code is no card), so a request to any of them that carries
-    `giftCardCodes` also spends `gift_card_check`
-    (`core.api.throttling.gift_card_code_throttles`, the one helper the
-    three views add to their throttles): none is a faster balance oracle
-    than `/giftcard/check`. A request without codes is not counted.
+  - **Guessing a gift-card code is budgeted, using one is not.** The
+    quote, the payment intent and order creation each say what a card
+    settles (or that the code is no card), so each could be used to guess
+    codes. `core.api.throttling.gift_card_code_throttles`, the one helper
+    the three views add to their throttles, gives a request that carries
+    `giftCardCodes` a `GiftCardCodeThrottle`:
+    - only a code **new to the cart** counts. The cart keeps the codes it
+      has been allowed to try for `GIFT_CARD_CODES_SEEN_TTL_SECONDS`
+      (keyed digests, never the code), across the three routes, so a
+      checkout that re-prices the same card on every change is never
+      refused; a request with several new codes costs that many;
+    - the caller pays, from the `gift_card_check` budget that
+      `/giftcard/check` spends too (6 a minute for all of a caller's
+      guesses): the signed-in customer or the proven address, and the
+      cart for a guest request the agent gateway makes, since every buyer
+      of a platform arrives from its address;
+    - a refused request tried nothing, so its codes stay new.
   - A polled quote does not reach the carrier: ACS's live price is cached
     for five minutes per country, region and weight bracket
     (`AcsCarrier._fetch_live_quote`), the entry order creation reads. A

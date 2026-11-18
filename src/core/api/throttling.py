@@ -39,10 +39,12 @@ proven visitor instead, and no module outside this one imports
 import hashlib
 import hmac
 import logging
+import uuid
 from collections.abc import Mapping
 from typing import ClassVar
 
 from django.conf import settings
+from django.utils.crypto import salted_hmac
 from rest_framework.throttling import (
     AnonRateThrottle,
     ScopedRateThrottle,
@@ -366,24 +368,126 @@ class GiftCardCheckThrottle(UserOrIpRateThrottle):
 GIFT_CARD_CODES_FIELD = "gift_card_codes"
 
 
-def gift_card_code_throttles(request) -> list[GiftCardCheckThrottle]:
-    """The extra budget of a checkout request that carries gift-card codes.
+def _gift_card_codes(request) -> set[str]:
+    """The gift-card codes a checkout request carries, as the gift-card
+    service reads them (trimmed, upper-cased: ``GiftCardService.
+    _load_cards``), so one card typed two ways is one code.
 
-    Every route that prices a checkout says what a card settles, or that
-    the code is no card: the quote in its rows, the payment intent in its
-    amount, order creation in its refusal (and in the quote of a
-    ``total_changed``). So each is a balance oracle, and with codes it
-    spends the balance check's own budget (``gift_card_check``) besides
-    its own. A view's ``get_throttles`` adds what this returns; a
-    request without codes is not counted.
-
-    Read before the body is validated, so anything that is not an object
-    with a non-empty list there counts as none.
+    Read before the body is validated: anything that is not a list of
+    scalars there is no code, since no serializer would price it.
     """
     data = request.data
-    if isinstance(data, Mapping) and data.get(GIFT_CARD_CODES_FIELD):
-        return [GiftCardCheckThrottle()]
-    return []
+    codes = (
+        data.get(GIFT_CARD_CODES_FIELD) if isinstance(data, Mapping) else None
+    )
+    if not isinstance(codes, list):
+        return set()
+    normalised = {
+        str(code).strip().upper()
+        for code in codes
+        if isinstance(code, (str, int))
+    }
+    normalised.discard("")
+    return normalised
+
+
+def _checkout_cart_ident(request) -> str | None:
+    """The cart a checkout request prices, for the record of the codes it
+    has tried: the cart token's hash, else the signed-in customer (who
+    has one cart), else the guest cart's id. ``None`` when it names none.
+    """
+    from cart.agent_token import cart_token_from_request, hash_cart_token
+
+    token = cart_token_from_request(request)
+    if token:
+        return "token:" + hash_cart_token(token)
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated:
+        return f"user:{user.pk}"
+    try:
+        return "cart:" + str(uuid.UUID(request.headers.get("X-Cart-Id", "")))
+    except ValueError:
+        return None
+
+
+class GiftCardCodeThrottle(GiftCardCheckThrottle):
+    """Bound GUESSING a gift-card code through checkout, not using one.
+
+    The quote, the payment intent and order creation each say what a
+    card settles, or that a code is no card, so each is a balance oracle
+    like ``/giftcard/check``. But a checkout re-prices the same card on
+    every change, and that is use, not guessing. So:
+
+    * **Only a code new to the cart counts.** The cart keeps, for
+      ``GIFT_CARD_CODES_SEEN_TTL_SECONDS``, the codes it has already
+      been allowed to try (as keyed digests, never the code). Sending
+      one of them again costs nothing; each new one costs one, and a
+      request with several new codes costs that many.
+    * **Who pays.** The signed-in customer or the proven address, as
+      ``/giftcard/check``, and from the same ``gift_card_check`` budget:
+      a caller's guesses are counted once, wherever they are made.
+      A request the agent gateway makes for a guest is counted on its
+      cart instead (``_gateway_ident``, as ``GatewayAnonThrottle``):
+      every buyer of a platform arrives from the platform's address.
+
+    The record is written only for a request that was let through, so a
+    refused guess is still new the next time. A changed cart id loses
+    the record, never the budget. During a cache outage the record
+    reads empty (every code counts) and the budget itself refuses, as
+    its parent does.
+    """
+
+    seen_format = "gift_card_codes_seen_%(cart)s"
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            ident = _gateway_ident(request)
+            if ident:
+                return self.cache_format % {
+                    "scope": self.scope,
+                    "ident": f"gw:{ident}",
+                }
+        return super().get_cache_key(request, view)
+
+    @staticmethod
+    def _digest(code: str) -> str:
+        return salted_hmac(
+            "giftcard.code-seen", code, algorithm="sha256"
+        ).hexdigest()
+
+    def allow_request(self, request, view) -> bool:
+        cart = _checkout_cart_ident(request)
+        self.seen_key = self.seen_format % {"cart": cart} if cart else None
+        self.seen = set(self.cache.get(self.seen_key, ())) if cart else set()
+        digests = {self._digest(code) for code in _gift_card_codes(request)}
+        self.new = digests - self.seen
+        if not self.new:
+            return True
+        return super().allow_request(request, view)
+
+    def throttle_success(self) -> bool:
+        """Count every new code, and remember them for the cart."""
+        if len(self.history) + len(self.new) > self.num_requests:
+            return self.throttle_failure()
+        self.history[:0] = [self.now] * len(self.new)
+        self.cache.set(self.key, self.history, self.duration)
+        if self.seen_key:
+            self.cache.set(
+                self.seen_key,
+                sorted(self.seen | self.new),
+                settings.GIFT_CARD_CODES_SEEN_TTL_SECONDS,
+            )
+        return True
+
+
+def gift_card_code_throttles(request) -> list[GiftCardCodeThrottle]:
+    """The extra budget of a checkout request that carries gift-card codes
+    (``GiftCardCodeThrottle``). A view's ``get_throttles`` adds what this
+    returns, on every route that prices such codes: the quote, the
+    payment intent and order creation. A request without codes gets none.
+    """
+    return [GiftCardCodeThrottle()] if _gift_card_codes(request) else []
 
 
 class B2BProfileSubmitThrottle(UserOrIpRateThrottle):

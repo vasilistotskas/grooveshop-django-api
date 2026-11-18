@@ -29,7 +29,7 @@ from cart.models import Cart
 from core.api.throttling import (
     CartMutationAnonThrottle,
     CartQuoteAnonThrottle,
-    GiftCardCheckThrottle,
+    GiftCardCodeThrottle,
 )
 from country.factories import CountryFactory
 from giftcard.enum import GiftCardTransactionKind
@@ -646,54 +646,169 @@ def _post_intent(checkout, pay_way, **extra):
     )
 
 
-class TestGiftCardCodesAreBudgeted:
-    """Every route that prices a checkout says what a gift card settles
-    (or that the code is no card). With codes, each also spends the
-    balance check's budget, so none is a faster oracle than
-    ``/giftcard/check``; without codes it is not counted."""
+def _guess(number: int) -> dict:
+    return {"gift_card_codes": [f"GC-GUESS-{number:04d}"]}
 
-    CODES = {"gift_card_codes": ["GC-NOPE-NOPE"]}
+
+class TestGiftCardGuessesAreBudgeted:
+    """Every route that prices a checkout says what a gift card settles
+    (or that the code is no card), so each could be used to guess codes.
+    What is limited is guessing, not use: only a code new to the cart
+    counts, six a minute, and sending a tried code again is free."""
+
+    LIMIT = 6
 
     @pytest.fixture(autouse=True)
-    def _two_a_minute(self, monkeypatch):
-        _private_budget(monkeypatch, GiftCardCheckThrottle, "2/minute")
+    def _six_a_minute(self, monkeypatch):
+        _private_budget(
+            monkeypatch, GiftCardCodeThrottle, f"{self.LIMIT}/minute"
+        )
 
-    def test_on_the_quote(self):
+    def _spend(self, post) -> list[int]:
+        """Try LIMIT new codes, then one more."""
+        return [post(_guess(n)).status_code for n in range(self.LIMIT + 1)]
+
+    def test_requoting_one_card_is_never_refused(self):
         checkout = _checkout()
         card = GiftCardFactory(initial_value=Money(Decimal("10.00"), "EUR"))
         with_card = {**_choices(checkout), "gift_card_codes": [card.code]}
 
-        statuses = [
-            _post_quote(checkout, **with_card).status_code for _ in range(3)
-        ]
+        statuses = {
+            _post_quote(checkout, **with_card).status_code for _ in range(20)
+        }
 
-        assert statuses == [200, 200, 429]
+        assert statuses == {200}
+
+    def test_the_seventh_new_code_is_refused_on_the_quote(self):
+        checkout = _checkout()
+
+        statuses = self._spend(
+            lambda codes: _post_quote(checkout, **_choices(checkout), **codes)
+        )
+
+        assert statuses == [400] * self.LIMIT + [429]
+        # A code already tried is not a new guess, and a quote without
+        # codes was never counted.
+        again = _post_quote(checkout, **_choices(checkout), **_guess(0))
+        assert again.status_code == 400
         assert _post_quote(checkout, **_choices(checkout)).status_code == 200
+
+    def test_one_card_typed_two_ways_is_one_code(self):
+        checkout = _checkout()
+        spellings = ["gc-guess-0000", " GC-GUESS-0000 ", "Gc-Guess-0000"] * 3
+
+        statuses = {
+            _post_quote(
+                checkout, **_choices(checkout), gift_card_codes=[code]
+            ).status_code
+            for code in spellings
+        }
+
+        assert statuses == {400}
+
+    def test_every_new_code_of_a_request_counts(self):
+        checkout = _checkout()
+
+        def three(start: int):
+            codes = [f"GC-GUESS-{n:04d}" for n in range(start, start + 3)]
+            return _post_quote(
+                checkout, **_choices(checkout), gift_card_codes=codes
+            ).status_code
+
+        assert [three(0), three(3)] == [400, 400]
+        assert three(6) == 429
+        # The refused codes were never tried: one of them is still new.
+        assert (
+            _post_quote(checkout, **_choices(checkout), **_guess(6)).status_code
+            == 429
+        )
 
     def test_on_the_payment_intent(self):
         checkout = _checkout()
         stripe = PayWayFactory.create_online_payment(provider_code="stripe")
 
         with fake_stripe():
-            statuses = [
-                _post_intent(checkout, stripe, **self.CODES).status_code
-                for _ in range(3)
-            ]
+            statuses = self._spend(
+                lambda codes: _post_intent(checkout, stripe, **codes)
+            )
+            again = _post_intent(checkout, stripe, **_guess(0))
             without_codes = _post_intent(checkout, stripe)
 
-        assert statuses == [400, 400, 429]
+        assert statuses == [400] * self.LIMIT + [429]
+        assert again.status_code == 400
         assert without_codes.status_code == 200, without_codes.content
 
     def test_on_order_creation(self):
         checkout = _checkout()
 
-        statuses = [
-            _post_order(checkout, **self.CODES).status_code for _ in range(3)
-        ]
+        statuses = self._spend(lambda codes: _post_order(checkout, **codes))
 
-        assert statuses == [400, 400, 429]
+        assert statuses == [400] * self.LIMIT + [429]
+        assert _post_order(checkout, **_guess(0)).status_code == 400
         assert not Order.objects.exists()
         assert _post_order(checkout).status_code == 201
+
+    def test_the_routes_share_one_budget_and_one_record(self):
+        """A code tried on the quote is not new to the order, and guesses
+        on one route are not free on another."""
+        checkout = _checkout()
+
+        def quote(codes):
+            return _post_quote(checkout, **_choices(checkout), **codes)
+
+        assert [quote(_guess(n)).status_code for n in range(3)] == [400] * 3
+        assert _post_order(checkout, **_guess(0)).status_code == 400
+        assert [
+            _post_order(checkout, **_guess(n)).status_code for n in (3, 4, 5, 6)
+        ] == [400, 400, 400, 429]
+
+    def test_two_gateway_carts_do_not_share_a_budget(self, settings):
+        """Every buyer of a platform arrives from the platform's address:
+        the gateway's requests are counted on their cart."""
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gateway-secret"
+        one, other = _checkout(user=False), _checkout(user=False)
+        gateway = APIClient()
+        gateway.credentials(HTTP_X_INTERNAL_GATEWAY="gateway-secret")
+
+        statuses = self._spend(
+            lambda codes: _post_quote(
+                one, client=gateway, **_choices(one), **codes
+            )
+        )
+
+        assert statuses == [400] * self.LIMIT + [429]
+        assert (
+            _post_quote(
+                other, client=gateway, **_choices(other), **_guess(99)
+            ).status_code
+            == 400
+        )
+
+    def test_a_storefront_callers_carts_share_one(self):
+        """Without the gateway's secret the caller pays, whichever cart
+        the guess is made on: a new cart is not a new budget."""
+        one, other = _checkout(user=False), _checkout(user=False)
+        visitor = APIClient()
+
+        def guess(cart, number: int) -> int:
+            return _post_quote(
+                cart, client=visitor, **_choices(cart), **_guess(number)
+            ).status_code
+
+        assert [guess(one, n) for n in range(3)] == [400] * 3
+        assert [guess(other, n) for n in range(3, 6)] == [400] * 3
+        assert guess(other, 6) == 429
+        assert guess(one, 7) == 429
+
+    def test_the_record_holds_no_code(self):
+        checkout = _checkout()
+        throttle_cache = GiftCardCodeThrottle.cache
+
+        _post_quote(checkout, **_choices(checkout), **_guess(0))
+
+        stored = repr(throttle_cache._cache)
+        assert "gift_card_codes_seen_" in stored
+        assert "GC-GUESS-0000" not in stored
 
 
 class TestPointsWorthLessThanACent:

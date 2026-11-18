@@ -154,6 +154,13 @@ REST_FRAMEWORK = {
     "COERCE_DECIMAL_TO_STRING": False,
 }
 
+# How long a cart remembers the gift-card codes it has already tried
+# (``core.api.throttling.GiftCardCodeThrottle``): within it, sending one
+# of them again is use, not a new guess. About the length of a checkout.
+GIFT_CARD_CODES_SEEN_TTL_SECONDS = int(
+    getenv("GIFT_CARD_CODES_SEEN_TTL_SECONDS", "1800")
+)
+
 # Other general settings
 APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 

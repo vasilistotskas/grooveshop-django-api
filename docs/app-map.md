@@ -210,7 +210,8 @@ and `VivaWebhookEvent`.
 
 Entry points: `src/order/services.py` (creation, the state machine,
 cancel, refund), `src/order/checkout/quote.py` (`OrderQuoteService`: the
-free-shipping basis, the shipping price and the pay-way fee),
+checkout quote, which is the one total, the free-shipping basis, the
+shipping price and the pay-way fee),
 `src/order/inventory/stock.py` (`StockManager`),
 `src/order/payments/payment.py` (the payment providers),
 `src/order/payments/payment_ledger.py` (`PaymentLedger`),
@@ -223,9 +224,10 @@ free-shipping basis, the shipping price and the pay-way fee),
 `Cart`, `CartItem` and `CartAttribution` (`src/cart/models/`),
 `src/cart/services.py`, the guest and customer cart API under
 `src/cart/views/`, and the agent's cart token (`src/cart/agent_token.py`).
-Read `docs/cart-agent-token.md` for the token, and
-`docs/order/creation-records.md` (section 3.4) for the first touch a cart
-records.
+Read `docs/cart-agent-token.md` for the token,
+`docs/order/creation.md` (section 3.0) for `POST /cart/quote`, priced by
+`order.checkout.quote`, and `docs/order/creation-records.md` (section
+3.4) for the first touch a cart records.
 
 ### `blog/`
 

@@ -12743,6 +12743,93 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedCartList'
           description: ''
+  /api/v1/cart/quote:
+    post:
+      operationId: quoteCart
+      description: 'Τι χρεώνει το ταμείο για το καλάθι με τις επιλογές που έχουν γίνει
+        ως τώρα, υπολογισμένο από τη συνάρτηση που χρησιμοποιούν η δημιουργία παραγγελίας
+        και το payment intent: τα προϊόντα, οι προσφορές, η παράδοση, η επιβάρυνση
+        της μεθόδου πληρωμής, η έκπτωση πόντων και οι δωροκάρτες, και το οφειλόμενο
+        ποσό. Μια γραμμή που εξαρτάται από επιλογή που δεν έκανε το αίτημα είναι null.
+        Παραθέτει επίσης κάθε διαθέσιμο τρόπο παράδοσης και κάθε μέθοδο πληρωμής στην
+        τιμή που θα χρεωνόταν αυτό το καλάθι. Στείλτε πίσω το ``expectedTotal`` κατά
+        τη δημιουργία της παραγγελίας: τότε δημιουργείται μόνο σε αυτό το σύνολο.
+        Μια κοστολόγηση που ζητείται με ``X-Cart-Token`` είναι η τιμή του κατόχου
+        του καλαθιού.'
+      summary: Κοστολόγηση του συνόλου του καλαθιού στο ταμείο
+      parameters:
+      - in: header
+        name: X-Cart-Id
+        schema:
+          type: string
+          format: uuid
+        description: Cart UUID for guest users. Used to identify and maintain guest
+          cart sessions. Sequential integer IDs were enumerable metadata, so the public
+          identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
+      tags:
+      - Cart
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CartQuoteRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CartQuoteRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartQuoteRequestRequest'
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartQuote'
+          description: ''
   /api/v1/cart/release-reservations:
     post:
       operationId: releaseCartReservations
@@ -39347,6 +39434,333 @@ components:
       - clientSecret
       - currency
       - paymentIntentId
+    CartQuote:
+      type: object
+      description: |-
+        The body of ``POST /cart/quote``: the quote, and what each
+        delivery and pay way on offer would cost this cart.
+      properties:
+        itemsSubtotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Οι γραμμές του καλαθιού στις τιμές που πληρώνει ο αγοραστής.
+        discountTotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Ό,τι αφαιρούν οι ενεργές προσφορές και το εφαρμοσμένο κουπόνι.
+        appliedPromotions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteAppliedPromotion'
+          description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
+            στο discountTotal.
+        blockingCoupon:
+          allOf:
+          - $ref: '#/components/schemas/QuoteBlockingCoupon'
+          nullable: true
+          description: Συνδεδεμένο κουπόνι για το οποίο η δημιουργία παραγγελίας απορρίπτει
+            αυτό το καλάθι (``invalid_coupon``). Η έκπτωσή του δεν περιλαμβάνεται
+            σε αυτή την κοστολόγηση· αφαιρέστε τον κωδικό πριν από την παραγγελία.
+            Null όταν δεν υπάρχει.
+        freeThresholdValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: 'Η αξία με την οποία κρίνεται κάθε όριο «δωρεάν άνω των»: τα
+            προϊόντα μετά τις εκπτώσεις, χωρίς μεταφορικά και επιβαρύνσεις.'
+        shipping:
+          allOf:
+          - $ref: '#/components/schemas/QuoteShipping'
+          nullable: true
+        paymentMethodFee:
+          allOf:
+          - $ref: '#/components/schemas/QuotePaymentFee'
+          nullable: true
+        loyaltyDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Ό,τι αφαιρούν οι πόντοι πιστότητας που εξαργυρώνονται.
+        giftCardAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Το μέρος του συνόλου που εξοφλούν οι δωροκάρτες· είναι πληρωμή
+            και εφαρμόζονται τελευταίες.
+        grandTotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Τα προϊόντα μετά τις προσφορές, συν τα μεταφορικά και την επιβάρυνση
+            της μεθόδου πληρωμής.
+        amountDue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Ό,τι απομένει προς πληρωμή μετά την έκπτωση πόντων και τις
+            δωροκάρτες: το ποσό που αποθηκεύει μια παραγγελία με αυτές τις επιλογές
+            και για το οποίο πληρώνεται.'
+        currency:
+          type: string
+          description: Κωδικός νομίσματος ISO 4217 για κάθε ποσό της κοστολόγησης.
+        expectedTotal:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedTotal'
+          nullable: true
+          description: 'Το amountDue όπως το συγκρίνει η δημιουργία παραγγελίας. Στείλτε
+            το πίσω ως ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: η παραγγελία
+            δημιουργείται μόνο σε αυτό το σύνολο.'
+        shippingOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteShippingOption'
+          nullable: true
+          readOnly: true
+          description: Κάθε τρόπος παράδοσης που προσφέρει το κατάστημα στη χώρα του
+            αιτήματος, με την τιμή που θα χρεωνόταν μια παραγγελία. Null χωρίς χώρα.
+        payWays:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotePayWayOption'
+          readOnly: true
+          description: Κάθε μέθοδος πληρωμής που προσφέρεται για την επιλεγμένη παράδοση
+            (όλες, όσο δεν έχει επιλεγεί καμία), με την επιβάρυνση που θα χρεωνόταν
+            μια παραγγελία.
+      required:
+      - amountDue
+      - appliedPromotions
+      - blockingCoupon
+      - currency
+      - discountTotal
+      - expectedTotal
+      - freeThresholdValue
+      - giftCardAmount
+      - grandTotal
+      - itemsSubtotal
+      - loyaltyDiscount
+      - payWays
+      - paymentMethodFee
+      - shipping
+      - shippingOptions
+    CartQuoteRequestRequest:
+      type: object
+      description: |-
+        Request body for ``POST /api/v1/cart/quote``.
+
+        The choices of the payment-intent body, each optional: a quote may
+        be asked before the shopper has chosen a delivery or a pay way, and
+        the rows that depend on a missing choice come back null. A delivery
+        is priced once both ``shipping_kind`` and ``country_id`` are given.
+        Send what the order-create body will carry, the email included, so
+        the quote is the total that order is created at.
+      properties:
+        payWayId:
+          type: integer
+          minimum: 1
+          description: ID της επιλεγμένης μεθόδου πληρωμής· παραλείψτε το όσο δεν
+            έχει επιλεγεί καμία.
+        shippingKind:
+          allOf:
+          - $ref: '#/components/schemas/ShippingKind'
+          description: |-
+            Είδος εκπλήρωσης της επιλεγμένης παράδοσης· παραλείψτε το όσο δεν έχει επιλεγεί καμία.
+
+            * `home_delivery` - Κατ' οίκον παράδοση
+            * `pickup_point` - Σημείο παραλαβής / locker
+        shippingProviderCode:
+          type: string
+          description: Κωδικός μεταφορέα που αντιστοιχεί σε καταχωρημένο προσαρμογέα
+            αποστολής (π.χ. 'acs', 'boxnow'). Απαιτείται για ``pickup_point``· παραλείψτε/αφήστε
+            κενό για ``home_delivery`` (το backend χρησιμοποιεί τη γενική πάγια χρέωση,
+            αντίστοιχη με αυτή που θα υπολογίσει η επαλήθευση δημιουργίας παραγγελίας
+            για το ίδιο αίτημα).
+          maxLength: 32
+        countryId:
+          type: string
+          minLength: 1
+          description: Χώρα παράδοσης (ISO 3166-1 alpha-2). Χρειάζεται για την τιμολόγηση
+            μιας παράδοσης και για τη λίστα των τρόπων αποστολής.
+          maxLength: 2
+        regionId:
+          type: string
+          description: Προαιρετικός κωδικός περιφέρειας — καθορίζει την προσαρμογή
+            αποστολής σε επίπεδο περιφέρειας.
+          maxLength: 16
+        email:
+          description: Email ολοκλήρωσης αγοράς. Επιτρέπει στους ελέγχους επιλεξιμότητας
+            προσφορών που εξαρτώνται από την ταυτότητα του πελάτη (μόνο για πρώτη
+            παραγγελία, όρια ανά πελάτη) να εκτελούνται με την ίδια ταυτότητα που
+            θα χρησιμοποιήσει η επαλήθευση κατά τη δημιουργία παραγγελίας, ώστε το
+            ποσό του PaymentIntent να παραμένει συγχρονισμένο.
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        giftCardCodes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          description: Κωδικοί δωροκαρτών που θέλει να εξαργυρώσει ο αγοραστής — το
+            intent δημιουργείται για το ΠΟΣΟ ΠΟΥ ΑΠΟΜΕΝΕΙ αφού αφαιρεθούν τα υπόλοιπά
+            τους. Στείλτε τους ίδιους κωδικούς στο σώμα της δημιουργίας παραγγελίας.
+          maxItems: 3
+        loyaltyPointsToRedeem:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Πόντοι πιστότητας που θα εξαργυρώσει ο αγοραστής κατά τη δημιουργία
+            της παραγγελίας. Από το ποσό του intent αφαιρείται η έκπτωση που προκύπτει,
+            ώστε ο πάροχος να χρεώσει ό,τι εμφανίστηκε στον πελάτη. Στείλτε την ίδια
+            τιμή στο σώμα της δημιουργίας παραγγελίας. Απαιτεί πιστοποιημένο αίτημα.
+    CheckoutQuote:
+      type: object
+      description: |-
+        What checkout charges for a cart, row by row.
+
+        A row that depends on a choice the request did not make is null,
+        never guessed: ``shipping`` without a delivery, ``paymentMethodFee``
+        without a pay way, and ``giftCardAmount``, ``grandTotal``,
+        ``amountDue`` and ``expectedTotal`` without both.
+      properties:
+        itemsSubtotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Οι γραμμές του καλαθιού στις τιμές που πληρώνει ο αγοραστής.
+        discountTotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Ό,τι αφαιρούν οι ενεργές προσφορές και το εφαρμοσμένο κουπόνι.
+        appliedPromotions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteAppliedPromotion'
+          description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
+            στο discountTotal.
+        blockingCoupon:
+          allOf:
+          - $ref: '#/components/schemas/QuoteBlockingCoupon'
+          nullable: true
+          description: Συνδεδεμένο κουπόνι για το οποίο η δημιουργία παραγγελίας απορρίπτει
+            αυτό το καλάθι (``invalid_coupon``). Η έκπτωσή του δεν περιλαμβάνεται
+            σε αυτή την κοστολόγηση· αφαιρέστε τον κωδικό πριν από την παραγγελία.
+            Null όταν δεν υπάρχει.
+        freeThresholdValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: 'Η αξία με την οποία κρίνεται κάθε όριο «δωρεάν άνω των»: τα
+            προϊόντα μετά τις εκπτώσεις, χωρίς μεταφορικά και επιβαρύνσεις.'
+        shipping:
+          allOf:
+          - $ref: '#/components/schemas/QuoteShipping'
+          nullable: true
+        paymentMethodFee:
+          allOf:
+          - $ref: '#/components/schemas/QuotePaymentFee'
+          nullable: true
+        loyaltyDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Ό,τι αφαιρούν οι πόντοι πιστότητας που εξαργυρώνονται.
+        giftCardAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Το μέρος του συνόλου που εξοφλούν οι δωροκάρτες· είναι πληρωμή
+            και εφαρμόζονται τελευταίες.
+        grandTotal:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Τα προϊόντα μετά τις προσφορές, συν τα μεταφορικά και την επιβάρυνση
+            της μεθόδου πληρωμής.
+        amountDue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Ό,τι απομένει προς πληρωμή μετά την έκπτωση πόντων και τις
+            δωροκάρτες: το ποσό που αποθηκεύει μια παραγγελία με αυτές τις επιλογές
+            και για το οποίο πληρώνεται.'
+        currency:
+          type: string
+          description: Κωδικός νομίσματος ISO 4217 για κάθε ποσό της κοστολόγησης.
+        expectedTotal:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedTotal'
+          nullable: true
+          description: 'Το amountDue όπως το συγκρίνει η δημιουργία παραγγελίας. Στείλτε
+            το πίσω ως ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: η παραγγελία
+            δημιουργείται μόνο σε αυτό το σύνολο.'
+      required:
+      - amountDue
+      - appliedPromotions
+      - blockingCoupon
+      - currency
+      - discountTotal
+      - expectedTotal
+      - freeThresholdValue
+      - giftCardAmount
+      - grandTotal
+      - itemsSubtotal
+      - loyaltyDiscount
+      - paymentMethodFee
+      - shipping
     CheckpointWriteRequest:
       type: object
       properties:
@@ -40425,6 +40839,40 @@ components:
             που είναι στη γλώσσα του αιτήματος.
       required:
       - detail
+    ExpectedTotal:
+      type: object
+      description: An order total in whole minor units, compared exactly.
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+          description: 'Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά):
+            1999 για 19,99.'
+        currency:
+          type: string
+          description: Κωδικός νομίσματος ISO 4217 του ποσού.
+          maxLength: 3
+          minLength: 3
+      required:
+      - amount
+      - currency
+    ExpectedTotalRequest:
+      type: object
+      description: An order total in whole minor units, compared exactly.
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+          description: 'Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά):
+            1999 για 19,99.'
+        currency:
+          type: string
+          minLength: 3
+          description: Κωδικός νομίσματος ISO 4217 του ποσού.
+          maxLength: 3
+      required:
+      - amount
+      - currency
     FacetStats:
       type: object
       description: Serializer for facet statistics (numeric facets).
@@ -42270,8 +42718,12 @@ components:
       description: |-
         The 400 or 409 body of ``POST /order``.
 
-        409 is ``legal_document_unavailable``: a checkout legal text the
-        store cannot show in the order's language.
+        409 is ``legal_document_unavailable`` (a checkout legal text the
+        store cannot show in the order's language) or ``total_changed``
+        (the request's ``expectedTotal`` is not the amount due computed
+        now). Tell ``total_changed`` by ``code`` and the status: its
+        ``error.type`` is ``invalid_order_data`` until every client lists
+        the new value.
 
         A refusal the order service understands carries ``error.type``; a
         malformed payload is DRF's field-error map instead (``{field:
@@ -42331,6 +42783,12 @@ components:
         reason:
           type: string
           description: Μόνο για ``invalid_coupon`` / ``invalid_gift_card``.
+        quote:
+          allOf:
+          - $ref: '#/components/schemas/CheckoutQuote'
+          description: 'Μόνο για ``total_changed``: τι χρεώνει τώρα το ταμείο για
+            το καλάθι. Δείξτε το σύνολό του και στείλτε το ``expectedTotal`` του για
+            να γίνει η παραγγελία σε αυτό.'
       required:
       - type
     OrderCreateErrorType:
@@ -42570,6 +43028,16 @@ components:
             (αριθμός φυσικών δεμάτων στην αποστολή). Προεπιλογή 1. ΔΕΝ πρέπει να οριστεί
             για παραλαβή Smartpoint — η ACS απορρίπτει vouchers πολλαπλών δεμάτων
             σε lockers.
+        expectedTotal:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedTotalRequest'
+          writeOnly: true
+          description: 'Το σύνολο που είδε ο αγοραστής: το ``expectedTotal`` του ``POST
+            /cart/quote``, ή το οφειλόμενο ποσό που υπολόγισε ο ίδιος ο client, σε
+            υποδιαιρέσεις του νομίσματος. Όταν αποστέλλεται, η παραγγελία δημιουργείται
+            μόνο αν είναι ακριβώς το οφειλόμενο ποσό που υπολογίζεται τώρα· διαφορετικά
+            η απάντηση είναι 409 ``total_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται
+            τίποτα.'
         meta:
           type: object
           additionalProperties: {}
@@ -50462,6 +50930,155 @@ components:
       - key
       - kind
       - updatedAt
+    QuoteAppliedPromotion:
+      type: object
+      properties:
+        promotionId:
+          type: integer
+        name:
+          type: string
+          readOnly: true
+        code:
+          type: string
+          nullable: true
+          description: Το κουπόνι που έδωσε την εγγραφή· null για αυτόματη προσφορά.
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+      required:
+      - amount
+      - code
+      - name
+      - promotionId
+    QuoteBlockingCoupon:
+      type: object
+      properties:
+        code:
+          type: string
+        reason:
+          type: string
+          description: Γιατί απορρίπτεται ο κωδικός, στο λεξιλόγιο απόρριψης κουπονιών
+            (``discount_code_expired``, ...).
+      required:
+      - code
+      - reason
+    QuotePayWayOption:
+      type: object
+      description: |-
+        One pay way the shopper is offered, with the fee this cart would
+        be charged for choosing it.
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+          description: Το κλειδί της μεθόδου πληρωμής, όπως στο endpoint των μεθόδων
+            πληρωμής.
+        fee:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        waived:
+          type: boolean
+          description: Αληθές όταν η μέθοδος πληρωμής έχει επιβάρυνση και το καλάθι
+            έφτασε το όριο πάνω από το οποίο είναι δωρεάν.
+      required:
+      - fee
+      - id
+      - key
+      - waived
+    QuotePaymentFee:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        waived:
+          type: boolean
+          description: Αληθές όταν η μέθοδος πληρωμής έχει επιβάρυνση και το καλάθι
+            έφτασε το όριο πάνω από το οποίο είναι δωρεάν.
+      required:
+      - amount
+      - waived
+    QuoteShipping:
+      type: object
+      properties:
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        waivedBy:
+          nullable: true
+          description: |-
+            Τι έκανε την παράδοση δωρεάν: ``threshold`` (το όριο δωρεάν αποστολής του μεταφορέα) ή ``promotion`` (προσφορά δωρεάν αποστολής). Null όταν χρεώνεται ή όταν απλώς δεν κοστίζει τίποτα.
+
+            * `threshold` - threshold
+            * `promotion` - promotion
+          oneOf:
+          - $ref: '#/components/schemas/WaivedByEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - price
+      - waivedBy
+    QuoteShippingOption:
+      type: object
+      description: |-
+        One delivery the store offers, at the price this cart would be
+        charged for choosing it.
+      properties:
+        providerCode:
+          type: string
+        providerName:
+          type: string
+        kind:
+          $ref: '#/components/schemas/ShippingKind'
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        waivedBy:
+          nullable: true
+          description: |-
+            Τι έκανε την παράδοση δωρεάν: ``threshold`` (το όριο δωρεάν αποστολής του μεταφορέα) ή ``promotion`` (προσφορά δωρεάν αποστολής). Null όταν χρεώνεται ή όταν απλώς δεν κοστίζει τίποτα.
+
+            * `threshold` - threshold
+            * `promotion` - promotion
+          oneOf:
+          - $ref: '#/components/schemas/WaivedByEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        exceedsMaxWeight:
+          type: boolean
+          description: Αληθές όταν το καλάθι είναι βαρύτερο από όσο μεταφέρει αυτή
+            η επιλογή· η επιλογή της απορρίπτεται.
+        exceedsParcelSize:
+          type: boolean
+          description: Αληθές όταν το καλάθι δεν χωρά στα δέματα αυτού του μεταφορέα·
+            η επιλογή του απορρίπτεται.
+      required:
+      - exceedsMaxWeight
+      - exceedsParcelSize
+      - kind
+      - price
+      - providerCode
+      - providerName
+      - waivedBy
     RateEnum:
       enum:
       - 1
@@ -54516,6 +55133,14 @@ components:
       - order
       type: string
       description: '* `order` - order'
+    WaivedByEnum:
+      enum:
+      - threshold
+      - promotion
+      type: string
+      description: |-
+        * `threshold` - threshold
+        * `promotion` - promotion
     WebSocketTicketResponse:
       type: object
       properties:

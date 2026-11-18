@@ -30,6 +30,10 @@ from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemDetailSerializer,
 )
+from order.serializers.quote import (
+    CheckoutQuoteSerializer,
+    ExpectedTotalSerializer,
+)
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
@@ -1327,6 +1331,21 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
 
+    # ---------- The total the buyer was shown ----------
+    # Optional for now: a client that sends it gets the order only at
+    # that total (``OrderTotalChangedError``, 409 ``total_changed``).
+    expected_total = ExpectedTotalSerializer(
+        required=False,
+        write_only=True,
+        help_text=_(
+            "The total the buyer was shown: ``expectedTotal`` of "
+            "``POST /cart/quote``, or the client's own amount due in minor "
+            "units. When sent, the order is created only if it is exactly "
+            "the amount due computed now; otherwise the answer is 409 "
+            "``total_changed`` with the new quote and nothing is created."
+        ),
+    )
+
     # ---------- Meta Conversions API context ----------
     # Forwarded by the Nuxt ``server/api/orders/index.post.ts`` proxy
     # at order creation. Persisted on ``order.metadata['meta']`` so
@@ -2037,13 +2056,25 @@ class OrderCreateErrorDetailSerializer(serializers.Serializer):
         required=False,
         help_text=_("``invalid_coupon`` / ``invalid_gift_card`` only."),
     )
+    quote = CheckoutQuoteSerializer(
+        required=False,
+        help_text=_(
+            "``total_changed`` only: what checkout charges for the cart "
+            "now. Show its total and send its ``expectedTotal`` to order "
+            "at it."
+        ),
+    )
 
 
 class OrderCreateErrorSerializer(serializers.Serializer):
     """The 400 or 409 body of ``POST /order``.
 
-    409 is ``legal_document_unavailable``: a checkout legal text the
-    store cannot show in the order's language.
+    409 is ``legal_document_unavailable`` (a checkout legal text the
+    store cannot show in the order's language) or ``total_changed``
+    (the request's ``expectedTotal`` is not the amount due computed
+    now). Tell ``total_changed`` by ``code`` and the status: its
+    ``error.type`` is ``invalid_order_data`` until every client lists
+    the new value.
 
     A refusal the order service understands carries ``error.type``; a
     malformed payload is DRF's field-error map instead (``{field:

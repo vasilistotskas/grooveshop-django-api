@@ -92,17 +92,22 @@ accepting Cyprus orders at the Greek flat rate.
   (`src/order/checkout/quote.py`): the products after promotion and
   coupon discounts, excluding shipping and the pay-way fee (loyalty
   points and gift cards are payment, not discounts, and do not move it).
-  Every caller of `OrderQuoteService.shipping_cost` and
-  `calculate_payment_method_fee` passes it: both order-creation paths, the
-  payment-first verification step and the cart's create-payment-intent
-  preview, so the preview and the order cannot disagree. The cart response
+  `OrderQuoteService.quote` passes it to `shipping_cost` and
+  `calculate_payment_method_fee`, and both order-creation paths, the
+  cart's create-payment-intent and `POST /cart/quote` price through that
+  one function ([§3.0](creation.md)), so the quote, the intent and the
+  order cannot disagree. The cart response
   reports it as `freeThresholdValue`, and `/shipping/options` takes it as
   `orderValueAmount`; a client shows "X more for free" from that number,
   never from `totalPrice`. (Before, the fee compared items + shipping and
   free shipping the gross total, so a EUR 39.98 cart with both thresholds at
   EUR 40 paid shipping but not the fee.)
-- **`ShippingService.quote(...)`** is `assert_available` + pricing:
-  the rate's own `free_shipping_threshold` first, then the carrier's
+- **`ShippingService.quote(...)`** is `assert_available` + pricing, and
+  returns a `ShippingCharge`: the price, and `waived_by` when a rule took
+  a real price to 0 (`promotion` for `free=True`, a free-shipping
+  promotion, which still runs the gate; `threshold` for the rate's own).
+  The order is: the promotion, then
+  the rate's own `free_shipping_threshold`, then the carrier's
   `live_quote()` hook (ACS's weight-banded `ACS_Price_Calculation`,
   gated on `ACS_DYNAMIC_PRICING_ENABLED`; every other carrier returns
   `None` and the rate's stored `price` wins), and is
@@ -118,7 +123,11 @@ accepting Cyprus orders at the Greek flat rate.
   carries `country_code`, `max_weight_grams` and `exceeds_max_weight`
   — an over-cap option (a heavy Cyprus BoxNow cart) is still listed,
   flagged, so the storefront can disable it with a reason instead of
-  the step silently having one fewer card.
+  the step silently having one fewer card. It prices on the caller's
+  `orderValueAmount`, with no region and no promotion waiver; the
+  `shippingOptions` of `POST /cart/quote` are the same rows
+  (`available_options`) priced as an order would be, each with
+  `waivedBy` ([§3.0](creation.md)).
 - **Delivery estimate**: `delivery_days_min`/`delivery_days_max`
   (business days after dispatch, both null = no estimate advertised,
   nothing invented) are on the rate and on each `/shipping/options`

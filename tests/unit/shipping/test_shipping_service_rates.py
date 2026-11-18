@@ -222,7 +222,7 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("10.00", "EUR"),
-        )
+        ).price
         assert price == Money("4.20", "EUR")
 
     def test_free_above_the_threshold(self, active_flat_rate):
@@ -238,7 +238,7 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("50.00", "EUR"),
-        )
+        ).price
         assert price == Money("0", "EUR")
 
     def test_below_the_threshold_still_charges(self, active_flat_rate):
@@ -254,7 +254,7 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("49.99", "EUR"),
-        )
+        ).price
         assert price == Money("4.20", "EUR")
 
     def test_live_quote_overrides_the_rate_price(self, active_flat_rate):
@@ -282,7 +282,7 @@ class TestQuote:
                 kind=ShippingKind.HOME_DELIVERY.value,
                 country_code=country.alpha_2,
                 order_value=Money("10.00", "EUR"),
-            )
+            ).price
         assert price == Money("7.77", "EUR")
 
     def test_raises_when_unavailable(self):

@@ -5,7 +5,6 @@ import logging
 from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -24,6 +23,7 @@ from cart.serializers.cart import (
     CartAgentTokenResponseSerializer,
     CartCreatePaymentIntentRequestSerializer,
     CartPaymentIntentResponseSerializer,
+    CartQuoteRequestSerializer,
     CartSerializer,
     CartWriteSerializer,
     CouponApplyRequestSerializer,
@@ -50,23 +50,32 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from order.checkout.quote import OrderQuoteService
+from order.checkout.quote import (
+    CheckoutQuote,
+    OrderQuoteService,
+    ShippingChoice,
+)
 from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
     CartStockUnavailableError,
+    InvalidGiftCardError,
     InvalidOrderDataError,
+    LoyaltyRedemptionError,
     StockReservationError,
 )
 from order.inventory.stock import StockManager
 from order.models import StockReservation
 from order.payments.payment import provider_supports
 from order.payments.payment_binding import PaymentPurpose
+from order.serializers.quote import CartQuoteSerializer
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderLegalAcceptanceService,
 )
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
+from pay_way.models import PayWay
+from pay_way.services import PayWayService
 from promotion.serializers import CartCouponSerializer
 from tenant.membership import is_store_staff
 from tenant.permissions import (
@@ -193,6 +202,26 @@ serializers_config: SerializersConfig = {
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
     ),
+    "quote": ActionConfig(
+        request=CartQuoteRequestSerializer,
+        response=CartQuoteSerializer,
+        operation_id="quoteCart",
+        summary=_("Quote the cart's checkout total"),
+        description=_(
+            "What checkout charges for the cart with the choices made so "
+            "far, computed by the function order creation and the payment "
+            "intent use: the products, the promotions, the delivery, the "
+            "pay-way fee, the loyalty discount and the gift cards, and the "
+            "amount due. A row that depends on a choice the request did "
+            "not make is null. Also lists every delivery and pay way on "
+            "offer at the price this cart would be charged. Send "
+            "``expectedTotal`` back when creating the order: it is then "
+            "created only at this total. A quote asked with "
+            "``X-Cart-Token`` is the cart owner's price."
+        ),
+        tags=["Cart"],
+        parameters=CART_TOKEN_HEADERS,
+    ),
     "apply_coupon": ActionConfig(
         request=CouponApplyRequestSerializer,
         response=CartSerializer,
@@ -290,17 +319,26 @@ class CartViewSet(BaseModelViewSet):
             "reserve_stock",
             "release_reservations",
             "create_payment_intent",
+            # A read, but it can ask a carrier for a live price: the
+            # per-minute limits of the checkout calls apply.
+            "quote",
             "apply_coupon",
             "remove_coupon",
         }
     )
 
     # What an ``X-Cart-Token`` may do on the cart, spelled out: a
-    # read, coupons, and (on the item routes) the lines. Payment
-    # intents, stock reservation and cart delete or edit are not here,
-    # so the token is refused there.
+    # read, a quote, coupons, and (on the item routes) the lines.
+    # Payment intents, stock reservation and cart delete or edit are
+    # not here, so the token is refused there.
     _CART_TOKEN_ACTIONS = frozenset(
-        {"retrieve", "apply_coupon", "remove_coupon", "list_coupons"}
+        {
+            "retrieve",
+            "quote",
+            "apply_coupon",
+            "remove_coupon",
+            "list_coupons",
+        }
     )
 
     def initial(self, request, *args, **kwargs):
@@ -820,6 +858,193 @@ class CartViewSet(BaseModelViewSet):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+    def _offered_pay_way(
+        self, pay_way_id: int, shipping: ShippingChoice | None
+    ) -> PayWay | Response:
+        """The pay way a checkout call names, or the response refusing it.
+
+        The same two runtime-configurable layers order creation applies
+        (``OrderViewSet._validate_pay_way_for_order``): the ``active``
+        master switch, and the admin-managed ``PayWayShippingExclusion``
+        rows for the chosen carrier + kind. Minting an intent without
+        them means the shopper CONFIRMS the card in Stripe.js and only
+        then gets a 400 from order creation — money taken, no order,
+        nothing to refund against.
+        """
+        pay_way = PayWay.objects.filter(id=pay_way_id).first()
+        if pay_way is None:
+            logger.error("Payment method with ID %s not found", pay_way_id)
+            return Response(
+                {
+                    "detail": f"Payment method with ID {pay_way_id} not found",
+                    "code": "pay_way_not_found",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        provider_code = shipping.provider_code if shipping else None
+        shipping_kind = shipping.kind if shipping else None
+        allowed = PayWayService.filter_by_carrier(
+            PayWay.objects.active(),
+            provider_code=provider_code,
+            shipping_kind=shipping_kind,
+            country_code=shipping.country_id if shipping else None,
+        )
+        if not allowed.filter(id=pay_way.id).exists():
+            logger.info(
+                "Pay way refused: pay_way=%s (provider=%s, active=%s) not "
+                "available for shipping_provider_code=%s shipping_kind=%s",
+                pay_way.id,
+                pay_way.provider_code,
+                pay_way.active,
+                provider_code,
+                shipping_kind,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "The selected payment method is not available "
+                        "for this order."
+                    ),
+                    "reason": "pay_way_unavailable",
+                    "code": "pay_way_unavailable",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return pay_way
+
+    def _quote(
+        self,
+        cart: Cart,
+        data: dict,
+        *,
+        pay_way: PayWay | None,
+        shipping: ShippingChoice | None,
+    ) -> CheckoutQuote | Response:
+        """The checkout quote for a request body (``data``, validated),
+        or the 400 that refuses it.
+
+        The one place the cart endpoints price a checkout: the payment
+        intent's amount and ``POST /cart/quote`` both come from here,
+        and ``OrderQuoteService.quote`` is what order creation runs.
+        """
+        loyalty_points = data.get("loyalty_points_to_redeem")
+        user = self.cart_service.owner
+        if loyalty_points and user is None:
+            return Response(
+                {
+                    "detail": _(
+                        "Loyalty redemption requires a signed-in customer."
+                    ),
+                    "reason": "loyalty_requires_authentication",
+                    "code": "loyalty_requires_authentication",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            return OrderQuoteService.quote(
+                cart,
+                user=user,
+                email=data.get("email") or "",
+                pay_way=pay_way,
+                shipping=shipping,
+                loyalty_points=loyalty_points,
+                gift_card_codes=data.get("gift_card_codes"),
+            )
+        except LoyaltyRedemptionError as exc:
+            return Response(
+                {
+                    "detail": exc.reason,
+                    "reason": "loyalty_redemption_invalid",
+                    "code": "loyalty_redemption_invalid",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except InvalidOrderDataError as exc:
+            # Same shape as order creation's refusal: a fixed detail and
+            # the field-scoped messages, never the exception's own text.
+            logger.warning("Invalid order data: %s", exc)
+            return Response(
+                {
+                    "detail": _("Invalid order data"),
+                    "field_errors": exc.field_errors,
+                    "code": "invalid_order_data",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except InvalidGiftCardError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                    "reason": exc.reason,
+                    "code": exc.reason,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"], url_path="quote")
+    def quote(self, request, *args, **kwargs):
+        """What checkout charges for the cart with the choices made so far.
+
+        The cart is found as order creation finds it
+        (``get_existing_cart``): a quote never creates one. Stock, the
+        cart's validity, the wholesale minimum and the legal texts are
+        order creation's to judge; a quote only prices.
+        """
+        cart = self.cart_service.get_existing_cart()
+        if not cart:
+            return self._cart_not_found()
+        if not cart.items.exists():
+            return Response(
+                {
+                    "detail": _(
+                        "Cart is empty. Please add items before checkout."
+                    ),
+                    "code": "cart_empty",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_serializer = self.get_request_serializer()(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        data = request_serializer.validated_data
+        country_id = data.get("country_id") or None
+        region_id = data.get("region_id") or None
+
+        # A delivery is priced once it is chosen: a kind and a country.
+        shipping = None
+        if data.get("shipping_kind") and country_id:
+            shipping = ShippingChoice(
+                kind=data["shipping_kind"],
+                provider_code=data.get("shipping_provider_code"),
+                country_id=country_id,
+                region_id=region_id,
+            )
+        pay_way = None
+        if data.get("pay_way_id"):
+            pay_way = self._offered_pay_way(data["pay_way_id"], shipping)
+            if isinstance(pay_way, Response):
+                return pay_way
+
+        quote = self._quote(cart, data, pay_way=pay_way, shipping=shipping)
+        if isinstance(quote, Response):
+            return quote
+
+        response_serializer = self.get_response_serializer()(
+            quote,
+            context={
+                "shipping_options": (
+                    OrderQuoteService.shipping_options(
+                        quote, country_id=country_id, region_id=region_id
+                    )
+                    if country_id
+                    else None
+                ),
+                "pay_ways": OrderQuoteService.pay_way_options(quote, shipping),
+            },
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["post"], url_path="create-payment-intent")
     def create_payment_intent(self, request, *args, **kwargs):
         """
@@ -838,10 +1063,6 @@ class CartViewSet(BaseModelViewSet):
 
         The payment_intent_id must be included in the order creation request.
         """
-        from pay_way.models import PayWay
-        from pay_way.services import PayWayService
-        from shipping.utils import compute_total_weight_grams
-
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             logger.error("Cart not found")
@@ -863,7 +1084,7 @@ class CartViewSet(BaseModelViewSet):
         # Wholesale minimum-order-value gate — refuse to mint an intent
         # order-create would reject AFTER the customer confirmed (and
         # possibly captured) the payment.
-        from b2b.services import B2BPricingService, B2BService
+        from b2b.services import B2BPricingService
 
         unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
         if unmet_minimum is not None:
@@ -925,60 +1146,21 @@ class CartViewSet(BaseModelViewSet):
         country_id = request_serializer.validated_data.get("country_id") or None
         region_id = request_serializer.validated_data.get("region_id") or None
 
-        try:
-            pay_way = PayWay.objects.get(id=pay_way_id)
-            logger.info(
-                "Payment intent: pay_way=%s provider=%s settlement=%s",
-                pay_way.id,
-                pay_way.provider_code,
-                pay_way.settlement,
-            )
-        except PayWay.DoesNotExist:
-            logger.error(f"Payment method with ID {pay_way_id} not found")
-            return Response(
-                {
-                    "detail": f"Payment method with ID {pay_way_id} not found",
-                    "code": "pay_way_not_found",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # The same two runtime-configurable layers order creation
-        # applies (`OrderViewSet._validate_pay_way_for_order`): the
-        # `active` master switch, and the admin-managed
-        # `PayWayShippingExclusion` rows for this carrier + kind. Minting
-        # an intent without them means the shopper CONFIRMS the card in
-        # Stripe.js and only then gets a 400 from order creation — money
-        # taken, no order, nothing to refund against. The B2B branch
-        # above already guards for exactly this reason.
-        allowed = PayWayService.filter_by_carrier(
-            PayWay.objects.active(),
+        shipping = ShippingChoice(
+            kind=shipping_kind,
             provider_code=shipping_provider_code,
-            shipping_kind=shipping_kind,
-            country_code=country_id,
+            country_id=country_id,
+            region_id=region_id,
         )
-        if not allowed.filter(id=pay_way.id).exists():
-            logger.info(
-                "Payment intent refused: pay_way=%s (provider=%s, "
-                "active=%s) not available for shipping_provider_code=%s "
-                "shipping_kind=%s",
-                pay_way.id,
-                pay_way.provider_code,
-                pay_way.active,
-                shipping_provider_code,
-                shipping_kind,
-            )
-            return Response(
-                {
-                    "detail": _(
-                        "The selected payment method is not available "
-                        "for this order."
-                    ),
-                    "reason": "pay_way_unavailable",
-                    "code": "pay_way_unavailable",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        pay_way = self._offered_pay_way(pay_way_id, shipping)
+        if isinstance(pay_way, Response):
+            return pay_way
+        logger.info(
+            "Payment intent: pay_way=%s provider=%s settlement=%s",
+            pay_way.id,
+            pay_way.provider_code,
+            pay_way.settlement,
+        )
 
         # Two separate questions, neither of which is a vendor name:
         # is money taken at checkout (the PAY WAY's settlement), and can
@@ -1011,148 +1193,21 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Calculate cart total including shipping and payment method fee
-        # using the SAME inputs the order-create verification step uses
-        # (per-carrier free-shipping threshold + weight-banded quote +
-        # country/region multipliers + promotion discount). The intent
-        # must equal what ``OrderService.create_order_*`` will charge —
-        # otherwise ``PaymentAmountMismatchError`` raises at
-        # order-create time.
-        from promotion.services import PromotionEngine
-
-        promo_result = PromotionEngine.evaluate(
+        # The amount is the checkout quote's: the one total order creation
+        # computes too, so the intent equals what
+        # ``OrderService.create_order_from_cart`` verifies it against.
+        quote = self._quote(
             cart,
-            user=request.user if request.user.is_authenticated else None,
-            email=request_serializer.validated_data.get("email") or "",
+            request_serializer.validated_data,
+            pay_way=pay_way,
+            shipping=shipping,
         )
-
-        cart_total = cart.total_price
-        cart_items = [
-            (item.product, item.quantity) for item in cart.items.all()
-        ] + PromotionEngine.gift_pairs(promo_result)
-        cart_weight_grams = compute_total_weight_grams(cart_items)
-        try:
-            threshold_value = OrderQuoteService.threshold_value(
-                cart_total, promo_result.discount_total
-            )
-            shipping_cost = OrderQuoteService.shipping_cost(
-                order_value=threshold_value,
-                country_id=country_id,
-                region_id=region_id,
-                shipping_provider_code=shipping_provider_code,
-                shipping_kind=shipping_kind,
-                weight_grams=cart_weight_grams,
-                items=cart_items,
-                free=promo_result.free_shipping,
-            )
-        except InvalidOrderDataError as exc:
-            # Same shape as order creation's refusal: a fixed detail and
-            # the field-scoped messages, never the exception's own text.
-            logger.warning("Invalid order data: %s", exc)
-            return Response(
-                {
-                    "detail": _("Invalid order data"),
-                    "field_errors": exc.field_errors,
-                    "code": "invalid_order_data",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # The pay-way fee is waived on the same value as free shipping
-        # (``threshold_value``), exactly as order creation does.
-        order_subtotal = Money(
-            cart_total.amount
-            - promo_result.discount_total.amount
-            + shipping_cost.amount,
-            cart_total.currency,
-        )
-        payment_fee = OrderQuoteService.calculate_payment_method_fee(
-            pay_way, threshold_value
-        )
-        cart_total = Money(
-            order_subtotal.amount + payment_fee.amount,
-            cart_total.currency,
-        )
-
-        # Loyalty discount reduces the charge — same pricing math as
-        # redeem_points (validated, unquantised Decimal), so the intent
-        # equals what order creation persists as amount_due.
-        loyalty_points = request_serializer.validated_data.get(
-            "loyalty_points_to_redeem"
-        )
-        # Wholesale carts sit outside the loyalty program unless the
-        # merchant opts in — drop it here too, so this intent matches
-        # what order creation will charge (which drops it as well).
-        if B2BService.suppresses_loyalty(cart):
-            loyalty_points = 0
-        if loyalty_points and loyalty_points > 0:
-            if not request.user.is_authenticated:
-                return Response(
-                    {
-                        "detail": _(
-                            "Loyalty redemption requires a signed-in customer."
-                        ),
-                        "reason": "loyalty_requires_authentication",
-                        "code": "loyalty_requires_authentication",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            from django.core.exceptions import (
-                ValidationError as DjangoValidationError,
-            )
-
-            from loyalty.services import LoyaltyService
-
-            try:
-                loyalty_preview = LoyaltyService.preview_redemption(
-                    request.user,
-                    loyalty_points,
-                    str(cart_total.currency),
-                    max_discount=cart.total_price.amount,
-                )
-            except DjangoValidationError as exc:
-                message = getattr(exc, "message", None) or "; ".join(
-                    str(msg) for msg in getattr(exc, "messages", [])
-                )
-                return Response(
-                    {
-                        "detail": message,
-                        "reason": "loyalty_redemption_invalid",
-                        "code": "loyalty_redemption_invalid",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            cart_total = Money(
-                max(cart_total.amount - loyalty_preview, 0),
-                cart_total.currency,
-            )
-
-        # Gift cards settle part of the total LAST (payment, not
-        # discount) — the intent covers the REMAINDER only. Same plan
-        # math as the order-create verification (which recomputes it
-        # under card locks), so the two always agree.
+        if isinstance(quote, Response):
+            return quote
+        cart_total = quote.charges().amount_due
         gift_card_codes = request_serializer.validated_data.get(
             "gift_card_codes"
         )
-        if gift_card_codes:
-            from giftcard.services import GiftCardError, GiftCardService
-
-            try:
-                gift_plan = GiftCardService.plan_redemption(
-                    gift_card_codes, cart_total
-                )
-            except GiftCardError as exc:
-                return Response(
-                    {
-                        "detail": exc.message,
-                        "reason": exc.reason,
-                        "code": exc.reason,
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            cart_total = Money(
-                cart_total.amount - gift_plan.amount.amount,
-                cart_total.currency,
-            )
 
         if cart_total.amount <= 0:
             # Nothing left to charge — gift cards, a 100% promotion or

@@ -54,8 +54,9 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
+from order.checkout.quote import ExpectedTotal
 from order.enum.cancel_error import OrderCancelErrorType
-from order.enum.create_error import OrderCreateErrorType
+from order.enum.create_error import TOTAL_CHANGED_CODE, OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartHasUnpaidOrderError,
@@ -68,6 +69,7 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCancellationError,
     OrderChangedDuringPaymentError,
+    OrderTotalChangedError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
@@ -111,6 +113,7 @@ from order.serializers.order import (
     VivaReturnGiftCardPurchaseResponseSerializer,
     VivaReturnOrderResponseSerializer,
 )
+from order.serializers.quote import CheckoutQuoteSerializer
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderAttributionService,
@@ -999,6 +1002,26 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except OrderTotalChangedError as e:
+            # Nothing was created. The quote is what the order would
+            # have been created at: the client shows it and asks again.
+            # ``error.type`` is not ``total_changed`` yet, see
+            # ``TOTAL_CHANGED_CODE``.
+            return Response(
+                {
+                    "detail": _(
+                        "The order total has changed. Review the new "
+                        "total and place the order again."
+                    ),
+                    "error": {
+                        "type": OrderCreateErrorType.INVALID_ORDER_DATA,
+                        "quote": CheckoutQuoteSerializer(e.quote).data,
+                    },
+                    "code": TOTAL_CHANGED_CODE,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         except LegalDocumentUnavailableError as e:
             # A store fault, not the buyer's: the checkout linked a page
             # with no published text in this language, so nothing could
@@ -1205,6 +1228,7 @@ class OrderViewSet(BaseModelViewSet):
                 request, validated_data.get("attribution")
             ),
             legal_acceptance=legal_acceptance,
+            expected_total=self._expected_total(validated_data),
         )
 
         # Return order details
@@ -1289,6 +1313,7 @@ class OrderViewSet(BaseModelViewSet):
                 request, validated_data.get("attribution")
             ),
             legal_acceptance=legal_acceptance,
+            expected_total=self._expected_total(validated_data),
         )
 
         # Return order details
@@ -1307,6 +1332,12 @@ class OrderViewSet(BaseModelViewSet):
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
         )
+
+    @staticmethod
+    def _expected_total(validated_data: dict) -> ExpectedTotal | None:
+        """The total the client says it showed the buyer, if it sent one."""
+        expected = validated_data.get("expected_total")
+        return None if expected is None else ExpectedTotal(**expected)
 
     def _get_cart_and_user(self, request):
         """

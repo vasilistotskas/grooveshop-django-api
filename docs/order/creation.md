@@ -9,6 +9,98 @@ Two entry points in `src/order/services.py` (the legacy
 `OrderService.create_order`
 — dead code with zero production callers — was removed 2026-08-24):
 
+### 3.0 One total: the checkout quote and the expected total
+
+`OrderQuoteService.quote` (`src/order/checkout/quote.py`) is the one
+computation of what checkout charges. A rule added there reaches every
+caller:
+
+| Caller | Locks | Reads |
+|---|---|---|
+| `POST /api/v1/cart/quote` (`CartViewSet.quote`) | none | the whole quote, partial input allowed |
+| `POST /api/v1/cart/create-payment-intent` | none | `amount_due` is the intent's amount |
+| `create_order_from_cart` (§3.1) | `lock=True` | compares the intent's amount with `amount_due` |
+| `create_order_from_cart_offline` (§3.2) | `lock=True` | the order's charges |
+
+- **The rows** (`CheckoutQuote`): the products (`items_subtotal`), the
+  promotions (`promotion`, `discount_total`), `free_threshold_value`
+  ([§5.0](shipping.md)), the delivery (`shipping`: price and `waived_by`,
+  a `ShippingCharge`), the pay-way fee (`payment_fee`: amount and
+  `waived`), the loyalty discount, the gift-card plan, `grand_total`
+  (products after promotions, plus shipping and the fee) and `amount_due`
+  (what is left after loyalty and the gift cards: what the order stores).
+  The parcel it weighs holds the promotion's gifts, and promotions are
+  evaluated with the checkout email.
+- **A row is never guessed.** Without a delivery `shipping` is `None`,
+  without a pay way `payment_fee` is, and the rows that need both
+  (`grand_total`, the gift-card plan, `amount_due`) are `None` with them.
+  The callers that pass both read `quote.charges()`.
+- **`lock=True` is order creation.** The candidate `Promotion` rows, the
+  customer's row (when points are redeemed) and the gift cards are locked
+  until commit, so what was quoted is what `PromotionEngine.record`,
+  `LoyaltyService.redeem_points` and `GiftCardService.record_plan` write.
+  A refused attached coupon raises `InvalidCouponError`; without the lock
+  it is reported on the quote (`blocking_coupon`).
+- **The order is built from the quote's rows**
+  (`OrderService._quote_under_lock`): `shipping_price`,
+  `payment_method_fee`, the promotion result, the points and the gift-card
+  plan. `Order.calculate_order_total_amount()` still decides what is
+  stored, and `_require_quoted_total` refuses (rolls back) an order whose
+  own sum is not the quote's `amount_due`: a charge added to one and not
+  the other, or a cart line changed between the quote and the line lock,
+  fails the creation instead of producing an order no payment matches.
+- **The expected total.** `POST /api/v1/order` takes an optional
+  `expectedTotal` `{amount, currency}`: the amount due in minor units
+  (cents). Both creation paths compare it, exactly, with the quote computed
+  under the cart lock. A difference creates nothing and answers **409**
+  `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
+  the quote the order would have been created at, so the client shows the
+  new total and sends its `expectedTotal`. This is the only amount check
+  the order-first path has (cash on delivery, Viva).
+  - What can change between the last render and the order: a price, VAT
+    or markdown edit (a cart stores no price), a promotion starting, ending
+    or reaching a usage limit, an edit to a shipping rate or a pay way, an
+    ACS live price leaving its cache, another email than the one quoted
+    with. Each is a `total_changed` refusal, by design.
+  - **`error.type` is `invalid_order_data` for now.**
+    `OrderCreateErrorType` is an enum in the API contract, and a new
+    response enum value ships consumer first (`api-contract/README.md`):
+    the storefront in production must list `total_changed` before Django
+    may send it. Until then clients branch on `code` and the 409
+    (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
+    `code` already.
+  - **Optional for now.** The storefront and the gateway start sending it,
+    then a later release requires it (#635).
+- **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
+  body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
+  once `shippingKind` and `countryId` are both given (order creation
+  prices a missing kind as home delivery; a quote does not assume one).
+  Besides the rows it returns `expectedTotal`, to send back with the
+  order, and the priced lists: `shippingOptions` (every delivery the store
+  offers to the country, `ShippingService.available_options` priced with
+  the region and a free-shipping promotion, each with `waivedBy`; null
+  without a country) and `payWays` (every pay way a shopper is offered
+  for the chosen delivery, `PayWayService.shopper_facing` and
+  `filter_for_shipping`, each with its fee and `waived`).
+  - The cart is found as order creation finds it (`get_existing_cart`):
+    404 `cart_not_found`, never a new cart; an empty one is 400
+    `cart_empty`.
+  - Refusals are the payment-intent endpoint's: 400 `invalid_order_data`
+    with `fieldErrors` for a delivery that cannot be priced, 400
+    `pay_way_unavailable` / 404 `pay_way_not_found`, 400
+    `loyalty_requires_authentication` / `loyalty_redemption_invalid`, and
+    the gift card's own reason.
+  - `X-Cart-Token` is accepted (`docs/cart-agent-token.md`): the quote is
+    then the cart owner's price. Order creation takes no token, so that
+    quote must not feed the expected total of an anonymous order.
+  - **A quote only prices.** Stock, the cart's validity, the wholesale
+    minimum, the legal texts and the unpaid-order limit are order
+    creation's to judge.
+  - Not in the quote yet: the VAT total. The receipt's VAT
+    (`order.accounting.taxation.vat_lines`) taxes shipping and the fee at
+    the goods' rates and spreads the loyalty discount over the lines; the
+    cart's `totalVatValue` is the goods' VAT only.
+
 ### 3.1 `create_order_from_cart` — payment-first / online
 - **Caller**: `OrderViewSet.create` for an intent-based ONLINE pay way (Stripe)
   whose request carries `payment_intent_id`. Every client reaches it through
@@ -31,8 +123,9 @@ Two entry points in `src/order/services.py` (the legacy
   transaction, idle on a connection that `idle_in_transaction_session_timeout`
   kills. `_create_order_for_verified_intent` is the one transaction; it
   re-compares only what depends on server state, the intent's amount and
-  currency against the total it computes under lock (Step 3, which also
-  prices loyalty and gift cards under their own locks). Order of checks
+  currency against the total it computes under lock (Step 2.5, the quote
+  of §3.0, which also prices loyalty and gift cards under their own
+  locks). Order of checks
   therefore changed: a cart that cannot be checked out costs one provider
   read first, with no lock.
 - **The intent must be this cart's** (`src/order/payments/payment_binding.py`,
@@ -147,8 +240,12 @@ Two entry points in `src/order/services.py` (the legacy
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
   agent gateway's UCP/ACP checkout.
 - Sets `status=PENDING`, `payment_status=PENDING`.
-- Same lock order as §3.1 (cart row, then promotions, then products in pk
-  order before any `OrderItem` insert). There is no provider call here.
+- Same lock order as §3.1: the cart row, then what the quote locks (§3.0:
+  promotions, the customer's row when points are redeemed, the gift
+  cards), then the cart lines, then the products in pk order before any
+  `OrderItem` insert. Until #635 this path priced loyalty and the gift
+  cards after the lines were written; it now takes those locks where §3.1
+  always did. There is no provider call here.
 - **Not idempotent.** A hosted-payment order (Viva) keeps the cart, so a
   repeat submit creates a second PENDING order that takes its own stock until
   its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a

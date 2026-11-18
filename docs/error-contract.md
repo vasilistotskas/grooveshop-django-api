@@ -105,7 +105,10 @@ stable discriminator already existed, `code` now repeats it:
 - `{"detail", "reason"}` (cart coupons and payment intents, gift cards,
   business profile): `code` equals `reason`.
 - `{"detail", "error": {"type"}}` (order create and cancel): `code` equals
-  `error.type`.
+  `error.type`. One exception, for now: an order refused because its total
+  changed is 409 `code: total_changed` with `error.type`
+  `invalid_order_data` (`docs/order/creation.md` §3.0 says why and until
+  when).
 - Plain `{"detail"}` responses of the cart, order, account and alert views
   carry a `code` too.
 

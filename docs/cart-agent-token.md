@@ -37,6 +37,7 @@ The gateway then sends `X-Cart-Token: <token>` on its calls.
 | Route | Allowed |
 |---|---|
 | `GET /cart`, `GET /cart/coupons` | yes |
+| `POST /cart/quote` | yes (the checkout quote at the cart owner's prices; it changes nothing) |
 | `GET/POST /cart/item`, `GET/PUT/PATCH/DELETE /cart/item/<id>` | yes |
 | `POST/DELETE /cart/coupon` | yes |
 | `GET /shipping/options`, `POST /shipping/boxnow/lockers/nearest` | yes (they read the cart only to tell whether it fits a carrier's parcels: `exceedsParcelSize`, the locker `requiredSize`) |

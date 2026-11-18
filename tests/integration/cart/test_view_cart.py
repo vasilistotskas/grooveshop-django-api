@@ -55,6 +55,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         from djmoney.money import Money
 
         from pay_way.factories import PayWayFactory
+        from shipping.services import ShippingCharge
 
         pay_way = PayWayFactory.create_online_payment(
             provider_code="stripe", active=True
@@ -71,7 +72,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         with (
             patch(
                 "cart.views.cart.OrderQuoteService.shipping_cost",
-                return_value=Money("0.00", "EUR"),
+                return_value=ShippingCharge(Money("0.00", "EUR")),
             ),
             patch(
                 "cart.views.cart.OrderQuoteService.calculate_payment_method_fee",

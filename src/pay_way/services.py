@@ -61,6 +61,25 @@ class PayWayService:
         }
 
     @staticmethod
+    def shopper_facing(queryset: QuerySet) -> QuerySet:
+        """The pay ways of ``queryset`` a shopper may be offered.
+
+        Active, and not through a provider this store holds no
+        credentials for: a seeded-but-keyless Stripe/Viva row would
+        dead-end the shopper at checkout-session creation.
+        """
+        queryset = queryset.filter(active=True)
+        codes = set(
+            queryset.exclude(provider_code="").values_list(
+                "provider_code", flat=True
+            )
+        )
+        unavailable = PayWayService.unconfigured_provider_codes(codes)
+        if unavailable:
+            queryset = queryset.exclude(provider_code__in=unavailable)
+        return queryset
+
+    @staticmethod
     def _exclusions(
         provider_code: str, kind: str, country_code: str | None
     ) -> QuerySet:
@@ -222,6 +241,39 @@ class PayWayService:
             queryset = adapter.filter_pay_ways(queryset, kind=kind_enum)
 
         return queryset
+
+    @staticmethod
+    def filter_for_shipping(
+        queryset: QuerySet,
+        *,
+        provider_code: str | None,
+        shipping_kind: str | None,
+        country_code: str | None = None,
+    ) -> QuerySet:
+        """Filter PayWays for the delivery a shopper chose.
+
+        ``shipping_kind`` is the required half: with a provider code that
+        carrier's rules apply (:meth:`filter_by_carrier`), without one
+        the rules every carrier serving the kind agrees on
+        (:meth:`filter_by_shipping_kind`). A kind without a provider is
+        not a caller mistake: checkout's ``home_delivery`` is
+        provider-agnostic and cannot name one. Without a kind there is
+        nothing to judge and the queryset passes through.
+        """
+        if not shipping_kind:
+            return queryset
+        if not provider_code:
+            return PayWayService.filter_by_shipping_kind(
+                queryset,
+                shipping_kind=shipping_kind,
+                country_code=country_code,
+            )
+        return PayWayService.filter_by_carrier(
+            queryset,
+            provider_code=provider_code,
+            shipping_kind=shipping_kind,
+            country_code=country_code,
+        )
 
     @staticmethod
     def get_provider_for_pay_way(pay_way: PayWay):

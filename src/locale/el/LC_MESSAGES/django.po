@@ -1715,6 +1715,9 @@ msgstr "Μια διεύθυνση IP δεν είναι domain καταστήμα
 msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
 msgstr "Μια κινούμενη εικόνα δεν μπορεί να αλλάξει μέγεθος ούτε να χάσει την τοποθεσία της. Ανεβάστε μια μικρότερη ή μια στατική εικόνα."
 
+msgid "An attached coupon order creation refuses this cart for (``invalid_coupon``). Its discount is not in this quote; remove the code before ordering. Null when there is none."
+msgstr "Συνδεδεμένο κουπόνι για το οποίο η δημιουργία παραγγελίας απορρίπτει αυτό το καλάθι (``invalid_coupon``). Η έκπτωσή του δεν περιλαμβάνεται σε αυτή την κοστολόγηση· αφαιρέστε τον κωδικό πριν από την παραγγελία. Null όταν δεν υπάρχει."
+
 msgid "An authenticator or recovery code is required."
 msgstr "Απαιτείται κωδικός εφαρμογής ταυτοποίησης ή κωδικός ανάκτησης."
 
@@ -4896,6 +4899,9 @@ msgstr "Συμβάντα που παραλήφθηκαν"
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Κάθε κουπόνι που μπορεί να προσφερθεί στον αγοραστή — οι κωδικοί που το κατάστημα προβάλλει δημόσια, καθώς και τα προσωπικά κουπόνια που έχουν αντιστοιχιστεί στον συνδεδεμένο πελάτη — το καθένα αξιολογημένο εκ των προτέρων έναντι του καλαθιού όπως είναι τώρα. Το ``eligible`` αντιστοιχεί ακριβώς σε ό,τι θα έκανε η εφαρμογή του κωδικού, ώστε μια απενεργοποιημένη γραμμή και μια άρνηση κατά την εφαρμογή να μη διαφωνούν ποτέ· το ``reason`` φέρει το λεξιλόγιο εκπτώσεων ACP και το ``discountAmount`` το ποσό που θα αφαιρούσε ο κωδικός αυτή τη στιγμή. Κενό όταν το κατάστημα έχει απενεργοποιημένες τις προσφορές."
 
+msgid "Every delivery the store offers to the request's country, priced as an order would be. Null without a country."
+msgstr "Κάθε τρόπος παράδοσης που προσφέρει το κατάστημα στη χώρα του αιτήματος, με την τιμή που θα χρεωνόταν μια παραγγελία. Null χωρίς χώρα."
+
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Όλα τα email που στέλνει το κατάστημά σας. Κλείστε ένα και το κατάστημα σταματά να το στέλνει, μόνο εκείνο. Τα email που χρειάζεται ο πελάτης ή ο νόμος, όπως η επιβεβαίωση παραγγελίας ή η επαναφορά κωδικού, δεν μπορούν να κλείσουν."
 
@@ -4907,6 +4913,9 @@ msgstr "Κάθε βράδυ τα βάρη των στρατηγικών υπολ
 
 msgid "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
 msgstr "Όλες οι σελίδες του καταστήματος που έχουν αποθηκευτεί στην cache, και η ανάγνωση των ρυθμίσεών του. Καθαρίζεται αυτόματα όταν ενεργοποιείται ή απενεργοποιείται μια λειτουργία του καταστήματος, επειδή η πλοήγηση, το υποσέλιδο και οι κάρτες προϊόντων κάθε σελίδας δείχνουν τι προσφέρει το κατάστημα."
+
+msgid "Every pay way offered for the chosen delivery (all of them while none is chosen), with the fee an order would be charged."
+msgstr "Κάθε μέθοδος πληρωμής που προσφέρεται για την επιλεγμένη παράδοση (όλες, όσο δεν έχει επιλεγεί καμία), με την επιβάρυνση που θα χρεωνόταν μια παραγγελία."
 
 msgid "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
 msgstr "Κάθε περίοδος κατά την οποία η τιμή του προϊόντος για τον καταναλωτή (με ΦΠΑ, με εκπτώσεις που δεν απαιτούν τίποτα από το καλάθι) ήταν σταθερή, από την παλαιότερη. Η ισχύουσα περίοδος δεν έχει ημερομηνία λήξης."
@@ -6483,6 +6492,9 @@ msgstr "Από προϊόν"
 msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
 msgstr "Τύπος εκπλήρωσης για τον μεταφορέα (home_delivery ή pickup_point). Απαιτείται ώστε να τηρούνται οι επιμέρους έλεγχοι διαθεσιμότητας (οι θυρίδες ACS χρειάζονται συγχρονισμένους σταθμούς) και ο έλεγχος PICKUP_POINT του BoxNow."
 
+msgid "Fulfilment kind of the chosen delivery; omit while none is chosen."
+msgstr "Είδος εκπλήρωσης της επιλεγμένης παράδοσης· παραλείψτε το όσο δεν έχει επιλεγεί καμία."
+
 msgid "Full delivery-request response and diagnostics from BoxNow"
 msgstr "Πλήρης απόκριση αιτήματος παράδοσης και διαγνωστικά από το BoxNow"
 
@@ -7334,6 +7346,9 @@ msgstr "Βιαστείτε — τα δημοφιλή προϊόντα εξαντ
 msgid "I have saved them, continue"
 msgstr "Τους αποθήκευσα, συνέχεια"
 
+msgid "ID of the chosen PayWay; omit while none is chosen."
+msgstr "ID της επιλεγμένης μεθόδου πληρωμής· παραλείψτε το όσο δεν έχει επιλεγεί καμία."
+
 msgid "ID of the selected PayWay (must be online Stripe)."
 msgstr "ID της επιλεγμένης μεθόδου πληρωμής (πρέπει να είναι online Stripe)."
 
@@ -7379,6 +7394,9 @@ msgstr "ISO 3166-1 alpha-2 κωδικός χώρας."
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Αφαιρεί τους τρόπους πληρωμής που ο διαχειριστής έχει αποκλείσει για τη χώρα αυτή (π.χ. BoxNow PAY ON THE GO στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."
 
+msgid "ISO 3166-1 alpha-2 delivery country. Needed to price a delivery and to list the shipping options."
+msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Χρειάζεται για την τιμολόγηση μιας παράδοσης και για τη λίστα των τρόπων αποστολής."
+
 msgid "ISO 3166-1 alpha-2 destination country."
 msgstr "Χώρα προορισμού (ISO 3166-1 alpha-2)."
 
@@ -7387,6 +7405,12 @@ msgstr "Κωδικός νομίσματος ISO 4217 (π.χ. EUR)"
 
 msgid "ISO 4217 currency code for all monetary values in this cart"
 msgstr "Κωδικός νομίσματος ISO 4217 για όλες τις χρηματικές τιμές αυτού του καλαθιού"
+
+msgid "ISO 4217 currency code of every amount in the quote."
+msgstr "Κωδικός νομίσματος ISO 4217 για κάθε ποσό της κοστολόγησης."
+
+msgid "ISO 4217 currency code of the amount."
+msgstr "Κωδικός νομίσματος ISO 4217 του ποσού."
 
 msgid "ISO Country Code"
 msgstr "Κωδικός ISO χώρας"
@@ -9522,6 +9546,9 @@ msgstr "Στη λίστα παραλαβής %(no)s"
 msgid "One"
 msgstr "Ένα"
 
+msgid "One entry per promotion that took money off; the amounts sum to discountTotal."
+msgstr "Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν στο discountTotal."
+
 msgid "One held voucher request is being sent to ACS. The others follow once ACS answers it."
 msgstr "Ένα αίτημα voucher που ήταν σε αναμονή στέλνεται στην ACS. Τα υπόλοιπα ακολουθούν μόλις η ACS το απαντήσει."
 
@@ -11571,6 +11598,9 @@ msgstr "Σε αναμονή"
 
 msgid "Queued at"
 msgstr "Σε αναμονή από"
+
+msgid "Quote the cart's checkout total"
+msgstr "Κοστολόγηση του συνόλου του καλαθιού στο ταμείο"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "ΑΞΙΟΛΟΓΗΣΤΕ ΤΗΝ ΑΓΟΡΑ ΣΑΣ"
@@ -14486,6 +14516,9 @@ msgstr "Το aade-user-id του λογαριασμού προγραμματισ
 msgid "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
 msgstr "Η διεύθυνση που δόθηκε στη φόρμα ενημερωτικού δελτίου. Είναι ο παραλήπτης μιας εγγραφής επισκέπτη· η εγγραφή ενός λογαριασμού αποστέλλεται στη διεύθυνση του λογαριασμού."
 
+msgid "The amount due in minor units (cents): 1999 for 19.99."
+msgstr "Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά): 1999 για 19,99."
+
 msgid "The applied discounts and gift cards cover the full total; no payment intent is needed."
 msgstr "Οι εφαρμοσμένες εκπτώσεις και δωροκάρτες καλύπτουν ολόκληρο το σύνολο· δεν απαιτείται payment intent."
 
@@ -14521,6 +14554,9 @@ msgstr "Αυτό το σημείο πρόσβασης δεν δέχεται δι
 
 msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα μετά τις εκπτώσεις, χωρίς τα μεταφορικά. Τα όρια δωρεάν αποστολής ελέγχονται με αυτό."
+
+msgid "The cart's lines at the prices the shopper pays."
+msgstr "Οι γραμμές του καλαθιού στις τιμές που πληρώνει ο αγοραστής."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
@@ -14562,6 +14598,9 @@ msgstr "Ο κωδικός κουπονιού δεν μπορεί πλέον να
 
 msgid "The coupon code to apply."
 msgstr "Ο κωδικός κουπονιού προς εφαρμογή."
+
+msgid "The coupon that earned the entry; null for an automatic promotion."
+msgstr "Το κουπόνι που έδωσε την εγγραφή· null για αυτόματη προσφορά."
 
 msgid "The courier cannot be reached right now. Try again in a moment."
 msgstr "Δεν είναι δυνατή η επικοινωνία με τον courier αυτή τη στιγμή. Δοκίμασε ξανά σε λίγο."
@@ -14776,6 +14815,9 @@ msgstr "Η παραγγελία κοστίζει {due}· επιβεβαιώστ�
 msgid "The order line whose returned units this restock put back (empty for every other stock operation). The profit report reverses a line's cost by it."
 msgstr "Η γραμμή παραγγελίας της οποίας τα επιστρεφόμενα τεμάχια επανέφερε αυτή η επαναφορά αποθέματος (κενό σε κάθε άλλη κίνηση αποθέματος). Η αναφορά κέρδους επιστρέφει το κόστος μιας γραμμής με βάση αυτό."
 
+msgid "The order total has changed. Review the new total and place the order again."
+msgstr "Το σύνολο της παραγγελίας άλλαξε. Ελέγξτε το νέο σύνολο και υποβάλετε ξανά την παραγγελία."
+
 #, python-brace-format
 msgid "The order total is below this wholesale tier's minimum of {minimum}."
 msgstr "Το σύνολο της παραγγελίας είναι κάτω από το ελάχιστο {minimum} αυτής της βαθμίδας χονδρικής."
@@ -14791,6 +14833,9 @@ msgstr "Η τιμή paid_until στην οποία αναφέρεται το σ�
 
 msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 msgstr "Το μέρος των χρημάτων της πηγής που κινήθηκε αλλά που η απόδειξη δεν είχε περιθώριο να πιστώσει· ορίζεται σε μία γραμμή της πηγής."
+
+msgid "The pay way's key, as on the pay-way endpoint."
+msgstr "Το κλειδί της μεθόδου πληρωμής, όπως στο endpoint των μεθόδων πληρωμής."
 
 #, python-format
 msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
@@ -14874,6 +14919,9 @@ msgstr "Το αναγνωριστικό του προϊόντος σε άλλο 
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ το τρέχον όνομα του προϊόντος."
+
+msgid "The products after promotions, plus shipping and the pay-way fee."
+msgstr "Τα προϊόντα μετά τις προσφορές, συν τα μεταφορικά και την επιβάρυνση της μεθόδου πληρωμής."
 
 msgid "The promotion has ended"
 msgstr "Η προσφορά έχει λήξει"
@@ -15108,6 +15156,9 @@ msgstr "Ο χρόνος πληρωμής αυτής της παραγγελία�
 msgid "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 msgstr "Ο τίτλος που εμφανίζεται στο Google Merchant Center και στα άλλα feeds προϊόντων αντί για το όνομα του προϊόντος. Έως 150 χαρακτήρες. Κενό → χρησιμοποιείται το όνομα του προϊόντος."
 
+msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgstr "Το σύνολο που είδε ο αγοραστής: το ``expectedTotal`` του ``POST /cart/quote``, ή το οφειλόμενο ποσό που υπολόγισε ο ίδιος ο client, σε υποδιαιρέσεις του νομίσματος. Όταν αποστέλλεται, η παραγγελία δημιουργείται μόνο αν είναι ακριβώς το οφειλόμενο ποσό που υπολογίζεται τώρα· διαφορετικά η απάντηση είναι 409 ``total_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται τίποτα."
+
 msgid "The type must look like name@version."
 msgstr "Ο τύπος πρέπει να έχει τη μορφή όνομα@έκδοση."
 
@@ -15116,6 +15167,9 @@ msgstr "Τα τεμάχια δεν επανήλθαν στο απόθεμα επ
 
 msgid "The updated cart, as returned by the cart detail endpoint"
 msgstr "Το ενημερωμένο καλάθι, όπως το επιστρέφει η λήψη καλαθιού"
+
+msgid "The value every free-above threshold is judged on: the products after discounts, excluding shipping and fees."
+msgstr "Η αξία με την οποία κρίνεται κάθε όριο «δωρεάν άνω των»: τα προϊόντα μετά τις εκπτώσεις, χωρίς μεταφορικά και επιβαρύνσεις."
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Η αξία με την οποία κρίνονται τα δωρεάν μεταφορικά και το δωρεάν τέλος πληρωμής: τα προϊόντα μετά τις εκπτώσεις προωθήσεων και κουπονιών, χωρίς μεταφορικά και τέλη. Συγκρίνετε ένα όριο «δωρεάν πάνω από» με αυτήν, ποτέ με το total_price."
@@ -15777,6 +15831,15 @@ msgstr "True όταν το ``weight_grams`` του αιτήματος ξεπερ
 
 msgid "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
 msgstr "Αληθές όταν το καλάθι του καλούντος (που αναγνωρίζεται με την ίδια κεφαλίδα ``X-Cart-Id`` όπως σε κάθε endpoint του καλαθιού) περιέχει προϊόντα που δεν χωρούν στα δέματα αυτού του μεταφορέα. Πάντα ψευδές όταν δεν αναγνωρίζεται καλάθι. Η επιλογή εξακολουθεί να επιστρέφεται, όπως το ``exceeds_max_weight``, ώστε το storefront να την εμφανίζει απενεργοποιημένη με αιτιολογία."
+
+msgid "True when the cart does not fit this carrier's parcels; choosing it is refused."
+msgstr "Αληθές όταν το καλάθι δεν χωρά στα δέματα αυτού του μεταφορέα· η επιλογή του απορρίπτεται."
+
+msgid "True when the cart is heavier than this option carries; choosing it is refused."
+msgstr "Αληθές όταν το καλάθι είναι βαρύτερο από όσο μεταφέρει αυτή η επιλογή· η επιλογή της απορρίπτεται."
+
+msgid "True when the pay way has a fee and the cart reached its free-above threshold."
+msgstr "Αληθές όταν η μέθοδος πληρωμής έχει επιβάρυνση και το καλάθι έφτασε το όριο πάνω από το οποίο είναι δωρεάν."
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True όταν το κατάστημα έχει προεπιλεγμένο θέμα newsletter, δηλαδή όταν μια υποβολή της φόρμας newsletter μπορεί να εξυπηρετηθεί."
@@ -16751,6 +16814,9 @@ msgstr "Τι αποφάσισε ένας άνθρωπος για αυτό το �
 msgid "What became of the goods?"
 msgstr "Τι απέγιναν τα προϊόντα;"
 
+msgid "What checkout charges for the cart with the choices made so far, computed by the function order creation and the payment intent use: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
+msgstr "Τι χρεώνει το ταμείο για το καλάθι με τις επιλογές που έχουν γίνει ως τώρα, υπολογισμένο από τη συνάρτηση που χρησιμοποιούν η δημιουργία παραγγελίας και το payment intent: τα προϊόντα, οι προσφορές, η παράδοση, η επιβάρυνση της μεθόδου πληρωμής, η έκπτωση πόντων και οι δωροκάρτες, και το οφειλόμενο ποσό. Μια γραμμή που εξαρτάται από επιλογή που δεν έκανε το αίτημα είναι null. Παραθέτει επίσης κάθε διαθέσιμο τρόπο παράδοσης και κάθε μέθοδο πληρωμής στην τιμή που θα χρεωνόταν αυτό το καλάθι. Στείλτε πίσω το ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: τότε δημιουργείται μόνο σε αυτό το σύνολο. Μια κοστολόγηση που ζητείται με ``X-Cart-Token`` είναι η τιμή του κατόχου του καλαθιού."
+
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "Τι κάνει αυτή τη στιγμή κάθε συνδεδεμένο κουπόνι για το καλάθι: το ποσό που αφαιρεί, τα δωρεάν μεταφορικά ή το δώρο που κερδίζει, ή γιατί το απορρίπτει ο μηχανισμός. Ένας κωδικός που δεν θα άλλαζε τίποτα απορρίπτεται, οπότε σε κάθε εγγραφή ισχύει ακριβώς ένα από τα τέσσερα."
 
@@ -16759,6 +16825,15 @@ msgstr "Τι συνέβη"
 
 msgid "What is enforced"
 msgstr "Τι επιβάλλεται αυτόματα"
+
+msgid "What is left to pay after the loyalty discount and the gift cards: the amount an order created with these choices stores and is paid for."
+msgstr "Ό,τι απομένει προς πληρωμή μετά την έκπτωση πόντων και τις δωροκάρτες: το ποσό που αποθηκεύει μια παραγγελία με αυτές τις επιλογές και για το οποίο πληρώνεται."
+
+msgid "What live promotions and the applied coupon take off."
+msgstr "Ό,τι αφαιρούν οι ενεργές προσφορές και το εφαρμοσμένο κουπόνι."
+
+msgid "What made the delivery free: ``threshold`` (the carrier's free-shipping threshold) or ``promotion`` (a free-shipping promotion). Null when it is charged, or simply costs nothing."
+msgstr "Τι έκανε την παράδοση δωρεάν: ``threshold`` (το όριο δωρεάν αποστολής του μεταφορέα) ή ``promotion`` (προσφορά δωρεάν αποστολής). Null όταν χρεώνεται ή όταν απλώς δεν κοστίζει τίποτα."
 
 msgid "What one unit costs the store, net of VAT. Copied onto each order line when it is sold, so a later edit never changes a past sale. Empty means unknown: the profit report lists such sales as having no cost, it never counts them as free."
 msgstr "Όσο κοστίζει ένα τεμάχιο στο κατάστημα, χωρίς ΦΠΑ. Αντιγράφεται σε κάθε γραμμή παραγγελίας όταν πουλιέται, οπότε μια μεταγενέστερη αλλαγή δεν αλλάζει ποτέ μια περασμένη πώληση. Κενό σημαίνει άγνωστο: η αναφορά κέρδους καταγράφει τέτοιες πωλήσεις ως πωλήσεις χωρίς κόστος, δεν τις μετράει ποτέ ως δωρεάν."
@@ -16769,11 +16844,17 @@ msgstr "Τι αναζητούν περισσότερο οι πελάτες."
 msgid "What the customer owes for the order, fixed at creation: lines and extras, less every deduction. Not what was collected; that is on the payment ledger."
 msgstr "Το ποσό που οφείλει ο πελάτης για την παραγγελία, καθορισμένο κατά τη δημιουργία: προϊόντα και έξτρα, μείον κάθε έκπτωση. Δεν είναι το ποσό που εισπράχθηκε· αυτό βρίσκεται στο καθολικό πληρωμών."
 
+msgid "What the gift cards settle of the total; they are payment, applied last."
+msgstr "Το μέρος του συνόλου που εξοφλούν οι δωροκάρτες· είναι πληρωμή και εφαρμόζονται τελευταίες."
+
 msgid "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 msgstr "Όσα χρέωσε ο πάροχος για αυτή την κίνηση, όπως τα ανέφερε. Κενό μέχρι να αναφερθούν· ποτέ εκτίμηση."
 
 msgid "What the provider reported"
 msgstr "Τι ανέφερε ο πάροχος"
+
+msgid "What the redeemed loyalty points take off."
+msgstr "Ό,τι αφαιρούν οι πόντοι πιστότητας που εξαργυρώνονται."
 
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "Τι πληρώνει ο πελάτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν από το ``free_shipping_threshold`` ή τη ζωντανή τιμή (``live_quote``) του courier."
@@ -17011,6 +17092,9 @@ msgstr "Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, co
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Γιατί απορρίπτεται ο κωδικός, από το λεξιλόγιο εκπτώσεων του ACP (discount_code_expired, discount_code_minimum_not_met, …). Null όταν ο κωδικός είναι επιλέξιμος."
+
+msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
+msgstr "Γιατί απορρίπτεται ο κωδικός, στο λεξιλόγιο απόρριψης κουπονιών (``discount_code_expired``, ...)."
 
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Γιατί ακυρώνεται το voucher (π.χ. διορθωμένη διεύθυνση). Αποθηκεύεται στην αποστολή."
@@ -17646,11 +17730,17 @@ msgstr "Μόνο για ``invalid_coupon``."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` για κάθε επισκέπτη: μπορεί να ακολουθήσει email, χωρίς υπόσχεση. ``already_subscribed`` μόνο όταν ο συνδεδεμένος λογαριασμός υπέβαλε δική του επαληθευμένη διεύθυνση και η συνδρομή του λογαριασμού στο newsletter είναι ήδη επιβεβαιωμένη· τότε δεν στέλνεται email."
 
+msgid "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
+msgstr "Μόνο για ``total_changed``: τι χρεώνει τώρα το ταμείο για το καλάθι. Δείξτε το σύνολό του και στείλτε το ``expectedTotal`` του για να γίνει η παραγγελία σε αυτό."
+
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστώνει αυτό το παραστατικό, παγωμένες κατά την έκδοση."
 
 msgid "admin/"
 msgstr "admin/"
+
+msgid "amountDue as order creation compares it. Send it back as ``expectedTotal`` when creating the order: the order is created only at this total."
+msgstr "Το amountDue όπως το συγκρίνει η δημιουργία παραγγελίας. Στείλτε το πίσω ως ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: η παραγγελία δημιουργείται μόνο σε αυτό το σύνολο."
 
 msgid "blockOrder must list every block exactly once."
 msgstr "Το blockOrder πρέπει να περιέχει κάθε μπλοκ ακριβώς μία φορά."

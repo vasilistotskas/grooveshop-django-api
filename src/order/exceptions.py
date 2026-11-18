@@ -14,7 +14,9 @@ Exception Hierarchy:
     ├── ProductNotFoundError
     ├── InvalidOrderDataError
     │   ├── CartNotReadyError
-    │   └── CartHasUnpaidOrderError
+    │   ├── CartHasUnpaidOrderError
+    │   └── LoyaltyRedemptionError
+    ├── OrderTotalChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -27,6 +29,8 @@ Exception Hierarchy:
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
 """
+
+from django.utils.translation import gettext as _
 
 
 class OrderServiceError(Exception):
@@ -249,6 +253,48 @@ class UnpaidOrderLimitError(InvalidOrderDataError):
             f"the customer already has {limit} orders awaiting an online "
             "payment"
         )
+
+
+class LoyaltyRedemptionError(InvalidOrderDataError):
+    """Raised when the loyalty points a checkout asks to redeem cannot
+    be redeemed (the program is off, the balance is short, the discount
+    is more than the products).
+
+    The shopper was shown the discount, so it is never dropped: the
+    quote, the payment intent or the order is refused instead.
+
+    A subclass of ``InvalidOrderDataError`` so order creation passes it
+    on as it passes its other refusals.
+
+    Attributes:
+        reason (str): The loyalty program's own message, in the
+            request's language.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(
+            _("Loyalty redemption cannot be applied: {reason}").format(
+                reason=reason
+            )
+        )
+
+
+class OrderTotalChangedError(OrderServiceError):
+    """Raised when order creation computes a total other than the one the
+    client says it showed the buyer (``expectedTotal``).
+
+    Nothing was created. The API answers it 409 with the quote the order
+    would have been created at, so the client can show the new total and
+    ask again.
+
+    Attributes:
+        quote (CheckoutQuote): What checkout charges for the cart now.
+    """
+
+    def __init__(self, quote):
+        self.quote = quote
+        super().__init__("the order total is not the total the client expected")
 
 
 class InvalidCouponError(OrderServiceError):

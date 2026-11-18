@@ -68,6 +68,7 @@ shared secret in `X-Internal-Token` and this body:
 | `occurredAt` | when the row was written (inside the change's transaction, before its commit), ISO 8601 in UTC: the `Webhook-Timestamp` |
 | `schemaName` | the store |
 | `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now |
+| `agentCheckoutId` | the agent checkout that placed the order (`Order.agent_checkout`, [order creation §3.2](order/creation.md)), so the gateway finds its checkout from the event alone; empty for an order placed before orders carried it |
 
 The gateway's answer decides the row:
 

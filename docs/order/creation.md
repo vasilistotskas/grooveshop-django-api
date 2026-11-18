@@ -328,15 +328,52 @@ caller:
   cards after the lines were written; it now takes those locks where §3.1
   always did. There is no provider call here, and the carrier's live
   price is resolved before the transaction (§3.0).
-- **Not idempotent.** A hosted-payment order (Viva) keeps the cart, so a
-  repeat submit creates a second PENDING order that takes its own stock until
-  its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a
+- **Not idempotent for the storefront.** A hosted-payment order (Viva) keeps
+  the cart, so a repeat submit creates a second PENDING order that takes its
+  own stock until its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a
   key over
   the whole request (cart lines and prices, pay way, address, loyalty points,
   gift-card codes) and has to run before BOTH stock validations (the view's and
   the service's: the open order already took the stock), and what the first
   creation consumed (the coupon, the gift-card balance, the loyalty points) is
   not recoverable from the inputs. It is a separate change, not a lookup.
+  The agent gateway names its checkout instead, and is answered by it
+  (below).
+- **One agent checkout, one order** (`Order.agent_checkout`, #637). The
+  agent gateway sends its checkout session's id as `agentCheckout` and,
+  when an order call goes unanswered, asks again with the same id. A
+  repeat is answered with the order that checkout placed, the same `201`
+  and body the first call got, and creates, refuses and sends nothing.
+  Both paths (§3.1 too) apply it the same way.
+  - **Only the gateway names one.** `agentCheckout` is believed beside the
+    gateway's secret in `X-Internal-Gateway` alone
+    (`OrderViewSet._believed_agent_checkout`), as `agentProtocol` is
+    ([§3.4](creation-records.md)). From any other caller it is ignored:
+    the order stores none and no order is looked up by it.
+  - **First, before anything is judged.** `OrderViewSet.create` looks the
+    checkout up (`OrderService.order_for_agent_checkout`) right after the
+    body is validated: the first order took the stock and kept (Viva),
+    emptied or deleted (cash on delivery) the cart, so the pay way, cart,
+    stock and unpaid-cart checks would each refuse the repeat for what the
+    first call did.
+  - **Under the cart lock.** Both locked halves look it up again right
+    after the cart row lock and before `_refuse_agent_order_on_unpaid_cart`.
+    Two calls of one checkout on one cart serialise there and the second
+    returns the first's committed order.
+  - **The index.** `order_agent_checkout_unique` is a partial unique index
+    over the non-NULL ids (orders not placed through the gateway carry
+    NULL). Two calls on two different carts can both miss the lookup; the
+    second insert is then rejected, read off the error by its constraint
+    name and raised as `AgentCheckoutOrderedError`, so it rolls back
+    whatever it took.
+  - **A refusal after a racing commit.** When a call is refused after the
+    first lookup (the cart the racing call deleted, its stock, the index),
+    the view looks again and answers the order if the checkout has one
+    now; otherwise the refusal stands.
+  - Deleted orders count: the checkout placed it, and deleting it does not
+    let the checkout place another. The response carries `agentCheckout`
+    (`OrderDetailSerializer`; null for any other order), and so does the
+    gateway's internal read of an order.
 - **An agent order is refused while its cart's earlier order awaits its
   online payment** (`OrderService._refuse_agent_order_on_unpaid_cart`, #692).
   The repeat submit above is a person's own act on the storefront ("Back,

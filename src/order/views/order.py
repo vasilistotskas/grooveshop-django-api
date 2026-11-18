@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -129,6 +130,7 @@ from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
+from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 
@@ -769,6 +771,10 @@ class OrderViewSet(BaseModelViewSet):
           answers 201 with the order the first submit created, not a
           second order
 
+        **An agent checkout** (``agentCheckout``, from the agent gateway
+        alone) places one order on either flow: a repeat answers 201 with
+        the order it placed, before anything else is judged.
+
         **Order-first (offline + redirect-based online):**
         - No payment_intent_id required
         - Flow: Order created → Payment pending (redirect to hosted checkout or pay later)
@@ -798,6 +804,17 @@ class OrderViewSet(BaseModelViewSet):
             request_serializer = request_serializer_class(data=request.data)
             request_serializer.is_valid(raise_exception=True)
             validated_data = request_serializer.validated_data
+
+            # A repeat of an agent checkout is answered with its order
+            # before anything is judged: that order took the stock and
+            # kept, emptied or deleted the cart, so every check below
+            # could refuse the repeat for what the first call did.
+            agent_checkout = self._believed_agent_checkout(
+                request, validated_data
+            )
+            placed = self._order_placed_by(agent_checkout)
+            if placed is not None:
+                return self._order_response(request, placed)
 
             # Step 1: Get payment method to determine flow
             pay_way_id = validated_data["pay_way_id"]
@@ -832,23 +849,38 @@ class OrderViewSet(BaseModelViewSet):
             # service with a typed error — strictly better than the
             # old blanket "payment_intent_id required" 400, which
             # made zero-total checkouts impossible.
-            if (
-                PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
-                and provider_supports(
-                    pay_way.provider_code, "supports_payment_intent"
-                )
-                and validated_data.get("payment_intent_id")
-            ):
-                # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
-                return self._create_with_payment_intent(
-                    request, pay_way, validated_data
-                )
-            else:
+            try:
+                if (
+                    PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
+                    and provider_supports(
+                        pay_way.provider_code, "supports_payment_intent"
+                    )
+                    and validated_data.get("payment_intent_id")
+                ):
+                    # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
+                    return self._create_with_payment_intent(
+                        request,
+                        pay_way,
+                        validated_data,
+                        agent_checkout=agent_checkout,
+                    )
                 # Order-first flow: No payment_intent_id required
                 # (offline payments + redirect-based online providers like Viva Wallet)
                 return self._create_without_payment_intent(
-                    request, pay_way, validated_data
+                    request,
+                    pay_way,
+                    validated_data,
+                    agent_checkout=agent_checkout,
                 )
+            except Exception:
+                # Another call of this checkout committed its order after
+                # the lookup above. Whatever this call was refused for
+                # (the cart that order emptied or deleted, the stock it
+                # took, the unique index), its answer is that order.
+                placed = self._order_placed_by(agent_checkout)
+                if placed is None:
+                    raise
+                return self._order_response(request, placed)
 
         except InsufficientStockError as e:
             logger.warning(
@@ -1128,7 +1160,12 @@ class OrderViewSet(BaseModelViewSet):
             )
 
     def _create_with_payment_intent(
-        self, request, pay_way: PayWay, validated_data: dict
+        self,
+        request,
+        pay_way: PayWay,
+        validated_data: dict,
+        *,
+        agent_checkout: UUID | None,
     ) -> Response:
         """
         Create order with payment-first flow (online payments).
@@ -1209,12 +1246,7 @@ class OrderViewSet(BaseModelViewSet):
             ),
             legal_acceptance=legal_acceptance,
             expected_total=self._expected_total(validated_data),
-        )
-
-        # Return order details
-        response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(
-            order, context={"request": request}
+            agent_checkout=agent_checkout,
         )
 
         logger.info(
@@ -1224,12 +1256,15 @@ class OrderViewSet(BaseModelViewSet):
             payment_intent_id,
         )
 
-        return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
-        )
+        return self._order_response(request, order)
 
     def _create_without_payment_intent(
-        self, request, pay_way: PayWay, validated_data: dict
+        self,
+        request,
+        pay_way: PayWay,
+        validated_data: dict,
+        *,
+        agent_checkout: UUID | None,
     ) -> Response:
         """
         Create order with order-first flow.
@@ -1294,12 +1329,7 @@ class OrderViewSet(BaseModelViewSet):
             ),
             legal_acceptance=legal_acceptance,
             expected_total=self._expected_total(validated_data),
-        )
-
-        # Return order details
-        response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(
-            order, context={"request": request}
+            agent_checkout=agent_checkout,
         )
 
         logger.info(
@@ -1309,9 +1339,47 @@ class OrderViewSet(BaseModelViewSet):
             user.id if user else "guest",
         )
 
+        return self._order_response(request, order)
+
+    def _order_response(self, request, order: Order) -> Response:
+        """The answer to an order creation: the order, ``201``. A repeat
+        of an agent checkout or of a payment intent gets the same answer
+        the call that created the order got."""
+        response_serializer = self.get_response_serializer()(
+            order, context={"request": request}
+        )
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
         )
+
+    @staticmethod
+    def _believed_agent_checkout(request, validated_data: dict) -> UUID | None:
+        """The agent checkout the order is placed for, when the agent
+        gateway names one.
+
+        Believed only beside the gateway's shared secret
+        (``X-Internal-Gateway``), as ``attribution.agentProtocol`` is.
+        From any other caller it is ignored: no one else can tie an order
+        to a checkout, or be answered an order by naming one.
+        """
+        if not is_internal_caller(
+            request.headers.get("X-Internal-Gateway", "")
+        ):
+            return None
+        return validated_data.get("agent_checkout")
+
+    @staticmethod
+    def _order_placed_by(agent_checkout: UUID | None) -> Order | None:
+        if agent_checkout is None:
+            return None
+        placed = OrderService.order_for_agent_checkout(agent_checkout)
+        if placed is not None:
+            logger.info(
+                "Agent checkout %s already placed order %s; answering it",
+                agent_checkout,
+                placed.id,
+            )
+        return placed
 
     @staticmethod
     def _expected_total(validated_data: dict) -> ExpectedTotal | None:

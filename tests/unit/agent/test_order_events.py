@@ -16,6 +16,7 @@ import time
 from datetime import timedelta
 from email.utils import format_datetime
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import pytest
 import requests
@@ -222,7 +223,21 @@ class AttemptTests(TestCase):
                 "status": OrderStatus.PENDING.value,
                 "paymentStatus": PaymentStatus.PENDING.value,
                 "trackingNumber": "",
+                "agentCheckoutId": "",
             },
+        )
+
+    def test_the_body_names_the_agent_checkout_that_placed_the_order(
+        self, post
+    ):
+        post.return_value = _response(204)
+        checkout = uuid4()
+        Order.objects.filter(pk=self.order.pk).update(agent_checkout=checkout)
+
+        outbox.attempt(self.event().pk)
+
+        self.assertEqual(
+            post.call_args.kwargs["json"]["agentCheckoutId"], str(checkout)
         )
 
     def test_a_retry_sends_the_same_id_and_time(self, post):

@@ -24,11 +24,17 @@ every DRF throttle: they are all defined in `src/core/api/throttling.py`,
 whose `ResilientThrottleMixin.get_ident` is `client_ip_or_peer`, the
 `anon`/`user` defaults too (`AnonIpRateThrottle`, `UserBudgetThrottle`).
 DRF's own classes take the rightmost hop alone, the shared peer, and no
-module imports them (`tests/unit/core/test_throttle_outage.py`). Two
+module imports them (`tests/unit/core/test_throttle_outage.py`). Some
 budgets are not keyed on the address alone. A request carrying the agent
-gateway's secret is keyed on the cart or order it names
-(`GatewayAnonThrottle`, `_gateway_ident`): every buyer of an AI platform
-arrives from the platform's address. And the gift-card guessing budget
+gateway's secret is identified by the cart or order it names
+(`GatewayIdentMixin.get_ident`, `_gateway_ident`), because every buyer of
+an AI platform arrives from the platform's address. The rule lives once, in
+that mixin, and every pair of cart, order and payment budgets uses it:
+the anonymous half (`GatewayAnonThrottle`) and the signed-in half
+(`CartMutationThrottle`, `OrderCreateThrottle`, `PaymentAttemptThrottle`,
+whose `UserRateThrottle` keys a caller who is not signed in on
+`get_ident`). Without the secret the address is the key, so a forged
+`X-Cart-Id` buys no budget. And the gift-card guessing budget
 (`GiftCardCodeThrottle`) is keyed on the signed-in customer, else the
 gateway's cart, else the address, and counts only codes new to the cart
 (`docs/order/creation.md` §3.0). `edge_client_ip` itself never falls back to

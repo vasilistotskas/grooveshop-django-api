@@ -9,6 +9,8 @@ every AI agent into one shared bucket.
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, override_settings
@@ -17,10 +19,14 @@ from rest_framework.test import APIRequestFactory
 from cart.agent_token import hash_cart_token
 from core.api.throttling import (
     CartMutationAnonThrottle,
+    CartMutationThrottle,
     OrderCreateAnonThrottle,
+    OrderCreateThrottle,
     PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
     SearchThrottle,
 )
+from tests.utils.redis import private_cache
 
 SECRET = "gateway-shared-secret"
 CART_UUID = "521b14f2-da94-48eb-9426-9cfa922606f8"
@@ -290,4 +296,141 @@ class PaymentAttemptAnonThrottleTestCase(TestCase):
     def test_without_the_secret_it_keys_on_the_address(self) -> None:
         key = _payment_request(**{"X-Internal-Gateway": "not-the-secret"})
         self.assertNotIn("gw:", key)
+        self.assertNotIn(ORDER_UUID, key)
+
+
+class _GatewayUserBudgetTests:
+    """The signed-in half of a pair (``UserRateThrottle``) keys an
+    anonymous request on its address, so every buyer a gateway serves was
+    one caller. A request carrying the gateway's secret is keyed on its
+    cart or order instead, as the anonymous half is; everyone else keeps
+    the address.
+    """
+
+    throttle_class: type
+    scope: str
+
+    def setUp(self) -> None:
+        self.factory = APIRequestFactory()
+
+    def _key(self, *, path="/api/v1/cart/item", user=None, **headers):
+        request = self.factory.post(path, headers=headers)
+        request.user = user if user is not None else AnonymousUser()
+        return self.throttle_class().get_cache_key(request, view=None)
+
+    def _allowed(self, cache, *, rate="1/minute", **headers) -> bool:
+        throttle_class = self.throttle_class
+        with (
+            mock.patch.object(throttle_class, "cache", cache),
+            mock.patch.object(throttle_class, "rate", rate, create=True),
+        ):
+            request = self.factory.post("/api/v1/cart/item", headers=headers)
+            request.user = AnonymousUser()
+            return throttle_class().allow_request(request, view=None)
+
+    def test_a_gateway_request_keys_on_its_cart(self) -> None:
+        key = self._key(
+            **{"X-Internal-Gateway": SECRET, "X-Cart-Id": CART_UUID}
+        )
+        self.assertIn(f"gw:{CART_UUID}", key)
+        self.assertIn(self.scope, key)
+
+    def test_a_gateway_cart_token_keys_on_its_hash_never_the_token(
+        self,
+    ) -> None:
+        token = "a-cart-token-value"
+        key = self._key(**{"X-Internal-Gateway": SECRET, "X-Cart-Token": token})
+        self.assertIn(f"gw:{hash_cart_token(token)}", key)
+        self.assertNotIn(token, key)
+
+    def test_two_gateway_carts_have_separate_budgets(self) -> None:
+        cache = private_cache()
+        other = "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"
+        gateway = {"X-Internal-Gateway": SECRET}
+        keys = [
+            self._key(**gateway, **{"X-Cart-Id": cart})
+            for cart in (CART_UUID, other)
+        ]
+        try:
+            self.assertTrue(
+                self._allowed(cache, **gateway, **{"X-Cart-Id": CART_UUID})
+            )
+            self.assertFalse(
+                self._allowed(cache, **gateway, **{"X-Cart-Id": CART_UUID})
+            )
+            self.assertTrue(
+                self._allowed(cache, **gateway, **{"X-Cart-Id": other})
+            )
+        finally:
+            cache.delete_many(keys)
+
+    def test_storefront_guests_still_share_their_address_budget(
+        self,
+    ) -> None:
+        cache = private_cache()
+        headers = {"X-Cart-Id": CART_UUID}
+        key = self._key(**headers)
+        try:
+            self.assertNotIn(CART_UUID, key)
+            self.assertTrue(self._allowed(cache, **headers))
+            # Another cart from the same address is the same guest.
+            self.assertFalse(
+                self._allowed(
+                    cache,
+                    **{"X-Cart-Id": "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"},
+                )
+            )
+        finally:
+            cache.delete(key)
+
+    def test_a_forged_gateway_header_without_the_secret_keys_on_the_address(
+        self,
+    ) -> None:
+        for headers in (
+            {"X-Internal-Gateway": "not-the-secret", "X-Cart-Id": CART_UUID},
+            {"X-Internal-Gateway": SECRET},
+            {"X-Cart-Id": CART_UUID},
+        ):
+            with self.subTest(headers=headers):
+                self.assertNotIn(CART_UUID, self._key(**headers))
+                self.assertNotIn("gw:", self._key(**headers))
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="")
+    def test_an_unset_secret_never_matches(self) -> None:
+        key = self._key(**{"X-Internal-Gateway": "", "X-Cart-Id": CART_UUID})
+        self.assertNotIn("gw:", key)
+
+    def test_a_signed_in_caller_keys_on_the_account(self) -> None:
+        user = type("SignedIn", (), {"is_authenticated": True, "pk": 7})()
+        key = self._key(
+            user=user,
+            **{"X-Internal-Gateway": SECRET, "X-Cart-Id": CART_UUID},
+        )
+        self.assertTrue(key.endswith("_7"))
+        self.assertNotIn("gw:", key)
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class CartMutationThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+    throttle_class = CartMutationThrottle
+    scope = "cart_mutation"
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class OrderCreateThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+    throttle_class = OrderCreateThrottle
+    scope = "order_create"
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class PaymentAttemptThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+    throttle_class = PaymentAttemptThrottle
+    scope = "payment"
+
+    def test_a_gateway_request_keys_on_the_orders_hash(self) -> None:
+        key = self._key(
+            path=f"/api/v1/order/1/create_checkout_session?uuid={ORDER_UUID}",
+            **{"X-Internal-Gateway": SECRET},
+        )
+        self.assertIn("gw:order:", key)
         self.assertNotIn(ORDER_UUID, key)

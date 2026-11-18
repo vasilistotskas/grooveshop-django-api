@@ -157,6 +157,28 @@ def _gateway_ident(request) -> str | None:
     return None
 
 
+class GatewayIdentMixin(ResilientThrottleMixin):
+    """Identify a request the agent gateway authenticates by what it names.
+
+    Every buyer an AI platform serves reaches Django through the gateway
+    from the platform's address, so the per-address identity would put
+    them all in one budget. A request carrying the gateway's secret and
+    a cart or an order is identified by it instead (``_gateway_ident``),
+    so one cart or order still cannot exceed the rate; everyone else
+    keeps the proven visitor. DRF asks ``get_ident`` only for a caller
+    who is not signed in, so a signed-in agent is keyed on its account.
+
+    The rule lives here, once, for both halves of a pair
+    (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it)
+    and for ``GiftCardCodeThrottle``.
+    """
+
+    def get_ident(self, request) -> str:
+        if ident := _gateway_ident(request):
+            return f"gw:{ident}"
+        return super().get_ident(request)
+
+
 class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
     """A scoped budget that applies to every caller, signed in or not.
 
@@ -255,33 +277,17 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
     """
 
 
-class GatewayAnonThrottle(AnonIpRateThrottle):
-    """Key a request the agent gateway authenticates on its cart or order.
+class GatewayAnonThrottle(GatewayIdentMixin, AnonIpRateThrottle):
+    """The anonymous half of an Anon/User pair, keyed on the cart or order
+    when the agent gateway asks (``GatewayIdentMixin``), else on the
+    visitor.
 
-    Every buyer an AI platform serves reaches Django through the gateway
-    from the platform's address, so the per-address key would put them
-    all in one budget. A request carrying the gateway's secret and a cart
-    or an order is keyed on it instead (``_gateway_ident``); one cart or
-    order still cannot exceed the rate. Everyone else keeps the
-    per-address key.
+    Anonymous only, as its parent: a gateway request signed in as an
+    account (a linked agent) is throttled by the user budget alone.
     """
 
-    def get_cache_key(self, request, view):
-        # Anonymous only, as the parent: a gateway request signed in as an
-        # account (a linked agent) is throttled by the user budget alone.
-        user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated:
-            return None
-        ident = _gateway_ident(request)
-        if ident:
-            return self.cache_format % {
-                "scope": self.scope,
-                "ident": f"gw:{ident}",
-            }
-        return super().get_cache_key(request, view)
 
-
-class PaymentAttemptThrottle(ResilientThrottleMixin, UserRateThrottle):
+class PaymentAttemptThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
 
@@ -294,7 +300,7 @@ class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
     fail_closed = True
 
 
-class OrderCreateThrottle(ResilientThrottleMixin, UserRateThrottle):
+class OrderCreateThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "order_create"
     fail_closed = True
 
@@ -313,7 +319,7 @@ class OrderCreateAnonThrottle(GatewayAnonThrottle):
     fail_closed = True
 
 
-class CartMutationThrottle(ResilientThrottleMixin, UserRateThrottle):
+class CartMutationThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "cart_mutation"
 
 
@@ -496,7 +502,7 @@ def _checkout_cart_ident(request) -> str | None:
         return None
 
 
-class GiftCardCodeThrottle(GiftCardCheckThrottle):
+class GiftCardCodeThrottle(GatewayIdentMixin, GiftCardCheckThrottle):
     """Bound GUESSING a gift-card code through checkout, not using one.
 
     The quote, the payment intent and order creation each say what a
@@ -532,17 +538,6 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
     def __init__(self, codes: Iterable[str] = ()):
         super().__init__()
         self.codes = set(codes)
-
-    def get_cache_key(self, request, view):
-        user = getattr(request, "user", None)
-        if user is None or not user.is_authenticated:
-            ident = _gateway_ident(request)
-            if ident:
-                return self.cache_format % {
-                    "scope": self.scope,
-                    "ident": f"gw:{ident}",
-                }
-        return super().get_cache_key(request, view)
 
     @staticmethod
     def _digest(code: str) -> str:

@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 
 from django.core.management.base import BaseCommand
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import schema_context
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +69,8 @@ class Command(BaseCommand):
 
         target_schema = options["schema"]
         dry_run = options["dry_run"]
-        public_schema = get_public_schema_name()
-
         if target_schema:
-            tenants = Tenant.objects.filter(
-                schema_name=target_schema,
-                is_active=True,
-            ).exclude(schema_name=public_schema)
+            tenants = Tenant.objects.active().filter(schema_name=target_schema)
             if not tenants.exists():
                 self.stdout.write(
                     self.style.WARNING(
@@ -85,9 +80,7 @@ class Command(BaseCommand):
                 )
                 return
         else:
-            tenants = Tenant.objects.filter(is_active=True).exclude(
-                schema_name=public_schema
-            )
+            tenants = Tenant.objects.active()
 
         total = tenants.count()
         if total == 0:

@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 
 from django.core.management.base import BaseCommand, CommandError
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import schema_context
 
 from tenant.models import StoreVertical
 
@@ -67,11 +67,7 @@ class Command(BaseCommand):
         target_schema = options["schema"]
         override = options["vertical"]
         dry_run = options["dry_run"]
-        public_schema = get_public_schema_name()
-
-        tenants = Tenant.objects.filter(is_active=True).exclude(
-            schema_name=public_schema
-        )
+        tenants = Tenant.objects.active()
         if target_schema:
             tenants = tenants.filter(schema_name=target_schema)
             if not tenants.exists():

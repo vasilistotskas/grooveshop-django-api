@@ -82,13 +82,19 @@ class TenantQuerySet(models.QuerySet):
     removed, and every row these return is a store whose schema exists.
     """
 
+    _ACTIVE = models.Q(is_active=True, suspended_at__isnull=True)
+
     def stores(self) -> TenantQuerySet:
         """Every store, active or suspended: each row but the platform's."""
         return self.exclude(schema_name=get_public_schema_name())
 
     def active(self) -> TenantQuerySet:
         """The stores that are neither suspended nor switched off."""
-        return self.stores().filter(is_active=True, suspended_at__isnull=True)
+        return self.stores().filter(self._ACTIVE)
+
+    def unavailable(self) -> TenantQuerySet:
+        """The stores ``active`` leaves out: suspended or switched off."""
+        return self.stores().exclude(self._ACTIVE)
 
 
 class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):

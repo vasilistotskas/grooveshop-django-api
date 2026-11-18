@@ -160,6 +160,32 @@ class TestSuspendedStores:
         assert self.INCLUDE_SUSPENDED < reached(active)
 
     @pytest.mark.django_db
+    def test_active_and_unavailable_split_the_stores(self):
+        from django.utils import timezone
+
+        from tenant.models import Tenant
+
+        active = store_tenant("split_active")
+        suspended = self._suspended_store("split_suspended")
+        switched_off = store_tenant("split_off", is_active=False)
+        leftover = store_tenant("split_leftover", suspended_at=timezone.now())
+        mine = {active.pk, suspended.pk, switched_off.pk, leftover.pk}
+
+        def picked(queryset) -> set[int]:
+            return set(
+                queryset.filter(pk__in=mine).values_list("pk", flat=True)
+            )
+
+        assert picked(Tenant.objects.active()) == {active.pk}
+        assert picked(Tenant.objects.unavailable()) == {
+            suspended.pk,
+            switched_off.pk,
+            leftover.pk,
+        }
+        assert picked(Tenant.objects.stores()) == mine
+        assert not Tenant.objects.stores().filter(schema_name="public").exists()
+
+    @pytest.mark.django_db
     def test_a_destroyed_store_gets_nothing(self):
         from datetime import timedelta
 

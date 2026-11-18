@@ -138,7 +138,6 @@ def run_billing_cycle() -> dict[str, int]:
     crashed run re-sends rather than silently skipping a notice.
     """
     from django.utils import timezone
-    from django_tenants.utils import get_public_schema_name
 
     from tenant.lifecycle import (
         is_protected_tenant,
@@ -156,13 +155,7 @@ def run_billing_cycle() -> dict[str, int]:
     stage_counters = {1: "warned", 2: "expired", 3: "suspended"}
 
     tenants = (
-        Tenant.objects.filter(
-            is_active=True,
-            suspended_at__isnull=True,
-            paid_until__isnull=False,
-        )
-        .exclude(schema_name=get_public_schema_name())
-        .order_by("pk")
+        Tenant.objects.active().filter(paid_until__isnull=False).order_by("pk")
     )
 
     for tenant in tenants:

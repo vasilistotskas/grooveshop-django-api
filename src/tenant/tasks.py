@@ -35,9 +35,7 @@ def fanout_reset_demo_stores():
     from devtools.tasks import reset_demo_store_task
     from tenant.models import Tenant
 
-    tenants = Tenant.objects.filter(
-        is_active=True, is_demo=True, suspended_at__isnull=True
-    ).exclude(schema_name="public")
+    tenants = Tenant.objects.active().filter(is_demo=True)
 
     dispatched: list[dict[str, str]] = []
     for tenant in tenants:

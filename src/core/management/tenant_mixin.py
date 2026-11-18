@@ -112,11 +112,7 @@ class TenantCommandMixin:
         from tenant.models import Tenant
 
         if options.get("all_tenants"):
-            tenants = list(
-                Tenant.objects.filter(is_active=True).exclude(
-                    schema_name="public"
-                )
-            )
+            tenants = list(Tenant.objects.active())
             if not tenants:
                 raise CommandError(
                     "No active tenants found: --all-tenants matched zero "

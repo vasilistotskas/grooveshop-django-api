@@ -150,12 +150,21 @@ def run_for_all_tenants(
     #   parcel is delivered.
     #
     # Anything that starts new work for the store (polls, syncs, mail)
-    # stays off.
+    # stays off. What finishing such work sets off divides the same way:
+    # what the store owes its customer still runs (the refund confirmation
+    # email, the myDATA credit document or receipt), marketing and
+    # analytics do not (``meta_capi.services.is_capi_enabled`` refuses a
+    # suspended store). The agent outbox sweep is passed the flag too and
+    # sends nothing for a suspended store (``agent.outbox._store_is_active``
+    # holds its events).
     #
     # A store being destroyed needs no filter: ``destroy_tenant`` drops
     # its schema and deletes its row in one transaction, so every row read
-    # here has its schema. A task queued just before that commits finds
-    # neither, and ``TenantTask`` does not run it.
+    # here has its schema. A task queued for it that STARTS after the
+    # destroy commits finds neither, and ``TenantTask`` does not run it
+    # (``TenantArchive``). One already running when it commits is not
+    # stopped: its later queries find the tables gone, or public's tables of
+    # an app both schemas share.
     tenants = (
         Tenant.objects.stores()
         if include_suspended

@@ -30,6 +30,7 @@ from tenant.credentials import (
     tenant_meta_capi_access_token,
     tenant_meta_pixel_id,
 )
+from tenant.membership import bound_tenant
 
 if TYPE_CHECKING:
     from facebook_business.adobjects.serverside.event import Event
@@ -130,6 +131,12 @@ def is_capi_enabled() -> bool:
     in the Django admin take effect on the next event, modulo
     ``Setting.get``'s lookup cost (one indexed PK fetch per call,
     not per event-type).
+
+    A suspended store sends nothing. The work its suspension still runs
+    (``run_for_all_tenants(..., include_suspended=True)``) finishes what
+    the store owes its customers, such as a refund still pending at the
+    provider; reporting it to Meta is marketing, which is not owed. Every
+    dispatch task reads this, so it is the one place the rule lives.
     """
     if not bool(store_setting("META_CAPI_ENABLED")):
         return False
@@ -139,7 +146,11 @@ def is_capi_enabled() -> bool:
     # operand, so this function annotated `-> bool` was returning the CAPI
     # access token itself. Any caller comparing `is True` saw False, and
     # the secret travelled somewhere only a flag was expected.
-    return bool(tenant_meta_pixel_id() and tenant_meta_capi_access_token())
+    if not (tenant_meta_pixel_id() and tenant_meta_capi_access_token()):
+        return False
+    # Credentials are read off the bound store, so there is one here.
+    tenant = bound_tenant()
+    return tenant is not None and not tenant.is_suspended
 
 
 def _build_user_data(order: Order) -> Any:

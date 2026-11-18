@@ -82,6 +82,7 @@ class TenantQuerySet(models.QuerySet):
     removed, and every row these return is a store whose schema exists.
     """
 
+    #: ``Tenant.is_suspended`` is the same rule read off one row.
     _ACTIVE = models.Q(is_active=True, suspended_at__isnull=True)
 
     def stores(self) -> TenantQuerySet:
@@ -1290,6 +1291,13 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         return super().delete(
             using=using, keep_parents=keep_parents, force_drop=force_drop
         )
+
+    @property
+    def is_suspended(self) -> bool:
+        """Whether ``Tenant.objects.active()`` leaves this store out:
+        suspended, or switched off. The row's form of
+        ``TenantQuerySet._ACTIVE``, for a reader holding the bound row."""
+        return not (self.is_active and self.suspended_at is None)
 
     class Meta:
         verbose_name = _("Tenant")

@@ -3,6 +3,115 @@
 
 
 
+## v3.253.0 (2026-11-18)
+
+### Bug fixes
+
+* fix(agent): retry deployment faults, honour Retry-After, bound sweep runs
+
+Review of the order-event outbox:
+
+- 401, 403 and 404 from the gateway are retried on the backoff and stop
+  the sweep run with one ERROR line. They mean a wrong or rotating
+  shared secret, or a wrong URL, and failing the rows for them needed a
+  superuser to bring each one back. 400 and 422 stay final.
+- A Retry-After on a retryable answer sets the next attempt, bounded by
+  AGENT_ORDER_EVENT_RETRY_AFTER_MIN/CAP_SECONDS, so "Order created",
+  which races the gateway's order link, is not held for the 10-minute
+  backoff with the order's later events behind it.
+- The calls use their own connect/read timeouts (3 s / 30 s, above the
+  gateway's 25 s deadline), and a sweep run takes no new row after
+  AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS, so slow answers cannot stack
+  runs.
+- The order is read with all_with_deleted(): a soft-deleted order's
+  events are delivered instead of failing after 2.8 days with an empty
+  error. Only an order deleted for good fails its event, at once.
+- order.tasks.push_order_event_to_gateway stays registered for one
+  release and records the change through the outbox, so messages queued
+  during the deploy and DeferredDispatch rows naming it still arrive.
+docs/agent-order-events.md: when occurredAt is set, and which call
+  sites write the event inside the change's transaction.
+
+Part of #637 ([`f9f3116`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f3116913e2294fddf9fc676c8fc937561c6283))
+
+* fix(agent): fence outbox attempts, bound each call, recheck retention deletes
+
+Review of the order-event outbox:
+
+- A call to the gateway gets a total deadline of connect + read timeout.
+  requests' read timeout bounds each wait for bytes, not the answer, so
+  a trickling answer could outlast a sweep run's budget; the call runs
+  in a daemon thread abandoned at the deadline, and the body is not read.
+- A gateway-wide fault (unreachable, 401/403/404) on an event's last
+  attempt still fails the event but now stops the sweep run.
+- A claim token on the row fences each attempt: its writes after the call
+  are conditional on it, and "Send again now" clears it, so an attempt it
+  superseded cannot fail the fresh cycle. The reset is one conditional
+  update per row that refuses a delivered row, and only reset rows are
+  queued.
+- core.retention.delete_in_batches re-reads each batch under row locks
+  with the sweep's own filters before deleting it, so a row that stopped
+  being stale after the first read (an event sent again, a renewed knox
+  token) is kept. Every retention sweep goes through it.
+
+The claim column is folded into agent 0001, which has not been released.
+
+Part of #637 ([`f9f3116`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f3116913e2294fddf9fc676c8fc937561c6283))
+
+### Features
+
+* feat(agent): durable outbox for the order events sent to the agent gateway (#749) ([`f9f3116`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f3116913e2294fddf9fc676c8fc937561c6283))
+
+* feat(agent): durable outbox for the order events sent to the agent gateway
+
+Django pushed an order event to the agent gateway with a Celery task that
+gave up after five retries and carried no event identity, so the gateway
+minted the Webhook-Id from the order's state and stamped Webhook-Timestamp
+with the attempt time, and no "Order created" event was ever sent (the
+created branch of the order's post_save returned before the push).
+
+Each event of an order an agent placed is now an AgentOrderEvent row,
+written in the transaction of its change: "created" when the order's
+attribution says an agent placed it, "updated" when a save changes its
+status, payment status or tracking. The row's UUIDv7 id is the
+Webhook-Id and its occurred_at the Webhook-Timestamp, sent unchanged on
+every attempt (UCP ucp#659). The first attempt is queued on commit; a
+per-store sweep every minute retries what is due, 10 attempts over about
+2.8 days with capped exponential backoff and jitter (settings), an
+order's events in order, and a 4xx other than 408/429 fails the row at
+once. A superuser admin lists the rows and sends failed ones again;
+finished rows are purged after AGENT_ORDER_EVENT_RETENTION_DAYS, and the
+staging refresh deletes them.
+
+The request keeps the gateway's current body and adds eventId, eventType
+and occurredAt, so the gateway in production reads it unchanged until
+grooveshop-agent-gateway#111 uses them. push_order_event_to_gateway is
+removed.
+
+pay_way 0029 now depends on order 0055: 0055 reads PayWayTranslation.name,
+which 0029 takes out of state, and only the walk order of the migration
+graph kept them apart. The new agent leaf reversed that order and broke
+building a fresh database.
+
+Part of #637 ([`f9f3116`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f3116913e2294fddf9fc676c8fc937561c6283))
+
+### Refactoring
+
+* refactor(core): lock and limit each retention batch in one query
+
+delete_in_batches read a batch, then read it again under FOR UPDATE with
+the sweep's filters before deleting it. One query does both: Postgres
+takes LIMIT with FOR UPDATE, so each batch is now selected under row
+locks (of the sweep's own table, waiting for a writer that holds one)
+and deleted in the same transaction, and the unlocked first read goes.
+
+The outbox's _post docstring and docs/agent-order-events.md claimed an
+abandoned call thread ends on its own socket timeout. It does not while
+the gateway keeps sending within the read timeout: it ends when the
+gateway stops or closes the connection, and dies with the worker child.
+
+Part of #637 ([`f9f3116`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f3116913e2294fddf9fc676c8fc937561c6283))
+
 ## v3.252.6 (2026-11-17)
 
 ### Chores

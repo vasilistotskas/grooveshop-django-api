@@ -98,6 +98,14 @@ class AgentInternalOrderTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_a_soft_deleted_order_is_not_found(self):
+        order = self.agent_order(user=None)
+        order.delete()
+
+        response = self.read(order.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_an_unknown_order_is_not_found(self):
         response = self.read(uuid4())
 

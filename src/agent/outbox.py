@@ -37,11 +37,16 @@ from order.enum.attribution import OrderSourceType
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from tenant.celery import dispatch_on_commit
+from tenant.membership import bound_tenant
 
 logger = logging.getLogger(__name__)
 
 #: The gateway's route for order events (``internal/server/routes.go``).
 ORDER_EVENTS_PATH = "/internal/events/order-status"
+
+
+#: ``last_error`` of an event whose order is deleted, soft or for good.
+ORDER_DELETED = "order deleted"
 
 
 #: Answers about the deployment, not the event: a wrong shared secret (one
@@ -147,7 +152,7 @@ def attempt(event_id: UUID | str) -> Outcome:
     mid-call leaves it to be attempted then, and ``claim`` gets a token
     that every later write of this attempt names (``_settle``).
     """
-    if not settings.AGENT_GATEWAY_INTERNAL_URL:
+    if not settings.AGENT_GATEWAY_INTERNAL_URL or not _store_is_active():
         return Outcome.SKIPPED
     event = _due().filter(pk=event_id).first()
     if event is None:
@@ -174,10 +179,7 @@ def attempt(event_id: UUID | str) -> Outcome:
 
     order = _order_state(event.order_id)
     if order is None:
-        # Deleted for good between the claim and this read. A deleted
-        # order takes its events with it, so this row is normally gone
-        # too; nothing is left to render either way.
-        return _give_up(event, token, "order deleted", Outcome.FAILED)
+        return _give_up(event, token, ORDER_DELETED, Outcome.FAILED)
 
     try:
         status, headers = _post(_body(event, order))
@@ -263,13 +265,27 @@ def _post(body: dict[str, str]) -> tuple[int, Mapping[str, str]]:
     return answer[0]
 
 
+def _store_is_active() -> bool:
+    """Whether the gateway can resolve this store: ``tenant/resolve``
+    answers only a store whose row is active (``tenant.views``), so the
+    events of an inactive store, or of a schema with no store row, could
+    be neither rendered nor signed. They stay ``pending``, with no
+    attempt spent, and go out once the store is active again."""
+    tenant = bound_tenant()
+    return tenant is not None and tenant.is_active
+
+
 def _order_state(order_id: int) -> dict | None:
-    """The order as the gateway is told of it, or None once it is deleted
-    for good. A soft-deleted order is still the order the platform placed:
-    its events are delivered."""
+    """The order as the gateway is told of it, or None once it is deleted.
+
+    The gateway renders the event from its own read of the order
+    (``agent.views.AgentInternalOrderView``), which finds no soft-deleted
+    order, so a soft-deleted order's event could never be rendered: it
+    fails at once, like one whose order was deleted for good between the
+    claim and this read (a deleted order otherwise takes its events with
+    it)."""
     return (
-        Order.objects.all_with_deleted()
-        .filter(pk=order_id)
+        Order.objects.filter(pk=order_id)
         .values("uuid", "status", "payment_status", "tracking_number")
         .first()
     )
@@ -394,7 +410,7 @@ def deliver_due() -> dict[str, int]:
     the call itself: every other row would get the same answer.
     """
     counts: dict[str, int] = {}
-    if not settings.AGENT_GATEWAY_INTERNAL_URL:
+    if not settings.AGENT_GATEWAY_INTERNAL_URL or not _store_is_active():
         return counts
     started = time.monotonic()
     for _ in range(settings.AGENT_ORDER_EVENT_SWEEP_BATCH):
@@ -424,21 +440,28 @@ def retry_now(events: QuerySet[AgentOrderEvent]) -> int:
     Each row is reset by an update that itself refuses a delivered row,
     so one delivered after the selection is left as it is, and only the
     rows reset are queued. The reset clears the claim: an attempt still in
-    flight writes nothing over the new cycle (``_settle``). Returns how
-    many were queued.
+    flight writes nothing over the new cycle (``_settle``). An event
+    whose order is deleted is made ``failed`` instead (``_order_state``
+    says why), and is not queued. Returns how many were queued.
     """
+    order_exists = Exists(Order.objects.filter(pk=OuterRef("order_id")))
     queued = 0
     for event_id in list(events.values_list("pk", flat=True)):
-        reset = (
-            AgentOrderEvent.objects.filter(pk=event_id)
-            .exclude(status=AgentOrderEventStatus.DELIVERED)
-            .update(
-                status=AgentOrderEventStatus.PENDING,
-                attempts=0,
-                next_attempt_at=timezone.now(),
-                finished_at=None,
-                claim=None,
-            )
+        not_delivered = AgentOrderEvent.objects.filter(pk=event_id).exclude(
+            status=AgentOrderEventStatus.DELIVERED
+        )
+        not_delivered.exclude(order_exists).update(
+            status=AgentOrderEventStatus.FAILED,
+            finished_at=timezone.now(),
+            last_error=ORDER_DELETED,
+            claim=None,
+        )
+        reset = not_delivered.filter(order_exists).update(
+            status=AgentOrderEventStatus.PENDING,
+            attempts=0,
+            next_attempt_at=timezone.now(),
+            finished_at=None,
+            claim=None,
         )
         if reset:
             _queue_attempt(event_id)

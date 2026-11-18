@@ -15,8 +15,10 @@ import threading
 import time
 from datetime import timedelta
 from email.utils import format_datetime
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
 import requests
 from django.conf import settings
 from django.db import connection, transaction
@@ -35,6 +37,7 @@ from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.tasks import push_order_event_to_gateway
 from settings.schedule import SCHEDULE_PRESETS
+from tests.utils.staff import store_tenant
 
 GATEWAY_URL = "http://agent-gateway-service"
 SECRET = "test-internal-secret"
@@ -45,6 +48,19 @@ gateway = override_settings(
     AGENT_ORDER_EVENT_BACKOFF_SECONDS=BACKOFF,
     AGENT_ORDER_EVENT_BACKOFF_JITTER=0,
 )
+
+
+@pytest.fixture(autouse=True)
+def _an_active_store():
+    """The suite runs in the public schema with no store bound; the outbox
+    attempts only for a store the gateway can resolve
+    (``outbox._store_is_active``), so every test runs as an active one
+    unless it binds another."""
+    with patch(
+        "agent.outbox.bound_tenant",
+        return_value=SimpleNamespace(is_active=True),
+    ):
+        yield
 
 
 def _response(status_code: int, **headers: str) -> Mock:
@@ -307,16 +323,18 @@ class AttemptTests(TestCase):
             ),
         )
 
-    def test_a_soft_deleted_orders_event_is_delivered(self, post):
-        post.return_value = _response(204)
+    def test_a_soft_deleted_orders_event_fails_at_once(self, post):
         event = self.event()
         self.order.delete()
         self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
 
-        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.DELIVERED)
-        self.assertEqual(
-            post.call_args.kwargs["json"]["orderUuid"], str(self.order.uuid)
-        )
+        self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.FAILED)
+
+        post.assert_not_called()
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.FAILED)
+        self.assertEqual(event.last_error, outbox.ORDER_DELETED)
+        self.assertIsNotNone(event.finished_at)
 
     def test_an_order_deleted_for_good_fails_its_event_at_once(self, post):
         event = self.event()
@@ -328,7 +346,7 @@ class AttemptTests(TestCase):
         post.assert_not_called()
         event.refresh_from_db()
         self.assertEqual(event.status, Status.FAILED)
-        self.assertEqual(event.last_error, "order deleted")
+        self.assertEqual(event.last_error, outbox.ORDER_DELETED)
 
     def test_a_gateway_fault_on_the_last_attempt_fails_the_event_and_stops(
         self, post
@@ -495,6 +513,63 @@ class SweepTests(TestCase):
         self.assertEqual(counts, {outbox.Outcome.UNREACHABLE: 1})
         post.assert_called_once()
 
+    def test_a_suspended_stores_events_wait_until_it_is_reactivated(self, post):
+        post.return_value = _response(204)
+        event = self.event(self.orders[0])
+        store = store_tenant("outbox_suspended", is_active=False)
+
+        with patch("agent.outbox.bound_tenant", return_value=store):
+            self.assertEqual(outbox.deliver_due(), {})
+            self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.SKIPPED)
+            post.assert_not_called()
+            event.refresh_from_db()
+            self.assertEqual(event.status, Status.PENDING)
+            self.assertEqual(event.attempts, 0)
+
+            store.is_active = True
+            self.assertEqual(
+                outbox.deliver_due(), {outbox.Outcome.DELIVERED: 1}
+            )
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.DELIVERED)
+
+    def test_a_store_still_active_with_a_leftover_suspension_is_retried(
+        self, post
+    ):
+        post.side_effect = [_response(503), _response(204)]
+        event = self.event(self.orders[0])
+        store = store_tenant(
+            "outbox_leftover_suspension",
+            is_active=True,
+            suspended_at=timezone.now(),
+        )
+
+        with patch("agent.outbox.bound_tenant", return_value=store):
+            self.assertEqual(outbox.deliver_due(), {outbox.Outcome.RETRY: 1})
+            AgentOrderEvent.objects.filter(pk=event.pk).update(
+                next_attempt_at=timezone.now()
+            )
+            self.assertEqual(
+                outbox.deliver_due(), {outbox.Outcome.DELIVERED: 1}
+            )
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.DELIVERED)
+        self.assertEqual(event.attempts, 2)
+
+    def test_a_schema_with_no_store_row_sends_nothing(self, post):
+        event = self.event(self.orders[0])
+
+        with patch("agent.outbox.bound_tenant", return_value=None):
+            self.assertEqual(outbox.deliver_due(), {})
+            self.assertEqual(outbox.attempt(event.pk), outbox.Outcome.SKIPPED)
+
+        post.assert_not_called()
+        event.refresh_from_db()
+        self.assertEqual(event.status, Status.PENDING)
+        self.assertEqual(event.attempts, 0)
+
     def test_an_event_not_due_waits(self, post):
         self.event(
             self.orders[0], next_attempt_at=timezone.now() + timedelta(hours=1)
@@ -586,6 +661,36 @@ class RetryNowTests(TestCase):
             args=[str(failed.pk)],
             headers={"_schema_name": connection.schema_name},
         )
+
+    def test_an_event_of_a_soft_deleted_order_fails_instead(self, task):
+        with override_settings(AGENT_GATEWAY_INTERNAL_URL=""):
+            order = _order()
+        failed = AgentOrderEvent.objects.create(
+            order=order,
+            event_type=EventType.UPDATED,
+            status=Status.FAILED,
+            attempts=10,
+            last_error="HTTP 503",
+            finished_at=timezone.now() - timedelta(days=1),
+        )
+        pending = AgentOrderEvent.objects.create(
+            order=order, event_type=EventType.UPDATED, attempts=2
+        )
+        order.delete()
+
+        queued = outbox.retry_now(AgentOrderEvent.objects.all())
+
+        self.assertEqual(queued, 0)
+        task.apply_async.assert_not_called()
+        for event in (failed, pending):
+            with self.subTest(event=event.pk):
+                event.refresh_from_db()
+                self.assertEqual(event.status, Status.FAILED)
+                self.assertEqual(event.last_error, outbox.ORDER_DELETED)
+                self.assertIsNone(event.claim)
+                self.assertGreater(
+                    event.finished_at, timezone.now() - timedelta(minutes=1)
+                )
 
 
 class PurgeTests(TestCase):

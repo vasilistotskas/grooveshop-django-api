@@ -61,7 +61,10 @@ class AgentOrderEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         queued = retry_now(queryset)
         self.message_user(
             request,
-            _("%(count)d events queued; delivered events are not sent again.")
+            _(
+                "%(count)d events queued; delivered events and events of "
+                "deleted orders are not sent again."
+            )
             % {"count": queued},
             messages.SUCCESS,
         )

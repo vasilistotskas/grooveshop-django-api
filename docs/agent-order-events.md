@@ -67,7 +67,7 @@ shared secret in `X-Internal-Token` and this body:
 | `eventType` | `created` or `updated` |
 | `occurredAt` | when the row was written (inside the change's transaction, before its commit), ISO 8601 in UTC: the `Webhook-Timestamp` |
 | `schemaName` | the store |
-| `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now, soft-deleted or not |
+| `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now |
 
 The gateway's answer decides the row:
 
@@ -97,20 +97,33 @@ it has stored its order link, which it writes only once the order-creation
 response reaches it. The sweep's minute sets the real delay. Every attempt
 counts towards the maximum, whatever its answer.
 
-An order deleted for good fails its pending event at once (`last_error`
-"order deleted"); a soft-deleted order is still the platform's order, and its
-events are delivered.
+An event whose order is deleted, soft-deleted or deleted for good, fails at
+once, with `last_error` "order deleted" (`agent.outbox.ORDER_DELETED`) and no
+call: the gateway renders the event from its own read of the order
+(`GET /api/v1/agent/internal/order/{uuid}`), which finds no soft-deleted
+order, so the event could never be rendered. A deleted order otherwise takes
+its events with it; this covers one deleted between an attempt's claim and
+its read of the order.
 
 The first attempt is queued when the change commits (`dispatch_on_commit`).
 Every attempt after it is the sweep's: `deliver-due-agent-order-events` runs
-every minute, per store and suspended stores included (the platform still
-learns what became of an order it placed), and attempts at most
+every minute, per store the gateway can resolve (an active one; a leftover
+`suspended_at` does not matter), and attempts at most
 `AGENT_ORDER_EVENT_SWEEP_BATCH` due events. It takes no new event once it has
 spent `AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS` (25 s), so a run lasts at most
 the budget plus one call's timeouts, under the minute between runs, and slow
 answers cannot stack runs. A run stops when the gateway cannot be reached or
 refuses the call itself (401, 403, 404), since every other event would get
 the same answer.
+
+A store gets deliveries exactly when the gateway can resolve it: through
+`GET /api/v1/tenant/resolve`, which answers only a store whose row is active.
+Every attempt checks this first (`agent.outbox._store_is_active`): for a
+suspended store (`is_active` false), or a schema with no store row, it sends
+nothing and spends no attempt, so the events stay `pending` and go out once
+the store is active again. The sweep never reaches a suspended store anyway
+(`run_for_all_tenants` requires `is_active`); the check is what holds the
+first attempt queued at commit and **Send again now**.
 
 - **One attempt at a time.** An attempt first claims its row by moving
   `next_attempt_at` to when a failure would set it, so a second worker finds
@@ -147,7 +160,9 @@ with its attempts, next attempt and last error. **Send again now** puts the
 selected `failed` or `pending` events back to `pending` with a fresh set of
 attempts and queues an attempt for each. The reset is one update per row
 that itself refuses a `delivered` row, so an event delivered after the
-selection is not sent again, and only the rows it reset are queued. A
+selection is not sent again, and only the rows it reset are queued. An
+event whose order is deleted is made `failed` ("order deleted") instead,
+and is not queued. A
 `pending` event whose attempt is in flight can be sent twice under the same
 `Webhook-Id`, which a platform dedupes.
 

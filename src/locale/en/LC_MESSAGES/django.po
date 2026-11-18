@@ -130,8 +130,8 @@ msgid "%(count)d confirmation emails were queued."
 msgstr "%(count)d confirmation emails were queued."
 
 #, python-format
-msgid "%(count)d events queued; delivered events are not sent again."
-msgstr "%(count)d events queued; delivered events are not sent again."
+msgid "%(count)d events queued; delivered events and events of deleted orders are not sent again."
+msgstr "%(count)d events queued; delivered events and events of deleted orders are not sent again."
 
 #, python-format
 msgid "%(count)d item"

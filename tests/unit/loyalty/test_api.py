@@ -461,6 +461,47 @@ class TestRedeemEndpoint:
         assert response.json()["code"] == "loyalty_redemption_too_small"
         assert LoyaltyService.get_user_balance(user) == 50
 
+    def test_redeem_is_capped_at_the_goods_after_the_orders_promotion(self):
+        """100.00 of goods less a 90.00 promotion leave 10.00: points may
+        take those, never the delivery or a fee beyond them."""
+        user = UserAccountFactory(num_addresses=0)
+        PointsTransaction.objects.create(
+            user=user, points=10_000, transaction_type=TransactionType.EARN
+        )
+        order = OrderFactory(
+            user=user,
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            discount_amount=Money(Decimal("90.00"), "EUR"),
+        )
+        OrderItemFactory(
+            order=order, price=Money(Decimal("100.00"), "EUR"), quantity=1
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        def redeem(points: int):
+            with patch(
+                "extra_settings.models.Setting.get",
+                side_effect=_mock_settings_enabled,
+            ):
+                return client.post(
+                    "/api/v1/loyalty/redeem",
+                    {
+                        "points_amount": points,
+                        "currency": "EUR",
+                        "order_id": order.id,
+                    },
+                    format="json",
+                )
+
+        # 100 points a euro (``_mock_settings_enabled``).
+        too_many = redeem(5000)
+        within = redeem(1000)
+
+        assert too_many.status_code == status.HTTP_400_BAD_REQUEST
+        assert within.status_code == status.HTTP_200_OK, within.content
+
     def test_redeem_insufficient_balance(self):
         """Redemption with insufficient balance returns 400."""
         user = UserAccountFactory(num_addresses=0)

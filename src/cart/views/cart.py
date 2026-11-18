@@ -887,13 +887,15 @@ class CartViewSet(BaseModelViewSet):
     ) -> PayWay | Response:
         """The pay way a checkout call names, or the response refusing it.
 
-        The same two runtime-configurable layers order creation applies
-        (``OrderViewSet._validate_pay_way_for_order``): the ``active``
-        master switch, and the admin-managed ``PayWayShippingExclusion``
-        rows for the chosen carrier + kind. Minting an intent without
-        them means the shopper CONFIRMS the card in Stripe.js and only
-        then gets a 400 from order creation — money taken, no order,
-        nothing to refund against.
+        Accepted exactly when the quote would list it
+        (``OrderQuoteService.offered_pay_ways``): active, through a
+        provider the store can charge with, and not excluded for the
+        chosen delivery, a home delivery that names no carrier included.
+        Order creation refuses the rest too
+        (``OrderViewSet._validate_pay_way_for_order``), and minting an
+        intent for one means the shopper CONFIRMS the card in Stripe.js
+        and only then gets a 400 from order creation — money taken, no
+        order, nothing to refund against.
         """
         pay_way = PayWay.objects.filter(id=pay_way_id).first()
         if pay_way is None:
@@ -906,23 +908,16 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        provider_code = shipping.provider_code if shipping else None
-        shipping_kind = shipping.kind if shipping else None
-        allowed = PayWayService.filter_by_carrier(
-            PayWay.objects.active(),
-            provider_code=provider_code,
-            shipping_kind=shipping_kind,
-            country_code=shipping.country_id if shipping else None,
-        )
+        allowed = OrderQuoteService.offered_pay_ways(shipping)
         if not allowed.filter(id=pay_way.id).exists():
             logger.info(
                 "Pay way refused: pay_way=%s (provider=%s, active=%s) not "
-                "available for shipping_provider_code=%s shipping_kind=%s",
+                "offered for shipping_provider_code=%s shipping_kind=%s",
                 pay_way.id,
                 pay_way.provider_code,
                 pay_way.active,
-                provider_code,
-                shipping_kind,
+                shipping.provider_code if shipping else None,
+                shipping.kind if shipping else None,
             )
             return Response(
                 {

@@ -10,6 +10,7 @@ and both creation paths agree on the amount.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -18,7 +19,7 @@ from uuid import uuid4
 
 import pytest
 from django.core.cache import cache
-from django.core.cache.backends.locmem import LocMemCache
+from django.db import connection
 from django.urls import reverse
 from djmoney.money import Money
 from knox.models import get_token_model
@@ -30,6 +31,7 @@ from cart.models import Cart
 from core.api.throttling import (
     CartMutationAnonThrottle,
     CartQuoteAnonThrottle,
+    CartQuoteThrottle,
     GiftCardCodeThrottle,
 )
 from country.factories import CountryFactory
@@ -39,7 +41,7 @@ from giftcard.models import GiftCardTransaction
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
-from order.checkout.quote import ExpectedTotal
+from order.checkout.quote import ExpectedTotal, OrderQuoteService
 from order.exceptions import InvalidOrderDataError, OrderTotalChangedError
 from order.models import OrderVatLine
 from order.models.order import Order
@@ -53,8 +55,10 @@ from promotion.models import CartPromotionCode, PromotionRedemption
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import get_provider
 from shipping_acs import config as acs_config
+from shipping_acs.exceptions import AcsAPIError
 from tests.utils.fake_stripe import fake_stripe
 from tests.utils.legal import checkout_acceptance
+from tests.utils.redis import private_cache
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
@@ -437,16 +441,17 @@ class TestQuoteRefusals:
         stripe = PayWayFactory.create_online_payment(provider_code="stripe")
         elsewhere = CountryFactory()
 
-        response = checkout.client.post(
-            reverse("cart-create-payment-intent"),
-            {
-                **_choices(checkout),
-                "pay_way_id": stripe.id,
-                "country_id": elsewhere.alpha_2,
-            },
-            format="json",
-            HTTP_X_CART_ID=str(checkout.cart.uuid),
-        )
+        with fake_stripe():
+            response = checkout.client.post(
+                reverse("cart-create-payment-intent"),
+                {
+                    **_choices(checkout),
+                    "pay_way_id": stripe.id,
+                    "country_id": elsewhere.alpha_2,
+                },
+                format="json",
+                HTTP_X_CART_ID=str(checkout.cart.uuid),
+            )
 
         assert response.status_code == 400
         body = response.json()
@@ -462,6 +467,39 @@ class TestQuoteRefusals:
 
         assert response.status_code == 400
         assert response.json()["code"] == "pay_way_unavailable"
+
+    def test_a_pay_way_is_accepted_exactly_when_it_is_listed(self):
+        """The selection and ``payWays`` go through one rule
+        (``OrderQuoteService.offered_pay_ways``): a home delivery that
+        names no carrier is judged by every carrier that could take it,
+        and a provider the store holds no credentials for is not offered.
+        Before, the selection applied neither, so the quote priced pay
+        ways its own list left out."""
+        checkout = _checkout()
+        pay_ways = [
+            checkout.pay_way,
+            PayWayFactory.create_carrier_terminal_payment(),
+            # No credentials in this store: not offered.
+            PayWayFactory.create_online_payment(provider_code="stripe"),
+            PayWayFactory.create_offline_payment(),
+        ]
+        listed = {
+            row["id"]
+            for row in _quote(checkout, **_choices(checkout))["payWays"]
+        }
+
+        accepted = {
+            pay_way.id
+            for pay_way in pay_ways
+            if _post_quote(
+                checkout, **{**_choices(checkout), "pay_way_id": pay_way.id}
+            ).status_code
+            == 200
+        }
+
+        assert accepted == listed & {pay_way.id for pay_way in pay_ways}
+        assert checkout.pay_way.id in accepted
+        assert pay_ways[2].id not in accepted
 
     def test_a_pay_way_that_does_not_exist(self):
         checkout = _checkout()
@@ -596,12 +634,7 @@ def _private_budget(monkeypatch, throttle, rate: str) -> None:
     """Give one throttle a rate (the suite runs with none) and a counter
     of its own, so no other xdist worker shares its history."""
     monkeypatch.setattr(throttle, "rate", rate, raising=False)
-    monkeypatch.setattr(
-        throttle,
-        "cache",
-        LocMemCache(f"quote-throttle-{uuid4()}", {}),
-        raising=False,
-    )
+    monkeypatch.setattr(throttle, "cache", private_cache(), raising=False)
 
 
 class TestQuoteBudget:
@@ -624,8 +657,12 @@ class TestQuoteBudget:
         assert statuses == [200, 200, 200, 429]
 
     def test_the_gateway_is_budgeted_per_cart(self, monkeypatch, settings):
+        """Guests are budgeted by ``CartQuoteAnonThrottle`` alone. The
+        signed-in budget does not count them: DRF's ``UserRateThrottle``
+        would, by address, and every buyer of a platform would share it."""
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gateway-secret"
         _private_budget(monkeypatch, CartQuoteAnonThrottle, "2/minute")
+        _private_budget(monkeypatch, CartQuoteThrottle, "2/minute")
         polled, other = _checkout(user=False), _checkout(user=False)
         gateway = APIClient()
         gateway.credentials(HTTP_X_INTERNAL_GATEWAY="gateway-secret")
@@ -872,13 +909,14 @@ class TestGiftCardGuessesAreBudgeted:
 
     def test_the_record_holds_no_code(self):
         checkout = _checkout()
-        throttle_cache = GiftCardCodeThrottle.cache
 
         _post_quote(checkout, **_choices(checkout), **_guess(0))
 
-        stored = repr(throttle_cache._cache)
-        assert "gift_card_codes_seen_" in stored
-        assert "GC-GUESS-0000" not in stored
+        [digest] = GiftCardCodeThrottle.cache.get(
+            f"gift_card_codes_seen_user:{checkout.user.pk}"
+        )
+        assert "GUESS" not in digest
+        assert len(digest) == 64
 
 
 class TestPointsWorthLessThanACent:
@@ -948,11 +986,39 @@ class TestPointsWorthLessThanACent:
         assert checkout.product.stock == 10
 
 
+@contextmanager
+def _acs_prices_live(answer):
+    """ACS as a live-priced home-delivery carrier whose
+    ``ACS_Price_Calculation`` gives ``answer`` (or raises it). Yields the
+    savepoint depth of every call: 0 extra means no transaction of the
+    code under test was open, so no row lock was held."""
+    depths: list[int] = []
+    outside = len(connection.savepoint_ids)
+
+    def price_calculation(_payload):
+        depths.append(len(connection.savepoint_ids) - outside)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    with (
+        _store_settings(ACS_DYNAMIC_PRICING_ENABLED=True),
+        patch.object(acs_config, "is_configured", return_value=True),
+        patch.object(acs_config, "station_origin", return_value="ΑΚ"),
+        patch("shipping_acs.client.AcsClient") as client,
+    ):
+        client.return_value.price_calculation.side_effect = price_calculation
+        cache.clear()
+        yield depths
+
+
 class TestLivePrice:
-    def test_a_polled_quote_asks_the_carrier_once(self):
-        """ACS prices live. The price is cached per country, region and
-        weight bracket (``AcsCarrier._fetch_live_quote``), the entry order
-        creation reads, so polling a quote does not reach the carrier."""
+    """ACS prices live, over HTTP. The answer is cached per country,
+    region and weight bracket (``AcsCarrier._fetch_live_quote``)."""
+
+    LIVE = {"Total_Ammount": 5.21}
+
+    def _checkout(self):
         checkout = _checkout()
         enable_rate(
             checkout.country,
@@ -960,25 +1026,92 @@ class TestLivePrice:
             price=SHIPPING,
             free_shipping_threshold=THRESHOLD,
         )
-        acs = {**_choices(checkout), "shipping_provider_code": "acs"}
-        cache.clear()
+        return checkout
 
-        with (
-            _store_settings(ACS_DYNAMIC_PRICING_ENABLED=True),
-            patch.object(acs_config, "is_configured", return_value=True),
-            patch.object(acs_config, "station_origin", return_value="ΑΚ"),
-            patch("shipping_acs.client.AcsClient") as client,
-        ):
-            client.return_value.price_calculation.return_value = {
-                "Total_Ammount": 5.21
-            }
+    def _order(self, checkout, **extra):
+        return OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
+            cart=checkout.cart,
+            shipping_address={
+                **_address(checkout),
+                "shipping_provider_code": "acs",
+            },
+            pay_way=checkout.pay_way,
+            user=checkout.user,
+            **extra,
+        )
+
+    def test_a_polled_quote_asks_the_carrier_once(self):
+        checkout = self._checkout()
+        acs = {**_choices(checkout), "shipping_provider_code": "acs"}
+
+        with _acs_prices_live(self.LIVE) as calls:
             first = _quote(checkout, **acs)
             second = _quote(checkout, **acs)
 
         assert _money(first["shipping"]["price"]) == Decimal("5.21")
         assert second["shipping"] == first["shipping"]
         assert second["expectedTotal"] == first["expectedTotal"]
-        assert client.return_value.price_calculation.call_count == 1
+        assert len(calls) == 1
+
+    def test_order_creation_asks_the_carrier_before_its_locks(self):
+        """A carrier call can take seconds. Order creation makes it with
+        nothing locked, and prices from the cache once it holds the cart,
+        the promotions, the customer and the gift cards."""
+        checkout = self._checkout()
+
+        with _acs_prices_live(self.LIVE) as calls:
+            order = self._order(checkout)
+
+        assert order.shipping_price.amount == Decimal("5.21")
+        assert calls == [0]
+
+    def test_a_price_not_resolved_for_this_parcel_refuses_the_order(self):
+        """The locked half finds no price for what it weighs (the cart
+        changed after the price was resolved, or the entry expired). It
+        does not ask the carrier: the creation rolls back, the cart is
+        priced again with nothing locked, and the order is refused as a
+        changed total with that quote."""
+        checkout = self._checkout()
+
+        with (
+            _acs_prices_live(self.LIVE) as calls,
+            patch.object(OrderQuoteService, "resolve_live_shipping"),
+            pytest.raises(OrderTotalChangedError) as refused,
+        ):
+            self._order(checkout)
+
+        assert refused.value.quote.charges().shipping.price.amount == Decimal(
+            "5.21"
+        )
+        assert calls == [0]
+        assert not Order.objects.exists()
+        checkout.product.refresh_from_db()
+        assert checkout.product.stock == 10
+
+        with _acs_prices_live(self.LIVE) as calls:
+            order = self._order(
+                checkout, expected_total=refused.value.quote.expected_total
+            )
+
+        assert order.shipping_price.amount == Decimal("5.21")
+        assert calls == [0]
+
+    def test_a_carrier_that_gave_no_price_is_remembered(self):
+        """ACS down: the stored rate is charged, as before. The failure is
+        remembered for a minute, so the locked half knows the answer was
+        "no live price" and neither it nor the next quote asks again."""
+        checkout = self._checkout()
+        acs = {**_choices(checkout), "shipping_provider_code": "acs"}
+        down = AcsAPIError(alias="ACS_Price_Calculation", error_message="x")
+
+        with _acs_prices_live(down) as calls:
+            quote = _quote(checkout, **acs)
+            order = self._order(checkout)
+
+        assert _money(quote["shipping"]["price"]) == SHIPPING
+        assert order.shipping_price.amount == SHIPPING
+        assert calls == [0]
 
 
 class TestExpectedTotal:
@@ -1182,6 +1315,43 @@ class TestDeductions:
         assert order.amount_due.amount == Decimal("10.00")
         assert LoyaltyService.get_user_balance(checkout.user) == 0
         assert card.balance.amount == 0
+
+    def test_points_pay_for_goods_never_for_shipping_or_the_fee(self):
+        """20.00 of goods less a 15.00 promotion leave 5.00 to pay for
+        them. Points may take those 5.00 and no more: before, the cap was
+        the goods before the promotion, and 10.00 of points also paid the
+        delivery and the fee."""
+        checkout = self._member(1000)
+        PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal("15.00"),
+        )
+
+        too_many = _post_quote(
+            checkout, **_choices(checkout), loyalty_points_to_redeem=1000
+        )
+        order_too_many = _post_order(checkout, loyalty_points_to_redeem=1000)
+        quote = _quote(
+            checkout, **_choices(checkout), loyalty_points_to_redeem=500
+        )
+
+        assert too_many.status_code == 400
+        assert too_many.json()["code"] == "loyalty_redemption_invalid"
+        assert order_too_many.status_code == 400
+        assert not Order.objects.exists()
+        assert LoyaltyService.get_user_balance(checkout.user) == 1000
+        assert _money(quote["loyaltyDiscount"]) == Decimal("5.00")
+        assert _money(quote["amountDue"]) == SHIPPING + FEE
+
+        response = _post_order(
+            checkout,
+            loyalty_points_to_redeem=500,
+            expected_total=quote["expectedTotal"],
+        )
+
+        assert response.status_code == 201, response.content
+        assert Order.objects.get().amount_due.amount == SHIPPING + FEE
 
     def test_points_worth_half_a_cent_are_rounded_once(self):
         """103 points at 200 a euro are 0.515: the quote, the order and

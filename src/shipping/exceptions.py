@@ -132,3 +132,15 @@ class CarrierBusyError(CarrierUnavailableError):
     message says what to wait for, so an API answers it as a 409 with
     that text instead of "the courier cannot be reached".
     """
+
+
+class ShippingLivePriceUnresolvedError(ShippingError):
+    """A carrier's live price was asked for from the cache alone, and the
+    cache holds no answer for it.
+
+    Raised by a carrier's ``live_quote(cached_only=True)``: the caller
+    holds row locks and must not wait on the carrier
+    (``OrderQuoteService.quote(lock=True)``). The price is resolved, and
+    cached, before the locks are taken; a miss means what it was resolved
+    for is no longer what is being priced.
+    """

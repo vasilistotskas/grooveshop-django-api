@@ -41,10 +41,12 @@ import hmac
 import logging
 import uuid
 from collections.abc import Iterable, Mapping
+from contextlib import suppress
 from typing import ClassVar
 
 from django.conf import settings
 from django.utils.crypto import salted_hmac
+from redis.exceptions import LockError
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import SkipField
 from rest_framework.throttling import (
@@ -100,7 +102,7 @@ class ResilientThrottleMixin:
 
     def allow_request(self, request, view) -> bool:
         try:
-            return super().allow_request(request, view)  # type: ignore[misc]
+            return self.take(request, view)
         except REDIS_UNAVAILABLE as exc:
             scope = getattr(self, "scope", None)
             if self.fail_closed:
@@ -108,6 +110,12 @@ class ResilientThrottleMixin:
                 raise
             _allowed_while_unavailable.report(scope, exc)
             return True
+
+    def take(self, request, view) -> bool:
+        """The budget check itself, which the outage policy above wraps:
+        DRF's. A budget that must count requests arriving together
+        overrides it (``GiftCardCheckThrottle``)."""
+        return super().allow_request(request, view)  # type: ignore[misc]
 
 
 def _gateway_ident(request) -> str | None:
@@ -337,9 +345,20 @@ class CartQuoteThrottle(ResilientThrottleMixin, UserRateThrottle):
     A read a checkout repeats on every change and a platform polls, so
     it has a budget of its own: quotes cannot spend the cart's write
     budget (``cart_mutation``), nor writes the quotes'.
+
+    Signed-in callers only. DRF's ``UserRateThrottle`` keys an anonymous
+    request on its address, which would put every guest the agent
+    gateway quotes for in one budget beside their per-cart one;
+    ``CartQuoteAnonThrottle`` is the guests' budget.
     """
 
     scope = "cart_quote"
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return None
+        return super().get_cache_key(request, view)
 
 
 class CartQuoteAnonThrottle(GatewayAnonThrottle):
@@ -357,12 +376,73 @@ class CouponApplyThrottle(UserOrIpRateThrottle):
     fail_closed = True
 
 
+#: How long a caller's gift-card budget may stay held while one request
+#: takes from it (a lease, should the holder die), and how long another
+#: request of the same caller waits for it before it is refused.
+_BUDGET_LEASE_SECONDS = 5
+_BUDGET_WAIT_SECONDS = 2
+
+
 class GiftCardCheckThrottle(UserOrIpRateThrottle):
     """Tight per-caller throttle for the gift-card balance check — the code
-    IS the bearer secret, so this endpoint must not be enumerable."""
+    IS the bearer secret, so this endpoint must not be enumerable.
+
+    The check and the count are ONE step per caller. DRF's throttle reads
+    the caller's history, compares it with the limit and writes it back:
+    requests that arrive together all read the same history, all pass,
+    and each writes one that leaves the others out, so N parallel
+    guesses were N answers whatever the limit. Here the three happen
+    while the budget's key is held (``CustomCache.lock``, the lease the
+    carrier mutexes use), so a caller's parallel requests are counted
+    one after the other. A request that cannot get the budget within
+    ``_BUDGET_WAIT_SECONDS`` is refused, never let through uncounted.
+
+    ``cost`` and ``taken`` are what a subclass changes
+    (``GiftCardCodeThrottle``); both run while the budget is held.
+    """
 
     scope = "gift_card_check"
     fail_closed = True
+
+    def cost(self) -> int:
+        """What this request takes from the budget."""
+        return 1
+
+    def taken(self) -> None:
+        """Called once the request's cost has been counted."""
+
+    def take(self, request, view) -> bool:
+        if self.rate is None:
+            return True
+        key = self.get_cache_key(request, view)
+        if key is None:
+            return True
+        lease = self.cache.lock(f"{key}:lease", timeout=_BUDGET_LEASE_SECONDS)
+        if not lease.acquire(
+            blocking=True, blocking_timeout=_BUDGET_WAIT_SECONDS
+        ):
+            # What ``wait()`` reads for the Retry-After of a refusal.
+            self.key, self.history, self.now = key, [], self.timer()
+            return self.throttle_failure()
+        try:
+            return super().take(request, view)
+        finally:
+            # A lease that outlived its timeout is no longer ours to
+            # release; whoever holds it now keeps it.
+            with suppress(LockError):
+                lease.release()
+
+    def throttle_success(self) -> bool:
+        """Count the request's cost, all of it or none."""
+        cost = self.cost()
+        if cost == 0:
+            return True
+        if len(self.history) + cost > self.num_requests:
+            return self.throttle_failure()
+        self.history[:0] = [self.now] * cost
+        self.cache.set(self.key, self.history, self.duration)
+        self.taken()
+        return True
 
 
 #: The body field a checkout names its gift cards in: the quote, the
@@ -436,6 +516,8 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
       cart instead (``_gateway_ident``, as ``GatewayAnonThrottle``):
       every buyer of a platform arrives from the platform's address.
 
+    The count is taken while the budget is held (see the parent), so
+    requests that arrive together are counted one after the other.
     A request this budget refuses records nothing, so its codes are
     still new the next time. (One that another throttle of the view
     refuses may already have been counted and recorded here, DRF asks
@@ -471,26 +553,34 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
     def allow_request(self, request, view) -> bool:
         cart = _checkout_cart_ident(request)
         self.seen_key = self.seen_format % {"cart": cart} if cart else None
-        self.seen = set(self.cache.get(self.seen_key, ())) if cart else set()
-        digests = {self._digest(code) for code in self.codes}
-        self.new = digests - self.seen
-        if not self.new:
+        self.digests = {self._digest(code) for code in self.codes}
+        # Nothing new is use, not a guess: free, and the budget is not
+        # even held for it.
+        if not self._new_to_cart():
             return True
         return super().allow_request(request, view)
 
-    def throttle_success(self) -> bool:
-        """Count every new code, and remember them for the cart."""
-        if len(self.history) + len(self.new) > self.num_requests:
-            return self.throttle_failure()
-        self.history[:0] = [self.now] * len(self.new)
-        self.cache.set(self.key, self.history, self.duration)
+    def _new_to_cart(self) -> set[str]:
+        self.seen = (
+            set(self.cache.get(self.seen_key, ())) if self.seen_key else set()
+        )
+        return self.digests - self.seen
+
+    def cost(self) -> int:
+        """Every code new to the cart, read again now that the budget is
+        held: a request that arrived together with this one may have
+        just been counted for the same code."""
+        self.new = self._new_to_cart()
+        return len(self.new)
+
+    def taken(self) -> None:
+        """Remember the codes for the cart."""
         if self.seen_key:
             self.cache.set(
                 self.seen_key,
                 sorted(self.seen | self.new),
                 settings.GIFT_CARD_CODES_SEEN_TTL_SECONDS,
             )
-        return True
 
 
 def gift_card_code_throttles(

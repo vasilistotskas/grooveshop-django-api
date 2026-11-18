@@ -5,7 +5,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn
 from uuid import UUID
 
 from django.conf import settings
@@ -66,6 +66,7 @@ from order.exceptions import (
     PaymentVerificationError,
     ProductNotFoundError,
     RefundOutstandingError,
+    ShippingPriceUnresolvedError,
     StockReservationError,
     UnpaidOrderLimitError,
 )
@@ -604,6 +605,75 @@ class OrderService:
             | {gift.product.id for gift in promo_result.gift_items}
         )
 
+    @staticmethod
+    def _shipping_choice(shipping_address: dict[str, Any]) -> ShippingChoice:
+        return ShippingChoice(
+            kind=shipping_address.get("shipping_kind"),
+            provider_code=shipping_address.get("shipping_provider_code"),
+            country_id=shipping_address.get("country_id"),
+            region_id=shipping_address.get("region_id"),
+        )
+
+    @classmethod
+    def _resolve_live_shipping(
+        cls, cart, *, user, shipping_address: dict[str, Any]
+    ) -> None:
+        """Have the carrier's live price resolved BEFORE any row is locked.
+
+        Both creation paths call it ahead of their transaction. A carrier
+        call can take seconds, and inside the transaction it would hold
+        the cart row and whatever the quote locks (promotions, the
+        customer, gift cards) for that long, which every checkout sharing
+        one of them waits behind. The locked quote then reads the answer
+        from the carrier adapter's cache and never calls out
+        (``OrderQuoteService.resolve_live_shipping``).
+
+        The cart's wholesale prices are bound first, as the locked half
+        binds them, so both weigh the same parcel.
+        """
+        from b2b.services import B2BPricingService
+
+        B2BPricingService.bind_cart(cart, user)
+        OrderQuoteService.resolve_live_shipping(
+            cart,
+            user=user,
+            email=shipping_address.get("email") or "",
+            shipping=cls._shipping_choice(shipping_address),
+        )
+
+    @classmethod
+    def _refuse_unpriced(
+        cls,
+        cart,
+        *,
+        user,
+        pay_way,
+        shipping_address: dict[str, Any],
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+    ) -> NoReturn:
+        """Answer a creation whose locked quote could not price the
+        delivery (``ShippingPriceUnresolvedError``): the parcel it weighed
+        was not the one the live price was resolved for, so the cart
+        changed in between, or the cached price expired.
+
+        The transaction has rolled back and nothing is locked. The cart
+        is priced again, which may ask the carrier, and the creation is
+        refused as a changed total with that quote: the client shows it
+        and orders again, now against a resolved price.
+        """
+        raise OrderTotalChangedError(
+            OrderQuoteService.quote(
+                cart,
+                user=user,
+                email=shipping_address.get("email") or "",
+                pay_way=pay_way,
+                shipping=cls._shipping_choice(shipping_address),
+                loyalty_points=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
+        )
+
     @classmethod
     def _quote_under_lock(
         cls,
@@ -639,12 +709,7 @@ class OrderService:
             user=user,
             email=shipping_address.get("email") or "",
             pay_way=pay_way,
-            shipping=ShippingChoice(
-                kind=shipping_address.get("shipping_kind"),
-                provider_code=shipping_address.get("shipping_provider_code"),
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-            ),
+            shipping=cls._shipping_choice(shipping_address),
             loyalty_points=loyalty_points_to_redeem,
             gift_card_codes=gift_card_codes,
             lock=True,
@@ -1014,21 +1079,34 @@ class OrderService:
                 _("Failed to create order: {error}").format(error=str(e))
             ) from e
 
-        return cls._create_order_for_verified_intent(
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id=payment_intent_id,
-            payment_status=payment_status,
-            payment_data=payment_data,
-            pay_way=pay_way,
-            user=user,
-            loyalty_points_to_redeem=loyalty_points_to_redeem,
-            gift_card_codes=gift_card_codes,
-            meta_context=meta_context,
-            attribution=attribution,
-            legal_acceptance=legal_acceptance,
-            expected_total=expected_total,
+        cls._resolve_live_shipping(
+            cart, user=user, shipping_address=shipping_address
         )
+        try:
+            return cls._create_order_for_verified_intent(
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id=payment_intent_id,
+                payment_status=payment_status,
+                payment_data=payment_data,
+                pay_way=pay_way,
+                user=user,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                meta_context=meta_context,
+                attribution=attribution,
+                legal_acceptance=legal_acceptance,
+                expected_total=expected_total,
+            )
+        except ShippingPriceUnresolvedError:
+            cls._refuse_unpriced(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
 
     @classmethod
     @transaction.atomic
@@ -1051,9 +1129,12 @@ class OrderService:
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
-        Makes no provider call: ``payment_status`` and ``payment_data``
-        were read before this transaction opened. Everything here either
-        hits the database or recomputes the server-side total.
+        Makes no provider call and no carrier call: ``payment_status``
+        and ``payment_data`` were read, and the carrier's live price was
+        resolved (``_resolve_live_shipping``), before this transaction
+        opened. Everything here either hits the database, reads the cache
+        or recomputes the server-side total. A live price the cache does
+        not hold raises ``ShippingPriceUnresolvedError``.
         """
         try:
             from cart.models import Cart
@@ -1453,16 +1534,15 @@ class OrderService:
                 try:
                     from loyalty.services import LoyaltyService
 
-                    # Cap discount to products total (excluding shipping/fees)
-                    items_total_amount = order.total_price_items.amount
-
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
                         points_amount=quote.loyalty_points,
                         currency=str(target_currency),
                         order=order,
-                        max_discount=items_total_amount,
+                        # The cap the quote priced it under: the goods
+                        # after promotions, never shipping or a fee.
+                        max_discount=quote.free_threshold_value.amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 
@@ -1693,7 +1773,6 @@ class OrderService:
         raise CartHasUnpaidOrderError
 
     @classmethod
-    @transaction.atomic
     def create_order_from_cart_offline(
         cls,
         *,
@@ -1760,6 +1839,52 @@ class OrderService:
             ...     user=user
             ... )
         """
+        cls._resolve_live_shipping(
+            cart, user=user, shipping_address=shipping_address
+        )
+        try:
+            return cls._create_order_offline_locked(
+                cart=cart,
+                shipping_address=shipping_address,
+                pay_way=pay_way,
+                user=user,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                meta_context=meta_context,
+                attribution=attribution,
+                legal_acceptance=legal_acceptance,
+                expected_total=expected_total,
+            )
+        except ShippingPriceUnresolvedError:
+            cls._refuse_unpriced(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
+
+    @classmethod
+    @transaction.atomic
+    def _create_order_offline_locked(
+        cls,
+        *,
+        cart,
+        shipping_address: dict[str, Any],
+        pay_way,
+        user,
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        meta_context: dict[str, Any] | None,
+        attribution: AttributionInput | None,
+        legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal | None,
+    ) -> Order:
+        """The locked half of ``create_order_from_cart_offline``: one
+        transaction, no carrier call (the live price was resolved before
+        it opened; one the cache does not hold raises
+        ``ShippingPriceUnresolvedError``)."""
         try:
             from cart.models import Cart
 
@@ -2066,16 +2191,15 @@ class OrderService:
                 try:
                     from loyalty.services import LoyaltyService
 
-                    # Cap discount to products total (excluding shipping/fees)
-                    items_total_amount = order.total_price_items.amount
-
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
                         points_amount=quote.loyalty_points,
                         currency=str(target_currency),
                         order=order,
-                        max_discount=items_total_amount,
+                        # The cap the quote priced it under: the goods
+                        # after promotions, never shipping or a fee.
+                        max_discount=quote.free_threshold_value.amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 

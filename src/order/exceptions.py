@@ -16,7 +16,8 @@ Exception Hierarchy:
     │   ├── CartNotReadyError
     │   ├── CartHasUnpaidOrderError
     │   ├── LoyaltyRedemptionError
-    │   └── ShippingRefusedError
+    │   ├── ShippingRefusedError
+    │   └── ShippingPriceUnresolvedError
     ├── OrderTotalChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
@@ -309,6 +310,27 @@ class ShippingRefusedError(InvalidOrderDataError):
         self.message = message
         super().__init__(
             message, field_errors={"shipping_provider_code": [message]}
+        )
+
+
+class ShippingPriceUnresolvedError(InvalidOrderDataError):
+    """Raised by the locked quote of order creation when the carrier's
+    live price for the delivery was not resolved before the locks were
+    taken, or was resolved for another parcel (the cart changed in
+    between).
+
+    Under its locks order creation never asks a carrier, so it cannot
+    price the delivery: the creation rolls back, and its caller prices
+    the cart again with nothing locked and answers ``total_changed``
+    with that quote (``OrderService._quoted_again``).
+
+    A subclass of ``InvalidOrderDataError`` so the locked half passes it
+    on as it passes its other refusals.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "the carrier's live price was not resolved before the locks"
         )
 
 

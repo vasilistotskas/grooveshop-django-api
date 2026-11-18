@@ -41,6 +41,32 @@ caller:
   `LoyaltyService.redeem_points` and `GiftCardService.record_plan` write.
   A refused attached coupon raises `InvalidCouponError`; without the lock
   it is reported on the quote (`blocking_coupon`).
+- **No carrier is asked while those rows are locked.** A carrier's live
+  price is an HTTP call that can take seconds (ACS: a 15 s timeout), and
+  every checkout sharing the cart, a promotion, the customer or a gift
+  card would wait behind it. So both creation paths resolve it BEFORE
+  their transaction (`OrderService._resolve_live_shipping` ->
+  `OrderQuoteService.resolve_live_shipping` ->
+  `ShippingService.resolve_live_price`), where the carrier's adapter
+  caches the answer, and the locked quote prices with `cached_only`: it
+  reads that cache and never calls out. When the cache holds no answer
+  for the parcel the locked quote weighs (the cart changed in between,
+  or the entry expired) the creation rolls back
+  (`ShippingPriceUnresolvedError`), the cart is priced again with
+  nothing locked, and the answer is 409 `total_changed` with that quote
+  (`OrderService._refuse_unpriced`): the client orders again, against a
+  resolved price.
+- **Points pay for goods, never for shipping or a fee.** The most a
+  redemption takes off is what the goods cost after the promotions
+  (`free_threshold_value`): the quote prices it under that cap and
+  `redeem_points` is given the same one, as is `POST /loyalty/redeem` on
+  an existing order.
+- **A pay way is accepted exactly when it is listed.** The selection of a
+  quote or a payment intent and the quote's `payWays` both come from
+  `OrderQuoteService.offered_pay_ways`: active, through a provider the
+  store holds credentials for, and not excluded for the delivery (a home
+  delivery that names no carrier is judged by every carrier that could
+  take it).
 - **The order is built from the quote's rows**
   (`OrderService._quote_under_lock`): `shipping_price`,
   `payment_method_fee`, the promotion result, the points and the gift-card
@@ -107,9 +133,9 @@ caller:
     because the refusal of too many points states the balance.
   - **A budget of its own.** The quote is repeated on every change of a
     checkout and polled by the agent gateway, so it is throttled by
-    `cart_quote` / `cart_quote_anon` (`CartQuoteThrottle`,
-    `CartQuoteAnonThrottle`: per cart for the gateway), not by the cart's
-    write budget.
+    `cart_quote` (`CartQuoteThrottle`, signed-in callers only) or
+    `cart_quote_anon` (`CartQuoteAnonThrottle`: guests, per cart for the
+    gateway), not by the cart's write budget.
   - **Guessing a gift-card code is budgeted, using one is not.** The
     quote, the payment intent and order creation each say what a card
     settles (or that the code is no card), so each could be used to guess
@@ -126,6 +152,10 @@ caller:
       guesses): the signed-in customer or the proven address, and the
       cart for a guest request the agent gateway makes, since every buyer
       of a platform arrives from its address;
+    - the check and the count are one step per caller, made while the
+      budget's key is held (`CustomCache.lock`), so guesses that arrive
+      together are counted one after the other; `/giftcard/check` counts
+      the same way;
     - a request this budget refuses records nothing, so its codes stay
       new. (One refused by another throttle of the view may already have
       been counted and recorded: each code still counts once.)
@@ -133,10 +163,10 @@ caller:
       `gift_card_codes` field (`get_value`, `run_validation`), so a JSON
       list, a repeated key of a form or multipart body and indexed form
       keys are counted exactly as they are priced.
-  - A polled quote does not reach the carrier: ACS's live price is cached
-    for five minutes per country, region and weight bracket
-    (`AcsCarrier._fetch_live_quote`), the entry order creation reads. A
-    failed call is not cached; the stored rate is charged.
+  - A polled quote does not reach the carrier each time: ACS's live price
+    is cached per country, region and weight bracket
+    (`AcsCarrier._fetch_live_quote`), a price for five minutes and a
+    failed call for one (the stored rate is charged meanwhile).
   - **A quote only prices.** Stock, the cart's validity, the wholesale
     minimum, the legal texts and the unpaid-order limit are order
     creation's to judge.
@@ -155,7 +185,8 @@ caller:
   the dispatch to the payment-success webhook (PR #1 commit
   `59527a87`; the `transaction.on_commit` invariant in
   [§8](invariants.md) has the reason).
-- **The provider is asked before the transaction opens.**
+- **The provider, like the carrier (§3.0), is asked before the
+  transaction opens.**
   `_retrieve_payment_intent` runs `get_payment_status` (for Stripe
   `PaymentIntent.retrieve` plus the dj-stripe sync, an HTTP round trip) and
   refuses an intent that is not PENDING / PROCESSING / COMPLETED. Inside the
@@ -289,7 +320,8 @@ caller:
   cards), then the cart lines, then the products in pk order before any
   `OrderItem` insert. Until #635 this path priced loyalty and the gift
   cards after the lines were written; it now takes those locks where §3.1
-  always did. There is no provider call here.
+  always did. There is no provider call here, and the carrier's live
+  price is resolved before the transaction (§3.0).
 - **Not idempotent.** A hosted-payment order (Viva) keeps the cart, so a
   repeat submit creates a second PENDING order that takes its own stock until
   its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a

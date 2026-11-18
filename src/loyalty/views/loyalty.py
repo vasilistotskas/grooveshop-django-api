@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -245,8 +246,13 @@ class LoyaltyViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Cap discount to the products total (excluding shipping/fees)
-        max_discount = order.total_price_items.amount
+        # Points pay for goods, never for shipping or a fee: the cap is
+        # what the goods cost after the order's promotions, as checkout
+        # caps it (``OrderQuoteService.quote``).
+        max_discount = max(
+            order.total_price_items.amount - order.discount_amount.amount,
+            Decimal(0),
+        )
 
         try:
             discount = LoyaltyService.redeem_points(

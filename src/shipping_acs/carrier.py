@@ -341,6 +341,7 @@ class AcsCarrier(ShippingCarrierInterface):
         region_id: str | None = None,
         weight_grams: int | None = None,
         currency: str,
+        cached_only: bool = False,
     ) -> Decimal | None:
         """Optional live quote via ``ACS_Price_Calculation``.
 
@@ -348,6 +349,10 @@ class AcsCarrier(ShippingCarrierInterface):
         of truth when ``ACS_DYNAMIC_PRICING_ENABLED`` is off OR when
         the live API call fails — a transient ACS outage must never
         block checkout.
+
+        ``cached_only`` never calls ACS: it answers from the cache (a
+        price, or the remembered "no live price"), and raises
+        ``ShippingLivePriceUnresolvedError`` when the cache holds neither.
         """
         from core.store_settings import store_setting
 
@@ -359,11 +364,21 @@ class AcsCarrier(ShippingCarrierInterface):
             region_id=region_id,
             currency=currency,
             weight_grams=weight_grams,
+            cached_only=cached_only,
         )
         if quote is None:
             return None
         amount, _currency = quote
         return Decimal(str(amount))
+
+    # How long a live price is trusted, and how long "ACS gave none"
+    # is: a failed call is remembered briefly, so neither a polled
+    # quote nor every order during an ACS outage asks again, and order
+    # creation (which reads the cache alone) can tell "ACS gave no price,
+    # charge the stored rate" from "nobody asked yet".
+    _QUOTE_TTL_SECONDS: ClassVar[int] = 300
+    _NO_QUOTE_TTL_SECONDS: ClassVar[int] = 60
+    _NO_QUOTE: ClassVar[str] = "none"
 
     # ACS minimum chargeable weight per published tariff. Anything
     # below 500g is billed at 500g.
@@ -398,8 +413,15 @@ class AcsCarrier(ShippingCarrierInterface):
         region_id: str | None,
         currency: str,
         weight_grams: int | None = None,
+        cached_only: bool = False,
     ) -> tuple[float, str] | None:
         """Call ACS_Price_Calculation with caching + graceful failure.
+
+        The answer is cached either way: a price for
+        ``_QUOTE_TTL_SECONDS``, a failure (``None``: the stored rate is
+        charged) for ``_NO_QUOTE_TTL_SECONDS``. ``cached_only`` reads
+        that cache and never calls ACS; with no entry it raises
+        ``ShippingLivePriceUnresolvedError``.
 
         Uses ``weight_grams`` bucketed to the ACS billing brackets so
         the customer-shown quote matches what the voucher API will
@@ -410,12 +432,9 @@ class AcsCarrier(ShippingCarrierInterface):
         an admin tariff change propagates without a cache flush.
         """
         from django.core.cache import cache
-        from django.utils import timezone
 
+        from shipping.exceptions import ShippingLivePriceUnresolvedError
         from shipping_acs import config as acs_config
-        from shipping_acs.client import AcsClient
-        from shipping_acs.exceptions import AcsAPIError, AcsConfigError
-        from shipping_acs.services import _kg_from_grams
 
         # ACS_Price_Calculation requires both Origin and Destination
         # station codes. Empty/missing values return
@@ -443,8 +462,33 @@ class AcsCarrier(ShippingCarrierInterface):
             f":{bucketed_grams}:{origin}:{destination}"
         )
         cached = cache.get(cache_key)
+        if cached == cls._NO_QUOTE:
+            return None
         if cached is not None:
             return (float(cached), currency)
+        if cached_only:
+            raise ShippingLivePriceUnresolvedError
+
+        amount = cls._ask_live_quote(origin, destination, bucketed_grams)
+        if amount is None:
+            cache.set(
+                cache_key, cls._NO_QUOTE, timeout=cls._NO_QUOTE_TTL_SECONDS
+            )
+            return None
+        cache.set(cache_key, amount, timeout=cls._QUOTE_TTL_SECONDS)
+        return (amount, currency)
+
+    @classmethod
+    def _ask_live_quote(
+        cls, origin: str, destination: str, bucketed_grams: int
+    ) -> float | None:
+        """One ``ACS_Price_Calculation`` call; ``None`` for any failure
+        (logged), which the caller answers with the stored rate."""
+        from django.utils import timezone
+
+        from shipping_acs.client import AcsClient
+        from shipping_acs.exceptions import AcsAPIError, AcsConfigError
+        from shipping_acs.services import _kg_from_grams
 
         try:
             client = AcsClient()
@@ -519,6 +563,4 @@ class AcsCarrier(ShippingCarrierInterface):
                 amount_raw,
             )
             return None
-
-        cache.set(cache_key, amount, timeout=300)
-        return (amount, currency)
+        return amount

@@ -23,6 +23,7 @@ from order.exceptions import (
     InvalidCouponError,
     InvalidGiftCardError,
     LoyaltyRedemptionError,
+    ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
 from promotion.enum import BenefitType
@@ -246,7 +247,6 @@ class OrderQuoteService:
         ``LoyaltyRedemptionError`` and ``InvalidGiftCardError``.
         """
         from b2b.services import B2BService
-        from shipping.utils import compute_total_weight_grams
 
         promotion = PromotionEngine.evaluate(
             cart, user=user, email=email, lock=lock
@@ -259,13 +259,7 @@ class OrderQuoteService:
 
         items_subtotal = cart.total_price
         currency = items_subtotal.currency
-        # Gifts ride in the parcel: they count for the weight bracket,
-        # the weight cap and the carrier's parcel size.
-        parcel_items = (
-            *((item.product, item.quantity) for item in cart.items.all()),
-            *PromotionEngine.gift_pairs(promotion),
-        )
-        weight_grams = compute_total_weight_grams(parcel_items)
+        parcel_items, weight_grams = cls._parcel(cart, promotion)
         threshold_value = cls.threshold_value(
             items_subtotal, promotion.discount_total
         )
@@ -281,6 +275,9 @@ class OrderQuoteService:
                 weight_grams=weight_grams,
                 items=parcel_items,
                 free=promotion.free_shipping,
+                # Rows are locked: the carrier is not asked. Its live
+                # price was resolved before (``resolve_live_shipping``).
+                cached_only=lock,
             )
         payment_fee = None
         if pay_way is not None:
@@ -297,12 +294,16 @@ class OrderQuoteService:
         if B2BService.suppresses_loyalty(cart):
             loyalty_points = 0
         loyalty_points = cls._redeemable_points(user, loyalty_points)
+        # Points pay for goods, never for shipping or a fee: the most
+        # they take off is what the goods cost after the promotions
+        # (``threshold_value``). ``redeem_points`` at order creation is
+        # given the same cap.
         loyalty_discount = Money(
             cls._loyalty_discount(
                 user,
                 loyalty_points,
                 currency,
-                max_discount=items_subtotal.amount,
+                max_discount=threshold_value.amount,
                 lock=lock,
             ),
             currency,
@@ -337,6 +338,89 @@ class OrderQuoteService:
             gift_cards=gift_cards,
             grand_total=grand_total,
             amount_due=amount_due,
+        )
+
+    @staticmethod
+    def _parcel(cart: Cart, promotion: CartDiscountResult):
+        """What ships and what it weighs: the cart's lines and the gifts
+        the promotions add. Gifts ride in the parcel, so they count for
+        the weight bracket, the weight cap and the carrier's parcel size.
+        """
+        from shipping.utils import compute_total_weight_grams
+
+        parcel_items = (
+            *((item.product, item.quantity) for item in cart.items.all()),
+            *PromotionEngine.gift_pairs(promotion),
+        )
+        return parcel_items, compute_total_weight_grams(parcel_items)
+
+    @staticmethod
+    def _carrier(
+        shipping_kind: str | None,
+        shipping_provider_code: str | None,
+        country_id: str | None,
+        weight_grams: int | None,
+    ) -> tuple[str, str | None]:
+        """The (kind, carrier code) a delivery is priced as.
+
+        An order created without a kind is a home delivery —
+        ``Order.shipping_kind``'s own default, and what
+        ``OrderService._resolve_shipping_provider`` assigns the carrier
+        for — so it is priced as one too. A home delivery that names no
+        carrier takes the active home-delivery carrier for the country,
+        by the helper that assigns the order's carrier, so the price
+        charged and the carrier assigned always agree.
+        """
+        from shipping.enum import ShippingKind
+        from shipping.services import ShippingService
+
+        shipping_kind = shipping_kind or ShippingKind.HOME_DELIVERY.value
+        if (
+            not shipping_provider_code
+            and shipping_kind == ShippingKind.HOME_DELIVERY.value
+        ):
+            shipping_provider_code = (
+                ShippingService.resolve_home_delivery_provider(
+                    country_id, weight_grams
+                )
+            )
+        return shipping_kind, shipping_provider_code
+
+    @classmethod
+    def resolve_live_shipping(
+        cls, cart: Cart, *, user, email: str = "", shipping: ShippingChoice
+    ) -> None:
+        """Have the carrier's live price for this checkout resolved now.
+
+        Order creation calls it BEFORE it locks anything. A carrier call
+        can take seconds (ACS: a 15 s timeout), and under the locks of
+        ``quote(lock=True)`` every checkout that shares the cart, a
+        promotion, the customer or a gift card would wait behind it. So
+        the price is asked for here, with nothing locked, and the answer
+        is cached by the carrier's adapter; the locked quote then prices
+        with ``cached_only`` and never reaches the carrier.
+
+        It resolves the price of the parcel the locked quote will weigh
+        (the gifts of an unlocked promotion evaluation included), whether
+        or not a threshold or a promotion ends up waiving it.
+        """
+        from shipping.services import ShippingService
+
+        _parcel_items, weight_grams = cls._parcel(
+            cart, PromotionEngine.evaluate(cart, user=user, email=email)
+        )
+        kind, provider_code = cls._carrier(
+            shipping.kind,
+            shipping.provider_code,
+            shipping.country_id,
+            weight_grams,
+        )
+        ShippingService.resolve_live_price(
+            provider_code=provider_code,
+            kind=kind,
+            country_code=shipping.country_id,
+            region_id=shipping.region_id,
+            weight_grams=weight_grams,
         )
 
     @staticmethod
@@ -564,6 +648,7 @@ class OrderQuoteService:
         *,
         items: Iterable[tuple[Any, int]] | None = None,
         free: bool = False,
+        cached_only: bool = False,
     ) -> ShippingCharge:
         """The shipping price for a (provider, kind, country) — or 0 when ``free`` —
         and what made it free (``ShippingCharge.waived_by``).
@@ -582,6 +667,11 @@ class OrderQuoteService:
         A combination with no active rate is a genuine error, not a
         gap to paper over with a platform-wide flat price.
 
+        ``cached_only`` is the locked quote of order creation: no
+        carrier is asked, and a live price that was not resolved first
+        (:meth:`resolve_live_shipping`) raises
+        ``ShippingPriceUnresolvedError``.
+
         ``free=True`` is for a free-shipping promotion: the price is
         forced to 0, but availability and the weight cap are STILL
         checked — a promo must never make an unavailable or
@@ -594,39 +684,17 @@ class OrderQuoteService:
         quote endpoints — gets the same field-scoped 400 shape it
         already handles for every other checkout-time rejection.
         """
-        from shipping.enum import ShippingKind
         from shipping.exceptions import (
+            ShippingLivePriceUnresolvedError,
             ShippingParcelTooLargeError,
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
         from shipping.services import ShippingService
 
-        # An order created without a kind is a home delivery —
-        # ``Order.shipping_kind``'s own default, and what
-        # ``OrderService._resolve_shipping_provider`` assigns the carrier
-        # for — so it is priced as one too.
-        shipping_kind = shipping_kind or ShippingKind.HOME_DELIVERY.value
-
-        # Auto-resolve ``home_delivery`` to the active home-delivery
-        # provider's code when the caller didn't supply one — mirrors
-        # what ``OrderService._resolve_shipping_provider`` does for the
-        # order FK (same helper, single source of truth) so the cost calc and
-        # the assigned carrier always agree. Without this, a
-        # ``home_delivery`` cart with no explicit provider_code (the
-        # storefront sends ``null`` per
-        # ``shared/shipping/index.ts::carrierForMethod`` — home
-        # delivery is provider-agnostic at the form level) would never
-        # resolve a rate, and ``OrderService._resolve_shipping_provider``
-        # would still set the order's FK to a real carrier — a silent
-        # disagreement between the carrier the customer was promised
-        # and the price they paid.
-        if not shipping_provider_code and shipping_kind == "home_delivery":
-            shipping_provider_code = (
-                ShippingService.resolve_home_delivery_provider(
-                    country_id, weight_grams
-                )
-            )
+        shipping_kind, shipping_provider_code = cls._carrier(
+            shipping_kind, shipping_provider_code, country_id, weight_grams
+        )
 
         try:
             return ShippingService.quote(
@@ -638,7 +706,10 @@ class OrderQuoteService:
                 items=items,
                 order_value=order_value,
                 free=free,
+                cached_only=cached_only,
             )
+        except ShippingLivePriceUnresolvedError as exc:
+            raise ShippingPriceUnresolvedError from exc
         except ShippingUnavailableError as exc:
             raise ShippingRefusedError(
                 ShippingRefusal.UNAVAILABLE,
@@ -715,10 +786,13 @@ class OrderQuoteService:
     def _fee_waived(pay_way, order_value: Money) -> bool:
         """Whether ``order_value`` reaches the free-above threshold of a
         pay way that has a fee."""
+        # Same currency only, as the fee itself: a threshold in another
+        # currency is another sum, not this number.
         return bool(
             pay_way.cost
             and pay_way.free_threshold
             and pay_way.free_threshold.amount > 0
+            and pay_way.free_threshold.currency == order_value.currency
             and order_value.amount >= pay_way.free_threshold.amount
         )
 
@@ -757,17 +831,6 @@ class OrderQuoteService:
         """Every pay way a shopper is offered for ``shipping`` (all of
         them while no delivery is chosen), each with the fee ``quote``'s
         cart would be charged for choosing it."""
-        from pay_way.models import PayWay
-        from pay_way.services import PayWayService
-
-        offered = PayWayService.shopper_facing(PayWay.objects.all())
-        if shipping is not None:
-            offered = PayWayService.filter_for_shipping(
-                offered,
-                provider_code=shipping.provider_code,
-                shipping_kind=shipping.kind,
-                country_code=shipping.country_id,
-            )
         value = quote.free_threshold_value
         return [
             {
@@ -776,5 +839,28 @@ class OrderQuoteService:
                 "fee": cls.calculate_payment_method_fee(pay_way, value).amount,
                 "waived": cls._fee_waived(pay_way, value),
             }
-            for pay_way in offered.order_by("sort_order", "id")
+            for pay_way in cls.offered_pay_ways(shipping).order_by(
+                "sort_order", "id"
+            )
         ]
+
+    @staticmethod
+    def offered_pay_ways(shipping: ShippingChoice | None):
+        """The pay ways a shopper is offered for ``shipping``: active,
+        through a provider the store can charge with, and not excluded
+        for the chosen delivery (all of the first two while none is
+        chosen). The one rule behind both the list a quote returns and
+        the pay way a quote or a payment intent accepts, so a selection
+        is accepted exactly when it is listed."""
+        from pay_way.models import PayWay
+        from pay_way.services import PayWayService
+
+        offered = PayWayService.shopper_facing(PayWay.objects.all())
+        if shipping is None:
+            return offered
+        return PayWayService.filter_for_shipping(
+            offered,
+            provider_code=shipping.provider_code,
+            shipping_kind=shipping.kind,
+            country_code=shipping.country_id,
+        )

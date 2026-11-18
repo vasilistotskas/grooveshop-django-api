@@ -168,15 +168,15 @@ def test_the_preview_and_both_creation_paths_agree(products, discount, free):
     fee = Decimal(0) if free else FEE
     items = Decimal(products) - Decimal(discount or 0)
 
-    quote = _quote(user, cart, pay_way, address)
-    assert Decimal(str(quote["amountDue"])) == items + shipping + fee
-    assert Decimal(str(quote["freeThresholdValue"])) == items
-    assert Decimal(str(quote["shipping"]["price"])) == shipping
-    assert quote["shipping"]["waivedBy"] == ("threshold" if free else None)
-    assert Decimal(str(quote["paymentMethodFee"]["amount"])) == fee
-    assert quote["paymentMethodFee"]["waived"] is free
-
     with fake_stripe():
+        quote = _quote(user, cart, pay_way, address)
+        assert Decimal(str(quote["amountDue"])) == items + shipping + fee
+        assert Decimal(str(quote["freeThresholdValue"])) == items
+        assert Decimal(str(quote["shipping"]["price"])) == shipping
+        assert quote["shipping"]["waivedBy"] == ("threshold" if free else None)
+        assert Decimal(str(quote["paymentMethodFee"]["amount"])) == fee
+        assert quote["paymentMethodFee"]["waived"] is free
+
         amount, intent_id = _preview(user, cart, pay_way, address)
         assert amount == Decimal(str(quote["amountDue"]))
 

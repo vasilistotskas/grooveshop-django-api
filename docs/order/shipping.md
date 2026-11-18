@@ -95,8 +95,11 @@ accepting Cyprus orders at the Greek flat rate.
   `OrderQuoteService.quote` passes it to `shipping_cost` and
   `calculate_payment_method_fee`, and both order-creation paths, the
   cart's create-payment-intent and `POST /cart/quote` price through that
-  one function ([§3.0](creation.md)), so the quote, the intent and the
-  order cannot disagree. The cart response
+  one function ([§3.0](creation.md)), so they agree for the same pricing
+  inputs. The inputs can change between two requests (a price, a
+  promotion, a rate), and then the later total differs: a client that
+  must know sends the quote's `expectedTotal` with the order, which is
+  then created only at that total. The cart response
   reports it as `freeThresholdValue`, and `/shipping/options` takes it as
   `orderValueAmount`; a client shows "X more for free" from that number,
   never from `totalPrice`. (Before, the fee compared items + shipping and
@@ -106,11 +109,19 @@ accepting Cyprus orders at the Greek flat rate.
   returns a `ShippingCharge`: the price, and `waived_by` when a rule took
   a real price to 0 (`promotion` for `free=True`, a free-shipping
   promotion, which still runs the gate; `threshold` for the rate's own).
+  A rate whose own price is 0 has nothing to waive, so its `waived_by`
+  stays unset. `cached_only=True` (order creation, under its locks) never
+  asks a carrier: it reads what `resolve_live_price` had the adapter
+  resolve before the locks, and raises
+  `ShippingLivePriceUnresolvedError` when the adapter holds no answer.
   The order is: the promotion, then
   the rate's own `free_shipping_threshold`, then the carrier's
   `live_quote()` hook (ACS's weight-banded `ACS_Price_Calculation`,
   gated on `ACS_DYNAMIC_PRICING_ENABLED`; every other carrier returns
-  `None` and the rate's stored `price` wins), and is
+  `None` and the rate's stored `price` wins; ACS caches its answer per
+  country, region and weight bracket: a price for five minutes, a
+  failed call for one, during which the stored rate is charged and ACS
+  is not asked again), and is
   `OrderQuoteService.shipping_cost`'s only pricing path — no generic
   fallback survives it.
 - **`ShippingCarrierInterface.live_quote(rate, country_code, region_id,

@@ -471,8 +471,23 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         """True for a receipt with movement indication whose parcel has not
         left yet: it is not handed to the customer before it does, so an
         order canceled meanwhile can have it canceled in myDATA, which
-        AADE allows only for a document never used (Α.1138/2020 annex)."""
-        return bool(self.movement) and self.order.shipped_at is None
+        AADE allows only for a document never used (Α.1138/2020 annex).
+
+        An order canceled before the parcel left waits while its receipt
+        is set aside (``cancel_requested_at``); once the receipt stands (the
+        courier could not stop the parcel, AADE refused the cancel) it no
+        longer waits, and reaches the customer with its credit."""
+        from order.enum.status import OrderStatus
+
+        order = self.order
+        return (
+            bool(self.movement)
+            and order.shipped_at is None
+            and (
+                order.status != OrderStatus.CANCELED
+                or self.cancel_requested_at is not None
+            )
+        )
 
     def is_deliverable(self) -> bool:
         """True when the receipt may reach the customer: AADE registered it

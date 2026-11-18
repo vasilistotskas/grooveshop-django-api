@@ -13,7 +13,11 @@ from djstripe.models import Event
 from agent.outbox import record_order_changed
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
-from order.accounting.invoicing import hold_receipt_for_cancel, receipt_issuable
+from order.accounting.invoicing import (
+    PRE_SHIPMENT_STATUSES,
+    hold_receipt_for_cancel,
+    receipt_issuable,
+)
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.communications.notifications import (
     notify_order_created_live,
@@ -53,6 +57,7 @@ from order.signals import (
     order_delivered,
     order_paid,
     order_refunded,
+    order_shipment_cancel_answered,
     order_shipment_dispatched,
     order_shipped,
     order_status_changed,
@@ -62,6 +67,7 @@ from order.signals import (
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
+    issue_receipt_for_pickup,
     send_admin_new_order_email,
     send_dispute_notification_email,
     send_invoice_email,
@@ -561,6 +567,40 @@ def handle_order_shipped(
         .exists()
     ):
         dispatch_on_commit(send_invoice_email, [order.id])
+
+
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.issue_receipt_when_the_shipment_is_live",
+)
+def issue_receipt_when_the_shipment_is_live(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """A carrier's voucher or parcel was recorded on the order: its
+    receipt, with movement indication, is issued now, before the pickup.
+
+    Every path that makes a shipment live records it through
+    ``Order.add_tracking_info`` (an ACS voucher minted or adopted, a BOX NOW
+    parcel created, taken over or settled), whose first tracking number
+    sends this signal, so none of them can skip the receipt.
+    """
+    if order.status in PRE_SHIPMENT_STATUSES and receipt_issuable(order):
+        issue_receipt_for_pickup(order.id)
+
+
+@receiver(
+    order_shipment_cancel_answered,
+    dispatch_uid="order.settle_receipt_once_the_courier_answered",
+)
+def settle_receipt_once_the_courier_answered(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """The courier answered the shipment cancel of a canceled order: its
+    receipt set aside for cancel is settled now (``settle_canceled_receipt``)."""
+    if Invoice.objects.filter(
+        order_id=order.id, cancel_requested_at__isnull=False
+    ).exists():
+        dispatch_on_commit(settle_canceled_receipt, [order.id])
 
 
 @receiver(order_canceled, dispatch_uid="order.hold_receipt_of_canceled_order")

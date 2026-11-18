@@ -55,7 +55,7 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from order.accounting import credit_allocation
-from order.accounting.movement import ReceiptMovement
+from order.accounting.movement import ReceiptMovement, movement_receipts_on
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.accounting.taxation import breakdown_by_rate, order_vat_lines
 from order.checkout.discounts import order_discount_total
@@ -105,7 +105,8 @@ def receipt_issuable(order: Order) -> bool:
     receipt order (an invoice order never gets one) whose goods have
     shipped, or whose parcel waits for its carrier: a courier or locker
     sale's receipt is issued with movement indication before the movement
-    starts (``order.accounting.movement``), once nothing is owed online."""
+    starts (``order.accounting.movement``), once nothing is owed online
+    and the store has set its dispatch point (``movement_receipts_on``)."""
     if order.document_type != OrderDocumentTypeEnum.RECEIPT.value:
         return False
     if order.status in RECEIPT_ISSUING_STATUSES:
@@ -113,7 +114,7 @@ def receipt_issuable(order: Order) -> bool:
     return (
         order.status in PRE_SHIPMENT_STATUSES
         and not order.awaits_online_payment
-        and ShippingService.moves_by_carrier(order)
+        and movement_receipts_on(order)
     )
 
 
@@ -132,6 +133,10 @@ def hold_receipt_for_cancel(order: Order) -> bool:
     answered the cancel: canceled in myDATA, or released to the credit
     path when the courier may hold the parcel. Returns whether a receipt
     was set aside.
+
+    A receipt that already has a credit document (money returned before
+    the pickup) was used: it is never canceled, and the rest of it goes the
+    credit path like any other refund.
     """
     if (
         order.shipped_at is not None
@@ -146,6 +151,11 @@ def hold_receipt_for_cancel(order: Order) -> bool:
         )
         .exclude(
             mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
+        .exclude(
+            pk__in=RetailCredit.objects.filter(order_id=order.pk).values(
+                "invoice_id"
+            )
         )
         .update(cancel_requested_at=now, updated_at=now)
     )

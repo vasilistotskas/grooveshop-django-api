@@ -141,13 +141,23 @@ def _doc(xml_bytes: bytes) -> SimpleNamespace:
 
 class FakeAade:
     """AADE's ERP endpoints: every ``SendInvoices`` is answered with a
-    Success and the next MARK, every ``CancelInvoice`` with a
-    cancellation MARK."""
+    Success and the next MARK, every ``CancelInvoice`` with a cancellation
+    MARK (a second cancel of one document with AADE's refusal), and
+    ``RequestTransmittedDocs`` lists the cancellations it holds.
 
-    def __init__(self, *, over_credit_error: bool = False):
+    ``lose_cancel_answers=True`` registers each cancel and then loses the
+    answer (a ``MyDataTransportError``), as a dropped connection does.
+    """
+
+    def __init__(self, *, lose_cancel_answers: bool = False):
         self.sent: list[SimpleNamespace] = []
         self.marks: list[int] = []
         self.cancelled: list[int] = []
+        self.cancellations: dict[int, int] = {}
+        #: Documents AADE registered whose answer we never read, by uid:
+        #: listed by ``RequestTransmittedDocs``.
+        self.registered: dict[str, int] = {}
+        self.lose_cancel_answers = lose_cancel_answers
         self._next = FIRST_MARK
         self._patches = [
             mock.patch(
@@ -157,6 +167,11 @@ class FakeAade:
             mock.patch(
                 "order.accounting.mydata.client.MyDataClient.cancel_invoice",
                 side_effect=self._cancel,
+            ),
+            mock.patch(
+                "order.accounting.mydata.client.MyDataClient."
+                "request_transmitted_docs",
+                side_effect=self._transmitted,
             ),
         ]
 
@@ -183,12 +198,48 @@ class FakeAade:
         ).encode()
 
     def _cancel(self, mark: int, entity_vat_number: str | None = None) -> bytes:
+        from order.accounting.mydata.exceptions import MyDataTransportError
+
+        if mark in self.cancellations:
+            return (
+                '<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+                "<index>1</index><statusCode>ValidationError</statusCode>"
+                "<errors><error><message>Invoice with MARK "
+                f"{mark} cannot be cancelled</message><code>279</code>"
+                "</error></errors></response></ResponseDoc>"
+            ).encode()
         self.cancelled.append(mark)
+        cancellation = 900000000000000 + len(self.cancelled)
+        self.cancellations[mark] = cancellation
+        if self.lose_cancel_answers:
+            raise MyDataTransportError("the answer was lost")
         return (
             '<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
             "<index>1</index><statusCode>Success</statusCode>"
-            f"<cancellationMark>{900000000000000 + len(self.cancelled)}"
+            f"<cancellationMark>{cancellation}"
             "</cancellationMark></response></ResponseDoc>"
+        ).encode()
+
+    def _transmitted(self, *, after_mark: int = 0, **_query) -> bytes:
+        rows = "".join(
+            f"<cancelledInvoice><invoiceMark>{mark}</invoiceMark>"
+            f"<cancellationMark>{cancellation}</cancellationMark>"
+            "<cancellationDate>2026-11-18</cancellationDate>"
+            "</cancelledInvoice>"
+            for mark, cancellation in self.cancellations.items()
+            if mark > after_mark
+        )
+        invoices = "".join(
+            f"<invoice><uid>{uid}</uid><mark>{mark}</mark></invoice>"
+            for uid, mark in self.registered.items()
+            if mark > after_mark
+        )
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">'
+            f"<invoicesDoc>{invoices}</invoicesDoc>"
+            f"<cancelledInvoicesDoc>{rows}</cancelledInvoicesDoc>"
+            "</RequestedDoc>"
         ).encode()
 
     @property

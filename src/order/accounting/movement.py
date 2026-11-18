@@ -15,10 +15,11 @@ Shipping never waits for AADE: a receipt myDATA does not answer for is sent
 with AADE's loss-of-connection indication (``transmissionFailure`` 3,
 ``Invoice.transmission_failed_at``) and transmitted again when it answers.
 
-The block is decided when the receipt is sent and stored on the row
-(``Invoice.movement``), so the registered PDF prints what AADE received. A
-resubmission keeps it while its dispatch date can still be sent: AADE
-refuses a ``dispatchDate`` before the current date (error 280).
+The block is decided when the receipt is first sent and stored on the row
+(``Invoice.movement``), so the registered PDF prints what AADE received,
+and a resubmission sends the document as issued (``receipt_movement``).
+It applies only once the store has set its dispatch point
+(``movement_receipts_on``).
 """
 
 from __future__ import annotations
@@ -66,10 +67,14 @@ def validate_loading_postal_code_setting(value: object) -> bool:
     )
 
 
-def loading_address() -> PostalAddress:
-    """The store's dispatch point. Raises ``ValueError`` naming the
-    settings when the postcode or the city, which AADE requires, is
-    blank."""
+def loading_address() -> PostalAddress | None:
+    """The store's dispatch point, or ``None`` while the postcode or the
+    city, which AADE requires, is blank.
+
+    A store without one keeps the plain receipt at SHIPPED for every order
+    (``movement_receipts_on``), so setting up the platform never turns a
+    courier order's receipt into a refusal; the dashboard asks for it.
+    """
     values = store_settings(LOADING_ADDRESS_SETTINGS.values())
     address = PostalAddress(
         **{
@@ -78,12 +83,18 @@ def loading_address() -> PostalAddress:
         }
     )
     if not (address.postal_code and address.city):
-        raise ValueError(
-            "The store's dispatch point is not set: fill in "
-            "MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the "
-            "street) before a courier order's receipt can be sent."
-        )
+        return None
     return address
+
+
+def movement_receipts_on(order: Any) -> bool:
+    """Whether *order*'s receipt carries the movement and is issued before
+    the pickup: a carrier takes the parcel and the store has its dispatch
+    point set."""
+    return (
+        ShippingService.moves_by_carrier(order)
+        and loading_address() is not None
+    )
 
 
 @dataclass(frozen=True)
@@ -131,25 +142,34 @@ def _planned_dispatch(order: Any) -> tuple[date, time | None]:
 
 
 def receipt_movement(invoice: Any) -> ReceiptMovement | None:
-    """The movement block of *invoice*'s receipt, or ``None`` for an order
-    that does not move through a carrier (the merchant's own delivery keeps
-    a plain receipt).
+    """The movement block of *invoice*'s receipt, or ``None`` for a plain
+    receipt: the order does not move through a carrier (the merchant's own
+    delivery), or the store has not set its dispatch point.
 
-    Raises ``ValueError`` when an address AADE requires is unknown: the
-    store's dispatch point, or the pickup point's.
+    A block already sent is the document as issued and is sent again as it
+    is, its dispatch date included, unless AADE refused it: a send that
+    went unanswered may have been registered. AADE's documentation says
+    nothing of error 280 (a ``dispatchDate`` before the current date) for a
+    document sent with ``transmissionFailure``, so a receipt issued during
+    an outage keeps the date it was issued with.
+
+    Raises ``ValueError`` when the pickup point's address is not known.
     """
+    from order.models.invoice import MyDataStatus
+
+    if invoice.movement and invoice.mydata_status != MyDataStatus.REJECTED:
+        return ReceiptMovement.from_json(invoice.movement)
     order = invoice.order
+    loading = loading_address()
+    if loading is None:
+        return None
     delivery = ShippingService.delivery_address(order)
     if delivery is None:
         return None
-    if invoice.movement:
-        stored = ReceiptMovement.from_json(invoice.movement)
-        if stored.dispatch_date >= timezone.localdate():
-            return stored
     planned_date, planned_time = _planned_dispatch(order)
     return ReceiptMovement(
         dispatch_date=planned_date,
         dispatch_time=planned_time,
-        loading=loading_address(),
+        loading=loading,
         delivery=delivery,
     )

@@ -107,6 +107,7 @@ from order.payments.payment_ledger import (
 from order.refunds.refund_lines import plan_pieces
 from order.signals import (
     order_refunded,
+    order_shipment_cancel_answered,
     order_stored_value_returned,
     order_stripe_payment_polled,
 )
@@ -5144,6 +5145,9 @@ class OrderService:
                 metadata.pop(SHIPMENT_CANCEL_UNANSWERED_KEY, None)
                 Order.objects.filter(pk=order.pk).update(metadata=metadata)
         order.metadata = metadata
+        if recorded:
+            # Once the answer is written: nothing a receiver does can undo it.
+            order_shipment_cancel_answered.send(sender=Order, order=order)
         return recorded
 
     @classmethod

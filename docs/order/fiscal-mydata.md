@@ -123,16 +123,20 @@ The 228 duplicate-uid MARK recovery through `RequestTransmittedDocs` is
 unchanged.
 
 **A courier or locker sale's receipt carries the movement and is issued when
-its voucher or parcel is created, before the pickup (#747).** Α.1123/2024
+its voucher or parcel is recorded, before the pickup (#747).** Α.1123/2024
 Annex ΙΙ §7.3, as replaced by Α.1233/2026 (ΦΕΚ Β' 6576/30-10-2026), makes the
 receipt «με ένδειξη διακίνησης αποθεμάτων» mandatory for goods delivered to
 the consumer through a postal or courier entity unless the receipt is on the
 parcel where it can be seen, or the carrier can show it at once; Α.1122/2024
 art. 3(1) has it transmitted «πριν την έναρξη διακίνησης». Neither exemption
 holds for an ACS or BOX NOW parcel. All of this applies only to a store whose
-receipts the platform issues (`MyDataConfig.is_ready`, the one gate above); a
-store that issues them in its own ΦΗΜ or provider sees no change at all. For
-an order whose carrier keeps a shipment of its own
+receipts the platform issues (`MyDataConfig.is_ready`, the one gate above)
+and that has set its dispatch point (`movement.movement_receipts_on`: the
+`MYDATA_LOADING_STREET` / `_NUMBER` / `_POSTAL_CODE` / `_CITY` settings,
+postcode and city required). A store that issues in its own ΦΗΜ or provider
+sees no change at all; one without a dispatch point keeps the plain receipt
+at SHIPPED, and its dashboard (when ACS or BOX NOW is active) asks for the
+dispatch point. For an order whose carrier keeps a shipment of its own
 (`ShippingService.moves_by_carrier`):
 
 - **The document** (`src/order/accounting/movement.py`, the builder's
@@ -140,12 +144,10 @@ an order whose carrier keeps a shipment of its own
   (the order's dispatch day from `shipping.delivery.dispatch_date`, at
   `DISPATCH_CUTOFF`; today for a receipt issued after the parcel left, since
   AADE refuses a past `dispatchDate`, error 280), `movePurpose` 1 «Πώληση»,
-  `otherDeliveryNoteHeader` (`loadingAddress`: the store's dispatch point,
-  the `MYDATA_LOADING_STREET` / `_NUMBER` / `_POSTAL_CODE` / `_CITY`
-  settings, postcode and city required; `deliveryAddress`: the ACS station's
-  or the BOX NOW locker's address for a pickup order,
-  `ShippingCarrierInterface.pickup_point_address`, BOX NOW's city being its
-  `addressLine2`, otherwise the order's shipping address) and
+  `otherDeliveryNoteHeader` (`loadingAddress`: the dispatch point;
+  `deliveryAddress`: the ACS station's or the BOX NOW locker's address for a
+  pickup order, `ShippingCarrierInterface.pickup_point_address`, BOX NOW's
+  city being its `addressLine2`, otherwise the order's shipping address) and
   `isDeliveryNote` true; every goods line carries its `quantity` and
   `measurementUnit` 1 «Τεμάχια» (shipping and the fee carry none; a receipt
   netted by an earlier refund, one line per rate, carries none either). No
@@ -153,19 +155,26 @@ an order whose carrier keeps a shipment of its own
   only of an entity of ν.4308/2014 art. 1, and AADE refuses the name of a
   Greek counterpart (error 220); the buyer's name and address are printed on
   the receipt, with a "Movement of goods" box (purpose, start, loading and
-  delivery place, unit). The block is decided when the receipt is sent and
-  stored on the row (`Invoice.movement`) with its identity fields, so the
-  PDF registered after it prints what AADE received; a resubmission keeps it
-  while its dispatch date is not past.
+  delivery place, unit). The block is decided when the receipt is first sent
+  and stored on the row (`Invoice.movement`) with its identity fields: the
+  PDF registered after it prints what AADE received, and a resubmission
+  sends the document as issued, its dispatch date included, unless AADE
+  refused it (nothing was registered). AADE's documentation says nothing of
+  error 280 for a `transmissionFailure` document, so one issued during an
+  outage keeps its date. Every payload is checked against AADE's v2.0.2 XSDs,
+  vendored in `src/order/accounting/mydata/xsd/`, before it is sent.
 - **When it is issued.** The order is issuable before it ships
-  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online). Each
-  carrier's creation task, once the voucher or parcel exists
-  (`create_acs_voucher_for_order`, `create_boxnow_shipment_for_order`),
-  calls `order.tasks.issue_receipt_for_pickup`, which queues
-  `generate_order_invoice` while `issues_automatically()`. A store that
-  issues by hand issues it from the order ("Issue receipt (myDATA)") before
-  handing the parcel over. **Shipping never waits for myDATA**: the voucher,
-  the pickup list and the handover go ahead whatever AADE answers.
+  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online). Every
+  path that makes a shipment live records it through `Order.add_tracking_info`
+  (an ACS voucher minted or adopted, a BOX NOW parcel created, taken over
+  after P410 or settled), and the order's first tracking number sends
+  `order_shipment_dispatched`, whose receiver
+  (`issue_receipt_when_the_shipment_is_live`) calls
+  `order.tasks.issue_receipt_for_pickup`: `generate_order_invoice` is queued
+  while `issues_automatically()`. A store that issues by hand issues it from
+  the order ("Issue receipt (myDATA)") before handing the parcel over.
+  **Shipping never waits for myDATA**: the voucher, the pickup list and the
+  handover go ahead whatever AADE answers.
 - **When myDATA does not answer** (a transport error or AADE's
   `TechnicalError`). AADE's loss-of-connection procedure: Α.1233/2026 annex
   §12.1 has a movement document issued during the loss «με διακριτή ένδειξη
@@ -175,14 +184,16 @@ an order whose carrier keeps a shipment of its own
   `Invoice.transmission_failed_at`, and every later transmission carries
   `transmissionFailure` 3, «Απώλεια διασύνδεσης», the one value of that
   element (`xs:byte` 1-4 in the v2.0.2 XSD) the REST API documentation
-  allows an ERP to send (1, 2 and 4 are a licensed provider's). The task
-  retries as before, and `order.tasks.retry_receipts_with_mydata`
-  (beat `retry-receipts-with-mydata`, every 5 minutes, per store) sends
-  every such receipt not touched for `MYDATA_RETRY_AFTER_MINUTES` (15)
-  again, up to `MYDATA_RETRY_SWEEP_BATCH` per run, until it is registered; a send that overlaps a late retry is answered by AADE's
-  duplicate-uid check (228) and its MARK recovered. Staff see one warning on
-  the dashboard ("Receipts issued while myDATA was unreachable", with the
-  count) and need do nothing.
+  allows an ERP to send (1, 2 and 4 are a licensed provider's). Before such
+  a receipt is sent again its MARK is looked up (`RequestTransmittedDocs` by
+  its uid, the 228 recovery), since the unanswered send may have been
+  registered. The task retries as before, and
+  `order.tasks.retry_receipts_with_mydata` (beat
+  `retry-receipts-with-mydata`, every 5 minutes, every store suspended or
+  not) sends every such receipt not touched for `MYDATA_RETRY_AFTER_MINUTES`
+  (15) again, up to `MYDATA_RETRY_SWEEP_BATCH` per run, until it is
+  registered. Staff see one warning on the dashboard ("Receipts issued while
+  myDATA was unreachable", with the count) and need do nothing.
 - **It reaches the customer with the parcel.** A receipt with movement is
   not emailed nor offered for download before its parcel leaves
   (`Invoice.awaits_the_parcel`, in `is_deliverable`): `send_invoice_to_mydata`
@@ -194,8 +205,8 @@ an order whose carrier keeps a shipment of its own
   receipt is REJECTED with AADE's code and message on the row and in an
   order note, and counted on the dashboard ("Receipts rejected by myDATA");
   the parcel ships. Staff fix the data and press "Send receipt to myDATA". A
-  missing dispatch point or pickup-point address is refused before sending
-  (BUILD), and the dashboard says when the dispatch point is not set.
+  pickup point whose address is not known is refused before sending
+  (BUILD).
 - **The QR on the parcel.** The registered receipt PDF carries AADE's QR
   (`mydata_qr_url`, the `qrUrl` of the response; empty after a 228
   recovery, which reads no URL). Printing it with the parcel is what §7.3
@@ -207,25 +218,42 @@ an order whose carrier keeps a shipment of its own
   handed to the customer, the one case `CancelInvoice` is lawful for (the
   "never used" rule below; AADE's annex §13 lets only a movement document
   *without* value be canceled merely because the movement had not started,
-  so the 11.1 rests on that rule). The `order_canceled` receiver
-  (`hold_receipt_of_canceled_order`) sets the receipt aside in the cancel's
-  own transaction (`invoicing.hold_receipt_for_cancel`:
-  `Invoice.cancel_requested_at`, for a carrier order that has not shipped,
-  only while the platform issues the store's receipts), so no credit is
-  created for it meanwhile (`create_pending_credits` waits).
-  `order.tasks.settle_canceled_receipt` then reads the courier's answer the
-  cancel paths record (`metadata['cancellation']['shipment_cancel']`,
-  [§7.1](cancel.md)): stopped, or no parcel to stop, cancels the receipt in
-  myDATA (`cancel_document`, an order note with the cancellation MARK) and
-  no credit follows; a refusal, or a courier that never answered, means the
-  parcel may be on its way, so the receipt is released to the credit path
-  as before. It runs when the cancel commits (a customer cancel already
-  holds the answer), after `finish_pending_shipment_cancels` records one,
-  and from `retry_receipts_with_mydata`; no answer from myDATA is retried
-  there, a refusal is noted with AADE's reason and the receipt is credited
-  instead. A receipt still unregistered (issued while myDATA was down) is
-  sent first and canceled on a later run. Nothing about the cancel or the
-  refund waits for it.
+  so the 11.1 rests on that rule).
+  - **Set aside.** The `order_canceled` receiver
+    (`hold_receipt_of_canceled_order`) sets the receipt aside in the
+    cancel's own transaction (`invoicing.hold_receipt_for_cancel`:
+    `Invoice.cancel_requested_at`, for a carrier order that has not shipped,
+    only while the platform issues the store's receipts), so no credit is
+    created for it meanwhile (`create_pending_credits` waits). A receipt
+    that already has a credit document (money went back before the pickup)
+    was used: it is never set aside, and the rest of it goes the credit
+    path.
+  - **Decided by the courier's answer** the cancel paths record
+    (`metadata['cancellation']['shipment_cancel']`, [§7.1](cancel.md)):
+    `order.tasks.settle_canceled_receipt` runs when the cancel commits (a
+    customer cancel already holds the answer), whenever an answer is
+    recorded later (`_record_shipment_cancel` sends
+    `order_shipment_cancel_answered`: the staff cancel's own ask and
+    `finish_pending_shipment_cancels`), and from
+    `retry_receipts_with_mydata`. It reads the state under the order's and
+    the receipt's row locks. Stopped, or no parcel to stop: the receipt is
+    canceled in myDATA (`cancel_document`, an order note with the
+    cancellation MARK) and no credit follows. A refusal, or a courier that
+    never answered: the parcel may be on its way, so the receipt stands,
+    reaches the customer, and goes the credit path as before.
+  - **myDATA's answers.** Only AADE refusing the cancel
+    (`MyDataValidationError`) sends the receipt the credit path too, with the
+    reason in an order note. Credentials AADE refuses keep it set aside with
+    a note for staff; no answer is retried (`autoretry_for` the transient
+    network set, which `MyDataTransportError`, a `ConnectionError`, is in),
+    then by the sweep. Before any receipt goes the credit path, AADE is
+    asked whether it already holds a cancellation of it
+    (`service.find_cancellation_mark`: `RequestTransmittedDocs` after its
+    MARK, the document's `cancelledByMark` or `cancelledInvoicesDoc`), so a
+    cancel whose answer was lost is recorded as such and never ends as a
+    cancellation and a credit. A receipt still unregistered (issued while
+    myDATA was down) is sent first and canceled on a later run. Nothing about
+    the cancel or the refund waits for it.
 - **What stays.** An order no carrier takes keeps the plain receipt at
   SHIPPED, and SHIPPED issues nothing twice (`generate_invoice` returns the
   existing row). An order canceled after its parcel left, or whose goods

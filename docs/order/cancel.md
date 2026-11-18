@@ -132,15 +132,19 @@ created and handed to the customer only when the parcel leaves. So every
 cancel path above (customer, staff, the auto-cancel sweep, ACS's dead
 shipment) reaches `order_canceled`, whose receiver sets that receipt aside in
 the cancel's own transaction (`Invoice.cancel_requested_at`); no credit is
-issued for it meanwhile. Once the courier's answer is recorded (step 0 for a
-customer, step 4 or `finish_pending_shipment_cancels` otherwise),
-`order.tasks.settle_canceled_receipt` cancels the receipt in myDATA when the
-courier stopped the parcel or there was none, and releases it to the refund
-and credit path when the courier refused or never answered, since the goods
-may be moving. myDATA's silence is retried by `retry_receipts_with_mydata`,
-its refusal is noted with AADE's reason and the receipt is credited instead;
-the cancel and the refund never wait for either. Detail:
-[§7.4](fiscal-mydata.md).
+issued for it meanwhile; a receipt that already has a credit document (money
+went back before the pickup) is not set aside and is credited for the rest.
+Once the courier's answer is recorded (step 0 for a customer; step 4 or
+`finish_pending_shipment_cancels` otherwise, where `_record_shipment_cancel`
+sends `order_shipment_cancel_answered`), `order.tasks.settle_canceled_receipt`
+cancels the receipt in myDATA when the courier stopped the parcel or there was
+none, and releases it to the refund and credit path, and to the customer, when
+the courier refused or never answered, since the goods may be moving.
+myDATA's silence keeps it set aside and is retried by
+`retry_receipts_with_mydata`; only AADE's refusal sends it the credit path,
+with the reason in an order note, and only after AADE confirmed it holds no
+cancellation of it already. The cancel and the refund never wait for either.
+Detail: [§7.4](fiscal-mydata.md).
 
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record

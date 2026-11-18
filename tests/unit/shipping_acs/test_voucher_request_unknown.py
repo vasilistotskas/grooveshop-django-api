@@ -441,6 +441,28 @@ class TestAdoptTheVoucherAcsHolds:
             AcsService.adopt_voucher(shipment, V1, user=None)
 
 
+class TestAnAdoptedVoucherGetsItsReceipt:
+    def test_adopting_issues_the_receipt_before_the_pickup(
+        self, acs, sent, django_capture_on_commit_callbacks
+    ):
+        """An adopted voucher is a live shipment like a minted one: the
+        order's first tracking number issues its receipt (#747)."""
+        shipment = _unknown_shipment(acs)
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(shipment.order),
+        }
+
+        with (
+            patch("order.signals.handlers.receipt_issuable", return_value=True),
+            patch("order.signals.handlers.issue_receipt_for_pickup") as issue,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        issue.assert_called_once_with(shipment.order_id)
+
+
 class TestAdoptConfirmsTheVoucherIsThisOrders:
     """Review of #626, finding 2."""
 

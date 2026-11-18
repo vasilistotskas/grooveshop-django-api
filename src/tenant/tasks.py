@@ -301,7 +301,9 @@ def fanout_reap_unclaimed_attachments():
 
 @celery_app.task(base=TenantTask)
 def fanout_retry_receipts_with_mydata():
-    return run_for_all_tenants("order.tasks.retry_receipts_with_mydata")
+    return run_for_all_tenants(
+        "order.tasks.retry_receipts_with_mydata", include_suspended=True
+    )
 
 
 @celery_app.task(base=TenantTask)

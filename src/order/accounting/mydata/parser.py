@@ -202,6 +202,9 @@ class TransmittedDoc:
 
     uid: str
     invoice_mark: int | None
+    #: ``cancelledByMark``: the MARK of the cancellation of this
+    #: document, filled by AADE (``AadeBookInvoiceType``, v2.0.2).
+    cancelled_by_mark: int | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +221,10 @@ class RequestedDocResult:
     docs: list[TransmittedDoc]
     next_partition_key: str | None = None
     next_row_key: str | None = None
+    #: ``cancelledInvoicesDoc``: the MARK of each cancelled document
+    #: mapped to the MARK of its cancellation (``CancelledInvoiceType``:
+    #: ``invoiceMark``, ``cancellationMark``).
+    cancellations: dict[int, int] = field(default_factory=dict)
 
 
 def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
@@ -259,8 +266,23 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
                 TransmittedDoc(
                     uid=_text(invoice_el, "uid") or "",
                     invoice_mark=_int_or_none(_text(invoice_el, "mark")),
+                    cancelled_by_mark=_int_or_none(
+                        _text(invoice_el, "cancelledByMark")
+                    ),
                 )
             )
+
+    cancellations: dict[int, int] = {}
+    for cancelled_doc_el in _iter_children(root, "cancelledInvoicesDoc"):
+        for cancelled_el in _iter_children(
+            cancelled_doc_el, "cancelledInvoice"
+        ):
+            invoice_mark = _int_or_none(_text(cancelled_el, "invoiceMark"))
+            cancellation_mark = _int_or_none(
+                _text(cancelled_el, "cancellationMark")
+            )
+            if invoice_mark is not None and cancellation_mark is not None:
+                cancellations[invoice_mark] = cancellation_mark
 
     # nextPartitionKey / nextRowKey live INSIDE the <continuationToken>
     # wrapper, not as direct children of <RequestedDoc>.
@@ -275,6 +297,7 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
         docs=docs,
         next_partition_key=next_partition_key,
         next_row_key=next_row_key,
+        cancellations=cancellations,
     )
 
 

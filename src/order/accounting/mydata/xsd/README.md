@@ -1,34 +1,23 @@
-# myDATA XSD Schemas
+# myDATA XSD schemas
 
-Drop the official AADE `InvoicesDoc-v1.0.10.xsd` (and any
-transitively-imported schema files) here to enable **local XSD
-pre-validation** of outbound payloads. When this directory is empty,
-`order.accounting.mydata.validator.validate_invoice_doc` is a no-op — AADE
-still validates server-side, so the integration is correct either
-way; pre-validation just gives you faster feedback on master-data
-drift.
+AADE's public myDATA **v2.0.2** schemas (September 2026), as published at
+https://www.aade.gr/mydata/tehnikes-prodiagrafes-ekdoseis-mydata
+(`v2.0.2XSDs.zip`), so that
+`order.accounting.mydata.validator.validate_invoice_doc` checks every
+`InvoicesDoc` before it is sent:
 
-## Where to get the XSDs
+- `InvoicesDoc-v2.0.2.xsd` — the document (`INVOICE_SCHEMA_FILENAME`);
+- `incomeClassification-v2.0.2.xsd`, `expensesClassification-v2.0.2.xsd` —
+  the namespaces it imports;
+- `TransportTypes-v2.0.2.xsd`, `SimpleTypes-v2.0.2.xsd` — the types it
+  includes.
 
-The official schemas are hosted behind auth on the AADE developer
-portal (https://mydata-dev.azure-api.net/). After your subscription
-is approved, download them from the portal and commit them to this
-directory. File names must match the `INVOICE_SCHEMA_FILENAME`
-constant in `order.accounting.mydata.validator`.
+The files are AADE's, unchanged. The rest of the zip (the response, the
+request and the delivery-note methods' schemas) is not used here.
 
-## Versioning
+## A new AADE version
 
-The integration is pinned to **v1.0.10** (AADE pre-official ERP
-documentation, dated Nov 2024). Bumping versions is mechanical:
-
-1. Drop the new XSDs here.
+1. Replace these files with the new version's, under their new names.
 2. Update `INVOICE_SCHEMA_FILENAME` in `order.accounting.mydata.validator`.
-3. Re-run the `tests/unit/order/mydata/` suite — failures pinpoint
-   fields that changed shape.
-
-## Do not commit copyrighted schemas
-
-If your AADE subscription terms forbid redistributing the XSD files,
-leave them out of the repo and populate them at deploy time via
-ConfigMap / Secret. The integration works without them; you just
-lose the local fail-fast check.
+3. Run `tests/unit/order/mydata/`: `test_payloads_match_the_schema.py`
+   builds every document the platform sends and validates it.

@@ -1305,20 +1305,26 @@ class StoreAlerts(DashboardWidget):
                     % {"count": waiting},
                 )
             )
-        try:
-            loading_address()
-        except ValueError:
+        # Only a store whose parcels a carrier integration takes owes a
+        # movement receipt (``order.accounting.movement``).
+        carrier_apps = {"shipping_acs", "shipping_boxnow"}
+        uses_a_carrier = bool(
+            carrier_apps - store_features(self.request).inactive_carrier_apps()
+        )
+        if uses_a_carrier and loading_address() is None:
             alerts.append(
                 _alert(
-                    "danger",
+                    "warning",
                     "local_shipping",
-                    _("Courier receipts cannot be sent: no dispatch point"),
+                    _("Set the dispatch point for courier receipts"),
                     _(
-                        "A courier or locker order's receipt names the place "
-                        "its parcel leaves from, and is refused until it is "
-                        "set. Fill in MYDATA_LOADING_POSTAL_CODE and "
-                        "MYDATA_LOADING_CITY (and the street), then send the "
-                        "refused receipts again from their orders."
+                        "A receipt for a courier or locker order must carry "
+                        "the movement of goods and be issued before the "
+                        "courier collects the parcel. Until the dispatch "
+                        "point is set, receipts are issued when the order "
+                        "ships, without it. Fill in "
+                        "MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY "
+                        "(and the street)."
                     ),
                     link=(
                         self.changelist_url(

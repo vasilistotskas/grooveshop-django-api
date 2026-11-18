@@ -30,10 +30,14 @@ class MyDataError(Exception):
         super().__init__(self.message)
 
 
-class MyDataTransportError(MyDataError):
+class MyDataTransportError(MyDataError, ConnectionError):
     """Transient transport-level failure — network error, timeout,
     5xx, or 429 rate-limit. The Celery task retries these with
-    exponential backoff using the same ``uid`` (AADE dedupes)."""
+    exponential backoff using the same ``uid`` (AADE dedupes).
+
+    A ``ConnectionError``: AADE could not be reached or answered, so a
+    task's ``autoretry_for`` names it through ``core.retry``'s transient
+    network set, like any other service that did not answer."""
 
 
 class MyDataAuthError(MyDataError):

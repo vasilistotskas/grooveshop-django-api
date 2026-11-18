@@ -797,9 +797,6 @@ msgstr "A content page with this slug already exists."
 msgid "A conversion label is letters, digits, '_' and '-' only — the part after the slash in 'AW-…/LABEL', not the whole 'send_to'."
 msgstr "A conversion label is letters, digits, '_' and '-' only — the part after the slash in 'AW-…/LABEL', not the whole 'send_to'."
 
-msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
-msgstr "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
-
 #, python-format
 msgid "A daily billing task walks the estate and notifies the store owner at three points: an expiry warning %(warn)s days before the term ends, an expired notice the day after it lapses, and — %(grace)s days past the term end — suspension. Each stage is sent at most once per term; the expired and suspension notices also copy the platform admins."
 msgstr "A daily billing task walks the estate and notifies the store owner at three points: an expiry warning %(warn)s days before the term ends, an expired notice the day after it lapses, and — %(grace)s days past the term end — suspension. Each stage is sent at most once per term; the expired and suspension notices also copy the platform admins."
@@ -889,6 +886,9 @@ msgstr "A publish can be scheduled at most %(days)s days ahead."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
+
+msgid "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
+msgstr "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
 
 msgid "A refund by lines is worth what its lines are worth: do not give an amount with them."
 msgstr "A refund by lines is worth what its lines are worth: do not give an amount with them."
@@ -3769,9 +3769,6 @@ msgstr "Coupon codes currently attached to this cart"
 
 msgid "Courier could not be reached"
 msgstr "Courier could not be reached"
-
-msgid "Courier receipts cannot be sent: no dispatch point"
-msgstr "Courier receipts cannot be sent: no dispatch point"
 
 msgid "Courier rejected a shipment"
 msgstr "Courier rejected a shipment"
@@ -13263,6 +13260,9 @@ msgstr "Set the Google Ads conversion ID first; a label cannot be sent without i
 msgid "Set the VAT percentage rate (0.0% - 100.0%)"
 msgstr "Set the VAT percentage rate (0.0% - 100.0%)"
 
+msgid "Set the dispatch point for courier receipts"
+msgstr "Set the dispatch point for courier receipts"
+
 msgid "Set this address as the user's main address."
 msgstr "Set this address as the user's main address."
 
@@ -18108,6 +18108,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "%(slot)s navigation"
 #~ msgstr "%(slot)s navigation"
 
+#~ msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
+#~ msgstr "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
+
 #~ msgid "A document has more than one version."
 #~ msgstr "A document has more than one version."
 
@@ -18260,6 +18263,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Contact Panel"
 #~ msgstr "Contact Panel"
+
+#~ msgid "Courier receipts cannot be sent: no dispatch point"
+#~ msgstr "Courier receipts cannot be sent: no dispatch point"
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Critical Stock (1-5)"

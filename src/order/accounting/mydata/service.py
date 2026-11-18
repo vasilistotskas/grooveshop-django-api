@@ -32,6 +32,7 @@ from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
+from xmlschema import XMLSchemaValidationError
 
 from core.store_settings import store_setting
 from order.accounting.movement import receipt_movement
@@ -53,6 +54,10 @@ from order.accounting.mydata.validator import validate_invoice_doc
 from order.models.retail_credit import RetailCredit
 
 logger = logging.getLogger(__name__)
+
+#: A hard ceiling on the pages of one ``RequestTransmittedDocs`` read,
+#: against an endless loop on a bad continuation token.
+_MAX_REQUESTED_PAGES = 20
 
 
 def submit_document(invoice: Any) -> ResponseRow | None:
@@ -78,6 +83,21 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             index=0,
             status_code="Success",
             invoice_uid=invoice.mydata_uid or "",
+            invoice_mark=invoice.mydata_mark,
+        )
+
+    if (
+        getattr(invoice, "transmission_failed_at", None) is not None
+        and invoice.mydata_uid
+        and recover_mark_for_document(invoice)
+    ):
+        # Sent while myDATA did not answer, so it may be registered: its
+        # MARK is looked up before anything is built or sent again, and
+        # the document is kept as it was issued.
+        return ResponseRow(
+            index=0,
+            status_code="Success",
+            invoice_uid=invoice.mydata_uid,
             invoice_mark=invoice.mydata_mark,
         )
 
@@ -120,7 +140,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
 
     try:
         validate_invoice_doc(built.xml_bytes)
-    except Exception as exc:
+    except XMLSchemaValidationError as exc:
         # XSD validation error is terminal: the payload does not
         # match the pinned schema. Fall into the same rejection
         # bucket as a server-side ValidationError so ops can see
@@ -261,6 +281,57 @@ def cancel_document(invoice: Any) -> ResponseRow | None:
     raise MyDataValidationError(message, code=code)
 
 
+def find_cancellation_mark(invoice: Any) -> int | None:
+    """The MARK of the cancellation AADE holds for *invoice*, or ``None``
+    when AADE holds none: what ``RequestTransmittedDocs`` lists after the
+    document's own MARK, either as the document's ``cancelledByMark`` or in
+    ``cancelledInvoicesDoc`` (myDATA REST API v2.0.2, §4.2.7 and §6.2).
+
+    Asked before a canceled order's receipt goes to the credit path, so a
+    cancel whose answer was lost never ends as a cancellation and a
+    credit. Raises ``MyDataTransportError`` when AADE cannot be asked.
+    """
+    config = load_config()
+    issuer_vat = _resolve_issuer_vat()
+    if not (config.is_ready() and issuer_vat and invoice.mydata_mark):
+        raise MyDataTransportError(
+            "myDATA cannot be asked about the document now."
+        )
+    client = MyDataClient(config)
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+    for _ in range(_MAX_REQUESTED_PAGES):
+        result = parse_requested_doc(
+            client.request_transmitted_docs(
+                entity_vat_number=issuer_vat,
+                after_mark=invoice.mydata_mark - 1,
+                next_partition_key=next_partition_key,
+                next_row_key=next_row_key,
+            )
+        )
+        if invoice.mydata_mark in result.cancellations:
+            return result.cancellations[invoice.mydata_mark]
+        for doc in result.docs:
+            if (
+                doc.invoice_mark == invoice.mydata_mark
+                and doc.cancelled_by_mark
+            ):
+                return doc.cancelled_by_mark
+        if result.next_partition_key is None and result.next_row_key is None:
+            return None
+        next_partition_key = result.next_partition_key
+        next_row_key = result.next_row_key
+    raise MyDataTransportError(
+        "myDATA listed more documents than can be read in one go."
+    )
+
+
+def record_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
+    """Record that AADE holds a cancellation of *invoice* (a cancel whose
+    answer was lost, found by :func:`find_cancellation_mark`)."""
+    _persist_cancellation(invoice, cancellation_mark=cancellation_mark)
+
+
 def recover_mark_for_document(invoice: Any) -> bool:
     """Attempt to recover a MARK for an invoice that received error 228.
 
@@ -343,8 +414,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
     # but we implement it for correctness.
     next_partition_key: str | None = None
     next_row_key: str | None = None
-    max_pages = 20  # hard ceiling against infinite loops on bad responses
-    for _ in range(max_pages):
+    for _ in range(_MAX_REQUESTED_PAGES):
         try:
             raw = client.request_transmitted_docs(
                 entity_vat_number=issuer_vat,

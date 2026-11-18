@@ -548,6 +548,55 @@ class TestAlerts:
         assert "myDATA has no valid environment" in titles
         assert "myDATA is using the AADE sandbox" not in titles
 
+    @pytest.mark.parametrize(
+        ("carriers", "dispatch_point", "shown"),
+        [
+            pytest.param({"acs"}, False, True, id="acs-without-point"),
+            pytest.param({"boxnow"}, False, True, id="boxnow-without-point"),
+            pytest.param({"acs"}, True, False, id="point-set"),
+            pytest.param(set(), False, False, id="no-carrier"),
+        ],
+    )
+    def test_the_dispatch_point_is_asked_of_a_store_a_carrier_serves(
+        self, bind_tenant, carriers, dispatch_point, shown
+    ):
+        """Without it a courier order's receipt is issued at shipment with
+        no movement indication (``order.accounting.movement``): only a store
+        whose parcels ACS or BOX NOW take is asked to set it."""
+        from shipping.models import ShippingProvider
+        from tests.utils.staff import store_tenant
+
+        ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
+            is_active=False
+        )
+        ShippingProvider.objects.filter(code__in=carriers).update(
+            is_active=True
+        )
+        if dispatch_point:
+            for name, value in (
+                ("MYDATA_LOADING_POSTAL_CODE", "14561"),
+                ("MYDATA_LOADING_CITY", "Κηφισιά"),
+            ):
+                Setting.objects.update_or_create(
+                    name=name,
+                    defaults={"value_type": "string", "value_string": value},
+                )
+
+        titles = self._mydata_titles(
+            store_tenant(
+                f"widget_dispatch_{'_'.join(sorted(carriers)) or 'none'}"
+                f"_{int(dispatch_point)}",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+        )
+
+        assert (
+            "Set the dispatch point for courier receipts" in titles
+        ) is shown
+
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch
     ):

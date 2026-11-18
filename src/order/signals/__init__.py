@@ -55,3 +55,7 @@ order_stripe_payment_polled = Signal()
 # naturally separate from the shopper's point of view ("we marked it
 # shipped" vs "here's how to track it").
 order_shipment_dispatched = Signal()
+# Dispatched once the courier's answer to the shipment cancel of a canceled
+# order is recorded (``OrderService._record_shipment_cancel``), after the
+# write commits: what the order's receipt becomes depends on it.
+order_shipment_cancel_answered = Signal()

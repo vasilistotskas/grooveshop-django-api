@@ -1073,10 +1073,10 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
         "description": (
             "Postcode of the place the store's parcels leave from (a Greek "
-            "postcode). Required, with MYDATA_LOADING_CITY, while the "
-            "platform issues the store's receipts: until both are set a "
-            "courier or locker order's receipt cannot be sent to AADE, and "
-            "its parcel waits."
+            "postcode). With MYDATA_LOADING_CITY it turns on the receipt "
+            "with movement indication for courier and locker orders, issued "
+            "when the voucher is created; until both are set those receipts "
+            "are issued when the order ships, without it."
         ),
     },
     {
@@ -1085,9 +1085,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": "",
         "validator": "order.setting_validators.validate_loading_text_setting",
         "description": (
-            "City of the place the store's parcels leave from. Required, "
-            "with MYDATA_LOADING_POSTAL_CODE, while the platform issues the "
-            "store's receipts; up to 150 characters."
+            "City of the place the store's parcels leave from, up to 150 "
+            "characters. With MYDATA_LOADING_POSTAL_CODE it turns on the "
+            "receipt with movement indication for courier and locker orders."
         ),
     },
     {

@@ -27,11 +27,11 @@ Internals:
 - :mod:`order.accounting.mydata.client` — HTTP layer with retry/backoff.
 - :mod:`order.accounting.mydata.parser` — ``ResponseDoc`` / ``RequestedDoc`` →
   Python dataclasses.
-- :mod:`order.accounting.mydata.validator` — optional XSD pre-validation.
+- :mod:`order.accounting.mydata.validator` — XSD validation of every
+  payload before it is sent.
 
-Pinned schema: AADE ``myDATA v1.0.12`` (under ``xsd/``). Schema bumps
-are mechanical — drop the new XSDs in and update
-``DEFAULT_XSD_VERSION``.
+Pinned schema: AADE's public ``myDATA v2.0.2`` XSDs, vendored under
+``xsd/`` (its README says how to move to a new version).
 """
 
 from order.accounting.mydata.exceptions import (

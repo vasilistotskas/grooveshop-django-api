@@ -39,11 +39,14 @@ guessing budget (`GiftCardCodeThrottle`).
 **The address is the key unless the secret verifies and the request names
 something that exists.** What counts is settled once per request, by
 `cart.agent_token.existing_gateway_subject`: a cart token that was minted
-and has not expired (keyed by its hash); else a guest cart, by the uuid the
+and has not expired (keyed by the cart its grant names, so several live
+tokens for one cart are one budget); else a guest cart, by the uuid the
 cart lookup parses (`core.cart_id.cart_uuid_from_request`, so upper case, no
 hyphens, braces or `urn:uuid:` are one cart); else, only for the payment
-throttles (`gateway_names_order`), an order (keyed by its hash). A cart
-route's `?uuid=` names no order and is ignored. An id that is no uuid, names
+throttles (`gateway_names_order`), the order the route authorizes: the one its
+`pk` URL kwarg names, when `?uuid=` is that order's uuid (keyed by the uuid's
+hash; another order's uuid charges nothing to it). A cart route's `?uuid=`
+names no order and is ignored. An id that is no uuid, names
 no cart or order, or comes without the secret is keyed on the address, as
 before the gateway rule. The cart writes create a cart when the one they
 name does not resolve (a cart-item create, a coupon apply), so an id that
@@ -53,14 +56,16 @@ guessing limit. For the coupon budget, guessing stays bounded for the same
 reason: a cart is minted by a cart write, which names no cart yet and is
 budgeted per address (`cart_mutation`).
 
-**Two readings of an order uuid, one rule.** A cache key could accept any
-spelling, but guest authorization (`Order.opens_for_guest`) accepts only the
-canonical string (lower case, hyphenated), and the payment budget must charge
-exactly what authorization can accept, or refused spellings would use up the
-budget of a corrected retry. Both go through `core.canonical_uuid`: a
-non-canonical spelling is keyed on the address, never on the order. (A
-cart's id is different: the cart lookup itself accepts every spelling, so
-the throttle follows it.)
+**Two readings of an order uuid, one spelling rule.** A cache key could accept
+any spelling, but guest authorization (`Order.opens_for_guest`) accepts only
+the canonical string (lower case, hyphenated), and refused spellings would
+use up the budget of a corrected retry. Both go through
+`core.canonical_uuid`: a non-canonical spelling is keyed on the address,
+never on the order. This is spelling parity, not authorization parity: the
+guest link's access window (`GUEST_ORDER_ACCESS_DAYS`) is checked by
+`opens_for_guest` alone, and the throttle may charge an expired link's
+order. (A cart's id is different: the cart lookup itself accepts every
+spelling, so the throttle follows it.)
 
 The gift-card guessing budget is keyed on the signed-in customer, else the
 gateway's cart, else the address, and counts only codes new to the cart

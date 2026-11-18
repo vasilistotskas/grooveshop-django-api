@@ -160,27 +160,37 @@ def existing_gateway_subject(
     ``None`` means "budget it on the address", and what counts as existing
     is what the cart service resolves:
 
-    * a cart token that was minted and has not expired, keyed by its hash;
+    * a cart token that was minted and has not expired, keyed by the cart
+      its grant names (several live tokens for one cart are one budget);
     * a guest cart, by the uuid the cart lookup parses (any spelling);
-    * with ``order``, the order whose uuid ``?uuid=`` spells in its
-      canonical form, the one form guest authorization accepts
-      (``core.canonical_uuid``), keyed by its hash. Cart routes never ask
-      for it: their ``?uuid=`` names nothing.
+    * with ``order``, the order the route authorizes, which is the one
+      its ``pk`` URL kwarg names, when ``?uuid=`` is that order's uuid in
+      its canonical spelling (``core.canonical_uuid``), keyed by the uuid's
+      hash. A ``?uuid=`` that is another order's charges nothing to it.
+      Cart routes never ask for it: their ``?uuid=`` names nothing.
     """
     from cart.models import Cart
     from order.models import Order
 
     token = cart_token_from_request(request)
-    if token and cache.get(_cache_key(token)) is not None:
-        return hash_cart_token(token)
+    if token and (stored := cache.get(_cache_key(token))) is not None:
+        return f"cart:{CartTokenGrant(**stored).cart_id}"
     if (cart_uuid := cart_uuid_from_request(request)) is not None and (
         Cart.objects.guest_carts().filter(uuid=cart_uuid).exists()
     ):
         return str(cart_uuid)
-    order_uuid = canonical_uuid(request.GET.get("uuid")) if order else None
+    if not order:
+        return None
+    # The view authorizes the order its URL names, then checks ``?uuid=``
+    # opens it (``OrderViewSet.check_object_permissions``): same two
+    # sources here, so a uuid that opens nothing there spends nothing.
+    parser_context = getattr(request, "parser_context", None) or {}
+    pk = parser_context.get("kwargs", {}).get("pk")
+    order_uuid = canonical_uuid(request.GET.get("uuid"))
     if (
-        order_uuid is not None
-        and Order.objects.filter(uuid=order_uuid).exists()
+        pk is not None
+        and order_uuid is not None
+        and Order.objects.filter(pk=pk, uuid=order_uuid).exists()
     ):
         return "order:" + hashlib.sha256(str(order_uuid).encode()).hexdigest()
     return None

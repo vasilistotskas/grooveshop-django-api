@@ -12,16 +12,18 @@ ids up would never meet a limit.
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from unittest import mock
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
+from cart.agent_token import CartTokenGrant, hash_cart_token
 from cart.agent_token import _cache_key as _token_cache_key
-from cart.agent_token import hash_cart_token
 from cart.models import Cart
 from core.api.throttling import (
     CartMutationAnonThrottle,
@@ -34,6 +36,7 @@ from core.api.throttling import (
     SearchThrottle,
 )
 from order.factories.order import OrderFactory
+from order.models import Order
 from tests.utils.redis import private_cache
 
 SECRET = "gateway-shared-secret"
@@ -43,6 +46,17 @@ UNKNOWN_UUID = "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"
 def _guest_cart() -> str:
     """The id of a guest cart that exists in this store."""
     return str(Cart.objects.create(user=None).uuid)
+
+
+def _mint(cart_id: int) -> str:
+    """A fresh cart token as the mint stores it, for the cart `cart_id`."""
+    token = uuid.uuid4().hex
+    cache.set(
+        _token_cache_key(token),
+        asdict(CartTokenGrant(cart_id=cart_id, user_id=1, knox_digest="d")),
+        60,
+    )
+    return token
 
 
 def _spellings(value: str) -> tuple[str, ...]:
@@ -150,14 +164,26 @@ class _GatewayCartKeyTests:
             self._key(**{"X-Internal-Gateway": SECRET, "X-Cart-Id": other}),
         )
 
-    def test_a_minted_cart_token_keys_on_its_hash_never_the_token(
+    def test_a_minted_cart_token_keys_on_its_cart_never_the_token(
         self,
     ) -> None:
-        token = "a-cart-token-value"
-        cache.set(_token_cache_key(token), {"cart_id": 1}, 60)
+        token = _mint(cart_id=42)
         key = self._key(**{"X-Internal-Gateway": SECRET, "X-Cart-Token": token})
-        self.assertIn(f"gw:{hash_cart_token(token)}", key)
+        self.assertIn("gw:cart:42", key)
         self.assertNotIn(token, key)
+        self.assertNotIn(hash_cart_token(token), key)
+
+    def test_every_token_of_one_cart_is_one_budget(self) -> None:
+        def key(cart_id):
+            return self._key(
+                **{
+                    "X-Internal-Gateway": SECRET,
+                    "X-Cart-Token": _mint(cart_id),
+                }
+            )
+
+        self.assertEqual(key(7), key(7))
+        self.assertNotEqual(key(7), key(8))
 
     def test_a_token_that_was_never_minted_falls_back_to_ip(self) -> None:
         key = self._key(
@@ -307,16 +333,23 @@ def test_an_unproven_request_keys_on_the_peer_rule_of_client_ip(
     assert key.endswith("10.42.0.9")
 
 
-def _guest_order() -> str:
-    """The uuid of a guest order that exists in this store."""
-    return str(OrderFactory(user=None).uuid)
+def _guest_order() -> Order:
+    """A guest order that exists in this store."""
+    order = OrderFactory(user=None)
+    assert isinstance(order, Order)
+    return order
 
 
-def _payment_key(throttle_class, order_uuid, *, user=None, **headers):
-    request = APIRequestFactory().post(
-        f"/api/v1/order/1/create_checkout_session?uuid={order_uuid}",
+def _payment_key(
+    throttle_class, order_uuid, *, pk=1, user=None, **headers
+) -> str | None:
+    """The key of a payment call as the view reaches it: the order is the
+    URL's `pk` (`parser_context`), the buyer's key the `?uuid=`."""
+    raw = APIRequestFactory().post(
+        f"/api/v1/order/{pk}/create_checkout_session?uuid={order_uuid}",
         headers=headers,
     )
+    request = Request(raw, parser_context={"kwargs": {"pk": pk}})
     request.user = user if user is not None else AnonymousUser()
     return throttle_class().get_cache_key(request, view=None)
 
@@ -324,19 +357,23 @@ def _payment_key(throttle_class, order_uuid, *, user=None, **headers):
 class _GatewayPaymentKeyTests:
     """The gateway asks for a payment link right after placing an online
     order; keyed on the platform's address, the sixth agent order in a
-    minute would be placed with no link. Keyed on the order instead, when
-    it exists and the uuid is spelled the way guest authorization reads it
-    (``Order.opens_for_guest``)."""
+    minute would be placed with no link. Keyed on the order the route
+    authorizes (its `pk`) instead, when `?uuid=` is that order's uuid,
+    spelled the way guest authorization reads it
+    (`Order.opens_for_guest`)."""
 
     throttle_class: type
 
     def setUp(self) -> None:
-        self.order_uuid = _guest_order()
+        self.order = _guest_order()
+        self.order_uuid = str(self.order.uuid)
 
-    def _pkey(self, order_uuid=None, **headers):
+    def _pkey(self, order=None, uuid_value=None, **headers):
+        order = order or self.order
         return _payment_key(
             self.throttle_class,
-            order_uuid or self.order_uuid,
+            uuid_value or str(order.uuid),
+            pk=order.pk,
             **headers,
         )
 
@@ -352,37 +389,65 @@ class _GatewayPaymentKeyTests:
             self._pkey(_guest_order(), **{"X-Internal-Gateway": SECRET}),
         )
 
+    def test_another_orders_uuid_charges_nothing_to_it(self) -> None:
+        """The route authorizes the order its pk names: path A with B's
+        uuid is refused there, so it must not spend B's budget; path A
+        with A's uuid spends A's."""
+        other = _guest_order()
+        gateway = {"X-Internal-Gateway": SECRET}
+        mismatched = self._pkey(self.order, str(other.uuid), **gateway)
+        self.assertNotIn("gw:", mismatched)
+        self.assertNotEqual(
+            mismatched, self._pkey(other, str(other.uuid), **gateway)
+        )
+        self.assertIn(
+            "gw:order:", self._pkey(self.order, self.order_uuid, **gateway)
+        )
+
+    def test_a_route_without_an_order_pk_keys_on_the_address(self) -> None:
+        raw = APIRequestFactory().post(
+            f"/api/v1/giftcard/purchase?uuid={self.order_uuid}",
+            headers={"X-Internal-Gateway": SECRET},
+        )
+        request = Request(raw, parser_context={"kwargs": {}})
+        request.user = AnonymousUser()
+        key = self.throttle_class().get_cache_key(request, view=None)
+        self.assertNotIn("gw:", key)
+
     def test_an_unknown_order_keys_on_the_address(self) -> None:
-        key = self._pkey(UNKNOWN_UUID, **{"X-Internal-Gateway": SECRET})
+        key = self._pkey(
+            uuid_value=UNKNOWN_UUID, **{"X-Internal-Gateway": SECRET}
+        )
         self.assertNotIn("gw:", key)
 
     def test_a_spelling_authorization_refuses_keys_on_the_address(
         self,
     ) -> None:
-        """One rule: only the canonical spelling opens the order, so only
-        it spends the order's budget. A refused spelling is the address's,
-        and cannot use up the budget of a corrected retry."""
+        """One spelling rule: only the canonical spelling opens the order,
+        so only it spends the order's budget. A refused spelling is the
+        address's, and cannot use up the budget of a corrected retry."""
         for spelling in (
             self.order_uuid.upper(),
             self.order_uuid.replace("-", ""),
             "{" + self.order_uuid + "}",
         ):
             with self.subTest(spelling=spelling):
-                key = self._pkey(spelling, **{"X-Internal-Gateway": SECRET})
+                key = self._pkey(
+                    uuid_value=spelling, **{"X-Internal-Gateway": SECRET}
+                )
                 self.assertNotIn("gw:", key)
 
-    def test_the_throttle_and_authorization_read_one_rule(self) -> None:
-        order = OrderFactory(user=None)
+    def test_the_throttle_and_authorization_read_one_spelling(self) -> None:
         for spelling in (
-            str(order.uuid),
-            str(order.uuid).upper(),
-            str(order.uuid).replace("-", ""),
+            self.order_uuid,
+            self.order_uuid.upper(),
+            self.order_uuid.replace("-", ""),
         ):
             with self.subTest(spelling=spelling):
                 keyed = "gw:" in self._pkey(
-                    spelling, **{"X-Internal-Gateway": SECRET}
+                    uuid_value=spelling, **{"X-Internal-Gateway": SECRET}
                 )
-                self.assertEqual(keyed, order.opens_for_guest(spelling))
+                self.assertEqual(keyed, self.order.opens_for_guest(spelling))
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
@@ -395,6 +460,7 @@ class PaymentAttemptAnonThrottleTestCase(_GatewayPaymentKeyTests, TestCase):
             _payment_key(
                 PaymentAttemptAnonThrottle,
                 self.order_uuid,
+                pk=self.order.pk,
                 user=user,
                 **{"X-Internal-Gateway": SECRET},
             )
@@ -479,26 +545,35 @@ class _GatewayUserBudgetTests:
             cache.delete(key)
 
     def test_the_query_uuid_names_no_cart(self) -> None:
-        """Only the payment throttles read ``?uuid=``, as an order: on a
-        cart route it must not take a budget from an order that exists."""
-        order_uuid = _guest_order()
+        """A cart route has no order: `?uuid=` must not take a budget
+        from an order that exists, whichever throttle asks."""
+        order_uuid = str(_guest_order().uuid)
         key = self._key(
             path=f"/api/v1/cart/item?uuid={order_uuid}",
             **{"X-Internal-Gateway": SECRET},
         )
-        if self.throttle_class.gateway_names_order:
-            self.assertIn("gw:order:", key)
-        else:
-            self.assertNotIn("gw:", key)
+        self.assertNotIn("gw:", key)
 
-    def test_a_minted_cart_token_keys_on_its_hash_never_the_token(
+    def test_a_minted_cart_token_keys_on_its_cart_never_the_token(
         self,
     ) -> None:
-        token = "a-cart-token-value"
-        cache.set(_token_cache_key(token), {"cart_id": 1}, 60)
+        token = _mint(cart_id=42)
         key = self._key(**{"X-Internal-Gateway": SECRET, "X-Cart-Token": token})
-        self.assertIn(f"gw:{hash_cart_token(token)}", key)
+        self.assertIn("gw:cart:42", key)
         self.assertNotIn(token, key)
+        self.assertNotIn(hash_cart_token(token), key)
+
+    def test_every_token_of_one_cart_is_one_budget(self) -> None:
+        def key(cart_id):
+            return self._key(
+                **{
+                    "X-Internal-Gateway": SECRET,
+                    "X-Cart-Token": _mint(cart_id),
+                }
+            )
+
+        self.assertEqual(key(7), key(7))
+        self.assertNotEqual(key(7), key(8))
 
     def test_a_token_that_was_never_minted_keys_on_the_address(self) -> None:
         key = self._key(
@@ -573,20 +648,42 @@ class _GatewayUserBudgetTests:
         self.assertNotIn("gw:", key)
 
 
+class _AddressOnOrderRoutesTests:
+    """Only the payment throttles budget a gateway call per order. A cart
+    or order-create throttle on a payment-shaped path, with an order that
+    exists and its uuid, still keys on the address."""
+
+    def test_an_order_route_names_no_order(self) -> None:
+        order = _guest_order()
+        key = _payment_key(
+            self.throttle_class,
+            str(order.uuid),
+            pk=order.pk,
+            **{"X-Internal-Gateway": SECRET},
+        )
+        self.assertNotIn("gw:", key)
+
+
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
-class CartMutationThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+class CartMutationThrottleTestCase(
+    _GatewayUserBudgetTests, _AddressOnOrderRoutesTests, TestCase
+):
     throttle_class = CartMutationThrottle
     scope = "cart_mutation"
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
-class CouponApplyThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+class CouponApplyThrottleTestCase(
+    _GatewayUserBudgetTests, _AddressOnOrderRoutesTests, TestCase
+):
     throttle_class = CouponApplyThrottle
     scope = "coupon_apply"
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
-class OrderCreateThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+class OrderCreateThrottleTestCase(
+    _GatewayUserBudgetTests, _AddressOnOrderRoutesTests, TestCase
+):
     throttle_class = OrderCreateThrottle
     scope = "order_create"
 
@@ -609,8 +706,9 @@ class GatewaySubjectIsSettledOnceTestCase(TestCase):
     the cart or order a gateway call names must not run once per throttle:
     it is settled once per request."""
 
-    def _keys(self, throttles, path, **headers):
-        request = APIRequestFactory().post(path, headers=headers)
+    def _keys(self, throttles, path, *, pk=None, **headers):
+        raw = APIRequestFactory().post(path, headers=headers)
+        request = Request(raw, parser_context={"kwargs": {"pk": pk}})
         request.user = AnonymousUser()
         return [t.get_cache_key(request, view=None) for t in throttles]
 
@@ -639,11 +737,13 @@ class GatewaySubjectIsSettledOnceTestCase(TestCase):
             )
 
     def test_a_payment_route_looks_the_order_up_once(self) -> None:
-        order_uuid = _guest_order()
+        order = _guest_order()
         with self.assertNumQueries(1):
             keys = self._keys(
                 [PaymentAttemptThrottle(), PaymentAttemptAnonThrottle()],
-                f"/api/v1/order/1/create_checkout_session?uuid={order_uuid}",
+                f"/api/v1/order/{order.pk}/create_checkout_session"
+                f"?uuid={order.uuid}",
+                pk=order.pk,
                 **{"X-Internal-Gateway": SECRET},
             )
         self.assertTrue(all("gw:order:" in key for key in keys))

@@ -51,6 +51,10 @@ msgid "%(amount)s of goods the receipt is short of, after a refund was reversed,
 msgstr "Το ποσό %(amount)s ειδών που λείπει από την απόδειξη, μετά από αναστροφή επιστροφής, επιβεβαιώθηκε ως διορθωμένο εκτός απόδειξης από τον/την %(who)s."
 
 #, python-format
+msgid "%(amount)s points are worth less than one cent. Redeem at least %(minimum)s points."
+msgstr "Οι %(amount)s πόντοι αξίζουν λιγότερο από ένα λεπτό. Εξαργυρώστε τουλάχιστον %(minimum)s πόντους."
+
+#, python-format
 msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 msgstr "Τα %(amount)s που επιστράφηκαν πέρα από την απόδειξη επιβεβαιώθηκαν από %(who)s ως ρυθμισμένα εκτός των πιστωτικών παραστατικών."
 

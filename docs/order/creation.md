@@ -94,7 +94,11 @@ caller:
     (`ShippingRefusedError` is an `InvalidOrderDataError`). The rest are
     the payment-intent endpoint's: 400 `pay_way_unavailable` / 404
     `pay_way_not_found`, 400 `loyalty_requires_authentication` /
-    `loyalty_redemption_invalid`, and the gift card's own reason.
+    `loyalty_redemption_invalid` / `loyalty_redemption_too_small` (points
+    worth less than a cent would be spent for a discount of 0.00; the
+    detail says how many make one; order creation answers it as
+    `invalid_order_data` with the message under
+    `fieldErrors.loyaltyPointsToRedeem`), and the gift card's own reason.
   - `X-Cart-Token` is accepted (`docs/cart-agent-token.md`): the quote is
     then the cart owner's price. Order creation takes no token, so that
     quote must not feed the expected total of an anonymous order. Points
@@ -105,8 +109,14 @@ caller:
     checkout and polled by the agent gateway, so it is throttled by
     `cart_quote` / `cart_quote_anon` (`CartQuoteThrottle`,
     `CartQuoteAnonThrottle`: per cart for the gateway), not by the cart's
-    write budget. A quote that carries `giftCardCodes` also spends
-    `gift_card_check`, since it says what each card settles.
+    write budget.
+  - **Gift-card codes spend the balance check's budget.** The quote, the
+    payment intent and order creation each say what a card settles (or
+    that the code is no card), so a request to any of them that carries
+    `giftCardCodes` also spends `gift_card_check`
+    (`core.api.throttling.gift_card_code_throttles`, the one helper the
+    three views add to their throttles): none is a faster balance oracle
+    than `/giftcard/check`. A request without codes is not counted.
   - A polled quote does not reach the carrier: ACS's live price is cached
     for five minutes per country, region and weight bracket
     (`AcsCarrier._fetch_live_quote`), the entry order creation reads. A

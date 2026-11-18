@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 
 from django.conf import settings
 from django.db.models import Q
@@ -44,8 +43,8 @@ from core.api.throttling import (
     CartQuoteAnonThrottle,
     CartQuoteThrottle,
     CouponApplyThrottle,
-    GiftCardCheckThrottle,
     UserBudgetThrottle,
+    gift_card_code_throttles,
 )
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
@@ -401,35 +400,29 @@ class CartViewSet(BaseModelViewSet):
             # A read with a budget of its own (``cart_quote``), so a
             # checkout that re-quotes on every change, or a platform
             # polling one, cannot use up the cart's write budget.
-            throttles = [
+            return [
+                *gift_card_code_throttles(self.request),
                 CartQuoteThrottle(),
                 CartQuoteAnonThrottle(),
                 AnonIpRateThrottle(),
                 UserBudgetThrottle(),
             ]
-            if self._names_gift_cards():
-                # A quote with gift-card codes says what each card is
-                # worth: it must not be a faster oracle than the balance
-                # check, so it also spends that budget.
-                throttles.insert(0, GiftCardCheckThrottle())
-            return throttles
         if self.action in self._MUTATION_ACTIONS:
             # Per-minute burst limits layered ON TOP of the global daily caps
             # (DEFAULT_THROTTLE_CLASSES) — include the defaults explicitly so
             # the override supplements rather than replaces them.
-            return [
+            throttles = [
                 CartMutationThrottle(),
                 CartMutationAnonThrottle(),
                 AnonIpRateThrottle(),
                 UserBudgetThrottle(),
             ]
+            if self.action == "create_payment_intent":
+                # The intent's amount is the quote's: it prices gift
+                # cards too.
+                return [*gift_card_code_throttles(self.request), *throttles]
+            return throttles
         return super().get_throttles()
-
-    def _names_gift_cards(self) -> bool:
-        """Whether the request body carries gift-card codes. Read before
-        the body is validated, so anything else counts as none."""
-        data = self.request.data
-        return isinstance(data, Mapping) and bool(data.get("gift_card_codes"))
 
     def get_queryset(self):
         """
@@ -993,8 +986,8 @@ class CartViewSet(BaseModelViewSet):
             return Response(
                 {
                     "detail": exc.reason,
-                    "reason": "loyalty_redemption_invalid",
-                    "code": "loyalty_redemption_invalid",
+                    "reason": exc.code,
+                    "code": exc.code,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

@@ -382,7 +382,8 @@ class OrderQuoteService:
         except ValidationError as exc:
             raise LoyaltyRedemptionError(
                 getattr(exc, "message", None)
-                or "; ".join(str(msg) for msg in getattr(exc, "messages", []))
+                or "; ".join(str(msg) for msg in getattr(exc, "messages", [])),
+                code=getattr(exc, "code", None),
             ) from exc
 
     @staticmethod

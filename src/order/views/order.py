@@ -45,6 +45,7 @@ from core.api.throttling import (
     PaymentAttemptThrottle,
     UserBudgetThrottle,
     VivaReturnThrottle,
+    gift_card_code_throttles,
 )
 from core.api.views import BaseModelViewSet
 from core.filters.camel_case_ordering import ActionOrdering
@@ -762,6 +763,9 @@ class OrderViewSet(BaseModelViewSet):
         # and do not bound a burst, so this action carries its own.
         if self.action == "create":
             return [
+                # An order refused for its gift card, or for its total,
+                # says what the card is worth.
+                *gift_card_code_throttles(self.request),
                 OrderCreateThrottle(),
                 OrderCreateAnonThrottle(),
                 *super().get_throttles(),

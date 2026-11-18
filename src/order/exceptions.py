@@ -265,19 +265,27 @@ class LoyaltyRedemptionError(InvalidOrderDataError):
     quote, the payment intent or the order is refused instead.
 
     A subclass of ``InvalidOrderDataError`` so order creation passes it
-    on as it passes its other refusals.
+    on as it passes its other refusals, with the program's message under
+    ``loyalty_points_to_redeem``. The cart endpoints answer it with
+    ``code``.
 
     Attributes:
         reason (str): The loyalty program's own message, in the
             request's language.
+        code (str): The program's code for the refusal
+            (``loyalty_redemption_too_small``), else ``DEFAULT_CODE``.
     """
 
-    def __init__(self, reason: str):
+    DEFAULT_CODE = "loyalty_redemption_invalid"
+
+    def __init__(self, reason: str, code: str | None = None):
         self.reason = reason
+        self.code = code or self.DEFAULT_CODE
         super().__init__(
             _("Loyalty redemption cannot be applied: {reason}").format(
                 reason=reason
-            )
+            ),
+            field_errors={"loyalty_points_to_redeem": [reason]},
         )
 
 

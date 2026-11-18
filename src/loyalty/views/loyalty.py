@@ -258,7 +258,9 @@ class LoyaltyViewSet(BaseModelViewSet):
             )
         except ValidationError as e:
             return Response(
-                {"detail": e.message, "code": "redemption_invalid"},
+                # The program's own code when it gives one
+                # (``loyalty_redemption_too_small``).
+                {"detail": e.message, "code": e.code or "redemption_invalid"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

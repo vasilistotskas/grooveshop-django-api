@@ -2,7 +2,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 #: ``<prefix><ISO currency>``: points per one unit of that currency.
 REDEMPTION_RATIO_PREFIX = "LOYALTY_REDEMPTION_RATIO_"
+
+#: The code of a redemption refused because its points are worth less
+#: than a cent (``LoyaltyService._validate_and_price_redemption``).
+REDEMPTION_TOO_SMALL = "loyalty_redemption_too_small"
 
 
 _RATE_SETTINGS = (
@@ -621,6 +625,20 @@ class LoyaltyService:
         discount = (Decimal(str(points_amount)) / ratio).quantize(
             CENT, rounding=ROUND_HALF_UP
         )
+        if discount <= 0:
+            # Points worth less than half a cent buy nothing: redeeming
+            # them would spend the points for a discount of 0.00.
+            minimum = (ratio * CENT / 2).to_integral_value(
+                rounding=ROUND_CEILING
+            )
+            raise ValidationError(
+                _(
+                    "%(amount)s points are worth less than one cent. "
+                    "Redeem at least %(minimum)s points."
+                )
+                % {"amount": points_amount, "minimum": minimum},
+                code=REDEMPTION_TOO_SMALL,
+            )
 
         if discount > max_discount:
             raise ValidationError(

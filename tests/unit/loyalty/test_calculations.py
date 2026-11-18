@@ -164,6 +164,27 @@ class TestRedemptionPrice:
         assert price == discount
         assert price.as_tuple().exponent == -2
 
+    def test_points_worth_less_than_a_cent_are_refused(self, member):
+        """4 points at 1000 a euro round to 0.00: spending them would buy
+        nothing. The refusal is coded and names the fewest that count."""
+        with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=1000.0):
+            with pytest.raises(ValidationError) as refused:
+                LoyaltyService.preview_redemption(
+                    member, 4, "EUR", max_discount=Decimal(1000)
+                )
+            with pytest.raises(ValidationError):
+                LoyaltyService.redeem_points(
+                    member, 4, "EUR", max_discount=Decimal(1000)
+                )
+            a_cent = LoyaltyService.preview_redemption(
+                member, 5, "EUR", max_discount=Decimal(1000)
+            )
+
+        assert refused.value.code == "loyalty_redemption_too_small"
+        assert "5" in refused.value.message
+        assert a_cent == Decimal("0.01")
+        assert LoyaltyService.get_user_balance(member) == 1000
+
     def test_a_preview_writes_nothing(self, member):
         with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=100.0):
             LoyaltyService.preview_redemption(

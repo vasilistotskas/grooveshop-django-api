@@ -39,6 +39,7 @@ proven visitor instead, and no module outside this one imports
 import hashlib
 import hmac
 import logging
+from collections.abc import Mapping
 from typing import ClassVar
 
 from django.conf import settings
@@ -358,6 +359,31 @@ class GiftCardCheckThrottle(UserOrIpRateThrottle):
 
     scope = "gift_card_check"
     fail_closed = True
+
+
+#: The body field a checkout names its gift cards in: the quote, the
+#: payment intent and order creation share it.
+GIFT_CARD_CODES_FIELD = "gift_card_codes"
+
+
+def gift_card_code_throttles(request) -> list[GiftCardCheckThrottle]:
+    """The extra budget of a checkout request that carries gift-card codes.
+
+    Every route that prices a checkout says what a card settles, or that
+    the code is no card: the quote in its rows, the payment intent in its
+    amount, order creation in its refusal (and in the quote of a
+    ``total_changed``). So each is a balance oracle, and with codes it
+    spends the balance check's own budget (``gift_card_check``) besides
+    its own. A view's ``get_throttles`` adds what this returns; a
+    request without codes is not counted.
+
+    Read before the body is validated, so anything that is not an object
+    with a non-empty list there counts as none.
+    """
+    data = request.data
+    if isinstance(data, Mapping) and data.get(GIFT_CARD_CODES_FIELD):
+        return [GiftCardCheckThrottle()]
+    return []
 
 
 class B2BProfileSubmitThrottle(UserOrIpRateThrottle):

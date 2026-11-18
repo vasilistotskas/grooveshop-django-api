@@ -636,10 +636,29 @@ class TestQuoteBudget:
         assert statuses == [200, 200, 429]
         assert _post_quote(other, client=gateway).status_code == 200
 
-    def test_gift_card_codes_spend_the_balance_check_budget(self, monkeypatch):
-        """A quote says what a card settles: with codes it is as tight
-        as ``/giftcard/check``, without them it is not counted."""
+
+def _post_intent(checkout, pay_way, **extra):
+    return checkout.client.post(
+        reverse("cart-create-payment-intent"),
+        {**_choices(checkout), "pay_way_id": pay_way.id, **extra},
+        format="json",
+        HTTP_X_CART_ID=str(checkout.cart.uuid),
+    )
+
+
+class TestGiftCardCodesAreBudgeted:
+    """Every route that prices a checkout says what a gift card settles
+    (or that the code is no card). With codes, each also spends the
+    balance check's budget, so none is a faster oracle than
+    ``/giftcard/check``; without codes it is not counted."""
+
+    CODES = {"gift_card_codes": ["GC-NOPE-NOPE"]}
+
+    @pytest.fixture(autouse=True)
+    def _two_a_minute(self, monkeypatch):
         _private_budget(monkeypatch, GiftCardCheckThrottle, "2/minute")
+
+    def test_on_the_quote(self):
         checkout = _checkout()
         card = GiftCardFactory(initial_value=Money(Decimal("10.00"), "EUR"))
         with_card = {**_choices(checkout), "gift_card_codes": [card.code]}
@@ -650,6 +669,98 @@ class TestQuoteBudget:
 
         assert statuses == [200, 200, 429]
         assert _post_quote(checkout, **_choices(checkout)).status_code == 200
+
+    def test_on_the_payment_intent(self):
+        checkout = _checkout()
+        stripe = PayWayFactory.create_online_payment(provider_code="stripe")
+
+        with fake_stripe():
+            statuses = [
+                _post_intent(checkout, stripe, **self.CODES).status_code
+                for _ in range(3)
+            ]
+            without_codes = _post_intent(checkout, stripe)
+
+        assert statuses == [400, 400, 429]
+        assert without_codes.status_code == 200, without_codes.content
+
+    def test_on_order_creation(self):
+        checkout = _checkout()
+
+        statuses = [
+            _post_order(checkout, **self.CODES).status_code for _ in range(3)
+        ]
+
+        assert statuses == [400, 400, 429]
+        assert not Order.objects.exists()
+        assert _post_order(checkout).status_code == 201
+
+
+class TestPointsWorthLessThanACent:
+    """4 points at 1000 a euro are 0.004: a discount of 0.00. Redeeming
+    them would spend the points for nothing, so every path refuses and
+    says how many points make a cent."""
+
+    @pytest.fixture(autouse=True)
+    def _a_thousand_points_a_euro(self):
+        with _store_settings(LOYALTY_REDEMPTION_RATIO_EUR=1000.0):
+            yield
+
+    def _member(self):
+        checkout = _checkout()
+        PointsTransaction.objects.create(
+            user=checkout.user,
+            points=100,
+            transaction_type=TransactionType.EARN,
+        )
+        return checkout
+
+    def test_the_quote_refuses(self):
+        checkout = self._member()
+
+        response = _post_quote(
+            checkout, **_choices(checkout), loyalty_points_to_redeem=4
+        )
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["code"] == body["reason"] == "loyalty_redemption_too_small"
+        assert "5" in body["detail"]
+
+    def test_five_points_are_a_cent(self):
+        checkout = self._member()
+
+        quote = _quote(
+            checkout, **_choices(checkout), loyalty_points_to_redeem=5
+        )
+
+        assert _money(quote["loyaltyDiscount"]) == Decimal("0.01")
+
+    def test_the_payment_intent_refuses(self):
+        checkout = self._member()
+        stripe = PayWayFactory.create_online_payment(provider_code="stripe")
+
+        with fake_stripe():
+            response = _post_intent(
+                checkout, stripe, loyalty_points_to_redeem=4
+            )
+
+        assert response.status_code == 400
+        assert response.json()["code"] == "loyalty_redemption_too_small"
+
+    def test_order_creation_refuses_and_spends_nothing(self):
+        checkout = self._member()
+
+        response = _post_order(checkout, loyalty_points_to_redeem=4)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["error"]["type"] == "invalid_order_data"
+        assert "5" in body["fieldErrors"]["loyaltyPointsToRedeem"][0]
+        assert not Order.objects.exists()
+        assert LoyaltyService.get_user_balance(checkout.user) == 100
+        checkout.product.refresh_from_db()
+        assert checkout.product.stock == 10
 
 
 class TestLivePrice:

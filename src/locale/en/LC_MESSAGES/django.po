@@ -46,6 +46,10 @@ msgid "%(amount)s of goods the receipt is short of, after a refund was reversed,
 msgstr "%(amount)s of goods the receipt is short of, after a refund was reversed, was acknowledged as corrected outside the receipt by %(who)s."
 
 #, python-format
+msgid "%(amount)s points are worth less than one cent. Redeem at least %(minimum)s points."
+msgstr "%(amount)s points are worth less than one cent. Redeem at least %(minimum)s points."
+
+#, python-format
 msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 msgstr "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 

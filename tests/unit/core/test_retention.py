@@ -72,8 +72,8 @@ class TestDeleteInBatches:
         stale = SearchQuery.objects.filter(query="blank")
 
         def a_writer_renews_the_row_first():
-            # Between the batch read and the delete, another writer makes
-            # the row no longer match the sweep.
+            # Another writer makes the row no longer match the sweep just
+            # before the batch is read under lock.
             SearchQuery.objects.filter(pk=row.pk).update(query="renewed")
             return real_atomic()
 

@@ -81,8 +81,12 @@ The gateway's answer decides the row:
 The timeouts are a total deadline. requests' read timeout bounds each wait
 for the next bytes, not the whole answer (urllib3's `Timeout` documents the
 same of its `total`), so the call runs in a daemon thread that is abandoned
-when connect + read have passed; it ends on its own socket timeout. The body
-is never read: the status and `Retry-After` are the answer.
+when connect + read have passed. The body is never read: the status and
+`Retry-After` are the answer. An abandoned thread ends only when the gateway
+stops sending or closes the connection (bytes arriving within the read
+timeout keep it alive); being a daemon, it dies with the worker child, which
+`CELERY_WORKER_MAX_TASKS_PER_CHILD` replaces. A run leaves at most one, since
+it stops on the timeout.
 
 A retryable answer with a `Retry-After` (delta-seconds or an HTTP date)
 sets the next attempt to what it asks, at least
@@ -152,9 +156,10 @@ selection is not sent again, and only the rows it reset are queued. A
 `purge-expired-agent-order-events` (daily, per store, suspended stores
 included) deletes `delivered` and `failed` events that finished more than
 `AGENT_ORDER_EVENT_RETENTION_DAYS` (30) days ago, through
-`core.retention.delete_in_batches`, which reads each batch again under row
-locks with the sweep's filters before deleting it: an event sent again from
-the admin between the two reads is `pending` by then and kept. A `pending`
+`core.retention.delete_in_batches`, which reads each batch with the sweep's
+filters under row locks and deletes it in the same transaction: an event
+sent again from the admin before the read is `pending` and not read, and
+one sent again after it waits for the delete and then finds no row to reset. A `pending`
 event is never deleted. An
 event goes with its order. The staging refresh deletes every row
 (`devtools.anonymise.rules`): they are production's to send.

@@ -219,8 +219,12 @@ def _post(body: dict[str, str]) -> tuple[int, Mapping[str, str]]:
     whole answer (urllib3's ``Timeout`` documents the same of ``total``),
     so a gateway answering a byte at a time could hold a sweep run past
     its budget. The call runs in a daemon thread that is abandoned once
-    the deadline passes (it ends with its own socket timeout), and the
-    body is never read: the status and ``Retry-After`` are the answer.
+    the deadline passes, and the body is never read: the status and
+    ``Retry-After`` are the answer. An abandoned thread ends only when the
+    gateway stops sending or closes the connection: bytes arriving within
+    the read timeout keep it alive. Being a daemon, it dies with the
+    worker child, which ``CELERY_WORKER_MAX_TASKS_PER_CHILD`` replaces; a
+    run leaves at most one, since it stops on ``UNREACHABLE``.
     Raises ``TimeoutError`` at the deadline, and what the call raises.
     """
     connect = settings.AGENT_ORDER_EVENT_CONNECT_TIMEOUT

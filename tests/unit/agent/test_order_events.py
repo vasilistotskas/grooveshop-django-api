@@ -34,7 +34,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
-from order.tasks import push_order_event_to_gateway
 from settings.schedule import SCHEDULE_PRESETS
 from tenant.models import Tenant
 from tests.utils.staff import store_tenant
@@ -776,34 +775,6 @@ class PurgeTests(TestCase):
         self.assertEqual(
             kept, {rows["recent delivered"].pk, rows["old pending"].pk}
         )
-
-
-@gateway
-@patch("agent.tasks.deliver_agent_order_event")
-class RemovedPushTaskTests(TestCase):
-    """The old task's messages, queued by the release before, still reach
-    the gateway through the outbox for one release."""
-
-    def test_an_agent_orders_change_is_recorded(self, task):
-        order = _order()
-
-        push_order_event_to_gateway(order.id)
-
-        self.assertEqual(
-            list(
-                AgentOrderEvent.objects.filter(order=order)
-                .order_by("occurred_at", "pk")
-                .values_list("event_type", flat=True)
-            ),
-            [EventType.CREATED, EventType.UPDATED],
-        )
-
-    def test_an_order_no_agent_placed_records_nothing(self, task):
-        order = _order(OrderSourceType.DIRECT)
-
-        push_order_event_to_gateway(order.id)
-
-        self.assertFalse(AgentOrderEvent.objects.filter(order=order).exists())
 
 
 def test_a_sweep_run_ends_before_the_next_one_starts():

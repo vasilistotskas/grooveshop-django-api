@@ -147,14 +147,6 @@ first attempt queued at commit and **Send again now**.
   `ERROR` log line; when it was the gateway itself (unreachable, or 401,
   403, 404) the run still stops there.
 
-## The task the outbox replaced
-
-The release before queued `order.tasks.push_order_event_to_gateway` on
-every order change. It stays registered for one release: a message still
-queued or on a retry countdown during the deploy, and a `DeferredDispatch`
-row naming it, records the change as an `updated` event (with the time it
-runs as `occurredAt`). Remove it in the release after this one.
-
 ## The admin
 
 `Audit & Logs → Agent Order Events`, for superusers: every row read-only,

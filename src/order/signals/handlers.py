@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 
-from django.conf import settings
 from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -11,6 +10,7 @@ from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
+from agent.outbox import record_order_changed
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
 from order.accounting.invoicing import receipt_issuable
@@ -61,7 +61,6 @@ from order.signals import (
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
-    push_order_event_to_gateway,
     send_admin_new_order_email,
     send_dispute_notification_email,
     send_order_confirmation_email,
@@ -182,12 +181,12 @@ def handle_order_post_save(
 
         transaction.on_commit(send_shipment_dispatched)
 
-    # Agent-gateway order-event push: one event per save that changed
-    # the order status, the payment status (which can move without a
-    # status change, e.g. a refund) or set tracking info. The task
-    # re-reads fresh values from the DB, so a single enqueue covers a
-    # save that changed several of them at once. Gated on the gateway
-    # URL so non-agent deployments never enqueue.
+    # The agent gateway's order event: one per save that changed the
+    # order status, the payment status (which can move without a status
+    # change, e.g. a refund) or set tracking info, for an order an agent
+    # placed (``agent.outbox``). The gateway renders the order as it is
+    # when the event is sent, so one event covers a save that changed
+    # several of them at once.
     payment_status_changed = (
         hasattr(instance, "_original_payment_status")
         and instance._original_payment_status != instance.payment_status
@@ -201,10 +200,8 @@ def handle_order_post_save(
     ):
         request_credit_documents(instance.id)
 
-    if settings.AGENT_GATEWAY_INTERNAL_URL and (
-        status_changed or payment_status_changed or tracking_dispatched
-    ):
-        dispatch_on_commit(push_order_event_to_gateway, [instance.id])
+    if status_changed or payment_status_changed or tracking_dispatched:
+        record_order_changed(instance.id)
 
 
 def _cart_for_order(order: Order):

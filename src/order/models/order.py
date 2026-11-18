@@ -610,7 +610,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_status = self.status
         # Payment status is snapshotted too so the post_save handler can
         # detect payment transitions (they can occur without a status
-        # change, e.g. a refund) for the agent-gateway event push.
+        # change, e.g. a refund) for the agent gateway's order events.
         self._original_payment_status = self.payment_status
         # Cache tracking state so the post_save handler can detect the
         # null → set transition that fires ``order_shipment_dispatched``.

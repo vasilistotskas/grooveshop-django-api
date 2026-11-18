@@ -380,6 +380,24 @@ def fanout_purge_expired_pending_payment_fees():
     )
 
 
+# Order events owed to the agent gateway. Suspended stores too: the
+# platform that placed an order is still told what became of it, as the
+# money and parcel jobs above finish what a customer waits on.
+@celery_app.task(base=TenantTask)
+def fanout_deliver_due_agent_order_events():
+    return run_for_all_tenants(
+        "agent.tasks.deliver_due_agent_order_events", include_suspended=True
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_agent_order_events():
+    return run_for_all_tenants(
+        "agent.tasks.purge_expired_agent_order_events",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_purge_expired_meta_capi_event_logs():
     return run_for_all_tenants(

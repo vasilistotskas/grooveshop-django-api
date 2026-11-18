@@ -350,8 +350,11 @@ toasts.
 
 ### `agent/`
 
-No models. The OAuth-scoped `/api/v1/agent/*` surface that the agent
-gateway calls: the shopper tools (`src/agent/views.py`, behind the
+Model: `AgentOrderEvent` (`src/agent/models.py`), the order events Django
+owes the agent gateway: a row per event of an order an agent placed,
+delivered by `src/agent/outbox.py` and retried by a per-store sweep
+(`src/agent/tasks.py`); read `docs/agent-order-events.md`. Also the
+OAuth-scoped `/api/v1/agent/*` surface that the agent gateway calls: the shopper tools (`src/agent/views.py`, behind the
 gateway's `/mcp`, with the store's own issuer and customers) and the
 read-only store-admin tools (`src/agent/staff_views.py`, `/agent/staff/*`
 behind `/mcp/admin`). Django is the OAuth 2.1
@@ -364,8 +367,8 @@ token endpoint (or a store's device-code endpoint) is OAuth's
 `invalid_target`, not allauth's 500 (`src/core/middleware/idp_oauth_errors.py`);
 the staff issuer requires the `resource` on the token request too, as MCP
 clients send it, except on a refresh, which without one keeps the store its
-grant was connected to and naming another is still `invalid_target`. It has no doc in this repository; the
-cross-service views are
+grant was connected to and naming another is still `invalid_target`. The
+OAuth surface has no doc in this repository; the cross-service views are
 `grooveshop-docs/src/dev/flows/agentic-commerce.md` and
 `grooveshop-docs/src/dev/flows/staff-mcp.md`.
 

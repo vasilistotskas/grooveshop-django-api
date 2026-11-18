@@ -413,6 +413,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "sessions.Session": Delete(tenant_only=True),
     "user.UserDataExport": Delete(),
     "meta_capi.MetaCapiEventLog": Delete(),
+    # Order events owed to production's agent gateway: staging must not
+    # send them from a restored copy.
+    "agent.AgentOrderEvent": Delete(),
     # Changes waiting to be announced to search engines: staging must not
     # replay production's pages from a restored copy.
     "indexnow.PendingUrl": Delete(),

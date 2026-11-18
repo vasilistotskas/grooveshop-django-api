@@ -99,6 +99,7 @@ class TestSuspendedStores:
         "contact.tasks.purge_expired_attachment_files",
         "contact.tasks.purge_expired_contact_records",
         "contact.tasks.reap_unclaimed_attachments",
+        "core.tasks.clear_expired_notifications_task",
         "core.tasks.purge_expired_admin_log_entries",
         "emails.tasks.purge_expired_email_logs",
         "meta_capi.tasks.purge_expired_meta_capi_event_logs",

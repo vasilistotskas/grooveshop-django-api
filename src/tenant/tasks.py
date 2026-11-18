@@ -61,10 +61,14 @@ def fanout_cleanup_old_guest_carts():
     return run_for_all_tenants("core.tasks.cleanup_old_guest_carts")
 
 
+# A retention sweep, so it reaches SUSPENDED tenants too: a store's
+# billing state does not pause a deletion the platform promised.
 @celery_app.task(base=TenantTask)
 def fanout_clear_expired_notifications():
     return run_for_all_tenants(
-        "core.tasks.clear_expired_notifications_task", days=365
+        "core.tasks.clear_expired_notifications_task",
+        include_suspended=True,
+        days=365,
     )
 
 

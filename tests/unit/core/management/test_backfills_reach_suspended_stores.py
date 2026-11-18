@@ -101,6 +101,8 @@ INCLUDE_SUSPENDED_STORES = {
     "backfill_recommendation_slots": True,
     "backfill_turnover_snapshots": True,
     "builder_rewrite_backups": True,
+    # A retention sweep, like its beat fan-out.
+    "expire_notifications": True,
     "heal_discount_allocation": True,
     "import_builder_media": True,
     "migrate_builder_media": True,
@@ -120,8 +122,6 @@ INCLUDE_SUSPENDED_STORES = {
     "reconcile_acs_order_status": False,
     # A readiness report before a store issues receipts, not a backfill.
     "mydata_readiness": False,
-    # Follows its beat fan-out, which reaches active stores only.
-    "expire_notifications": False,
 }
 
 

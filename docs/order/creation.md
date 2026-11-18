@@ -347,15 +347,25 @@ caller:
   Both paths (§3.1 too) apply it the same way.
   - **Only the gateway names one.** `agentCheckout` is believed beside the
     gateway's secret in `X-Internal-Gateway` alone
-    (`OrderViewSet._believed_agent_checkout`), as `agentProtocol` is
+    (`OrderViewSet._named_agent_checkout`), as `agentProtocol` is
     ([§3.4](creation-records.md)). From any other caller it is ignored:
     the order stores none and no order is looked up by it.
-  - **First, before anything is judged.** `OrderViewSet.create` looks the
-    checkout up (`OrderService.order_for_agent_checkout`) right after the
-    body is validated: the first order took the stock and kept (Viva),
-    emptied or deleted (cash on delivery) the cart, so the pay way, cart,
-    stock and unpaid-cart checks would each refuse the repeat for what the
-    first call did.
+  - **First, before anything is judged, the body's validation included.**
+    `OrderViewSet.create` reads the bare id from the body (through the
+    request serializer's own `agent_checkout` field; a malformed value
+    names no checkout and the validation refuses it) and looks the
+    checkout up (`OrderService.order_for_agent_checkout`) before the body
+    is validated. The first order took the stock and kept (Viva), emptied
+    or deleted (cash on delivery) the cart, and validation reads rows that
+    can change after it (an active carrier, a country, a region), so the
+    validation and the pay way, cart, stock and unpaid-cart checks could
+    each refuse the repeat of an order that exists.
+  - **No live stock hold is needed.** Creation reconciles the cart's holds
+    under the product locks (`_consume_stock_for_order`): a missing or
+    expired hold is released and the cart's quantity is taken from the
+    stock that other carts' active holds leave. A call whose first attempt
+    never reached Django is an ordinary creation, refused only when that
+    stock no longer covers the cart.
   - **Under the cart lock.** Both locked halves look it up again right
     after the cart row lock and before `_refuse_agent_order_on_unpaid_cart`.
     Two calls of one checkout on one cart serialise there and the second

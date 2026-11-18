@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Mapping
 from uuid import UUID
 
 from django.conf import settings
@@ -794,6 +795,17 @@ class OrderViewSet(BaseModelViewSet):
         """
 
         try:
+            # A repeat of an agent checkout is answered with its order
+            # before anything is judged, the body's validation included:
+            # that order took the stock and kept, emptied or deleted the
+            # cart, and validation reads rows that can change after it
+            # (an active carrier, a country, a region), so any check could
+            # refuse the repeat of an order that exists.
+            agent_checkout = self._named_agent_checkout(request)
+            placed = self._order_placed_by(agent_checkout)
+            if placed is not None:
+                return self._order_response(request, placed)
+
             # Step 0: Validate the full request body through
             # OrderCreateFromCartSerializer so every field is type-checked,
             # cross-field rules (B2B, BoxNow) are applied, and the runtime
@@ -804,17 +816,6 @@ class OrderViewSet(BaseModelViewSet):
             request_serializer = request_serializer_class(data=request.data)
             request_serializer.is_valid(raise_exception=True)
             validated_data = request_serializer.validated_data
-
-            # A repeat of an agent checkout is answered with its order
-            # before anything is judged: that order took the stock and
-            # kept, emptied or deleted the cart, so every check below
-            # could refuse the repeat for what the first call did.
-            agent_checkout = self._believed_agent_checkout(
-                request, validated_data
-            )
-            placed = self._order_placed_by(agent_checkout)
-            if placed is not None:
-                return self._order_response(request, placed)
 
             # Step 1: Get payment method to determine flow
             pay_way_id = validated_data["pay_way_id"]
@@ -1352,8 +1353,7 @@ class OrderViewSet(BaseModelViewSet):
             response_serializer.data, status=status.HTTP_201_CREATED
         )
 
-    @staticmethod
-    def _believed_agent_checkout(request, validated_data: dict) -> UUID | None:
+    def _named_agent_checkout(self, request) -> UUID | None:
         """The agent checkout the order is placed for, when the agent
         gateway names one.
 
@@ -1361,12 +1361,28 @@ class OrderViewSet(BaseModelViewSet):
         (``X-Internal-Gateway``), as ``attribution.agentProtocol`` is.
         From any other caller it is ignored: no one else can tie an order
         to a checkout, or be answered an order by naming one.
+
+        Read from the raw body, through the request serializer's own
+        ``agent_checkout`` field, before the body is validated: the
+        lookup needs nothing else, and a repeat must not depend on the
+        rest of the body still validating. A malformed value names no
+        checkout here, and the body's validation refuses it.
         """
         if not is_internal_caller(
             request.headers.get("X-Internal-Gateway", "")
         ):
             return None
-        return validated_data.get("agent_checkout")
+        data = request.data
+        value = (
+            data.get("agent_checkout") if isinstance(data, Mapping) else None
+        )
+        if value is None:
+            return None
+        field = self.get_request_serializer()().fields["agent_checkout"]
+        try:
+            return field.run_validation(value)
+        except ValidationError:
+            return None
 
     @staticmethod
     def _order_placed_by(agent_checkout: UUID | None) -> Order | None:

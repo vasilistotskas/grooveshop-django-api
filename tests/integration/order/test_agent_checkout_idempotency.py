@@ -33,6 +33,7 @@ import pytest
 from django.db import IntegrityError, connection, transaction
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -50,6 +51,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from region.factories import RegionFactory
+from shipping.models import ShippingProvider
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
@@ -271,7 +273,9 @@ class TestThroughTheEndpoint:
             self.cod = _cod()
             yield
 
-    def _post(self, pay_way, checkout, *, secret=GATEWAY_SECRET, cart=None):
+    def _post(
+        self, pay_way, checkout, *, secret=GATEWAY_SECRET, cart=None, **body
+    ):
         address = self.checkout.address()
         return APIClient().post(
             reverse("order-list"),
@@ -290,6 +294,7 @@ class TestThroughTheEndpoint:
                 "phone": address["phone"],
                 "attribution": {"agentProtocol": "ucp"},
                 "agentCheckout": str(checkout),
+                **body,
             },
             format="json",
             HTTP_X_CART_ID=str((cart or self.checkout.cart).uuid),
@@ -330,6 +335,70 @@ class TestThroughTheEndpoint:
 
         assert second.status_code == status.HTTP_201_CREATED, second.json()
         assert second.json()["id"] == first["id"]
+
+    def test_a_repeat_is_answered_before_the_body_is_validated(self):
+        """Validation reads rows that can change after the first order:
+        here its carrier is switched off, which refuses a new order with
+        that carrier, and must not refuse the repeat of one that exists
+        (the gateway reads a 4xx as "nothing placed")."""
+        checkout = uuid4()
+        carrier = {"shippingProviderCode": "flat_rate"}
+        first = self._post(self.cod, checkout, **carrier)
+        assert first.status_code == status.HTTP_201_CREATED, first.json()
+        # Made before the switch: a new cart's rate re-enables its carrier.
+        other = _Cart()
+        ShippingProvider.objects.filter(code="flat_rate").update(
+            is_active=False
+        )
+        refused = self._post(self.cod, uuid4(), cart=other.cart, **carrier)
+        assert refused.status_code == status.HTTP_400_BAD_REQUEST
+        assert refused.json()["code"] == "shipping_provider_unavailable"
+
+        second = self._post(self.cod, checkout, **carrier)
+
+        assert second.status_code == status.HTTP_201_CREATED, second.json()
+        assert second.json()["id"] == first.json()["id"]
+        assert Order.objects.count() == 1
+
+    def test_a_repeat_whose_order_was_deleted_is_answered_with_it(self):
+        """The checkout placed it: deleting it does not let the checkout
+        place another."""
+        checkout = uuid4()
+        first = self._post(self.cod, checkout).json()
+        Order.objects.filter(pk=first["id"]).update(
+            is_deleted=True, deleted_at=timezone.now()
+        )
+
+        second = self._post(self.cod, checkout)
+
+        assert second.status_code == status.HTTP_201_CREATED, second.json()
+        assert second.json()["id"] == first["id"]
+        assert Order.objects.all_with_deleted().count() == 1
+
+    def test_a_call_the_index_refused_is_answered_with_the_first_order(self):
+        """Two carts of one checkout: the second call misses both lookups
+        (blinded here), its insert is rejected by the real index, and the
+        view's lookup after the refusal answers the first order."""
+        checkout = uuid4()
+        first = self._post(self.cod, checkout).json()
+        other = _Cart()
+        real_lookup = OrderService.order_for_agent_checkout
+        lookups: list[UUID] = []
+
+        def blind_twice(agent_checkout):
+            lookups.append(agent_checkout)
+            return None if len(lookups) <= 2 else real_lookup(agent_checkout)
+
+        with patch.object(
+            OrderService, "order_for_agent_checkout", side_effect=blind_twice
+        ):
+            second = self._post(self.cod, checkout, cart=other.cart)
+
+        assert len(lookups) == 3, "the lookup after the refusal never ran"
+        assert second.status_code == status.HTTP_201_CREATED, second.json()
+        assert second.json()["id"] == first["id"]
+        assert Order.objects.count() == 1
+        assert other.stock() == STOCK, "the refused call kept its stock"
 
     @pytest.mark.parametrize("secret", ["", "guess"])
     def test_without_the_secret_the_checkout_is_ignored(self, secret):

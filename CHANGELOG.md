@@ -3,6 +3,233 @@
 
 
 
+## v3.254.0 (2026-11-18)
+
+### Bug fixes
+
+* fix(order): checkout quote review: token points, a quote budget, shipping codes, loyalty rounding
+
+Points on a cart-token request. POST /cart/quote priced the cart owner's
+loyalty points for whoever held the owner's cart token, and the refusal
+of too many points states the balance. A token request that asks to
+redeem points is now refused before anything is priced (400
+loyalty_requires_authentication), also when the caller is signed in as
+another account.
+
+A budget of its own. The quote was in the cart's write budget
+(cart_mutation_anon, 30/minute), so a platform polling an open checkout
+could use up the budget its own cart writes need. It now has cart_quote
+and cart_quote_anon (120/minute, per cart for the agent gateway). A quote
+that carries gift-card codes also spends gift_card_check, so it is no
+faster a balance oracle than /giftcard/check.
+
+Coded shipping refusals. A delivery that cannot be priced answered
+invalid_order_data with the reason only in translated text. shipping_cost
+now raises ShippingRefusedError (an InvalidOrderDataError that names the
+refusal), and the quote answers {detail, reason, code} with
+shipping_unavailable, shipping_parcel_too_large or
+shipping_weight_exceeded. The payment intent and order creation keep
+their answer.
+
+One loyalty rounding. The redemption was priced unrounded (points /
+ratio). With 103 points at 200 a euro (0.515) the order held 0.52 and
+its lines' discount snapshots 0.51, so write_vat_lines refused the order.
+LoyaltyService._validate_and_price_redemption now rounds half up to the
+cent, the one place the quote, redeem_points and the snapshots read.
+
+InvalidGiftCardError keeps its message as an attribute and the cart view
+reads that instead of str(exc).
+
+Tests: the documented fixture validated OpenAPI 3.0 with a Draft 2020-12
+validator, which misreads the boolean exclusiveMaximum of every decimal
+field and ignores nullable. It goes through tests/utils/openapi.py
+(Draft 4, nullable handled), and the quote and 409 bodies are checked
+against the schema again.
+
+Part of #635. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): gift-card codes are budgeted on every checkout route; points worth under a cent are refused
+
+A request that carries gift-card codes says what a card settles, or that
+the code is no card, on three routes: the quote, the cart's payment
+intent and order creation (in its refusal, and in the quote of a
+total_changed). Only the quote spent gift_card_check; the payment intent
+allowed 30 a minute. gift_card_code_throttles(request) in
+core.api.throttling now returns GiftCardCheckThrottle for such a body,
+and the three views add it in get_throttles. A request without codes is
+not counted.
+
+Points worth less than half a cent priced at 0.00, and redeem_points
+spent them for nothing. LoyaltyService._validate_and_price_redemption,
+which every path reads, refuses with the code
+loyalty_redemption_too_small and states the fewest points that make a
+cent. The quote and the payment intent answer 400 with that code,
+/loyalty/redeem passes it on, and order creation answers
+invalid_order_data with the message under
+field_errors.loyalty_points_to_redeem, where every loyalty refusal's
+message now goes.
+
+Part of #635. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): the gift-card budget counts guesses, not use
+
+The budget added for checkout requests that carry gift-card codes counted
+every such request, per user or address. A checkout re-prices the same
+card on every change, so a shopper with one card was refused after six
+quotes, and every buyer of an agent platform shared the gateway's
+address.
+
+GiftCardCodeThrottle limits guessing instead. Only a code new to the cart
+counts: the cart keeps the codes it has been allowed to try for
+GIFT_CARD_CODES_SEEN_TTL_SECONDS, as keyed SHA-256 digests, shared by the
+quote, the payment intent and order creation. A request with several new
+codes costs that many, and a refused request tried nothing. The caller
+pays: the signed-in customer, else the cart for a request carrying the
+gateway's secret (as GatewayAnonThrottle keys it), else the address. The
+budget stays the gift_card_check scope, which /giftcard/check spends for
+the same caller; that endpoint is unchanged.
+
+Part of #635. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): the gift-card budget reads codes as the serializer does, form bodies included
+
+The budget read the codes with request.data.get("gift_card_codes"). On a
+form or multipart body that is a QueryDict, whose get returns the last
+value as a string, so no throttle was added while the serializers'
+ListField priced every repeated value: guesses sent as a form were never
+counted.
+
+The codes are now taken from the route's request serializer's own
+gift_card_codes field, by the calls the serializer makes (get_value, then
+run_validation), so the budget counts exactly what is priced: a JSON
+list, repeated keys, indexed form keys. A field the serializer would
+refuse answers 400 with nothing priced and nothing counted.
+gift_card_code_throttles takes the serializer class; the quote, the
+payment intent and order creation pass their own.
+
+The docstring and docs/order/creation.md said a refused request tried
+nothing. DRF asks every throttle, so that holds only for a request this
+budget refuses; the sentence says so now.
+
+Part of #635. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): no carrier call under the order-create locks; loyalty capped at goods after promotions; atomic gift-card budget
+
+Carrier calls. On an ACS cache miss the locked quote of order creation
+called ACS while holding the cart, promotion, customer and gift-card
+rows (a 15 s timeout, failures not cached). Both creation paths now
+resolve the carrier's live price before their transaction
+(OrderService._resolve_live_shipping), and the locked quote prices with
+cached_only: it reads the adapter's cache and never calls out. A parcel
+the cache holds no answer for rolls the creation back
+(ShippingPriceUnresolvedError) and is answered total_changed with a quote
+priced after the rollback. The order-first path is an unlocked wrapper
+around _create_order_offline_locked. ACS remembers a failed price call
+for 60 seconds, so "no live price" is an answer the locked half can read.
+
+Loyalty cap. Points were capped at the goods before the promotion, in the
+quote and in redeem_points, so a redemption could pay for shipping and
+the fee. The cap is the goods after promotions
+(CheckoutQuote.free_threshold_value) on the quote, the payment intent,
+both creation paths and POST /loyalty/redeem.
+
+Gift-card budget. DRF's throttle reads the history, compares and writes
+as three steps, so requests arriving together all passed.
+GiftCardCheckThrottle, whose logic GiftCardCodeThrottle shares, does them
+while holding the budget's key (CustomCache.lock), inside the outage
+policy (ResilientThrottleMixin.take).
+
+Also: CartQuoteThrottle counts signed-in callers only (DRF keys an
+anonymous request by address, which every gateway guest shares); the pay
+way a quote or a payment intent accepts goes through the rule that lists
+them (OrderQuoteService.offered_pay_ways); a fee threshold in another
+currency waives nothing; a delivery whose rate costs nothing reports no
+waiver.
+
+Part of #635. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): order creation accepts exactly the pay ways the quote offers
+
+Order creation checked its pay way with a rule of its own
+(filter_by_carrier plus a credentials check), which judges a home
+delivery that names no carrier by no carrier at all. The storefront
+never names one for a home delivery, so creation accepted pay ways the
+quote does not list and the payment intent refuses: a locker-terminal
+pay way on a courier delivery, or cash the store switched off for the
+carrier that would deliver.
+
+_validate_pay_way_for_order now asks OrderQuoteService.offered_pay_ways,
+the rule behind the quote's payWays and the pay way a quote or a payment
+intent accepts. It runs before the two creation paths split, so both use
+it. The refusal is unchanged: 400 pay_way_unavailable with the message
+under pay_way_id. A provider without credentials now gets the same
+message as any other pay way that is not offered. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* fix(order): an order without a shipping kind is offered a home delivery's pay ways; ACS price cache key versioned
+
+An order created without shipping_kind is priced and assigned as a home
+delivery, but offered_pay_ways judged it by no delivery at all, so it
+took any active pay way: a locker-terminal one, or cash the store
+switched off for the carrier that delivers. The kind a delivery is now
+comes from one helper, OrderQuoteService.delivery_kind, read by the
+price (_carrier), the carrier assignment
+(_resolve_shipping_provider) and the pay-way rule.
+
+The "ACS gave no price" marker was written under the cache key the
+release still serving reads with float(), so an ACS failure while a
+deploy rolls would have failed every ACS-priced request on the old pods
+until the entry expired. The key now carries a version, and the two
+releases never read each other's entries. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+### Features
+
+* feat(order): one checkout quote over HTTP, and an expected total on order creation (#750) ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
+* feat(order): one checkout quote over HTTP, and an expected total on order creation
+
+The checkout total was computed four times: by the cart's payment-intent
+endpoint, twice by payment-first order creation and once by order-first
+creation, each from its own copy of the same steps. Clients (the
+storefront, the agent gateway) computed it a fifth and sixth time, because
+no endpoint returned the total an order would be created at, and the
+order-first path (cash on delivery, Viva) compared its total with nothing.
+
+OrderQuoteService.quote is now the one computation: promotions, the parcel
+(gifts included), shipping, the pay-way fee, the loyalty discount, the
+gift-card plan and the amount due, as a frozen CheckoutQuote. Its callers:
+
+- POST /api/v1/cart/quote (new): the quote for the choices made so far. A
+  row that depends on a choice the request did not make is null. Also
+  returns every delivery and pay way on offer at the price this cart would
+  be charged (shippingOptions with waivedBy, payWays with waived), a
+  blocking coupon, and expectedTotal. The cart is found as order creation
+  finds it (get_existing_cart, 404 when missing); X-Cart-Token is accepted.
+- POST /api/v1/cart/create-payment-intent: the intent's amount is the
+  quote's amount due. Its refusals keep their bodies.
+- Both order-creation paths call it with lock=True (promotions, the
+  customer's row, the gift cards) and build the order from its rows. The
+  order-first path now plans loyalty and gift cards before the lines are
+  written, as the payment-first path always did. An order whose own sum is
+  not the quote's amount due is refused and rolled back.
+
+POST /api/v1/order takes an optional expectedTotal {amount, currency}
+(minor units). Both paths compare it exactly with the amount due computed
+under the cart lock; a difference creates nothing and answers 409 with
+code total_changed and the quote. OrderCreateErrorType is an enum in the
+API contract and the storefront in production rejects a value it does not
+list, so error.type stays invalid_order_data in this release and clients
+branch on code; the enum value follows the storefront release that lists
+it.
+
+ShippingService.quote and OrderQuoteService.shipping_cost return a
+ShippingCharge (price and what waived it) and take the free-shipping
+promotion themselves. PayWayService.shopper_facing and filter_for_shipping
+hold the rules the pay-way list already applied, for the quote to share.
+GiftCardService.redeem and the order service's private planning helpers
+are gone: the quote plans, record_plan writes.
+
+Part of #635. Carries the one-total part of #577. ([`c39535e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c39535ee28ccaa2f300aeaee4da7b6c042dcb4a8))
+
 ## v3.253.1 (2026-11-18)
 
 ### Bug fixes

@@ -7,7 +7,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.utils import timezone
 
-from agent.outbox import record_order_changed
 from core import celery_app
 from core.retention import delete_in_batches
 from core.retry import (
@@ -2219,25 +2218,6 @@ def send_review_request_emails() -> dict[str, int]:
             failed,
         )
     return {"sent": sent, "skipped": skipped, "failed": failed}
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    autoretry_for=TRANSIENT_DB_ERRORS,
-    retry_backoff=True,
-    retry_jitter=True,
-    max_retries=3,
-)
-def push_order_event_to_gateway(order_id: int) -> None:
-    """Remove in the release after this one.
-
-    The release before the outbox queued this task on every order change,
-    so a message still waiting (or on a retry countdown) during the deploy,
-    and a ``DeferredDispatch`` row naming it, end here: the change is
-    recorded as an agent order event (``agent.outbox``), which delivers
-    it. The event's time is when this runs, not when the order changed.
-    """
-    record_order_changed(order_id)
 
 
 @celery_app.task(

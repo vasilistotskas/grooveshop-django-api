@@ -601,3 +601,57 @@ class PaymentAttemptThrottleTestCase(
     def setUp(self) -> None:
         _GatewayUserBudgetTests.setUp(self)
         _GatewayPaymentKeyTests.setUp(self)
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class GatewaySubjectIsSettledOnceTestCase(TestCase):
+    """A view asks several throttles for the caller's key, so the lookup of
+    the cart or order a gateway call names must not run once per throttle:
+    it is settled once per request."""
+
+    def _keys(self, throttles, path, **headers):
+        request = APIRequestFactory().post(path, headers=headers)
+        request.user = AnonymousUser()
+        return [t.get_cache_key(request, view=None) for t in throttles]
+
+    def test_an_order_create_looks_the_cart_up_once(self) -> None:
+        cart_id = _guest_cart()
+        with self.assertNumQueries(1):
+            keys = self._keys(
+                [
+                    OrderCreateThrottle(),
+                    OrderCreateAnonThrottle(),
+                    CouponApplyThrottle(),
+                    CartMutationThrottle(),
+                    CartMutationAnonThrottle(),
+                ],
+                "/api/v1/order",
+                **{"X-Internal-Gateway": SECRET, "X-Cart-Id": cart_id},
+            )
+        self.assertTrue(all(f"gw:{cart_id}" in key for key in keys))
+
+    def test_an_unknown_cart_is_looked_up_once_too(self) -> None:
+        with self.assertNumQueries(1):
+            self._keys(
+                [CartMutationThrottle(), CartMutationAnonThrottle()],
+                "/api/v1/cart/item",
+                **{"X-Internal-Gateway": SECRET, "X-Cart-Id": UNKNOWN_UUID},
+            )
+
+    def test_a_payment_route_looks_the_order_up_once(self) -> None:
+        order_uuid = _guest_order()
+        with self.assertNumQueries(1):
+            keys = self._keys(
+                [PaymentAttemptThrottle(), PaymentAttemptAnonThrottle()],
+                f"/api/v1/order/1/create_checkout_session?uuid={order_uuid}",
+                **{"X-Internal-Gateway": SECRET},
+            )
+        self.assertTrue(all("gw:order:" in key for key in keys))
+
+    def test_a_request_without_the_secret_looks_nothing_up(self) -> None:
+        with self.assertNumQueries(0):
+            self._keys(
+                [PaymentAttemptThrottle(), PaymentAttemptAnonThrottle()],
+                f"/api/v1/order/1/create_checkout_session?uuid={UNKNOWN_UUID}",
+                **{"X-Cart-Id": UNKNOWN_UUID},
+            )

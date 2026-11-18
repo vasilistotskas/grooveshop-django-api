@@ -43,6 +43,11 @@ urlpatterns = [
         name="cart-create-payment-intent",
     ),
     path(
+        "cart/quote",
+        CartViewSet.as_view({"post": "quote"}),
+        name="cart-quote",
+    ),
+    path(
         "cart/coupon",
         CartViewSet.as_view(
             {"post": "apply_coupon", "delete": "remove_coupon"}

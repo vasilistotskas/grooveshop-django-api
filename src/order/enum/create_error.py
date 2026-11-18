@@ -1,6 +1,16 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+# The ``code`` of an order create refused because the request's
+# ``expectedTotal`` is not the amount due computed now (409). Not a member
+# of ``OrderCreateErrorType`` yet: that enum is in the API contract, and the
+# storefront in production must list a value before Django may send it
+# (``api-contract/README.md``, "ships consumer first"). Until its release
+# does, the refusal carries ``error.type`` ``invalid_order_data``, which
+# every client already handles, and clients branch on ``code``. Then this
+# becomes ``OrderCreateErrorType.TOTAL_CHANGED`` and both carry it (#635).
+TOTAL_CHANGED_CODE = "total_changed"
+
 
 class OrderCreateErrorType(models.TextChoices):
     """``error.type`` of a refused order create (``POST /order``).

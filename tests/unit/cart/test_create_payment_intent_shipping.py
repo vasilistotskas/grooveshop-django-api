@@ -135,13 +135,13 @@ def test_pi_and_order_create_calcs_agree_at_every_price_point():
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
-        )
+        ).price
         order_calc = OrderQuoteService.shipping_cost(
             order_value=Money(total, "EUR"),
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
-        )
+        ).price
         assert pi_calc.amount == order_calc.amount, (
             f"PI vs order calc diverged at {total}: "
             f"pi={pi_calc.amount} order={order_calc.amount}"
@@ -153,13 +153,13 @@ def test_pi_and_order_create_calcs_agree_at_every_price_point():
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",
         shipping_kind="home_delivery",
-    ).amount == Decimal("3.50")
+    ).price.amount == Decimal("3.50")
     assert OrderQuoteService.shipping_cost(
         order_value=Money(Decimal("30.00"), "EUR"),
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",
         shipping_kind="home_delivery",
-    ).amount == Decimal(0)
+    ).price.amount == Decimal(0)
 
 
 def test_home_delivery_without_explicit_code_resolves_to_the_active_carrier():
@@ -185,7 +185,7 @@ def test_home_delivery_without_explicit_code_resolves_to_the_active_carrier():
         shipping_kind="home_delivery",
         # NOTE: shipping_provider_code intentionally omitted — that's
         # the production frontend's behaviour for home_delivery.
-    )
+    ).price
     assert quote.amount == Decimal("3.50")
 
 
@@ -231,5 +231,5 @@ def test_free_shipping_info_min_matches_carrier_at_threshold():
         country_id=country.alpha_2,
         shipping_provider_code="flat_rate",
         shipping_kind="home_delivery",
-    )
+    ).price
     assert quote.amount == Decimal(0)

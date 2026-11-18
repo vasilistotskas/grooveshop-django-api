@@ -14,7 +14,11 @@ Exception Hierarchy:
     ├── ProductNotFoundError
     ├── InvalidOrderDataError
     │   ├── CartNotReadyError
-    │   └── CartHasUnpaidOrderError
+    │   ├── CartHasUnpaidOrderError
+    │   ├── LoyaltyRedemptionError
+    │   ├── ShippingRefusedError
+    │   └── ShippingPriceUnresolvedError
+    ├── OrderTotalChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -27,6 +31,8 @@ Exception Hierarchy:
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
 """
+
+from django.utils.translation import gettext as _
 
 
 class OrderServiceError(Exception):
@@ -251,6 +257,100 @@ class UnpaidOrderLimitError(InvalidOrderDataError):
         )
 
 
+class LoyaltyRedemptionError(InvalidOrderDataError):
+    """Raised when the loyalty points a checkout asks to redeem cannot
+    be redeemed (the program is off, the balance is short, the discount
+    is more than the products).
+
+    The shopper was shown the discount, so it is never dropped: the
+    quote, the payment intent or the order is refused instead.
+
+    A subclass of ``InvalidOrderDataError`` so order creation passes it
+    on as it passes its other refusals, with the program's message under
+    ``loyalty_points_to_redeem``. The cart endpoints answer it with
+    ``code``.
+
+    Attributes:
+        reason (str): The loyalty program's own message, in the
+            request's language.
+        code (str): The program's code for the refusal
+            (``loyalty_redemption_too_small``), else ``DEFAULT_CODE``.
+    """
+
+    DEFAULT_CODE = "loyalty_redemption_invalid"
+
+    def __init__(self, reason: str, code: str | None = None):
+        self.reason = reason
+        self.code = code or self.DEFAULT_CODE
+        super().__init__(
+            _("Loyalty redemption cannot be applied: {reason}").format(
+                reason=reason
+            ),
+            field_errors={"loyalty_points_to_redeem": [reason]},
+        )
+
+
+class ShippingRefusedError(InvalidOrderDataError):
+    """Raised when the chosen delivery cannot be priced for the cart: the
+    store does not ship that way to the country, the cart is too heavy,
+    or it does not fit the carrier's parcels.
+
+    A subclass of ``InvalidOrderDataError`` that carries the sentence
+    under ``shipping_provider_code``, so order creation and the payment
+    intent answer it as they answer their other refusals.
+    ``POST /cart/quote`` answers it with ``reason`` as its code.
+
+    Attributes:
+        reason (str): A ``shipping.enum.ShippingRefusal`` value.
+        message (str): The sentence, in the request's language.
+    """
+
+    def __init__(self, reason: str, message: str):
+        self.reason = reason
+        self.message = message
+        super().__init__(
+            message, field_errors={"shipping_provider_code": [message]}
+        )
+
+
+class ShippingPriceUnresolvedError(InvalidOrderDataError):
+    """Raised by the locked quote of order creation when the carrier's
+    live price for the delivery was not resolved before the locks were
+    taken, or was resolved for another parcel (the cart changed in
+    between).
+
+    Under its locks order creation never asks a carrier, so it cannot
+    price the delivery: the creation rolls back, and its caller prices
+    the cart again with nothing locked and answers ``total_changed``
+    with that quote (``OrderService._quoted_again``).
+
+    A subclass of ``InvalidOrderDataError`` so the locked half passes it
+    on as it passes its other refusals.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "the carrier's live price was not resolved before the locks"
+        )
+
+
+class OrderTotalChangedError(OrderServiceError):
+    """Raised when order creation computes a total other than the one the
+    client says it showed the buyer (``expectedTotal``).
+
+    Nothing was created. The API answers it 409 with the quote the order
+    would have been created at, so the client can show the new total and
+    ask again.
+
+    Attributes:
+        quote (CheckoutQuote): What checkout charges for the cart now.
+    """
+
+    def __init__(self, quote):
+        self.quote = quote
+        super().__init__("the order total is not the total the client expected")
+
+
 class InvalidCouponError(OrderServiceError):
     """
     Raised when a coupon attached to the cart is refused at order
@@ -283,10 +383,12 @@ class InvalidGiftCardError(OrderServiceError):
 
     Attributes:
         reason (str): Machine-readable reason (gift_card_* vocabulary).
+        message (str): The sentence a client may show.
     """
 
     def __init__(self, reason: str, message: str):
         self.reason = reason
+        self.message = message
         super().__init__(message)
 
 

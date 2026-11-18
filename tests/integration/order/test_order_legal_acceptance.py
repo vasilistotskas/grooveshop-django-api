@@ -294,9 +294,17 @@ class TestPaymentIntentNeedsTheLegalTexts(APITestCase):
             True,
             {"client_secret": "cs_test_legal", "payment_id": "pi_test_legal"},
         )
-        with patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
+        with (
+            patch(
+                "pay_way.services.PayWayService.get_provider_for_pay_way",
+                return_value=provider,
+            ),
+            # The store holds the provider's credentials: a pay way it
+            # could not charge with is not offered.
+            patch(
+                "pay_way.services.PayWayService.is_provider_configured",
+                return_value=True,
+            ),
         ):
             response = self.client.post(
                 reverse("cart-create-payment-intent"),

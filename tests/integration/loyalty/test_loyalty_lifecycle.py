@@ -472,7 +472,7 @@ class TestOrderCompleteAndRedeemFlow:
         # Verify order metadata
         redeem_order.refresh_from_db()
         assert redeem_order.metadata["loyalty_points_redeemed"] == 200
-        assert redeem_order.metadata["loyalty_discount"] == "4"
+        assert redeem_order.metadata["loyalty_discount"] == "4.00"
 
     def test_redeem_rejects_over_balance(self):
         """Attempting to redeem more than balance raises ValidationError."""

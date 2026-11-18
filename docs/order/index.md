@@ -16,7 +16,7 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 |---|---|---|
 | 1 | [`overview.md`](overview.md) | anything here: the three axes of an order (status, payment status, settlement), the two "payment method" columns, the carrier adapter |
 | 2 | [`state-machines.md`](state-machines.md) | an order status or payment status transition, who may make it, the follow-up flag |
-| 3, 3.1 to 3.3 | [`creation.md`](creation.md) | checkout: the payment-first and order-first creation paths, locks and stock holds, delivery-address rules |
+| 3, 3.0 to 3.3 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds, delivery-address rules |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
 | 4 | [`payments.md`](payments.md) | Stripe, Viva Wallet or cash on delivery: per-tenant credentials, webhooks, fees, provider refunds, disputes |
 | 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares (the lock order included), shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
@@ -36,7 +36,10 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-16 (a staff or system cancel asks the courier after it
+Last refresh: 2026-11-18 (one checkout total: `OrderQuoteService.quote`
+behind `POST /cart/quote`, the payment intent and both creation paths, and
+an order created with `expectedTotal` exists only at that total,
+[§3.0](creation.md); before that 2026-11-16: a staff or system cancel asks the courier after it
 has committed, with no row locked, and a sweep finishes a cancel whose worker
 stopped in between, [§7.1.2](cancel.md); one lock order for an order and its
 shipment, the order first, [§5](shipping.md); before that 2026-11-14: an agent

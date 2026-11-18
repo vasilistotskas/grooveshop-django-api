@@ -5,7 +5,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn
 from uuid import UUID
 
 from django.conf import settings
@@ -29,7 +29,12 @@ from order.checkout.discounts import (
     add_line_discounts,
     spread_by_remaining_value,
 )
-from order.checkout.quote import OrderQuoteService
+from order.checkout.quote import (
+    CheckoutQuote,
+    ExpectedTotal,
+    OrderQuoteService,
+    ShippingChoice,
+)
 from order.enum.attribution import OrderSourceType
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
@@ -51,6 +56,7 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCancellationError,
     OrderNotCancelableError,
+    OrderTotalChangedError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
@@ -60,6 +66,7 @@ from order.exceptions import (
     PaymentVerificationError,
     ProductNotFoundError,
     RefundOutstandingError,
+    ShippingPriceUnresolvedError,
     StockReservationError,
     UnpaidOrderLimitError,
 )
@@ -598,44 +605,151 @@ class OrderService:
             | {gift.product.id for gift in promo_result.gift_items}
         )
 
-    @classmethod
-    def _evaluate_promotions(cls, cart, *, user, email: str):
-        """Locked promotion evaluation for order creation.
+    @staticmethod
+    def _shipping_choice(shipping_address: dict[str, Any]) -> ShippingChoice:
+        return ShippingChoice(
+            kind=shipping_address.get("shipping_kind"),
+            provider_code=shipping_address.get("shipping_provider_code"),
+            country_id=shipping_address.get("country_id"),
+            region_id=shipping_address.get("region_id"),
+        )
 
-        Runs inside the caller's order-create transaction and takes
-        ``select_for_update`` on the candidate Promotion rows so the
-        usage-limit counts hold until commit. A refused attached
-        coupon raises ``InvalidCouponError`` — the offline providers
-        (COD/Viva) have no amount guard, so silently dropping the
-        discount would charge the shopper more than the sidebar showed.
+    @classmethod
+    def _resolve_live_shipping(
+        cls, cart, *, user, shipping_address: dict[str, Any]
+    ) -> None:
+        """Have the carrier's live price resolved BEFORE any row is locked.
+
+        Both creation paths call it ahead of their transaction. A carrier
+        call can take seconds, and inside the transaction it would hold
+        the cart row and whatever the quote locks (promotions, the
+        customer, gift cards) for that long, which every checkout sharing
+        one of them waits behind. The locked quote then reads the answer
+        from the carrier adapter's cache and never calls out
+        (``OrderQuoteService.resolve_live_shipping``).
+
+        The cart's wholesale prices are bound first, as the locked half
+        binds them, so both weigh the same parcel.
         """
-        result = PromotionEngine.evaluate(
-            cart, user=user, email=email, lock=True
+        from b2b.services import B2BPricingService
+
+        B2BPricingService.bind_cart(cart, user)
+        OrderQuoteService.resolve_live_shipping(
+            cart,
+            user=user,
+            email=shipping_address.get("email") or "",
+            shipping=cls._shipping_choice(shipping_address),
         )
-        blocking = result.blocking_rejections
-        if blocking:
-            code, reason = blocking[0]
-            raise InvalidCouponError(code=code, reason=reason)
-        return result
 
     @classmethod
-    def _redeem_gift_cards(cls, gift_card_codes, order) -> Money:
-        """Order-first path: locked plan + record against what is still
-        due after promotions and loyalty. Returns the settled amount."""
-        if not gift_card_codes:
-            return Money(0, settings.DEFAULT_CURRENCY)
-        from giftcard.services import (
-            GiftCardError,
-            GiftCardService,
+    def _refuse_unpriced(
+        cls,
+        cart,
+        *,
+        user,
+        pay_way,
+        shipping_address: dict[str, Any],
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+    ) -> NoReturn:
+        """Answer a creation whose locked quote could not price the
+        delivery (``ShippingPriceUnresolvedError``): the parcel it weighed
+        was not the one the live price was resolved for, so the cart
+        changed in between, or the cached price expired.
+
+        The transaction has rolled back and nothing is locked. The cart
+        is priced again, which may ask the carrier, and the creation is
+        refused as a changed total with that quote: the client shows it
+        and orders again, now against a resolved price.
+        """
+        raise OrderTotalChangedError(
+            OrderQuoteService.quote(
+                cart,
+                user=user,
+                email=shipping_address.get("email") or "",
+                pay_way=pay_way,
+                shipping=cls._shipping_choice(shipping_address),
+                loyalty_points=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
         )
 
-        amount_due = order.calculate_order_total_amount()
-        try:
-            return GiftCardService.redeem(gift_card_codes, order, amount_due)
-        except GiftCardError as exc:
-            raise InvalidGiftCardError(
-                reason=exc.reason, message=str(exc.message)
-            ) from exc
+    @classmethod
+    def _quote_under_lock(
+        cls,
+        cart,
+        *,
+        user,
+        pay_way,
+        shipping_address: dict[str, Any],
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        expected_total: ExpectedTotal | None,
+    ) -> CheckoutQuote:
+        """The total an order is created at, computed once.
+
+        Runs inside the caller's order-create transaction, after the
+        cart row is locked and its wholesale prices are bound.
+        ``OrderQuoteService.quote(lock=True)`` locks the candidate
+        Promotion rows, the customer's row (loyalty) and the gift cards
+        until commit, so the usage limits it enforced, the points it
+        priced and the card balances it planned cannot be raced, and a
+        refused attached coupon raises ``InvalidCouponError`` rather
+        than silently charging the undiscounted total.
+
+        ``expected_total`` is the total the client showed the buyer.
+        When it is not the amount due computed here, nothing is created:
+        ``OrderTotalChangedError`` carries the quote. Prices, VAT,
+        promotions, rates and pay-way fees can all change between the
+        last render and the order, and this is the one place a change
+        is caught for a pay way with no provider amount to compare.
+        """
+        quote = OrderQuoteService.quote(
+            cart,
+            user=user,
+            email=shipping_address.get("email") or "",
+            pay_way=pay_way,
+            shipping=cls._shipping_choice(shipping_address),
+            loyalty_points=loyalty_points_to_redeem,
+            gift_card_codes=gift_card_codes,
+            lock=True,
+        )
+        if (
+            expected_total is not None
+            and expected_total != quote.expected_total
+        ):
+            logger.info(
+                "Order refused for cart %s: the client expected %s, the "
+                "total is %s",
+                cart.uuid,
+                expected_total,
+                quote.expected_total,
+            )
+            raise OrderTotalChangedError(quote)
+        return quote
+
+    @staticmethod
+    def _require_quoted_total(order: Order, quoted: Money) -> None:
+        """Refuse an order whose rows do not add up to its quote.
+
+        The quote is the total the buyer was shown, the payment intent
+        was verified against and ``expected_total`` was compared with;
+        ``Order.calculate_order_total_amount`` is what the order stores
+        and is charged for. They are one figure because the order is
+        built from the quote's rows. A charge added to one and not the
+        other, or a cart line changed between the quote and the line
+        lock, must fail here and roll the creation back, not surface as
+        a payment that does not match its order.
+        """
+        if ExpectedTotal.of(order.amount_due) != ExpectedTotal.of(quoted):
+            logger.error(
+                "Order total %s is not its quote's %s; creation rolled back",
+                order.amount_due,
+                quoted,
+            )
+            raise InvalidOrderDataError(
+                "the order's rows do not add up to the total it was quoted at"
+            )
 
     @classmethod
     def _inject_promotion_gifts(cls, order, promo_result, target_currency):
@@ -721,67 +835,6 @@ class OrderService:
                 lines,
                 spread_by_remaining_value(lines, loyalty_discount.amount),
             )
-
-    @classmethod
-    def _plan_loyalty_locked(
-        cls, user, loyalty_points_to_redeem, currency, max_discount
-    ) -> Decimal:
-        """Payment-first path: price the loyalty redemption under the
-        user-row lock so the PaymentIntent verification and the later
-        ``redeem_points`` (same transaction, same lock) cannot drift.
-
-        Returns Decimal("0") when no redemption was requested. A
-        redemption that cannot be honoured aborts order creation with
-        a typed error — the intent was created for the discounted
-        amount, so silently dropping the discount would make the
-        capture disagree with ``amount_due``.
-        """
-        if (
-            not loyalty_points_to_redeem
-            or loyalty_points_to_redeem <= 0
-            or user is None
-            or not getattr(user, "is_authenticated", False)
-        ):
-            return Decimal(0)
-
-        from loyalty.services import LoyaltyService
-
-        try:
-            return LoyaltyService.preview_redemption(
-                user,
-                loyalty_points_to_redeem,
-                str(currency),
-                max_discount,
-                lock=True,
-            )
-        except ValidationError as exc:
-            message = getattr(exc, "message", None) or "; ".join(
-                str(msg) for msg in getattr(exc, "messages", [])
-            )
-            raise InvalidOrderDataError(
-                _("Loyalty redemption cannot be applied: {reason}").format(
-                    reason=message
-                )
-            ) from exc
-
-    @classmethod
-    def _plan_gift_cards_locked(cls, gift_card_codes, amount_due: Money):
-        """Payment-first path: lock the cards and compute the plan the
-        PaymentIntent verification AND the later recording both use —
-        one plan, no drift between the verified and redeemed amounts."""
-        from giftcard.services import (
-            GiftCardError,
-            GiftCardService,
-        )
-
-        try:
-            return GiftCardService.plan_redemption(
-                gift_card_codes or [], amount_due, lock=True
-            )
-        except GiftCardError as exc:
-            raise InvalidGiftCardError(
-                reason=exc.reason, message=str(exc.message)
-            ) from exc
 
     @classmethod
     def _retrieve_payment_intent(
@@ -934,6 +987,7 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -949,8 +1003,9 @@ class OrderService:
            created for it, if any (idempotent)
         2. Validates cart items still exist and prices match
         3. Validates shipping address completeness
-        4. Re-compares the intent's amount and currency with the total
-           computed under lock
+        4. Re-compares the intent's amount and currency, and the
+           client's ``expected_total`` when it sent one, with the total
+           computed under lock (``OrderQuoteService.quote``)
         5. Gets stock reservations for cart session
         6. Creates Order with payment_id field populated
         7. Creates OrderItems from CartItems
@@ -975,6 +1030,8 @@ class OrderService:
             PaymentNotFoundError: If payment_intent_id invalid
             PaymentVerificationError: If the intent is in an invalid state
                 or already belongs to another order
+            OrderTotalChangedError: If ``expected_total`` is not the
+                amount due computed under lock
 
         Example:
             >>> order = OrderService.create_order_from_cart(
@@ -1022,20 +1079,34 @@ class OrderService:
                 _("Failed to create order: {error}").format(error=str(e))
             ) from e
 
-        return cls._create_order_for_verified_intent(
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id=payment_intent_id,
-            payment_status=payment_status,
-            payment_data=payment_data,
-            pay_way=pay_way,
-            user=user,
-            loyalty_points_to_redeem=loyalty_points_to_redeem,
-            gift_card_codes=gift_card_codes,
-            meta_context=meta_context,
-            attribution=attribution,
-            legal_acceptance=legal_acceptance,
+        cls._resolve_live_shipping(
+            cart, user=user, shipping_address=shipping_address
         )
+        try:
+            return cls._create_order_for_verified_intent(
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id=payment_intent_id,
+                payment_status=payment_status,
+                payment_data=payment_data,
+                pay_way=pay_way,
+                user=user,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                meta_context=meta_context,
+                attribution=attribution,
+                legal_acceptance=legal_acceptance,
+                expected_total=expected_total,
+            )
+        except ShippingPriceUnresolvedError:
+            cls._refuse_unpriced(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
 
     @classmethod
     @transaction.atomic
@@ -1054,12 +1125,16 @@ class OrderService:
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
-        Makes no provider call: ``payment_status`` and ``payment_data``
-        were read before this transaction opened. Everything here either
-        hits the database or recomputes the server-side total.
+        Makes no provider call and no carrier call: ``payment_status``
+        and ``payment_data`` were read, and the carrier's live price was
+        resolved (``_resolve_live_shipping``), before this transaction
+        opened. Everything here either hits the database, reads the cache
+        or recomputes the server-side total. A live price the cache does
+        not hold raises ``ShippingPriceUnresolvedError``.
         """
         try:
             from cart.models import Cart
@@ -1095,20 +1170,9 @@ class OrderService:
             # payment fee, item price snapshots, PaymentIntent amount
             # verification) must see the same prices the cart preview
             # showed. Kept in lockstep with the offline path.
-            from b2b.services import (
-                B2BPricingService,
-                B2BService,
-            )
+            from b2b.services import B2BPricingService
 
             B2BPricingService.bind_cart(cart, user)
-
-            # Wholesale carts sit outside the loyalty program unless the
-            # merchant opts in. Dropped HERE, before any pricing math,
-            # so the verified PaymentIntent amount, the order total and
-            # ``redeem_points`` all agree — dropping it later would let
-            # the capture disagree with ``amount_due``.
-            if B2BService.suppresses_loyalty(cart):
-                loyalty_points_to_redeem = 0
 
             # Wholesale minimum-order-value gate (standard B2B term).
             # Checked here AND at payment-intent creation so an online
@@ -1125,84 +1189,30 @@ class OrderService:
                     )
                 )
 
-            # Step 2.5: Evaluate promotions under lock. The Promotion
-            # rows stay locked until commit, so the usage-limit counts
-            # the engine enforced cannot be raced by a concurrent
-            # checkout. A refused attached coupon aborts with a typed
-            # error rather than silently charging the undiscounted
-            # total (COD/Viva have no amount guard to catch it).
-            promo_result = cls._evaluate_promotions(
-                cart, user=user, email=shipping_address.get("email") or ""
-            )
-            promo_discount = promo_result.discount_total
-
-            # Step 3: Verify the provider amount matches the server-
-            # calculated total. The intent itself (existence, state) was
-            # read before this transaction opened, so this is the only
-            # part of the verification that needs server state.
-            # The Stripe PaymentIntent's amount (in cents) must equal the
-            # cart total + shipping + payment fee to prevent a tampered client
-            # submitting a PI created for a lower amount.
-            # payment_data["amount"] is in euros (stripe_pi.amount / 100).
-            # We calculate the expected total using the same logic as Step 5.
-            from shipping.utils import compute_total_weight_grams
-
-            _cart_total = cart.total_price
-            _cart_pairs = [
-                (item.product, item.quantity) for item in cart.items.all()
-            ] + PromotionEngine.gift_pairs(promo_result)
-            _cart_weight_grams = compute_total_weight_grams(_cart_pairs)
-            _threshold_value = OrderQuoteService.threshold_value(
-                _cart_total, promo_discount
-            )
-            _shipping_cost = OrderQuoteService.shipping_cost(
-                order_value=_threshold_value,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=_cart_weight_grams,
-                items=_cart_pairs,
-                free=promo_result.free_shipping,
-            )
-            # Pay-way fee: waived on the same value as free shipping —
-            # mirrors the create-payment-intent endpoint exactly.
-            _payment_fee = OrderQuoteService.calculate_payment_method_fee(
+            # Step 2.5: The total, once, under lock (promotions, the
+            # customer's points, the gift cards): what the intent and
+            # the client's expected total are compared with, and what
+            # the order below is built from.
+            quote = cls._quote_under_lock(
+                cart,
+                user=user,
                 pay_way=pay_way,
-                order_value=_threshold_value,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                expected_total=expected_total,
             )
-            _expected_total = (
-                _cart_total.amount
-                - promo_discount.amount
-                + _shipping_cost.amount
-                + _payment_fee.amount
-            )
-            # Loyalty is a discount, so it reduces what the provider
-            # charges — priced here under the user-row lock with the
-            # SAME math ``redeem_points`` runs after the order exists,
-            # so the verified intent amount and ``amount_due`` cannot
-            # drift. (Historically the intent ignored loyalty and
-            # Stripe captured the undiscounted total while the points
-            # were still burnt.)
-            loyalty_preview = cls._plan_loyalty_locked(
-                user,
-                loyalty_points_to_redeem,
-                _cart_total.currency,
-                max_discount=_cart_total.amount,
-            )
-            _expected_total = max(_expected_total - loyalty_preview, Decimal(0))
-            # Gift cards settle part of the total LAST (payment, not
-            # discount) — the plan locks the card rows until commit so
-            # the amount verified here is exactly what gets redeemed
-            # after the order row exists.
-            gift_plan = cls._plan_gift_cards_locked(
-                gift_card_codes,
-                Money(_expected_total, _cart_total.currency),
-            )
-            _expected_total -= gift_plan.amount.amount
-            calculated_total_cents = round(_expected_total * 100)
+            charges = quote.charges()
+            promo_result = quote.promotion
+
+            # Step 3: Verify the provider amount matches that total. The
+            # intent itself (existence, state) was read before this
+            # transaction opened, so this is the only part of the
+            # verification that needs server state. It prevents a
+            # tampered client submitting a PI created for a lower
+            # amount. payment_data["amount"] is in euros
+            # (stripe_pi.amount / 100).
+            calculated_total_cents = ExpectedTotal.of(charges.amount_due).amount
             # The Stripe provider returns amount already divided by 100
             # (see payment.py StripePaymentProvider.get_payment_status) and
             # also returns a currency code. Some providers/tests return a
@@ -1233,24 +1243,34 @@ class OrderService:
                             "cart_uuid": str(cart.uuid),
                             "provider_amount_cents": provider_amount_cents,
                             "calculated_amount_cents": calculated_total_cents,
-                            "cart_total_amount": str(_cart_total.amount),
-                            "shipping_cost_amount": str(_shipping_cost.amount),
-                            "payment_fee_amount": str(_payment_fee.amount),
+                            "cart_total_amount": str(
+                                quote.items_subtotal.amount
+                            ),
+                            "shipping_cost_amount": str(
+                                charges.shipping.price.amount
+                            ),
+                            "payment_fee_amount": str(
+                                charges.payment_fee.amount.amount
+                            ),
                             "promotion_discount_amount": str(
-                                promo_discount.amount
+                                quote.discount_total.amount
                             ),
                             "promotion_free_shipping": (
                                 promo_result.free_shipping
                             ),
-                            "loyalty_preview_amount": str(loyalty_preview),
-                            "gift_plan_amount": str(gift_plan.amount.amount),
+                            "loyalty_preview_amount": str(
+                                quote.loyalty_discount.amount
+                            ),
+                            "gift_plan_amount": str(
+                                charges.gift_cards.amount.amount
+                            ),
                             "shipping_provider_code": shipping_address.get(
                                 "shipping_provider_code"
                             ),
                             "shipping_kind": shipping_address.get(
                                 "shipping_kind"
                             ),
-                            "cart_weight_grams": _cart_weight_grams,
+                            "cart_weight_grams": quote.weight_grams,
                             "country_id": shipping_address.get("country_id"),
                             "region_id": shipping_address.get("region_id"),
                             "pay_way_code": pay_way.provider_code,
@@ -1366,41 +1386,13 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost — pass cart weight so ACS live
-            # quotes match the weight-banded tariff bracket the voucher
-            # mint will charge (no surprise upcharge after order create).
-            from shipping.utils import compute_total_weight_grams
-
-            cart_total = cart.total_price
-            parcel_items = [
-                (ci.product, ci.quantity) for ci in cart_items
-            ] + PromotionEngine.gift_pairs(promo_result)
-            cart_weight_grams = compute_total_weight_grams(parcel_items)
-            threshold_value = OrderQuoteService.threshold_value(
-                cart_total, promo_discount
-            )
-            shipping_cost = OrderQuoteService.shipping_cost(
-                order_value=threshold_value,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=cart_weight_grams,
-                items=parcel_items,
-                free=promo_result.free_shipping,
-            )
-            order_data["shipping_price"] = shipping_cost
-
-            # Calculate payment method fee
-            # on the same value free shipping is judged on: the products
-            # after discounts (``threshold_value``).
-            payment_fee = OrderQuoteService.calculate_payment_method_fee(
-                pay_way=pay_way,
-                order_value=threshold_value,
-            )
-            order_data["payment_method_fee"] = payment_fee
+            # Shipping and the pay-way fee are the quote's: the parcel
+            # it weighed (gifts included) is the one the shipment is
+            # created for.
+            parcel_items = list(quote.parcel_items)
+            cart_weight_grams = quote.weight_grams
+            order_data["shipping_price"] = charges.shipping.price
+            order_data["payment_method_fee"] = charges.payment_fee.amount
 
             # Resolve provider FK + kind, then create the order.
             order_data.setdefault(
@@ -1538,30 +1530,25 @@ class OrderService:
 
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
-            if (
-                loyalty_points_to_redeem
-                and loyalty_points_to_redeem > 0
-                and user
-            ):
+            if quote.loyalty_points:
                 try:
                     from loyalty.services import LoyaltyService
-
-                    # Cap discount to products total (excluding shipping/fees)
-                    items_total_amount = order.total_price_items.amount
 
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
-                        points_amount=loyalty_points_to_redeem,
+                        points_amount=quote.loyalty_points,
                         currency=str(target_currency),
                         order=order,
-                        max_discount=items_total_amount,
+                        # The cap the quote priced it under: the goods
+                        # after promotions, never shipping or a fee.
+                        max_discount=quote.free_threshold_value.amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 
                     # Store loyalty redemption in order metadata
                     order.metadata["loyalty_redemption"] = {
-                        "points_redeemed": loyalty_points_to_redeem,
+                        "points_redeemed": quote.loyalty_points,
                         "discount_amount": str(discount_amount),
                         "currency": str(target_currency),
                     }
@@ -1570,7 +1557,7 @@ class OrderService:
                         "Applied loyalty discount of %s %s (%s points) to order %s",
                         discount_amount,
                         target_currency,
-                        loyalty_points_to_redeem,
+                        quote.loyalty_points,
                         order.id,
                     )
                 except ValidationError:
@@ -1581,7 +1568,7 @@ class OrderService:
                         order.id,
                     )
                     # The PaymentIntent was verified WITH the loyalty
-                    # discount (Step 2.6) — silently dropping it here
+                    # discount (Step 2.5) — silently dropping it here
                     # would make the captured amount disagree with
                     # ``amount_due``. The user-row lock taken during
                     # verification makes this branch unreachable in
@@ -1608,7 +1595,7 @@ class OrderService:
                 order_items, promo_result, loyalty_discount
             )
             order.gift_card_amount = GiftCardService.record_plan(
-                gift_plan, order
+                charges.gift_cards, order
             )
 
             # Persist the deductions so they survive on the order, then
@@ -1618,6 +1605,7 @@ class OrderService:
             # charge site bill the full amount while the points were
             # burnt.
             order.amount_due = order.calculate_order_total_amount()
+            cls._require_quoted_total(order, charges.amount_due)
             order.save(
                 update_fields=[
                     "discount_amount",
@@ -1673,6 +1661,7 @@ class OrderService:
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
+            OrderTotalChangedError,
             PaymentNotFoundError,
             PaymentVerificationError,
             PaymentAmountMismatchError,
@@ -1784,7 +1773,6 @@ class OrderService:
         raise CartHasUnpaidOrderError
 
     @classmethod
-    @transaction.atomic
     def create_order_from_cart_offline(
         cls,
         *,
@@ -1797,6 +1785,7 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -1825,6 +1814,8 @@ class OrderService:
         Raises:
             InvalidOrderDataError: If validation fails
             InsufficientStockError: If stock unavailable
+            OrderTotalChangedError: If ``expected_total`` is not the
+                amount due computed under lock
 
         References:
             - Design Section "Order Service"
@@ -1848,6 +1839,52 @@ class OrderService:
             ...     user=user
             ... )
         """
+        cls._resolve_live_shipping(
+            cart, user=user, shipping_address=shipping_address
+        )
+        try:
+            return cls._create_order_offline_locked(
+                cart=cart,
+                shipping_address=shipping_address,
+                pay_way=pay_way,
+                user=user,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                meta_context=meta_context,
+                attribution=attribution,
+                legal_acceptance=legal_acceptance,
+                expected_total=expected_total,
+            )
+        except ShippingPriceUnresolvedError:
+            cls._refuse_unpriced(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
+
+    @classmethod
+    @transaction.atomic
+    def _create_order_offline_locked(
+        cls,
+        *,
+        cart,
+        shipping_address: dict[str, Any],
+        pay_way,
+        user,
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        meta_context: dict[str, Any] | None,
+        attribution: AttributionInput | None,
+        legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal | None,
+    ) -> Order:
+        """The locked half of ``create_order_from_cart_offline``: one
+        transaction, no carrier call (the live price was resolved before
+        it opened; one the cache does not hold raises
+        ``ShippingPriceUnresolvedError``)."""
         try:
             from cart.models import Cart
 
@@ -1876,17 +1913,9 @@ class OrderService:
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).
-            from b2b.services import (
-                B2BPricingService,
-                B2BService,
-            )
+            from b2b.services import B2BPricingService
 
             B2BPricingService.bind_cart(cart, user)
-
-            # Wholesale carts sit outside the loyalty program unless the
-            # merchant opts in (see the payment-first path).
-            if B2BService.suppresses_loyalty(cart):
-                loyalty_points_to_redeem = 0
 
             # Wholesale minimum-order-value gate (standard B2B term).
             # Checked here AND at payment-intent creation so an online
@@ -1903,12 +1932,20 @@ class OrderService:
                     )
                 )
 
-            # Step 2.5: Evaluate promotions under lock (see the
-            # payment-first path for the race/typed-error rationale).
-            promo_result = cls._evaluate_promotions(
-                cart, user=user, email=shipping_address.get("email") or ""
+            # Step 2.5: The total, once, under lock (see the
+            # payment-first path). No provider amount guards this path,
+            # so the client's expected total is its only check.
+            quote = cls._quote_under_lock(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                expected_total=expected_total,
             )
-            promo_discount = promo_result.discount_total
+            charges = quote.charges()
+            promo_result = quote.promotion
 
             # Step 3: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
@@ -1992,41 +2029,13 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost — pass cart weight so ACS live
-            # quotes match the weight-banded tariff bracket the voucher
-            # mint will charge.
-            from shipping.utils import compute_total_weight_grams
-
-            cart_total = cart.total_price
-            parcel_items = [
-                (ci.product, ci.quantity) for ci in cart_items
-            ] + PromotionEngine.gift_pairs(promo_result)
-            cart_weight_grams = compute_total_weight_grams(parcel_items)
-            threshold_value = OrderQuoteService.threshold_value(
-                cart_total, promo_discount
-            )
-            shipping_cost = OrderQuoteService.shipping_cost(
-                order_value=threshold_value,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=cart_weight_grams,
-                items=parcel_items,
-                free=promo_result.free_shipping,
-            )
-            order_data["shipping_price"] = shipping_cost
-
-            # Calculate payment method fee
-            # on the same value free shipping is judged on: the products
-            # after discounts (``threshold_value``).
-            payment_fee = OrderQuoteService.calculate_payment_method_fee(
-                pay_way=pay_way,
-                order_value=threshold_value,
-            )
-            order_data["payment_method_fee"] = payment_fee
+            # Shipping and the pay-way fee are the quote's: the parcel
+            # it weighed (gifts included) is the one the shipment is
+            # created for.
+            parcel_items = list(quote.parcel_items)
+            cart_weight_grams = quote.weight_grams
+            order_data["shipping_price"] = charges.shipping.price
+            order_data["payment_method_fee"] = charges.payment_fee.amount
 
             order_data.setdefault(
                 "shipping_provider_code",
@@ -2178,30 +2187,25 @@ class OrderService:
 
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
-            if (
-                loyalty_points_to_redeem
-                and loyalty_points_to_redeem > 0
-                and user
-            ):
+            if quote.loyalty_points:
                 try:
                     from loyalty.services import LoyaltyService
-
-                    # Cap discount to products total (excluding shipping/fees)
-                    items_total_amount = order.total_price_items.amount
 
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
-                        points_amount=loyalty_points_to_redeem,
+                        points_amount=quote.loyalty_points,
                         currency=str(target_currency),
                         order=order,
-                        max_discount=items_total_amount,
+                        # The cap the quote priced it under: the goods
+                        # after promotions, never shipping or a fee.
+                        max_discount=quote.free_threshold_value.amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 
                     # Store loyalty redemption in order metadata
                     order.metadata["loyalty_redemption"] = {
-                        "points_redeemed": loyalty_points_to_redeem,
+                        "points_redeemed": quote.loyalty_points,
                         "discount_amount": str(discount_amount),
                         "currency": str(target_currency),
                     }
@@ -2210,7 +2214,7 @@ class OrderService:
                         "Applied loyalty discount of %s %s (%s points) to order %s",
                         discount_amount,
                         target_currency,
-                        loyalty_points_to_redeem,
+                        quote.loyalty_points,
                         order.id,
                     )
                 except ValidationError:
@@ -2241,11 +2245,13 @@ class OrderService:
                 order_items, promo_result, loyalty_discount
             )
 
-            # Step 6.7: Redeem gift cards LAST — they are payment, not
-            # discount, so they settle whatever is still due after the
-            # promotion and loyalty deductions.
-            order.gift_card_amount = cls._redeem_gift_cards(
-                gift_card_codes, order
+            # Step 6.7: Record the gift-card plan the quote locked. The
+            # cards are payment, not discount: they settled what was
+            # still due after the promotion and loyalty deductions.
+            from giftcard.services import GiftCardService
+
+            order.gift_card_amount = GiftCardService.record_plan(
+                charges.gift_cards, order
             )
 
             # Persist the deductions so they survive on the order, then
@@ -2255,6 +2261,7 @@ class OrderService:
             # charge site bill the full amount while the points were
             # burnt.
             order.amount_due = order.calculate_order_total_amount()
+            cls._require_quoted_total(order, charges.amount_due)
             order.save(
                 update_fields=[
                     "discount_amount",
@@ -2372,6 +2379,7 @@ class OrderService:
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
+            OrderTotalChangedError,
         ):
             raise
         except Exception as e:
@@ -4652,7 +4660,9 @@ class OrderService:
         Mutates ``order_data`` in place: removes ``shipping_provider_code``
         and replaces it with the resolved ``shipping_provider`` (a
         ``ShippingProvider`` instance). Defaults ``shipping_kind`` to
-        ``home_delivery`` when not supplied.
+        ``home_delivery`` when not supplied
+        (``OrderQuoteService.delivery_kind``, which the price and the pay
+        ways offered read too).
 
         Dispatch is registry-driven from the explicit
         ``(shipping_provider_code, shipping_kind)`` pair only.
@@ -4665,7 +4675,7 @@ class OrderService:
         from shipping.services import ShippingService
 
         code = order_data.pop("shipping_provider_code", None) or None
-        kind = order_data.get("shipping_kind") or "home_delivery"
+        kind = OrderQuoteService.delivery_kind(order_data.get("shipping_kind"))
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
         # auto-routes to the active home-delivery carrier for the

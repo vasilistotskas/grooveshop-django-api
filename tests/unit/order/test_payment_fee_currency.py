@@ -43,6 +43,21 @@ def test_a_mismatched_currency_charges_nothing():
     )
 
 
+def test_a_threshold_in_another_currency_waives_nothing():
+    """40 USD is not 40 EUR: a threshold is compared in its own currency
+    or not at all, as the fee is."""
+    pay_way = _pay_way(
+        Money(Decimal("3.50"), "EUR"),
+        free_threshold=Money(Decimal("40.00"), "USD"),
+    )
+    value = Money(Decimal("50.00"), "EUR")
+
+    assert OrderQuoteService.calculate_payment_method_fee(
+        pay_way, value
+    ) == Money(Decimal("3.50"), "EUR")
+    assert OrderQuoteService._fee_waived(pay_way, value) is False
+
+
 def test_the_free_threshold_still_applies():
     fee = OrderQuoteService.calculate_payment_method_fee(
         _pay_way(

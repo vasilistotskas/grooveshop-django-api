@@ -7,9 +7,12 @@ threshold_value``). Before, the fee compared items + shipping, so a EUR 39.98
 cart with a EUR 40 threshold paid for shipping but not for the COD fee, and
 free shipping compared the gross cart total.
 
-Each scenario is checked three ways, which must agree: the cart's payment
-intent preview, offline order creation, and payment-first order creation
-(which refuses an intent whose amount is not the total it computes).
+Each scenario is checked four ways, which must agree: the checkout quote
+(``POST /cart/quote``), the cart's payment intent, offline order creation,
+and payment-first order creation (which refuses an intent whose amount is
+not the total it computes). All four read ``OrderQuoteService.quote``, so
+the quote's amount due is the intent's amount and the order's
+``amount_due``.
 """
 
 from __future__ import annotations
@@ -103,6 +106,28 @@ def _checkout(products: str, discount: str | None):
     return user, cart, pay_way, address
 
 
+def _quote(user, cart, pay_way, address) -> dict:
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.post(
+        reverse("cart-quote"),
+        {
+            "pay_way_id": pay_way.id,
+            "shipping_kind": "home_delivery",
+            "country_id": address["country_id"],
+            "email": address["email"],
+        },
+        format="json",
+        HTTP_X_CART_ID=str(cart.uuid),
+    )
+    assert response.status_code == 200, response.content
+    return response.json()
+
+
+def _cents(amount: Decimal) -> int:
+    return int(amount * 100)
+
+
 def _preview(user, cart, pay_way, address) -> tuple[Decimal, str]:
     client = APIClient()
     client.force_authenticate(user=user)
@@ -144,8 +169,16 @@ def test_the_preview_and_both_creation_paths_agree(products, discount, free):
     items = Decimal(products) - Decimal(discount or 0)
 
     with fake_stripe():
+        quote = _quote(user, cart, pay_way, address)
+        assert Decimal(str(quote["amountDue"])) == items + shipping + fee
+        assert Decimal(str(quote["freeThresholdValue"])) == items
+        assert Decimal(str(quote["shipping"]["price"])) == shipping
+        assert quote["shipping"]["waivedBy"] == ("threshold" if free else None)
+        assert Decimal(str(quote["paymentMethodFee"]["amount"])) == fee
+        assert quote["paymentMethodFee"]["waived"] is free
+
         amount, intent_id = _preview(user, cart, pay_way, address)
-        assert amount == items + shipping + fee
+        assert amount == Decimal(str(quote["amountDue"]))
 
         # Payment-first creation refuses an intent whose amount is not the
         # total it computes, so accepting this one proves it agrees.
@@ -159,6 +192,11 @@ def test_the_preview_and_both_creation_paths_agree(products, discount, free):
         )
     assert order.shipping_price.amount == shipping
     assert order.payment_method_fee.amount == fee
+    assert order.amount_due.amount == amount
+    assert quote["expectedTotal"] == {
+        "amount": _cents(order.amount_due.amount),
+        "currency": "EUR",
+    }
 
 
 @pytest.mark.parametrize(("products", "discount", "free"), SCENARIOS)
@@ -171,6 +209,7 @@ def test_offline_creation_charges_the_same(products, discount, free):
         cost=Money(FEE, "EUR"),
         free_threshold=Money(THRESHOLD, "EUR"),
     )
+    quote = _quote(user, cart, pay_way, address)
 
     order = OrderService.create_order_from_cart_offline(
         legal_acceptance=checkout_acceptance(),
@@ -182,6 +221,8 @@ def test_offline_creation_charges_the_same(products, discount, free):
 
     assert order.shipping_price.amount == (Decimal(0) if free else SHIPPING)
     assert order.payment_method_fee.amount == (Decimal(0) if free else FEE)
+    assert order.amount_due.amount == Decimal(str(quote["amountDue"]))
+    assert quote["expectedTotal"]["amount"] == _cents(order.amount_due.amount)
 
 
 class TestTheCartReportsTheValue:

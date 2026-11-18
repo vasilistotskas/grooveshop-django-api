@@ -16,7 +16,7 @@ from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
     PromotionProductRefSerializer,
 )
-from shipping.enum import FreeShippingSource
+from shipping.enum import FreeShippingSource, ShippingKind
 
 
 class CartWriteSerializer(serializers.ModelSerializer[Cart]):
@@ -852,6 +852,39 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         # downstream None-check stays clean.
         attrs["shipping_provider_code"] = code or None
         return attrs
+
+
+class CartQuoteRequestSerializer(CartCreatePaymentIntentRequestSerializer):
+    """Request body for ``POST /api/v1/cart/quote``.
+
+    The choices of the payment-intent body, each optional: a quote may
+    be asked before the shopper has chosen a delivery or a pay way, and
+    the rows that depend on a missing choice come back null. A delivery
+    is priced once both ``shipping_kind`` and ``country_id`` are given.
+    Send what the order-create body will carry, the email included, so
+    the quote is the total that order is created at.
+    """
+
+    pay_way_id = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        help_text=_("ID of the chosen PayWay; omit while none is chosen."),
+    )
+    shipping_kind = serializers.ChoiceField(
+        choices=ShippingKind.choices,
+        required=False,
+        help_text=_(
+            "Fulfilment kind of the chosen delivery; omit while none is chosen."
+        ),
+    )
+    country_id = serializers.CharField(
+        max_length=2,
+        required=False,
+        help_text=_(
+            "ISO 3166-1 alpha-2 delivery country. Needed to price a "
+            "delivery and to list the shipping options."
+        ),
+    )
 
 
 class CouponApplyRequestSerializer(serializers.Serializer):

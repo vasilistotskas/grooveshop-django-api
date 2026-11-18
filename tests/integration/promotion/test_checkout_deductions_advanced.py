@@ -259,7 +259,7 @@ class TestLoyaltyPaymentIntentParity:
             shipping_provider_code=None,
             shipping_kind="home_delivery",
             weight_grams=0,
-        ).amount + Decimal("95.00")
+        ).price.amount + Decimal("95.00")
 
         with patch(
             "order.payments.payment.get_payment_provider"
@@ -319,7 +319,7 @@ class TestLoyaltyPaymentIntentParity:
             shipping_provider_code=None,
             shipping_kind="home_delivery",
             weight_grams=0,
-        ).amount + Decimal("100.00")
+        ).price.amount + Decimal("100.00")
 
         with patch(
             "order.payments.payment.get_payment_provider"

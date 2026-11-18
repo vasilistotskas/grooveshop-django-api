@@ -83,18 +83,7 @@ class PayWayViewSet(BaseModelViewSet):
         # via the DRF API as well as Django admin.
         user = getattr(self.request, "user", None)
         if self.action in {"list", "retrieve"} and not is_store_staff(user):
-            qs = qs.active()
-            # Also hide providers this tenant holds no credentials for —
-            # a seeded-but-keyless Stripe/Viva row would dead-end the
-            # shopper at checkout-session creation.
             from pay_way.services import PayWayService
 
-            codes = set(
-                qs.exclude(provider_code="").values_list(
-                    "provider_code", flat=True
-                )
-            )
-            unavailable = PayWayService.unconfigured_provider_codes(codes)
-            if unavailable:
-                qs = qs.exclude(provider_code__in=unavailable)
+            qs = PayWayService.shopper_facing(qs)
         return qs

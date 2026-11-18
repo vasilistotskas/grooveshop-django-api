@@ -46,6 +46,10 @@ msgid "%(amount)s of goods the receipt is short of, after a refund was reversed,
 msgstr "%(amount)s of goods the receipt is short of, after a refund was reversed, was acknowledged as corrected outside the receipt by %(who)s."
 
 #, python-format
+msgid "%(amount)s points are worth less than one cent. Redeem at least %(minimum)s points."
+msgstr "%(amount)s points are worth less than one cent. Redeem at least %(minimum)s points."
+
+#, python-format
 msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 msgstr "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 
@@ -1722,6 +1726,9 @@ msgstr "An IP address is not a store domain; use a host name."
 
 msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
 msgstr "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
+
+msgid "An attached coupon order creation refuses this cart for (``invalid_coupon``). Its discount is not in this quote; remove the code before ordering. Null when there is none."
+msgstr "An attached coupon order creation refuses this cart for (``invalid_coupon``). Its discount is not in this quote; remove the code before ordering. Null when there is none."
 
 msgid "An authenticator or recovery code is required."
 msgstr "An authenticator or recovery code is required."
@@ -4907,6 +4914,9 @@ msgstr "Events received"
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 
+msgid "Every delivery the store offers to the request's country, priced as an order would be. Null without a country."
+msgstr "Every delivery the store offers to the request's country, priced as an order would be. Null without a country."
+
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 
@@ -4918,6 +4928,9 @@ msgstr "Every night, re-weight the strategies by how often the products each one
 
 msgid "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
 msgstr "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
+
+msgid "Every pay way offered for the chosen delivery (all of them while none is chosen), with the fee an order would be charged."
+msgstr "Every pay way offered for the chosen delivery (all of them while none is chosen), with the fee an order would be charged."
 
 msgid "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
 msgstr "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
@@ -6497,6 +6510,9 @@ msgstr "From product"
 msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
 msgstr "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
 
+msgid "Fulfilment kind of the chosen delivery; omit while none is chosen."
+msgstr "Fulfilment kind of the chosen delivery; omit while none is chosen."
+
 msgid "Full delivery-request response and diagnostics from BoxNow"
 msgstr "Full delivery-request response and diagnostics from BoxNow"
 
@@ -7346,6 +7362,9 @@ msgstr "Hurry — popular items may sell out quickly!"
 msgid "I have saved them, continue"
 msgstr "I have saved them, continue"
 
+msgid "ID of the chosen PayWay; omit while none is chosen."
+msgstr "ID of the chosen PayWay; omit while none is chosen."
+
 msgid "ID of the selected PayWay (must be online Stripe)."
 msgstr "ID of the selected PayWay (must be online Stripe)."
 
@@ -7391,6 +7410,9 @@ msgstr "ISO 3166-1 alpha-2 country code."
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 
+msgid "ISO 3166-1 alpha-2 delivery country. Needed to price a delivery and to list the shipping options."
+msgstr "ISO 3166-1 alpha-2 delivery country. Needed to price a delivery and to list the shipping options."
+
 msgid "ISO 3166-1 alpha-2 destination country."
 msgstr "ISO 3166-1 alpha-2 destination country."
 
@@ -7399,6 +7421,12 @@ msgstr "ISO 4217 currency code (e.g. EUR)"
 
 msgid "ISO 4217 currency code for all monetary values in this cart"
 msgstr "ISO 4217 currency code for all monetary values in this cart"
+
+msgid "ISO 4217 currency code of every amount in the quote."
+msgstr "ISO 4217 currency code of every amount in the quote."
+
+msgid "ISO 4217 currency code of the amount."
+msgstr "ISO 4217 currency code of the amount."
 
 msgid "ISO Country Code"
 msgstr "ISO Country Code"
@@ -9538,6 +9566,9 @@ msgstr "On pickup list %(no)s"
 msgid "One"
 msgstr "One"
 
+msgid "One entry per promotion that took money off; the amounts sum to discountTotal."
+msgstr "One entry per promotion that took money off; the amounts sum to discountTotal."
+
 msgid "One held voucher request is being sent to ACS. The others follow once ACS answers it."
 msgstr "One held voucher request is being sent to ACS. The others follow once ACS answers it."
 
@@ -11589,6 +11620,9 @@ msgstr "Queued"
 
 msgid "Queued at"
 msgstr "Queued at"
+
+msgid "Quote the cart's checkout total"
+msgstr "Quote the cart's checkout total"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "RATE YOUR PURCHASE"
@@ -14512,6 +14546,9 @@ msgstr "The aade-user-id of the store's TAXISnet myDATA developer account. No pl
 msgid "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
 msgstr "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
 
+msgid "The amount due in minor units (cents): 1999 for 19.99."
+msgstr "The amount due in minor units (cents): 1999 for 19.99."
+
 msgid "The applied discounts and gift cards cover the full total; no payment intent is needed."
 msgstr "The applied discounts and gift cards cover the full total; no payment intent is needed."
 
@@ -14547,6 +14584,9 @@ msgstr "The cart token is not accepted by this endpoint."
 
 msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 msgstr "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
+
+msgid "The cart's lines at the prices the shopper pays."
+msgstr "The cart's lines at the prices the shopper pays."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
@@ -14588,6 +14628,9 @@ msgstr "The coupon code can no longer be used."
 
 msgid "The coupon code to apply."
 msgstr "The coupon code to apply."
+
+msgid "The coupon that earned the entry; null for an automatic promotion."
+msgstr "The coupon that earned the entry; null for an automatic promotion."
 
 msgid "The courier cannot be reached right now. Try again in a moment."
 msgstr "The courier cannot be reached right now. Try again in a moment."
@@ -14802,6 +14845,9 @@ msgstr "The order costs {due}; confirm exactly that amount."
 msgid "The order line whose returned units this restock put back (empty for every other stock operation). The profit report reverses a line's cost by it."
 msgstr "The order line whose returned units this restock put back (empty for every other stock operation). The profit report reverses a line's cost by it."
 
+msgid "The order total has changed. Review the new total and place the order again."
+msgstr "The order total has changed. Review the new total and place the order again."
+
 #, python-brace-format
 msgid "The order total is below this wholesale tier's minimum of {minimum}."
 msgstr "The order total is below this wholesale tier's minimum of {minimum}."
@@ -14817,6 +14863,9 @@ msgstr "The paid_until value the notice stage refers to. A mismatch with the cur
 
 msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 msgstr "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
+
+msgid "The pay way's key, as on the pay-way endpoint."
+msgstr "The pay way's key, as on the pay-way endpoint."
 
 #, python-format
 msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
@@ -14900,6 +14949,9 @@ msgstr "The product's id in another system, used to match it when a catalogue fi
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
+
+msgid "The products after promotions, plus shipping and the pay-way fee."
+msgstr "The products after promotions, plus shipping and the pay-way fee."
 
 msgid "The promotion has ended"
 msgstr "The promotion has ended"
@@ -15134,6 +15186,9 @@ msgstr "The time to pay for this order has run out. Place a new order from your 
 msgid "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 msgstr "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 
+msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgstr "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+
 msgid "The type must look like name@version."
 msgstr "The type must look like name@version."
 
@@ -15142,6 +15197,9 @@ msgstr "The units were not put back in stock because the refund was not made in 
 
 msgid "The updated cart, as returned by the cart detail endpoint"
 msgstr "The updated cart, as returned by the cart detail endpoint"
+
+msgid "The value every free-above threshold is judged on: the products after discounts, excluding shipping and fees."
+msgstr "The value every free-above threshold is judged on: the products after discounts, excluding shipping and fees."
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
@@ -15803,6 +15861,15 @@ msgstr "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. Th
 
 msgid "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
 msgstr "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
+
+msgid "True when the cart does not fit this carrier's parcels; choosing it is refused."
+msgstr "True when the cart does not fit this carrier's parcels; choosing it is refused."
+
+msgid "True when the cart is heavier than this option carries; choosing it is refused."
+msgstr "True when the cart is heavier than this option carries; choosing it is refused."
+
+msgid "True when the pay way has a fee and the cart reached its free-above threshold."
+msgstr "True when the pay way has a fee and the cart reached its free-above threshold."
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
@@ -16780,6 +16847,9 @@ msgstr "What a person decided for this store in this run, as the decisions file 
 msgid "What became of the goods?"
 msgstr "What became of the goods?"
 
+msgid "What checkout charges for the cart with the choices made so far, computed by the function order creation and the payment intent use: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
+msgstr "What checkout charges for the cart with the choices made so far, computed by the function order creation and the payment intent use: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
+
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 
@@ -16788,6 +16858,15 @@ msgstr "What happened"
 
 msgid "What is enforced"
 msgstr "What is enforced"
+
+msgid "What is left to pay after the loyalty discount and the gift cards: the amount an order created with these choices stores and is paid for."
+msgstr "What is left to pay after the loyalty discount and the gift cards: the amount an order created with these choices stores and is paid for."
+
+msgid "What live promotions and the applied coupon take off."
+msgstr "What live promotions and the applied coupon take off."
+
+msgid "What made the delivery free: ``threshold`` (the carrier's free-shipping threshold) or ``promotion`` (a free-shipping promotion). Null when it is charged, or simply costs nothing."
+msgstr "What made the delivery free: ``threshold`` (the carrier's free-shipping threshold) or ``promotion`` (a free-shipping promotion). Null when it is charged, or simply costs nothing."
 
 msgid "What one unit costs the store, net of VAT. Copied onto each order line when it is sold, so a later edit never changes a past sale. Empty means unknown: the profit report lists such sales as having no cost, it never counts them as free."
 msgstr "What one unit costs the store, net of VAT. Copied onto each order line when it is sold, so a later edit never changes a past sale. Empty means unknown: the profit report lists such sales as having no cost, it never counts them as free."
@@ -16798,11 +16877,17 @@ msgstr "What shoppers look for most."
 msgid "What the customer owes for the order, fixed at creation: lines and extras, less every deduction. Not what was collected; that is on the payment ledger."
 msgstr "What the customer owes for the order, fixed at creation: lines and extras, less every deduction. Not what was collected; that is on the payment ledger."
 
+msgid "What the gift cards settle of the total; they are payment, applied last."
+msgstr "What the gift cards settle of the total; they are payment, applied last."
+
 msgid "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 msgstr "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 
 msgid "What the provider reported"
 msgstr "What the provider reported"
+
+msgid "What the redeemed loyalty points take off."
+msgstr "What the redeemed loyalty points take off."
 
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
@@ -17040,6 +17125,9 @@ msgstr "Why it could not be released: [{path, code, message}]"
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
+
+msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
+msgstr "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
@@ -17675,11 +17763,17 @@ msgstr "``invalid_coupon`` only."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 
+msgid "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
+msgstr "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
+
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 
 msgid "admin/"
 msgstr "admin/"
+
+msgid "amountDue as order creation compares it. Send it back as ``expectedTotal`` when creating the order: the order is created only at this total."
+msgstr "amountDue as order creation compares it. Send it back as ``expectedTotal`` when creating the order: the order is created only at this total."
 
 msgid "blockOrder must list every block exactly once."
 msgstr "blockOrder must list every block exactly once."

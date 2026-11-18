@@ -37,6 +37,7 @@ The gateway then sends `X-Cart-Token: <token>` on its calls.
 | Route | Allowed |
 |---|---|
 | `GET /cart`, `GET /cart/coupons` | yes |
+| `POST /cart/quote` | yes (the checkout quote at the cart owner's prices; it changes nothing). Not with `loyaltyPointsToRedeem`: 400 `loyalty_requires_authentication` |
 | `GET/POST /cart/item`, `GET/PUT/PATCH/DELETE /cart/item/<id>` | yes |
 | `POST/DELETE /cart/coupon` | yes |
 | `GET /shipping/options`, `POST /shipping/boxnow/lockers/nearest` | yes (they read the cart only to tell whether it fits a carrier's parcels: `exceedsParcelSize`, the locker `requiredSize`) |
@@ -77,6 +78,12 @@ one and retries. Checked on every use:
 - **Pricing binds to the cart's owner**, not `request.user`
   (`CartService.owner`): wholesale buyers see wholesale prices and
   coupons are judged against the owner, though the request is anonymous.
+- **The token never reads the owner's points.** Prices and coupons follow
+  the owner; the loyalty balance does not. A quote that asks to redeem
+  points on a token request is refused before anything is priced
+  (`CartViewSet._quote`, 400 `loyalty_requires_authentication`), also
+  when the caller is signed in as someone else: the refusal of too many
+  points states the balance, and the token's holder is not the owner.
 - **Attribution is optional on the token path.** `POST /cart/item`
   takes the same `attribution` object as on the storefront and records
   the cart's first touch from it (`docs/order/creation-records.md`

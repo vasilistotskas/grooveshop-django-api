@@ -16,8 +16,6 @@ from __future__ import annotations
 import ast
 import inspect
 import logging
-import uuid
-from os import getenv
 from pathlib import Path
 
 import pytest
@@ -31,8 +29,8 @@ from rest_framework.views import APIView
 
 from core import caches as core_caches
 from core.api import throttling
-from core.caches import STRICT_NAMESPACE, CustomCache
-from tests.utils.redis import stopped_cache
+from core.caches import STRICT_NAMESPACE
+from tests.utils.redis import private_cache, stopped_cache
 
 #: The classification this module locks in. Changing a scope's policy
 #: must be a deliberate edit here too.
@@ -43,6 +41,7 @@ FAIL_CLOSED = {
     "OrderCreateAnonThrottle",
     "CouponApplyThrottle",
     "GiftCardCheckThrottle",
+    "GiftCardCodeThrottle",
     "B2BProfileSubmitThrottle",
     "NewsletterSubscribeThrottle",
     "ProductAlertCreateThrottle",
@@ -63,6 +62,10 @@ FAIL_OPEN = {
     "FeedbackCreateThrottle",
     "CartMutationThrottle",
     "CartMutationAnonThrottle",
+    # The checkout quote is a read: a shopper keeps seeing a total
+    # through a blip, as they keep their cart.
+    "CartQuoteThrottle",
+    "CartQuoteAnonThrottle",
     "SearchThrottle",
     "SearchClickThrottle",
     "ViewCountThrottle",
@@ -72,17 +75,6 @@ FAIL_OPEN = {
     # or money behind it, and a store's team keeps working through a blip.
     "StaffAgentThrottle",
 }
-
-
-def _live_cache() -> CustomCache:
-    host = getenv("REDIS_HOST", "localhost")
-    port = getenv("REDIS_PORT", "6379")
-    worker = getenv("PYTEST_XDIST_WORKER", "gw0")
-    db = (int("".join(filter(str.isdigit, worker)) or "0") % 15) + 1
-    return CustomCache(
-        server=f"redis://{host}:{port}/{db}",
-        params={"KEY_PREFIX": f"throttle-test-{uuid.uuid4().hex[:8]}"},
-    )
 
 
 @pytest.fixture(autouse=True)
@@ -289,7 +281,7 @@ def _names_drf_throttling(node: ast.AST) -> bool:
 
 class TestRedisUp:
     def test_a_security_scope_throttles_normally(self, monkeypatch):
-        cache = _live_cache()
+        cache = private_cache()
         throttle_cls = throttling.GiftCardCheckThrottle
         monkeypatch.setattr(throttle_cls, "cache", cache)
         monkeypatch.setattr(throttle_cls, "rate", "2/minute", raising=False)
@@ -305,7 +297,7 @@ class TestRedisUp:
         cache.delete(key)
 
     def test_a_general_scope_throttles_normally(self, monkeypatch):
-        cache = _live_cache()
+        cache = private_cache()
         throttle_cls = throttling.SearchThrottle
         monkeypatch.setattr(throttle_cls, "cache", cache)
         monkeypatch.setattr(throttle_cls, "rate", "1/minute", raising=False)

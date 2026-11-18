@@ -2,7 +2,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -20,12 +20,17 @@ from loyalty.enum import PriceBasis, TransactionType
 from loyalty.models.pause import LoyaltyPause
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
+from order.checkout.discounts import CENT
 from tenant.features import feature_on
 
 logger = logging.getLogger(__name__)
 
 #: ``<prefix><ISO currency>``: points per one unit of that currency.
 REDEMPTION_RATIO_PREFIX = "LOYALTY_REDEMPTION_RATIO_"
+
+#: The code of a redemption refused because its points are worth less
+#: than a cent (``LoyaltyService._validate_and_price_redemption``).
+REDEMPTION_TOO_SMALL = "loyalty_redemption_too_small"
 
 
 _RATE_SETTINGS = (
@@ -563,8 +568,8 @@ class LoyaltyService:
     ) -> Decimal:
         """Shared validation + pricing for a redemption WITHOUT writing.
 
-        Raises ValidationError on any rule violation; returns the exact
-        (unquantised) discount Decimal — both ``redeem_points`` and the
+        Raises ValidationError on any rule violation; returns the
+        discount, rounded half up to the cent — both ``redeem_points`` and the
         payment-intent preview go through this, so the amount a Stripe
         PaymentIntent is created for and the amount later persisted on
         the order cannot drift.
@@ -610,8 +615,30 @@ class LoyaltyService:
                 % {"balance": balance, "amount": points_amount}
             )
 
+        # Money has cents: rounded here, once, so the quote, the payment
+        # intent, the order's ``loyalty_discount`` and the per-line
+        # snapshots the receipt reads all hold one figure. Left
+        # unrounded, 103 points at 200 a euro (0.515) were 0.52 on the
+        # order and 0.51 over its lines, and the order's VAT lines could
+        # not be written.
         ratio = Decimal(str(store_setting(ratio_key)))
-        discount = Decimal(str(points_amount)) / ratio
+        discount = (Decimal(str(points_amount)) / ratio).quantize(
+            CENT, rounding=ROUND_HALF_UP
+        )
+        if discount <= 0:
+            # Points worth less than half a cent buy nothing: redeeming
+            # them would spend the points for a discount of 0.00.
+            minimum = (ratio * CENT / 2).to_integral_value(
+                rounding=ROUND_CEILING
+            )
+            raise ValidationError(
+                _(
+                    "%(amount)s points are worth less than one cent. "
+                    "Redeem at least %(minimum)s points."
+                )
+                % {"amount": points_amount, "minimum": minimum},
+                code=REDEMPTION_TOO_SMALL,
+            )
 
         if discount > max_discount:
             raise ValidationError(

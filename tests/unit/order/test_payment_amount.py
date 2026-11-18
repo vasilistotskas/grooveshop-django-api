@@ -248,7 +248,7 @@ class TestOrderQuoteServiceShippingCost:
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
-        )
+        ).price
         assert shipping.amount == Decimal("3.00")
 
     def test_free_shipping_above_threshold(self):
@@ -269,7 +269,7 @@ class TestOrderQuoteServiceShippingCost:
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
-        )
+        ).price
         assert shipping.amount == Decimal(0)
 
     def test_home_delivery_auto_resolves_the_active_provider(self):
@@ -286,7 +286,7 @@ class TestOrderQuoteServiceShippingCost:
             order_value=Money(Decimal("10.00"), "EUR"),
             country_id=country.alpha_2,
             shipping_kind="home_delivery",
-        )
+        ).price
         assert shipping.amount == Decimal("4.00")
 
     def test_free_true_forces_zero_but_still_checks_availability(self):
@@ -303,7 +303,7 @@ class TestOrderQuoteServiceShippingCost:
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
             free=True,
-        )
+        ).price
         assert shipping.amount == Decimal(0)
 
     def test_free_true_still_raises_when_unavailable(self):
@@ -390,7 +390,7 @@ class TestOrderQuoteServiceShippingCost:
             region_id="ignored-region",
             shipping_provider_code="boxnow",
             shipping_kind="pickup_point",
-        )
+        ).price
         assert shipping.amount == Decimal("2.50")
 
     def test_total_payment_amount_includes_all_components(self):
@@ -413,7 +413,7 @@ class TestOrderQuoteServiceShippingCost:
             country_id=country.alpha_2,
             shipping_provider_code="flat_rate",
             shipping_kind="home_delivery",
-        )
+        ).price
 
         pay_way = mock.Mock()
         pay_way.cost = Money(Decimal("1.50"), "EUR")

@@ -142,18 +142,48 @@ class TestRedemptionPrice:
         return user
 
     @pytest.mark.parametrize(
-        ("ratio", "discount"),
-        [(100.0, Decimal(5)), (3.0, Decimal(500) / Decimal(3))],
+        ("points", "ratio", "discount"),
+        [
+            (500, 100.0, Decimal("5.00")),
+            (500, 3.0, Decimal("166.67")),
+            # Half a cent rounds up, as a promotion's amount does.
+            (103, 200.0, Decimal("0.52")),
+            (101, 200.0, Decimal("0.51")),
+        ],
     )
-    def test_points_buy_their_ratio_worth_unrounded(
-        self, member, ratio, discount
+    def test_points_buy_their_ratio_worth_to_the_cent(
+        self, member, points, ratio, discount
     ):
+        """One rounding, here: the quote, the order and the per-line
+        discount snapshots all read this figure."""
         with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=ratio):
             price = LoyaltyService.preview_redemption(
-                member, 500, "EUR", max_discount=Decimal(1000)
+                member, points, "EUR", max_discount=Decimal(1000)
             )
 
         assert price == discount
+        assert price.as_tuple().exponent == -2
+
+    def test_points_worth_less_than_a_cent_are_refused(self, member):
+        """4 points at 1000 a euro round to 0.00: spending them would buy
+        nothing. The refusal is coded and names the fewest that count."""
+        with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=1000.0):
+            with pytest.raises(ValidationError) as refused:
+                LoyaltyService.preview_redemption(
+                    member, 4, "EUR", max_discount=Decimal(1000)
+                )
+            with pytest.raises(ValidationError):
+                LoyaltyService.redeem_points(
+                    member, 4, "EUR", max_discount=Decimal(1000)
+                )
+            a_cent = LoyaltyService.preview_redemption(
+                member, 5, "EUR", max_discount=Decimal(1000)
+            )
+
+        assert refused.value.code == "loyalty_redemption_too_small"
+        assert "5" in refused.value.message
+        assert a_cent == Decimal("0.01")
+        assert LoyaltyService.get_user_balance(member) == 1000
 
     def test_a_preview_writes_nothing(self, member):
         with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=100.0):

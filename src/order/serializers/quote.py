@@ -1,0 +1,270 @@
+"""The checkout quote on the wire.
+
+``CheckoutQuoteSerializer`` renders an ``order.checkout.quote.CheckoutQuote``:
+the body of ``POST /cart/quote`` (with the priced option lists,
+``CartQuoteSerializer``) and the ``error.quote`` of an order refused
+because its total changed. ``ExpectedTotalSerializer`` is the total a
+client sends back with the order.
+"""
+
+from __future__ import annotations
+
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
+from shipping.enum import FreeShippingSource, ShippingKind
+
+
+class ExpectedTotalSerializer(serializers.Serializer):
+    """An order total in whole minor units, compared exactly."""
+
+    amount = serializers.IntegerField(
+        min_value=0,
+        help_text=_("The amount due in minor units (cents): 1999 for 19.99."),
+    )
+    currency = serializers.CharField(
+        min_length=3,
+        max_length=3,
+        help_text=_("ISO 4217 currency code of the amount."),
+    )
+
+    def validate_currency(self, value: str) -> str:
+        return value.upper()
+
+
+class QuoteAppliedPromotionSerializer(serializers.Serializer):
+    promotion_id = serializers.IntegerField(source="promotion.id")
+    name = serializers.SerializerMethodField()
+    code = serializers.CharField(
+        source="code.code",
+        allow_null=True,
+        help_text=_(
+            "The coupon that earned the entry; null for an automatic promotion."
+        ),
+    )
+    amount = serializers.DecimalField(
+        source="amount.amount", max_digits=11, decimal_places=2
+    )
+
+    def get_name(self, entry) -> str:
+        return (
+            entry.promotion.safe_translation_getter("name", any_language=True)
+            or ""
+        )
+
+
+class QuoteBlockingCouponSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    reason = serializers.CharField(
+        help_text=_(
+            "Why the code is refused, in the coupon rejection vocabulary "
+            "(``discount_code_expired``, ...)."
+        ),
+    )
+
+
+def _waived_by_field() -> serializers.ChoiceField:
+    return serializers.ChoiceField(
+        choices=[(source.value, source.value) for source in FreeShippingSource],
+        allow_null=True,
+        help_text=_(
+            "What made the delivery free: ``threshold`` (the carrier's "
+            "free-shipping threshold) or ``promotion`` (a free-shipping "
+            "promotion). Null when it is charged, or simply costs nothing."
+        ),
+    )
+
+
+class QuoteShippingSerializer(serializers.Serializer):
+    price = serializers.DecimalField(
+        source="price.amount", max_digits=11, decimal_places=2
+    )
+    waived_by = _waived_by_field()
+
+
+class QuotePaymentFeeSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        source="amount.amount", max_digits=11, decimal_places=2
+    )
+    waived = serializers.BooleanField(
+        help_text=_(
+            "True when the pay way has a fee and the cart reached its "
+            "free-above threshold."
+        ),
+    )
+
+
+class QuoteShippingOptionSerializer(serializers.Serializer):
+    """One delivery the store offers, at the price this cart would be
+    charged for choosing it."""
+
+    provider_code = serializers.CharField()
+    provider_name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=ShippingKind.choices)
+    price = serializers.DecimalField(max_digits=11, decimal_places=2)
+    waived_by = _waived_by_field()
+    exceeds_max_weight = serializers.BooleanField(
+        help_text=_(
+            "True when the cart is heavier than this option carries; "
+            "choosing it is refused."
+        ),
+    )
+    exceeds_parcel_size = serializers.BooleanField(
+        help_text=_(
+            "True when the cart does not fit this carrier's parcels; "
+            "choosing it is refused."
+        ),
+    )
+
+
+class QuotePayWayOptionSerializer(serializers.Serializer):
+    """One pay way the shopper is offered, with the fee this cart would
+    be charged for choosing it."""
+
+    id = serializers.IntegerField()
+    key = serializers.CharField(
+        help_text=_("The pay way's key, as on the pay-way endpoint.")
+    )
+    fee = serializers.DecimalField(max_digits=11, decimal_places=2)
+    waived = serializers.BooleanField(
+        help_text=_(
+            "True when the pay way has a fee and the cart reached its "
+            "free-above threshold."
+        ),
+    )
+
+
+class CheckoutQuoteSerializer(serializers.Serializer):
+    """What checkout charges for a cart, row by row.
+
+    A row that depends on a choice the request did not make is null,
+    never guessed: ``shipping`` without a delivery, ``paymentMethodFee``
+    without a pay way, and ``giftCardAmount``, ``grandTotal``,
+    ``amountDue`` and ``expectedTotal`` without both.
+    """
+
+    items_subtotal = serializers.DecimalField(
+        source="items_subtotal.amount",
+        help_text=_("The cart's lines at the prices the shopper pays."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    discount_total = serializers.DecimalField(
+        source="discount_total.amount",
+        help_text=_("What live promotions and the applied coupon take off."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    applied_promotions = QuoteAppliedPromotionSerializer(
+        source="promotion.applied",
+        many=True,
+        help_text=_(
+            "One entry per promotion that took money off; the amounts "
+            "sum to discountTotal."
+        ),
+    )
+    blocking_coupon = QuoteBlockingCouponSerializer(
+        allow_null=True,
+        help_text=_(
+            "An attached coupon order creation refuses this cart for "
+            "(``invalid_coupon``). Its discount is not in this quote; "
+            "remove the code before ordering. Null when there is none."
+        ),
+    )
+    free_threshold_value = serializers.DecimalField(
+        source="free_threshold_value.amount",
+        help_text=_(
+            "The value every free-above threshold is judged on: the "
+            "products after discounts, excluding shipping and fees."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+    shipping = QuoteShippingSerializer(allow_null=True)
+    payment_method_fee = QuotePaymentFeeSerializer(
+        source="payment_fee", allow_null=True
+    )
+    loyalty_discount = serializers.DecimalField(
+        source="loyalty_discount.amount",
+        help_text=_("What the redeemed loyalty points take off."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    gift_card_amount = serializers.DecimalField(
+        source="gift_card_amount.amount",
+        allow_null=True,
+        help_text=_(
+            "What the gift cards settle of the total; they are payment, "
+            "applied last."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+    grand_total = serializers.DecimalField(
+        source="grand_total.amount",
+        allow_null=True,
+        help_text=_(
+            "The products after promotions, plus shipping and the pay-way fee."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+    amount_due = serializers.DecimalField(
+        source="amount_due.amount",
+        allow_null=True,
+        help_text=_(
+            "What is left to pay after the loyalty discount and the gift "
+            "cards: the amount an order created with these choices stores "
+            "and is paid for."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+    currency = serializers.CharField(
+        help_text=_("ISO 4217 currency code of every amount in the quote."),
+    )
+    expected_total = ExpectedTotalSerializer(
+        allow_null=True,
+        help_text=_(
+            "amountDue as order creation compares it. Send it back as "
+            "``expectedTotal`` when creating the order: the order is "
+            "created only at this total."
+        ),
+    )
+
+
+class CartQuoteSerializer(CheckoutQuoteSerializer):
+    """The body of ``POST /cart/quote``: the quote, and what each
+    delivery and pay way on offer would cost this cart."""
+
+    shipping_options = serializers.SerializerMethodField(
+        help_text=_(
+            "Every delivery the store offers to the request's country, "
+            "priced as an order would be. Null without a country."
+        ),
+    )
+    pay_ways = serializers.SerializerMethodField(
+        help_text=_(
+            "Every pay way offered for the chosen delivery (all of them "
+            "while none is chosen), with the fee an order would be "
+            "charged."
+        ),
+    )
+
+    @extend_schema_field(
+        QuoteShippingOptionSerializer(many=True, allow_null=True)
+    )
+    def get_shipping_options(self, quote) -> list | None:
+        options = self.context["shipping_options"]
+        if options is None:
+            return None
+        return list(QuoteShippingOptionSerializer(options, many=True).data)
+
+    @extend_schema_field(QuotePayWayOptionSerializer(many=True))
+    def get_pay_ways(self, quote) -> list:
+        return list(
+            QuotePayWayOptionSerializer(
+                self.context["pay_ways"], many=True
+            ).data
+        )

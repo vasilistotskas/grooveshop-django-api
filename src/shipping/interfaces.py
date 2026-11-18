@@ -168,8 +168,15 @@ class ShippingCarrierInterface(ABC):
         region_id: str | None = None,
         weight_grams: int | None = None,
         currency: str,
+        cached_only: bool = False,
     ) -> Decimal | None:
         """Return a live-quoted price that overrides ``rate.price``.
+
+        ``cached_only`` is for a caller that holds row locks (order
+        creation): the carrier is not asked. An adapter that prices live
+        answers from what it resolved earlier, and raises
+        :class:`~shipping.exceptions.ShippingLivePriceUnresolvedError`
+        when it holds no answer.
 
         ``rate`` is the resolved ``ShippingRate`` for this
         (provider, country, kind) — the price, free-shipping threshold

@@ -102,10 +102,21 @@ from a missing one.
 calls it for raised exceptions), so those keep their own shape. Where a
 stable discriminator already existed, `code` now repeats it:
 
-- `{"detail", "reason"}` (cart coupons and payment intents, gift cards,
-  business profile): `code` equals `reason`.
+- `{"detail", "reason"}` (cart coupons, quotes and payment intents, gift
+  cards, business profile): `code` equals `reason`. `POST /cart/quote`
+  answers a delivery it cannot price this way, with
+  `shipping_unavailable`, `shipping_parcel_too_large` or
+  `shipping_weight_exceeded` (`shipping.enum.ShippingRefusal`), so a
+  client can drop the selection and go on. A loyalty refusal there and on
+  the payment intent carries the loyalty program's code when it has one
+  (`loyalty_redemption_too_small`), else `loyalty_redemption_invalid`. The payment intent and order
+  creation keep `invalid_order_data` with the message under
+  `fieldErrors.shippingProviderCode` for the same three.
 - `{"detail", "error": {"type"}}` (order create and cancel): `code` equals
-  `error.type`.
+  `error.type`. One exception, for now: an order refused because its total
+  changed is 409 `code: total_changed` with `error.type`
+  `invalid_order_data` (`docs/order/creation.md` §3.0 says why and until
+  when).
 - Plain `{"detail"}` responses of the cart, order, account and alert views
   carry a `code` too.
 

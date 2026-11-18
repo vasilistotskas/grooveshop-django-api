@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 import operator
 from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import dataclass
+from decimal import Decimal
 from functools import reduce
 from typing import TYPE_CHECKING, Any
 
@@ -19,7 +21,7 @@ from django.conf import settings
 from django.db.models import Q
 from djmoney.money import Money
 
-from shipping.enum import ShippingKind
+from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
     ShippingParcelTooLargeError,
     ShippingUnavailableError,
@@ -65,6 +67,19 @@ def sanitize_delivery_notes(value: object) -> str:
         return ""
     text = " ".join(str(value).split())
     return text[:DELIVERY_NOTES_MAX_LEN]
+
+
+@dataclass(frozen=True, slots=True)
+class ShippingCharge:
+    """What a shipping option costs a cart, and what made it free.
+
+    ``waived_by`` is set only when a rule took a real price to 0: the
+    rate's own free-shipping threshold, or a free-shipping promotion. A
+    rate that simply costs nothing has none.
+    """
+
+    price: Money
+    waived_by: FreeShippingSource | None = None
 
 
 class ShippingService:
@@ -284,10 +299,12 @@ class ShippingService:
         cls,
         *,
         country_code: str,
-        order_value_amount: float = 0.0,
+        order_value_amount: Decimal | float = 0.0,
         currency: str = "EUR",
         weight_grams: int | None = None,
         items: Iterable[tuple[Any, int]] | None = None,
+        region_id: str | None = None,
+        free: bool = False,
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
@@ -312,6 +329,11 @@ class ShippingService:
         ``(product, quantity)`` pairs, when the caller's cart is known)
         that do not fit the carrier's parcels: ``exceeds_parcel_size``,
         decided by the rule :meth:`assert_available` enforces.
+
+        ``region_id`` and ``free`` (a free-shipping promotion) are what
+        :meth:`quote` prices with, so a caller that knows them (the
+        checkout quote) gets each row at the price an order would be
+        charged, with ``waived_by`` saying what made it free.
         """
         items = None if items is None else list(items)
         country_code = country_code.upper()
@@ -330,12 +352,13 @@ class ShippingService:
                     adapter.assert_parcel_fits(kind=kind, items=items)
                 except ShippingParcelTooLargeError:
                     exceeds_parcel_size = True
-            price = cls._priced(
+            charge = cls._priced(
                 rate,
                 country_code=country_code,
-                region_id=None,
+                region_id=region_id,
                 weight_grams=weight_grams,
                 order_value=order_value,
+                free=free,
             )
 
             # Per-(provider, kind) logo: ``pickup_point`` rows
@@ -350,8 +373,9 @@ class ShippingService:
                     "provider_code": provider.code,
                     "provider_name": provider.name,
                     "kind": kind.value,
-                    "price": price.amount,
-                    "currency": str(price.currency),
+                    "price": charge.price.amount,
+                    "waived_by": charge.waived_by,
+                    "currency": str(charge.price.currency),
                     "live_mode": provider.live_mode,
                     "priority": provider.priority,
                     "logo_path": provider.logo_path_for_kind(kind.value),
@@ -882,8 +906,17 @@ class ShippingService:
         region_id: str | None,
         weight_grams: int | None,
         order_value: Money,
-    ) -> Money:
-        """Price ``rate`` for ``order_value`` — threshold, then live quote, then rate price.
+        free: bool = False,
+        cached_only: bool = False,
+    ) -> ShippingCharge:
+        """Price ``rate`` for ``order_value`` — promotion, then threshold, then live quote, then rate price.
+
+        ``free`` is a free-shipping promotion: it waives every rate.
+        ``waived_by`` is set only for a rate that has a price to waive: a
+        delivery that costs nothing anyway was not made free by anything.
+
+        ``cached_only`` keeps the carrier from being asked (see
+        ``ShippingCarrierInterface.live_quote``).
 
         Deliberately does not re-check availability or the weight cap
         (:meth:`assert_available` already did, or the caller is
@@ -891,11 +924,19 @@ class ShippingService:
         ``available_options``, which shows an over-cap option's price
         alongside its ``exceeds_max_weight`` flag rather than hiding it).
         """
-        if (
+        waiver = None
+        if free:
+            waiver = FreeShippingSource.PROMOTION
+        elif (
             rate.free_shipping_threshold is not None
             and order_value.amount >= rate.free_shipping_threshold.amount
         ):
-            return Money(0, order_value.currency)
+            waiver = FreeShippingSource.THRESHOLD
+        if waiver is not None:
+            return ShippingCharge(
+                Money(0, order_value.currency),
+                waiver if rate.price.amount > 0 else None,
+            )
 
         adapter = get_provider(rate.provider.code)
         live = adapter.live_quote(
@@ -904,10 +945,47 @@ class ShippingService:
             region_id=region_id,
             weight_grams=weight_grams,
             currency=str(order_value.currency),
+            cached_only=cached_only,
         )
         if live is not None:
-            return Money(live, order_value.currency)
-        return Money(rate.price.amount, order_value.currency)
+            return ShippingCharge(Money(live, order_value.currency))
+        return ShippingCharge(Money(rate.price.amount, order_value.currency))
+
+    @classmethod
+    def resolve_live_price(
+        cls,
+        *,
+        provider_code: str | None,
+        kind: str | None,
+        country_code: str | None,
+        region_id: str | None = None,
+        weight_grams: int | None = None,
+    ) -> None:
+        """Have the carrier's live price for this delivery resolved and
+        cached, so a later ``quote(cached_only=True)`` finds it.
+
+        Order creation calls it before it takes its locks: a carrier call
+        can take seconds, and nothing may wait on a carrier while rows
+        are locked. Whatever the answer (a price, or none: the stored
+        rate is charged), the carrier's adapter remembers it. A delivery
+        the store does not offer has nothing to resolve; the quote
+        refuses it.
+        """
+        try:
+            rate = cls.active_rate(
+                provider_code=provider_code,
+                kind=kind,
+                country_code=country_code,
+            )
+        except ShippingUnavailableError:
+            return
+        get_provider(rate.provider.code).live_quote(
+            rate=rate,
+            country_code=(country_code or "").upper(),
+            region_id=region_id,
+            weight_grams=weight_grams,
+            currency=str(rate.price.currency),
+        )
 
     @classmethod
     def quote(
@@ -920,12 +998,20 @@ class ShippingService:
         weight_grams: int | None = None,
         items: Iterable[tuple[Any, int]] | None = None,
         order_value: Money,
-    ) -> Money:
+        free: bool = False,
+        cached_only: bool = False,
+    ) -> ShippingCharge:
         """Gate on availability, weight cap and parcel size, then price.
 
-        The single entry point ``OrderQuoteService.shipping_cost`` and the
-        create-payment-intent view use — replaces the old
-        ``calculate_shipping_cost`` dispatcher. Raises
+        ``cached_only`` is for a caller holding row locks: no carrier is
+        asked (``ShippingLivePriceUnresolvedError`` when a live price is
+        needed and was not resolved first, :meth:`resolve_live_price`).
+
+        The single entry point ``OrderQuoteService.shipping_cost`` uses —
+        replaces the old ``calculate_shipping_cost`` dispatcher.
+        ``free`` is a free-shipping promotion: the price is 0, but the
+        gate still runs, so a promotion never makes an unavailable or
+        over-weight option orderable. Raises
         :class:`~shipping.exceptions.ShippingUnavailableError` /
         :class:`~shipping.exceptions.ShippingWeightExceededError`
         instead of silently falling back to a generic flat rate:
@@ -939,13 +1025,16 @@ class ShippingService:
             weight_grams=weight_grams,
             items=items,
         )
-        price = cls._priced(
+        charge = cls._priced(
             rate,
             country_code=(country_code or "").upper(),
             region_id=region_id,
             weight_grams=weight_grams,
             order_value=order_value,
+            free=free,
+            cached_only=cached_only,
         )
+        price = charge.price
         # Anchor log for the per-carrier pricing decision. Used by ops
         # to answer "did the free-shipping threshold fire for this
         # cart?" without re-running the carrier adapter under a
@@ -973,4 +1062,4 @@ class ShippingService:
                 "is_free": price.amount == 0,
             },
         )
-        return price
+        return charge

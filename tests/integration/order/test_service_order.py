@@ -117,7 +117,7 @@ class OrderServiceTestCase(TestCase):
                 country_id=order.country_id,
                 shipping_provider_code="flat_rate",
                 shipping_kind="home_delivery",
-            )
+            ).price
 
         self.assertEqual(quote(_eur("49.99")), _eur("5.00"))
         self.assertEqual(quote(_eur("500.00")), _eur("0.00"))

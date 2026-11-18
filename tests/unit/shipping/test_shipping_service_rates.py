@@ -32,7 +32,7 @@ import pytest
 from djmoney.money import Money
 
 from country.factories import CountryFactory
-from shipping.enum import ShippingKind
+from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
     ShippingUnavailableError,
     ShippingWeightExceededError,
@@ -222,8 +222,40 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("10.00", "EUR"),
-        )
+        ).price
         assert price == Money("4.20", "EUR")
+
+    @pytest.mark.parametrize(
+        ("price", "free", "waived_by"),
+        [
+            ("4.20", False, FreeShippingSource.THRESHOLD),
+            ("4.20", True, FreeShippingSource.PROMOTION),
+            # A delivery that costs nothing was not made free by anything.
+            ("0.00", False, None),
+            ("0.00", True, None),
+        ],
+    )
+    def test_only_a_delivery_with_a_price_is_waived(
+        self, active_flat_rate, price, free, waived_by
+    ):
+        country = CountryFactory()
+        ShippingRateFactory(
+            provider=active_flat_rate,
+            country=country,
+            price=Decimal(price),
+            free_shipping_threshold=Decimal("50.00"),
+        )
+
+        charge = ShippingService.quote(
+            provider_code="flat_rate",
+            kind=ShippingKind.HOME_DELIVERY.value,
+            country_code=country.alpha_2,
+            order_value=Money("50.00", "EUR"),
+            free=free,
+        )
+
+        assert charge.price == Money("0", "EUR")
+        assert charge.waived_by == waived_by
 
     def test_free_above_the_threshold(self, active_flat_rate):
         country = CountryFactory()
@@ -238,7 +270,7 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("50.00", "EUR"),
-        )
+        ).price
         assert price == Money("0", "EUR")
 
     def test_below_the_threshold_still_charges(self, active_flat_rate):
@@ -254,7 +286,7 @@ class TestQuote:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2,
             order_value=Money("49.99", "EUR"),
-        )
+        ).price
         assert price == Money("4.20", "EUR")
 
     def test_live_quote_overrides_the_rate_price(self, active_flat_rate):
@@ -282,7 +314,7 @@ class TestQuote:
                 kind=ShippingKind.HOME_DELIVERY.value,
                 country_code=country.alpha_2,
                 order_value=Money("10.00", "EUR"),
-            )
+            ).price
         assert price == Money("7.77", "EUR")
 
     def test_raises_when_unavailable(self):

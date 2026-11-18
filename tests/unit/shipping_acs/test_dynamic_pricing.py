@@ -522,3 +522,50 @@ def test_quote_cache_separates_distinct_weight_buckets(
 
     assert instance.price_calculation.call_count == 2
     assert len(fake_store) == 2
+
+
+def test_the_quote_cache_is_not_the_one_the_previous_release_reads(
+    dynamic_pricing_on, pin_station_origin
+):
+    """The release before the "no live price" marker reads
+    ``acs:price_quote:<country>:...`` and calls ``float()`` on what it
+    finds. While a deploy rolls, both releases serve from one Redis, so
+    this one writes under a namespace of its own: the marker never
+    reaches the old reader, and an old entry is never read here."""
+    from unittest.mock import MagicMock
+
+    from shipping_acs.exceptions import AcsAPIError
+
+    adapter = get_provider("acs")
+    store: dict[str, object] = {}
+    fake_cache = MagicMock()
+    fake_cache.get.side_effect = lambda key, default=None: store.get(
+        key, default
+    )
+    fake_cache.set.side_effect = lambda key, value, timeout=None: (
+        store.__setitem__(key, value)
+    )
+
+    def ask():
+        return adapter.live_quote(
+            rate=None, country_code="GR", weight_grams=None, currency="EUR"
+        )
+
+    with (
+        patch("django.core.cache.cache", fake_cache),
+        patch("shipping_acs.client.AcsClient") as mock_class,
+    ):
+        acs = mock_class.return_value.price_calculation
+        acs.side_effect = AcsAPIError(
+            alias="ACS_Price_Calculation", error_message="Test outage"
+        )
+        assert ask() is None
+        [key] = store
+        assert key.startswith("acs:price_quote:v2:")
+
+        # What the previous release wrote for the same parcel.
+        store.clear()
+        store[key.replace("acs:price_quote:v2:", "acs:price_quote:")] = 9.99
+        acs.side_effect = None
+        acs.return_value = {"Total_Ammount": 5.21}
+        assert ask() == Decimal("5.21")

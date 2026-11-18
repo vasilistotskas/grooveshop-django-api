@@ -45,6 +45,7 @@ from core.api.throttling import (
     PaymentAttemptThrottle,
     UserBudgetThrottle,
     VivaReturnThrottle,
+    gift_card_code_throttles,
 )
 from core.api.views import BaseModelViewSet
 from core.filters.camel_case_ordering import ActionOrdering
@@ -54,8 +55,13 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
+from order.checkout.quote import (
+    ExpectedTotal,
+    OrderQuoteService,
+    ShippingChoice,
+)
 from order.enum.cancel_error import OrderCancelErrorType
-from order.enum.create_error import OrderCreateErrorType
+from order.enum.create_error import TOTAL_CHANGED_CODE, OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartHasUnpaidOrderError,
@@ -68,6 +74,7 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCancellationError,
     OrderChangedDuringPaymentError,
+    OrderTotalChangedError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
@@ -111,6 +118,7 @@ from order.serializers.order import (
     VivaReturnGiftCardPurchaseResponseSerializer,
     VivaReturnOrderResponseSerializer,
 )
+from order.serializers.quote import CheckoutQuoteSerializer
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderAttributionService,
@@ -609,85 +617,55 @@ class OrderViewSet(BaseModelViewSet):
             ) from e
 
     def _validate_pay_way_for_order(self, pay_way, validated_data):
-        """Reject an inactive, carrier-incompatible, or unconfigured pay-way.
+        """Refuse a pay way checkout would not have offered for the order.
 
-        The GET ``/api/v1/pay-way`` list already hides pay-ways that are
-        inactive or excluded for the chosen carrier + kind, but order
-        creation resolved the pay_way by bare PK with no re-check — so a
-        direct API call (or a stale client cache) could place an order
-        with a pay-way that checkout would never have offered.
-        ``filter_by_carrier`` re-applies the two runtime-configurable
-        layers: the admin-managed ``PayWayShippingExclusion`` rows (e.g.
-        ops disabling COD at a BoxNow locker for a partner account that
-        does not have BoxNow's "pay on the go" active — it is NOT a
-        universal code-level veto; BoxNow COD is otherwise supported) and
-        each carrier adapter's ``filter_pay_ways`` hook. ``active()``
-        enforces the master switch. For home_delivery without an explicit
-        provider code ``filter_by_carrier`` is a pass-through, so only the
-        active check applies.
-
-        A second gate — ``PayWayService.is_provider_configured`` — rejects
-        a credentialed provider (Stripe, Viva Wallet) the tenant hasn't
-        actually configured: the pay-way list hides it, but a stale
-        client (or credentials removed mid-session) could still submit
-        it, and ``StripePaymentProvider``/``VivaWalletPaymentProvider``
-        would otherwise raise ``ImproperlyConfigured`` deep inside order
-        creation instead of a clean 400.
+        Order creation resolves the pay way by bare PK, so a direct API
+        call or a stale client can name one the shopper was never shown.
+        It is accepted exactly when the quote lists it for this delivery:
+        ``OrderQuoteService.offered_pay_ways`` is the one rule behind
+        the quote's ``payWays``, the pay way a quote or a payment intent
+        accepts, and this check, so the three never disagree. That rule
+        is: active; through a provider the store holds credentials for
+        (``StripePaymentProvider``/``VivaWalletPaymentProvider`` would
+        otherwise raise ``ImproperlyConfigured`` deep inside order
+        creation); and not excluded for the delivery, by an
+        admin-managed ``PayWayShippingExclusion`` row or by a settlement
+        the carrier cannot perform. A home delivery that names no carrier
+        is judged by every carrier that could take it.
         """
-        from pay_way.models import PayWay
-        from pay_way.services import PayWayService
-
-        allowed = PayWayService.filter_by_carrier(
-            PayWay.objects.active(),
+        shipping = ShippingChoice(
+            kind=validated_data.get("shipping_kind"),
             provider_code=validated_data.get("shipping_provider_code"),
-            shipping_kind=validated_data.get("shipping_kind"),
-            country_code=validated_data.get("country_id"),
+            country_id=validated_data.get("country_id"),
+            region_id=validated_data.get("region_id"),
         )
-        if not allowed.filter(id=pay_way.id).exists():
-            # Log the rejection so "why can't the customer place this
-            # order?" is answerable from logs — the pay-way is either
-            # inactive or excluded for this carrier + kind.
-            logger.info(
-                "Order create rejected: pay_way=%s (provider=%s, active=%s) "
-                "not available for shipping_provider_code=%s shipping_kind=%s",
-                pay_way.id,
-                pay_way.provider_code,
-                pay_way.active,
-                validated_data.get("shipping_provider_code"),
-                validated_data.get("shipping_kind"),
-            )
-            raise ValidationError(
-                {
-                    "pay_way_id": [
-                        _(
-                            "The selected payment method is not available "
-                            "for this order."
-                        )
-                    ]
-                },
-                code="pay_way_unavailable",
-            )
+        offered = OrderQuoteService.offered_pay_ways(shipping)
+        if offered.filter(id=pay_way.id).exists():
+            return
 
-        if pay_way.provider_code and not PayWayService.is_provider_configured(
-            pay_way.provider_code
-        ):
-            logger.info(
-                "Order create rejected: pay_way=%s (provider=%s) has no "
-                "tenant credentials configured",
-                pay_way.id,
-                pay_way.provider_code,
-            )
-            raise ValidationError(
-                {
-                    "pay_way_id": [
-                        _(
-                            "This payment method is not available for "
-                            "this store."
-                        )
-                    ]
-                },
-                code="pay_way_unavailable",
-            )
+        # Logged so "why can't the customer place this order?" is
+        # answerable: the pay way is switched off, its provider has no
+        # credentials, or the delivery excludes it.
+        logger.info(
+            "Order create rejected: pay_way=%s (provider=%s, active=%s) "
+            "not offered for shipping_provider_code=%s shipping_kind=%s",
+            pay_way.id,
+            pay_way.provider_code,
+            pay_way.active,
+            shipping.provider_code,
+            shipping.kind,
+        )
+        raise ValidationError(
+            {
+                "pay_way_id": [
+                    _(
+                        "The selected payment method is not available "
+                        "for this order."
+                    )
+                ]
+            },
+            code="pay_way_unavailable",
+        )
 
     def _payment_start_refusal(self, order) -> Response | None:
         """Why a payment cannot be started for *order*, or ``None``.
@@ -759,6 +737,11 @@ class OrderViewSet(BaseModelViewSet):
         # and do not bound a burst, so this action carries its own.
         if self.action == "create":
             return [
+                # An order refused for its gift card, or for its total,
+                # says what the card is worth.
+                *gift_card_code_throttles(
+                    self.request, self.get_request_serializer()
+                ),
                 OrderCreateThrottle(),
                 OrderCreateAnonThrottle(),
                 *super().get_throttles(),
@@ -999,6 +982,26 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except OrderTotalChangedError as e:
+            # Nothing was created. The quote is what the order would
+            # have been created at: the client shows it and asks again.
+            # ``error.type`` is not ``total_changed`` yet, see
+            # ``TOTAL_CHANGED_CODE``.
+            return Response(
+                {
+                    "detail": _(
+                        "The order total has changed. Review the new "
+                        "total and place the order again."
+                    ),
+                    "error": {
+                        "type": OrderCreateErrorType.INVALID_ORDER_DATA,
+                        "quote": CheckoutQuoteSerializer(e.quote).data,
+                    },
+                    "code": TOTAL_CHANGED_CODE,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         except LegalDocumentUnavailableError as e:
             # A store fault, not the buyer's: the checkout linked a page
             # with no published text in this language, so nothing could
@@ -1205,6 +1208,7 @@ class OrderViewSet(BaseModelViewSet):
                 request, validated_data.get("attribution")
             ),
             legal_acceptance=legal_acceptance,
+            expected_total=self._expected_total(validated_data),
         )
 
         # Return order details
@@ -1289,6 +1293,7 @@ class OrderViewSet(BaseModelViewSet):
                 request, validated_data.get("attribution")
             ),
             legal_acceptance=legal_acceptance,
+            expected_total=self._expected_total(validated_data),
         )
 
         # Return order details
@@ -1307,6 +1312,12 @@ class OrderViewSet(BaseModelViewSet):
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
         )
+
+    @staticmethod
+    def _expected_total(validated_data: dict) -> ExpectedTotal | None:
+        """The total the client says it showed the buyer, if it sent one."""
+        expected = validated_data.get("expected_total")
+        return None if expected is None else ExpectedTotal(**expected)
 
     def _get_cart_and_user(self, request):
         """

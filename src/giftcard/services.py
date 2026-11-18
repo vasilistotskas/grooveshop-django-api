@@ -400,12 +400,6 @@ class GiftCardService:
             ]
         return plan.amount
 
-    @classmethod
-    def redeem(cls, codes, order, amount_due: Money) -> Money:
-        """Plan (locked) + record in one step — the order-first path."""
-        plan = cls.plan_redemption(codes, amount_due, lock=True)
-        return cls.record_plan(plan, order)
-
     # ── purchase flow ──────────────────────────────────────────────
 
     @classmethod

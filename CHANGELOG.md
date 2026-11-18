@@ -3,6 +3,41 @@
 
 
 
+## v3.254.1 (2026-11-18)
+
+### Bug fixes
+
+* fix(agent): fail deleted orders' events, hold unresolvable stores' events (#752) ([`5c126ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c126cae5377637b280ba51e96b0ee353084e3f5))
+
+* fix(agent): fail deleted orders' events, hold unresolvable stores' events
+
+The gateway renders each order event from its own read of the order
+(GET /api/v1/agent/internal/order/{uuid}), which goes through
+Order.objects.for_detail() and so finds no soft-deleted order: such an
+event could only be answered 422 and fail after a wasted call. An event
+whose order is deleted, soft or for good, now fails at once with
+last_error "order deleted" and no call, at attempt time and from "Send
+again now", which makes it failed instead of queuing it.
+
+The gateway resolves a store through tenant/resolve, which answers only
+a store whose row is active. The sweep never reached an inactive store
+(run_for_all_tenants requires is_active), but the attempt queued at
+commit and "Send again now" did, and spent attempts on events the
+gateway could neither render nor sign. Every attempt now checks the
+gateway's rule first: for an inactive store, or a schema with no store
+row, it sends nothing and spends no attempt, so the events stay pending
+until the store is active again. A store that is active with a leftover
+suspended_at is resolvable, and is still swept. ([`5c126ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c126cae5377637b280ba51e96b0ee353084e3f5))
+
+* fix(agent): read the store's state at every attempt
+
+A sweep run binds its store once, and bound_tenant() keeps the row it
+read, so a store suspended during a run still read as active and its
+remaining events were attempted. _store_is_active() now queries the
+store's row at each attempt (no row still means inactive), and an
+attempt for an inactive store returns STORE_INACTIVE, which stops the
+run like the other outcomes that every remaining event would share. ([`5c126ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c126cae5377637b280ba51e96b0ee353084e3f5))
+
 ## v3.254.0 (2026-11-18)
 
 ### Bug fixes

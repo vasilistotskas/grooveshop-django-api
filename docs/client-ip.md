@@ -34,10 +34,17 @@ the anonymous half (`GatewayAnonThrottle`) and the signed-in half
 (`CartMutationThrottle`, `OrderCreateThrottle`, `PaymentAttemptThrottle`,
 whose `UserRateThrottle` keys a caller who is not signed in on
 `get_ident`). Without the secret the address is the key, so a forged
-`X-Cart-Id` buys no budget. And the gift-card guessing budget
+`X-Cart-Id` buys no budget. The coupon budget
+(`CouponApplyThrottle`) takes the same rule: the UCP and ACP coupon calls
+of every buyer of a platform come from the platform's address, so per
+address they would spend one budget. Guessing stays bounded because a
+cart is minted by a cart write, which names no cart yet and is budgeted
+per address (`cart_mutation`). And the gift-card guessing budget
 (`GiftCardCodeThrottle`) is keyed on the signed-in customer, else the
 gateway's cart, else the address, and counts only codes new to the cart
-(`docs/order/creation.md` §3.0). `edge_client_ip` itself never falls back to
+(`docs/order/creation.md` §3.0). The BoxNow nearest-locker budget stays
+per address: the endpoint calls BOX NOW live and the gateway's call names
+no cart. `edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
 (`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is

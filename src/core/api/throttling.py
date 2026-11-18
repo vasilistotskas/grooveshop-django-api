@@ -169,8 +169,8 @@ class GatewayIdentMixin(ResilientThrottleMixin):
     who is not signed in, so a signed-in agent is keyed on its account.
 
     The rule lives here, once, for both halves of a pair
-    (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it)
-    and for ``GiftCardCodeThrottle``.
+    (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it),
+    for ``GiftCardCodeThrottle`` and for ``CouponApplyThrottle``.
     """
 
     def get_ident(self, request) -> str:
@@ -374,9 +374,19 @@ class CartQuoteAnonThrottle(GatewayAnonThrottle):
     scope = "cart_quote_anon"
 
 
-class CouponApplyThrottle(UserOrIpRateThrottle):
+class CouponApplyThrottle(GatewayIdentMixin, UserOrIpRateThrottle):
     """Tight per-caller throttle for coupon application — the endpoint is a
-    brute-forceable code oracle (valid/invalid distinguishes codes)."""
+    brute-forceable code oracle (valid/invalid distinguishes codes).
+
+    Behind the verified gateway secret the caller is the cart the request
+    names (``GatewayIdentMixin``, as ``GiftCardCodeThrottle``): the UCP
+    and ACP coupon calls of every buyer of a platform arrive from the
+    platform's address, so per address one buyer's attempts would spend
+    everyone's. Guessing stays bounded: a cart is minted by a cart write,
+    which carries no cart yet and so is budgeted per address
+    (``cart_mutation``), and a request that names no cart, or names one
+    without the secret, is keyed on the address as before.
+    """
 
     scope = "coupon_apply"
     fail_closed = True

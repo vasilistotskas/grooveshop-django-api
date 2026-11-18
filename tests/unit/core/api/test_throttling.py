@@ -20,6 +20,7 @@ from cart.agent_token import hash_cart_token
 from core.api.throttling import (
     CartMutationAnonThrottle,
     CartMutationThrottle,
+    CouponApplyThrottle,
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
     PaymentAttemptAnonThrottle,
@@ -406,7 +407,7 @@ class _GatewayUserBudgetTests:
             user=user,
             **{"X-Internal-Gateway": SECRET, "X-Cart-Id": CART_UUID},
         )
-        self.assertTrue(key.endswith("_7"))
+        self.assertRegex(key, r"[_:]7$")
         self.assertNotIn("gw:", key)
 
 
@@ -414,6 +415,12 @@ class _GatewayUserBudgetTests:
 class CartMutationThrottleTestCase(_GatewayUserBudgetTests, TestCase):
     throttle_class = CartMutationThrottle
     scope = "cart_mutation"
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)
+class CouponApplyThrottleTestCase(_GatewayUserBudgetTests, TestCase):
+    throttle_class = CouponApplyThrottle
+    scope = "coupon_apply"
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET=SECRET)

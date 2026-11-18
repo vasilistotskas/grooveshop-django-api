@@ -33,7 +33,11 @@ that mixin, and every pair of cart, order and payment budgets uses it:
 the anonymous half (`GatewayAnonThrottle`) and the signed-in half
 (`CartMutationThrottle`, `OrderCreateThrottle`, `PaymentAttemptThrottle`,
 whose `UserRateThrottle` keys a caller who is not signed in on
-`get_ident`). Without the secret the address is the key, so a forged
+`get_ident`). The cart or order is keyed by the uuid it parses to
+(`core.cart_id.cart_uuid_from_request`, the parse the cart lookup makes), so
+upper case, no hyphens, braces or `urn:uuid:` are one cart, not a fresh
+budget each; an id that is no uuid names nothing and falls back to the
+address. Without the secret the address is the key, so a forged
 `X-Cart-Id` buys no budget. The coupon budget
 (`CouponApplyThrottle`) takes the same rule: the UCP and ACP coupon calls
 of every buyer of a platform come from the platform's address, so per

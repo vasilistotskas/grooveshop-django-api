@@ -14,6 +14,7 @@ from cart.agent_token import (
     resolve_cart_token,
 )
 from cart.models import Cart, CartAttribution, CartItem
+from core.cart_id import cart_uuid_from_request
 from order.checkout.attribution import ClassifiedAttribution
 from order.models.stock_reservation import StockReservation
 
@@ -28,28 +29,6 @@ if TYPE_CHECKING:
 
 class CartServiceInitException(Exception):
     pass
-
-
-def cart_uuid_from_request(request: Request | HttpRequest) -> uuid.UUID | None:
-    """The cart the caller is addressing, from the ``X-Cart-Id`` header.
-
-    Carts are addressed by their unguessable UUID, never the sequential
-    PK — otherwise any anonymous caller could enumerate other guests'
-    carts by incrementing an integer header (IDOR). Anything that is
-    not a valid UUID reads as "no cart". The storefront proxy sends the
-    header on every cart-scoped call, including the recommendation
-    feedback events, so the same parse serves both.
-    """
-    if hasattr(request, "META"):
-        raw = request.META.get("HTTP_X_CART_ID")
-    else:
-        raw = request.headers.get("X-Cart-Id")
-    if not raw:
-        return None
-    try:
-        return uuid.UUID(str(raw))
-    except ValueError, TypeError, AttributeError:
-        return None
 
 
 def cart_item_pairs(

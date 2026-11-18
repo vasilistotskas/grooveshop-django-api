@@ -57,6 +57,7 @@ from rest_framework.throttling import (
 )
 
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
+from core.cart_id import cart_uuid_from_request
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,12 @@ def _gateway_ident(request) -> str | None:
     matches, and the request names a cart (cart writes, order creation)
     or an order (``?uuid=``, the payment-link calls). A cart token and an
     order uuid both open what they name, so each is keyed by its hash.
+
+    A cart or an order is keyed by the uuid it parses to, the parse the
+    cart lookup itself makes (``core.cart_id.cart_uuid_from_request``): upper case,
+    no hyphens, braces and ``urn:uuid:`` all name one cart, so one
+    cart cannot take a fresh budget by changing how it spells its id.
+    A value that is no uuid names nothing and is keyed on the address.
     """
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
     provided = request.headers.get("X-Internal-Gateway", "")
@@ -150,11 +157,13 @@ def _gateway_ident(request) -> str | None:
     if token:
         # The token names the cart; key on its hash, never the token.
         return hash_cart_token(token)
-    if cart_id := request.headers.get("X-Cart-Id"):
-        return cart_id
-    if order_uuid := request.GET.get("uuid"):
-        return "order:" + hashlib.sha256(order_uuid.encode()).hexdigest()
-    return None
+    if cart_uuid := cart_uuid_from_request(request):
+        return str(cart_uuid)
+    try:
+        order_uuid = uuid.UUID(request.GET.get("uuid", ""))
+    except ValueError:
+        return None
+    return "order:" + hashlib.sha256(order_uuid.hex.encode()).hexdigest()
 
 
 class GatewayIdentMixin(ResilientThrottleMixin):
@@ -506,10 +515,8 @@ def _checkout_cart_ident(request) -> str | None:
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
         return f"user:{user.pk}"
-    try:
-        return "cart:" + str(uuid.UUID(request.headers.get("X-Cart-Id", "")))
-    except ValueError:
-        return None
+    cart_uuid = cart_uuid_from_request(request)
+    return f"cart:{cart_uuid}" if cart_uuid else None
 
 
 class GiftCardCodeThrottle(GatewayIdentMixin, GiftCardCheckThrottle):

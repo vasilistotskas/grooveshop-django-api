@@ -19,6 +19,7 @@ from tenant.internal import is_internal_caller
 from tenant.views import _is_gateway
 
 HIGH_BYTE = "\xff"
+CART_ID = "521b14f2-da94-48eb-9426-9cfa922606f8"
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
@@ -50,7 +51,7 @@ def test_throttle_bypass_refuses_a_non_ascii_header():
     request = RequestFactory().get(
         "/",
         HTTP_X_INTERNAL_GATEWAY=HIGH_BYTE,
-        HTTP_X_CART_ID="abc",
+        HTTP_X_CART_ID=CART_ID,
     )
     assert _gateway_ident(request) is None
 
@@ -60,6 +61,16 @@ def test_throttle_bypass_still_works_for_the_real_secret():
     request = RequestFactory().get(
         "/",
         HTTP_X_INTERNAL_GATEWAY="s3cret",
+        HTTP_X_CART_ID=CART_ID,
+    )
+    assert _gateway_ident(request) == CART_ID
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
+def test_a_cart_id_that_is_no_uuid_names_no_cart():
+    request = RequestFactory().get(
+        "/",
+        HTTP_X_INTERNAL_GATEWAY="s3cret",
         HTTP_X_CART_ID="abc",
     )
-    assert _gateway_ident(request) == "abc"
+    assert _gateway_ident(request) is None

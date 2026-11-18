@@ -31,6 +31,13 @@ from tests.utils.redis import private_cache
 
 SECRET = "gateway-shared-secret"
 CART_UUID = "521b14f2-da94-48eb-9426-9cfa922606f8"
+#: Every way the cart lookup (``uuid.UUID``) reads one id.
+CART_SPELLINGS = (
+    CART_UUID.upper(),
+    CART_UUID.replace("-", ""),
+    "{" + CART_UUID + "}",
+    "urn:uuid:" + CART_UUID,
+)
 
 
 def _anon_request(factory: APIRequestFactory, **headers):
@@ -71,6 +78,28 @@ class _GatewayCartKeyTests:
         )
         key = self.throttle.get_cache_key(request, view=None)
         self.assertIn(f"gw:{CART_UUID}", key)
+
+    def test_every_spelling_of_a_cart_is_one_budget(self) -> None:
+        keys = {
+            self.throttle.get_cache_key(
+                _anon_request(
+                    self.factory,
+                    **{"X-Internal-Gateway": SECRET, "X-Cart-Id": spelling},
+                ),
+                view=None,
+            )
+            for spelling in (CART_UUID, *CART_SPELLINGS)
+        }
+        self.assertEqual(len(keys), 1)
+
+    def test_a_cart_id_that_is_no_uuid_falls_back_to_ip(self) -> None:
+        request = _anon_request(
+            self.factory,
+            **{"X-Internal-Gateway": SECRET, "X-Cart-Id": "not-a-uuid"},
+        )
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertNotIn("not-a-uuid", key)
+        self.assertNotIn("gw:", key)
 
     def test_two_carts_get_distinct_buckets(self) -> None:
         other_uuid = "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"
@@ -273,6 +302,19 @@ class PaymentAttemptAnonThrottleTestCase(TestCase):
         # The uuid opens a guest order: never kept in a cache key.
         self.assertNotIn(ORDER_UUID, key)
 
+    def test_every_spelling_of_an_order_is_one_budget(self) -> None:
+        keys = {
+            _payment_request(
+                order_uuid=spelling, **{"X-Internal-Gateway": SECRET}
+            )
+            for spelling in (
+                ORDER_UUID,
+                ORDER_UUID.upper(),
+                ORDER_UUID.replace("-", ""),
+            )
+        }
+        self.assertEqual(len(keys), 1)
+
     def test_two_orders_get_distinct_buckets(self) -> None:
         other = "0e35c7e5-8a5d-4f6e-9be1-2be929e14a41"
         self.assertNotEqual(
@@ -335,6 +377,20 @@ class _GatewayUserBudgetTests:
         )
         self.assertIn(f"gw:{CART_UUID}", key)
         self.assertIn(self.scope, key)
+
+    def test_every_spelling_of_a_cart_is_one_budget(self) -> None:
+        keys = {
+            self._key(**{"X-Internal-Gateway": SECRET, "X-Cart-Id": spelling})
+            for spelling in (CART_UUID, *CART_SPELLINGS)
+        }
+        self.assertEqual(len(keys), 1)
+
+    def test_a_cart_id_that_is_no_uuid_keys_on_the_address(self) -> None:
+        key = self._key(
+            **{"X-Internal-Gateway": SECRET, "X-Cart-Id": "not-a-uuid"}
+        )
+        self.assertNotIn("not-a-uuid", key)
+        self.assertNotIn("gw:", key)
 
     def test_a_gateway_cart_token_keys_on_its_hash_never_the_token(
         self,
@@ -433,6 +489,20 @@ class OrderCreateThrottleTestCase(_GatewayUserBudgetTests, TestCase):
 class PaymentAttemptThrottleTestCase(_GatewayUserBudgetTests, TestCase):
     throttle_class = PaymentAttemptThrottle
     scope = "payment"
+
+    def test_every_spelling_of_an_order_is_one_budget(self) -> None:
+        keys = {
+            self._key(
+                path=f"/api/v1/order/1/create_checkout_session?uuid={spelling}",
+                **{"X-Internal-Gateway": SECRET},
+            )
+            for spelling in (
+                ORDER_UUID,
+                ORDER_UUID.upper(),
+                ORDER_UUID.replace("-", ""),
+            )
+        }
+        self.assertEqual(len(keys), 1)
 
     def test_a_gateway_request_keys_on_the_orders_hash(self) -> None:
         key = self._key(

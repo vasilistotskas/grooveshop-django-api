@@ -22,12 +22,12 @@ from djmoney.money import Money
 from order.exceptions import (
     InvalidCouponError,
     InvalidGiftCardError,
-    InvalidOrderDataError,
     LoyaltyRedemptionError,
+    ShippingRefusedError,
 )
 from promotion.enum import BenefitType
 from promotion.services import PromotionEngine
-from shipping.enum import FreeShippingSource
+from shipping.enum import FreeShippingSource, ShippingRefusal
 
 if TYPE_CHECKING:
     from cart.models import Cart
@@ -586,8 +586,9 @@ class OrderQuoteService:
         checked — a promo must never make an unavailable or
         over-weight option orderable just because it charges nothing.
 
-        Raises :class:`~order.exceptions.InvalidOrderDataError` (never
-        the raw ``shipping.exceptions`` types) so every caller of
+        Raises :class:`~order.exceptions.ShippingRefusedError`, an
+        ``InvalidOrderDataError`` that names which refusal it is (never
+        the raw ``shipping.exceptions`` types), so every caller of
         :meth:`quote` — order creation, the create-payment-intent and
         quote endpoints — gets the same field-scoped 400 shape it
         already handles for every other checkout-time rejection.
@@ -638,55 +639,28 @@ class OrderQuoteService:
                 free=free,
             )
         except ShippingUnavailableError as exc:
-            raise InvalidOrderDataError(
+            raise ShippingRefusedError(
+                ShippingRefusal.UNAVAILABLE,
                 str(
                     _(
                         "The selected shipping method is not available "
                         "for the selected country."
                     )
                 ),
-                field_errors={
-                    "shipping_provider_code": [
-                        str(
-                            _(
-                                "The selected shipping method is not "
-                                "available for the selected country."
-                            )
-                        )
-                    ]
-                },
             ) from exc
         except ShippingParcelTooLargeError as exc:
-            raise InvalidOrderDataError(
+            raise ShippingRefusedError(
+                ShippingRefusal.PARCEL_TOO_LARGE,
                 str(
                     _("The cart is too large for the selected shipping method.")
                 ),
-                field_errors={
-                    "shipping_provider_code": [
-                        str(
-                            _(
-                                "The cart is too large for the selected "
-                                "shipping method."
-                            )
-                        )
-                    ]
-                },
             ) from exc
         except ShippingWeightExceededError as exc:
-            raise InvalidOrderDataError(
+            raise ShippingRefusedError(
+                ShippingRefusal.WEIGHT_EXCEEDED,
                 str(
                     _("The cart is too heavy for the selected shipping method.")
                 ),
-                field_errors={
-                    "shipping_provider_code": [
-                        str(
-                            _(
-                                "The cart is too heavy for the selected "
-                                "shipping method."
-                            )
-                        )
-                    ]
-                },
             ) from exc
 
     @classmethod

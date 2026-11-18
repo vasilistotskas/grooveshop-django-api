@@ -85,14 +85,32 @@ caller:
   - The cart is found as order creation finds it (`get_existing_cart`):
     404 `cart_not_found`, never a new cart; an empty one is 400
     `cart_empty`.
-  - Refusals are the payment-intent endpoint's: 400 `invalid_order_data`
-    with `fieldErrors` for a delivery that cannot be priced, 400
-    `pay_way_unavailable` / 404 `pay_way_not_found`, 400
-    `loyalty_requires_authentication` / `loyalty_redemption_invalid`, and
-    the gift card's own reason.
+  - Refusals are `{detail, reason, code}`. A delivery that cannot be
+    priced has a code of its own (`shipping.enum.ShippingRefusal`:
+    `shipping_unavailable`, `shipping_parcel_too_large`,
+    `shipping_weight_exceeded`), so a client drops the selection instead
+    of matching translated text; the payment intent and order creation
+    keep `invalid_order_data` with `fieldErrors` for the same three
+    (`ShippingRefusedError` is an `InvalidOrderDataError`). The rest are
+    the payment-intent endpoint's: 400 `pay_way_unavailable` / 404
+    `pay_way_not_found`, 400 `loyalty_requires_authentication` /
+    `loyalty_redemption_invalid`, and the gift card's own reason.
   - `X-Cart-Token` is accepted (`docs/cart-agent-token.md`): the quote is
     then the cart owner's price. Order creation takes no token, so that
-    quote must not feed the expected total of an anonymous order.
+    quote must not feed the expected total of an anonymous order. Points
+    are priced only for the signed-in owner: with a token,
+    `loyaltyPointsToRedeem` is refused (`loyalty_requires_authentication`),
+    because the refusal of too many points states the balance.
+  - **A budget of its own.** The quote is repeated on every change of a
+    checkout and polled by the agent gateway, so it is throttled by
+    `cart_quote` / `cart_quote_anon` (`CartQuoteThrottle`,
+    `CartQuoteAnonThrottle`: per cart for the gateway), not by the cart's
+    write budget. A quote that carries `giftCardCodes` also spends
+    `gift_card_check`, since it says what each card settles.
+  - A polled quote does not reach the carrier: ACS's live price is cached
+    for five minutes per country, region and weight bracket
+    (`AcsCarrier._fetch_live_quote`), the entry order creation reads. A
+    failed call is not cached; the stored rate is charged.
   - **A quote only prices.** Stock, the cart's validity, the wholesale
     minimum, the legal texts and the unpaid-order limit are order
     creation's to judge.

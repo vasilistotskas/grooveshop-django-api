@@ -63,6 +63,10 @@ FAIL_OPEN = {
     "FeedbackCreateThrottle",
     "CartMutationThrottle",
     "CartMutationAnonThrottle",
+    # The checkout quote is a read: a shopper keeps seeing a total
+    # through a blip, as they keep their cart.
+    "CartQuoteThrottle",
+    "CartQuoteAnonThrottle",
     "SearchThrottle",
     "SearchClickThrottle",
     "ViewCountThrottle",

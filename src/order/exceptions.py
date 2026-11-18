@@ -15,7 +15,8 @@ Exception Hierarchy:
     ├── InvalidOrderDataError
     │   ├── CartNotReadyError
     │   ├── CartHasUnpaidOrderError
-    │   └── LoyaltyRedemptionError
+    │   ├── LoyaltyRedemptionError
+    │   └── ShippingRefusedError
     ├── OrderTotalChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
@@ -280,6 +281,29 @@ class LoyaltyRedemptionError(InvalidOrderDataError):
         )
 
 
+class ShippingRefusedError(InvalidOrderDataError):
+    """Raised when the chosen delivery cannot be priced for the cart: the
+    store does not ship that way to the country, the cart is too heavy,
+    or it does not fit the carrier's parcels.
+
+    A subclass of ``InvalidOrderDataError`` that carries the sentence
+    under ``shipping_provider_code``, so order creation and the payment
+    intent answer it as they answer their other refusals.
+    ``POST /cart/quote`` answers it with ``reason`` as its code.
+
+    Attributes:
+        reason (str): A ``shipping.enum.ShippingRefusal`` value.
+        message (str): The sentence, in the request's language.
+    """
+
+    def __init__(self, reason: str, message: str):
+        self.reason = reason
+        self.message = message
+        super().__init__(
+            message, field_errors={"shipping_provider_code": [message]}
+        )
+
+
 class OrderTotalChangedError(OrderServiceError):
     """Raised when order creation computes a total other than the one the
     client says it showed the buyer (``expectedTotal``).
@@ -329,10 +353,12 @@ class InvalidGiftCardError(OrderServiceError):
 
     Attributes:
         reason (str): Machine-readable reason (gift_card_* vocabulary).
+        message (str): The sentence a client may show.
     """
 
     def __init__(self, reason: str, message: str):
         self.reason = reason
+        self.message = message
         super().__init__(message)
 
 

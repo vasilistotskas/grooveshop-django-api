@@ -142,18 +142,27 @@ class TestRedemptionPrice:
         return user
 
     @pytest.mark.parametrize(
-        ("ratio", "discount"),
-        [(100.0, Decimal(5)), (3.0, Decimal(500) / Decimal(3))],
+        ("points", "ratio", "discount"),
+        [
+            (500, 100.0, Decimal("5.00")),
+            (500, 3.0, Decimal("166.67")),
+            # Half a cent rounds up, as a promotion's amount does.
+            (103, 200.0, Decimal("0.52")),
+            (101, 200.0, Decimal("0.51")),
+        ],
     )
-    def test_points_buy_their_ratio_worth_unrounded(
-        self, member, ratio, discount
+    def test_points_buy_their_ratio_worth_to_the_cent(
+        self, member, points, ratio, discount
     ):
+        """One rounding, here: the quote, the order and the per-line
+        discount snapshots all read this figure."""
         with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=ratio):
             price = LoyaltyService.preview_redemption(
-                member, 500, "EUR", max_discount=Decimal(1000)
+                member, points, "EUR", max_discount=Decimal(1000)
             )
 
         assert price == discount
+        assert price.as_tuple().exponent == -2
 
     def test_a_preview_writes_nothing(self, member):
         with loyalty_settings(LOYALTY_REDEMPTION_RATIO_EUR=100.0):

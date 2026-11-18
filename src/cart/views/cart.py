@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from django.conf import settings
 from django.db.models import Q
@@ -40,7 +41,10 @@ from core.api.throttling import (
     CartAgentTokenThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
+    CartQuoteAnonThrottle,
+    CartQuoteThrottle,
     CouponApplyThrottle,
+    GiftCardCheckThrottle,
     UserBudgetThrottle,
 )
 from core.api.views import BaseModelViewSet
@@ -61,6 +65,7 @@ from order.exceptions import (
     InvalidGiftCardError,
     InvalidOrderDataError,
     LoyaltyRedemptionError,
+    ShippingRefusedError,
     StockReservationError,
 )
 from order.inventory.stock import StockManager
@@ -319,9 +324,6 @@ class CartViewSet(BaseModelViewSet):
             "reserve_stock",
             "release_reservations",
             "create_payment_intent",
-            # A read, but it can ask a carrier for a live price: the
-            # per-minute limits of the checkout calls apply.
-            "quote",
             "apply_coupon",
             "remove_coupon",
         }
@@ -395,6 +397,22 @@ class CartViewSet(BaseModelViewSet):
                 AnonIpRateThrottle(),
                 UserBudgetThrottle(),
             ]
+        if self.action == "quote":
+            # A read with a budget of its own (``cart_quote``), so a
+            # checkout that re-quotes on every change, or a platform
+            # polling one, cannot use up the cart's write budget.
+            throttles = [
+                CartQuoteThrottle(),
+                CartQuoteAnonThrottle(),
+                AnonIpRateThrottle(),
+                UserBudgetThrottle(),
+            ]
+            if self._names_gift_cards():
+                # A quote with gift-card codes says what each card is
+                # worth: it must not be a faster oracle than the balance
+                # check, so it also spends that budget.
+                throttles.insert(0, GiftCardCheckThrottle())
+            return throttles
         if self.action in self._MUTATION_ACTIONS:
             # Per-minute burst limits layered ON TOP of the global daily caps
             # (DEFAULT_THROTTLE_CLASSES) — include the defaults explicitly so
@@ -406,6 +424,12 @@ class CartViewSet(BaseModelViewSet):
                 UserBudgetThrottle(),
             ]
         return super().get_throttles()
+
+    def _names_gift_cards(self) -> bool:
+        """Whether the request body carries gift-card codes. Read before
+        the body is validated, so anything else counts as none."""
+        data = self.request.data
+        return isinstance(data, Mapping) and bool(data.get("gift_card_codes"))
 
     def get_queryset(self):
         """
@@ -920,6 +944,7 @@ class CartViewSet(BaseModelViewSet):
         *,
         pay_way: PayWay | None,
         shipping: ShippingChoice | None,
+        name_shipping_refusal: bool = False,
     ) -> CheckoutQuote | Response:
         """The checkout quote for a request body (``data``, validated),
         or the 400 that refuses it.
@@ -927,10 +952,23 @@ class CartViewSet(BaseModelViewSet):
         The one place the cart endpoints price a checkout: the payment
         intent's amount and ``POST /cart/quote`` both come from here,
         and ``OrderQuoteService.quote`` is what order creation runs.
+
+        Points are priced only for the signed-in customer who owns the
+        cart. A cart token names the owner without being the owner: its
+        holder may not price the owner's points, whose refusal says the
+        balance. So a token request with points is refused like a
+        guest's, before anything is priced.
+
+        ``name_shipping_refusal`` answers a delivery that cannot be
+        priced with its own code (``ShippingRefusal``) instead of
+        ``invalid_order_data``: the quote's answer, which a client
+        branches on to drop the selection.
         """
         loyalty_points = data.get("loyalty_points_to_redeem")
         user = self.cart_service.owner
-        if loyalty_points and user is None:
+        if loyalty_points and (
+            user is None or self.cart_service.token_cart is not None
+        ):
             return Response(
                 {
                     "detail": _(
@@ -960,27 +998,42 @@ class CartViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except InvalidOrderDataError as exc:
-            # Same shape as order creation's refusal: a fixed detail and
-            # the field-scoped messages, never the exception's own text.
-            logger.warning("Invalid order data: %s", exc)
+        except ShippingRefusedError as exc:
+            if not name_shipping_refusal:
+                return self._invalid_order_data(exc)
             return Response(
                 {
-                    "detail": _("Invalid order data"),
-                    "field_errors": exc.field_errors,
-                    "code": "invalid_order_data",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except InvalidGiftCardError as exc:
-            return Response(
-                {
-                    "detail": str(exc),
+                    "detail": exc.message,
                     "reason": exc.reason,
                     "code": exc.reason,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except InvalidOrderDataError as exc:
+            return self._invalid_order_data(exc)
+        except InvalidGiftCardError as exc:
+            return Response(
+                {
+                    "detail": exc.message,
+                    "reason": exc.reason,
+                    "code": exc.reason,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @staticmethod
+    def _invalid_order_data(exc: InvalidOrderDataError) -> Response:
+        """Order creation's refusal shape: a fixed detail and the
+        field-scoped messages, never the exception's own text."""
+        logger.warning("Invalid order data: %s", exc)
+        return Response(
+            {
+                "detail": _("Invalid order data"),
+                "field_errors": exc.field_errors,
+                "code": "invalid_order_data",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     @action(detail=False, methods=["post"], url_path="quote")
     def quote(self, request, *args, **kwargs):
@@ -1026,7 +1079,13 @@ class CartViewSet(BaseModelViewSet):
             if isinstance(pay_way, Response):
                 return pay_way
 
-        quote = self._quote(cart, data, pay_way=pay_way, shipping=shipping)
+        quote = self._quote(
+            cart,
+            data,
+            pay_way=pay_way,
+            shipping=shipping,
+            name_shipping_refusal=True,
+        )
         if isinstance(quote, Response):
             return quote
 

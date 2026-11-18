@@ -176,7 +176,12 @@ catalogue can no longer change.
   paths) freezes each line's share on `OrderItem.discount_allocation`
   (the whole line, not per unit) exactly as it freezes `vat_rate`; the
   loyalty redemption is order-wide and is spread over the value left on
-  every line (`spread_by_remaining_value`; the standalone
+  every line. Its amount is rounded to the cent once, where it is priced
+  (`LoyaltyService._validate_and_price_redemption`, half up), so the
+  quote, the order's `loyalty_discount` and the lines' shares are one
+  figure: unrounded, 103 points at 200 a euro (0.515) were 0.52 on the
+  order and 0.51 over its lines, and the VAT lines could not be written
+  (`spread_by_remaining_value`; the standalone
   `/loyalty/redeem` endpoint does the same on an existing pending
   order). Gift-card amounts are payment and never allocated; a staff-added
   line carries none; a free gift has no value to carry any.

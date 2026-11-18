@@ -705,9 +705,8 @@ class TestOrderMetadataIntegration:
         # Verify metadata stored in order
         order.refresh_from_db()
         assert order.metadata["loyalty_points_redeemed"] == 150
-        assert order.metadata["loyalty_discount"] == str(
-            Decimal(150) / Decimal(100)
-        )
+        # The discount is money: stored as it was priced, to the cent.
+        assert order.metadata["loyalty_discount"] == "1.50"
 
     def test_redeem_with_order_sets_reference_order_on_transaction(self):
         """REDEEM transaction references the order when order is provided."""
@@ -823,4 +822,4 @@ class TestOrderMetadataIntegration:
 
         order.refresh_from_db()
         assert order.metadata["loyalty_points_redeemed"] == 200
-        assert order.metadata["loyalty_discount"] == str(expected_discount)
+        assert order.metadata["loyalty_discount"] == "4.00"

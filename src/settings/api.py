@@ -79,6 +79,12 @@ REST_FRAMEWORK = {
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
+        # The checkout quote is a read that is repeated on every change
+        # of a checkout and polled by the agent gateway (per cart there):
+        # its own budget, so reads and cart writes cannot starve each
+        # other.
+        "cart_quote": None if DEBUG else "120/minute",
+        "cart_quote_anon": None if DEBUG else "120/minute",
         # Each mint hands out a credential for the shopper's cart.
         "cart_agent_token": None if DEBUG else "10/minute",
         # The store-admin agent surface, per staff member and store. An AI

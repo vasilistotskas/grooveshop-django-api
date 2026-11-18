@@ -926,16 +926,16 @@ def documented(generated_schema):
 
     ``documented(response, "/api/v1/product/{id}", "get")`` validates the
     JSON body against the schema declared for the response's status code.
+    The document is OpenAPI 3.0: ``tests.utils.openapi`` judges it as
+    such (``nullable``, a boolean ``exclusiveMaximum``), which a plain
+    JSON Schema validator misreads on every decimal and nullable field.
     """
-    from jsonschema import Draft202012Validator
+    from tests.utils.openapi import response_schema, validate_against
 
     def check(response, path, method):
-        responses = generated_schema["paths"][path][method]["responses"]
-        declared = responses[str(response.status_code)]["content"][
-            "application/json"
-        ]["schema"]
-        Draft202012Validator(
-            {**declared, "components": generated_schema["components"]}
-        ).validate(response.json())
+        declared = response_schema(
+            generated_schema, path, method, str(response.status_code)
+        )
+        validate_against(generated_schema, declared, response.json())
 
     return check

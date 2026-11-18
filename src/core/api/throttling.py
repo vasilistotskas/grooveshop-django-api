@@ -326,6 +326,24 @@ class CartMutationAnonThrottle(GatewayAnonThrottle):
     scope = "cart_mutation_anon"
 
 
+class CartQuoteThrottle(ResilientThrottleMixin, UserRateThrottle):
+    """``POST /cart/quote`` for a signed-in shopper.
+
+    A read a checkout repeats on every change and a platform polls, so
+    it has a budget of its own: quotes cannot spend the cart's write
+    budget (``cart_mutation``), nor writes the quotes'.
+    """
+
+    scope = "cart_quote"
+
+
+class CartQuoteAnonThrottle(GatewayAnonThrottle):
+    """``POST /cart/quote`` for a guest, keyed per cart when the agent
+    gateway asks (it quotes on every render of an open checkout)."""
+
+    scope = "cart_quote_anon"
+
+
 class CouponApplyThrottle(UserOrIpRateThrottle):
     """Tight per-caller throttle for coupon application — the endpoint is a
     brute-forceable code oracle (valid/invalid distinguishes codes)."""

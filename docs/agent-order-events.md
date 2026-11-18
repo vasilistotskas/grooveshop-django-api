@@ -113,15 +113,17 @@ every minute, per store the gateway can resolve (an active one; a leftover
 spent `AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS` (25 s), so a run lasts at most
 the budget plus one call's timeouts, under the minute between runs, and slow
 answers cannot stack runs. A run stops when the gateway cannot be reached or
-refuses the call itself (401, 403, 404), since every other event would get
-the same answer.
+refuses the call itself (401, 403, 404), or the store is no longer active,
+since every other event would get the same answer.
 
 A store gets deliveries exactly when the gateway can resolve it: through
 `GET /api/v1/tenant/resolve`, which answers only a store whose row is active.
-Every attempt checks this first (`agent.outbox._store_is_active`): for a
-suspended store (`is_active` false), or a schema with no store row, it sends
-nothing and spends no attempt, so the events stay `pending` and go out once
-the store is active again. The sweep never reaches a suspended store anyway
+Every attempt checks this first (`agent.outbox._store_is_active`), reading
+the store's row each time, so a store suspended while a sweep run goes on gets
+no further attempt and the run stops there. For a suspended store
+(`is_active` false), or a schema with no store row, an attempt sends nothing
+and spends no attempt, so the events stay `pending` and go out once the store
+is active again. The sweep never reaches a suspended store anyway
 (`run_for_all_tenants` requires `is_active`); the check is what holds the
 first attempt queued at commit and **Send again now**.
 

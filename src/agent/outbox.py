@@ -38,6 +38,7 @@ from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from tenant.celery import dispatch_on_commit
 from tenant.membership import bound_tenant
+from tenant.models import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +74,15 @@ class Outcome(StrEnum):
     MISCONFIGURED = "misconfigured"
     #: Refused for good, or out of attempts.
     FAILED = "failed"
+    #: Not attempted: the gateway cannot resolve the store
+    #: (``_store_is_active``). Attempted once it is active again.
+    STORE_INACTIVE = "store_inactive"
 
 
 #: Outcomes that would be the same for every other row: a sweep run stops.
-STOPS_THE_RUN = frozenset({Outcome.UNREACHABLE, Outcome.MISCONFIGURED})
+STOPS_THE_RUN = frozenset(
+    {Outcome.UNREACHABLE, Outcome.MISCONFIGURED, Outcome.STORE_INACTIVE}
+)
 
 
 def record_order_created(order_id: int) -> None:
@@ -152,8 +158,10 @@ def attempt(event_id: UUID | str) -> Outcome:
     mid-call leaves it to be attempted then, and ``claim`` gets a token
     that every later write of this attempt names (``_settle``).
     """
-    if not settings.AGENT_GATEWAY_INTERNAL_URL or not _store_is_active():
+    if not settings.AGENT_GATEWAY_INTERNAL_URL:
         return Outcome.SKIPPED
+    if not _store_is_active():
+        return Outcome.STORE_INACTIVE
     event = _due().filter(pk=event_id).first()
     if event is None:
         return Outcome.SKIPPED
@@ -270,9 +278,15 @@ def _store_is_active() -> bool:
     answers only a store whose row is active (``tenant.views``), so the
     events of an inactive store, or of a schema with no store row, could
     be neither rendered nor signed. They stay ``pending``, with no
-    attempt spent, and go out once the store is active again."""
+    attempt spent, and go out once the store is active again.
+
+    Read from the database at every attempt: a sweep run binds its store
+    once, and the store can be suspended while the run goes on."""
     tenant = bound_tenant()
-    return tenant is not None and tenant.is_active
+    return (
+        tenant is not None
+        and Tenant.objects.filter(pk=tenant.pk, is_active=True).exists()
+    )
 
 
 def _order_state(order_id: int) -> dict | None:
@@ -407,10 +421,11 @@ def deliver_due() -> dict[str, int]:
     delivered. A run takes no new row once it has spent
     ``AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS``, so slow answers cannot
     stack runs, and stops when the gateway cannot be reached or refuses
-    the call itself: every other row would get the same answer.
+    the call itself, or the store is no longer active: every other row
+    would get the same answer.
     """
     counts: dict[str, int] = {}
-    if not settings.AGENT_GATEWAY_INTERNAL_URL or not _store_is_active():
+    if not settings.AGENT_GATEWAY_INTERNAL_URL:
         return counts
     started = time.monotonic()
     for _ in range(settings.AGENT_ORDER_EVENT_SWEEP_BATCH):

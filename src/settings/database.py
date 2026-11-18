@@ -79,6 +79,10 @@ DATABASES = {
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 TENANT_MODEL = "tenant.Tenant"
 TENANT_DOMAIN_MODEL = "tenant.TenantDomain"
+# Checks each migration's deferred foreign keys when it ends, so a store
+# provisioned inside one transaction migrates as a deploy does
+# (``src/core/db/migrate_command.py``).
+TENANT_BASE_MIGRATE_COMMAND = "core.db.migrate_command.Command"
 PUBLIC_SCHEMA_URLCONF = "tenant.urls_public"
 # django-tenants >= 3.14 issues ``SET search_path`` before EVERY cursor
 # unless this flag caches it per connection (one extra round-trip per

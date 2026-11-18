@@ -1,5 +1,28 @@
 # Migration Safety Rules
 
+## A store's schema is migrated inside one transaction
+
+A deploy (`migrate_schemas` in the PreSync job) commits each migration on
+its own. Provisioning a store does not: `Tenant.save()`
+(`auto_create_schema`) replays the whole history into the new schema
+inside the caller's transaction (`tenant_create`, the platform admin's
+add form), so no migration commits: an atomic one runs in a savepoint, an
+`atomic = False` one straight in that transaction. Two things follow:
+
+- A foreign key Django creates is `DEFERRABLE INITIALLY DEFERRED`, so the
+  rows a data migration writes are checked at commit. PostgreSQL refuses to
+  `ALTER` or `DROP` a table whose checks are still queued ("cannot ALTER
+  TABLE ... because it has pending trigger events"). The migrate command
+  every `migrate_schemas` run uses, `core.db.migrate_command.Command`
+  (`TENANT_BASE_MIGRATE_COMMAND`), runs those checks after each migration
+  when a transaction is open, as the commit would have. Without it, whether a
+  data migration and a later `ALTER` of its table could share a
+  transaction depended on the graph's order: v3.253.0's new leaf moved
+  `shipping.0017` next to `shipping.0011` and broke every new store.
+  `tests_mt/test_provisioning_in_one_transaction.py` provisions a store
+  that way.
+- A concurrent index build is not possible there; see below.
+
 ## Index additions on large tables
 
 A plain `CREATE INDEX` (what `AddIndex` emits) takes a `SHARE` lock on the

@@ -6,8 +6,9 @@ PostgreSQL checks the foreign keys a data migration wrote (they are
 ``DEFERRABLE INITIALLY DEFERRED``) at that commit. Provisioning a store
 is different: ``Tenant.save()`` with ``auto_create_schema`` replays the
 whole history into the new schema inside the caller's transaction
-(``tenant_create``, the platform admin's "Add tenant"), so every
-migration is a savepoint and those checks stay queued until the end.
+(``tenant_create``, the platform admin's "Add tenant"), so no migration
+commits (an atomic one runs in a savepoint, an ``atomic = False`` one
+straight in that transaction) and those checks stay queued until the end.
 PostgreSQL refuses to ``ALTER`` or ``DROP`` a table that still has
 queued trigger events, so a later migration that alters a table a data
 migration filled fails ("cannot ALTER TABLE ... because it has pending

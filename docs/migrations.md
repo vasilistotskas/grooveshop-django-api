@@ -6,7 +6,8 @@ A deploy (`migrate_schemas` in the PreSync job) commits each migration on
 its own. Provisioning a store does not: `Tenant.save()`
 (`auto_create_schema`) replays the whole history into the new schema
 inside the caller's transaction (`tenant_create`, the platform admin's
-add form), so each migration is a savepoint. Two things follow:
+add form), so no migration commits: an atomic one runs in a savepoint, an
+`atomic = False` one straight in that transaction. Two things follow:
 
 - A foreign key Django creates is `DEFERRABLE INITIALLY DEFERRED`, so the
   rows a data migration writes are checked at commit. PostgreSQL refuses to

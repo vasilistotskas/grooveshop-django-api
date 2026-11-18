@@ -3,7 +3,9 @@
 Reference for the commands under `src/meili/management/commands/`. Every command below
 also accepts `--tenant <schema>` or `--all-tenants` (from `core.management.tenant_mixin`)
 unless stated otherwise; without either it runs against the schema bound to the current
-connection. Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
+connection. `--all-tenants` reaches the active stores only: these commands call
+Meilisearch for each store, and a suspended store's index is brought back with a sync
+when it is reactivated (`TenantCommandMixin.include_suspended_stores`). Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
 classmethod in `src/meili/models.py`.
 
 Run `uv run python manage.py <command> --help` for the authoritative option list.
@@ -27,7 +29,7 @@ Syncs one model's index, e.g. `product.ProductTranslation` or `blog.BlogPostTran
 |---|---|
 | `--batch_size N` | Documents per import batch |
 | `--tenant SCHEMA` | Sync that store's index only |
-| `--all-tenants` | Sync every store's index |
+| `--all-tenants` | Sync every active store's index |
 
 Without either option it runs in the public schema, which holds no store's
 products. A release that adds a field to the index document needs this with

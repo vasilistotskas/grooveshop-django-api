@@ -9,17 +9,18 @@ connection context would either crash (fresh database: the table does
 not exist in public) or, worse, silently act on pre-multi-tenant
 legacy rows left in public by the production clone.
 
-``--all-tenants`` with zero active tenants exits
-``NO_ACTIVE_TENANTS_RETURNCODE`` rather than the default 1, so a script
-can distinguish "nothing to do" from "the work failed" without parsing
-stderr.
+``--all-tenants`` reaches the active stores, or every store, suspended
+ones included, for a command that sets ``include_suspended_stores``.
+Matching no store, it exits ``NO_ACTIVE_TENANTS_RETURNCODE`` rather than
+the default 1, so a script can distinguish "nothing to do" from "the work
+failed" without parsing stderr.
 """
 
 from contextlib import nullcontext
 
 from django.core.management.base import CommandError
 
-#: Exit code for ``--all-tenants`` matching zero active tenants.
+#: Exit code for ``--all-tenants`` matching no store.
 #:
 #: Distinct from the default 1 so a CALLER can tell "there was nothing
 #: to do" apart from "the work was attempted and failed" — the two are
@@ -47,6 +48,22 @@ class TenantCommandMixin:
     #: pass the guard without flags.
     require_tenant_scope = False
 
+    #: When True, ``--all-tenants`` reaches suspended stores too
+    #: (``Tenant.objects.stores()``, not ``active()``). For a command that
+    #: only brings a store's own data up to date with the code, like the
+    #: retention sweeps: a store suspended through a few releases must not
+    #: come back without what they wrote. A command that calls a service on
+    #: the store's behalf or sends mail leaves it False.
+    include_suspended_stores = False
+
+    def target_stores(self):
+        """The stores ``--all-tenants`` reaches."""
+        from tenant.models import Tenant
+
+        if self.include_suspended_stores:
+            return Tenant.objects.stores()
+        return Tenant.objects.active()
+
     def add_tenant_arguments(self, parser):
         group = parser.add_mutually_exclusive_group()
         group.add_argument(
@@ -58,7 +75,11 @@ class TenantCommandMixin:
             "--all-tenants",
             action="store_true",
             default=False,
-            help="Run for all active tenant schemas",
+            help=(
+                "Run for every store, suspended ones included"
+                if self.include_suspended_stores
+                else "Run for every active store"
+            ),
         )
 
     def iter_tenant_contexts(self, options):
@@ -112,10 +133,10 @@ class TenantCommandMixin:
         from tenant.models import Tenant
 
         if options.get("all_tenants"):
-            tenants = list(Tenant.objects.active())
+            tenants = list(self.target_stores())
             if not tenants:
                 raise CommandError(
-                    "No active tenants found: --all-tenants matched zero "
+                    "No stores found: --all-tenants matched zero "
                     "schemas, so nothing was applied. This is not a "
                     "failure of the work itself; see "
                     "NO_ACTIVE_TENANTS_RETURNCODE.",

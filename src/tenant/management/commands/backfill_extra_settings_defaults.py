@@ -29,10 +29,12 @@ import logging
 from django.core.management.base import BaseCommand
 from django_tenants.utils import schema_context
 
+from core.management.tenant_mixin import TenantCommandMixin
+
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     """Backfill EXTRA_SETTINGS_DEFAULTS entries across every store.
 
     Useful after adding new rows to EXTRA_SETTINGS_DEFAULTS in
@@ -47,6 +49,8 @@ class Command(BaseCommand):
         "Idempotent — skips rows "
         "that already exist."
     )
+
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -68,12 +72,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from tenant.models import Tenant
-
         target_schema = options["schema"]
         dry_run = options["dry_run"]
         if target_schema:
-            tenants = Tenant.objects.stores().filter(schema_name=target_schema)
+            tenants = self.target_stores().filter(schema_name=target_schema)
             if not tenants.exists():
                 self.stdout.write(
                     self.style.WARNING(
@@ -82,7 +84,7 @@ class Command(BaseCommand):
                 )
                 return
         else:
-            tenants = Tenant.objects.stores()
+            tenants = self.target_stores()
 
         total = tenants.count()
         if total == 0:

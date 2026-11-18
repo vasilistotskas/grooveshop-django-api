@@ -106,6 +106,7 @@ class Command(TenantCommandMixin, BaseCommand):
         "assets, and move their alt text onto the assets."
     )
     require_tenant_scope = True
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         self.add_tenant_arguments(parser)

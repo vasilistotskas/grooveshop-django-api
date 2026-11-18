@@ -28,18 +28,21 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import schema_context
 
+from core.management.tenant_mixin import TenantCommandMixin
 from tenant.models import StoreVertical
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = (
         "Seed missing RecommendationSlot rows from each tenant's vertical "
         "preset into every store's schema, suspended ones included (or a "
         "single --schema). "
         "Idempotent — never overwrites an existing slot."
     )
+
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -65,12 +68,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from tenant.models import Tenant
-
         target_schema = options["schema"]
         override = options["vertical"]
         dry_run = options["dry_run"]
-        tenants = Tenant.objects.stores()
+        tenants = self.target_stores()
         if target_schema:
             tenants = tenants.filter(schema_name=target_schema)
             if not tenants.exists():

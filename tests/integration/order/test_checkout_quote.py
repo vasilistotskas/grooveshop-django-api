@@ -13,6 +13,7 @@ from __future__ import annotations
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import pytest
@@ -646,6 +647,21 @@ def _post_intent(checkout, pay_way, **extra):
     )
 
 
+def _post_encoded(checkout, url_name: str, data: dict, encoding: str):
+    """POST ``data`` as a multipart or a url-encoded form body."""
+    headers = {"HTTP_X_CART_ID": str(checkout.cart.uuid)}
+    if encoding == "multipart":
+        return checkout.client.post(
+            reverse(url_name), data, format="multipart", **headers
+        )
+    return checkout.client.post(
+        reverse(url_name),
+        urlencode(data, doseq=True),
+        content_type="application/x-www-form-urlencoded",
+        **headers,
+    )
+
+
 def _guess(number: int) -> dict:
     return {"gift_card_codes": [f"GC-GUESS-{number:04d}"]}
 
@@ -747,6 +763,60 @@ class TestGiftCardGuessesAreBudgeted:
         assert _post_order(checkout, **_guess(0)).status_code == 400
         assert not Order.objects.exists()
         assert _post_order(checkout).status_code == 201
+
+    @pytest.mark.parametrize("encoding", ["multipart", "form"])
+    @pytest.mark.parametrize("route", ["quote", "intent", "order"])
+    def test_a_form_body_is_counted_like_json(self, route, encoding):
+        """The serializers read every code of a form or multipart body
+        (repeated keys), so the budget must read them the same way: it
+        takes them from the request serializer's own field."""
+        checkout = _checkout()
+        stripe = PayWayFactory.create_online_payment(provider_code="stripe")
+        url_name, body = {
+            "quote": ("cart-quote", _choices(checkout)),
+            "intent": (
+                "cart-create-payment-intent",
+                {**_choices(checkout), "pay_way_id": stripe.id},
+            ),
+            "order": (
+                "order-list",
+                {
+                    **_address(checkout),
+                    "pay_way_id": checkout.pay_way.id,
+                    "terms_accepted": "true",
+                },
+            ),
+        }[route]
+
+        with fake_stripe():
+            statuses = self._spend(
+                lambda codes: _post_encoded(
+                    checkout, url_name, {**body, **codes}, encoding
+                )
+            )
+
+        assert statuses == [400] * self.LIMIT + [429]
+        assert not Order.objects.exists()
+
+    @pytest.mark.parametrize("encoding", ["multipart", "form"])
+    def test_every_code_of_a_form_body_counts(self, encoding):
+        """Ten guesses under one repeated key are ten codes: more than
+        the serializer takes (refused, nothing priced, nothing counted),
+        and three at a time they spend the budget in two requests."""
+        checkout = _checkout()
+
+        def guess(numbers) -> int:
+            codes = [f"GC-GUESS-{n:04d}" for n in numbers]
+            return _post_encoded(
+                checkout,
+                "cart-quote",
+                {**_choices(checkout), "gift_card_codes": codes},
+                encoding,
+            ).status_code
+
+        assert guess(range(100, 110)) == 400
+        assert [guess(range(3)), guess(range(3, 6))] == [400, 400]
+        assert guess(range(6, 9)) == 429
 
     def test_the_routes_share_one_budget_and_one_record(self):
         """A code tried on the quote is not new to the order, and guesses

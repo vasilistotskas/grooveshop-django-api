@@ -401,7 +401,7 @@ class CartViewSet(BaseModelViewSet):
             # checkout that re-quotes on every change, or a platform
             # polling one, cannot use up the cart's write budget.
             return [
-                *gift_card_code_throttles(self.request),
+                *self._gift_card_code_throttles(),
                 CartQuoteThrottle(),
                 CartQuoteAnonThrottle(),
                 AnonIpRateThrottle(),
@@ -420,9 +420,16 @@ class CartViewSet(BaseModelViewSet):
             if self.action == "create_payment_intent":
                 # The intent's amount is the quote's: it prices gift
                 # cards too.
-                return [*gift_card_code_throttles(self.request), *throttles]
+                return [*self._gift_card_code_throttles(), *throttles]
             return throttles
         return super().get_throttles()
+
+    def _gift_card_code_throttles(self):
+        """The gift-card guessing budget of the two actions that price a
+        checkout, read through the action's own request serializer."""
+        return gift_card_code_throttles(
+            self.request, self.get_request_serializer()
+        )
 
     def get_queryset(self):
         """

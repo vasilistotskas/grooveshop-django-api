@@ -126,7 +126,13 @@ caller:
       guesses): the signed-in customer or the proven address, and the
       cart for a guest request the agent gateway makes, since every buyer
       of a platform arrives from its address;
-    - a refused request tried nothing, so its codes stay new.
+    - a request this budget refuses records nothing, so its codes stay
+      new. (One refused by another throttle of the view may already have
+      been counted and recorded: each code still counts once.)
+    - the codes are read by the request serializer's own
+      `gift_card_codes` field (`get_value`, `run_validation`), so a JSON
+      list, a repeated key of a form or multipart body and indexed form
+      keys are counted exactly as they are priced.
   - A polled quote does not reach the carrier: ACS's live price is cached
     for five minutes per country, region and weight bracket
     (`AcsCarrier._fetch_live_quote`), the entry order creation reads. A

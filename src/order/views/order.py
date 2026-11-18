@@ -765,7 +765,9 @@ class OrderViewSet(BaseModelViewSet):
             return [
                 # An order refused for its gift card, or for its total,
                 # says what the card is worth.
-                *gift_card_code_throttles(self.request),
+                *gift_card_code_throttles(
+                    self.request, self.get_request_serializer()
+                ),
                 OrderCreateThrottle(),
                 OrderCreateAnonThrottle(),
                 *super().get_throttles(),

@@ -40,11 +40,13 @@ import hashlib
 import hmac
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import ClassVar
 
 from django.conf import settings
 from django.utils.crypto import salted_hmac
+from rest_framework.exceptions import ValidationError
+from rest_framework.fields import SkipField
 from rest_framework.throttling import (
     AnonRateThrottle,
     ScopedRateThrottle,
@@ -368,27 +370,31 @@ class GiftCardCheckThrottle(UserOrIpRateThrottle):
 GIFT_CARD_CODES_FIELD = "gift_card_codes"
 
 
-def _gift_card_codes(request) -> set[str]:
-    """The gift-card codes a checkout request carries, as the gift-card
-    service reads them (trimmed, upper-cased: ``GiftCardService.
-    _load_cards``), so one card typed two ways is one code.
+def _gift_card_codes(request, serializer_class) -> set[str]:
+    """The gift-card codes a checkout request will be priced with.
 
-    Read before the body is validated: anything that is not a list of
-    scalars there is no code, since no serializer would price it.
+    Taken from the request serializer's own field, by the calls the
+    serializer itself makes (``get_value``, then ``run_validation``), so
+    the budget and the pricing read one body one way: the list of a
+    JSON body, every value of a repeated key in a form or multipart
+    body, indexed form keys. A hand-written reader counted none of a
+    form body's codes while the serializer priced them all.
+
+    A field the serializer would refuse (not a list, too many codes, a
+    code too long) answers 400 before anything is priced, so it carries
+    no code to count. The codes are upper-cased as the gift-card service
+    reads them (``GiftCardService._load_cards``; the field has trimmed
+    them), so one card typed two ways is one code.
     """
     data = request.data
-    codes = (
-        data.get(GIFT_CARD_CODES_FIELD) if isinstance(data, Mapping) else None
-    )
-    if not isinstance(codes, list):
+    if not isinstance(data, Mapping):
         return set()
-    normalised = {
-        str(code).strip().upper()
-        for code in codes
-        if isinstance(code, (str, int))
-    }
-    normalised.discard("")
-    return normalised
+    field = serializer_class(data=data).fields[GIFT_CARD_CODES_FIELD]
+    try:
+        codes = field.run_validation(field.get_value(data))
+    except SkipField, ValidationError:
+        return set()
+    return {code.upper() for code in codes or () if code}
 
 
 def _checkout_cart_ident(request) -> str | None:
@@ -430,14 +436,20 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
       cart instead (``_gateway_ident``, as ``GatewayAnonThrottle``):
       every buyer of a platform arrives from the platform's address.
 
-    The record is written only for a request that was let through, so a
-    refused guess is still new the next time. A changed cart id loses
+    A request this budget refuses records nothing, so its codes are
+    still new the next time. (One that another throttle of the view
+    refuses may already have been counted and recorded here, DRF asks
+    every throttle: each code still counts once.) A changed cart id loses
     the record, never the budget. During a cache outage the record
     reads empty (every code counts) and the budget itself refuses, as
     its parent does.
     """
 
     seen_format = "gift_card_codes_seen_%(cart)s"
+
+    def __init__(self, codes: Iterable[str] = ()):
+        super().__init__()
+        self.codes = set(codes)
 
     def get_cache_key(self, request, view):
         user = getattr(request, "user", None)
@@ -460,7 +472,7 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
         cart = _checkout_cart_ident(request)
         self.seen_key = self.seen_format % {"cart": cart} if cart else None
         self.seen = set(self.cache.get(self.seen_key, ())) if cart else set()
-        digests = {self._digest(code) for code in _gift_card_codes(request)}
+        digests = {self._digest(code) for code in self.codes}
         self.new = digests - self.seen
         if not self.new:
             return True
@@ -481,13 +493,18 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
         return True
 
 
-def gift_card_code_throttles(request) -> list[GiftCardCodeThrottle]:
+def gift_card_code_throttles(
+    request, serializer_class
+) -> list[GiftCardCodeThrottle]:
     """The extra budget of a checkout request that carries gift-card codes
     (``GiftCardCodeThrottle``). A view's ``get_throttles`` adds what this
     returns, on every route that prices such codes: the quote, the
-    payment intent and order creation. A request without codes gets none.
+    payment intent and order creation. ``serializer_class`` is the
+    route's request serializer, whose ``gift_card_codes`` field reads the
+    codes. A request without codes gets none.
     """
-    return [GiftCardCodeThrottle()] if _gift_card_codes(request) else []
+    codes = _gift_card_codes(request, serializer_class)
+    return [GiftCardCodeThrottle(codes)] if codes else []
 
 
 class B2BProfileSubmitThrottle(UserOrIpRateThrottle):

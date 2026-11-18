@@ -4660,7 +4660,9 @@ class OrderService:
         Mutates ``order_data`` in place: removes ``shipping_provider_code``
         and replaces it with the resolved ``shipping_provider`` (a
         ``ShippingProvider`` instance). Defaults ``shipping_kind`` to
-        ``home_delivery`` when not supplied.
+        ``home_delivery`` when not supplied
+        (``OrderQuoteService.delivery_kind``, which the price and the pay
+        ways offered read too).
 
         Dispatch is registry-driven from the explicit
         ``(shipping_provider_code, shipping_kind)`` pair only.
@@ -4673,7 +4675,7 @@ class OrderService:
         from shipping.services import ShippingService
 
         code = order_data.pop("shipping_provider_code", None) or None
-        kind = order_data.get("shipping_kind") or "home_delivery"
+        kind = OrderQuoteService.delivery_kind(order_data.get("shipping_kind"))
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
         # auto-routes to the active home-delivery carrier for the

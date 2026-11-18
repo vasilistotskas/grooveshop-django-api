@@ -649,6 +649,55 @@ class TestPayWaysAreJudgedOnce:
             assert response.status_code == 400, response.content
             assert _refusal_code(response) == "pay_way_unavailable"
 
+    @pytest.mark.parametrize(
+        ("pay_way_of", "offered"),
+        [
+            pytest.param(_own, True, id="offered"),
+            pytest.param(_locker_terminal, False, id="locker-terminal"),
+            pytest.param(
+                _excluded_for_home_delivery,
+                False,
+                id="excluded-by-the-carrier-that-would-deliver",
+            ),
+        ],
+    )
+    def test_an_order_without_a_kind_is_judged_as_a_home_delivery(
+        self, pay_way_of, offered
+    ):
+        """``shippingKind`` is optional on order creation alone. An order
+        without one is priced and assigned as a home delivery
+        (``OrderQuoteService.delivery_kind``), so its pay way is judged
+        as one: the answer is the quote's for a home delivery. Judged by
+        no delivery at all, it took any active pay way."""
+        checkout = _checkout()
+        pay_way = pay_way_of(checkout)
+        body = {
+            **_address(checkout),
+            "pay_way_id": pay_way.id,
+            "terms_accepted": True,
+        }
+        del body["shipping_kind"]
+
+        quote = _post_quote(
+            checkout, **{**_choices(checkout), "pay_way_id": pay_way.id}
+        )
+        order = checkout.client.post(
+            reverse("order-list"),
+            body,
+            format="json",
+            HTTP_X_CART_ID=str(checkout.cart.uuid),
+        )
+
+        if offered:
+            assert quote.status_code == 200, quote.content
+            assert order.status_code == 201, order.content
+            created = Order.objects.get(id=order.json()["id"])
+            assert created.shipping_kind == "home_delivery"
+            return
+        for response in (quote, order):
+            assert response.status_code == 400, response.content
+            assert _refusal_code(response) == "pay_way_unavailable"
+
 
 def _cart_token(checkout) -> str:
     _auth, raw = get_token_model().objects.create(checkout.user)

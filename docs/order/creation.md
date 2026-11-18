@@ -69,7 +69,10 @@ caller:
   store holds credentials for, and not excluded for the delivery (a home
   delivery that names no carrier is judged by every carrier that could
   take it). The refusal is 400 `pay_way_unavailable` on each; order
-  creation puts its message under `payWayId`.
+  creation puts its message under `payWayId`. An order sent without a
+  `shippingKind` is a home delivery for the price, the carrier it is
+  assigned and this rule alike: all three read
+  `OrderQuoteService.delivery_kind`.
 - **The order is built from the quote's rows**
   (`OrderService._quote_under_lock`): `shipping_price`,
   `payment_method_fee`, the promotion result, the points and the gift-card

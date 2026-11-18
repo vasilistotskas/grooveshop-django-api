@@ -67,8 +67,9 @@ class ShippingChoice:
     """The delivery a shopper chose: what ``shipping_cost`` prices.
 
     ``kind`` may be empty: an order placed without one is a home
-    delivery, and is priced as one. ``provider_code`` may be empty for
-    a home delivery, whose carrier checkout resolves.
+    delivery, and is priced as one and offered the pay ways of one
+    (``OrderQuoteService.delivery_kind``). ``provider_code`` may be
+    empty for a home delivery, whose carrier checkout resolves.
     """
 
     kind: str | None
@@ -355,6 +356,24 @@ class OrderQuoteService:
         return parcel_items, compute_total_weight_grams(parcel_items)
 
     @staticmethod
+    def delivery_kind(shipping_kind: str | None) -> str:
+        """The kind a delivery is, whether or not the request named one.
+
+        An order created without a kind is a home delivery:
+        ``Order.shipping_kind``'s own default. Everything that depends
+        on the kind reads it here — the price (:meth:`_carrier`), the
+        carrier the order is assigned
+        (``OrderService._resolve_shipping_provider``) and the pay ways it
+        may use (:meth:`offered_pay_ways`) — so none of them can take a
+        kind-less order for something else. Judged by no kind at all,
+        such an order was priced as a home delivery and took a pay way
+        no home delivery is offered.
+        """
+        from shipping.enum import ShippingKind
+
+        return shipping_kind or ShippingKind.HOME_DELIVERY.value
+
+    @staticmethod
     def _carrier(
         shipping_kind: str | None,
         shipping_provider_code: str | None,
@@ -363,18 +382,15 @@ class OrderQuoteService:
     ) -> tuple[str, str | None]:
         """The (kind, carrier code) a delivery is priced as.
 
-        An order created without a kind is a home delivery —
-        ``Order.shipping_kind``'s own default, and what
-        ``OrderService._resolve_shipping_provider`` assigns the carrier
-        for — so it is priced as one too. A home delivery that names no
-        carrier takes the active home-delivery carrier for the country,
-        by the helper that assigns the order's carrier, so the price
-        charged and the carrier assigned always agree.
+        A home delivery (:meth:`delivery_kind`) that names no carrier
+        takes the active home-delivery carrier for the country, by the
+        helper that assigns the order's carrier, so the price charged
+        and the carrier assigned always agree.
         """
         from shipping.enum import ShippingKind
         from shipping.services import ShippingService
 
-        shipping_kind = shipping_kind or ShippingKind.HOME_DELIVERY.value
+        shipping_kind = OrderQuoteService.delivery_kind(shipping_kind)
         if (
             not shipping_provider_code
             and shipping_kind == ShippingKind.HOME_DELIVERY.value
@@ -849,9 +865,12 @@ class OrderQuoteService:
         """The pay ways a shopper is offered for ``shipping``: active,
         through a provider the store can charge with, and not excluded
         for the chosen delivery (all of the first two while none is
-        chosen). The one rule behind both the list a quote returns and
-        the pay way a quote or a payment intent accepts, so a selection
-        is accepted exactly when it is listed."""
+        chosen). The one rule behind the list a quote returns and the
+        pay way a quote, a payment intent or order creation accepts, so
+        a selection is accepted exactly when it is listed.
+
+        A delivery without a kind is judged as what it is priced as, a
+        home delivery (:meth:`delivery_kind`)."""
         from pay_way.models import PayWay
         from pay_way.services import PayWayService
 
@@ -861,6 +880,6 @@ class OrderQuoteService:
         return PayWayService.filter_for_shipping(
             offered,
             provider_code=shipping.provider_code,
-            shipping_kind=shipping.kind,
+            shipping_kind=OrderQuoteService.delivery_kind(shipping.kind),
             country_code=shipping.country_id,
         )

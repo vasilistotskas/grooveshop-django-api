@@ -379,6 +379,13 @@ class AcsCarrier(ShippingCarrierInterface):
     _QUOTE_TTL_SECONDS: ClassVar[int] = 300
     _NO_QUOTE_TTL_SECONDS: ClassVar[int] = 60
     _NO_QUOTE: ClassVar[str] = "none"
+    # The version is in the key because two releases read one Redis
+    # while a deploy rolls. v2 is the first to store ``_NO_QUOTE``; the
+    # release before it calls ``float()`` on whatever it finds under
+    # the unversioned key, so the marker there would fail every
+    # ACS-priced request it served until the entry expired. A release
+    # that changes what an entry holds takes the next version.
+    _QUOTE_KEY_PREFIX: ClassVar[str] = "acs:price_quote:v2"
 
     # ACS minimum chargeable weight per published tariff. Anything
     # below 500g is billed at 500g.
@@ -458,7 +465,7 @@ class AcsCarrier(ShippingCarrierInterface):
 
         bucketed_grams = cls._bucket_weight_grams(weight_grams)
         cache_key = (
-            f"acs:price_quote:{country_id or '-'}:{region_id or '-'}"
+            f"{cls._QUOTE_KEY_PREFIX}:{country_id or '-'}:{region_id or '-'}"
             f":{bucketed_grams}:{origin}:{destination}"
         )
         cached = cache.get(cache_key)

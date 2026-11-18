@@ -61,12 +61,15 @@ caller:
   (`free_threshold_value`): the quote prices it under that cap and
   `redeem_points` is given the same one, as is `POST /loyalty/redeem` on
   an existing order.
-- **A pay way is accepted exactly when it is listed.** The selection of a
-  quote or a payment intent and the quote's `payWays` both come from
+- **A pay way is accepted exactly when it is listed.** The quote's
+  `payWays`, the pay way a quote or a payment intent accepts, and the one
+  order creation accepts on both paths
+  (`OrderViewSet._validate_pay_way_for_order`) all come from
   `OrderQuoteService.offered_pay_ways`: active, through a provider the
   store holds credentials for, and not excluded for the delivery (a home
   delivery that names no carrier is judged by every carrier that could
-  take it).
+  take it). The refusal is 400 `pay_way_unavailable` on each; order
+  creation puts its message under `payWayId`.
 - **The order is built from the quote's rows**
   (`OrderService._quote_under_lock`): `shipping_price`,
   `payment_method_fee`, the promotion result, the points and the gift-card

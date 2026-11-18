@@ -47,13 +47,14 @@ from order.models import OrderVatLine
 from order.models.order import Order
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
-from pay_way.factories import PayWayFactory
+from pay_way.factories import PayWayFactory, PayWayShippingExclusionFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode, PromotionRedemption
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import get_provider
+from shipping.models import ShippingProvider
 from shipping_acs import config as acs_config
 from shipping_acs.exceptions import AcsAPIError
 from tests.utils.fake_stripe import fake_stripe
@@ -540,6 +541,113 @@ class TestQuoteRefusals:
 
         assert response.status_code == 400
         assert response.json()["code"] == "shipping_provider_required"
+
+
+def _cash(*, active: bool = True):
+    return PayWayFactory(settlement=PaySettlement.COURIER_CASH, active=active)
+
+
+def _own(checkout):
+    return checkout.pay_way
+
+
+def _switched_off(_checkout):
+    return _cash(active=False)
+
+
+def _without_credentials(_checkout):
+    return PayWayFactory.create_online_payment(provider_code="stripe")
+
+
+def _locker_terminal(_checkout):
+    return PayWayFactory.create_carrier_terminal_payment()
+
+
+def _excluded_for_home_delivery(_checkout, country=None):
+    """Cash the store switched off for its flat-rate home delivery."""
+    pay_way = _cash()
+    PayWayShippingExclusionFactory(
+        pay_way=pay_way,
+        shipping_provider=ShippingProvider.objects.get(code="flat_rate"),
+        shipping_kind="home_delivery",
+        country=country,
+    )
+    return pay_way
+
+
+def _excluded_in_another_country(checkout):
+    return _excluded_for_home_delivery(checkout, country=CountryFactory())
+
+
+def _refusal_code(response) -> str:
+    return response.json()["code"]
+
+
+class TestPayWaysAreJudgedOnce:
+    """The quote, the payment intent and order creation accept and refuse
+    the same pay ways: each asks ``OrderQuoteService.offered_pay_ways``.
+
+    Order creation had a rule of its own, which judged a home delivery
+    that names no carrier by no carrier at all: it created orders with a
+    pay way the quote would not list and the intent would not charge.
+    """
+
+    @pytest.mark.parametrize(
+        ("pay_way_of", "delivery", "offered"),
+        [
+            pytest.param(_own, {}, True, id="offered"),
+            pytest.param(_switched_off, {}, False, id="switched-off"),
+            pytest.param(
+                _without_credentials, {}, False, id="provider-without-keys"
+            ),
+            pytest.param(
+                _locker_terminal,
+                {},
+                False,
+                id="locker-terminal-on-a-home-delivery",
+            ),
+            pytest.param(
+                _excluded_for_home_delivery,
+                {},
+                False,
+                id="excluded-by-the-carrier-that-would-deliver",
+            ),
+            pytest.param(
+                _excluded_for_home_delivery,
+                {"shipping_provider_code": "flat_rate"},
+                False,
+                id="excluded-for-the-named-carrier",
+            ),
+            pytest.param(
+                _excluded_in_another_country,
+                {},
+                True,
+                id="excluded-in-another-country",
+            ),
+        ],
+    )
+    def test_the_three_routes_agree(self, pay_way_of, delivery, offered):
+        checkout = _checkout()
+        pay_way = pay_way_of(checkout)
+        choices = {**_choices(checkout), **delivery}
+        del choices["pay_way_id"]
+
+        listed = {row["id"] for row in _quote(checkout, **choices)["payWays"]}
+        quote = _post_quote(checkout, **choices, pay_way_id=pay_way.id)
+        intent = _post_intent(checkout, pay_way, **delivery)
+        order = _post_order(checkout, **delivery, pay_way_id=pay_way.id)
+
+        assert (pay_way.id in listed) is offered
+        if offered:
+            assert quote.status_code == 200, quote.content
+            # Past the pay-way rule and refused at the next gate: cash
+            # is not paid with a card.
+            assert intent.json()["code"] == "pay_way_not_intent_capable"
+            assert order.status_code == 201, order.content
+            return
+        for response in (quote, intent, order):
+            assert response.status_code == 400, response.content
+            assert _refusal_code(response) == "pay_way_unavailable"
 
 
 def _cart_token(checkout) -> str:

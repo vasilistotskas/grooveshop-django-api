@@ -891,7 +891,7 @@ class CartViewSet(BaseModelViewSet):
         (``OrderQuoteService.offered_pay_ways``): active, through a
         provider the store can charge with, and not excluded for the
         chosen delivery, a home delivery that names no carrier included.
-        Order creation refuses the rest too
+        Order creation refuses the rest by the same rule
         (``OrderViewSet._validate_pay_way_for_order``), and minting an
         intent for one means the shopper CONFIRMS the card in Stripe.js
         and only then gets a 400 from order creation — money taken, no

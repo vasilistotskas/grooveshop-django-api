@@ -103,6 +103,20 @@ def issuable(order):
     return order
 
 
+def registered(invoice):
+    """``invoice`` as AADE registered it (CONFIRMED, with a MARK): the one
+    state in which a receipt reaches the customer
+    (``Invoice.is_deliverable``)."""
+    from order.models.invoice import MyDataStatus
+
+    type(invoice).objects.filter(pk=invoice.pk).update(
+        mydata_status=MyDataStatus.CONFIRMED,
+        mydata_mark=invoice.mydata_mark or FIRST_MARK,
+    )
+    invoice.refresh_from_db()
+    return invoice
+
+
 def _doc(xml_bytes: bytes) -> SimpleNamespace:
     root = fromstring(xml_bytes)
     invoice = root.find(f"{AADE_NS}invoice")

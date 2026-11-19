@@ -63,7 +63,7 @@ from shipping_boxnow.factories import (
 )
 from shipping_boxnow.tasks import boxnow_send_arrival_notification
 from tests.utils.emails import open_email_gates  # noqa: F401
-from tests.utils.mydata import issuable, mydata_enabled
+from tests.utils.mydata import issuable, mydata_enabled, registered
 from user.adapter import UserAccountAdapter
 from user.factories.account import UserAccountFactory
 from user.factories.subscription import UserSubscriptionFactory
@@ -390,7 +390,7 @@ class TestMoreOrderEmails:
                 return_value=b"%PDF-1.4",
             ),
         ):
-            generate_invoice(issuable(order))
+            registered(generate_invoice(issuable(order)))
         mail.outbox = []
 
         with mydata_enabled(auto_submit=False):

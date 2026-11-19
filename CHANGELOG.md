@@ -3,6 +3,129 @@
 
 
 
+## v3.255.0 (2026-11-19)
+
+### Bug fixes
+
+* fix(order): answer an agent checkout's repeat before validating the body
+
+The body's validation reads rows that can change after the first order
+(an active carrier, a country, a region). A repeat whose first answer was
+lost could then be refused, which the agent gateway reads as "nothing
+placed", although the order exists.
+
+OrderViewSet.create now reads the bare agentCheckout first, behind the
+verified X-Internal-Gateway secret and through the request serializer's
+own field, and answers the checkout's order before any validation, pay
+way or cart work. A malformed value names no checkout and is refused by
+the validation as before.
+
+Tests pin a repeat after the carrier is switched off, a repeat whose
+order was soft-deleted, and the endpoint's answer to a call the unique
+index refused. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+* fix(order): build the agent checkout index in a migration of its own
+
+0107 was atomic = False, so its AddField committed before the
+concurrent index build; a failed or cancelled build left the column
+applied but the migration unrecorded, and the PreSync retry's ADD
+COLUMN failed on it. 0107 now adds the column atomically and 0108
+(atomic = False) builds order_agent_checkout_unique alone.
+docs/migrations.md states the rule for every concurrent build. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+* fix(order): answer a validation refusal with the racing checkout's order
+
+The lookup after a refusal now covers the body's validation and the
+pay way checks: a racing call of the same agent checkout can commit
+its order after the first lookup while a changed row (a carrier
+switched off) refuses this call. Callers without the gateway's secret
+no longer have agentCheckout validated: the field is dropped before
+validation, so a malformed value cannot refuse their order. The
+payment-first repeat test uses a second intent, so only the checkout
+lookup can answer it. agentCheckoutId is documented as empty whenever
+Order.agent_checkout is NULL. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+### Chores
+
+* chore(dev): stop the dev backend from restarting on its own
+
+backend was the only service in the dev stack with `restart: always`; db, redis, rabbitmq,
+meilisearch and the celery services are `no`. After a reboot or a Docker Desktop restart the
+backend came back alone, without its database and broker, and failed every request until the
+rest of the stack was started by hand. All services now start and stop together with
+`docker compose up`/`down`. ([`51e8861`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51e8861c2ea284048779c854a06becb446bd0f43))
+
+* chore(order): remove the push_order_event_to_gateway stub (#757)
+
+The task was kept for one release so messages queued by the release before
+the agent outbox, and DeferredDispatch rows naming it, still recorded their
+change. That release (v3.253.1) has been in production since 2026-11-18, and
+the infrastructure replay script that imported the task is gone.
+
+Remove the task, its entry in the locked task-name list, its tests and the
+section of docs/agent-order-events.md that described the stub. ([`211dcf7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/211dcf702765a3a12dbe8e35da3f599f4615e6f6))
+
+### Features
+
+* feat(order): one order per agent checkout, idempotent order creation (#759) ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+* feat(order): one order per agent checkout, idempotent order creation
+
+The agent gateway could not safely ask again when an order call went
+unanswered: a repeat created a second order, or was refused for what the
+first one did (the cart it kept, emptied or deleted, the stock it took),
+so the gateway left the checkout "outcome unknown".
+
+Order creation now takes the gateway's checkout id (agentCheckout),
+believed only beside its X-Internal-Gateway secret, as agentProtocol is.
+The order stores it (Order.agent_checkout, a nullable column with the
+partial unique index order_agent_checkout_unique, built concurrently in
+the PreSync job), and a repeat is answered with the order that checkout
+placed: the same 201 and body, nothing created, refused or sent.
+
+- OrderViewSet.create looks the checkout up before anything is judged,
+  and again after a refusal that a racing call of the same checkout
+  caused.
+- Both creation paths look it up under the cart row lock, so two calls
+  on one cart serialise; on two carts the index rejects the second insert
+  (AgentCheckoutOrderedError), which rolls back and is answered with the
+  first order.
+- The order detail response carries agentCheckout (additive, null for
+  other orders), and the agent order event body carries agentCheckoutId,
+  so the gateway finds its checkout from an event alone.
+
+Part (a) of #637 as narrowed on 2026-11-17. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+### Testing
+
+* test(migrations): roll back in contiguous runs of the full plan
+
+Django's _migrate_all_backwards renders the project state at the first
+migration it unapplies and then mutates that rendered state through every
+applied migration up to the last one it unapplies. agent.0001 depends on
+order.0106, so a new order migration that nothing depends on lands about
+200 migrations later in the full plan, and every rollback of order from
+its leaf re-rendered through all of them: about 50 s per call instead of
+2 s, which pushed CI shard 2 past its 18-minute timeout.
+
+tests.utils.migrations.migrate unapplies each contiguous run of the full
+plan as its own step, newest first, so each step renders once. The seven
+copies of _migrate_to and the SEO test's rollback now use it. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+* test(order): bound racing workers and terminate a stuck one
+
+tests.utils.concurrency.race runs the racing calls of the three order
+race tests. Each worker connection gets lock_timeout and
+statement_timeout below the join deadline (the test database lifts
+statement_timeout), and a worker still alive at the deadline has its
+session terminated, releasing its locks before teardown, and fails
+the test. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
+* test(order): run racing workers as daemon threads
+
+A worker stuck outside the database no longer holds the test process
+at interpreter exit. ([`d25fb55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d25fb55e721d6684a17842785139dcd243386c7f))
+
 ## v3.254.1 (2026-11-18)
 
 ### Bug fixes

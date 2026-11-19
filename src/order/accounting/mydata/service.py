@@ -180,7 +180,11 @@ def submit_document(invoice: Any) -> ResponseRow | None:
     row = response.first()
 
     if row.is_success:
-        _persist_success(invoice, row)
+        _persist_success(
+            invoice,
+            row,
+            movement=built.movement.as_json() if built.movement else None,
+        )
         return row
 
     # AADE explicitly distinguishes ``XMLSyntaxError`` from
@@ -677,7 +681,18 @@ def _mirror_registration(invoice: Any, locked: Any) -> None:
     invoice.mydata_qr_url = locked.mydata_qr_url
 
 
-def _persist_success(invoice: Any, row: ResponseRow) -> None:
+def _persist_success(
+    invoice: Any, row: ResponseRow, *, movement: dict[str, Any] | None = None
+) -> None:
+    """Record AADE's registration of the document as this send made it.
+
+    The facts of the registered document are written whatever the row
+    holds: its MARK, AADE's codes, and the movement block this send
+    carried, which is what AADE now holds even if an overlapping sender
+    wrote another (a redated) block meanwhile. The status becomes CONFIRMED,
+    unless the row was canceled in myDATA since (a MARK recovered by a
+    lookup, then the cancel, while this answer was on its way): a
+    cancellation is never undone."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -686,28 +701,35 @@ def _persist_success(invoice: Any, row: ResponseRow) -> None:
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
-        locked.mydata_status = MyDataStatus.CONFIRMED
+        fields = [
+            "mydata_mark",
+            "mydata_authentication_code",
+            "mydata_qr_url",
+            "updated_at",
+        ]
         locked.mydata_mark = row.invoice_mark
         locked.mydata_authentication_code = row.authentication_code or ""
         locked.mydata_qr_url = row.qr_url or ""
-        locked.mydata_confirmed_at = timezone.now()
-        locked.mydata_error_code = ""
-        locked.mydata_error_message = ""
-        locked.save(
-            update_fields=[
+        if locked.mydata_status != MyDataStatus.CANCELED:
+            locked.mydata_status = MyDataStatus.CONFIRMED
+            locked.mydata_confirmed_at = timezone.now()
+            locked.mydata_error_code = ""
+            locked.mydata_error_message = ""
+            fields += [
                 "mydata_status",
-                "mydata_mark",
-                "mydata_authentication_code",
-                "mydata_qr_url",
                 "mydata_confirmed_at",
                 "mydata_error_code",
                 "mydata_error_message",
-                "updated_at",
             ]
-        )
-    invoice.mydata_status = MyDataStatus.CONFIRMED
+        if movement is not None:
+            locked.movement = movement
+            fields.append("movement")
+        locked.save(update_fields=fields)
+    invoice.mydata_status = locked.mydata_status
     invoice.mydata_mark = row.invoice_mark
     invoice.mydata_qr_url = row.qr_url or ""
+    if movement is not None:
+        invoice.movement = movement
 
 
 def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:
@@ -799,7 +821,8 @@ def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
     """Flip invoice to CONFIRMED with a MARK recovered via
     ``RequestTransmittedDocs``. Uses the same locked pattern as
     ``_persist_success`` — no qr_url or authentication_code because
-    those aren't returned by the query endpoint."""
+    those aren't returned by the query endpoint. A row that holds a MARK
+    already (registered, or canceled in myDATA since) is left as it is."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -808,6 +831,9 @@ def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
+        if locked.mydata_mark:
+            _mirror_registration(invoice, locked)
+            return
         locked.mydata_status = MyDataStatus.CONFIRMED
         locked.mydata_mark = mark
         locked.mydata_confirmed_at = timezone.now()

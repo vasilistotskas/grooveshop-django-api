@@ -51,7 +51,6 @@ from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from order.accounting.mydata.types import (
-    ADDRESS_TEXT_MAX_LENGTH,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
     INVOICE_TYPE_RETAIL_CREDIT,
@@ -622,18 +621,18 @@ def _emit_movement(header: Element, movement: ReceiptMovement) -> None:
 
 def _emit_address(parent: Element, tag: str, address: PostalAddress) -> None:
     """An ``AddressType``: street and number when known, the postcode
-    without spaces, the city."""
+    without spaces, the city. The street and the city are within AADE's
+    length already (``movement._within_aade_limits``, applied where the
+    block is built, so the registered PDF prints the same)."""
     element = SubElement(parent, tag)
     if address.street:
-        SubElement(element, "street").text = address.street[
-            :ADDRESS_TEXT_MAX_LENGTH
-        ]
+        SubElement(element, "street").text = address.street
     if address.number:
         SubElement(element, "number").text = address.number
     SubElement(element, "postalCode").text = "".join(
         address.postal_code.split()
     )
-    SubElement(element, "city").text = address.city[:ADDRESS_TEXT_MAX_LENGTH]
+    SubElement(element, "city").text = address.city
 
 
 def _derive_aa_from_document_number(number: str) -> int:

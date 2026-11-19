@@ -1007,7 +1007,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "MYDATA_AUTO_SUBMIT",
         "type": "bool",
         "value": False,
-        "description": "If true, the platform issues its retail documents by itself: the receipt when an order ships, a credit document when money goes back. Otherwise they are issued only through the order's admin actions.",
+        "description": "If true, the platform issues its retail documents by itself: the receipt when an order ships, or, for a courier or locker order once the dispatch point (MYDATA_LOADING_*) is set, when its voucher or parcel is created, before the pickup; and a credit document when money goes back. Otherwise they are issued only through the order's admin actions.",
     },
     {
         "name": "MYDATA_ENVIRONMENT",

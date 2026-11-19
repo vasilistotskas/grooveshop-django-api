@@ -262,3 +262,24 @@ def test_goods_fully_refunded_do_not_move():
     type(item).objects.filter(pk=item.pk).update(refunded_quantity=3)
 
     assert moving_goods(invoice.order) == ()
+
+
+@pytest.mark.parametrize(
+    ("value", "accepted"),
+    [
+        ("Τατοΐου", True),
+        ("", True),
+        ("x" * 150, True),
+        ("x" * 151, False),
+        ("Τατοΐου\x01", False),
+        (5, False),
+    ],
+)
+def test_the_dispatch_point_text_is_what_an_aade_document_can_carry(
+    value, accepted
+):
+    """Within AADE's length, and no character XML 1.0 cannot carry: one
+    would make every courier receipt an unreadable payload."""
+    from order.accounting.movement import validate_loading_text_setting
+
+    assert validate_loading_text_setting(value) is accepted

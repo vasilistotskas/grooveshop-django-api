@@ -274,6 +274,14 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
     sets does not affect element matching.
     """
     root = _document_root(xml_bytes)
+    if _local(root.tag) != "RequestedDoc":
+        # An XML answer that is not AADE's (a gateway's page, an error
+        # envelope) lists nothing, which must not read as "AADE holds no
+        # such document" (``service.MarkLookup.ABSENT``).
+        raise MyDataTransportError(
+            f"AADE answered with a {_local(root.tag)!r} document, not a "
+            "RequestedDoc."
+        )
 
     docs: list[TransmittedDoc] = []
     for invoices_doc_el in _iter_children(root, "invoicesDoc"):

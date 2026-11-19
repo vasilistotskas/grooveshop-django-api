@@ -69,11 +69,10 @@ CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_1"
 # A receipt that is also the movement document (``isDeliveryNote``) states
 # why the goods move (annex 8.14, ``movePurpose`` 1 = «Πώληση») and, per
 # goods line, the unit its quantity counts (annex 8.13, ``measurementUnit``
-# 1 = «Τεμάχια»). AADE's ``AddressType`` caps ``street`` and ``city`` at
-# 150 characters.
+# 1 = «Τεμάχια»). The address lengths AADE's ``AddressType`` allows are
+# applied where the block is built (``order.accounting.movement``).
 MOVE_PURPOSE_SALE = 1
 MEASUREMENT_UNIT_PIECES = 1
-ADDRESS_TEXT_MAX_LENGTH = 150
 
 # ── transmissionFailure (AadeBookInvoiceType, v2.0.2) ─────────────
 # xs:byte 1-4 in the XSD. The REST API documentation (§5, the invoice

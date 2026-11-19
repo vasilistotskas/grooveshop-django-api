@@ -7008,6 +7008,9 @@ msgstr "Goods"
 msgid "Goods claimed"
 msgstr "Goods claimed"
 
+msgid "Goods moved"
+msgstr "Goods moved"
+
 msgid "Goods not yet settled"
 msgstr "Goods not yet settled"
 

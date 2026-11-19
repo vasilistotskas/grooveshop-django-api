@@ -66,8 +66,18 @@ class AcsShipmentFactory(CustomDjangoModelFactory):
     voucher_no = None
     pickup_list = None
     station_destination = None
-    station_destination_external_id = ""
-    station_branch_destination = ""
+    # The raw station the voucher books: the station's own pair, as
+    # checkout writes it (``AcsCarrier.create_shipment_row``).
+    station_destination_external_id = factory.LazyAttribute(
+        lambda o: (
+            o.station_destination.external_id if o.station_destination else ""
+        )
+    )
+    station_branch_destination = factory.LazyAttribute(
+        lambda o: (
+            o.station_destination.branch_code if o.station_destination else ""
+        )
+    )
     delivery_kind = ShippingKind.HOME_DELIVERY
     shipment_state = AcsShipmentState.PENDING_CREATION
     weight_grams = 500

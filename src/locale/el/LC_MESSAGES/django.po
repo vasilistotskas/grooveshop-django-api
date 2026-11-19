@@ -7014,6 +7014,9 @@ msgstr "Προϊόντα"
 msgid "Goods claimed"
 msgstr "Εμπορεύματα που διεκδικήθηκαν"
 
+msgid "Goods moved"
+msgstr "Αγαθά που διακινούνται"
+
 msgid "Goods not yet settled"
 msgstr "Προϊόντα που δεν έχουν διευθετηθεί"
 

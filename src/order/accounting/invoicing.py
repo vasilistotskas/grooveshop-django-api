@@ -105,8 +105,12 @@ def receipt_issuable(order: Order) -> bool:
     receipt order (an invoice order never gets one) whose goods have
     shipped, or whose parcel waits for its carrier: a courier or locker
     sale's receipt is issued with movement indication before the movement
-    starts (``order.accounting.movement``), once nothing is owed online
-    and the store has set its dispatch point (``movement_receipts_on``)."""
+    starts (``order.accounting.movement``), once nothing is owed online,
+    the store has set its dispatch point (``movement_receipts_on``) and the
+    carrier holds the parcel's voucher (``Order.tracking_number``, which
+    every path that makes a voucher or parcel live records through
+    ``Order.add_tracking_info``). A shipment row alone is no voucher: ACS's
+    is written at checkout, before the voucher is asked for."""
     if order.document_type != OrderDocumentTypeEnum.RECEIPT.value:
         return False
     if order.status in RECEIPT_ISSUING_STATUSES:
@@ -114,6 +118,7 @@ def receipt_issuable(order: Order) -> bool:
     return (
         order.status in PRE_SHIPMENT_STATUSES
         and not order.awaits_online_payment
+        and bool(order.tracking_number)
         and movement_receipts_on(order)
     )
 
@@ -507,6 +512,11 @@ def _build_context(
     A *specimen* carries no QR at all: it is registered nowhere, so there
     is nothing a scan could verify.
     """
+    movement = (
+        ReceiptMovement.from_json(invoice.movement)
+        if invoice.movement
+        else None
+    )
     qr_target_url = ""
     if not specimen:
         qr_target_url = invoice.mydata_qr_url or _verification_url(
@@ -534,10 +544,29 @@ def _build_context(
         "specimen": specimen,
         # What the receipt was sent to myDATA with as its movement
         # indication, printed with the parcel's addresses and dispatch.
-        "movement": ReceiptMovement.from_json(invoice.movement)
-        if invoice.movement
-        else None,
+        "movement": movement,
+        # The goods it declares moving, at the quantities it declares (the
+        # units bought less those refunded), apart from the sale's lines.
+        "movement_goods": _movement_goods(order, movement),
     }
+
+
+def _movement_goods(
+    order: Order, movement: ReceiptMovement | None
+) -> list[dict[str, Any]]:
+    """The goods *movement* declares, each named by its order line."""
+    if movement is None:
+        return []
+    names = {
+        item.pk: item.product_name
+        for item in order.items.filter(
+            pk__in=[good.item for good in movement.goods]
+        )
+    }
+    return [
+        {"name": names.get(good.item, ""), "quantity": good.quantity}
+        for good in movement.goods
+    ]
 
 
 def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
@@ -670,9 +699,35 @@ def _persist_invoice_row(
     invoice.discount = totals["discount"]
     invoice.total = totals["total"]
     invoice.currency = currency
-    # Save so ``invoice.pk`` exists when the upload_to callable builds
-    # the file path during the (post-commit) render step.
-    invoice.save()
+    if existing is None:
+        # Save so ``invoice.pk`` exists when the upload_to callable builds
+        # the file path during the (post-commit) render step.
+        invoice.save()
+    else:
+        # Only what rendering owns: *existing* was read before the order
+        # lock, and the rest of the row (its registration, a cancel's hold
+        # set since) belongs to the paths that write it.
+        invoice.save(
+            update_fields=[
+                "seller_snapshot",
+                "buyer_snapshot",
+                "vat_breakdown",
+                "subtotal",
+                "subtotal_currency",
+                "total_vat",
+                "total_vat_currency",
+                "shipping",
+                "shipping_currency",
+                "payment_fee",
+                "payment_fee_currency",
+                "discount",
+                "discount_currency",
+                "total",
+                "total_currency",
+                "currency",
+                "updated_at",
+            ]
+        )
     return invoice, vat_breakdown, totals
 
 

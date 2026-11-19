@@ -1377,6 +1377,17 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         return False
 
     invoice = getattr(order, "invoice", None)
+    if invoice is not None and not invoice.has_document():
+        # Its render never finished (a worker stopped after the row was
+        # committed): rendered now, number and figures as issued, since
+        # whatever asks for the send (the sweep, staff) may be the only
+        # thing left that will.
+        try:
+            invoice = generate_invoice(order, force=True)
+        except Exception:
+            logger.exception(
+                "Failed to render receipt PDF for order #%s", order_id
+            )
     if invoice is None or not invoice.has_document():
         logger.warning(
             "myDATA submission skipped for order #%s — receipt PDF not ready",
@@ -1469,7 +1480,10 @@ def retry_receipts_with_mydata() -> int:
     overlap (``settle_canceled_receipt`` holds a claim across its AADE
     call).
     """
-    from order.accounting.movement import unanswered_sends
+    from order.accounting.movement import (
+        stamp_the_parcels_left_unregistered,
+        unanswered_sends,
+    )
     from order.accounting.mydata.config import load_config
     from order.models.invoice import Invoice, MyDataStatus
 
@@ -1481,7 +1495,16 @@ def retry_receipts_with_mydata() -> int:
     batch = settings.MYDATA_RETRY_SWEEP_BATCH
     untouched = Invoice.objects.filter(updated_at__lte=cutoff)
     to_send = list(
-        unanswered_sends(untouched)
+        (
+            unanswered_sends(untouched)
+            # Set aside for a cancel before it was ever sent (its worker
+            # stopped before the send): nothing of it reached AADE, and its
+            # registration is what lets the cancel go through.
+            | untouched.filter(
+                cancel_requested_at__isnull=False,
+                mydata_status=MyDataStatus.NOT_SENT,
+            )
+        )
         .order_by("id")
         .values_list("order_id", flat=True)[:batch]
     )
@@ -1496,8 +1519,18 @@ def retry_receipts_with_mydata() -> int:
         .order_by("id")
         .values_list("order_id", flat=True)[:batch]
     )
+    # One whose parcel left meanwhile goes with the loss-of-connection
+    # indication, stamped before it is built again.
+    stamp_the_parcels_left_unregistered(
+        Invoice.objects.filter(order_id__in=to_send)
+    )
     for order_id in to_send:
         send_invoice_to_mydata.apply_async(args=[order_id])
+    # Touched, so a receipt still waiting (for the courier, for its MARK)
+    # goes to the back and no batch of them keeps newer ones out.
+    Invoice.objects.filter(order_id__in=to_cancel).update(
+        updated_at=timezone.now()
+    )
     for order_id in to_cancel:
         settle_canceled_receipt.apply_async(args=[order_id])
     if to_send or to_cancel:
@@ -1699,15 +1732,20 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
             )
             return "canceled"
     with transaction.atomic():
-        released = (
-            Invoice.objects.filter(
-                pk=invoice.pk, cancel_requested_at__isnull=False
-            )
+        # The MARK as it is now, under the row lock: a registration that
+        # lands while this settles saw the hold and left the email to
+        # whoever releases it; one that lands after this commits sees the
+        # hold gone and sends the email itself.
+        current = (
+            Invoice.objects.select_for_update()
+            .filter(pk=invoice.pk, cancel_requested_at__isnull=False)
             .exclude(mydata_status=MyDataStatus.CANCELED)
-            .update(cancel_requested_at=None, updated_at=timezone.now())
+            .first()
         )
-        if not released:
+        if current is None:
             return "nothing_to_settle"
+        current.cancel_requested_at = None
+        current.save(update_fields=["cancel_requested_at", "updated_at"])
         OrderHistory.log_note(
             order=order,
             note=(
@@ -1717,7 +1755,7 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
             ),
         )
         dispatch_on_commit(issue_pending_credits, [order.id])
-        if invoice.mydata_mark:
+        if current.mydata_mark:
             # It stands, so it reaches the customer (``awaits_the_parcel``).
             dispatch_on_commit(send_invoice_email, [order.id])
     return "credited"

@@ -74,10 +74,23 @@ class AcsCarrier(ShippingCarrierInterface):
         return getattr(order, "acs_shipment", None)
 
     def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
+        """The station's address, only from the catalogue row of the exact
+        station ACS books: the (external_id, branch_code) pair the voucher
+        carries. ``station_destination`` may be a row of the same area but
+        another branch (the code-only fallback when the pair is not in the
+        catalogue), whose address the receipt must not name."""
         if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
             return None
         station = shipment.station_destination
-        if station is None or not (station.postal_code and station.city):
+        booked = (
+            station is not None
+            and station.external_id == shipment.station_destination_external_id
+            and (
+                not shipment.station_branch_destination
+                or station.branch_code == shipment.station_branch_destination
+            )
+        )
+        if not booked or not (station.postal_code and station.city):
             raise ValueError(
                 "The address of ACS station "
                 f"{shipment.station_destination_external_id} "

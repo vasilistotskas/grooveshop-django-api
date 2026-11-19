@@ -57,6 +57,16 @@ LOADING_ADDRESS_SETTINGS = {
 #: AADE's ``AddressType`` caps ``street`` and ``city`` at 150 characters.
 ADDRESS_TEXT_MAX_LENGTH = 150
 
+#: Α.1123/2024 art. 7(1), as replaced by Α.1233/2026: the movement a
+#: document declares starts at most this many days after it is issued.
+MOVEMENT_START_MAX_DAYS = 5
+
+#: A character XML 1.0 cannot carry (``Char`` production): the payload
+#: with one is no well-formed document.
+_NOT_XML_CHARACTER = re.compile(
+    "[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]"
+)
+
 #: A Greek postcode: the dispatch point is the issuer's establishment, and
 #: the issuer is Greek (``order.accounting.mydata.service`` sends ``GR``).
 _GREEK_POSTCODE = re.compile(r"\d{3} ?\d{2}")
@@ -64,8 +74,13 @@ _GREEK_POSTCODE = re.compile(r"\d{3} ?\d{2}")
 
 def validate_loading_text_setting(value: object) -> bool:
     """Validator for ``MYDATA_LOADING_STREET``, ``_NUMBER`` and ``_CITY``:
-    text AADE accepts, or empty."""
-    return isinstance(value, str) and len(value) <= ADDRESS_TEXT_MAX_LENGTH
+    text AADE accepts, or empty: within its length, and only characters an
+    XML document can carry."""
+    return (
+        isinstance(value, str)
+        and len(value) <= ADDRESS_TEXT_MAX_LENGTH
+        and _NOT_XML_CHARACTER.search(value) is None
+    )
 
 
 def validate_loading_postal_code_setting(value: object) -> bool:
@@ -224,15 +239,25 @@ def receipt_movement(
 
     Raises ``ValueError`` when the pickup point's address is not known.
     """
-    if invoice.movement and not refused_for_its_content(invoice):
+    from order.models.invoice import MyDataStatus
+
+    today = timezone.localdate()
+    if invoice.mydata_status != MyDataStatus.NOT_SENT and (
+        not refused_for_its_content(invoice)
+    ):
+        # Sent before, and it may be registered as it was: a plain receipt
+        # stays plain, one with movement keeps its block.
+        if not invoice.movement:
+            return None
         issued = ReceiptMovement.from_json(invoice.movement)
-        today = timezone.localdate()
         if (
             nothing_registered
             and invoice.transmission_failed_at is None
             and issued.dispatch_date < today
         ):
-            return replace(issued, dispatch_date=today)
+            return _starting_in_time(
+                invoice, replace(issued, dispatch_date=today)
+            )
         return issued
     order = invoice.order
     loading = loading_address()
@@ -241,17 +266,47 @@ def receipt_movement(
     delivery = ShippingService.delivery_address(order)
     if delivery is None:
         return None
-    return ReceiptMovement(
-        dispatch_date=timezone.localdate(),
-        loading=loading,
-        delivery=delivery,
-        goods=moving_goods(order),
+    return _starting_in_time(
+        invoice,
+        ReceiptMovement(
+            dispatch_date=today,
+            loading=_within_aade_limits(loading),
+            delivery=_within_aade_limits(delivery),
+            goods=moving_goods(order),
+        ),
     )
 
 
-#: Α.1123/2024 art. 7(1), as replaced by Α.1233/2026: the movement a
-#: document declares starts at most this many days after it is issued.
-MOVEMENT_START_MAX_DAYS = 5
+def _within_aade_limits(address: PostalAddress) -> PostalAddress:
+    """*address* as AADE's ``AddressType`` takes it, street and city cut
+    to ``ADDRESS_TEXT_MAX_LENGTH``: decided once, here, so the payload and
+    the registered PDF (which prints the stored block) say the same."""
+    return replace(
+        address,
+        street=address.street[:ADDRESS_TEXT_MAX_LENGTH],
+        city=address.city[:ADDRESS_TEXT_MAX_LENGTH],
+    )
+
+
+def _starting_in_time(
+    invoice: Any, movement: ReceiptMovement
+) -> ReceiptMovement:
+    """*movement*, when its start falls within ``MOVEMENT_START_MAX_DAYS``
+    of the receipt's issue. A receipt sent so late that today is past that
+    cannot declare a start AADE accepts (error 280 refuses an earlier
+    date, the law a later one): it raises ``ValueError``, a BUILD refusal
+    that stops it for staff (an order note, the "Receipts rejected by
+    myDATA" counter) instead of sending a pair of dates that is wrong."""
+    late = (movement.dispatch_date - invoice.issue_date).days
+    if late > MOVEMENT_START_MAX_DAYS:
+        raise ValueError(
+            f"receipt {invoice.invoice_number} was issued on "
+            f"{invoice.issue_date}, and its movement can no longer start "
+            f"within the {MOVEMENT_START_MAX_DAYS} days the law allows "
+            f"(it would start on {movement.dispatch_date}); ask the "
+            "store's accountant how to document it"
+        )
+    return movement
 
 
 def unanswered_sends(invoices: Any) -> Any:
@@ -297,14 +352,27 @@ def parcel_left_unregistered(order_id: int) -> bool:
     ``service._persist_send_error``, so whichever comes second stamps it."""
     from order.models.invoice import Invoice
 
-    now = timezone.now()
     return bool(
-        unanswered_sends(
-            Invoice.objects.filter(
-                order_id=order_id, transmission_failed_at__isnull=True
-            )
-        ).update(transmission_failed_at=now, updated_at=now)
+        stamp_the_parcels_left_unregistered(
+            Invoice.objects.filter(order_id=order_id)
+        )
     )
+
+
+def stamp_the_parcels_left_unregistered(invoices: Any) -> int:
+    """Stamp ``transmission_failed_at`` on every receipt among *invoices*
+    whose parcel left (``Order.shipped_at``) while its last send has no
+    answer (:func:`unanswered_sends`), before anything sends it again:
+    SHIPPED does it for its order (:func:`parcel_left_unregistered`), and
+    the sweep for the ones only found unanswered later (a sender that
+    stopped mid-request looks unanswered only once it is stale). Returns
+    how many were stamped."""
+    now = timezone.now()
+    return unanswered_sends(
+        invoices.filter(
+            order__shipped_at__isnull=False, transmission_failed_at__isnull=True
+        )
+    ).update(transmission_failed_at=now, updated_at=now)
 
 
 def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
@@ -336,16 +404,25 @@ def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
     if invoice is None or refused_for_its_content(invoice):
         return
     declared = ReceiptMovement.from_json(invoice.movement)
-    problems = []
+    problems: list[str] = []
+    #: What differs, without the customer's address: for the log.
+    kinds: list[str] = []
     try:
         actual = ShippingService.delivery_address(order)
     except ValueError:
         actual = None
-    if actual is not None and actual != declared.delivery:
+    if actual is not None and _within_aade_limits(actual) != declared.delivery:
         problems.append(
             f"it declares delivery to {_one_line(declared.delivery)}, but "
             f"the parcel goes to {_one_line(actual)}"
         )
+        kinds.append("delivery place")
+    if declared.goods != moving_goods(order):
+        problems.append(
+            "the goods it declares differ from those the parcel carries "
+            "(units refunded since it was issued)"
+        )
+        kinds.append("goods")
     shipped_on = timezone.localdate(order.shipped_at or timezone.now())
     days = (shipped_on - invoice.issue_date).days
     if days > MOVEMENT_START_MAX_DAYS:
@@ -354,13 +431,15 @@ def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
             f"the {MOVEMENT_START_MAX_DAYS} days within which the movement "
             "it declares must start"
         )
+        kinds.append("start")
     if not problems:
         return
     logger.error(
-        "Order %s: receipt %s does not cover the movement of its parcel: %s",
+        "Order %s: receipt %s does not cover the movement of its parcel "
+        "(%s differs); the order's notes say what",
         order.pk,
         invoice.invoice_number,
-        "; ".join(problems),
+        ", ".join(kinds),
     )
     OrderHistory.log_note(
         order=order,

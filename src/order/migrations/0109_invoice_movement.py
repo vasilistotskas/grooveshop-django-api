@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('order', '0106_web_url_fields'),
+        ('order', '0108_order_agent_checkout_unique'),
     ]
 
     operations = [

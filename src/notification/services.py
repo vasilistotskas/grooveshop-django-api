@@ -23,6 +23,7 @@ from notification.enum import (
 )
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
+from tenant.customer_accounts import refuses_customer
 
 
 def supported_notification_languages() -> list[str]:
@@ -47,8 +48,15 @@ def create_user_notification(
     priority: str = NotificationPriorityEnum.NORMAL,
     notification_type: str = "",
     link: str = "",
-) -> NotificationUser:
+) -> NotificationUser | None:
     """Create a notification for a single user with multi-locale content.
+
+    Returns ``None`` and writes nothing for a shopper of a store with
+    customer accounts off (``tenant.customer_accounts``): no sign-in that
+    could show it is accepted there, and a notification kept for later
+    would greet the shopper as a backlog if the store turned accounts
+    back on. Every in-app notification is written here, so this is the
+    one place that holds.
 
     ``translations`` is a mapping ``{language_code: {"title": ..., "message": ...}}``.
     Locales present in ``PARLER_LANGUAGES[SITE_ID]`` but absent from the
@@ -65,6 +73,8 @@ def create_user_notification(
     because ``objects.create`` never runs the field's validators, and
     this is the one write path every task goes through.
     """
+    if refuses_customer(user):
+        return None
     if link:
         validate_storefront_path(link)
     notification = Notification.objects.create(

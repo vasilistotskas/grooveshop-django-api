@@ -54,7 +54,9 @@ def race[T](
         finally:
             connection.close()
 
-    threads = [threading.Thread(target=run) for _ in range(workers)]
+    threads = [
+        threading.Thread(target=run, daemon=True) for _ in range(workers)
+    ]
     for thread in threads:
         thread.start()
     deadline = time.monotonic() + JOIN_TIMEOUT_SECONDS

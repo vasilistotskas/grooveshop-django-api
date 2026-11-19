@@ -90,3 +90,9 @@ TRANSMISSION_FAILURE_ERP_CONNECTION_LOST = 3
 # ones with custom handling. Everything else is treated as a
 # terminal ``ValidationError``.
 ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
+
+# Our own code (``mydata_error_code`` is ours to fill): the last send of the
+# document reached AADE without an answer (a transport error, or AADE's
+# ``TechnicalError``), so it may or may not be registered. Recorded with
+# the status left SUBMITTED; the next send's intent clears it.
+ERROR_NO_ANSWER = "NO_ANSWER"

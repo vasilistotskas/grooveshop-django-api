@@ -27,7 +27,8 @@ Error handling:
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from collections.abc import Iterator
+from datetime import date, timedelta
 from typing import Any
 
 from django.db import transaction
@@ -45,19 +46,16 @@ from order.accounting.mydata.exceptions import (
     MyDataValidationError,
 )
 from order.accounting.mydata.parser import (
+    RequestedDocResult,
     ResponseRow,
     parse_requested_doc,
     parse_response_doc,
 )
-from order.accounting.mydata.types import ERROR_DUPLICATE_UID
+from order.accounting.mydata.types import ERROR_DUPLICATE_UID, ERROR_NO_ANSWER
 from order.accounting.mydata.validator import validate_invoice_doc
 from order.models.retail_credit import RetailCredit
 
 logger = logging.getLogger(__name__)
-
-#: A hard ceiling on the pages of one ``RequestTransmittedDocs`` read,
-#: against an endless loop on a bad continuation token.
-_MAX_REQUESTED_PAGES = 20
 
 
 def submit_document(invoice: Any) -> ResponseRow | None:
@@ -70,36 +68,30 @@ def submit_document(invoice: Any) -> ResponseRow | None:
 
     Raises one of the :class:`MyDataError` subclasses when the
     submission definitively failed.
+
+    A MARK is AADE's registration and nothing undoes it: every write below
+    re-reads the row under its lock and leaves a row that holds one as it
+    is, returning it as registered (:func:`_registered_row`). Several
+    senders may overlap (the task's retry chain, the sweep, staff, the
+    SHIPPED trigger); they send the same uid, AADE registers one and
+    answers the others with error 228, and none of them can demote the
+    registered row to REJECTED or SUBMITTED.
     """
     if invoice.mydata_mark:
-        # Already transmitted (it has a MARK) — re-submitting risks AADE 228
-        # and, worse, a failure would ``_persist_failure`` and flip the
-        # invoice from CONFIRMED to REJECTED. Return the existing identifiers
-        # as a synthetic Success so the caller treats it as already-done
+        # Already transmitted (it has a MARK): re-submitting would only be
+        # answered with 228. Return the existing identifiers as a
+        # synthetic Success so the caller treats it as already-done
         # (idempotent), mirroring the 228-recovery path (G0262).
-        from order.accounting.mydata.parser import ResponseRow as _ResponseRow
-
-        return _ResponseRow(
-            index=0,
-            status_code="Success",
-            invoice_uid=invoice.mydata_uid or "",
-            invoice_mark=invoice.mydata_mark,
-        )
+        return _registered_row(invoice)
 
     if (
-        getattr(invoice, "transmission_failed_at", None) is not None
+        invoice.mydata_error_code == ERROR_NO_ANSWER
         and invoice.mydata_uid
         and recover_mark_for_document(invoice)
     ):
-        # Sent while myDATA did not answer, so it may be registered: its
-        # MARK is looked up before anything is built or sent again, and
-        # the document is kept as it was issued.
-        return ResponseRow(
-            index=0,
-            status_code="Success",
-            invoice_uid=invoice.mydata_uid,
-            invoice_mark=invoice.mydata_mark,
-        )
+        # The last send went unanswered, so it may be registered: its MARK
+        # is looked up before anything is built or sent again.
+        return _registered_row(invoice)
 
     config = load_config()
     if not config.is_ready():
@@ -131,11 +123,12 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # master data, not transient. Record as a terminal validation
         # failure so the admin UI surfaces the reason rather than
         # retrying 5 times and then burying the error.
-        _persist_failure(
+        if not _persist_failure(
             invoice,
             code="BUILD",
             message=f"Failed to build myDATA payload: {exc}",
-        )
+        ):
+            return _registered_row(invoice)
         raise MyDataValidationError(str(exc), code="BUILD") from exc
 
     try:
@@ -145,27 +138,30 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # match the pinned schema. Fall into the same rejection
         # bucket as a server-side ValidationError so ops can see
         # the reason in the admin instead of a zombie SUBMITTED row.
-        _persist_failure(
+        if not _persist_failure(
             invoice, code="XSD", message=f"Local XSD validation failed: {exc}"
-        )
+        ):
+            return _registered_row(invoice)
         raise MyDataValidationError(str(exc), code="XSD") from exc
 
     # Persist UID + request-scope identity BEFORE the HTTP call so a
     # transport failure leaves enough state to recover on retry.
-    _persist_submission_intent(
+    if not _persist_submission_intent(
         invoice,
         uid=built.uid,
         invoice_type=built.invoice_type,
         series=built.series,
         aa=built.aa,
         movement=built.movement.as_json() if built.movement else None,
-    )
+    ):
+        # Another sender registered it since this one read the row.
+        return _registered_row(invoice)
 
     client = MyDataClient(config)
     try:
         response_bytes = client.send_invoices(built.xml_bytes)
-    except MyDataTransportError:
-        _record_connection_lost(invoice, built)
+    except MyDataTransportError as exc:
+        _persist_no_answer(invoice, message=exc.message)
         raise
     response = parse_response_doc(response_bytes)
     row = response.first()
@@ -184,28 +180,15 @@ def submit_document(invoice: Any) -> ResponseRow | None:
 
     if code == ERROR_DUPLICATE_UID:
         # Tier A.5 recovery: AADE already has this uid registered under
-        # a MARK from a prior transmission whose response we never
-        # received. Persist the error first (leaves REJECTED + uid set
-        # so recover_mark_for_invoice can use the uid), then attempt to
-        # recover the MARK via RequestTransmittedDocs.
-        _persist_failure(invoice, code=code, message=message)
-        recovered = recover_mark_for_document(invoice)
-        if recovered:
-            # Return a synthetic success row so the caller treats this
-            # as CONFIRMED and chains the post-submission steps (PDF
-            # re-render + email delivery). We don't have a real
-            # ResponseRow from AADE, so synthesise one that carries
-            # only the fields _persist_recovered_mark wrote.
-            from order.accounting.mydata.parser import (
-                ResponseRow as _ResponseRow,
-            )
-
-            return _ResponseRow(
-                index=0,
-                status_code="Success",
-                invoice_uid=invoice.mydata_uid or "",
-                invoice_mark=invoice.mydata_mark,
-            )
+        # a MARK, from a send whose answer we never read or from another
+        # sender. A row another sender registered meanwhile is returned
+        # as it is; otherwise the error is persisted (REJECTED + uid, so
+        # recover_mark_for_document can use the uid) and the MARK is
+        # recovered via RequestTransmittedDocs.
+        if not _persist_failure(invoice, code=code, message=message):
+            return _registered_row(invoice)
+        if recover_mark_for_document(invoice):
+            return _registered_row(invoice)
         raise MyDataDuplicateError(message, code=code)
 
     if row.status_code == "TechnicalError":
@@ -216,27 +199,61 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # REJECTED and skip all retries). Leave ``mydata_status=SUBMITTED``
         # and raise the retryable transport error so the Celery task's
         # backoff and the manual-resubmit path keep working (G0260).
-        _record_connection_lost(invoice, built)
+        _persist_no_answer(invoice, message=message or "AADE TechnicalError")
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
-    _persist_failure(invoice, code=code, message=message)
+    if not _persist_failure(invoice, code=code, message=message):
+        return _registered_row(invoice)
     raise MyDataValidationError(message, code=code)
 
 
-def _record_connection_lost(invoice: Any, built: Any) -> None:
-    """Mark a receipt with movement indication that AADE did not answer for
-    as issued under the loss-of-connection procedure (Α.1233/2026 annex
-    §12.1): its parcel ships anyway, every later transmission carries
-    ``transmissionFailure`` 3, and
-    ``order.tasks.retry_receipts_with_mydata`` sends it until it is
-    registered. Once, at the first failure."""
-    if built.movement is None or invoice.transmission_failed_at is not None:
-        return
-    now = timezone.now()
-    type(invoice)._default_manager.filter(
-        pk=invoice.pk, transmission_failed_at__isnull=True
-    ).update(transmission_failed_at=now, updated_at=now)
-    invoice.transmission_failed_at = now
+def _registered_row(invoice: Any) -> ResponseRow:
+    """A synthetic Success for a document that holds its MARK already (a
+    send before this one registered it, or the 228 recovery found it), so
+    the caller treats it as registered and chains what follows."""
+    return ResponseRow(
+        index=0,
+        status_code="Success",
+        invoice_uid=invoice.mydata_uid or "",
+        invoice_mark=invoice.mydata_mark,
+    )
+
+
+def _persist_no_answer(invoice: Any, *, message: str) -> None:
+    """Record that the send just made went unanswered (``ERROR_NO_ANSWER``,
+    the status left SUBMITTED): it may be registered, so the next send
+    first looks its MARK up, and ``order.tasks.retry_receipts_with_mydata``
+    sends a receipt with movement again until it is. A row registered
+    meanwhile by another sender is left as it is.
+
+    A receipt whose parcel is still with the store is sent again as
+    issued, plainly. AADE's loss-of-connection indication
+    (``transmissionFailure``, ``Invoice.transmission_failed_at``) belongs
+    to a receipt with movement whose parcel left without a MARK: stamped
+    here when the parcel left before this send, by
+    ``movement.parcel_left_unregistered`` when it leaves after."""
+    with transaction.atomic():
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
+        if locked.mydata_mark:
+            return
+        locked.mydata_error_code = ERROR_NO_ANSWER
+        locked.mydata_error_message = message or ""
+        fields = ["mydata_error_code", "mydata_error_message", "updated_at"]
+        if (
+            getattr(locked, "movement", None)
+            and locked.transmission_failed_at is None
+            and locked.order.shipped_at is not None
+        ):
+            locked.transmission_failed_at = timezone.now()
+            fields.append("transmission_failed_at")
+            invoice.transmission_failed_at = locked.transmission_failed_at
+        locked.save(update_fields=fields)
+    invoice.mydata_error_code = ERROR_NO_ANSWER
+    invoice.mydata_error_message = message or ""
 
 
 def cancel_document(invoice: Any) -> ResponseRow | None:
@@ -283,13 +300,20 @@ def cancel_document(invoice: Any) -> ResponseRow | None:
 
 def find_cancellation_mark(invoice: Any) -> int | None:
     """The MARK of the cancellation AADE holds for *invoice*, or ``None``
-    when AADE holds none: what ``RequestTransmittedDocs`` lists after the
-    document's own MARK, either as the document's ``cancelledByMark`` or in
-    ``cancelledInvoicesDoc`` (myDATA REST API v2.0.2, §4.2.7 and §6.2).
+    when AADE holds none: ``RequestTransmittedDocs`` lists the document
+    with its ``cancelledByMark`` once it is canceled, and a cancellation of
+    it in ``cancelledInvoicesDoc`` (myDATA REST API v2.0.2, §4.2.7 and
+    §6.2).
+
+    The search starts at the document's own MARK and is bounded by its
+    issue date (:func:`_issue_window`, as the 228 recovery's), never by a
+    page count: on a busy VAT the documents issued after it that day are
+    the only other rows, and every page of them is read.
 
     Asked before a canceled order's receipt goes to the credit path, so a
     cancel whose answer was lost never ends as a cancellation and a
-    credit. Raises ``MyDataTransportError`` when AADE cannot be asked.
+    credit. Raises ``MyDataTransportError`` when AADE cannot be asked, or
+    when it does not list the document at all (nothing can be concluded).
     """
     config = load_config()
     issuer_vat = _resolve_issuer_vat()
@@ -297,33 +321,67 @@ def find_cancellation_mark(invoice: Any) -> int | None:
         raise MyDataTransportError(
             "myDATA cannot be asked about the document now."
         )
-    client = MyDataClient(config)
-    next_partition_key: str | None = None
-    next_row_key: str | None = None
-    for _ in range(_MAX_REQUESTED_PAGES):
-        result = parse_requested_doc(
+    date_from, date_to = _issue_window(invoice.issue_date)
+    listed = False
+    for page in _requested_pages(
+        MyDataClient(config),
+        entity_vat_number=issuer_vat,
+        after_mark=invoice.mydata_mark - 1,
+        date_from=date_from,
+        date_to=date_to,
+    ):
+        if invoice.mydata_mark in page.cancellations:
+            return page.cancellations[invoice.mydata_mark]
+        for doc in page.docs:
+            if doc.invoice_mark != invoice.mydata_mark:
+                continue
+            if doc.cancelled_by_mark:
+                return doc.cancelled_by_mark
+            listed = True
+    if not listed:
+        raise MyDataTransportError(
+            f"myDATA does not list the document with MARK "
+            f"{invoice.mydata_mark} issued on {invoice.issue_date}."
+        )
+    return None
+
+
+def _issue_window(issue_date: date) -> tuple[date, date]:
+    """The ``RequestTransmittedDocs`` date window of a document: a day
+    either side of its issue date. AADE filters on the issue date, and the
+    margin covers a timezone edge without reading weeks of history."""
+    return issue_date - timedelta(days=1), issue_date + timedelta(days=1)
+
+
+def _requested_pages(
+    client: MyDataClient, **query: Any
+) -> Iterator[RequestedDocResult]:
+    """Every page ``RequestTransmittedDocs`` lists for *query*, following
+    its continuation token to the end. The query (a MARK and a date window)
+    is what bounds the read, never a page count, so a busy VAT is read
+    whole. A token AADE hands back a second time would loop forever: that
+    raises ``MyDataTransportError``, as any other answer that cannot be
+    used."""
+    seen: set[tuple[str | None, str | None]] = set()
+    token: tuple[str | None, str | None] = (None, None)
+    while True:
+        page = parse_requested_doc(
             client.request_transmitted_docs(
-                entity_vat_number=issuer_vat,
-                after_mark=invoice.mydata_mark - 1,
-                next_partition_key=next_partition_key,
-                next_row_key=next_row_key,
+                **query,
+                next_partition_key=token[0],
+                next_row_key=token[1],
             )
         )
-        if invoice.mydata_mark in result.cancellations:
-            return result.cancellations[invoice.mydata_mark]
-        for doc in result.docs:
-            if (
-                doc.invoice_mark == invoice.mydata_mark
-                and doc.cancelled_by_mark
-            ):
-                return doc.cancelled_by_mark
-        if result.next_partition_key is None and result.next_row_key is None:
-            return None
-        next_partition_key = result.next_partition_key
-        next_row_key = result.next_row_key
-    raise MyDataTransportError(
-        "myDATA listed more documents than can be read in one go."
-    )
+        yield page
+        token = (page.next_partition_key, page.next_row_key)
+        if token == (None, None):
+            return
+        if token in seen:
+            raise MyDataTransportError(
+                "myDATA repeated a continuation token of "
+                "RequestTransmittedDocs."
+            )
+        seen.add(token)
 
 
 def record_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
@@ -402,45 +460,31 @@ def recover_mark_for_document(invoice: Any) -> bool:
         )
         return False
 
-    date_from = issue_date - timedelta(days=1)
-    date_to = issue_date + timedelta(days=1)
+    date_from, date_to = _issue_window(issue_date)
 
-    client = MyDataClient(config)
-    all_docs = []
-
-    # Follow pagination until exhausted. In practice a ±1-day window
-    # scoped to our own VAT should return at most a handful of docs
-    # (one per order that day), so pagination is extremely unlikely —
-    # but we implement it for correctness.
-    next_partition_key: str | None = None
-    next_row_key: str | None = None
-    for _ in range(_MAX_REQUESTED_PAGES):
-        try:
-            raw = client.request_transmitted_docs(
+    # Every page of the window: it is bounded by the issue date, so a busy
+    # VAT is read whole instead of being cut off after a page count.
+    try:
+        all_docs = [
+            doc
+            for page in _requested_pages(
+                MyDataClient(config),
                 entity_vat_number=issuer_vat,
                 date_from=date_from,
                 date_to=date_to,
-                next_partition_key=next_partition_key,
-                next_row_key=next_row_key,
             )
-        except MyDataTransportError as exc:
-            logger.warning(
-                "recover_mark_for_invoice: transport error querying "
-                "RequestTransmittedDocs for invoice pk=%s uid=%s: %s",
-                invoice.pk,
-                uid_to_find,
-                exc,
-            )
-            # Do NOT re-raise — caller keeps REJECTED + logs.
-            return False
-
-        result = parse_requested_doc(raw)
-        all_docs.extend(result.docs)
-
-        if result.next_partition_key is None and result.next_row_key is None:
-            break
-        next_partition_key = result.next_partition_key
-        next_row_key = result.next_row_key
+            for doc in page.docs
+        ]
+    except MyDataTransportError as exc:
+        logger.warning(
+            "recover_mark_for_invoice: transport error querying "
+            "RequestTransmittedDocs for invoice pk=%s uid=%s: %s",
+            invoice.pk,
+            uid_to_find,
+            exc,
+        )
+        # Do NOT re-raise — caller keeps REJECTED + logs.
+        return False
 
     # SAFETY: require exactly one match for our uid.
     matches = [d for d in all_docs if d.uid == uid_to_find]
@@ -532,10 +576,14 @@ def _persist_submission_intent(
     series: str,
     aa: int,
     movement: dict[str, Any] | None = None,
-) -> None:
+) -> bool:
     """Lock + save the identity fields before the HTTP round-trip, and a
     receipt's movement indication with them (``Invoice.movement``), so the
-    PDF registered after it prints what AADE received."""
+    PDF registered after it prints what AADE received.
+
+    Returns ``False``, writing nothing, when the row holds a MARK already
+    (another sender registered it since this one read it): it is not sent
+    again, and its registered state is mirrored onto *invoice*."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -544,6 +592,9 @@ def _persist_submission_intent(
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
+        if locked.mydata_mark:
+            _mirror_registration(invoice, locked)
+            return False
         locked.mydata_uid = uid
         locked.mydata_invoice_type = invoice_type
         locked.mydata_series = series
@@ -575,8 +626,19 @@ def _persist_submission_intent(
     invoice.mydata_series = series
     invoice.mydata_aa = aa
     invoice.mydata_status = MyDataStatus.SUBMITTED
+    invoice.mydata_error_code = ""
+    invoice.mydata_error_message = ""
     if movement is not None:
         invoice.movement = movement
+    return True
+
+
+def _mirror_registration(invoice: Any, locked: Any) -> None:
+    """Copy a registered row's identifiers onto the caller's stale copy."""
+    invoice.mydata_status = locked.mydata_status
+    invoice.mydata_mark = locked.mydata_mark
+    invoice.mydata_uid = locked.mydata_uid
+    invoice.mydata_qr_url = locked.mydata_qr_url
 
 
 def _persist_success(invoice: Any, row: ResponseRow) -> None:
@@ -612,7 +674,10 @@ def _persist_success(invoice: Any, row: ResponseRow) -> None:
     invoice.mydata_qr_url = row.qr_url or ""
 
 
-def _persist_failure(invoice: Any, *, code: str, message: str) -> None:
+def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:
+    """Record a refusal: REJECTED, with its code and message. Returns
+    ``False``, writing nothing, when the row holds a MARK (another sender
+    registered it): a registration is never demoted."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -621,6 +686,9 @@ def _persist_failure(invoice: Any, *, code: str, message: str) -> None:
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
+        if locked.mydata_mark:
+            _mirror_registration(invoice, locked)
+            return False
         locked.mydata_status = MyDataStatus.REJECTED
         locked.mydata_error_code = code[:10]
         locked.mydata_error_message = message or ""
@@ -635,6 +703,7 @@ def _persist_failure(invoice: Any, *, code: str, message: str) -> None:
     invoice.mydata_status = MyDataStatus.REJECTED
     invoice.mydata_error_code = code[:10]
     invoice.mydata_error_message = message or ""
+    return True
 
 
 def _persist_error_only(invoice: Any, *, code: str, message: str) -> None:
@@ -642,14 +711,19 @@ def _persist_error_only(invoice: Any, *, code: str, message: str) -> None:
 
     Used when a CONFIRMED invoice's cancellation fails: the document is still
     validly transmitted at AADE, so it must not be flipped to REJECTED
-    (G0262).
+    (G0262). A row canceled meanwhile keeps no error: its cancellation
+    stands, whatever a later attempt was told.
     """
+    from order.models.invoice import MyDataStatus
+
     with transaction.atomic():
         locked = (
             type(invoice)
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
+        if locked.mydata_status == MyDataStatus.CANCELED:
+            return
         locked.mydata_error_code = code[:10]
         locked.mydata_error_message = message or ""
         locked.save(

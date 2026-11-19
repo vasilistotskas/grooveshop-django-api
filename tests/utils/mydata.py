@@ -143,7 +143,9 @@ class FakeAade:
     """AADE's ERP endpoints: every ``SendInvoices`` is answered with a
     Success and the next MARK, every ``CancelInvoice`` with a cancellation
     MARK (a second cancel of one document with AADE's refusal), and
-    ``RequestTransmittedDocs`` lists the cancellations it holds.
+    ``RequestTransmittedDocs`` lists the documents it registered, each
+    with its ``cancelledByMark`` once canceled, and the cancellations it
+    holds.
 
     ``lose_cancel_answers=True`` registers each cancel and then loses the
     answer (a ``MyDataTransportError``), as a dropped connection does.
@@ -229,10 +231,22 @@ class FakeAade:
             for mark, cancellation in self.cancellations.items()
             if mark > after_mark
         )
-        invoices = "".join(
-            f"<invoice><uid>{uid}</uid><mark>{mark}</mark></invoice>"
+        listed = {
+            mark: f"uid{mark}" for mark in self.marks if mark > after_mark
+        } | {
+            mark: uid
             for uid, mark in self.registered.items()
             if mark > after_mark
+        }
+        invoices = "".join(
+            f"<invoice><uid>{uid}</uid><mark>{mark}</mark>"
+            + (
+                f"<cancelledByMark>{self.cancellations[mark]}</cancelledByMark>"
+                if mark in self.cancellations
+                else ""
+            )
+            + "</invoice>"
+            for mark, uid in listed.items()
         )
         return (
             '<?xml version="1.0" encoding="UTF-8"?>'

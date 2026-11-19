@@ -2,29 +2,23 @@
 
 The agent gateway names its checkout session on order creation, and
 ``OrderService`` answers a repeat with that checkout's order. The partial
-unique index ``order_agent_checkout_unique`` rejects a second order that
-raced the lookup, so a checkout can never place two orders.
+unique index ``order_agent_checkout_unique`` (``0108``) rejects a second
+order that raced the lookup, so a checkout can never place two orders.
 
-Only adds: a nullable column (every existing order, and every order not
-placed through the gateway, carries NULL) and the index over its non-NULL
-values. The column is new and empty, so the index cannot meet a duplicate.
+Only adds a nullable column: every existing order, and every order not
+placed through the gateway, carries NULL.
 
-``AddUniqueConstraintAdaptively`` builds it ``CONCURRENTLY`` in the PreSync
-job, where ``order_order`` is live, and plainly inside the transaction a
-new store's schema is provisioned in (``docs/migrations.md``;
-``0069_order_payment_id_unique`` explains why neither ``AddConstraint`` nor
-``AddIndexConcurrently`` will do).
+Atomic, and apart from the index: ``0108`` must run outside a
+transaction to build ``CONCURRENTLY``, and in a non-atomic migration this
+column would commit before the build. A build that failed or was
+cancelled would then leave the column behind, unrecorded, and the
+PreSync retry's ``ADD COLUMN`` would fail on it.
 """
 
 from django.db import migrations, models
 
-from core.db.migration_operations import AddUniqueConstraintAdaptively
-
 
 class Migration(migrations.Migration):
-    # Lets the PreSync job build CONCURRENTLY; see AddUniqueConstraintAdaptively.
-    atomic = False
-
     dependencies = [
         ("order", "0106_web_url_fields"),
     ]
@@ -43,14 +37,6 @@ class Migration(migrations.Migration):
                 ),
                 null=True,
                 verbose_name="Agent checkout",
-            ),
-        ),
-        AddUniqueConstraintAdaptively(
-            "order",
-            models.UniqueConstraint(
-                fields=["agent_checkout"],
-                condition=models.Q(agent_checkout__isnull=False),
-                name="order_agent_checkout_unique",
             ),
         ),
     ]

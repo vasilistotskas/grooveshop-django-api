@@ -31,7 +31,13 @@ index exists. On a large or live table that is an outage, so index additions
 there MUST be built concurrently, which PostgreSQL only allows outside a
 transaction:
 
-- Set `atomic = False` on the migration.
+- Set `atomic = False` on the migration, and give the index a migration of
+  its own. Without a transaction every operation commits as it runs, so an
+  `AddField` beside the build commits before it; a build that fails or is
+  cancelled leaves the column applied while the migration stays unrecorded,
+  and the retry's plain `ADD COLUMN` fails on it. The column goes in an
+  atomic migration before it (`order` `0107_order_agent_checkout` and
+  `0108_order_agent_checkout_unique`).
 - Use `core.db.migration_operations.AddIndexAdaptively(model_name, index)`.
   Do not use Django's `AddIndexConcurrently`: it refuses to run inside the
   caller's transaction, and `Tenant.save()` (`auto_create_schema`) replays
@@ -56,7 +62,8 @@ with `ADD CONSTRAINT ... USING INDEX`, so the concurrent index build IS the
 constraint. Django already builds a conditional `UniqueConstraint` as exactly
 that index. For a live table:
 
-- Set `atomic = False` on the migration.
+- Set `atomic = False` on the migration, and keep the constraint alone in
+  it, as for an index (above).
 - Use `core.db.migration_operations.AddUniqueConstraintAdaptively(model_name,
   constraint)`. The constraint needs a `condition` (Django builds one without
   as an `ALTER TABLE`, which this operation refuses). Same adaptive build as

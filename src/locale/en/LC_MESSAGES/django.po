@@ -14884,8 +14884,8 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "The money beyond the receipt and the goods short of it are acknowledged."
 
-msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
-msgstr "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."

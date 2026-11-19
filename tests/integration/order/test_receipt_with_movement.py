@@ -267,6 +267,7 @@ class TestTheReceiptCarriesTheMovement:
             dispatch_date=timezone.localdate() - timedelta(days=2),
             loading=stored.loading,
             delivery=stored.delivery,
+            goods=stored.goods,
         )
 
         def sent_as(status, code=""):

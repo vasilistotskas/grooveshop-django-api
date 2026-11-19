@@ -403,9 +403,9 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         blank=True,
         help_text=_(
             "The movement indication the receipt was sent to myDATA with: "
-            "dispatch date, loading and delivery address. Empty "
-            "for a receipt without one (an order that does not move "
-            "through a carrier)."
+            "dispatch date, loading and delivery address, and the goods "
+            "that move with their quantities. Empty for a receipt without "
+            "one (an order that does not move through a carrier)."
         ),
     )
     transmission_failed_at = models.DateTimeField(

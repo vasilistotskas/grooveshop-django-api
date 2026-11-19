@@ -22,12 +22,17 @@ from order.accounting.mydata.validator import validate_invoice_doc
 from order.models import RetailCredit
 from order.models.retail_credit import CreditReason
 from tests.unit.order.mydata.test_builder_movement import (
-    MOVEMENT,
     _build,
+    _moving,
     _receipt,
 )
 
 pytestmark = pytest.mark.django_db
+
+
+def _receipt_with_movement():
+    invoice = _receipt()
+    return invoice, _moving(invoice)
 
 
 def test_the_plain_receipt():
@@ -35,14 +40,14 @@ def test_the_plain_receipt():
 
 
 def test_the_receipt_with_movement_indication():
-    validate_invoice_doc(_build(_receipt(), MOVEMENT).xml_bytes)
+    validate_invoice_doc(_build(*_receipt_with_movement()).xml_bytes)
 
 
 def test_the_receipt_sent_under_the_loss_of_connection_procedure():
     invoice = _receipt()
     invoice.transmission_failed_at = timezone.now()
 
-    validate_invoice_doc(_build(invoice, MOVEMENT).xml_bytes)
+    validate_invoice_doc(_build(invoice, _moving(invoice)).xml_bytes)
 
 
 def test_the_retail_credit_document():
@@ -79,7 +84,7 @@ def test_the_retail_credit_document():
 def test_a_payload_off_the_schema_is_refused():
     from xmlschema import XMLSchemaValidationError
 
-    xml = _build(_receipt(), MOVEMENT).xml_bytes.replace(
+    xml = _build(*_receipt_with_movement()).xml_bytes.replace(
         b"<movePurpose>1</movePurpose>", b"<movePurpose>99</movePurpose>"
     )
 

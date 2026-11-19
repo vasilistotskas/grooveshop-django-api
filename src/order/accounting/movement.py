@@ -32,6 +32,7 @@ import logging
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from django.utils import timezone
@@ -104,6 +105,16 @@ def movement_receipts_on(order: Any) -> bool:
 
 
 @dataclass(frozen=True)
+class MovingGoods:
+    """One good the parcel carries: the order line, its VAT rate, and how
+    many of it move, the units bought less those already refunded."""
+
+    item: int
+    rate: Decimal
+    quantity: int
+
+
+@dataclass(frozen=True)
 class ReceiptMovement:
     """What a receipt with movement indication declares about the parcel."""
 
@@ -116,12 +127,27 @@ class ReceiptMovement:
     dispatch_date: date
     loading: PostalAddress
     delivery: PostalAddress
+    #: Every good that physically moves, with its real quantity, decided
+    #: with the rest of the block and sent as it is again: a free gift (no
+    #: value, no money line) and the goods of a receipt netted by an
+    #: earlier refund (one money line per rate) are declared by lines of
+    #: their own with no value (myDATA REST API v2.0.2, §5.4: ``netValue``
+    #: and ``vatAmount`` have a minimum of 0).
+    goods: tuple[MovingGoods, ...]
 
     def as_json(self) -> dict[str, Any]:
         return {
             "dispatch_date": self.dispatch_date.isoformat(),
             "loading": asdict(self.loading),
             "delivery": asdict(self.delivery),
+            "goods": [
+                {
+                    "item": good.item,
+                    "rate": str(good.rate),
+                    "quantity": good.quantity,
+                }
+                for good in self.goods
+            ],
         }
 
     @classmethod
@@ -130,7 +156,29 @@ class ReceiptMovement:
             dispatch_date=date.fromisoformat(data["dispatch_date"]),
             loading=PostalAddress(**data["loading"]),
             delivery=PostalAddress(**data["delivery"]),
+            goods=tuple(
+                MovingGoods(
+                    item=good["item"],
+                    rate=Decimal(good["rate"]),
+                    quantity=good["quantity"],
+                )
+                for good in data["goods"]
+            ),
         )
+
+
+def moving_goods(order: Any) -> tuple[MovingGoods, ...]:
+    """The goods *order*'s parcel carries: every line with units left once
+    the refunded ones are taken off, free gifts included."""
+    return tuple(
+        MovingGoods(
+            item=item.pk,
+            rate=Decimal(item.vat_rate),
+            quantity=item.quantity - item.refunded_quantity,
+        )
+        for item in order.items.order_by("pk")
+        if item.quantity > item.refunded_quantity
+    )
 
 
 def refused_for_its_content(invoice: Any) -> bool:
@@ -176,6 +224,7 @@ def receipt_movement(invoice: Any) -> ReceiptMovement | None:
         dispatch_date=timezone.localdate(),
         loading=loading,
         delivery=delivery,
+        goods=moving_goods(order),
     )
 
 

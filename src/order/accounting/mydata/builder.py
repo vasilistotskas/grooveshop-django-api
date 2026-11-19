@@ -20,8 +20,9 @@ The receipt of an order that moves through a carrier also carries its
 movement indication (``order.accounting.movement``): ``dispatchDate``,
 ``movePurpose``, ``otherDeliveryNoteHeader`` (loading and
 delivery address) and ``isDeliveryNote`` in the header, and the quantity
-and its unit on each goods line. Shipping and the payment fee are no
-goods, so their lines carry none.
+and its unit for every good that moves: on its money line, or on a line
+of its own with no value (``_receipt_lines``). Shipping and the payment
+fee are no goods, so their lines carry none.
 
 Element ordering inside ``<invoice>`` is fixed by AADE's schema:
 ``issuer, counterpart, paymentMethods, invoiceHeader, invoiceDetails,
@@ -312,30 +313,66 @@ class _Line:
         return self.net + self.vat
 
 
-def _receipt_lines(invoice: Any) -> list[_Line]:
+def _receipt_lines(
+    invoice: Any, movement: ReceiptMovement | None = None
+) -> list[_Line]:
     """The receipt's lines — the PDF's lines, one rule for both documents
     (``order.accounting.taxation``): goods at the rate snapshotted on each item, then
     shipping and the payment-method fee at the rate(s) of the goods they
     travel with. Order-level discounts are already allocated across the
     goods; gift-card amounts are payment and never reduce a taxable
-    value."""
-    items = list(invoice.order.items.all())
-    quantities = {item.pk: item.quantity for item in items}
+    value.
+
+    A receipt with movement declares every good that moves with its
+    quantity (``ReceiptMovement.goods``): on the good's own money line
+    when it has one, otherwise on a line of its own with no value, which
+    changes no total. That is a free gift, and every good of a receipt
+    netted by an earlier refund, whose money lines are one per rate."""
+    lines, priced = _money_lines(invoice, movement)
+    if movement is None:
+        return lines
+    return lines + [
+        _Line(
+            rate=good.rate,
+            net=Decimal(0),
+            vat=Decimal(0),
+            quantity=good.quantity,
+        )
+        for good in movement.goods
+        if good.item not in priced
+    ]
+
+
+def _money_lines(
+    invoice: Any, movement: ReceiptMovement | None
+) -> tuple[list[_Line], set[int]]:
+    """The receipt's lines with value, and the order lines among them that
+    state the quantity that moves."""
+    quantities = (
+        {good.item: good.quantity for good in movement.goods}
+        if movement is not None
+        else {}
+    )
+    vat_lines = order_vat_lines(invoice.order)
     lines = [
         _Line(
             rate=line.rate,
             net=line.net,
             vat=line.vat,
-            quantity=quantities[line.item_pk]
-            if line.kind == ChargeKind.GOODS
+            quantity=quantities.get(line.item_pk)
+            if line.kind == ChargeKind.GOODS and line.item_pk is not None
             else None,
         )
-        for line in order_vat_lines(invoice.order, items)
+        for line in vat_lines
     ]
     if sum((line.gross for line in lines), Decimal(0)) == Decimal(
         invoice.total.amount
     ):
-        return lines
+        return lines, {
+            line.item_pk
+            for line in vat_lines
+            if line.kind == ChargeKind.GOODS and line.item_pk in quantities
+        }
     # A receipt issued net of money refunded before it (``order.accounting.invoicing``)
     # is documented by the breakdown frozen on its row, one line per rate:
     # the order's own lines would add up to the sale it no longer is. Such
@@ -347,7 +384,7 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
             vat=Decimal(row["vat"]),
         )
         for row in invoice.vat_breakdown
-    ]
+    ], set()
 
 
 def _credit_lines(credit: Any) -> list[_Line]:
@@ -396,7 +433,7 @@ def build_receipt_xml(
     return _build(
         invoice,
         invoice_type=INVOICE_TYPE_RETAIL_RECEIPT,
-        lines=_receipt_lines(invoice),
+        lines=_receipt_lines(invoice, movement),
         payment_rows=_payment_rows(invoice),
         issuer_vat=issuer_vat,
         issuer_country=issuer_country,

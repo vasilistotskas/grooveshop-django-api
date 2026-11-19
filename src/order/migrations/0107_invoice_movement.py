@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='invoice',
             name='movement',
-            field=models.JSONField(blank=True, db_default={}, default=dict, help_text='The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier).', verbose_name='Movement'),
+            field=models.JSONField(blank=True, db_default={}, default=dict, help_text='The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier).', verbose_name='Movement'),
         ),
         migrations.AddField(
             model_name='invoice',

@@ -20,6 +20,7 @@ from djmoney.money import Money
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
 from order.accounting import credit_allocation
+from order.accounting.invoicing import hold_receipt_for_cancel
 from order.checkout.attribution import (
     AttributionInput,
     ClassifiedAttribution,
@@ -3428,6 +3429,15 @@ class OrderService:
                 # commits with the cancel and goes with the answer.
                 order.metadata[SHIPMENT_CANCEL_PENDING_FLAG] = True
 
+            # A courier order's receipt not yet handed to the customer is
+            # set aside to be canceled in myDATA, here, under this lock and
+            # before the save: credits are created under the lock, and the
+            # save is what asks for them (``request_credit_documents``), so
+            # none can be created between the cancel and the hold; the
+            # receipt's email reads the hold before it sends.
+            # ``order_canceled``, sent after the commit, settles it
+            # (``settle_canceled_receipt``).
+            hold_receipt_for_cancel(order)
             order.save(
                 update_fields=["status", "status_updated_at", "metadata"]
             )

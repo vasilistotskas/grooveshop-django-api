@@ -317,16 +317,22 @@ msgstr[0] "%(count)s παραγγελία · %(share)s"
 msgstr[1] "%(count)s παραγγελίες · %(share)s"
 
 #, python-format
+msgid "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgid_plural "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+msgstr[0] "%(count)s δέμα έφυγε πριν το myDATA καταχωρίσει την απόδειξή του, επειδή το myDATA δεν απάντησε. Η απόδειξη στέλνεται ξανά αυτόματα, με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ, μέχρι να καταχωριστεί."
+msgstr[1] "%(count)s δέματα έφυγαν πριν το myDATA καταχωρίσει τις αποδείξεις τους, επειδή το myDATA δεν απάντησε. Οι αποδείξεις στέλνονται ξανά αυτόματα, με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ, μέχρι να καταχωριστούν."
+
+#, python-format
 msgid "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgid_plural "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[0] "Επιλέχθηκε %(count)s προϊόν: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
 msgstr[1] "Επιλέχθηκαν %(count)s προϊόντα: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
 
 #, python-format
-msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
-msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
-msgstr[0] "%(count)s απόδειξη εκδόθηκε με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχει καταχωριστεί ακόμη. Το δέμα της αποστέλλεται κανονικά· η απόδειξη στέλνεται ξανά αυτόματα μόλις απαντήσει το myDATA."
-msgstr[1] "%(count)s αποδείξεις εκδόθηκαν με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχουν καταχωριστεί ακόμη. Τα δέματά τους αποστέλλονται κανονικά· οι αποδείξεις στέλνονται ξανά αυτόματα μόλις απαντήσει το myDATA."
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
+msgstr[0] "%(count)s απόδειξη παραγγελίας που ακυρώθηκε πριν φύγει το δέμα της περιμένει ακόμη να ακυρωθεί στο myDATA. Οι σημειώσεις της παραγγελίας λένε γιατί."
+msgstr[1] "%(count)s αποδείξεις παραγγελιών που ακυρώθηκαν πριν φύγουν τα δέματά τους περιμένουν ακόμη να ακυρωθούν στο myDATA. Οι σημειώσεις των παραγγελιών λένε γιατί."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
@@ -7860,9 +7866,6 @@ msgstr "Έκδοση απόδειξης (myDATA)"
 msgid "Issued To"
 msgstr "Εκδόθηκε σε"
 
-msgid "Issued Without Connection At"
-msgstr "Εκδόθηκε χωρίς σύνδεση στις"
-
 msgid "Issued at"
 msgstr "Εκδόθηκε στις"
 
@@ -10349,6 +10352,9 @@ msgstr "Δέμα & Αντικαταβολή"
 msgid "Parcel ID"
 msgstr "ID δέματος"
 
+msgid "Parcel Left Unregistered At"
+msgstr "Το δέμα έφυγε χωρίς καταχώριση στις"
+
 msgid "Parcel State"
 msgstr "Κατάσταση Δέματος"
 
@@ -10378,6 +10384,9 @@ msgstr "Αποστολέας δέματος"
 
 msgid "Parcel_COD_Amount from ACS."
 msgstr "Parcel_COD_Amount από την ACS."
+
+msgid "Parcels that left while myDATA was unreachable"
+msgstr "Δέματα που έφυγαν ενώ το myDATA δεν ήταν διαθέσιμο"
 
 msgid "Parent"
 msgstr "Γονική κατηγορία"
@@ -11797,8 +11806,8 @@ msgstr "Απόδειξη {document_number} για την παραγγελία σ
 msgid "Receipts"
 msgstr "Αποδείξεις"
 
-msgid "Receipts issued while myDATA was unreachable"
-msgstr "Αποδείξεις που εκδόθηκαν ενώ το myDATA δεν ήταν διαθέσιμο"
+msgid "Receipts of canceled orders not canceled in myDATA"
+msgstr "Αποδείξεις ακυρωμένων παραγγελιών που δεν ακυρώθηκαν στο myDATA"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Αποδείξεις που απέρριψε το myDATA"
@@ -14877,8 +14886,8 @@ msgstr "Τα προωθητικά email που στέλνει αυτό το κα
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "Τα χρήματα πέρα από την απόδειξη και τα εμπορεύματα που λείπουν από αυτήν επιβεβαιώθηκαν."
 
-msgid "The movement indication the receipt was sent to myDATA with: dispatch date and time, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
-msgstr "Η ένδειξη διακίνησης με την οποία στάλθηκε η απόδειξη στο myDATA: ημερομηνία και ώρα έναρξης, διεύθυνση φόρτωσης και παράδοσης. Κενή για απόδειξη χωρίς ένδειξη (παραγγελία που δεν διακινείται μέσω μεταφορέα)."
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "Η ένδειξη διακίνησης με την οποία στάλθηκε η απόδειξη στο myDATA: ημερομηνία αποστολής, διεύθυνση φόρτωσης και παράδοσης. Κενή για απόδειξη χωρίς ένδειξη (παραγγελία που δεν διακινείται μέσω μεταφορέα)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
@@ -17024,14 +17033,14 @@ msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία �
 msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
 msgstr "Πότε ακυρώθηκε η παραγγελία πριν φύγει το δέμα της από το κατάστημα: η απόδειξη, που δεν παραδόθηκε ποτέ στον πελάτη, ακυρώνεται στο myDATA αντί να πιστωθεί, εκτός αν ο μεταφορέας δεν μπόρεσε να σταματήσει το δέμα."
 
+msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+msgstr "Πότε το δέμα έφυγε ενώ η απόδειξη, που φέρει ένδειξη διακίνησης, δεν είχε καταχωριστεί επειδή το myDATA δεν απάντησε. Από τότε στέλνεται με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ (transmissionFailure 3) μέχρι να καταχωριστεί."
+
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "Πότε παύει να ισχύει ο τελευταίος σύνδεσμος ή η τελευταία συνεδρία πληρωμής που άνοιξε για αυτή την παραγγελία. Το απόθεμα παραμένει δεσμευμένο μέχρι τότε (συν ένα σύντομο περιθώριο), και μετά η παραγγελία ακυρώνεται αν παραμένει απλήρωτη. Κενό μέχρι να ανοίξει πληρωμή."
 
 msgid "When the product was favourited"
 msgstr "Πότε προστέθηκε το προϊόν στα αγαπημένα"
-
-msgid "When the receipt, which carries a movement indication, could not be transmitted to myDATA because AADE did not answer. It is then sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered, and the parcel ships meanwhile."
-msgstr "Πότε η απόδειξη, που φέρει ένδειξη διακίνησης, δεν διαβιβάστηκε στο myDATA επειδή η ΑΑΔΕ δεν απάντησε. Στέλνεται τότε με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ (transmissionFailure 3) μέχρι να καταχωριστεί, και το δέμα αποστέλλεται κανονικά στο μεταξύ."
 
 msgid "When the reduction in force began; empty when the product is not reduced."
 msgstr "Πότε ξεκίνησε η ισχύουσα μείωση· κενό όταν το προϊόν δεν έχει μειωμένη τιμή."
@@ -18166,6 +18175,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgstr "%(count)d συνδρομές ενεργοποιήθηκαν."
 
 #, python-format
+#~ msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+#~ msgstr[0] "%(count)s απόδειξη εκδόθηκε με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχει καταχωριστεί ακόμη. Το δέμα της αποστέλλεται κανονικά· η απόδειξη στέλνεται ξανά αυτόματα μόλις απαντήσει το myDATA."
+#~ msgstr[1] "%(count)s αποδείξεις εκδόθηκαν με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχουν καταχωριστεί ακόμη. Τα δέματά τους αποστέλλονται κανονικά· οι αποδείξεις στέλνονται ξανά αυτόματα μόλις απαντήσει το myDATA."
+
+#, python-format
 #~ msgid "%(counter)s background task failed in the last 24h"
 #~ msgid_plural "%(counter)s background tasks failed in the last 24h"
 #~ msgstr[0] "%(counter)s εργασία απέτυχε τις τελευταίες 24 ώρες"
@@ -18774,6 +18789,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Is Visible"
 #~ msgstr "Ορατό"
+
+#~ msgid "Issued Without Connection At"
+#~ msgstr "Εκδόθηκε χωρίς σύνδεση στις"
 
 #~ msgid "Item Analytics"
 #~ msgstr "Αναλυτικά αντικειμένων"

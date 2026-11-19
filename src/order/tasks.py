@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.utils import timezone
+from redis.exceptions import LockError
 
 from core import celery_app
 from core.retention import delete_in_batches
@@ -1203,6 +1204,20 @@ def send_invoice_email(self, order_id: int) -> bool:
             )
             return False
 
+        if not invoice.is_deliverable():
+            # Read now, not when the email was queued: the receipt may wait
+            # for its parcel (a canceled order's set aside under the
+            # cancel's lock, a movement receipt before the pickup) or have
+            # been canceled in myDATA since. Whoever makes it deliverable
+            # queues the email again, so the reservation goes back.
+            _release_document_email(order_id, INVOICE_EMAIL_SENT_FLAG)
+            logger.info(
+                "Receipt email for order #%s not sent: the receipt is not "
+                "for the customer now",
+                order_id,
+            )
+            return False
+
         if not _send_document_email(invoice, is_credit=False):
             logger.info(
                 "Receipt email for order #%s not sent: turned off", order_id
@@ -1348,6 +1363,7 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     waiting for this MARK (:func:`issue_pending_credits`).
     """
     from order.accounting.invoicing import generate_invoice
+    from order.models.invoice import Invoice
 
     try:
         order = Order.objects.select_related(
@@ -1388,11 +1404,21 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         note=f"Receipt {invoice.invoice_number} registered with myDATA "
         f"(MARK={response.invoice_mark})",
     )
-    if not invoice.awaits_the_parcel():
+    # Read after the MARK is stored, never from the order loaded when this
+    # task started: SHIPPED may have landed meanwhile, and its handler
+    # (``handle_order_shipped``) found no MARK yet. Whichever of the two
+    # comes second sends the email.
+    registered = Invoice.objects.select_related("order").get(pk=invoice.pk)
+    if not registered.awaits_the_parcel():
         # A receipt with movement reaches the customer when its parcel
-        # leaves (``handle_order_shipped``), so that an order canceled
-        # before then can have it canceled in myDATA.
+        # leaves, so that an order canceled before then can have it
+        # canceled in myDATA.
         dispatch_on_commit(send_invoice_email, [order_id])
+    if registered.cancel_requested_at is not None:
+        # Set aside for a cancel while it waited for its MARK (sent during
+        # an outage, or corrected by staff after a refusal): it can be
+        # canceled now.
+        dispatch_on_commit(settle_canceled_receipt, [order_id])
     dispatch_on_commit(issue_pending_credits, [order_id])
     return True
 
@@ -1423,21 +1449,27 @@ def retry_receipts_with_mydata() -> int:
     """Take up every receipt whose business with myDATA is unfinished: shipping
     never waits for it, so this sweep is how it gets done.
 
-    - A receipt issued while myDATA could not be reached
-      (``Invoice.transmission_failed_at``, sent with ``transmissionFailure`` 3,
-      «Απώλεια διασύνδεσης») is sent again (``send_invoice_to_mydata``),
-      whose own retries an outage outlasts.
+    - A receipt with movement indication whose last send went unanswered
+      (``ERROR_NO_ANSWER``) is sent again (``send_invoice_to_mydata``),
+      whose own retries an outage outlasts: plainly while its parcel is
+      with the store, with ``transmissionFailure`` 3 once it left
+      (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»).
     - A receipt set aside because its order was canceled before the parcel
       left (``Invoice.cancel_requested_at``) is settled
       (``settle_canceled_receipt``): its courier may have answered since, or
       myDATA may answer again.
 
     The state is the guarantee: rows are found by it once
-    ``MYDATA_RETRY_AFTER_MINUTES`` passed since they were last touched, and
-    AADE's duplicate check (error 228, the same uid) makes a send that
-    overlaps a late retry harmless.
+    ``MYDATA_RETRY_AFTER_MINUTES`` passed since they were last touched. A
+    send may still overlap a late retry of the task's own: both send the
+    same uid, AADE registers one and answers the other with error 228, and
+    ``service.submit_document`` never lets that answer, or anything after a
+    MARK, demote the registered row. Two settles of one receipt never
+    overlap (``settle_canceled_receipt`` holds a claim across its AADE
+    call).
     """
     from order.accounting.mydata.config import load_config
+    from order.accounting.mydata.types import ERROR_NO_ANSWER
     from order.models.invoice import Invoice, MyDataStatus
 
     if not load_config().is_ready():
@@ -1445,19 +1477,25 @@ def retry_receipts_with_mydata() -> int:
     cutoff = timezone.now() - timedelta(
         minutes=settings.MYDATA_RETRY_AFTER_MINUTES
     )
-    settled = Invoice.objects.filter(updated_at__lte=cutoff).exclude(
-        mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
-    )
     batch = settings.MYDATA_RETRY_SWEEP_BATCH
+    untouched = Invoice.objects.filter(updated_at__lte=cutoff)
     to_send = list(
-        settled.filter(
-            transmission_failed_at__isnull=False, mydata_mark__isnull=True
+        untouched.filter(
+            mydata_mark__isnull=True,
+            mydata_status=MyDataStatus.SUBMITTED,
+            mydata_error_code=ERROR_NO_ANSWER,
         )
+        .exclude(movement={})
         .order_by("id")
         .values_list("order_id", flat=True)[:batch]
     )
     to_cancel = list(
-        settled.filter(cancel_requested_at__isnull=False)
+        untouched.filter(cancel_requested_at__isnull=False)
+        # A refused one waits for staff to correct it; its registration
+        # queues the settle (``send_invoice_to_mydata``).
+        .exclude(
+            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
         .exclude(order_id__in=to_send)
         .order_by("id")
         .values_list("order_id", flat=True)[:batch]
@@ -1468,12 +1506,16 @@ def retry_receipts_with_mydata() -> int:
         settle_canceled_receipt.apply_async(args=[order_id])
     if to_send or to_cancel:
         logger.warning(
-            "Queued %s receipt(s) issued while myDATA was unreachable and "
-            "%s of canceled orders",
+            "Queued %s receipt(s) myDATA did not answer for and %s of "
+            "canceled orders",
             len(to_send),
             len(to_cancel),
         )
     return len(to_send) + len(to_cancel)
+
+
+def _settle_claim_key(order_id: int) -> str:
+    return f"mydata:settle_canceled_receipt:{order_id}"
 
 
 @celery_app.task(
@@ -1504,11 +1546,42 @@ def settle_canceled_receipt(order_id: int) -> str:
     retried here, then by ``retry_receipts_with_mydata``. Before any
     receipt goes the credit path AADE is asked whether it already holds a
     cancellation (a cancel whose answer was lost), so a receipt is never
-    both canceled and credited. The state is read under the order's and the
-    receipt's row locks, so the cancel's receiver, the courier's answer and
-    the sweep settle it once. Shipping never waits on any of it. Returns
-    what became of the receipt.
+    both canceled and credited. A receipt not registered yet waits for its
+    MARK, whose arrival queues this again (``send_invoice_to_mydata``); one
+    AADE refused waits for staff to correct and send it, and they are told.
+
+    One settle per receipt at a time: the cancel's receiver, the courier's
+    answer and the sweep may each queue it, and a claim
+    (``cache.lock``, ``MYDATA_SETTLE_CLAIM_SECONDS``) is held from the read
+    of the state, under the order's and the receipt's row locks, across
+    the AADE calls, so a second run returns at once instead of sending
+    ``CancelInvoice`` again and leaving AADE's "already canceled" error
+    on the receipt. A claim that outlives a dead worker expires, and the
+    run after it finds the cancellation AADE recorded
+    (``find_cancellation_mark``). Shipping never waits on any of it.
+    Returns what became of the receipt.
     """
+    claim = cache.lock(
+        _settle_claim_key(order_id),
+        timeout=settings.MYDATA_SETTLE_CLAIM_SECONDS,
+    )
+    if not claim.acquire():
+        return "settling_elsewhere"
+    try:
+        return _settle_canceled_receipt(order_id)
+    finally:
+        try:
+            claim.release()
+        except LockError:
+            # The lease ran out and is another run's now; leaving it alone
+            # is the point of the token.
+            logger.warning(
+                "Settling the receipt of order #%s outlasted its claim",
+                order_id,
+            )
+
+
+def _settle_canceled_receipt(order_id: int) -> str:
     from order.accounting.mydata import (
         MyDataAuthError,
         MyDataValidationError,
@@ -1536,8 +1609,21 @@ def settle_canceled_receipt(order_id: int) -> str:
             return "courier_not_answered"
         courier_stopped = "error" not in answer
         if courier_stopped and not invoice.mydata_mark:
-            # Still to be registered (issued while myDATA was unreachable):
-            # it is sent first, and canceled on a later run.
+            if invoice.mydata_status == MyDataStatus.REJECTED:
+                OrderHistory.log_note(
+                    order=order,
+                    note=(
+                        f"Receipt {invoice.invoice_number} of the canceled "
+                        "order was refused by myDATA "
+                        f"({invoice.mydata_error_code} "
+                        f"{invoice.mydata_error_message}). Correct it and "
+                        'press "Send receipt to myDATA": once it is '
+                        "registered it is canceled in myDATA."
+                    ),
+                )
+                return "awaiting_correction"
+            # Still to be registered (its sends went unanswered): it is
+            # canceled once it has its MARK.
             return "awaiting_mark"
 
     try:

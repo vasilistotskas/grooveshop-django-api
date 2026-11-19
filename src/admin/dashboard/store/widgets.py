@@ -23,6 +23,7 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.urls import reverse
 from django.utils import formats, timezone
 from django.utils.text import Truncator
@@ -1290,19 +1291,53 @@ class StoreAlerts(DashboardWidget):
                 _alert(
                     "warning",
                     "cloud_sync",
-                    _("Receipts issued while myDATA was unreachable"),
+                    _("Parcels that left while myDATA was unreachable"),
                     ngettext(
-                        "%(count)s receipt was issued under AADE's "
-                        "loss-of-connection procedure and is not registered "
-                        "yet. Its parcel ships as usual; it is sent again "
-                        "automatically once myDATA answers.",
-                        "%(count)s receipts were issued under AADE's "
-                        "loss-of-connection procedure and are not registered "
-                        "yet. Their parcels ship as usual; they are sent "
-                        "again automatically once myDATA answers.",
+                        "%(count)s parcel left before myDATA registered its "
+                        "receipt, because myDATA did not answer. The receipt "
+                        "is sent again automatically, with AADE's "
+                        "loss-of-connection indication, until it is "
+                        "registered.",
+                        "%(count)s parcels left before myDATA registered "
+                        "their receipts, because myDATA did not answer. The "
+                        "receipts are sent again automatically, with AADE's "
+                        "loss-of-connection indication, until they are "
+                        "registered.",
                         waiting,
                     )
                     % {"count": waiting},
+                )
+            )
+        # Set aside when their orders were canceled before the parcel left,
+        # and settled within minutes; one still here needs a look: myDATA
+        # does not answer or refuses the store's credentials, or the receipt
+        # was refused and waits for staff to correct it (its order's notes
+        # say which).
+        held = (
+            Invoice.objects.filter(
+                cancel_requested_at__isnull=False,
+                cancel_requested_at__lte=timezone.now()
+                - timedelta(minutes=settings.MYDATA_RETRY_AFTER_MINUTES),
+            )
+            .exclude(mydata_status=MyDataStatus.CANCELED)
+            .count()
+        )
+        if held:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cancel_schedule_send",
+                    _("Receipts of canceled orders not canceled in myDATA"),
+                    ngettext(
+                        "%(count)s receipt of an order canceled before its "
+                        "parcel left is still waiting to be canceled in "
+                        "myDATA. Its order's notes say why.",
+                        "%(count)s receipts of orders canceled before their "
+                        "parcels left are still waiting to be canceled in "
+                        "myDATA. Their orders' notes say why.",
+                        held,
+                    )
+                    % {"count": held},
                 )
             )
         # Only a store whose parcels a carrier integration takes owes a

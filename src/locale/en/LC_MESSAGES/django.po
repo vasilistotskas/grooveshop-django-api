@@ -312,16 +312,22 @@ msgstr[0] "%(count)s order · %(share)s"
 msgstr[1] "%(count)s orders · %(share)s"
 
 #, python-format
+msgid "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgid_plural "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+msgstr[0] "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgstr[1] "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+
+#, python-format
 msgid "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgid_plural "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[0] "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[1] "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 
 #, python-format
-msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
-msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
-msgstr[0] "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
-msgstr[1] "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
+msgstr[0] "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
+msgstr[1] "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
@@ -7853,9 +7859,6 @@ msgstr "Issue receipt (myDATA)"
 msgid "Issued To"
 msgstr "Issued To"
 
-msgid "Issued Without Connection At"
-msgstr "Issued Without Connection At"
-
 msgid "Issued at"
 msgstr "Issued at"
 
@@ -10342,6 +10345,9 @@ msgstr "Parcel & COD"
 msgid "Parcel ID"
 msgstr "Parcel ID"
 
+msgid "Parcel Left Unregistered At"
+msgstr "Parcel Left Unregistered At"
+
 msgid "Parcel State"
 msgstr "Parcel State"
 
@@ -10371,6 +10377,9 @@ msgstr "Parcel sender"
 
 msgid "Parcel_COD_Amount from ACS."
 msgstr "Parcel_COD_Amount from ACS."
+
+msgid "Parcels that left while myDATA was unreachable"
+msgstr "Parcels that left while myDATA was unreachable"
 
 msgid "Parent"
 msgstr "Parent"
@@ -11790,8 +11799,8 @@ msgstr "Receipt {document_number} for your order #{order_id}"
 msgid "Receipts"
 msgstr "Receipts"
 
-msgid "Receipts issued while myDATA was unreachable"
-msgstr "Receipts issued while myDATA was unreachable"
+msgid "Receipts of canceled orders not canceled in myDATA"
+msgstr "Receipts of canceled orders not canceled in myDATA"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Receipts rejected by myDATA"
@@ -14875,8 +14884,8 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "The money beyond the receipt and the goods short of it are acknowledged."
 
-msgid "The movement indication the receipt was sent to myDATA with: dispatch date and time, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
-msgstr "The movement indication the receipt was sent to myDATA with: dispatch date and time, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
@@ -17022,14 +17031,14 @@ msgstr "When the order first left the store. The sale is counted in the month of
 msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
 msgstr "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
 
+msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+msgstr "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 
 msgid "When the product was favourited"
 msgstr "When the product was favourited"
-
-msgid "When the receipt, which carries a movement indication, could not be transmitted to myDATA because AADE did not answer. It is then sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered, and the parcel ships meanwhile."
-msgstr "When the receipt, which carries a movement indication, could not be transmitted to myDATA because AADE did not answer. It is then sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered, and the parcel ships meanwhile."
 
 msgid "When the reduction in force began; empty when the product is not reduced."
 msgstr "When the reduction in force began; empty when the product is not reduced."
@@ -18105,6 +18114,12 @@ msgid "…and {count} more lines with errors."
 msgstr "…and {count} more lines with errors."
 
 #, python-format
+#~ msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+#~ msgstr[0] "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgstr[1] "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+
+#, python-format
 #~ msgid "%(slot)s navigation"
 #~ msgstr "%(slot)s navigation"
 
@@ -18433,6 +18448,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Is Visible"
 #~ msgstr "Is Visible"
+
+#~ msgid "Issued Without Connection At"
+#~ msgstr "Issued Without Connection At"
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"

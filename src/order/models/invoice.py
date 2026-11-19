@@ -403,21 +403,21 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         blank=True,
         help_text=_(
             "The movement indication the receipt was sent to myDATA with: "
-            "dispatch date and time, loading and delivery address. Empty "
+            "dispatch date, loading and delivery address. Empty "
             "for a receipt without one (an order that does not move "
             "through a carrier)."
         ),
     )
     transmission_failed_at = models.DateTimeField(
-        _("Issued Without Connection At"),
+        _("Parcel Left Unregistered At"),
         null=True,
         blank=True,
         help_text=_(
-            "When the receipt, which carries a movement indication, could "
-            "not be transmitted to myDATA because AADE did not answer. It "
-            "is then sent with AADE's loss-of-connection indication "
-            "(transmissionFailure 3) until it is registered, and the "
-            "parcel ships meanwhile."
+            "When the parcel left while the receipt, which carries a "
+            "movement indication, was not registered because myDATA did "
+            "not answer. From then on it is sent with AADE's "
+            "loss-of-connection indication (transmissionFailure 3) until "
+            "it is registered."
         ),
     )
     cancel_requested_at = models.DateTimeField(
@@ -468,26 +468,25 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         return bool(self.document_file and self.document_file.name)
 
     def awaits_the_parcel(self) -> bool:
-        """True for a receipt with movement indication whose parcel has not
-        left yet: it is not handed to the customer before it does, so an
-        order canceled meanwhile can have it canceled in myDATA, which
-        AADE allows only for a document never used (Α.1138/2020 annex).
+        """True for a receipt that is not handed to the customer yet
+        because its parcel has not left: one with movement indication, so
+        that an order canceled meanwhile can have it canceled in myDATA,
+        which AADE allows only for a document never used (Α.1138/2020
+        annex).
 
-        An order canceled before the parcel left waits while its receipt
-        is set aside (``cancel_requested_at``); once the receipt stands (the
-        courier could not stop the parcel, AADE refused the cancel) it no
-        longer waits, and reaches the customer with its credit."""
+        A receipt set aside for that cancel (``cancel_requested_at``)
+        waits whatever it carries (``invoicing.hold_receipt_for_cancel``).
+        Once a canceled order's receipt stands (the courier could not stop
+        the parcel, AADE refused the cancel) it no longer waits, and
+        reaches the customer with its credit."""
         from order.enum.status import OrderStatus
 
         order = self.order
-        return (
-            bool(self.movement)
-            and order.shipped_at is None
-            and (
-                order.status != OrderStatus.CANCELED
-                or self.cancel_requested_at is not None
-            )
-        )
+        if order.shipped_at is not None:
+            return False
+        if self.cancel_requested_at is not None:
+            return True
+        return bool(self.movement) and order.status != OrderStatus.CANCELED
 
     def is_deliverable(self) -> bool:
         """True when the receipt may reach the customer: AADE registered it

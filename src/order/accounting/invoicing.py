@@ -134,9 +134,18 @@ def hold_receipt_for_cancel(order: Order) -> bool:
     path when the courier may hold the parcel. Returns whether a receipt
     was set aside.
 
-    A receipt that already has a credit document (money returned before
-    the pickup) was used: it is never canceled, and the rest of it goes the
-    credit path like any other refund.
+    Called by the one path that cancels an order
+    (``OrderService._cancel_order_locked``), in its transaction and under
+    its lock on the order row, the lock every credit is created under: no
+    credit can be created between the cancel and the hold. The receipt's
+    email reads the hold when it runs (``Invoice.is_deliverable``).
+
+    Set aside: a receipt not handed to the customer, that is one with
+    movement indication, or one AADE has not registered (never sent, or
+    refused: it is canceled once staff correct it and it is registered).
+    Never one already canceled, nor one with a credit document (money
+    returned before the pickup): that one was used, and the rest of it
+    goes the credit path like any other refund.
     """
     if (
         order.shipped_at is not None
@@ -149,9 +158,9 @@ def hold_receipt_for_cancel(order: Order) -> bool:
         Invoice.objects.filter(
             order_id=order.pk, cancel_requested_at__isnull=True
         )
-        .exclude(
-            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
-        )
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        # A plain receipt AADE registered was emailed at its MARK: used.
+        .exclude(movement={}, mydata_mark__isnull=False)
         .exclude(
             pk__in=RetailCredit.objects.filter(order_id=order.pk).values(
                 "invoice_id"
@@ -546,7 +555,7 @@ def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
 
 @transaction.atomic
 def _persist_invoice_row(
-    order: Order, existing: Invoice | None
+    order: Order, existing: Invoice | None, *, issuing: bool
 ) -> tuple[Invoice, list[dict[str, Any]], dict[str, Any]]:
     """Allocate the number and persist the Invoice row (no PDF).
 
@@ -562,8 +571,16 @@ def _persist_invoice_row(
     and the row's creation must be one step: a refund inserted but not yet
     committed when the ledger is read is invisible to the netting, yet it
     predates the row, and no credit would ever cover it.
+
+    *issuing* (a call that issues, not a re-render) re-judges
+    :func:`receipt_issuable` on the locked row: the caller's order was
+    read before the lock, and a cancel that committed since must find
+    either no receipt (refused here) or one it sets aside
+    (:func:`hold_receipt_for_cancel`, under the same lock).
     """
-    Order.objects.select_for_update().get(pk=order.pk)
+    locked = Order.objects.select_for_update().get(pk=order.pk)
+    if issuing:
+        _refuse_unless_issuable(locked)
     if existing is None:
         # The receipt nets what was returned before it, at the rates each
         # refund was allocated at: decide the sources nobody allocated yet
@@ -659,6 +676,23 @@ def _persist_invoice_row(
     return invoice, vat_breakdown, totals
 
 
+def _refuse_unless_issuable(order: Order) -> None:
+    """Refuse an order :func:`receipt_issuable` rejects."""
+    if not receipt_issuable(order):
+        raise ReceiptNotIssuable(
+            _(
+                "A retail receipt is issued for a receipt order once it "
+                "has shipped. Order #%(order_id)s is %(doc)s, status "
+                "%(status)s."
+            )
+            % {
+                "order_id": order.id,
+                "doc": order.get_document_type_display(),
+                "status": order.get_status_display(),
+            }
+        )
+
+
 def _refuse_if_fully_refunded(order: Order, existing: Invoice | None) -> None:
     """Refuse a receipt that would document nothing: everything was
     returned before its row was created. Applies to any receipt not yet
@@ -721,19 +755,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             )
         _refuse_if_fully_refunded(order, existing)
     else:
-        if not receipt_issuable(order):
-            raise ReceiptNotIssuable(
-                _(
-                    "A retail receipt is issued for a receipt order once it "
-                    "has shipped. Order #%(order_id)s is %(doc)s, status "
-                    "%(status)s."
-                )
-                % {
-                    "order_id": order.id,
-                    "doc": order.get_document_type_display(),
-                    "status": order.get_status_display(),
-                }
-            )
+        _refuse_unless_issuable(order)
         _refuse_if_fully_refunded(order, existing)
         if not load_mydata_config().is_ready():
             raise ReceiptNotIssuable(
@@ -751,7 +773,9 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             )
             return existing
 
-    invoice, vat_breakdown, totals = _persist_invoice_row(order, existing)
+    invoice, vat_breakdown, totals = _persist_invoice_row(
+        order, existing, issuing=not force
+    )
 
     # Render under the buyer's preferred language so e.g. a German
     # shopper gets a German-labelled invoice even though the seller

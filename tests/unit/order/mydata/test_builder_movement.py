@@ -2,16 +2,16 @@
 
 A retail sale that moves through a courier gets its 11.1 with movement
 indication (Α.1123/2024 Annex ΙΙ §7.3, as replaced by Α.1233/2026): the
-header's ``dispatchDate``, ``dispatchTime``, ``movePurpose``,
-``otherDeliveryNoteHeader`` and ``isDeliveryNote``, in the order of
-``InvoiceHeaderType`` (myDATA v2.0.2 XSD), and the quantity and its unit on
-each goods line. A receipt issued while myDATA could not be reached carries
+header's ``dispatchDate``, ``movePurpose``, ``otherDeliveryNoteHeader`` and
+``isDeliveryNote``, in the order of ``InvoiceHeaderType`` (myDATA v2.0.2
+XSD), and the quantity and its unit on each goods line. A receipt whose
+parcel left while myDATA could not be reached carries
 ``transmissionFailure`` 3 before the issuer.
 """
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 from xml.etree.ElementTree import fromstring
@@ -33,7 +33,6 @@ pytestmark = pytest.mark.django_db
 
 MOVEMENT = ReceiptMovement(
     dispatch_date=date(2026, 11, 19),
-    dispatch_time=time(15, 0),
     loading=PostalAddress(
         street="Τατοΐου", number="5", postal_code="145 61", city="Κηφισιά"
     ),
@@ -89,13 +88,13 @@ def test_the_header_carries_the_movement_in_the_schema_order():
     assert tags[tags.index("currency") :] == [
         "currency",
         "dispatchDate",
-        "dispatchTime",
         "movePurpose",
         "otherDeliveryNoteHeader",
         "isDeliveryNote",
     ]
     assert header.find(f"{AADE_NS}dispatchDate").text == "2026-11-19"
-    assert header.find(f"{AADE_NS}dispatchTime").text == "15:00:00"
+    # Optional in phase A, and when the courier collects is not known.
+    assert header.find(f"{AADE_NS}dispatchTime") is None
     # Annex 8.14: 1 = «Πώληση».
     assert header.find(f"{AADE_NS}movePurpose").text == "1"
     assert header.find(f"{AADE_NS}isDeliveryNote").text == "true"
@@ -157,21 +156,7 @@ def test_the_built_document_returns_the_movement_it_was_built_with():
     assert _build(_receipt()).movement is None
 
 
-def test_no_dispatch_time_leaves_the_element_out():
-    movement = ReceiptMovement(
-        dispatch_date=MOVEMENT.dispatch_date,
-        dispatch_time=None,
-        loading=MOVEMENT.loading,
-        delivery=MOVEMENT.delivery,
-    )
-    root = fromstring(_build(_receipt(), movement).xml_bytes)
-    header = root.find(f"{AADE_NS}invoice/{AADE_NS}invoiceHeader")
-
-    assert header.find(f"{AADE_NS}dispatchTime") is None
-    assert header.find(f"{AADE_NS}dispatchDate") is not None
-
-
-def test_a_receipt_issued_without_connection_says_so_before_the_issuer():
+def test_a_receipt_whose_parcel_left_without_connection_says_so_first():
     """«Απώλεια διασύνδεσης»: value 3, the one the REST API documentation
     (v2.0.2, §5) allows an ERP to send."""
     from django.utils import timezone

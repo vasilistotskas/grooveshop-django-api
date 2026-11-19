@@ -87,6 +87,12 @@ CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
 # about ten), at most this many of each kind per store and run.
 MYDATA_RETRY_AFTER_MINUTES = int(getenv("MYDATA_RETRY_AFTER_MINUTES", "15"))
 MYDATA_RETRY_SWEEP_BATCH = int(getenv("MYDATA_RETRY_SWEEP_BATCH", "100"))
+# How long one settle of a canceled order's receipt holds its claim
+# (``order.tasks.settle_canceled_receipt``): its AADE calls, a cancel and a
+# lookup of the cancellations, each bounded by the store's
+# MYDATA_REQUEST_TIMEOUT_SECONDS. A worker that dies holding it frees it
+# after this long.
+MYDATA_SETTLE_CLAIM_SECONDS = int(getenv("MYDATA_SETTLE_CLAIM_SECONDS", "300"))
 # The review reminder (``order.tasks.send_review_request_emails``) runs
 # daily: an order delivered up to this many days earlier than its due day
 # is still reminded, so a run that did not happen costs nothing.

@@ -15,8 +15,11 @@ from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
 from order.accounting.invoicing import (
     PRE_SHIPMENT_STATUSES,
-    hold_receipt_for_cancel,
     receipt_issuable,
+)
+from order.accounting.movement import (
+    flag_a_movement_the_receipt_does_not_cover,
+    parcel_left_unregistered,
 )
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.communications.notifications import (
@@ -34,7 +37,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.history import OrderHistory
-from order.models.invoice import Invoice
+from order.models.invoice import Invoice, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
@@ -71,6 +74,7 @@ from order.tasks import (
     send_admin_new_order_email,
     send_dispute_notification_email,
     send_invoice_email,
+    send_invoice_to_mydata,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
@@ -552,17 +556,33 @@ def handle_order_shipped(
     # Email is sent by handle_order_status_changed via
     # send_order_status_update_email (uses the shipped template)
 
-    # The retail receipt is issued when the shipment starts (ΕΛΠ art.
-    # 13(a)). Idempotent: ``generate_order_invoice`` issues it once, so an
-    # order a carrier took, whose receipt was issued when its voucher or
-    # parcel was created (``issue_receipt_for_pickup``), gets nothing more.
-    if receipt_issuable(order) and load_mydata_config().issues_automatically():
+    # A receipt with movement that AADE has not answered for goes on as a
+    # document whose movement started during a loss of connection: stamped
+    # before anything sends it again, and sent at once. Otherwise the
+    # retail receipt is issued when the shipment starts (ΕΛΠ art. 13(a)).
+    # Idempotent: ``generate_order_invoice`` issues it once, so an order a
+    # carrier took, whose receipt was issued when its voucher or parcel was
+    # created (``issue_receipt_for_pickup``), gets nothing more.
+    if parcel_left_unregistered(order.id):
+        dispatch_on_commit(send_invoice_to_mydata, [order.id])
+    elif (
+        receipt_issuable(order) and load_mydata_config().issues_automatically()
+    ):
         dispatch_on_commit(generate_order_invoice, [order.id])
+    flag_a_movement_the_receipt_does_not_cover(order)
     # A receipt with movement indication registered before the pickup
     # reaches the customer now that the parcel left
-    # (``Invoice.awaits_the_parcel``). The email task sends it once.
+    # (``Invoice.awaits_the_parcel``). SHIPPED is committed, so this reads
+    # after it; ``send_invoice_to_mydata`` reads the order after it stores
+    # the MARK, so whichever comes second sends it. The email task sends
+    # it once, and only while it ``is_deliverable`` (one staff canceled as
+    # issued in error is not).
     if (
-        Invoice.objects.filter(order_id=order.id, mydata_mark__isnull=False)
+        Invoice.objects.filter(
+            order_id=order.id,
+            mydata_mark__isnull=False,
+            mydata_status=MyDataStatus.CONFIRMED,
+        )
         .exclude(movement={})
         .exists()
     ):
@@ -603,17 +623,23 @@ def settle_receipt_once_the_courier_answered(
         dispatch_on_commit(settle_canceled_receipt, [order.id])
 
 
-@receiver(order_canceled, dispatch_uid="order.hold_receipt_of_canceled_order")
-def hold_receipt_of_canceled_order(
+@receiver(order_canceled, dispatch_uid="order.settle_receipt_of_canceled_order")
+def settle_receipt_of_canceled_order(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """A carrier order canceled before its parcel left: its receipt is set
-    aside to be canceled in myDATA (``hold_receipt_for_cancel``), in the
-    cancel's own transaction so no credit is issued for it meanwhile, and
-    settled once the cancel committed (``settle_canceled_receipt``, again
-    by the ``retry_receipts_with_mydata`` sweep while the courier has not
+    """A carrier order canceled before its parcel left: the cancel set its
+    receipt aside under the order's lock
+    (``invoicing.hold_receipt_for_cancel``), and now that it committed the
+    receipt is settled (``settle_canceled_receipt``; again by the
+    ``retry_receipts_with_mydata`` sweep while the courier has not
     answered)."""
-    if hold_receipt_for_cancel(order):
+    if (
+        Invoice.objects.filter(
+            order_id=order.id, cancel_requested_at__isnull=False
+        )
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .exists()
+    ):
         dispatch_on_commit(settle_canceled_receipt, [order.id])
 
 

@@ -18,11 +18,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='invoice',
             name='movement',
-            field=models.JSONField(blank=True, db_default={}, default=dict, help_text='The movement indication the receipt was sent to myDATA with: dispatch date and time, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier).', verbose_name='Movement'),
+            field=models.JSONField(blank=True, db_default={}, default=dict, help_text='The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address. Empty for a receipt without one (an order that does not move through a carrier).', verbose_name='Movement'),
         ),
         migrations.AddField(
             model_name='invoice',
             name='transmission_failed_at',
-            field=models.DateTimeField(blank=True, help_text="When the receipt, which carries a movement indication, could not be transmitted to myDATA because AADE did not answer. It is then sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered, and the parcel ships meanwhile.", null=True, verbose_name='Issued Without Connection At'),
+            field=models.DateTimeField(blank=True, help_text="When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered.", null=True, verbose_name='Parcel Left Unregistered At'),
         ),
     ]

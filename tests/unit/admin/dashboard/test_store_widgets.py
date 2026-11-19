@@ -597,6 +597,49 @@ class TestAlerts:
             "Set the dispatch point for courier receipts" in titles
         ) is shown
 
+    @pytest.mark.parametrize(
+        ("held_minutes_ago", "status", "shown"),
+        [
+            pytest.param(60, "CONFIRMED", True, id="held-an-hour"),
+            pytest.param(60, "REJECTED", True, id="held-and-refused"),
+            pytest.param(1, "CONFIRMED", False, id="just-held"),
+            pytest.param(60, "CANCELED", False, id="canceled-in-mydata"),
+        ],
+    )
+    def test_receipts_of_canceled_orders_left_uncanceled_are_counted(
+        self, bind_tenant, held_minutes_ago, status, shown
+    ):
+        """Set aside when its order was canceled before the parcel left and
+        normally canceled in myDATA within minutes (``settle_canceled_
+        receipt``); one still waiting after the sweep's interval is shown
+        like the other myDATA alerts."""
+        from datetime import timedelta
+
+        from order.models.invoice import Invoice
+        from tests.utils.staff import store_tenant
+
+        Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000747",
+            mydata_status=status,
+            cancel_requested_at=timezone.now()
+            - timedelta(minutes=held_minutes_ago),
+        )
+
+        titles = self._mydata_titles(
+            store_tenant(
+                f"widget_held_{held_minutes_ago}_{status.lower()}",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+        )
+
+        assert (
+            "Receipts of canceled orders not canceled in myDATA" in titles
+        ) is shown
+
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch
     ):

@@ -26,6 +26,7 @@ from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataTransportError,
 )
+from order.accounting.mydata.types import ERROR_DUPLICATE_UID, ERROR_NO_ANSWER
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
@@ -176,7 +177,7 @@ class TestTheReceiptCarriesTheMovement:
         movement = ReceiptMovement.from_json(invoice.movement)
         assert movement.delivery.postal_code == "10563"
         assert movement.loading.city == "Κηφισιά"
-        assert movement.dispatch_date >= timezone.localdate()
+        assert movement.dispatch_date == timezone.localdate()
 
     def test_the_registered_pdf_prints_the_movement(
         self, django_capture_on_commit_callbacks
@@ -247,33 +248,50 @@ class TestTheReceiptCarriesTheMovement:
         assert not sent.is_delivery_note
         assert invoice.movement == {}
 
+    def test_it_is_dated_the_day_it_is_issued(self):
+        """The day the voucher is created: never the next business day after
+        the cutoff, which would date the document after the movement
+        started, and never earlier, which AADE refuses (error 280)."""
+        movement = receipt_movement(Invoice(order=_acs_order(), movement={}))
+
+        assert movement.dispatch_date == timezone.localdate()
+
     def test_a_document_sent_is_sent_again_as_issued(self):
         """Its dispatch date included, even once past: AADE says nothing
         of error 280 for a ``transmissionFailure`` document, which was
-        issued during the outage."""
+        issued during the outage. Only a refusal of its content rebuilds
+        it; error 228 means AADE holds it as it was sent."""
         order = _acs_order()
         stored = receipt_movement(Invoice(order=order, movement={}))
         past = ReceiptMovement(
             dispatch_date=timezone.localdate() - timedelta(days=2),
-            dispatch_time=None,
             loading=stored.loading,
             delivery=stored.delivery,
         )
 
-        sent = Invoice(
-            order=order,
-            movement=past.as_json(),
-            mydata_status=MyDataStatus.SUBMITTED,
-        )
-        refused = Invoice(
-            order=order,
-            movement=past.as_json(),
-            mydata_status=MyDataStatus.REJECTED,
-        )
+        def sent_as(status, code=""):
+            return Invoice(
+                order=order,
+                movement=past.as_json(),
+                mydata_status=status,
+                mydata_error_code=code,
+            )
 
-        assert receipt_movement(sent) == past
+        assert receipt_movement(sent_as(MyDataStatus.SUBMITTED)) == past
+        assert (
+            receipt_movement(
+                sent_as(MyDataStatus.REJECTED, ERROR_DUPLICATE_UID)
+            )
+            == past
+        )
         # AADE refused it, so nothing was registered: it is built anew.
-        assert receipt_movement(refused).dispatch_date >= timezone.localdate()
+        for code in ("XSD", "BUILD", "101"):
+            assert (
+                receipt_movement(
+                    sent_as(MyDataStatus.REJECTED, code)
+                ).dispatch_date
+                == timezone.localdate()
+            )
 
     def test_shipping_it_later_issues_nothing_again(
         self, django_capture_on_commit_callbacks
@@ -409,17 +427,20 @@ def _untouched_for_a_while(invoice) -> None:
 
 @pytest.mark.usefixtures("dispatch_point")
 class TestWhenMyDataDoesNotAnswer:
-    def test_the_receipt_is_issued_under_the_loss_of_connection_procedure(
+    def test_one_unanswered_send_is_no_loss_of_connection(
         self, django_capture_on_commit_callbacks
     ):
+        """While the parcel is with the store the receipt is only a send
+        that went unanswered: no indication is stamped on it."""
         invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
 
         assert invoice.invoice_number
         assert invoice.mydata_mark is None
-        assert invoice.transmission_failed_at is not None
+        assert invoice.transmission_failed_at is None
         assert invoice.mydata_status == MyDataStatus.SUBMITTED
+        assert invoice.mydata_error_code == ERROR_NO_ANSWER
 
-    def test_the_sweep_sends_it_again_as_issued_with_the_indication(
+    def test_the_sweep_sends_it_again_plainly_while_the_parcel_is_here(
         self, django_capture_on_commit_callbacks
     ):
         invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
@@ -435,11 +456,61 @@ class TestWhenMyDataDoesNotAnswer:
 
         assert queued == 1
         [sent] = aade.receipts
-        assert sent.transmission_failure == "3"
+        assert sent.transmission_failure is None
         assert sent.is_delivery_note
         invoice.refresh_from_db()
         assert invoice.mydata_mark is not None
         assert invoice.movement == issued
+
+    def test_once_the_parcel_leaves_unregistered_every_send_says_so(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Α.1233/2026 annex §12.1: its movement started during the loss
+        of connection, so from the moment the parcel leaves, every
+        transmission carries ``transmissionFailure`` 3."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        invoice.refresh_from_db()
+        assert invoice.transmission_failed_at is not None
+        # Sent at once, with the indication.
+        [sent] = aade.receipts
+        assert sent.transmission_failure == "3"
+        assert invoice.mydata_mark is not None
+
+    def test_a_send_unanswered_after_the_parcel_left_is_stamped_too(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The parcel left while a send was in flight (its intent had
+        cleared the unanswered mark), and that send then went unanswered:
+        whichever of the two comes second stamps the receipt."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataTransportError("connection refused"),
+            ),
+            patch.object(send_invoice_to_mydata, "max_retries", 0),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            # SHIPPED finds no unanswered send, and sends the receipt
+            # again; that send goes unanswered too.
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_error_code == ERROR_NO_ANSWER
+        assert invoice.transmission_failed_at is not None
 
     def test_a_resend_finds_the_mark_of_a_send_that_registered(
         self, django_capture_on_commit_callbacks
@@ -841,14 +912,15 @@ class TestCanceledBeforeThePickup:
             )
             invoice.refresh_from_db()
             assert invoice.cancel_requested_at is not None
-            for _ in range(2):
-                _untouched_for_a_while(invoice)
-                with django_capture_on_commit_callbacks(execute=True):
-                    retry_receipts_with_mydata()
+            # Its registration queues the cancel at once.
+            _untouched_for_a_while(invoice)
+            with django_capture_on_commit_callbacks(execute=True):
+                retry_receipts_with_mydata()
 
         invoice.refresh_from_db()
         [sent] = aade.receipts
-        assert sent.transmission_failure == "3"
+        # The parcel never left: no loss-of-connection indication.
+        assert sent.transmission_failure is None
         assert invoice.mydata_status == MyDataStatus.CANCELED
         assert aade.cancelled == [invoice.mydata_mark]
         assert aade.credits == []
@@ -869,3 +941,321 @@ class TestCanceledBeforeThePickup:
         assert invoice.cancel_requested_at is None
         assert invoice.mydata_status == MyDataStatus.CONFIRMED
         assert aade.cancelled == []
+
+
+def _deferred_on_commit(func, using=None, robust=False):
+    """Django's own ``transaction.on_commit``: ``tests/conftest.py`` runs
+    commit hooks at once, and these tests need what happens before them."""
+    from django.db import transaction
+
+    transaction.get_connection(using).on_commit(func, robust)
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestWhatHappensBetweenTwoSteps:
+    """Second independent review of #760: what another worker can see or do
+    between two steps of a cancel, a send or an issue."""
+
+    def test_the_cancel_sets_the_receipt_aside_before_it_commits(
+        self, django_capture_on_commit_callbacks
+    ):
+        """No credit can be created for it, and no email sent, between the
+        cancel and its commit hooks: the hold is in the cancel itself."""
+        from order.models import RetailCredit
+        from order.tasks import send_invoice_email
+
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            with (
+                patch("django.db.transaction.on_commit", _deferred_on_commit),
+                django_capture_on_commit_callbacks(execute=False),
+                patch(
+                    "shipping.services.ShippingService.cancel_shipment",
+                    return_value=True,
+                ),
+            ):
+                OrderService.cancel_order(
+                    order, "changed my mind", customer_initiated=False
+                )
+                invoice.refresh_from_db()
+                assert invoice.cancel_requested_at is not None
+                # Another worker runs the credit and email tasks now.
+                issue_pending_credits(order.id)
+                send_invoice_email(order.id)
+
+        assert not RetailCredit.objects.filter(order=order).exists()
+        assert aade.credits == []
+
+    def test_a_receipt_not_for_the_customer_is_never_emailed(
+        self, django_capture_on_commit_callbacks, mailoutbox
+    ):
+        """The email task reads the receipt when it runs: a movement receipt
+        whose parcel has not left is not sent, whoever queued the email."""
+        from order.tasks import send_invoice_email
+
+        with mydata_enabled(), FakeAade():
+            invoice = _issue(_acs_order(), django_capture_on_commit_callbacks)
+            send_invoice_email(invoice.order_id)
+
+        assert not _emailed(mailoutbox, invoice)
+
+    def test_shipped_while_the_mark_was_stored_it_is_still_emailed(
+        self, django_capture_on_commit_callbacks, mailoutbox
+    ):
+        """SHIPPED commits after the order was loaded and before the MARK is
+        stored: its handler saw no MARK, so the send reads the order again
+        after storing it, and emails."""
+        from order.tasks import _submit_document_to_mydata
+
+        order = _acs_order()
+
+        def registered_then_shipped(task, order, document):
+            row = _submit_document_to_mydata(task, order, document)
+            type(order).objects.filter(pk=order.pk).update(
+                status=OrderStatus.SHIPPED, shipped_at=timezone.now()
+            )
+            return row
+
+        with (
+            mydata_enabled(),
+            FakeAade(),
+            patch(
+                "order.tasks._submit_document_to_mydata",
+                side_effect=registered_then_shipped,
+            ),
+        ):
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+
+        assert invoice.mydata_mark is not None
+        assert _emailed(mailoutbox, invoice)
+
+    def test_one_canceled_as_issued_in_error_is_not_emailed_at_shipped(
+        self, django_capture_on_commit_callbacks, mailoutbox
+    ):
+        order = _acs_order()
+        with mydata_enabled(), FakeAade():
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+            Invoice.objects.filter(pk=invoice.pk).update(
+                mydata_status=MyDataStatus.CANCELED
+            )
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        assert not _emailed(mailoutbox, invoice)
+
+    def test_an_order_canceled_since_it_was_read_gets_no_receipt(self):
+        """The issuing task read the order before the cancel committed; the
+        locked row decides."""
+        from order.accounting.invoicing import (
+            ReceiptNotIssuable,
+            generate_invoice,
+        )
+
+        order = _acs_order()
+        type(order).objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED
+        )
+
+        with mydata_enabled(), pytest.raises(ReceiptNotIssuable):
+            generate_invoice(order)
+
+        assert not Invoice.objects.filter(order=order).exists()
+
+    def test_a_sender_never_demotes_a_receipt_another_registered(
+        self, django_capture_on_commit_callbacks
+    ):
+        """A late retry holding the row as it was before the MARK: it sends
+        nothing, and the registered row stays as it is."""
+        from order.accounting.mydata.service import submit_document
+
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _issue(_acs_order(), django_capture_on_commit_callbacks)
+            stale = Invoice.objects.get(pk=invoice.pk)
+            stale.mydata_mark = None
+            stale.mydata_status = MyDataStatus.SUBMITTED
+
+            row = submit_document(stale)
+
+        assert row.invoice_mark == invoice.mydata_mark
+        assert len(aade.receipts) == 1
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert invoice.mydata_mark == row.invoice_mark
+
+    def test_a_228_after_another_sender_registered_it_is_no_refusal(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Two senders in flight: the other registers it while this one
+        waits, and AADE answers this one with error 228."""
+        from order.accounting.mydata.service import submit_document
+
+        order = _acs_order()
+        with mydata_enabled(), FakeAade():
+            invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        duplicate = (
+            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+            b"<index>1</index><statusCode>ValidationError</statusCode>"
+            b"<errors><error><message>duplicate</message><code>228</code>"
+            b"</error></errors></response></ResponseDoc>"
+        )
+
+        def the_other_sender_registers_it(xml_bytes):
+            Invoice.objects.filter(pk=invoice.pk).update(
+                mydata_status=MyDataStatus.CONFIRMED,
+                mydata_mark=400000000000999,
+            )
+            return duplicate
+
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+        invoice.refresh_from_db()
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=the_other_sender_registers_it,
+            ),
+            patch(
+                "order.accounting.mydata.service.recover_mark_for_document",
+                return_value=False,
+            ),
+        ):
+            row = submit_document(invoice)
+
+        assert row.invoice_mark == 400000000000999
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert invoice.mydata_error_code == ""
+
+    def test_two_settles_of_one_receipt_send_one_cancel(
+        self, django_capture_on_commit_callbacks
+    ):
+        """A second settle while the first waits for AADE (the sweep, the
+        courier's answer) returns at once: one CancelInvoice, and no
+        "already canceled" error left on the receipt."""
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            _staff_cancel(
+                order,
+                django_capture_on_commit_callbacks,
+                settle=False,
+                return_value=True,
+            )
+            answer = aade._cancel
+            second = []
+
+            def cancel_while_another_settles(mark, **kwargs):
+                if not second:
+                    second.append(settle_canceled_receipt(order.id))
+                return answer(mark, **kwargs)
+
+            with (
+                patch(
+                    "order.accounting.mydata.client.MyDataClient."
+                    "cancel_invoice",
+                    side_effect=cancel_while_another_settles,
+                ) as cancel,
+                django_capture_on_commit_callbacks(execute=True),
+            ):
+                assert settle_canceled_receipt(order.id) == "canceled"
+
+        assert second == ["settling_elsewhere"]
+        assert cancel.call_count == 1
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CANCELED
+        assert invoice.mydata_error_message == ""
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestARefusedReceiptOfACanceledOrder:
+    def test_it_is_set_aside_and_canceled_once_staff_correct_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Never registered, never handed out: set aside like any other,
+        staff are told to correct it, and once it is registered it is
+        canceled in myDATA, with no credit."""
+        refusal = (
+            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+            b"<index>1</index><statusCode>ValidationError</statusCode>"
+            b"<errors><error><message>bad</message><code>101</code>"
+            b"</error></errors></response></ResponseDoc>"
+        )
+        order = _cod_order()
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                return_value=refusal,
+            ),
+        ):
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+        assert invoice.mydata_status == MyDataStatus.REJECTED
+
+        with mydata_enabled(), FakeAade() as aade:
+            _staff_cancel(
+                order, django_capture_on_commit_callbacks, return_value=True
+            )
+            invoice.refresh_from_db()
+            assert invoice.cancel_requested_at is not None
+            assert any("Correct it" in note for note in _notes(order))
+            # Staff correct it and send it again.
+            with django_capture_on_commit_callbacks(execute=True):
+                send_invoice_to_mydata(order.id)
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CANCELED
+        assert aade.cancelled == [invoice.mydata_mark]
+        assert aade.credits == []
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestAMovementTheReceiptDoesNotCover:
+    """The voucher made again after the receipt was registered: staff are
+    told at SHIPPED, when the movement that took place is known."""
+
+    def test_a_parcel_sent_elsewhere_is_flagged(
+        self, django_capture_on_commit_callbacks, caplog
+    ):
+        order = _acs_order()
+        with mydata_enabled(), FakeAade():
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+            type(order).objects.filter(pk=order.pk).update(
+                street="Πατησίων", street_number="20", zipcode="10677"
+            )
+            order.refresh_from_db()
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        [note] = [n for n in _notes(order) if "movement indication" in n]
+        assert invoice.invoice_number in note
+        assert "Ερμού 10, 10563 Αθήνα" in note
+        assert "Πατησίων 20, 10677 Αθήνα" in note
+        assert any(r.levelname == "ERROR" for r in caplog.records)
+
+    def test_a_parcel_that_left_too_late_is_flagged(
+        self, django_capture_on_commit_callbacks
+    ):
+        order = _acs_order()
+        with mydata_enabled(), FakeAade():
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+            Invoice.objects.filter(pk=invoice.pk).update(
+                issue_date=timezone.localdate() - timedelta(days=6)
+            )
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        assert any("6 days after" in note for note in _notes(order))
+
+    def test_the_movement_as_declared_is_not_flagged(
+        self, django_capture_on_commit_callbacks
+    ):
+        order = _acs_order()
+        with mydata_enabled(), FakeAade():
+            _issue(order, django_capture_on_commit_callbacks)
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        assert not any("movement indication" in n for n in _notes(order))

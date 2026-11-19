@@ -12,29 +12,35 @@ addresses (myDATA REST API v2.0.2, §5.3 and §5.3.2), and Α.1122/2024 art.
 3(1) has it transmitted «πριν την έναρξη διακίνησης»: it is issued when the
 carrier's voucher or parcel is created (``order.tasks.issue_receipt_for_pickup``).
 Shipping never waits for AADE: a receipt myDATA does not answer for is sent
-with AADE's loss-of-connection indication (``transmissionFailure`` 3,
-``Invoice.transmission_failed_at``) and transmitted again when it answers.
+again as issued, and once its parcel leaves unregistered it is a document
+whose movement started during a loss of connection, sent from then on with
+AADE's indication (``transmissionFailure`` 3,
+``Invoice.transmission_failed_at``, :func:`parcel_left_unregistered`).
 
 The block is decided when the receipt is first sent and stored on the row
 (``Invoice.movement``), so the registered PDF prints what AADE received,
 and a resubmission sends the document as issued (``receipt_movement``).
 It applies only once the store has set its dispatch point
-(``movement_receipts_on``).
+(``movement_receipts_on``). A voucher made again after the receipt was
+issued can move the parcel elsewhere, or later, than it declares; staff
+are told when it leaves (:func:`flag_a_movement_the_receipt_does_not_cover`).
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import asdict, dataclass
-from datetime import date, time
+from datetime import date
 from typing import Any
 
 from django.utils import timezone
 
 from core.store_settings import store_settings
-from shipping.delivery import configured_cutoff, dispatch_date
 from shipping.interfaces import PostalAddress
 from shipping.services import ShippingService
+
+logger = logging.getLogger(__name__)
 
 #: The store settings naming the dispatch point (Τόπος Φόρτωσης), in the
 #: order of AADE's ``AddressType``.
@@ -101,19 +107,19 @@ def movement_receipts_on(order: Any) -> bool:
 class ReceiptMovement:
     """What a receipt with movement indication declares about the parcel."""
 
+    #: The day the movement starts as the receipt declares it: the day it
+    #: is issued, which is the day the voucher or parcel is created
+    #: (``order.tasks.issue_receipt_for_pickup``). Never a later day: a
+    #: document dated after the real start of the movement misstates it.
+    #: Never an earlier one: AADE refuses a ``dispatchDate`` before the
+    #: current date (error 280).
     dispatch_date: date
-    #: The planned start, as the store states it (``DISPATCH_CUTOFF``);
-    #: optional at issue in phase A of AADE's annex.
-    dispatch_time: time | None
     loading: PostalAddress
     delivery: PostalAddress
 
     def as_json(self) -> dict[str, Any]:
         return {
             "dispatch_date": self.dispatch_date.isoformat(),
-            "dispatch_time": self.dispatch_time.strftime("%H:%M")
-            if self.dispatch_time
-            else "",
             "loading": asdict(self.loading),
             "delivery": asdict(self.delivery),
         }
@@ -122,23 +128,23 @@ class ReceiptMovement:
     def from_json(cls, data: dict[str, Any]) -> ReceiptMovement:
         return cls(
             dispatch_date=date.fromisoformat(data["dispatch_date"]),
-            dispatch_time=time.fromisoformat(data["dispatch_time"])
-            if data["dispatch_time"]
-            else None,
             loading=PostalAddress(**data["loading"]),
             delivery=PostalAddress(**data["delivery"]),
         )
 
 
-def _planned_dispatch(order: Any) -> tuple[date, time | None]:
-    """When the parcel is planned to leave: the order's dispatch day as the
-    storefront promises it (``shipping.delivery.dispatch_date`` from now),
-    at the cutoff. An order that already left (a receipt issued late) is
-    dated today, the earliest AADE accepts."""
-    if order.shipped_at is not None:
-        return timezone.localdate(), None
-    cutoff = configured_cutoff()
-    return dispatch_date(timezone.now(), cutoff), cutoff
+def refused_for_its_content(invoice: Any) -> bool:
+    """Whether AADE refused *invoice* for what it says (a validation code,
+    or our own check before sending: ``BUILD``, ``XSD``), so nothing of it
+    was registered and it may be built anew. Error 228 is no such refusal:
+    AADE holds the document under that uid already, as it was sent."""
+    from order.accounting.mydata.types import ERROR_DUPLICATE_UID
+    from order.models.invoice import MyDataStatus
+
+    return (
+        invoice.mydata_status == MyDataStatus.REJECTED
+        and invoice.mydata_error_code != ERROR_DUPLICATE_UID
+    )
 
 
 def receipt_movement(invoice: Any) -> ReceiptMovement | None:
@@ -147,17 +153,17 @@ def receipt_movement(invoice: Any) -> ReceiptMovement | None:
     delivery), or the store has not set its dispatch point.
 
     A block already sent is the document as issued and is sent again as it
-    is, its dispatch date included, unless AADE refused it: a send that
-    went unanswered may have been registered. AADE's documentation says
-    nothing of error 280 (a ``dispatchDate`` before the current date) for a
-    document sent with ``transmissionFailure``, so a receipt issued during
-    an outage keeps the date it was issued with.
+    is, its dispatch date included, unless AADE refused it for its content
+    (:func:`refused_for_its_content`): a send that went unanswered, or one
+    AADE answered with error 228, may be registered as it was. AADE's
+    documentation says nothing of error 280 (a ``dispatchDate`` before the
+    current date) for a document sent with ``transmissionFailure``, so a
+    receipt whose parcel left while myDATA was unreachable keeps the date
+    it was issued with.
 
     Raises ``ValueError`` when the pickup point's address is not known.
     """
-    from order.models.invoice import MyDataStatus
-
-    if invoice.movement and invoice.mydata_status != MyDataStatus.REJECTED:
+    if invoice.movement and not refused_for_its_content(invoice):
         return ReceiptMovement.from_json(invoice.movement)
     order = invoice.order
     loading = loading_address()
@@ -166,10 +172,119 @@ def receipt_movement(invoice: Any) -> ReceiptMovement | None:
     delivery = ShippingService.delivery_address(order)
     if delivery is None:
         return None
-    planned_date, planned_time = _planned_dispatch(order)
     return ReceiptMovement(
-        dispatch_date=planned_date,
-        dispatch_time=planned_time,
+        dispatch_date=timezone.localdate(),
         loading=loading,
         delivery=delivery,
+    )
+
+
+#: Α.1123/2024 art. 7(1), as replaced by Α.1233/2026: the movement a
+#: document declares starts at most this many days after it is issued.
+MOVEMENT_START_MAX_DAYS = 5
+
+
+def parcel_left_unregistered(order_id: int) -> bool:
+    """The order's parcel left (SHIPPED) while its receipt with movement,
+    sent, had no answer from AADE: from now on the receipt is a document
+    whose movement started during a loss of connection (Α.1233/2026 annex
+    §12.1), so ``Invoice.transmission_failed_at`` is stamped and every
+    later transmission carries ``transmissionFailure`` 3. Returns whether
+    a receipt was stamped, for the caller to send it at once.
+
+    Not before: while the parcel is still with the store, a send that went
+    unanswered is sent again plainly (``ERROR_NO_ANSWER``). Not for a
+    receipt AADE refused or whose credentials it refused: that is no loss
+    of connection. A send that goes unanswered after the parcel left is
+    stamped by ``service._persist_no_answer``, so whichever comes second
+    stamps it."""
+    from order.accounting.mydata.types import ERROR_NO_ANSWER
+    from order.models.invoice import Invoice, MyDataStatus
+
+    now = timezone.now()
+    return bool(
+        Invoice.objects.filter(
+            order_id=order_id,
+            mydata_mark__isnull=True,
+            mydata_status=MyDataStatus.SUBMITTED,
+            mydata_error_code=ERROR_NO_ANSWER,
+            transmission_failed_at__isnull=True,
+        )
+        .exclude(movement={})
+        .update(transmission_failed_at=now, updated_at=now)
+    )
+
+
+def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
+    """The parcel left: tell staff when its receipt, sent with movement
+    indication, does not describe the movement that took place, which
+    happens when the voucher was made again after the receipt was issued.
+
+    - The parcel goes to another place than the receipt declares (a new
+      locker, station or address on the new voucher).
+    - It left more than ``MOVEMENT_START_MAX_DAYS`` after the receipt was
+      issued, later than the law lets a document's movement start.
+
+    The receipt is not touched: it is AADE's record of the sale, and how
+    the movement is documented then (a new document, or a correction) is
+    the accountant's call. An ERROR line raises the logged-errors alert,
+    and the order note says what differs. A receipt AADE refused for its
+    content is built anew when it is sent again, from the voucher as it is
+    then, so it is left out, as is one canceled in myDATA.
+    """
+    from order.models.history import OrderHistory
+    from order.models.invoice import Invoice, MyDataStatus
+
+    invoice = (
+        Invoice.objects.filter(order_id=order.pk)
+        .exclude(movement={})
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .first()
+    )
+    if invoice is None or refused_for_its_content(invoice):
+        return
+    declared = ReceiptMovement.from_json(invoice.movement)
+    problems = []
+    try:
+        actual = ShippingService.delivery_address(order)
+    except ValueError:
+        actual = None
+    if actual is not None and actual != declared.delivery:
+        problems.append(
+            f"it declares delivery to {_one_line(declared.delivery)}, but "
+            f"the parcel goes to {_one_line(actual)}"
+        )
+    shipped_on = timezone.localdate(order.shipped_at or timezone.now())
+    days = (shipped_on - invoice.issue_date).days
+    if days > MOVEMENT_START_MAX_DAYS:
+        problems.append(
+            f"the parcel left {days} days after it was issued, more than "
+            f"the {MOVEMENT_START_MAX_DAYS} days within which the movement "
+            "it declares must start"
+        )
+    if not problems:
+        return
+    logger.error(
+        "Order %s: receipt %s does not cover the movement of its parcel: %s",
+        order.pk,
+        invoice.invoice_number,
+        "; ".join(problems),
+    )
+    OrderHistory.log_note(
+        order=order,
+        note=(
+            f"Receipt {invoice.invoice_number} was issued with movement "
+            f"indication, but {'; and '.join(problems)}. The voucher was "
+            "made again after the receipt was issued. Ask the store's "
+            "accountant how to document this movement."
+        ),
+    )
+
+
+def _one_line(address: PostalAddress) -> str:
+    street = " ".join(part for part in (address.street, address.number) if part)
+    return ", ".join(
+        part
+        for part in (street, f"{address.postal_code} {address.city}")
+        if part
     )

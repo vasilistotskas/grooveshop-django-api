@@ -18,7 +18,7 @@ Invoices (1.1) and credit invoices (5.1) are not built here: AADE decision
 
 The receipt of an order that moves through a carrier also carries its
 movement indication (``order.accounting.movement``): ``dispatchDate``,
-``dispatchTime``, ``movePurpose``, ``otherDeliveryNoteHeader`` (loading and
+``movePurpose``, ``otherDeliveryNoteHeader`` (loading and
 delivery address) and ``isDeliveryNote`` in the header, and the quantity
 and its unit on each goods line. Shipping and the payment fee are no
 goods, so their lines carry none.
@@ -570,14 +570,12 @@ def _build(
 
 def _emit_movement(header: Element, movement: ReceiptMovement) -> None:
     """The header's movement indication, in the schema's order:
-    ``dispatchDate``, ``dispatchTime`` and ``movePurpose`` after
-    ``currency``, then ``otherDeliveryNoteHeader`` and ``isDeliveryNote``
-    (``InvoiceHeaderType``, v2.0.2)."""
+    ``dispatchDate`` and ``movePurpose`` after ``currency``, then
+    ``otherDeliveryNoteHeader`` and ``isDeliveryNote``
+    (``InvoiceHeaderType``, v2.0.2). No ``dispatchTime``: optional in
+    phase A of AADE's annex, and when the courier collects the parcel is
+    not known when the receipt is issued."""
     SubElement(header, "dispatchDate").text = movement.dispatch_date.isoformat()
-    if movement.dispatch_time is not None:
-        SubElement(
-            header, "dispatchTime"
-        ).text = movement.dispatch_time.isoformat(timespec="seconds")
     SubElement(header, "movePurpose").text = str(MOVE_PURPOSE_SALE)
     other = SubElement(header, "otherDeliveryNoteHeader")
     _emit_address(other, "loadingAddress", movement.loading)

@@ -14,8 +14,9 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
+
+from tests.utils.migrations import migrate_to
 
 BEFORE = ("product", "0048_field_verbose_names")
 AFTER = ("product", "0050_backfill_price_spells")
@@ -26,13 +27,6 @@ NOW = datetime.now(tz=UTC)
 def _settle_deferred_constraints():
     with connection.cursor() as cursor:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-
-
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
 
 
 class TestBackfillMigration(TestCase):
@@ -75,10 +69,10 @@ class TestBackfillMigration(TestCase):
         return Vat.objects.get_or_create(value=Decimal(value))[0].pk
 
     def _run(self, **kwargs):
-        before = _migrate_to(BEFORE)
+        before = migrate_to(BEFORE)
         vat_id = self._vat(before)
         pk = self._product(before, vat_id=vat_id, **kwargs)
-        after = _migrate_to(AFTER)
+        after = migrate_to(AFTER)
         Spell = after.get_model("product", "ProductPriceSpell")
         Product = after.get_model("product", "Product")
         return (
@@ -131,7 +125,7 @@ class TestBackfillMigration(TestCase):
         self.assertIsNotNone(product.reduction_started_at)
 
     def test_running_it_twice_adds_nothing(self):
-        before = _migrate_to(BEFORE)
+        before = migrate_to(BEFORE)
         vat_id = self._vat(before)
         pk = self._product(
             before,
@@ -139,7 +133,7 @@ class TestBackfillMigration(TestCase):
             discount=Decimal(0),
             vat_id=vat_id,
         )
-        after = _migrate_to(AFTER)
+        after = migrate_to(AFTER)
         from importlib import import_module
 
         module = import_module("product.migrations.0050_backfill_price_spells")
@@ -150,7 +144,7 @@ class TestBackfillMigration(TestCase):
         self.assertEqual(Spell.objects.filter(product_id=pk).count(), 1)
 
     def test_the_old_columns_are_untouched_and_it_reverses(self):
-        before = _migrate_to(BEFORE)
+        before = migrate_to(BEFORE)
         vat_id = self._vat(before)
         pk = self._product(
             before,
@@ -158,9 +152,9 @@ class TestBackfillMigration(TestCase):
             discount=Decimal(0),
             vat_id=vat_id,
         )
-        _migrate_to(AFTER)
+        migrate_to(AFTER)
 
-        back = _migrate_to(BEFORE)
+        back = migrate_to(BEFORE)
 
         Product = back.get_model("product", "Product")
         self.assertEqual(
@@ -177,7 +171,7 @@ class TestRepriceMigration(TestCase):
     marked-down product's current price dropped and is recorded as such."""
 
     def _setup(self, *, price, discount, spell_price, started_days=90):
-        before = _migrate_to(REPRICE_BEFORE)
+        before = migrate_to(REPRICE_BEFORE)
         Vat = before.get_model("vat", "Vat")
         Product = before.get_model("product", "Product")
         Spell = before.get_model("product", "ProductPriceSpell")
@@ -201,7 +195,7 @@ class TestRepriceMigration(TestCase):
         return product.pk
 
     def _after(self, pk):
-        after = _migrate_to(REPRICE_AFTER)
+        after = migrate_to(REPRICE_AFTER)
         Spell = after.get_model("product", "ProductPriceSpell")
         Product = after.get_model("product", "Product")
         return (
@@ -256,7 +250,7 @@ class TestRepriceMigration(TestCase):
             discount=Decimal(10),
             spell_price=Decimal("34.20"),
         )
-        after = _migrate_to(REPRICE_AFTER)
+        after = migrate_to(REPRICE_AFTER)
         from importlib import import_module
 
         import_module(

@@ -21,10 +21,10 @@ from __future__ import annotations
 import importlib
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
 
 from tenant.models import Tenant
+from tests.utils.migrations import migrate
 
 SCHEMA_NAME = "seo_migration_test"
 
@@ -50,16 +50,11 @@ def _state_before_copy(app_label: str, target: str):
     leaf: a later migration of another app that depends on one of
     ``app_label``'s newer migrations is rolled back with it, and naming
     its leaf would pull ``app_label`` forward again."""
-    executor = MigrationExecutor(connection)
-    executor.migrate([(app_label, target)])
-    executor.loader.build_graph()
-    graph = executor.loader.graph
+    loader = migrate((app_label, target))
     applied = [
-        node
-        for node in executor.loader.applied_migrations
-        if node in graph.nodes
+        node for node in loader.applied_migrations if node in loader.graph.nodes
     ]
-    return executor.loader.project_state(applied).apps
+    return loader.project_state(applied).apps
 
 
 class TestProductSeoMigration(TestCase):

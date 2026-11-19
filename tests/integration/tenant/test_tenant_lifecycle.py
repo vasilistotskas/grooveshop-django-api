@@ -146,6 +146,39 @@ class TestActivateTenant:
         tenant.refresh_from_db()
         assert tenant.suspended_at is None
 
+    def test_activating_a_suspended_store_queues_its_search_sync(self):
+        """Its indexes missed the deploys' settings and the daily sync."""
+        from core.tasks import sync_meilisearch_indexes
+        from tenant.lifecycle import activate_tenant
+
+        tenant = store_tenant(
+            "activate_search",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=2),
+        )
+
+        with patch("tenant.celery.dispatch_on_commit") as dispatch:
+            activate_tenant(tenant)
+
+        assert (
+            (sync_meilisearch_indexes,),
+            {"schema_name": "activate_search"},
+        ) in [(c.args, c.kwargs) for c in dispatch.call_args_list]
+
+    def test_activating_an_active_store_queues_no_search_sync(self):
+        from core.tasks import sync_meilisearch_indexes
+        from tenant.lifecycle import activate_tenant
+
+        tenant = store_tenant("activate_already_active")
+
+        with patch("tenant.celery.dispatch_on_commit") as dispatch:
+            activate_tenant(tenant)
+
+        assert all(
+            sync_meilisearch_indexes not in c.args
+            for c in dispatch.call_args_list
+        )
+
     def test_activate_skips_protected_tenants(self):
         tenant = store_tenant(
             "activate_guard",
@@ -412,6 +445,62 @@ class TestDestroyWaitsForTheStoresTasks:
         with connection.cursor() as cursor:
             cursor.execute("SELECT current_setting('lock_timeout')")
             assert cursor.fetchone() == (before,)
+
+    def test_a_store_the_gates_refuse_is_refused_without_waiting(self, worker):
+        """A live store always has tasks running: its refusal is its gate,
+        not ``busy`` after the wait."""
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant("destroy_live_busy")
+        self._run_a_task_in(worker, tenant.schema_name)
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=200),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "not_suspended"
+        mock_delete.assert_not_called()
+
+    def test_the_wait_ends_as_busy_under_a_statement_timeout(self, worker):
+        """Outside CI the connection's ``statement_timeout`` is as long as
+        the wait: the wait must still end as a refusal, not a cancelled
+        query."""
+        from django.db import connection
+
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_busy_timeout",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT set_config('statement_timeout', '300ms', true)"
+            )
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=300),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "busy"
+        mock_delete.assert_not_called()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('statement_timeout')")
+            assert cursor.fetchone() == ("300ms",)
 
     def test_the_destroy_goes_ahead_once_the_task_ended(self, worker):
         from tenant.lifecycle import destroy_tenant

@@ -4,8 +4,10 @@ Reference for the commands under `src/meili/management/commands/`. Every command
 also accepts `--tenant <schema>` or `--all-tenants` (from `core.management.tenant_mixin`)
 unless stated otherwise; without either it runs against the schema bound to the current
 connection. `--all-tenants` reaches the active stores only: these commands call
-Meilisearch for each store, and a suspended store's index is brought back with a sync
-when it is reactivated (`TenantCommandMixin.include_suspended_stores`). Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
+Meilisearch for each store (`TenantCommandMixin.include_suspended_stores`). A suspended
+store's indexes miss the deploys' settings and the daily sync, so `activate_tenant`
+queues `core.tasks.sync_meilisearch_indexes` for the store when it reactivates it; that
+sync applies each index's settings before its documents. Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
 classmethod in `src/meili/models.py`.
 
 Run `uv run python manage.py <command> --help` for the authoritative option list.

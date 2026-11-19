@@ -130,8 +130,11 @@ def holding_store(schema_name: str) -> Generator[None]:
 
     Inside a transaction (a task called within one, or applied eagerly)
     the lock is the transaction's and ends with it. Otherwise it is the
-    session's, released when the task ends; a closed connection releases
-    it too.
+    session's, released when the task ends. A task that closes its
+    connection releases it then: closing ends the session, or under the
+    connection pool returns it, and the pool's ``reset``
+    (``settings.database._release_session_locks``) drops its advisory
+    locks.
     """
     key = _store_lock_key(schema_name)
     if connection.in_atomic_block:
@@ -165,7 +168,8 @@ def holding_store(schema_name: str) -> Generator[None]:
             )
         else:
             if not released:
-                # The task closed its connection, which released the lock.
+                # The task closed its connection, which released the lock
+                # (see the docstring).
                 logger.warning(
                     "TenantTask: no store lock left to release for schema=%s",
                     schema_name,
@@ -177,15 +181,21 @@ def hold_store_for_destroy(schema_name: str, *, wait: timedelta) -> bool:
 
     Waits up to *wait* for the tasks running in the store to end; ``False``
     when they did not. Tasks that start meanwhile wait for the transaction
-    to end (``holding_store``). The wait applies to this lock only: the
-    transaction's ``lock_timeout`` is put back afterwards.
+    to end (``holding_store``). For this one statement ``lock_timeout`` is
+    *wait* and ``statement_timeout`` is off, so the wait ends as a lock
+    timeout and never as the connection's statement timeout (30 s, the
+    same length, outside CI); both are put back afterwards.
     """
     key = _store_lock_key(schema_name)
     with connection.cursor() as cursor:
-        cursor.execute("SELECT current_setting('lock_timeout')")
-        (previous,) = cursor.fetchone()
         cursor.execute(
-            "SELECT set_config('lock_timeout', %s, true)",
+            "SELECT current_setting('lock_timeout'), "
+            "current_setting('statement_timeout')"
+        )
+        previous_lock, previous_statement = cursor.fetchone()
+        cursor.execute(
+            "SELECT set_config('lock_timeout', %s, true), "
+            "set_config('statement_timeout', '0', true)",
             [f"{int(wait.total_seconds() * 1000)}ms"],
         )
         try:
@@ -200,7 +210,9 @@ def hold_store_for_destroy(schema_name: str, *, wait: timedelta) -> bool:
             return False
         finally:
             cursor.execute(
-                "SELECT set_config('lock_timeout', %s, true)", [previous]
+                "SELECT set_config('lock_timeout', %s, true), "
+                "set_config('statement_timeout', %s, true)",
+                [previous_lock, previous_statement],
             )
     return True
 

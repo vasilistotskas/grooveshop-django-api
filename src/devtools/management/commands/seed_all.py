@@ -681,7 +681,7 @@ class Command(BaseCommand):
         current = getattr(db_connection, "schema_name", "public")
         if current == "public":
             tenants = list(
-                Tenant.objects.active().values_list("schema_name", flat=True)[
+                Tenant.objects.stores().values_list("schema_name", flat=True)[
                     :10
                 ]
             )

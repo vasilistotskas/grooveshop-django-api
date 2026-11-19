@@ -28,11 +28,29 @@ _db_options: dict = {
         "require" if PRODUCTION_PROFILE else "prefer",
     ),
 }
+
+
+def _release_session_locks(conn) -> None:
+    """The pool's ``reset``: a returned connection keeps no advisory lock.
+
+    Django's ``close()`` gives the server session back to the pool rather
+    than ending it, and a session-level advisory lock outlives that. A task
+    that closes its connection mid-run (``meilisearch_sync_all_indexes``)
+    would leave ``TenantTask``'s store lock on a pooled session that later
+    serves other work, and ``destroy_tenant`` would wait for it until the
+    pool retired the session. psycopg_pool runs this on every return; a
+    connection it leaves in a transaction is discarded, which ends its
+    locks too.
+    """
+    conn.execute("SELECT pg_advisory_unlock_all()")
+
+
 if DB_POOL_ENABLED:
     _db_options["pool"] = {
         "min_size": DB_POOL_MIN_SIZE,
         "max_size": DB_POOL_MAX_SIZE,
         "timeout": DB_POOL_TIMEOUT,
+        "reset": _release_session_locks,
     }
 
 DB_PASSWORD = getenv("DB_PASSWORD", "postgres")

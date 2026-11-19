@@ -705,9 +705,10 @@ def redispatch_deferred_tasks() -> dict[str, int]:
 
     A healthy sweep takes seconds and beat sends one a minute, so a sweep
     that finds the lock held is a sign of trouble and says so at WARNING,
-    with what is waiting. The connection pool resets nothing on a returned
-    connection, so a lock left held would stop every sweep until the pool
-    retires that connection: an unlock that releases nothing is an ERROR.
+    with what is waiting. A connection returned to the pool drops its
+    advisory locks (``settings.database._release_session_locks``), so a
+    lock never outlives its checkout; an unlock that releases nothing means
+    the sweep lost its session mid-run, and is an ERROR.
     """
     from django.db import connection
     from django.utils import timezone

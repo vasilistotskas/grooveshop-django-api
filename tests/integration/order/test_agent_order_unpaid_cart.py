@@ -23,12 +23,10 @@ What is pinned here:
 
 from __future__ import annotations
 
-import threading
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
-from django.db import connection
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -49,6 +47,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
@@ -413,35 +412,21 @@ class TestTwoAgentOrdersRacingForOneCart:
         checkout = _Cart()
         pay_way = _viva()
         acceptance = checkout_acceptance()
-        barrier = threading.Barrier(2)
-        placed: list[int] = []
-        refused: list[CartHasUnpaidOrderError] = []
-        failures: list[BaseException] = []
-
-        def submit():
-            try:
-                barrier.wait(timeout=30)
-                placed.append(
-                    OrderService.create_order_from_cart_offline(
-                        legal_acceptance=acceptance,
-                        cart=checkout.cart,
-                        shipping_address=checkout.address(),
-                        pay_way=pay_way,
-                        attribution=AGENT,
-                    ).pk
-                )
-            except CartHasUnpaidOrderError as exc:
-                refused.append(exc)
-            except BaseException as exc:
-                failures.append(exc)
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=submit) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=120)
+        placed, raised = race(
+            lambda: (
+                OrderService.create_order_from_cart_offline(
+                    legal_acceptance=acceptance,
+                    cart=checkout.cart,
+                    shipping_address=checkout.address(),
+                    pay_way=pay_way,
+                    attribution=AGENT,
+                ).pk
+            )
+        )
+        refused = [
+            exc for exc in raised if isinstance(exc, CartHasUnpaidOrderError)
+        ]
+        failures = [exc for exc in raised if exc not in refused]
 
         assert not failures, failures
         assert (len(placed), len(refused)) == (1, 1)

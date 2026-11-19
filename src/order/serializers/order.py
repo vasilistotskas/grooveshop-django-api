@@ -1027,6 +1027,7 @@ class OrderDetailSerializer(OrderSerializer):
             "payment_hold_expires_at",
             "payment_decided_by",
             "payment_awaits_review",
+            "agent_checkout",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,
@@ -1043,6 +1044,7 @@ class OrderDetailSerializer(OrderSerializer):
             "payment_hold_expires_at",
             "payment_decided_by",
             "payment_awaits_review",
+            "agent_checkout",
         )
 
 
@@ -1366,6 +1368,19 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "boolean). Empty dict / null when the customer declined "
             "marketing cookies; the CAPI dispatcher then skips the "
             "send."
+        ),
+    )
+
+    # ---------- The agent checkout ----------
+    # Sent by the agent gateway alone, and believed only beside its shared
+    # secret (``X-Internal-Gateway``), as ``attribution.agent_protocol``.
+    agent_checkout = serializers.UUIDField(
+        required=False,
+        write_only=True,
+        help_text=_(
+            "Set by the agent gateway: the id of its checkout. A checkout "
+            "places one order: a repeat with the same id is answered with "
+            "the order it placed, and creates nothing."
         ),
     )
 

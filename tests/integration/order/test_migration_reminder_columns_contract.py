@@ -10,8 +10,9 @@ again.
 from __future__ import annotations
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
+
+from tests.utils.migrations import migrate_to
 
 BEFORE = ("order", "0089_remove_german_translations")
 AFTER = ("order", "0090_order_drop_reminder_columns")
@@ -24,13 +25,6 @@ def _settle_deferred_constraints():
     which PostgreSQL refuses to ALTER around inside one transaction."""
     with connection.cursor() as cursor:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-
-
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
 
 
 def _columns() -> dict[str, tuple[str, str | None, str | None]]:
@@ -51,10 +45,10 @@ def _columns() -> dict[str, tuple[str, str | None, str | None]]:
 
 class TestReminderColumnsContract(TestCase):
     def test_the_columns_are_dropped_and_the_rest_stays(self):
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
         self.assertTrue(set(REMINDER_COLUMNS) <= set(_columns()))
 
-        _migrate_to(AFTER)
+        migrate_to(AFTER)
         columns = _columns()
 
         for name in REMINDER_COLUMNS:
@@ -62,20 +56,20 @@ class TestReminderColumnsContract(TestCase):
         self.assertIn("amount_due", columns)
 
     def test_an_order_survives_the_drop(self):
-        Order = _migrate_to(BEFORE).get_model("order", "Order")
+        Order = migrate_to(BEFORE).get_model("order", "Order")
         pk = Order.objects.create().pk
         _settle_deferred_constraints()
 
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
 
         self.assertTrue(Order.objects.filter(pk=pk).exists())
 
     def test_reverse_restores_the_shape_0084_left(self):
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
         pk = Order.objects.create().pk
         _settle_deferred_constraints()
 
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
         columns = _columns()
 
         self.assertEqual(columns["reminder_count"][:2], ("NO", "smallint"))

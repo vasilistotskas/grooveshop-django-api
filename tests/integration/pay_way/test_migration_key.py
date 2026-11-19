@@ -12,8 +12,9 @@ migration again.
 from __future__ import annotations
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
+
+from tests.utils.migrations import migrate_to
 
 BEFORE = ("pay_way", "0028_field_verbose_names")
 AFTER = ("pay_way", "0029_payway_key")
@@ -26,16 +27,9 @@ def _settle_deferred_constraints():
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
-
-
 class TestKeyMigration(TestCase):
     def _before(self):
-        apps = _migrate_to(BEFORE)
+        apps = migrate_to(BEFORE)
         return (
             apps.get_model("pay_way", "PayWay"),
             apps.get_model("pay_way", "PayWayTranslation"),
@@ -52,7 +46,7 @@ class TestKeyMigration(TestCase):
         return pay_way.pk
 
     def _after_key(self, pk: int) -> str:
-        apps = _migrate_to(AFTER)
+        apps = migrate_to(AFTER)
         return apps.get_model("pay_way", "PayWay").objects.get(pk=pk).key
 
     def test_the_el_name_becomes_the_key(self):
@@ -73,7 +67,7 @@ class TestKeyMigration(TestCase):
         self.assertEqual(self._after_key(pk), "")
 
     def test_the_translated_name_column_is_gone(self):
-        apps = _migrate_to(AFTER)
+        apps = migrate_to(AFTER)
         fields = {
             f.name
             for f in apps.get_model("pay_way", "PayWayTranslation")._meta.fields
@@ -82,7 +76,7 @@ class TestKeyMigration(TestCase):
         self.assertNotIn("name", fields)
 
     def test_reverse_writes_the_key_back_to_el(self):
-        apps = _migrate_to(AFTER)
+        apps = migrate_to(AFTER)
         PayWay = apps.get_model("pay_way", "PayWay")
         pk = PayWay.objects.create(
             provider_code="m_rev", key="BANK_TRANSFER"

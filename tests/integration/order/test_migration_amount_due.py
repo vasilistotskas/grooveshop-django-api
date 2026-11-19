@@ -20,6 +20,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
 
+from tests.utils.migrations import migrate_to
+
 BEFORE = ("order", "0069_order_payment_id_unique")
 AFTER = ("order", "0070_order_amount_due")
 
@@ -31,20 +33,13 @@ def _settle_deferred_constraints():
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
-
-
 def _migrate_forward():
     """Run the migration here: the test database is built at the latest
-    migration, so ``_migrate_to(AFTER)`` alone would apply nothing and
+    migration, so ``migrate_to(AFTER)`` alone would apply nothing and
     this module would be reading the build's result, not the SQL under
     test."""
-    _migrate_to(BEFORE)
-    return _migrate_to(AFTER)
+    migrate_to(BEFORE)
+    return migrate_to(AFTER)
 
 
 def _columns() -> dict[str, tuple[str, str | None]]:
@@ -70,10 +65,10 @@ class TestAmountDueMigration(TestCase):
         returns to it, so a test still starts at ``BEFORE`` and runs the
         migration under test itself.
         """
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
 
     def _before_order(self, owed, currency="EUR", **fields):
-        Order = _migrate_to(BEFORE).get_model("order", "Order")
+        Order = migrate_to(BEFORE).get_model("order", "Order")
         order = Order.objects.create(
             paid_amount=owed, paid_amount_currency=currency, **fields
         )
@@ -81,7 +76,7 @@ class TestAmountDueMigration(TestCase):
         return order.pk
 
     def _after_order(self, pk):
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
         return Order.objects.get(pk=pk)
 
     def test_the_amount_owed_is_carried_over(self):
@@ -117,7 +112,7 @@ class TestAmountDueMigration(TestCase):
         first = self._before_order(Decimal("5.00"))
         second = self._before_order(Decimal("7.25"))
 
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
 
         self.assertEqual(
             Order.objects.get(pk=first).amount_due.amount, Decimal("5.00")
@@ -168,11 +163,11 @@ class TestAmountDueMigration(TestCase):
         self.assertEqual(row.amount_due_currency, "EUR")
 
     def test_reverse_writes_the_amount_back_to_paid_amount(self):
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
         pk = Order.objects.create(amount_due=Decimal("12.50")).pk
         _settle_deferred_constraints()
 
-        Order = _migrate_to(BEFORE).get_model("order", "Order")
+        Order = migrate_to(BEFORE).get_model("order", "Order")
 
         self.assertEqual(
             Order.objects.get(pk=pk).paid_amount.amount, Decimal("12.50")

@@ -30,9 +30,12 @@ Rules both carriers share:
   `Order.add_tracking_info`, and the order's first tracking number issues
   the receipt with movement indication (`issue_receipt_for_pickup`) for a
   store whose receipts the platform issues and that has set its dispatch
-  point ([§7.4](fiscal-mydata.md)). Nothing in shipping waits for myDATA: a
-  receipt AADE does not answer for is issued under its loss-of-connection
-  procedure and sent again later.
+  point ([§7.4](fiscal-mydata.md)), dated the day the voucher is created.
+  Nothing in shipping waits for myDATA: a receipt AADE does not answer for
+  is sent again, and once its parcel leaves unregistered, with AADE's
+  loss-of-connection indication. A voucher made again after the receipt
+  was issued (a new locker or address, or days later) is flagged to staff
+  when the parcel leaves.
 - **One HTTP retry rule.** Both clients build their `requests` session
   with `carrier_session` (`src/shipping/carrier_http.py`), whose
   `CARRIER_RETRY` sends a request again only when it never connected

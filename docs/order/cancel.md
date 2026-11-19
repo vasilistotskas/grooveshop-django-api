@@ -130,10 +130,13 @@ platform issues the store's receipts, a courier or locker order's receipt
 (with movement indication) is registered when its voucher or parcel is
 created and handed to the customer only when the parcel leaves. So every
 cancel path above (customer, staff, the auto-cancel sweep, ACS's dead
-shipment) reaches `order_canceled`, whose receiver sets that receipt aside in
-the cancel's own transaction (`Invoice.cancel_requested_at`); no credit is
-issued for it meanwhile; a receipt that already has a credit document (money
-went back before the pickup) is not set aside and is credited for the rest.
+shipment) goes through `_cancel_order_locked`, which sets that receipt aside
+under its lock on the order row, before the save that asks for the credits
+(`invoicing.hold_receipt_for_cancel`, `Invoice.cancel_requested_at`): no
+credit can be created for it and no email sent between the cancel and the
+hold; a receipt that already has a credit document (money went back before
+the pickup) is not set aside and is credited for the rest. `order_canceled`,
+after the commit, queues the settle.
 Once the courier's answer is recorded (step 0 for a customer; step 4 or
 `finish_pending_shipment_cancels` otherwise, where `_record_shipment_cancel`
 sends `order_shipment_cancel_answered`), `order.tasks.settle_canceled_receipt`

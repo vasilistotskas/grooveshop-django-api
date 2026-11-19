@@ -43048,6 +43048,14 @@ components:
             add_payment_info}), ``consent`` (dict με boolean ``ads``). Κενό dict /
             null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI
             τότε παραλείπει την αποστολή.'
+        agentCheckout:
+          type: string
+          format: uuid
+          writeOnly: true
+          description: 'Ορίζεται από το agent gateway: το αναγνωριστικό της ολοκλήρωσης
+            αγοράς του. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη
+            με το ίδιο αναγνωριστικό απαντάται με την παραγγελία που δημιούργησε και
+            δεν δημιουργεί τίποτα.'
         attribution:
           allOf:
           - $ref: '#/components/schemas/OrderAttributionInputRequest'
@@ -43631,8 +43639,18 @@ components:
             paid, and the store reconciles it by hand. Do not offer a new payment
             link. False for any other order, including one whose mismatch the store
             has since settled, canceled or refunded.'
+        agentCheckout:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          title: Ολοκλήρωση αγοράς πράκτορα AI
+          description: 'Η ολοκλήρωση αγοράς του agent gateway που δημιούργησε αυτή
+            την παραγγελία. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη
+            της δημιουργίας της απαντάται με αυτή την παραγγελία.'
       required:
       - acsShipment
+      - agentCheckout
       - amountDue
       - appliedCouponCodes
       - attribution

@@ -36,7 +36,9 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-18 (one checkout total: `OrderQuoteService.quote`
+Last refresh: 2026-11-18 (an agent checkout places one order, and a repeat
+of its creation is answered with that order, [§3.2](creation.md); one
+checkout total: `OrderQuoteService.quote`
 behind `POST /cart/quote`, the payment intent and both creation paths, and
 an order created with `expectedTotal` exists only at that total,
 [§3.0](creation.md); before that 2026-11-16: a staff or system cancel asks the courier after it

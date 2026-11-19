@@ -16,6 +16,7 @@ import time
 from datetime import timedelta
 from email.utils import format_datetime
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import pytest
 import requests
@@ -34,7 +35,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
-from order.tasks import push_order_event_to_gateway
 from settings.schedule import SCHEDULE_PRESETS
 from tenant.models import Tenant
 from tests.utils.staff import store_tenant
@@ -223,7 +223,21 @@ class AttemptTests(TestCase):
                 "status": OrderStatus.PENDING.value,
                 "paymentStatus": PaymentStatus.PENDING.value,
                 "trackingNumber": "",
+                "agentCheckoutId": "",
             },
+        )
+
+    def test_the_body_names_the_agent_checkout_that_placed_the_order(
+        self, post
+    ):
+        post.return_value = _response(204)
+        checkout = uuid4()
+        Order.objects.filter(pk=self.order.pk).update(agent_checkout=checkout)
+
+        outbox.attempt(self.event().pk)
+
+        self.assertEqual(
+            post.call_args.kwargs["json"]["agentCheckoutId"], str(checkout)
         )
 
     def test_a_retry_sends_the_same_id_and_time(self, post):
@@ -776,34 +790,6 @@ class PurgeTests(TestCase):
         self.assertEqual(
             kept, {rows["recent delivered"].pk, rows["old pending"].pk}
         )
-
-
-@gateway
-@patch("agent.tasks.deliver_agent_order_event")
-class RemovedPushTaskTests(TestCase):
-    """The old task's messages, queued by the release before, still reach
-    the gateway through the outbox for one release."""
-
-    def test_an_agent_orders_change_is_recorded(self, task):
-        order = _order()
-
-        push_order_event_to_gateway(order.id)
-
-        self.assertEqual(
-            list(
-                AgentOrderEvent.objects.filter(order=order)
-                .order_by("occurred_at", "pk")
-                .values_list("event_type", flat=True)
-            ),
-            [EventType.CREATED, EventType.UPDATED],
-        )
-
-    def test_an_order_no_agent_placed_records_nothing(self, task):
-        order = _order(OrderSourceType.DIRECT)
-
-        push_order_event_to_gateway(order.id)
-
-        self.assertFalse(AgentOrderEvent.objects.filter(order=order).exists())
 
 
 def test_a_sweep_run_ends_before_the_next_one_starts():

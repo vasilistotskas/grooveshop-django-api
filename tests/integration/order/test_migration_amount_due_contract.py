@@ -18,8 +18,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
+
+from tests.utils.migrations import migrate_to
 
 BEFORE = ("order", "0070_order_amount_due")
 AFTER = ("order", "0071_order_drop_paid_amount_columns")
@@ -32,13 +33,6 @@ def _settle_deferred_constraints():
     which PostgreSQL refuses to ALTER around inside one transaction."""
     with connection.cursor() as cursor:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-
-
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
 
 
 def _columns() -> dict[str, tuple[str, str | None, int | None]]:
@@ -68,12 +62,12 @@ class TestPaidAmountContract(TestCase):
         returns to it, so a test still starts at ``BEFORE`` and runs the
         migration under test itself.
         """
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
 
     def _served_by_the_previous_release(self, paid, currency="EUR"):
         """An order its INSERT wrote: ``paid_amount`` set, ``amount_due``
         left at the database default."""
-        Order = _migrate_to(BEFORE).get_model("order", "Order")
+        Order = migrate_to(BEFORE).get_model("order", "Order")
         pk = Order.objects.create().pk
         _settle_deferred_constraints()
         with connection.cursor() as cursor:
@@ -86,7 +80,7 @@ class TestPaidAmountContract(TestCase):
         return pk
 
     def _written_by_the_current_release(self, due, paid=None):
-        Order = _migrate_to(BEFORE).get_model("order", "Order")
+        Order = migrate_to(BEFORE).get_model("order", "Order")
         pk = Order.objects.create(amount_due=due).pk
         _settle_deferred_constraints()
         if paid is not None:
@@ -98,7 +92,7 @@ class TestPaidAmountContract(TestCase):
         return pk
 
     def _after(self, pk):
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
         return Order.objects.get(pk=pk)
 
     def test_an_order_the_previous_release_wrote_keeps_what_it_owed(self):
@@ -130,7 +124,7 @@ class TestPaidAmountContract(TestCase):
         first = self._served_by_the_previous_release(Decimal("5.00"))
         second = self._served_by_the_previous_release(Decimal("7.25"))
 
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
 
         self.assertEqual(
             Order.objects.get(pk=first).amount_due.amount, Decimal("5.00")
@@ -152,16 +146,16 @@ class TestPaidAmountContract(TestCase):
         zero = self._served_by_the_previous_release(Decimal("0.00"))
         no_value = self._written_by_the_current_release(Decimal("0.00"))
 
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
 
         self.assertEqual(Order.objects.get(pk=zero).amount_due.amount, 0)
         self.assertEqual(Order.objects.get(pk=no_value).amount_due.amount, 0)
 
     def test_the_legacy_columns_are_dropped_and_the_new_ones_stay(self):
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
         self.assertTrue(set(LEGACY_COLUMNS) <= set(_columns()))
 
-        _migrate_to(AFTER)
+        migrate_to(AFTER)
         columns = _columns()
 
         for name in LEGACY_COLUMNS:
@@ -170,10 +164,10 @@ class TestPaidAmountContract(TestCase):
         self.assertIn("amount_due_currency", columns)
 
     def test_reverse_re_adds_both_columns_nullable(self):
-        _migrate_to(AFTER)
+        migrate_to(AFTER)
         self.assertFalse(set(LEGACY_COLUMNS) & set(_columns()))
 
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
         columns = _columns()
 
         self.assertEqual(columns["paid_amount"], ("YES", "numeric", 11))
@@ -182,11 +176,11 @@ class TestPaidAmountContract(TestCase):
         )
 
     def test_reverse_leaves_the_re_added_columns_empty(self):
-        Order = _migrate_to(AFTER).get_model("order", "Order")
+        Order = migrate_to(AFTER).get_model("order", "Order")
         pk = Order.objects.create(amount_due=Decimal("12.50")).pk
         _settle_deferred_constraints()
 
-        _migrate_to(BEFORE)
+        migrate_to(BEFORE)
 
         with connection.cursor() as cursor:
             cursor.execute(

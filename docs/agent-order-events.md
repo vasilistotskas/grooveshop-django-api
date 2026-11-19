@@ -68,6 +68,7 @@ shared secret in `X-Internal-Token` and this body:
 | `occurredAt` | when the row was written (inside the change's transaction, before its commit), ISO 8601 in UTC: the `Webhook-Timestamp` |
 | `schemaName` | the store |
 | `orderUuid`, `status`, `paymentStatus`, `trackingNumber` | the order now |
+| `agentCheckoutId` | the agent checkout that placed the order (`Order.agent_checkout`, [order creation §3.2](order/creation.md)), so the gateway finds its checkout from the event alone; empty whenever `Order.agent_checkout` is NULL: an agent order whose creation named no checkout, every order placed before orders carried it included |
 
 The gateway's answer decides the row:
 
@@ -146,14 +147,6 @@ first attempt queued at commit and **Send again now**.
   first attempt to the last. The last failure makes the row `failed`, with an
   `ERROR` log line; when it was the gateway itself (unreachable, or 401,
   403, 404) the run still stops there.
-
-## The task the outbox replaced
-
-The release before queued `order.tasks.push_order_event_to_gateway` on
-every order change. It stays registered for one release: a message still
-queued or on a retry countdown during the deploy, and a `DeferredDispatch`
-row naming it, records the change as an `updated` event (with the time it
-runs as `occurredAt`). Remove it in the release after this one.
 
 ## The admin
 

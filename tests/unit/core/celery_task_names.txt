@@ -78,7 +78,6 @@ order.tasks.finish_pending_shipment_cancels
 order.tasks.generate_order_invoice
 order.tasks.issue_pending_credits
 order.tasks.purge_expired_pending_payment_fees
-order.tasks.push_order_event_to_gateway
 order.tasks.reconcile_pending_refunds
 order.tasks.send_admin_new_order_email
 order.tasks.send_checkout_abandonment_emails

@@ -67,6 +67,10 @@ def status_update_reservation_key(order_id: int, new_status: str) -> str:
 # order" from any other integrity failure.
 PAYMENT_ID_UNIQUE_CONSTRAINT = "order_payment_id_unique"
 
+# The partial unique index on ``Order.agent_checkout``, read back the same
+# way: "this agent checkout already has an order".
+AGENT_CHECKOUT_UNIQUE_CONSTRAINT = "order_agent_checkout_unique"
+
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     """
@@ -288,6 +292,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     payment_id = models.CharField(
         _("Payment ID"), max_length=255, blank=True, null=True, default=""
+    )
+    agent_checkout = models.UUIDField(
+        _("Agent checkout"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "The agent gateway's checkout that placed this order. A "
+            "checkout places one order: a repeat of its order creation "
+            "is answered with this order."
+        ),
     )
     payment_status = models.CharField(
         _("Payment Status"),
@@ -603,6 +618,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                     & ~models.Q(payment_id="")
                 ),
                 name=PAYMENT_ID_UNIQUE_CONSTRAINT,
+            ),
+            # One order per agent checkout: order creation looks the
+            # checkout up and answers a repeat with its order, and this
+            # index rejects the insert of a second one that raced it.
+            # Orders not placed through the gateway carry NULL.
+            models.UniqueConstraint(
+                fields=["agent_checkout"],
+                condition=models.Q(agent_checkout__isnull=False),
+                name=AGENT_CHECKOUT_UNIQUE_CONSTRAINT,
             ),
         ]
 

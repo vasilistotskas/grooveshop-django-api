@@ -19,15 +19,17 @@ When a sale is earned
     ships, but a courier or locker order's receipt carries the movement
     and is issued when its voucher is created, up to five days before the
     pickup (``order.accounting.movement``, ``docs/order/fiscal-mydata.md``
-    section 7.4). Until the parcel leaves that sale can still be undone
-    without a trace: an order canceled before the pickup has its receipt
-    canceled in myDATA as a document never used, the sale and the movement
-    never having happened. Counting it from the receipt's date would put a
-    sale in a month before it was certain and take it out again after the
-    month closed. So such a receipt can sit in myDATA's month before the
-    one this report counts its sale in, when the voucher is created in the
-    last days of a month and the parcel leaves in the next; the two agree
-    once both months are read together.
+    section 7.4). Until the parcel leaves that sale can still be undone: an
+    order canceled before the pickup is no sale here, and in myDATA its
+    receipt is either canceled (``CancelInvoice``, a document never used)
+    or, when the courier could not stop the parcel or AADE refused the
+    cancel, stands with a credit document that reverses it in full; myDATA
+    nets to nothing either way. Counting the sale from the receipt's date
+    would put it in a month before it was certain and take it out again
+    after the month closed. So such a receipt can sit in myDATA's month
+    before the one this report counts its sale in, when the voucher is
+    created in the last days of a month and the parcel leaves in the next;
+    the two agree once both months are read together.
 
     An order canceled or refunded before it shipped is never a sale; one
     that is still being prepared is not one yet.

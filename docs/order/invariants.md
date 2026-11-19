@@ -145,7 +145,11 @@ These invariants need more than a table row. Each ends with its anchor.
   the remainder
   - Anchor: [§7.2](refunds.md), [§7.3](payment-ledger.md)
 - The platform issues retail myDATA documents only: an 11.1 receipt when a
-  RECEIPT order ships (`order_shipped`, exactly once) and an 11.4 credit per
+  RECEIPT order ships (`order_shipped`), or, for a courier or locker order of
+  a store with its dispatch point set, with movement indication when its
+  voucher or parcel is recorded, before the pickup
+  (`order_shipment_dispatched`, [§7.4](fiscal-mydata.md)); exactly once
+  either way. An 11.4 credit per
   ledger REFUND row of an order whose receipt has a MARK, plus one settlement
   credit when the order closes without a sale. `document_type=INVOICE` orders
   submit nothing: invoices are issued by hand in timologio (AADE decision

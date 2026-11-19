@@ -43,8 +43,11 @@ parcel ships (`order.accounting.invoicing.receipt_issuable`), but a courier or
 locker order's receipt carries the movement and is issued when its voucher is
 created, up to five days before the pickup (`src/order/accounting/movement.py`,
 `docs/order/fiscal-mydata.md` section 7.4). Until the parcel leaves, that sale
-can still be undone without a trace: an order canceled before the pickup has
-its receipt canceled in myDATA as a document never used. Counting the sale from
+can still be undone: an order canceled before the pickup is no sale here, and in
+myDATA its receipt is either canceled (`CancelInvoice`, a document never used)
+or, when the courier could not stop the parcel or AADE refused the cancel,
+stands with a credit document that reverses it in full; either way myDATA nets
+to nothing for that order. Counting the sale from
 the receipt's date would put it in a month before it was certain and take it
 out again after that month closed. So when a voucher is created in the last
 days of a month and the parcel leaves in the next, myDATA holds the receipt in

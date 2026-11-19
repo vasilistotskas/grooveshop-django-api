@@ -24,13 +24,12 @@ What is pinned here:
 
 from __future__ import annotations
 
-import threading
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -52,6 +51,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from region.factories import RegionFactory
 from shipping.models import ShippingProvider
+from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
@@ -121,7 +121,9 @@ class _Cart:
             agent_checkout=checkout,
         )
 
-    def pay_first(self, checkout: UUID) -> Order:
+    def pay_first(
+        self, checkout: UUID, *, payment_intent_id: str = "pi_agent_checkout"
+    ) -> Order:
         """Place an agent order the payment-first way, on a Stripe intent."""
         provider = Mock()
         provider.get_payment_status.return_value = (
@@ -135,7 +137,7 @@ class _Cart:
                 legal_acceptance=checkout_acceptance(),
                 cart=self.cart,
                 shipping_address=self.address(),
-                payment_intent_id="pi_agent_checkout",
+                payment_intent_id=payment_intent_id,
                 pay_way=PayWayFactory.create_online_payment("stripe"),
                 attribution=AGENT,
                 agent_checkout=checkout,
@@ -169,11 +171,16 @@ class TestTheServiceAnswersARepeatWithTheOrder:
 
     @pytest.mark.usefixtures("trust_intent_binding")
     def test_the_payment_first_path_stores_and_answers_it_too(self):
+        """The repeat comes on another intent, so only the checkout can
+        name the first order (a repeat of the intent is answered by it
+        too, ``test_payment_intent_idempotency``)."""
         cart = _Cart()
         checkout = uuid4()
         first = cart.pay_first(checkout)
 
-        second = cart.pay_first(checkout)
+        second = cart.pay_first(
+            checkout, payment_intent_id="pi_agent_checkout_repeat"
+        )
 
         assert first.agent_checkout == checkout
         assert second.pk == first.pk
@@ -360,6 +367,35 @@ class TestThroughTheEndpoint:
         assert second.json()["id"] == first.json()["id"]
         assert Order.objects.count() == 1
 
+    def test_a_validation_refusal_after_a_racing_commit_is_answered(self):
+        """The racing call commits its order after this call's first
+        lookup (blinded here), and a row that changed meanwhile (its
+        carrier, switched off) fails this call's validation: the lookup
+        after the refusal answers the order."""
+        checkout = uuid4()
+        carrier = {"shippingProviderCode": "flat_rate"}
+        first = self._post(self.cod, checkout, **carrier)
+        assert first.status_code == status.HTTP_201_CREATED, first.json()
+        ShippingProvider.objects.filter(code="flat_rate").update(
+            is_active=False
+        )
+        real_lookup = OrderService.order_for_agent_checkout
+        lookups: list[UUID] = []
+
+        def blind_once(agent_checkout):
+            lookups.append(agent_checkout)
+            return None if len(lookups) == 1 else real_lookup(agent_checkout)
+
+        with patch.object(
+            OrderService, "order_for_agent_checkout", side_effect=blind_once
+        ):
+            second = self._post(self.cod, checkout, **carrier)
+
+        assert len(lookups) == 2, "the lookup after the refusal never ran"
+        assert second.status_code == status.HTTP_201_CREATED, second.json()
+        assert second.json()["id"] == first.json()["id"]
+        assert Order.objects.count() == 1
+
     def test_a_repeat_whose_order_was_deleted_is_answered_with_it(self):
         """The checkout placed it: deleting it does not let the checkout
         place another."""
@@ -415,6 +451,14 @@ class TestThroughTheEndpoint:
         assert response.json()["agentCheckout"] is None
         assert Order.objects.count() == 2
 
+    def test_without_the_secret_a_malformed_checkout_is_ignored(self):
+        """Only the gateway's checkout is validated: anyone else's field
+        is dropped before the body is, so it cannot refuse an order."""
+        response = self._post(self.cod, "not-a-uuid", secret="")
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        assert response.json()["agentCheckout"] is None
+
     def test_an_order_without_a_checkout_shows_none(self):
         response = APIClient().post(
             reverse("order-list"),
@@ -440,7 +484,7 @@ class TestThroughTheEndpoint:
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert response.json()["agentCheckout"] is None
 
-    def test_a_malformed_checkout_is_refused(self):
+    def test_from_the_gateway_a_malformed_checkout_is_refused(self):
         response = self._post(self.cod, "not-a-uuid")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -454,35 +498,13 @@ class TestTwoCallsOfOneCheckoutRacing:
     """Real commits on real connections: the cart row lock is the point.
     The second call waits for it, then finds the first one's order."""
 
-    @staticmethod
-    def _race(call) -> tuple[list, list[BaseException]]:
-        barrier = threading.Barrier(2)
-        results: list = []
-        failures: list[BaseException] = []
-
-        def run():
-            try:
-                barrier.wait(timeout=30)
-                results.append(call())
-            except BaseException as exc:
-                failures.append(exc)
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=run) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=120)
-        return results, failures
-
     def test_in_the_service_end_with_one_order(self):
         cart = _Cart()
         pay_way = _viva()
         acceptance = checkout_acceptance()
         checkout = uuid4()
 
-        placed, failures = self._race(
+        placed, failures = race(
             lambda: (
                 OrderService.create_order_from_cart_offline(
                     legal_acceptance=acceptance,
@@ -542,7 +564,7 @@ class TestTwoCallsOfOneCheckoutRacing:
                 return_value=True,
             ),
         ):
-            answers, failures = self._race(post)
+            answers, failures = race(post)
 
         assert not failures, failures
         assert [code for code, _ in answers] == [201, 201], answers

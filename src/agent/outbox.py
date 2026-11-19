@@ -348,8 +348,9 @@ def _body(event: AgentOrderEvent, order: dict) -> dict[str, str]:
         "status": order["status"],
         "paymentStatus": order["payment_status"],
         "trackingNumber": order["tracking_number"] or "",
-        # The checkout that placed the order; empty for an order placed
-        # before the order carried it.
+        # The checkout that placed the order; empty when it is NULL: an
+        # order whose creation named no checkout, every order placed
+        # before orders carried it included.
         "agentCheckoutId": str(order["agent_checkout"] or ""),
     }
 

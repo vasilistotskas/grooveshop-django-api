@@ -348,8 +348,10 @@ caller:
   - **Only the gateway names one.** `agentCheckout` is believed beside the
     gateway's secret in `X-Internal-Gateway` alone
     (`OrderViewSet._named_agent_checkout`), as `agentProtocol` is
-    ([§3.4](creation-records.md)). From any other caller it is ignored:
-    the order stores none and no order is looked up by it.
+    ([§3.4](creation-records.md)). From any other caller it is ignored,
+    a malformed value included (`OrderViewSet._validate_and_create` drops
+    the field before the body is validated): the order stores none and no
+    order is looked up by it.
   - **First, before anything is judged, the body's validation included.**
     `OrderViewSet.create` reads the bare id from the body (through the
     request serializer's own `agent_checkout` field; a malformed value
@@ -377,9 +379,10 @@ caller:
     name and raised as `AgentCheckoutOrderedError`, so it rolls back
     whatever it took.
   - **A refusal after a racing commit.** When a call is refused after the
-    first lookup (the cart the racing call deleted, its stock, the index),
-    the view looks again and answers the order if the checkout has one
-    now; otherwise the refusal stands.
+    first lookup (the body's validation or the pay way, which read rows
+    that changed meanwhile, the cart the racing call deleted, its stock,
+    the index), the view looks again and answers the order if the checkout
+    has one now; otherwise the refusal stands.
   - Deleted orders count: the checkout placed it, and deleting it does not
     let the checkout place another. The response carries `agentCheckout`
     (`OrderDetailSerializer`; null for any other order), and so does the

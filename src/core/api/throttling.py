@@ -123,11 +123,15 @@ def _gateway_ident(request, *, order: bool = False) -> str | None:
     The gateway authenticates itself with the ``X-Internal-Gateway``
     shared secret (its ``INTERNAL_EVENTS_SECRET``). Returns ``None`` —
     meaning "throttle normally", on the address — unless the secret is
-    configured, matches, and the request names a cart that exists in this
-    store (a cart token, or ``X-Cart-Id``) or, for the payment-link calls
-    that ask with ``order``, an order that does (``?uuid=``). A cart token
-    and an order uuid both open what they name, so each is keyed by its
-    hash. What counts as existing, and how each id is read, is
+    configured, matches, and the request names what it acts on and that
+    exists in this store: a cart (a cart token, or ``X-Cart-Id``) or, for
+    the payment calls that ask with ``order``, only the order the route
+    authorizes (its ``pk`` with that order's ``?uuid=``; cart headers are
+    not read, so they cannot give an order a fresh budget, and a payment
+    route without an order, the gift-card purchase, keeps the address).
+    A cart token and an order uuid both open what they name, so neither
+    is ever kept in a key. What counts as existing, and how each id is
+    read, is
     ``cart.agent_token.existing_gateway_subject``: an id that names nothing
     must not open a budget of its own, or a client making ids up would
     never meet a limit.
@@ -172,8 +176,10 @@ class GatewayIdentMixin(ResilientThrottleMixin):
     who is not signed in, so a signed-in agent is keyed on its account.
 
     Only a cart or order that exists earns the key, never a bare id
-    (``_gateway_ident``); a throttle that guards the order payment calls
-    sets ``gateway_names_order``, which cart routes never do.
+    (``_gateway_ident``). A throttle that guards the payment calls sets
+    ``gateway_names_order``, which cart routes never do: it is keyed on
+    the order the route authorizes alone, never on a cart, and on the
+    address where the route names no order (the gift-card purchase).
 
     The rule lives here, once, for both halves of a pair
     (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it),
@@ -304,7 +310,8 @@ class PaymentAttemptThrottle(GatewayIdentMixin, UserRateThrottle):
 
 class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
     """Starting a payment, keyed per order when the agent gateway asks for
-    the link it needs right after placing an online order."""
+    the link it needs right after placing an online order (the order the
+    route authorizes, never a cart: ``GatewayIdentMixin``)."""
 
     scope = "payment_anon"
     fail_closed = True

@@ -38,17 +38,22 @@ guessing budget (`GiftCardCodeThrottle`).
 
 **The address is the key unless the secret verifies and the request names
 something that exists.** What counts is settled once per request, by
-`cart.agent_token.existing_gateway_subject`: a cart token that was minted
-and has not expired (keyed by the cart its grant names, so several live
-tokens for one cart are one budget); else a guest cart, by the uuid the
-cart lookup parses (`core.cart_id.cart_uuid_from_request`, so upper case, no
-hyphens, braces or `urn:uuid:` are one cart); else, only for the payment
-throttles (`gateway_names_order`), the order the route authorizes: the one its
-`pk` URL kwarg names, when `?uuid=` is that order's uuid (keyed by the uuid's
-hash; another order's uuid charges nothing to it). A cart route's `?uuid=`
-names no order and is ignored. An id that is no uuid, names
-no cart or order, or comes without the secret is keyed on the address, as
-before the gateway rule. The cart writes create a cart when the one they
+`cart.agent_token.existing_gateway_subject`. The cart and order-create
+budgets read the cart: a cart token that was minted and has not expired
+(keyed by the cart its grant names, so several live tokens for one cart are
+one budget); else a guest cart, by the uuid the cart lookup parses
+(`core.cart_id.cart_uuid_from_request`, so upper case, no hyphens, braces or
+`urn:uuid:` are one cart). A cart route's `?uuid=` names no order and is
+ignored. The payment throttles (`gateway_names_order`: `payment` and
+`payment_anon`) read only the order the route authorizes: the one its `pk`
+URL kwarg names, when `?uuid=` is that order's uuid (keyed by the uuid's
+hash; another order's uuid charges nothing to it). They never read a cart
+header, so a caller cannot give one order a fresh payment budget by sending
+another cart id or token. The same two throttles guard the gift-card
+purchase (`POST giftcard/purchase`), which has no order `pk`: a gateway call
+there is budgeted on the address. An id that is no uuid, names no cart or
+order, or comes without the secret is keyed on the address, as before the
+gateway rule. The cart writes create a cart when the one they
 name does not resolve (a cart-item create, a coupon apply), so an id that
 earned a budget just by being well formed would let a client that makes ids
 up escape the per-address burst limit on cart creation and the tight coupon

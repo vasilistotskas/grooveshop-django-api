@@ -348,6 +348,103 @@ class TestDestroyTenants:
             mock_delete.assert_not_called()
 
 
+@pytest.mark.django_db
+class TestDestroyWaitsForTheStoresTasks:
+    """A task running in the store holds its lock (``holding_store``), as a
+    worker's session does; the destroy waits for it, then refuses."""
+
+    @pytest.fixture
+    def worker(self):
+        from django.db import connections
+
+        session = connections.create_connection("default")
+        yield session
+        session.close()
+
+    @staticmethod
+    def _run_a_task_in(session, schema_name):
+        from tenant.celery import _store_lock_key
+
+        with session.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_lock_shared(hashtextextended(%s, 0))",
+                [_store_lock_key(schema_name)],
+            )
+
+    @staticmethod
+    def _end_the_task_in(session, schema_name):
+        from tenant.celery import _store_lock_key
+
+        with session.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_unlock_shared(hashtextextended(%s, 0))",
+                [_store_lock_key(schema_name)],
+            )
+
+    def test_a_running_task_makes_the_destroy_refuse(self, worker):
+        from django.db import connection
+
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_busy",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('lock_timeout')")
+            (before,) = cursor.fetchone()
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=200),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "busy"
+        mock_delete.assert_not_called()
+        assert Tenant.objects.filter(pk=tenant.pk).exists()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('lock_timeout')")
+            assert cursor.fetchone() == (before,)
+
+    def test_the_destroy_goes_ahead_once_the_task_ended(self, worker):
+        from tenant.lifecycle import destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_after_task",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        self._end_the_task_in(worker, tenant.schema_name)
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            destroy_tenant(tenant)
+
+        mock_delete.assert_called_once_with(force_drop=True)
+
+    def test_a_task_in_another_store_does_not_hold_it(self, worker):
+        from tenant.lifecycle import destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_other_busy",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, "some_other_store")
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            destroy_tenant(tenant)
+
+        mock_delete.assert_called_once_with(force_drop=True)
+
+
 # ---------------------------------------------------------------------------
 # Destroy confirmation guard (quick win #4)
 # ---------------------------------------------------------------------------

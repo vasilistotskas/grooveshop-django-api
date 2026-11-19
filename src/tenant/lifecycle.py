@@ -34,11 +34,27 @@ if TYPE_CHECKING:
 # irreversible mistake this window exists to prevent.
 SUSPEND_COOLDOWN = timedelta(hours=24)
 
+# How long a destroy waits for the tasks running in the store to end
+# (``tenant.celery.holding_store``) before it refuses.
+DESTROY_TASKS_WAIT = timedelta(seconds=30)
+
 DESTROY_REFUSALS = {
     "protected": "it is a protected tenant",
     "not_suspended": "it must be suspended first",
     "cooldown": f"it was suspended less than {SUSPEND_COOLDOWN} ago",
 }
+
+
+class DestroyRefused(ValueError):
+    """``destroy_tenant`` refused; ``refusal`` names why.
+
+    A key of ``DESTROY_REFUSALS``, or ``"busy"``: tasks were still running
+    in the store after ``DESTROY_TASKS_WAIT``.
+    """
+
+    def __init__(self, schema_name: str, refusal: str, reason: str) -> None:
+        super().__init__(f"Refusing to destroy {schema_name!r}: {reason}.")
+        self.refusal = refusal
 
 
 def is_protected_tenant(tenant) -> bool:
@@ -273,9 +289,21 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
     from django.utils import timezone
 
     from tenant import offboarding
+    from tenant.celery import hold_store_for_destroy
     from tenant.models import Tenant, TenantArchive
 
     with transaction.atomic():
+        # A task running in the store would find its schema gone between
+        # two queries and fall through to public's tables; wait for those
+        # to end, and hold off new ones until the drop commits.
+        if not hold_store_for_destroy(
+            tenant.schema_name, wait=DESTROY_TASKS_WAIT
+        ):
+            raise DestroyRefused(
+                tenant.schema_name,
+                "busy",
+                f"its tasks were still running after {DESTROY_TASKS_WAIT}",
+            )
         # Judge the row as it is NOW, under lock — not the caller's
         # snapshot. Between an operator loading the changelist and
         # confirming, someone else may have re-activated or protected
@@ -284,9 +312,8 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
         tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
         refusal = destroy_refusal(tenant)
         if refusal is not None:
-            raise ValueError(
-                f"Refusing to destroy {tenant.schema_name!r}: "
-                f"{DESTROY_REFUSALS[refusal]}."
+            raise DestroyRefused(
+                tenant.schema_name, refusal, DESTROY_REFUSALS[refusal]
             )
 
         schema_name = tenant.schema_name

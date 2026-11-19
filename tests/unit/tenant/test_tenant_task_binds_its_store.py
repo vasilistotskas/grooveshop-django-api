@@ -32,6 +32,23 @@ def probe_task() -> dict[str, object]:
     }
 
 
+@celery_app.task(base=TenantTask, name="tests.held_store_lock_probe")
+def held_store_lock_probe() -> int:
+    """Shared advisory locks this session holds on its store's key."""
+    from tenant.celery import _store_lock_key
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+            "AND pid = pg_backend_pid() AND mode = 'ShareLock' "
+            "AND granted AND ((classid::bigint << 32) | objid::bigint) "
+            "= hashtextextended(%s, 0)",
+            [_store_lock_key(connection.schema_name)],
+        )
+        (count,) = cursor.fetchone()
+    return count
+
+
 @pytest.mark.django_db
 class TestEagerTaskBindsItsStore:
     def test_runs_in_the_schema_it_was_dispatched_in(self):
@@ -83,6 +100,16 @@ class TestEagerTaskBindsItsStore:
 
         assert result is None
 
+    def test_the_task_holds_its_store_while_it_runs(self):
+        """A destroy waits for it (``tenant.celery.holding_store``)."""
+        tenant = store_tenant("eager_held_store")
+
+        held = held_store_lock_probe.apply_async(
+            headers={"_schema_name": tenant.schema_name}
+        ).get()
+
+        assert held == 1
+
     def test_a_schema_with_no_store_row_still_runs_bare(self):
         result = probe_task.apply_async(
             headers={"_schema_name": "rowless_schema"}
@@ -93,6 +120,27 @@ class TestEagerTaskBindsItsStore:
             "is_row": False,
             "pk": None,
         }
+
+
+@pytest.mark.django_db(transaction=True)
+class TestOutsideATransaction:
+    """A worker runs a task in autocommit: the lock is the session's, held
+    while the task runs and released when it ends."""
+
+    def test_the_session_holds_the_store_only_while_the_task_runs(self):
+        tenant = store_tenant("worker_held_store")
+
+        held = held_store_lock_probe.apply_async(
+            headers={"_schema_name": tenant.schema_name}
+        ).get()
+
+        assert held == 1
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                "AND pid = pg_backend_pid()"
+            )
+            assert cursor.fetchone() == (0,)
 
 
 class TestWorkerRequestCarriesTheSchema:

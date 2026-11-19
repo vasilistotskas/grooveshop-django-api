@@ -1624,6 +1624,9 @@ msgstr "Agent Order Events"
 msgid "Agent Stripe Delegated Payments"
 msgstr "Agent Stripe Delegated Payments"
 
+msgid "Agent checkout"
+msgstr "Agent checkout"
+
 msgid "Agent order event"
 msgstr "Agent order event"
 
@@ -13256,6 +13259,9 @@ msgstr "Set by check_stale_acs_shipments after admins were alerted that this shi
 msgid "Set by the agent gateway for an order an AI agent placed over UCP, ACP or MCP."
 msgstr "Set by the agent gateway for an order an AI agent placed over UCP, ACP or MCP."
 
+msgid "Set by the agent gateway: the id of its checkout. A checkout places one order: a repeat with the same id is answered with the order it placed, and creates nothing."
+msgstr "Set by the agent gateway: the id of its checkout. A checkout places one order: a repeat with the same id is answered with the order it placed, and creates nothing."
+
 msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr "Set on a refund or a chargeback: the charge it took money from."
 
@@ -14600,6 +14606,9 @@ msgstr "The aade-user-id of the store's TAXISnet myDATA developer account. No pl
 
 msgid "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
 msgstr "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
+
+msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
+msgstr "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "The amount due in minor units (cents): 1999 for 19.99."

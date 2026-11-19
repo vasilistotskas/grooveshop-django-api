@@ -15,6 +15,7 @@ Exception Hierarchy:
     ├── InvalidOrderDataError
     │   ├── CartNotReadyError
     │   ├── CartHasUnpaidOrderError
+    │   ├── AgentCheckoutOrderedError
     │   ├── LoyaltyRedemptionError
     │   ├── ShippingRefusedError
     │   └── ShippingPriceUnresolvedError
@@ -31,6 +32,8 @@ Exception Hierarchy:
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
 """
+
+from uuid import UUID
 
 from django.utils.translation import gettext as _
 
@@ -234,6 +237,23 @@ class CartHasUnpaidOrderError(InvalidOrderDataError):
 
     def __init__(self) -> None:
         super().__init__("an order of this cart awaits its online payment")
+
+
+class AgentCheckoutOrderedError(InvalidOrderDataError):
+    """Raised when an order's insert meets ``order_agent_checkout_unique``:
+    another call of the same agent checkout committed its order first.
+
+    Nothing was created. Order creation answers with that checkout's order
+    (``OrderViewSet.create``). A subclass of ``InvalidOrderDataError`` so
+    order creation passes it on as it passes its other refusals; its
+    message is for logs.
+    """
+
+    def __init__(self, agent_checkout: UUID) -> None:
+        self.agent_checkout = agent_checkout
+        super().__init__(
+            f"agent checkout {agent_checkout} placed its order meanwhile"
+        )
 
 
 class UnpaidOrderLimitError(InvalidOrderDataError):

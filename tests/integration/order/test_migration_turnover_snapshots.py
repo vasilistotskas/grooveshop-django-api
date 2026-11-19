@@ -13,8 +13,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
+
+from tests.utils.migrations import migrate_to
 
 BEFORE = ("order", "0094_order_shipped_at_ordervatline")
 AFTER = ("order", "0095_backfill_turnover_snapshots")
@@ -26,16 +27,9 @@ def _settle_deferred_constraints():
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
-def _migrate_to(target):
-    executor = MigrationExecutor(connection)
-    executor.migrate([target])
-    executor.loader.build_graph()
-    return executor.loader.project_state([target]).apps
-
-
 class TestTurnoverSnapshotsMigration(TestCase):
     def _order_before(self):
-        apps = _migrate_to(BEFORE)
+        apps = migrate_to(BEFORE)
         Order = apps.get_model("order", "Order")
         Product = apps.get_model("product", "Product")
         Vat = apps.get_model("vat", "Vat")
@@ -65,7 +59,7 @@ class TestTurnoverSnapshotsMigration(TestCase):
     def test_an_existing_order_gets_its_lines_and_its_ship_moment(self):
         pk = self._order_before()
 
-        apps = _migrate_to(AFTER)
+        apps = migrate_to(AFTER)
 
         Order = apps.get_model("order", "Order")
         lines = apps.get_model("order", "OrderVatLine").objects.filter(
@@ -83,8 +77,8 @@ class TestTurnoverSnapshotsMigration(TestCase):
 
     def test_reversing_removes_nothing(self):
         pk = self._order_before()
-        _migrate_to(AFTER)
+        migrate_to(AFTER)
 
-        apps = _migrate_to(BEFORE)
+        apps = migrate_to(BEFORE)
 
         self.assertTrue(apps.get_model("order", "Order").objects.filter(pk=pk))

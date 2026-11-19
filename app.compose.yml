@@ -73,7 +73,7 @@ services:
   backend:
     container_name: backend
     user: 1000:1000
-    restart: always
+    restart: no
     tty: true
     build:
       context: .

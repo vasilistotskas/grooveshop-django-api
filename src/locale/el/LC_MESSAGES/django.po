@@ -1629,6 +1629,9 @@ msgstr "Συμβάντα παραγγελιών πρακτόρων AI"
 msgid "Agent Stripe Delegated Payments"
 msgstr "Εξουσιοδοτημένες Πληρωμές Stripe μέσω AI Πράκτορα"
 
+msgid "Agent checkout"
+msgstr "Ολοκλήρωση αγοράς πράκτορα AI"
+
 msgid "Agent order event"
 msgstr "Συμβάν παραγγελίας πράκτορα AI"
 
@@ -13262,6 +13265,9 @@ msgstr "Ορίζεται από το check_stale_acs_shipments αφού ειδο
 msgid "Set by the agent gateway for an order an AI agent placed over UCP, ACP or MCP."
 msgstr "Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP, ACP ή MCP."
 
+msgid "Set by the agent gateway: the id of its checkout. A checkout places one order: a repeat with the same id is answered with the order it placed, and creates nothing."
+msgstr "Ορίζεται από το agent gateway: το αναγνωριστικό της ολοκλήρωσης αγοράς του. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη με το ίδιο αναγνωριστικό απαντάται με την παραγγελία που δημιούργησε και δεν δημιουργεί τίποτα."
+
 msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr "Ορίζεται σε επιστροφή ή chargeback: η χρέωση από την οποία αφαιρέθηκαν χρήματα."
 
@@ -14602,6 +14608,9 @@ msgstr "Το aade-user-id του λογαριασμού προγραμματισ
 
 msgid "The address submitted on the newsletter form. The recipient of a guest subscription; an account's subscription mails the account's own address."
 msgstr "Η διεύθυνση που δόθηκε στη φόρμα ενημερωτικού δελτίου. Είναι ο παραλήπτης μιας εγγραφής επισκέπτη· η εγγραφή ενός λογαριασμού αποστέλλεται στη διεύθυνση του λογαριασμού."
+
+msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
+msgstr "Η ολοκλήρωση αγοράς του agent gateway που δημιούργησε αυτή την παραγγελία. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη της δημιουργίας της απαντάται με αυτή την παραγγελία."
 
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά): 1999 για 19,99."

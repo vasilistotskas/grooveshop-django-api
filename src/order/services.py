@@ -46,6 +46,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import (
+    AgentCheckoutOrderedError,
     CartHasUnpaidOrderError,
     CartNotReadyError,
     CourierUnreachableError,
@@ -76,6 +77,7 @@ from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import (
+    AGENT_CHECKOUT_UNIQUE_CONSTRAINT,
     PAYMENT_ID_UNIQUE_CONSTRAINT,
     Order,
     status_update_reservation_key,
@@ -926,6 +928,29 @@ class OrderService:
             )
             raise PaymentVerificationError(payment_intent_id, mismatch)
 
+    @staticmethod
+    def order_for_agent_checkout(agent_checkout: UUID) -> Order | None:
+        """The order this agent checkout placed, if it placed one.
+
+        The agent gateway names its checkout on order creation, and a
+        checkout places one order (``order_agent_checkout_unique``): a
+        repeat of its creation, a retry after an answer that never
+        arrived or a second call that raced the first, is answered with
+        this order. Deleted orders count: the checkout placed it, and
+        deleting it does not let the checkout place another.
+
+        Read by ``OrderViewSet.create`` before anything else (the
+        first order may have emptied or deleted the cart), and under the
+        cart row lock by both creation paths, where two calls of one
+        checkout serialise and the second finds the first's committed
+        order.
+        """
+        return (
+            Order.objects.all_with_deleted()
+            .filter(agent_checkout=agent_checkout)
+            .first()
+        )
+
     @classmethod
     def _order_created_for_payment(cls, payment_intent_id: str, cart):
         """The order this payment intent already produced for ``cart``.
@@ -990,6 +1015,7 @@ class OrderService:
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
         expected_total: ExpectedTotal | None = None,
+        agent_checkout: UUID | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -1001,8 +1027,8 @@ class OrderService:
            retrieves the intent from the provider and checks its state,
            OUTSIDE any transaction (``_retrieve_payment_intent``)
         then, in ONE transaction (``_create_order_for_verified_intent``):
-        1. Locks the cart; returns the order this payment intent already
-           created for it, if any (idempotent)
+        1. Locks the cart; returns the order this agent checkout or this
+           payment intent already created, if any (idempotent)
         2. Validates cart items still exist and prices match
         3. Validates shipping address completeness
         4. Re-compares the intent's amount and currency, and the
@@ -1034,6 +1060,8 @@ class OrderService:
                 or already belongs to another order
             OrderTotalChangedError: If ``expected_total`` is not the
                 amount due computed under lock
+            AgentCheckoutOrderedError: If another call of
+                ``agent_checkout`` committed its order first
 
         Example:
             >>> order = OrderService.create_order_from_cart(
@@ -1099,6 +1127,7 @@ class OrderService:
                 attribution=attribution,
                 legal_acceptance=legal_acceptance,
                 expected_total=expected_total,
+                agent_checkout=agent_checkout,
             )
         except ShippingPriceUnresolvedError:
             cls._refuse_unpriced(
@@ -1128,6 +1157,7 @@ class OrderService:
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
         expected_total: ExpectedTotal | None,
+        agent_checkout: UUID | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
@@ -1145,6 +1175,11 @@ class OrderService:
             # same cart are serialised.  Must happen before any reads so
             # validate_cart_for_checkout sees the locked snapshot.
             cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
+            if agent_checkout is not None:
+                existing_order = cls.order_for_agent_checkout(agent_checkout)
+                if existing_order is not None:
+                    return existing_order
 
             # Step 0: a repeat of a submit that already created its order
             # answers with that order. BEFORE the cart checks: the first
@@ -1349,6 +1384,7 @@ class OrderService:
                 "payment_id": payment_intent_id,
                 "payment_status": payment_status,
                 "status": OrderStatus.PENDING,
+                "agent_checkout": agent_checkout,
                 # Shipping address fields
                 "first_name": shipping_address.get("first_name"),
                 "last_name": shipping_address.get("last_name"),
@@ -1673,6 +1709,12 @@ class OrderService:
         except Exception as e:
             if (
                 isinstance(e, IntegrityError)
+                and agent_checkout is not None
+                and _violated_constraint(e) == AGENT_CHECKOUT_UNIQUE_CONSTRAINT
+            ):
+                raise AgentCheckoutOrderedError(agent_checkout) from e
+            if (
+                isinstance(e, IntegrityError)
                 and _violated_constraint(e) == PAYMENT_ID_UNIQUE_CONSTRAINT
             ):
                 # Another cart's checkout committed an order on this
@@ -1788,12 +1830,15 @@ class OrderService:
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
         expected_total: ExpectedTotal | None = None,
+        agent_checkout: UUID | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
 
         Used for offline payments (COD, Bank Transfer) and redirect-based
         online providers (Viva Wallet). It performs the following steps:
+        0. Locks the cart; returns the order this agent checkout already
+           created, if any (idempotent)
         1. Validates cart items still exist and prices match
         2. Validates shipping address completeness
         3. Gets or creates stock reservations for cart session
@@ -1818,6 +1863,8 @@ class OrderService:
             InsufficientStockError: If stock unavailable
             OrderTotalChangedError: If ``expected_total`` is not the
                 amount due computed under lock
+            AgentCheckoutOrderedError: If another call of
+                ``agent_checkout`` committed its order first
 
         References:
             - Design Section "Order Service"
@@ -1856,6 +1903,7 @@ class OrderService:
                 attribution=attribution,
                 legal_acceptance=legal_acceptance,
                 expected_total=expected_total,
+                agent_checkout=agent_checkout,
             )
         except ShippingPriceUnresolvedError:
             cls._refuse_unpriced(
@@ -1882,6 +1930,7 @@ class OrderService:
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
         expected_total: ExpectedTotal | None,
+        agent_checkout: UUID | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart_offline``: one
         transaction, no carrier call (the live price was resolved before
@@ -1894,6 +1943,14 @@ class OrderService:
             # same cart are serialised.  Must happen before any reads so
             # validate_cart_for_checkout sees the locked snapshot.
             cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
+            # A repeat of this agent checkout answers with its order,
+            # before the refusals below: that order took the stock, and
+            # the cart it kept or emptied would refuse the repeat.
+            if agent_checkout is not None:
+                existing_order = cls.order_for_agent_checkout(agent_checkout)
+                if existing_order is not None:
+                    return existing_order
 
             cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
 
@@ -1992,6 +2049,7 @@ class OrderService:
                 "payment_id": None,  # Will be set after order creation
                 "payment_status": PaymentStatus.PENDING,
                 "status": OrderStatus.PENDING,
+                "agent_checkout": agent_checkout,
                 # Shipping address fields
                 "first_name": shipping_address.get("first_name"),
                 "last_name": shipping_address.get("last_name"),
@@ -2385,6 +2443,14 @@ class OrderService:
         ):
             raise
         except Exception as e:
+            if (
+                isinstance(e, IntegrityError)
+                and agent_checkout is not None
+                and _violated_constraint(e) == AGENT_CHECKOUT_UNIQUE_CONSTRAINT
+            ):
+                # Another call of this checkout, on another cart (one
+                # cart's calls serialise on its lock), committed first.
+                raise AgentCheckoutOrderedError(agent_checkout) from e
             logger.exception(
                 "Unexpected error creating order from cart (order-first)",
             )

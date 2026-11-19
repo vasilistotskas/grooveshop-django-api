@@ -154,7 +154,10 @@ def _load_order(order_id: int) -> Order | None:
     Live notifications only make sense for authenticated shoppers — guest
     orders have no ``user`` to address, so we return ``None`` so the
     caller can early-exit without raising (Celery would otherwise retry
-    a task that can never succeed).
+    a task that can never succeed). So does every order of a store with
+    customer accounts off (``Order.served_as_guest``): nobody signs in to
+    read one there, and ``create_user_notification`` would write none, so
+    the task reports it skipped rather than sent.
     """
     try:
         order = Order.objects.select_related("user").get(id=order_id)
@@ -163,9 +166,11 @@ def _load_order(order_id: int) -> Order | None:
             "Live order notification skipped: order %s not found", order_id
         )
         return None
-    if order.user_id is None:
+    if order.served_as_guest:
         logger.debug(
-            "Live order notification skipped: guest order %s", order_id
+            "Live order notification skipped: order %s is served as a "
+            "guest's (no account, or the store's customer accounts are off)",
+            order_id,
         )
         return None
     return order

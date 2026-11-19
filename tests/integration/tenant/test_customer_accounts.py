@@ -259,9 +259,11 @@ def test_an_account_holders_order_notifies_only_while_accounts_are_on(
     order = OrderFactory(user=shopper, num_order_items=0)
     NotificationUser.objects.all().delete()
 
-    notify_order_created_live.run(order.id)
+    result = notify_order_created_live.run(order.id)
 
     assert NotificationUser.objects.filter(user=shopper).exists() is on
+    # The task says what it did: "sent" only when a notification was written.
+    assert result["status"] == ("sent" if on else "skipped")
 
 
 @pytest.mark.usefixtures("open_email_gates")

@@ -61,11 +61,18 @@ ADDRESS_TEXT_MAX_LENGTH = 150
 #: document declares starts at most this many days after it is issued.
 MOVEMENT_START_MAX_DAYS = 5
 
-#: A character XML 1.0 cannot carry (``Char`` production): the payload
-#: with one is no well-formed document.
-_NOT_XML_CHARACTER = re.compile(
-    "[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]"
-)
+
+def _xml_character(character: str) -> bool:
+    """Whether XML 1.0 can carry *character* (its ``Char`` production): a
+    payload with any other is no well-formed document."""
+    point = ord(character)
+    return (
+        point in (0x9, 0xA, 0xD)
+        or 0x20 <= point <= 0xD7FF
+        or 0xE000 <= point <= 0xFFFD
+        or 0x10000 <= point <= 0x10FFFF
+    )
+
 
 #: A Greek postcode: the dispatch point is the issuer's establishment, and
 #: the issuer is Greek (``order.accounting.mydata.service`` sends ``GR``).
@@ -79,7 +86,7 @@ def validate_loading_text_setting(value: object) -> bool:
     return (
         isinstance(value, str)
         and len(value) <= ADDRESS_TEXT_MAX_LENGTH
-        and _NOT_XML_CHARACTER.search(value) is None
+        and all(_xml_character(character) for character in value)
     )
 
 

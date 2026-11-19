@@ -117,8 +117,12 @@ def _shipment(**kwargs):
 
     return AcsShipmentFactory(
         # A status that needs a voucher: the factory picks one at random,
-        # a canceled order included.
-        order=courier_cash_order(status=OrderStatus.PENDING),
+        # a canceled order included. No tracking number yet: the factory
+        # gives half its orders one, and the voucher this order gets is its
+        # first (``order_shipment_dispatched``).
+        order=courier_cash_order(
+            status=OrderStatus.PENDING, tracking_number=""
+        ),
         voucher_no=None,
         shipment_state=AcsShipmentState.PENDING_CREATION,
         **kwargs,

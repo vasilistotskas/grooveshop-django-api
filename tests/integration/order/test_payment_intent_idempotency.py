@@ -19,13 +19,12 @@ What is pinned here:
   with one order.
 """
 
-import threading
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 from django.conf import settings
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from djmoney.money import Money
 
 from cart.models.cart import Cart
@@ -38,6 +37,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
 
@@ -409,24 +409,7 @@ class TestRacingSubmitsEndWithOneOrder(_Checkout):
             PaymentStatus.PENDING
         )
         self.setup_method()
-        barrier = threading.Barrier(2)
-        order_ids: list[int] = []
-        failures: list[BaseException] = []
-
-        def submit():
-            try:
-                barrier.wait(timeout=30)
-                order_ids.append(self._create().pk)
-            except BaseException as exc:
-                failures.append(exc)
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=submit) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=120)
+        order_ids, failures = race(lambda: self._create().pk)
 
         assert not failures, failures
         assert len(order_ids) == 2 and len(set(order_ids)) == 1, order_ids

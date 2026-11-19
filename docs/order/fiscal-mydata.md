@@ -150,9 +150,18 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `deliveryAddress`: the ACS station's or the BOX NOW locker's address for a
   pickup order, `ShippingCarrierInterface.pickup_point_address`, BOX NOW's
   city being its `addressLine2`, otherwise the order's shipping address) and
-  `isDeliveryNote` true; every goods line carries its `quantity` and
-  `measurementUnit` 1 «Τεμάχια» (shipping and the fee carry none; a receipt
-  netted by an earlier refund, one line per rate, carries none either). No
+  `isDeliveryNote` true; every good that moves is declared with its real
+  `quantity` (the units bought less those refunded,
+  `movement.moving_goods`, stored with the block) and `measurementUnit` 1
+  «Τεμάχια»: on its own money line, otherwise on a line of its own with
+  `netValue` and `vatAmount` 0 at the good's VAT category, which changes
+  no total. That is a free gift (it has no money line) and every good of a
+  receipt netted by an earlier refund (one money line per rate, mixing
+  goods and shipping); shipping and the fee carry no quantity. myDATA REST
+  API v2.0.2 §5.4 gives `netValue` and `vatAmount` a minimum of 0, and its
+  error table refuses no zero-value line in general; the shape has not
+  been sent to AADE's sandbox (no working credentials). `movePurpose`
+  stays 1 «Πώληση» for a gift: it moves with the sale. No
   `counterpart`: a consumer has no ΑΦΜ, the annex asks the recipient's ΑΦΜ
   only of an entity of ν.4308/2014 art. 1, and AADE refuses the name of a
   Greek counterpart (error 220); the buyer's name and address are printed on

@@ -189,14 +189,23 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   the order ("Issue receipt (myDATA)") before handing the parcel over.
   **Shipping never waits for myDATA**: the voucher, the pickup list and the
   handover go ahead whatever AADE answers.
-- **When myDATA does not answer** (a transport error or AADE's
-  `TechnicalError`). The receipt keeps its number and is recorded as
-  issued; the send is marked unanswered (`mydata_error_code` `NO_ANSWER`,
-  status SUBMITTED), so before it is sent again its MARK is looked up
-  (`RequestTransmittedDocs` by its uid, the 228 recovery), since the send
-  may have been registered. While the parcel is still with the store, a
-  resend is the document as issued, plainly: one timeout is no loss of
-  connection. **Once the parcel leaves (SHIPPED) without a MARK**, its
+- **When myDATA does not answer** (a transport error, AADE's
+  `TechnicalError`, or an answer that is not XML, such as an empty body
+  behind an HTTP 200, which the parser turns into a transport error). The
+  receipt keeps its number and is recorded as issued; the send is marked
+  unanswered (`mydata_error_code` `NO_ANSWER`, status SUBMITTED). A send
+  whose worker stopped mid-request is left SUBMITTED with no code, and counts
+  as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed
+  (`movement.unanswered_sends`); one whose credentials AADE refused keeps
+  AADE's code and waits for staff. Before any SUBMITTED document is sent
+  again its MARK is looked up (`service.look_up_mark`: `RequestTransmittedDocs`
+  by its uid, the 228 recovery), since the send may have been registered.
+  While the parcel is still with the store, a resend is the document as
+  issued, plainly: one timeout is no loss of connection. Its `dispatchDate`
+  is the one thing that moves: AADE refuses a date before the current one
+  (error 280), so a plain resend on a later day is dated today, and only
+  when the lookup read AADE's whole window and found no document under the
+  uid (`MarkLookup.ABSENT`); a registered one keeps the date AADE holds. **Once the parcel leaves (SHIPPED) without a MARK**, its
   movement started during a loss of connection, AADE's procedure:
   Α.1233/2026 annex §12.1 has such a movement document issued «με διακριτή
   ένδειξη για την απώλεια διασύνδεσης» and transmitted «άμεσα με την
@@ -204,7 +213,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `movement.parcel_left_unregistered` (in `handle_order_shipped`) stamps
   `Invoice.transmission_failed_at` on an unanswered receipt and sends it at
   once; a send that goes unanswered after the parcel left is stamped where
-  the answer is missed (`service._persist_no_answer`), so whichever comes
+  the answer is missed (`service._persist_send_error`), so whichever comes
   second stamps it. From then on every transmission carries
   `transmissionFailure` 3, «Απώλεια διασύνδεσης», the one value of that
   element (`xs:byte` 1-4 in the v2.0.2 XSD) the REST API documentation
@@ -309,6 +318,13 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     still set aside after `MYDATA_RETRY_AFTER_MINUTES` ("Receipts of
     canceled orders not canceled in myDATA"); the order's notes say why.
     Nothing about the cancel or the refund waits for it.
+- **Turnover.** The turnover report (`src/order/reporting/turnover.py`,
+  [turnover-report.md](../turnover-report.md)) still counts a sale when the
+  parcel leaves (`Order.shipped_at`), not on the receipt's date: until the
+  pickup the sale can be undone and its receipt canceled as never used. A
+  voucher created in the last days of a month whose parcel leaves in the
+  next puts the receipt in myDATA's earlier month and the sale in the
+  report's later one.
 - **What stays.** An order no carrier takes keeps the plain receipt at
   SHIPPED, and SHIPPED issues nothing twice (`generate_invoice` returns the
   existing row). An order canceled after its parcel left, or whose goods

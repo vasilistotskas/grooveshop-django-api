@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from datetime import date, timedelta
+from enum import Enum
 from typing import Any
 
 from django.db import transaction
@@ -41,6 +42,7 @@ from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
 from order.accounting.mydata.config import load_config
 from order.accounting.mydata.exceptions import (
+    MyDataAuthError,
     MyDataDuplicateError,
     MyDataTransportError,
     MyDataValidationError,
@@ -84,14 +86,18 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # (idempotent), mirroring the 228-recovery path (G0262).
         return _registered_row(invoice)
 
-    if (
-        invoice.mydata_error_code == ERROR_NO_ANSWER
-        and invoice.mydata_uid
-        and recover_mark_for_document(invoice)
-    ):
-        # The last send went unanswered, so it may be registered: its MARK
-        # is looked up before anything is built or sent again.
-        return _registered_row(invoice)
+    from order.models.invoice import MyDataStatus
+
+    # A document sent before (its intent is stored: SUBMITTED, with a uid)
+    # whose send has no answer on record may be registered: the send went
+    # unanswered, or its sender stopped mid-request. Its MARK is looked up
+    # before anything is built or sent again.
+    nothing_registered = False
+    if invoice.mydata_status == MyDataStatus.SUBMITTED and invoice.mydata_uid:
+        lookup = look_up_mark(invoice)
+        if lookup is MarkLookup.FOUND:
+            return _registered_row(invoice)
+        nothing_registered = lookup is MarkLookup.ABSENT
 
     config = load_config()
     if not config.is_ready():
@@ -117,6 +123,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             invoice,
             config=config,
             issuer_vat=issuer_vat,
+            nothing_registered=nothing_registered,
         )
     except ValueError as exc:
         # Unsupported VAT rate or malformed invoice_number — bad
@@ -159,11 +166,17 @@ def submit_document(invoice: Any) -> ResponseRow | None:
 
     client = MyDataClient(config)
     try:
-        response_bytes = client.send_invoices(built.xml_bytes)
+        response = parse_response_doc(client.send_invoices(built.xml_bytes))
     except MyDataTransportError as exc:
-        _persist_no_answer(invoice, message=exc.message)
+        # No answer, or none that can be read (an empty or cut-off body).
+        _persist_send_error(invoice, code=ERROR_NO_ANSWER, message=exc.message)
         raise
-    response = parse_response_doc(response_bytes)
+    except MyDataAuthError as exc:
+        # AADE refused the credentials, so the document was not taken in:
+        # recorded, so the sweep leaves it to staff instead of resending it
+        # as a send whose answer was lost.
+        _persist_send_error(invoice, code=exc.code, message=exc.message)
+        raise
     row = response.first()
 
     if row.is_success:
@@ -199,7 +212,11 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # REJECTED and skip all retries). Leave ``mydata_status=SUBMITTED``
         # and raise the retryable transport error so the Celery task's
         # backoff and the manual-resubmit path keep working (G0260).
-        _persist_no_answer(invoice, message=message or "AADE TechnicalError")
+        _persist_send_error(
+            invoice,
+            code=ERROR_NO_ANSWER,
+            message=message or "AADE TechnicalError",
+        )
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
     if not _persist_failure(invoice, code=code, message=message):
@@ -219,18 +236,20 @@ def _registered_row(invoice: Any) -> ResponseRow:
     )
 
 
-def _persist_no_answer(invoice: Any, *, message: str) -> None:
-    """Record that the send just made went unanswered (``ERROR_NO_ANSWER``,
-    the status left SUBMITTED): it may be registered, so the next send
-    first looks its MARK up, and ``order.tasks.retry_receipts_with_mydata``
-    sends a receipt with movement again until it is. A row registered
-    meanwhile by another sender is left as it is.
+def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
+    """Record why the send just made has no registration, the status left
+    SUBMITTED: ``ERROR_NO_ANSWER`` when AADE did not answer (or not
+    readably), so it may be registered, the next send first looks its MARK
+    up, and ``order.tasks.retry_receipts_with_mydata`` sends a receipt with
+    movement again until it is; AADE's own code when it refused the
+    credentials. A row registered meanwhile by another sender is left as
+    it is.
 
-    A receipt whose parcel is still with the store is sent again as
-    issued, plainly. AADE's loss-of-connection indication
-    (``transmissionFailure``, ``Invoice.transmission_failed_at``) belongs
-    to a receipt with movement whose parcel left without a MARK: stamped
-    here when the parcel left before this send, by
+    A receipt whose parcel is still with the store is sent again plainly.
+    AADE's loss-of-connection indication (``transmissionFailure``,
+    ``Invoice.transmission_failed_at``) belongs to a receipt with movement
+    whose parcel left without a MARK because myDATA did not answer:
+    stamped here when the parcel left before this unanswered send, by
     ``movement.parcel_left_unregistered`` when it leaves after."""
     with transaction.atomic():
         locked = (
@@ -240,11 +259,12 @@ def _persist_no_answer(invoice: Any, *, message: str) -> None:
         )
         if locked.mydata_mark:
             return
-        locked.mydata_error_code = ERROR_NO_ANSWER
+        locked.mydata_error_code = code[:10]
         locked.mydata_error_message = message or ""
         fields = ["mydata_error_code", "mydata_error_message", "updated_at"]
         if (
-            getattr(locked, "movement", None)
+            code == ERROR_NO_ANSWER
+            and getattr(locked, "movement", None)
             and locked.transmission_failed_at is None
             and locked.order.shipped_at is not None
         ):
@@ -252,7 +272,7 @@ def _persist_no_answer(invoice: Any, *, message: str) -> None:
             fields.append("transmission_failed_at")
             invoice.transmission_failed_at = locked.transmission_failed_at
         locked.save(update_fields=fields)
-    invoice.mydata_error_code = ERROR_NO_ANSWER
+    invoice.mydata_error_code = code[:10]
     invoice.mydata_error_message = message or ""
 
 
@@ -390,35 +410,47 @@ def record_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
     _persist_cancellation(invoice, cancellation_mark=cancellation_mark)
 
 
+class MarkLookup(Enum):
+    """What AADE says of a document we may have sent: it holds it under
+    our uid (``FOUND``, its MARK now recorded), it lists no document under
+    that uid in the document's issue window (``ABSENT``: nothing of it is
+    registered), or it could not be asked or gave an answer no safe
+    conclusion can be drawn from (``UNKNOWN``)."""
+
+    FOUND = "found"
+    ABSENT = "absent"
+    UNKNOWN = "unknown"
+
+
 def recover_mark_for_document(invoice: Any) -> bool:
     """Attempt to recover a MARK for an invoice that received error 228.
 
     Error 228 means AADE already has our ``uid`` registered under a MARK
     (from a prior successful transmission whose response we never
-    received). This function calls ``RequestTransmittedDocs`` scoped to
-    the invoice's issue date ± 1 day and our entity VAT, then finds the
-    single transmitted doc whose ``uid`` matches ``invoice.mydata_uid``.
+    received). Returns ``True`` when the MARK was recovered and the
+    invoice flipped to ``CONFIRMED`` (:func:`look_up_mark`), ``False``
+    otherwise; the caller (``send_invoice_to_mydata``) keeps the existing
+    ``REJECTED`` state and manual-reconciliation path then.
+    """
+    return look_up_mark(invoice) is MarkLookup.FOUND
+
+
+def look_up_mark(invoice: Any) -> MarkLookup:
+    """Ask AADE whether it holds *invoice* under its uid:
+    ``RequestTransmittedDocs`` scoped to the invoice's issue date ± 1 day
+    and our entity VAT, and the single transmitted doc whose ``uid``
+    matches ``invoice.mydata_uid``.
 
     SAFETY CONTRACT — the MARK is only written when ALL of:
       1. Exactly one transmitted doc matches the invoice's uid.
       2. That doc has a non-None ``invoiceMark``.
-    If zero docs match, more than one match, or the matched doc has no
-    MARK, this function returns ``False`` and writes nothing. A wrong
-    MARK must be impossible.
+    A wrong MARK must be impossible.
 
-    Returns ``True`` when the MARK was successfully recovered and the
-    invoice has been flipped to ``CONFIRMED``.
-    Returns ``False`` in every other case:
-      - config not ready
-      - no uid to look up
-      - transport error during the query
-      - zero matches
-      - multiple matches (uid collision — should never happen)
-      - match found but invoiceMark is None
-
-    The caller (``send_invoice_to_mydata`` task) keeps the existing
-    ``REJECTED`` state and manual-reconciliation path when this returns
-    ``False``.
+    ``ABSENT`` only when the whole window was read and no document has
+    the uid. ``UNKNOWN`` in every other case: config not ready, no uid,
+    VAT or issue date to look up with, a transport error during the
+    query, several matches (a uid collision, which should never happen),
+    or a match without a MARK.
     """
     uid_to_find = getattr(invoice, "mydata_uid", "") or ""
     if not uid_to_find:
@@ -427,7 +459,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             "— cannot query RequestTransmittedDocs",
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     config = load_config()
     if not config.is_ready():
@@ -436,7 +468,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             "for invoice pk=%s",
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     issuer_vat = _resolve_issuer_vat()
     if not issuer_vat:
@@ -445,7 +477,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             "cannot scope RequestTransmittedDocs query for invoice pk=%s",
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     # Scope the query as narrowly as possible: ±1 day around the invoice
     # issue date. AADE's date filter uses the document issue date so a
@@ -458,7 +490,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             "cannot scope the date window",
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     date_from, date_to = _issue_window(issue_date)
 
@@ -484,7 +516,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             exc,
         )
         # Do NOT re-raise — caller keeps REJECTED + logs.
-        return False
+        return MarkLookup.UNKNOWN
 
     # SAFETY: require exactly one match for our uid.
     matches = [d for d in all_docs if d.uid == uid_to_find]
@@ -493,14 +525,14 @@ def recover_mark_for_document(invoice: Any) -> bool:
         logger.warning(
             "recover_mark_for_invoice: uid=%s not found in "
             "RequestTransmittedDocs window %s–%s for invoice pk=%s "
-            "(retrieved %d docs). Keeping REJECTED state.",
+            "(retrieved %d docs).",
             uid_to_find,
             date_from,
             date_to,
             invoice.pk,
             len(all_docs),
         )
-        return False
+        return MarkLookup.ABSENT
 
     if len(matches) > 1:
         # uid collision — should be mathematically impossible (SHA-1
@@ -514,7 +546,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             len(matches),
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     matched = matches[0]
     if matched.invoice_mark is None:
@@ -524,7 +556,7 @@ def recover_mark_for_document(invoice: Any) -> bool:
             uid_to_find,
             invoice.pk,
         )
-        return False
+        return MarkLookup.UNKNOWN
 
     # All safety checks passed — write the recovered MARK.
     logger.info(
@@ -535,10 +567,12 @@ def recover_mark_for_document(invoice: Any) -> bool:
         uid_to_find,
     )
     _persist_recovered_mark(invoice, mark=matched.invoice_mark)
-    return True
+    return MarkLookup.FOUND
 
 
-def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
+def _build_document(
+    invoice: Any, *, config: Any, issuer_vat: str, nothing_registered: bool
+):
     """Build the payload for the document: a credit (11.4) for a
     :class:`RetailCredit`, otherwise the order's receipt (11.1), with its
     movement indication when the order moves through a carrier
@@ -558,7 +592,9 @@ def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
         issuer_country="GR",
         branch=config.issuer_branch,
         series_prefix=config.invoice_series_prefix,
-        movement=receipt_movement(invoice),
+        movement=receipt_movement(
+            invoice, nothing_registered=nothing_registered
+        ),
     )
 
 

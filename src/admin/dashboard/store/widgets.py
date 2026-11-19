@@ -1309,10 +1309,10 @@ class StoreAlerts(DashboardWidget):
                 )
             )
         # Set aside when their orders were canceled before the parcel left,
-        # and settled within minutes; one still here needs a look: myDATA
-        # does not answer or refuses the store's credentials, or the receipt
-        # was refused and waits for staff to correct it (its order's notes
-        # say which).
+        # and settled within minutes; one still here waits for myDATA to
+        # answer (sent and canceled automatically), or for staff: myDATA
+        # refused the receipt or the store's credentials (its order's notes
+        # say so).
         held = (
             Invoice.objects.filter(
                 cancel_requested_at__isnull=False,
@@ -1331,10 +1331,16 @@ class StoreAlerts(DashboardWidget):
                     ngettext(
                         "%(count)s receipt of an order canceled before its "
                         "parcel left is still waiting to be canceled in "
-                        "myDATA. Its order's notes say why.",
+                        "myDATA. It is canceled automatically once myDATA "
+                        "answers; if myDATA refused the receipt or the "
+                        "store's credentials, the order's notes say what "
+                        "to do.",
                         "%(count)s receipts of orders canceled before their "
                         "parcels left are still waiting to be canceled in "
-                        "myDATA. Their orders' notes say why.",
+                        "myDATA. They are canceled automatically once "
+                        "myDATA answers; if myDATA refused a receipt or the "
+                        "store's credentials, its order's notes say what "
+                        "to do.",
                         held,
                     )
                     % {"count": held},

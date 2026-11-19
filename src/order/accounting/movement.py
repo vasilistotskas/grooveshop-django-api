@@ -30,11 +30,13 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import asdict, dataclass
-from datetime import date
+from dataclasses import asdict, dataclass, replace
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
+from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 
 from core.store_settings import store_settings
@@ -195,7 +197,9 @@ def refused_for_its_content(invoice: Any) -> bool:
     )
 
 
-def receipt_movement(invoice: Any) -> ReceiptMovement | None:
+def receipt_movement(
+    invoice: Any, *, nothing_registered: bool = False
+) -> ReceiptMovement | None:
     """The movement block of *invoice*'s receipt, or ``None`` for a plain
     receipt: the order does not move through a carrier (the merchant's own
     delivery), or the store has not set its dispatch point.
@@ -209,10 +213,27 @@ def receipt_movement(invoice: Any) -> ReceiptMovement | None:
     receipt whose parcel left while myDATA was unreachable keeps the date
     it was issued with.
 
+    One date moves: AADE refuses a ``dispatchDate`` before the current
+    date (error 280), so a plain receipt sent again on a later day (its
+    first send went unanswered, the parcel is still with the store) is
+    dated today, its addresses and goods as issued. Only when
+    *nothing_registered*: AADE was asked and holds no document under its
+    uid (``service.look_up_mark``), since a registered one keeps the date
+    AADE has. One whose parcel left unregistered
+    (``transmission_failed_at``) keeps its date, above.
+
     Raises ``ValueError`` when the pickup point's address is not known.
     """
     if invoice.movement and not refused_for_its_content(invoice):
-        return ReceiptMovement.from_json(invoice.movement)
+        issued = ReceiptMovement.from_json(invoice.movement)
+        today = timezone.localdate()
+        if (
+            nothing_registered
+            and invoice.transmission_failed_at is None
+            and issued.dispatch_date < today
+        ):
+            return replace(issued, dispatch_date=today)
+        return issued
     order = invoice.order
     loading = loading_address()
     if loading is None:
@@ -233,34 +254,56 @@ def receipt_movement(invoice: Any) -> ReceiptMovement | None:
 MOVEMENT_START_MAX_DAYS = 5
 
 
+def unanswered_sends(invoices: Any) -> Any:
+    """The receipts with movement among *invoices* whose last send has no
+    answer from AADE, so they may or may not be registered: one it did not
+    answer, or not readably (``ERROR_NO_ANSWER``), and one whose sender
+    stopped mid-request (a worker killed during the call), which is left
+    SUBMITTED with no code at all; that one only once
+    ``MYDATA_RETRY_AFTER_MINUTES`` passed since it was touched, as a send
+    in flight right now looks the same. A receipt AADE refused, or whose
+    credentials it refused, is not one: it carries AADE's code."""
+    from order.accounting.mydata.types import ERROR_NO_ANSWER
+    from order.models.invoice import MyDataStatus
+
+    stalled_before = timezone.now() - timedelta(
+        minutes=settings.MYDATA_RETRY_AFTER_MINUTES
+    )
+    return (
+        invoices.filter(
+            mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
+        )
+        .exclude(movement={})
+        .filter(
+            Q(mydata_error_code=ERROR_NO_ANSWER)
+            | Q(mydata_error_code="", updated_at__lte=stalled_before)
+        )
+    )
+
+
 def parcel_left_unregistered(order_id: int) -> bool:
     """The order's parcel left (SHIPPED) while its receipt with movement,
-    sent, had no answer from AADE: from now on the receipt is a document
-    whose movement started during a loss of connection (Α.1233/2026 annex
-    §12.1), so ``Invoice.transmission_failed_at`` is stamped and every
-    later transmission carries ``transmissionFailure`` 3. Returns whether
-    a receipt was stamped, for the caller to send it at once.
+    sent, had no answer from AADE (:func:`unanswered_sends`): from now on
+    the receipt is a document whose movement started during a loss of
+    connection (Α.1233/2026 annex §12.1), so
+    ``Invoice.transmission_failed_at`` is stamped and every later
+    transmission carries ``transmissionFailure`` 3. Returns whether a
+    receipt was stamped, for the caller to send it at once.
 
     Not before: while the parcel is still with the store, a send that went
-    unanswered is sent again plainly (``ERROR_NO_ANSWER``). Not for a
-    receipt AADE refused or whose credentials it refused: that is no loss
-    of connection. A send that goes unanswered after the parcel left is
-    stamped by ``service._persist_no_answer``, so whichever comes second
-    stamps it."""
-    from order.accounting.mydata.types import ERROR_NO_ANSWER
-    from order.models.invoice import Invoice, MyDataStatus
+    unanswered is sent again plainly. Not for a receipt AADE refused or
+    whose credentials it refused: that is no loss of connection. A send
+    that goes unanswered after the parcel left is stamped by
+    ``service._persist_send_error``, so whichever comes second stamps it."""
+    from order.models.invoice import Invoice
 
     now = timezone.now()
     return bool(
-        Invoice.objects.filter(
-            order_id=order_id,
-            mydata_mark__isnull=True,
-            mydata_status=MyDataStatus.SUBMITTED,
-            mydata_error_code=ERROR_NO_ANSWER,
-            transmission_failed_at__isnull=True,
-        )
-        .exclude(movement={})
-        .update(transmission_failed_at=now, updated_at=now)
+        unanswered_sends(
+            Invoice.objects.filter(
+                order_id=order_id, transmission_failed_at__isnull=True
+            )
+        ).update(transmission_failed_at=now, updated_at=now)
     )
 
 

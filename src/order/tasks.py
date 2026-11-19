@@ -1449,8 +1449,9 @@ def retry_receipts_with_mydata() -> int:
     """Take up every receipt whose business with myDATA is unfinished: shipping
     never waits for it, so this sweep is how it gets done.
 
-    - A receipt with movement indication whose last send went unanswered
-      (``ERROR_NO_ANSWER``) is sent again (``send_invoice_to_mydata``),
+    - A receipt with movement indication whose last send has no answer
+      (``movement.unanswered_sends``: AADE did not answer, or its sender
+      stopped mid-request) is sent again (``send_invoice_to_mydata``),
       whose own retries an outage outlasts: plainly while its parcel is
       with the store, with ``transmissionFailure`` 3 once it left
       (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»).
@@ -1468,8 +1469,8 @@ def retry_receipts_with_mydata() -> int:
     overlap (``settle_canceled_receipt`` holds a claim across its AADE
     call).
     """
+    from order.accounting.movement import unanswered_sends
     from order.accounting.mydata.config import load_config
-    from order.accounting.mydata.types import ERROR_NO_ANSWER
     from order.models.invoice import Invoice, MyDataStatus
 
     if not load_config().is_ready():
@@ -1480,12 +1481,7 @@ def retry_receipts_with_mydata() -> int:
     batch = settings.MYDATA_RETRY_SWEEP_BATCH
     untouched = Invoice.objects.filter(updated_at__lte=cutoff)
     to_send = list(
-        untouched.filter(
-            mydata_mark__isnull=True,
-            mydata_status=MyDataStatus.SUBMITTED,
-            mydata_error_code=ERROR_NO_ANSWER,
-        )
-        .exclude(movement={})
+        unanswered_sends(untouched)
         .order_by("id")
         .values_list("order_id", flat=True)[:batch]
     )

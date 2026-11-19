@@ -16,12 +16,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Literal, cast, get_args
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, ParseError
 
 # AADE's answers come over the network, and a response wraps a second XML
 # document in an element's text; defusedxml refuses entity declarations
 # and external references in both, as for every other untrusted XML here.
 from defusedxml.ElementTree import fromstring
+
+from order.accounting.mydata.exceptions import MyDataTransportError
 
 StatusCode = Literal[
     "Success", "ValidationError", "TechnicalError", "XMLSyntaxError"
@@ -105,6 +107,27 @@ class ResponseDoc:
         return self.rows[0]
 
 
+def _document_root(xml_bytes: bytes) -> Element:
+    """The root of an answer of AADE's, unwrapped from the DataContract
+    ``<string>`` envelope its dev endpoint sometimes adds (the inner XML,
+    entity-escaped as text; ElementTree resolves the entities on parse).
+
+    An answer that is not XML at all (an empty or cut-off body behind an
+    HTTP 200, a gateway's HTML page) says nothing of what became of the
+    request: it raises ``MyDataTransportError``, like an answer that never
+    came, so the caller records the send as unanswered and retries it
+    instead of failing with a ``ParseError`` that no handler expects."""
+    try:
+        root = fromstring(xml_bytes)
+        if _local(root.tag) == "string" and root.text:
+            root = fromstring(root.text.encode("utf-8"))
+    except ParseError as exc:
+        raise MyDataTransportError(
+            f"AADE answered with no readable document: {exc}"
+        ) from exc
+    return root
+
+
 def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
     """Parse the ``ResponseDoc`` XML returned by any AADE submission.
 
@@ -115,12 +138,7 @@ def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
     form before parsing. The bare and namespaced ``ResponseDoc``
     forms both work via the namespace-stripping in ``_local``.
     """
-    root = fromstring(xml_bytes)
-    if _local(root.tag) == "string" and root.text:
-        # Re-parse the inner (previously escaped) XML. ``root.text``
-        # already contains the unescaped string because ElementTree
-        # resolves entities on parse.
-        root = fromstring(root.text.encode("utf-8"))
+    root = _document_root(xml_bytes)
     rows = [_parse_row(el) for el in _iter_children(root, "response")]
     return ResponseDoc(rows=rows)
 
@@ -255,9 +273,7 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
     Namespaces are stripped via ``_local`` so the default ``xmlns`` AADE
     sets does not affect element matching.
     """
-    root = fromstring(xml_bytes)
-    if _local(root.tag) == "string" and root.text:
-        root = fromstring(root.text.encode("utf-8"))
+    root = _document_root(xml_bytes)
 
     docs: list[TransmittedDoc] = []
     for invoices_doc_el in _iter_children(root, "invoicesDoc"):

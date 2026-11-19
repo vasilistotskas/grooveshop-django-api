@@ -329,10 +329,10 @@ msgstr[0] "Επιλέχθηκε %(count)s προϊόν: %(active_count)s ενε�
 msgstr[1] "Επιλέχθηκαν %(count)s προϊόντα: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
 
 #, python-format
-msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
-msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
-msgstr[0] "%(count)s απόδειξη παραγγελίας που ακυρώθηκε πριν φύγει το δέμα της περιμένει ακόμη να ακυρωθεί στο myDATA. Οι σημειώσεις της παραγγελίας λένε γιατί."
-msgstr[1] "%(count)s αποδείξεις παραγγελιών που ακυρώθηκαν πριν φύγουν τα δέματά τους περιμένουν ακόμη να ακυρωθούν στο myDATA. Οι σημειώσεις των παραγγελιών λένε γιατί."
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
+msgstr[0] "%(count)s απόδειξη παραγγελίας που ακυρώθηκε πριν φύγει το δέμα της περιμένει ακόμη να ακυρωθεί στο myDATA. Ακυρώνεται αυτόματα μόλις απαντήσει το myDATA· αν το myDATA απέρριψε την απόδειξη ή τα διαπιστευτήρια του καταστήματος, οι σημειώσεις της παραγγελίας λένε τι να κάνετε."
+msgstr[1] "%(count)s αποδείξεις παραγγελιών που ακυρώθηκαν πριν φύγουν τα δέματά τους περιμένουν ακόμη να ακυρωθούν στο myDATA. Ακυρώνονται αυτόματα μόλις απαντήσει το myDATA· αν το myDATA απέρριψε μια απόδειξη ή τα διαπιστευτήρια του καταστήματος, οι σημειώσεις της παραγγελίας της λένε τι να κάνετε."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."

@@ -324,10 +324,10 @@ msgstr[0] "%(count)s product selected: %(active_count)s active, %(inactive_count
 msgstr[1] "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 
 #, python-format
-msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
-msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
-msgstr[0] "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. Its order's notes say why."
-msgstr[1] "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. Their orders' notes say why."
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
+msgstr[0] "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgstr[1] "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."

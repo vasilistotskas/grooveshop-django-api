@@ -21,11 +21,16 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from order.accounting.invoicing import receipt_issuable
-from order.accounting.movement import ReceiptMovement, receipt_movement
+from order.accounting.movement import (
+    ReceiptMovement,
+    receipt_movement,
+    unanswered_sends,
+)
 from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataTransportError,
 )
+from order.accounting.mydata.service import MarkLookup
 from order.accounting.mydata.types import ERROR_DUPLICATE_UID, ERROR_NO_ANSWER
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
@@ -279,6 +284,15 @@ class TestTheReceiptCarriesTheMovement:
             )
 
         assert receipt_movement(sent_as(MyDataStatus.SUBMITTED)) == past
+        # AADE holds nothing under its uid: a plain resend is dated today
+        # (error 280), one whose parcel left unregistered keeps its date.
+        plain = sent_as(MyDataStatus.SUBMITTED)
+        assert (
+            receipt_movement(plain, nothing_registered=True).dispatch_date
+            == timezone.localdate()
+        )
+        plain.transmission_failed_at = timezone.now()
+        assert receipt_movement(plain, nothing_registered=True) == past
         assert (
             receipt_movement(
                 sent_as(MyDataStatus.REJECTED, ERROR_DUPLICATE_UID)
@@ -498,6 +512,7 @@ class TestWhenMyDataDoesNotAnswer:
 
         with (
             mydata_enabled(),
+            FakeAade(),
             patch(
                 "order.accounting.mydata.client.MyDataClient.send_invoices",
                 side_effect=MyDataTransportError("connection refused"),
@@ -1117,9 +1132,10 @@ class TestWhatHappensBetweenTwoSteps:
                 "order.accounting.mydata.client.MyDataClient.send_invoices",
                 side_effect=the_other_sender_registers_it,
             ),
+            # AADE cannot say whether it holds it, before the send or after.
             patch(
-                "order.accounting.mydata.service.recover_mark_for_document",
-                return_value=False,
+                "order.accounting.mydata.service.look_up_mark",
+                return_value=MarkLookup.UNKNOWN,
             ),
         ):
             row = submit_document(invoice)
@@ -1260,3 +1276,178 @@ class TestAMovementTheReceiptDoesNotCover:
                 OrderService.update_order_status(order, OrderStatus.SHIPPED)
 
         assert not any("movement indication" in n for n in _notes(order))
+
+
+def _stalled(invoice) -> None:
+    """The receipt as a sender killed mid-request leaves it: its intent
+    stored (SUBMITTED, uid), no answer recorded, untouched for a while."""
+    Invoice.objects.filter(pk=invoice.pk).update(
+        mydata_error_code="",
+        mydata_error_message="",
+        updated_at=timezone.now() - timedelta(hours=1),
+    )
+
+
+def _issued_days_ago(invoice, days: int) -> None:
+    movement = dict(invoice.movement)
+    movement["dispatch_date"] = (
+        timezone.localdate() - timedelta(days=days)
+    ).isoformat()
+    Invoice.objects.filter(pk=invoice.pk).update(movement=movement)
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestASendWithNoAnswerOnRecord:
+    """Stand-in review of #760: every way a send can end without an answer
+    is found again, and a resend on a later day carries a date AADE takes."""
+
+    def test_an_unreadable_answer_is_no_answer(
+        self, django_capture_on_commit_callbacks
+    ):
+        """An HTTP 200 with an empty body says nothing of the document: it is
+        recorded unanswered and retried, not a crash."""
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                return_value=b"",
+            ),
+            patch.object(send_invoice_to_mydata, "max_retries", 0),
+        ):
+            invoice = _issue(_acs_order(), django_capture_on_commit_callbacks)
+
+        assert invoice.mydata_status == MyDataStatus.SUBMITTED
+        assert invoice.mydata_error_code == ERROR_NO_ANSWER
+
+    def test_a_send_whose_worker_stopped_is_sent_again(
+        self, django_capture_on_commit_callbacks
+    ):
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        _stalled(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        assert len(aade.receipts) == 1
+        invoice.refresh_from_db()
+        assert invoice.mydata_mark is not None
+
+    def test_one_in_flight_now_is_left_to_its_sender(
+        self, django_capture_on_commit_callbacks
+    ):
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+
+        assert not unanswered_sends(Invoice.objects.filter(pk=invoice.pk))
+
+    def test_refused_credentials_wait_for_staff(
+        self, django_capture_on_commit_callbacks
+    ):
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataAuthError(
+                    "AADE rejected credentials (401)", code="401"
+                ),
+            ),
+        ):
+            invoice = _issue(_acs_order(), django_capture_on_commit_callbacks)
+        assert invoice.mydata_error_code == "401"
+        _untouched_for_a_while(invoice)
+
+        with mydata_enabled(), FakeAade() as aade:
+            assert retry_receipts_with_mydata() == 0
+
+        assert aade.sent == []
+
+    def test_the_parcel_leaving_after_a_stopped_send_stamps_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        _stalled(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        [sent] = aade.receipts
+        assert sent.transmission_failure == "3"
+
+    def test_a_canceled_orders_receipt_whose_sender_stopped_is_canceled(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Never answered, never registered, set aside by the cancel: the
+        sweep sends it, and its registration cancels it in myDATA."""
+        order = _cod_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        _stalled(invoice)
+        with mydata_enabled(), FakeAade() as aade:
+            _staff_cancel(
+                order, django_capture_on_commit_callbacks, return_value=True
+            )
+            _stalled(invoice)
+            with django_capture_on_commit_callbacks(execute=True):
+                retry_receipts_with_mydata()
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CANCELED
+        assert aade.cancelled == [invoice.mydata_mark]
+        assert aade.credits == []
+
+    def test_a_plain_resend_on_a_later_day_is_dated_today(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE refuses a dispatchDate before the current date (error 280):
+        once it says it holds nothing under the uid, the resend is dated
+        today, its addresses as issued."""
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        issued = invoice.movement
+        _issued_days_ago(invoice, 1)
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            retry_receipts_with_mydata()
+
+        [sent] = aade.receipts
+        today = timezone.localdate().isoformat()
+        assert f"<dispatchDate>{today}</dispatchDate>".encode() in sent.xml
+        invoice.refresh_from_db()
+        assert invoice.movement == issued
+
+    def test_not_when_aade_could_not_say_whether_it_holds_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        """A registered document keeps the date AADE has: without an answer
+        to the lookup, the resend goes as issued (228 finds it if it is)."""
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        _issued_days_ago(invoice, 1)
+        _untouched_for_a_while(invoice)
+        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            patch(
+                "order.accounting.mydata.client.MyDataClient."
+                "request_transmitted_docs",
+                side_effect=MyDataTransportError("timeout"),
+            ),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            retry_receipts_with_mydata()
+
+        [sent] = aade.receipts
+        assert f"<dispatchDate>{yesterday}</dispatchDate>".encode() in sent.xml

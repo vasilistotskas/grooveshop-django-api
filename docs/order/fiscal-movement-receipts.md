@@ -147,12 +147,16 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   receipt keeps its number and is recorded as issued; the send is marked
   unanswered (`mydata_error_code` `NO_ANSWER`, status SUBMITTED). A send
   whose worker stopped mid-request is left SUBMITTED with no code, and counts
-  as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed
+  as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed since that send
+  began (`Invoice.mydata_sent_at`, never the row's last write)
   (`movement.unanswered_sends`); one whose credentials AADE refused keeps
   AADE's code and waits for staff. Before any SUBMITTED document is sent
   again its MARK is looked up (`service.look_up_mark`: `RequestTransmittedDocs`
-  by its uid, the 228 recovery), since the send may have been registered;
-  credentials AADE refuses there are recorded the same way. Every send
+  by its uid, the 228 recovery), since the send may have been registered.
+  Credentials AADE refuses there are recorded as a message only: the last
+  send keeps its "no answer", so a parcel that leaves is still stamped, and
+  the sweep tries again every `MYDATA_RETRY_AFTER_MINUTES` until the
+  credentials work (one order note, not one per try). Every send
   stores the movement block it carries with it, `{}` for a receipt sent
   plain, so a receipt rebuilt plain keeps no block AADE was not sent.
   While the parcel is still with the store, a resend is the document as

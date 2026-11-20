@@ -263,6 +263,16 @@ class MyDataRegistration(models.Model):
             "across retries so reporting reflects the original send time."
         ),
     )
+    mydata_sent_at = models.DateTimeField(
+        _("myDATA Sent At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the latest send to AADE began. A send with no answer on "
+            "record still runs until this is older than the retry delay, "
+            "whatever else touched the document since."
+        ),
+    )
     mydata_confirmed_at = models.DateTimeField(
         _("myDATA Confirmed At"),
         null=True,

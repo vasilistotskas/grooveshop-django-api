@@ -17049,6 +17049,9 @@ msgstr "Πότε η απόφαση πήρε τελευταία την τρέχο
 msgid "When the export can no longer be downloaded."
 msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
 
+msgid "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+msgstr "Πότε ξεκίνησε η τελευταία αποστολή στην ΑΑΔΕ. Μια αποστολή χωρίς καταγεγραμμένη απάντηση θεωρείται σε εξέλιξη μέχρι να περάσει η καθυστέρηση επανάληψης από τότε, ό,τι άλλο κι αν άλλαξε στο παραστατικό στο μεταξύ."
+
 msgid "When the money moved; empty while it is in flight."
 msgstr "Πότε μετακινήθηκαν τα χρήματα· κενό όσο είναι σε εξέλιξη."
 
@@ -17966,6 +17969,9 @@ msgstr "myDATA MARK"
 
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
+
+msgid "myDATA Sent At"
+msgstr "Τελευταία αποστολή στο myDATA"
 
 msgid "myDATA Serial Number (aa)"
 msgstr "Αριθμός Σειράς myDATA (aa)"

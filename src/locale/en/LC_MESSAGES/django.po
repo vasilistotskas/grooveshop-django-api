@@ -17047,6 +17047,9 @@ msgstr "When the decision last took its current value. A receipt issued after it
 msgid "When the export can no longer be downloaded."
 msgstr "When the export can no longer be downloaded."
 
+msgid "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+msgstr "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+
 msgid "When the money moved; empty while it is in flight."
 msgstr "When the money moved; empty while it is in flight."
 
@@ -17964,6 +17967,9 @@ msgstr "myDATA MARK"
 
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
+
+msgid "myDATA Sent At"
+msgstr "myDATA Sent At"
 
 msgid "myDATA Serial Number (aa)"
 msgstr "myDATA Serial Number (aa)"

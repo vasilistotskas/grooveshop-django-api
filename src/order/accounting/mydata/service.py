@@ -107,10 +107,10 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         try:
             lookup = look_up_mark(invoice)
         except MyDataAuthError as exc:
-            # AADE refused the credentials before anything was sent:
-            # recorded as for a send, so the sweep leaves it to staff
-            # instead of asking again with the same credentials.
-            _persist_send_error(invoice, code=exc.code, message=exc.message)
+            # AADE refused the credentials the lookup asked with: that says
+            # nothing of the document, whose last send still has no answer
+            # (it stays so, for the stamp when its parcel leaves).
+            _persist_lookup_refusal(invoice, message=exc.message)
             raise
         if lookup is MarkLookup.FOUND:
             return _registered_row(invoice)
@@ -317,6 +317,26 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
         locked.save(update_fields=fields)
     invoice.mydata_error_code = code[:10]
     invoice.mydata_error_message = message or ""
+
+
+def _persist_lookup_refusal(invoice: Any, *, message: str) -> None:
+    """Record that AADE refused the credentials the lookup of *invoice*'s
+    MARK asked with, keeping its last send's outcome (``mydata_error_code``):
+    the document may still be registered from that send. Staff read why
+    (``mydata_error_message``), and the touch spaces the sweep's next try
+    by ``MYDATA_RETRY_AFTER_MINUTES``, which registers it once the store's
+    credentials work again. A row registered meanwhile is left as it is."""
+    with transaction.atomic():
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
+        if locked.mydata_mark:
+            return
+        locked.mydata_error_message = message
+        locked.save(update_fields=["mydata_error_message", "updated_at"])
+    invoice.mydata_error_message = message
 
 
 def cancel_document(invoice: Any) -> ResponseRow | None:
@@ -711,8 +731,8 @@ def _persist_submission_intent(
     mirrored onto *invoice*): the document built from the stale copy
     misses ``transmissionFailure`` and is built again. The stamp lands
     only on a row whose send has no answer
-    (``movement.unanswered_sends``), and this write gives it a fresh one,
-    so once claimed it cannot land before the send."""
+    (``movement.unanswered_sends``), and this write starts a new send
+    (``mydata_sent_at``), so once claimed it cannot land before the send."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -733,8 +753,10 @@ def _persist_submission_intent(
         locked.mydata_series = series
         locked.mydata_aa = aa
         locked.mydata_status = MyDataStatus.SUBMITTED
+        now = timezone.now()
         if locked.mydata_submitted_at is None:
-            locked.mydata_submitted_at = timezone.now()
+            locked.mydata_submitted_at = now
+        locked.mydata_sent_at = now
         locked.mydata_error_code = ""
         locked.mydata_error_message = ""
         fields = [
@@ -744,6 +766,7 @@ def _persist_submission_intent(
             "mydata_aa",
             "mydata_status",
             "mydata_submitted_at",
+            "mydata_sent_at",
             "mydata_error_code",
             "mydata_error_message",
             "updated_at",
@@ -759,6 +782,7 @@ def _persist_submission_intent(
     invoice.mydata_series = series
     invoice.mydata_aa = aa
     invoice.mydata_status = MyDataStatus.SUBMITTED
+    invoice.mydata_sent_at = locked.mydata_sent_at
     invoice.mydata_error_code = ""
     invoice.mydata_error_message = ""
     if movement is not None:

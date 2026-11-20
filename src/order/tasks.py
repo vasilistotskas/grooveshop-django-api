@@ -1295,6 +1295,7 @@ def _submit_document_to_mydata(task, order: Order, document):
 
     number = document.document_number
     refused_before = document.mydata_error_code
+    message_before = document.mydata_error_message
     try:
         return submit_document(document)
     except MyDataTransportError as exc:
@@ -1335,9 +1336,14 @@ def _submit_document_to_mydata(task, order: Order, document):
             exc.code,
             exc.message,
         )
-        if exc.code != refused_before or exc.code != ERROR_PICKUP_POINT_UNKNOWN:
-            # A pickup point still unknown is noted once, not at every
-            # sweep that builds it again.
+        noted_before = (
+            exc.code == refused_before == ERROR_PICKUP_POINT_UNKNOWN
+        ) or (
+            isinstance(exc, MyDataAuthError) and exc.message == message_before
+        )
+        if not noted_before:
+            # A pickup point still unknown, or credentials still refused,
+            # is noted once, not at every sweep that tries it again.
             OrderHistory.log_note(
                 order=order,
                 note=f"myDATA rejected {number}: {exc.code} {exc.message}",
@@ -1792,11 +1798,6 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
         )
         if current is None:
             return "nothing_to_settle"
-        # Read before the release touches the row: a send stopped
-        # mid-request counts once it has been still for a while.
-        unanswered = sends_without_an_answer(
-            Invoice.objects.filter(pk=current.pk)
-        ).exists()
         current.cancel_requested_at = None
         current.save(update_fields=["cancel_requested_at", "updated_at"])
         OrderHistory.log_note(
@@ -1811,7 +1812,12 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
         if current.mydata_mark:
             # It stands, so it reaches the customer (``awaits_the_parcel``).
             dispatch_on_commit(send_invoice_email, [order.id])
-        elif current.mydata_status == MyDataStatus.NOT_SENT or unanswered:
+        elif (
+            current.mydata_status == MyDataStatus.NOT_SENT
+            or sends_without_an_answer(
+                Invoice.objects.filter(pk=current.pk)
+            ).exists()
+        ):
             # Never sent (its worker stopped before the send), or its last
             # send has no answer: the hold was what the sweep sent it for
             # (a plain receipt's send is in no other sweep), so it is sent

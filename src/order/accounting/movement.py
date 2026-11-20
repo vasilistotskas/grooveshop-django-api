@@ -431,9 +431,11 @@ def sends_without_an_answer(invoices: Any) -> Any:
     not readably (``ERROR_NO_ANSWER``), and one whose sender stopped
     mid-request (a worker killed during the call), which is left SUBMITTED
     with no code at all; that one only once ``MYDATA_RETRY_AFTER_MINUTES``
-    passed since it was touched, as a send in flight right now looks the
-    same. A receipt AADE refused, or whose credentials it refused, is not
-    one: it carries AADE's code."""
+    passed since that send began (``mydata_sent_at``), as a send in flight
+    right now looks the same. The send's own start, never the row's last
+    write: setting a receipt aside for a cancel, or the sweep's touch,
+    says nothing of the send. A receipt AADE refused, or whose credentials
+    it refused, is not one: it carries AADE's code."""
     from order.accounting.mydata.types import ERROR_NO_ANSWER
     from order.models.invoice import MyDataStatus
 
@@ -444,7 +446,7 @@ def sends_without_an_answer(invoices: Any) -> Any:
         mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
     ).filter(
         Q(mydata_error_code=ERROR_NO_ANSWER)
-        | Q(mydata_error_code="", updated_at__lte=stalled_before)
+        | Q(mydata_error_code="", mydata_sent_at__lte=stalled_before)
     )
 
 

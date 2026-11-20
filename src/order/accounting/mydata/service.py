@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date, timedelta
 from enum import Enum
 from typing import Any
@@ -37,7 +38,7 @@ from django.utils import timezone
 from xmlschema import XMLSchemaValidationError
 
 from core.store_settings import store_setting
-from order.accounting.movement import receipt_movement
+from order.accounting.movement import ReceiptMovement, receipt_movement
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
 from order.accounting.mydata.config import load_config
@@ -50,6 +51,7 @@ from order.accounting.mydata.exceptions import (
 from order.accounting.mydata.parser import (
     RequestedDocResult,
     ResponseRow,
+    TransmittedDoc,
     parse_requested_doc,
     parse_response_doc,
 )
@@ -118,51 +120,61 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             code="MISSING_SELLER_VAT",
         )
 
-    try:
-        built = _build_document(
+    while True:
+        try:
+            built = _build_document(
+                invoice,
+                config=config,
+                issuer_vat=issuer_vat,
+                nothing_registered=nothing_registered,
+            )
+        except ValueError as exc:
+            # Unsupported VAT rate or malformed invoice_number — bad
+            # master data, not transient. Record as a terminal validation
+            # failure so the admin UI surfaces the reason rather than
+            # retrying 5 times and then burying the error.
+            if not _persist_failure(
+                invoice,
+                code="BUILD",
+                message=f"Failed to build myDATA payload: {exc}",
+            ):
+                return _registered_row(invoice)
+            raise MyDataValidationError(str(exc), code="BUILD") from exc
+
+        try:
+            validate_invoice_doc(built.xml_bytes)
+        except XMLSchemaValidationError as exc:
+            # XSD validation error is terminal: the payload does not
+            # match the pinned schema. Fall into the same rejection
+            # bucket as a server-side ValidationError so ops can see
+            # the reason in the admin instead of a zombie SUBMITTED row.
+            if not _persist_failure(
+                invoice,
+                code="XSD",
+                message=f"Local XSD validation failed: {exc}",
+            ):
+                return _registered_row(invoice)
+            raise MyDataValidationError(str(exc), code="XSD") from exc
+
+        # Persist UID + request-scope identity BEFORE the HTTP call so a
+        # transport failure leaves enough state to recover on retry.
+        claim = _persist_submission_intent(
             invoice,
-            config=config,
-            issuer_vat=issuer_vat,
-            nothing_registered=nothing_registered,
+            uid=built.uid,
+            invoice_type=built.invoice_type,
+            series=built.series,
+            aa=built.aa,
+            movement=built.movement.as_json() if built.movement else None,
         )
-    except ValueError as exc:
-        # Unsupported VAT rate or malformed invoice_number — bad
-        # master data, not transient. Record as a terminal validation
-        # failure so the admin UI surfaces the reason rather than
-        # retrying 5 times and then burying the error.
-        if not _persist_failure(
-            invoice,
-            code="BUILD",
-            message=f"Failed to build myDATA payload: {exc}",
-        ):
+        if claim is _SendClaim.REGISTERED:
+            # Another sender registered it since this one read the row.
             return _registered_row(invoice)
-        raise MyDataValidationError(str(exc), code="BUILD") from exc
-
-    try:
-        validate_invoice_doc(built.xml_bytes)
-    except XMLSchemaValidationError as exc:
-        # XSD validation error is terminal: the payload does not
-        # match the pinned schema. Fall into the same rejection
-        # bucket as a server-side ValidationError so ops can see
-        # the reason in the admin instead of a zombie SUBMITTED row.
-        if not _persist_failure(
-            invoice, code="XSD", message=f"Local XSD validation failed: {exc}"
-        ):
-            return _registered_row(invoice)
-        raise MyDataValidationError(str(exc), code="XSD") from exc
-
-    # Persist UID + request-scope identity BEFORE the HTTP call so a
-    # transport failure leaves enough state to recover on retry.
-    if not _persist_submission_intent(
-        invoice,
-        uid=built.uid,
-        invoice_type=built.invoice_type,
-        series=built.series,
-        aa=built.aa,
-        movement=built.movement.as_json() if built.movement else None,
-    ):
-        # Another sender registered it since this one read the row.
-        return _registered_row(invoice)
+        if claim is _SendClaim.CLAIMED:
+            break
+        # _SendClaim.STAMPED: the parcel left unregistered while this
+        # sender looked its MARK up, so the document it built lacks the
+        # loss-of-connection indication (and may carry a redated start).
+        # The stamp is set once, so it is built again at most once.
 
     client = MyDataClient(config)
     try:
@@ -525,6 +537,21 @@ def look_up_mark(invoice: Any) -> MarkLookup:
     # SAFETY: require exactly one match for our uid.
     matches = [d for d in all_docs if d.uid == uid_to_find]
 
+    if len(matches) == 0 and any(not doc.uid for doc in all_docs):
+        # A listed document without a uid (AADE's ``uid`` is optional in
+        # ``AadeBookInvoiceType``) may be this one: nothing can be
+        # concluded, and ABSENT would redate a document AADE may hold.
+        logger.warning(
+            "recover_mark_for_invoice: uid=%s not found, but the window "
+            "%s–%s lists documents without a uid; invoice pk=%s may be "
+            "one of them.",
+            uid_to_find,
+            date_from,
+            date_to,
+            invoice.pk,
+        )
+        return MarkLookup.UNKNOWN
+
     if len(matches) == 0:
         logger.warning(
             "recover_mark_for_invoice: uid=%s not found in "
@@ -570,7 +597,7 @@ def look_up_mark(invoice: Any) -> MarkLookup:
         invoice.pk,
         uid_to_find,
     )
-    _persist_recovered_mark(invoice, mark=matched.invoice_mark)
+    _persist_recovered_mark(invoice, matched)
     return MarkLookup.FOUND
 
 
@@ -608,6 +635,18 @@ def _resolve_issuer_vat() -> str:
     return str(store_setting("INVOICE_SELLER_VAT_ID") or "")
 
 
+class _SendClaim(Enum):
+    """What :func:`_persist_submission_intent` found under the row lock."""
+
+    #: The intent is stored: send the document built.
+    CLAIMED = "claimed"
+    #: Another sender registered it: send nothing.
+    REGISTERED = "registered"
+    #: Its loss-of-connection stamp (``transmission_failed_at``) landed
+    #: after the document was built: build it again from the row.
+    STAMPED = "stamped"
+
+
 def _persist_submission_intent(
     invoice: Any,
     *,
@@ -616,14 +655,20 @@ def _persist_submission_intent(
     series: str,
     aa: int,
     movement: dict[str, Any] | None = None,
-) -> bool:
+) -> _SendClaim:
     """Lock + save the identity fields before the HTTP round-trip, and a
     receipt's movement indication with them (``Invoice.movement``), so the
     PDF registered after it prints what AADE received.
 
-    Returns ``False``, writing nothing, when the row holds a MARK already
-    (another sender registered it since this one read it): it is not sent
-    again, and its registered state is mirrored onto *invoice*."""
+    Writes nothing when the row holds a MARK already (another sender
+    registered it since this one read it: ``REGISTERED``, its registered
+    state mirrored onto *invoice*), or when it was stamped as sent during
+    a loss of connection after *invoice* was read (``STAMPED``, the stamp
+    mirrored onto *invoice*): the document built from the stale copy
+    misses ``transmissionFailure`` and is built again. The stamp lands
+    only on a row whose send has no answer
+    (``movement.unanswered_sends``), and this write gives it a fresh one,
+    so once claimed it cannot land before the send."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -634,7 +679,11 @@ def _persist_submission_intent(
         )
         if locked.mydata_mark:
             _mirror_registration(invoice, locked)
-            return False
+            return _SendClaim.REGISTERED
+        stamp = getattr(locked, "transmission_failed_at", None)
+        if stamp != getattr(invoice, "transmission_failed_at", None):
+            invoice.transmission_failed_at = stamp
+            return _SendClaim.STAMPED
         locked.mydata_uid = uid
         locked.mydata_invoice_type = invoice_type
         locked.mydata_series = series
@@ -670,7 +719,7 @@ def _persist_submission_intent(
     invoice.mydata_error_message = ""
     if movement is not None:
         invoice.movement = movement
-    return True
+    return _SendClaim.CLAIMED
 
 
 def _mirror_registration(invoice: Any, locked: Any) -> None:
@@ -707,6 +756,9 @@ def _persist_success(
             "mydata_qr_url",
             "updated_at",
         ]
+        if not locked.mydata_mark:
+            # A row registered already cleared its PDF then.
+            _drop_the_unregistered_pdf(locked, fields)
         locked.mydata_mark = row.invoice_mark
         locked.mydata_authentication_code = row.authentication_code or ""
         locked.mydata_qr_url = row.qr_url or ""
@@ -728,8 +780,29 @@ def _persist_success(
     invoice.mydata_status = locked.mydata_status
     invoice.mydata_mark = row.invoice_mark
     invoice.mydata_qr_url = row.qr_url or ""
+    invoice.document_file = locked.document_file.name or ""
     if movement is not None:
         invoice.movement = movement
+
+
+def _drop_the_unregistered_pdf(locked: Any, fields: list[str]) -> None:
+    """Clear the PDF *locked* holds from before its registration, in the
+    save that records the MARK: it prints no MARK and no AADE QR, and
+    nothing may hand it to the customer as the registered document
+    (``Invoice.is_deliverable`` needs a stored PDF; the SHIPPED handler
+    and a download read the row at any moment). The registration renders
+    the registered one next (``order.tasks.send_invoice_to_mydata``), and
+    a render that fails leaves a row with no PDF, which that task renders
+    first when it runs again, with no second submission
+    (``submit_document`` returns the MARK it holds). The file goes once
+    the MARK is committed."""
+    if not locked.document_file:
+        return
+    storage = locked.document_file.storage
+    name = locked.document_file.name
+    locked.document_file = ""
+    fields.append("document_file")
+    transaction.on_commit(lambda: storage.delete(name))
 
 
 def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:
@@ -817,12 +890,17 @@ def _persist_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
     invoice.mydata_cancellation_mark = cancellation_mark
 
 
-def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
-    """Flip invoice to CONFIRMED with a MARK recovered via
-    ``RequestTransmittedDocs``. Uses the same locked pattern as
-    ``_persist_success`` — no qr_url or authentication_code because
-    those aren't returned by the query endpoint. A row that holds a MARK
-    already (registered, or canceled in myDATA since) is left as it is."""
+def _persist_recovered_mark(invoice: Any, registered: TransmittedDoc) -> None:
+    """Flip invoice to CONFIRMED with the MARK of the document
+    ``RequestTransmittedDocs`` listed under its uid (*registered*), the
+    same locked pattern as ``_persist_success``. What the listing says of
+    the registered document is kept: AADE's verification URL
+    (``qrCodeUrl``, when it lists one), and the movement's start as AADE
+    holds it (``dispatchDate``): the send that registered it may not be
+    the one whose block the row holds (one redated after an ``ABSENT``
+    lookup while an earlier send was still on its way). The listing
+    carries no authentication code. A row that holds a MARK already
+    (registered, or canceled in myDATA since) is left as it is."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -835,19 +913,34 @@ def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
             _mirror_registration(invoice, locked)
             return
         locked.mydata_status = MyDataStatus.CONFIRMED
-        locked.mydata_mark = mark
+        locked.mydata_mark = registered.invoice_mark
         locked.mydata_confirmed_at = timezone.now()
         locked.mydata_error_code = ""
         locked.mydata_error_message = ""
-        locked.save(
-            update_fields=[
-                "mydata_status",
-                "mydata_mark",
-                "mydata_confirmed_at",
-                "mydata_error_code",
-                "mydata_error_message",
-                "updated_at",
-            ]
-        )
+        fields = [
+            "mydata_status",
+            "mydata_mark",
+            "mydata_confirmed_at",
+            "mydata_error_code",
+            "mydata_error_message",
+            "updated_at",
+        ]
+        if registered.qr_code_url:
+            locked.mydata_qr_url = registered.qr_code_url
+            fields.append("mydata_qr_url")
+        stored = getattr(locked, "movement", None)
+        if stored and registered.dispatch_date is not None:
+            issued = ReceiptMovement.from_json(stored)
+            if issued.dispatch_date != registered.dispatch_date:
+                locked.movement = replace(
+                    issued, dispatch_date=registered.dispatch_date
+                ).as_json()
+                fields.append("movement")
+        _drop_the_unregistered_pdf(locked, fields)
+        locked.save(update_fields=fields)
     invoice.mydata_status = MyDataStatus.CONFIRMED
-    invoice.mydata_mark = mark
+    invoice.mydata_mark = registered.invoice_mark
+    invoice.mydata_qr_url = locked.mydata_qr_url
+    invoice.document_file = locked.document_file.name or ""
+    if stored:
+        invoice.movement = locked.movement

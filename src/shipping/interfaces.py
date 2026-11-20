@@ -140,6 +140,14 @@ class ShippingCarrierInterface(ABC):
     def shipment_for_order(self, order: Order) -> Any | None:
         """Return the provider's shipment row attached to ``order`` or None."""
 
+    @abstractmethod
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """Whether the carrier has accepted the parcel of *shipment*: its
+        voucher or parcel exists at the carrier, not only the local row a
+        checkout writes before asking for one. What a receipt with
+        movement indication waits for (``order.accounting.invoicing.
+        receipt_issuable``)."""
+
     def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
         """The address of the pickup point (a locker, a station) the parcel
         goes to, or ``None`` when it goes to the buyer's own address.

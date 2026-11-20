@@ -107,10 +107,11 @@ def receipt_issuable(order: Order) -> bool:
     sale's receipt is issued with movement indication before the movement
     starts (``order.accounting.movement``), once nothing is owed online,
     the store has set its dispatch point (``movement_receipts_on``) and the
-    carrier holds the parcel's voucher (``Order.tracking_number``, which
-    every path that makes a voucher or parcel live records through
-    ``Order.add_tracking_info``). A shipment row alone is no voucher: ACS's
-    is written at checkout, before the voucher is asked for."""
+    carrier has accepted the parcel
+    (``ShippingService.carrier_holds_the_parcel``: ACS's voucher, BOX NOW's
+    parcel). Neither a shipment row (ACS's is written at checkout, before
+    the voucher is asked for) nor a tracking number typed on the order is
+    that."""
     if order.document_type != OrderDocumentTypeEnum.RECEIPT.value:
         return False
     if order.status in RECEIPT_ISSUING_STATUSES:
@@ -118,8 +119,8 @@ def receipt_issuable(order: Order) -> bool:
     return (
         order.status in PRE_SHIPMENT_STATUSES
         and not order.awaits_online_payment
-        and bool(order.tracking_number)
         and movement_receipts_on(order)
+        and ShippingService.carrier_holds_the_parcel(order)
     )
 
 
@@ -639,13 +640,6 @@ def _persist_invoice_row(
         invoice = existing
         invoice_number = existing.invoice_number
         issue_date = existing.issue_date
-        # Delete the stale PDF so the regenerated one lands at the
-        # same storage key. Django's default ``get_available_name``
-        # appends a suffix to avoid overwrites, which would leave
-        # the pre-MARK PDF as an orphan (plus cost an extra S3
-        # object per regeneration in prod).
-        if invoice.document_file:
-            invoice.document_file.delete(save=False)
     else:
         issue_date = timezone.localdate()
         invoice_number = InvoiceCounter.allocate(issue_date.year)
@@ -841,17 +835,46 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             _build_context(order, invoice, vat_breakdown, totals)
         )
 
-    filename = f"{invoice.invoice_number}.pdf"
-    invoice.document_file.save(filename, ContentFile(pdf_bytes), save=False)
-    invoice.save(update_fields=["document_file"])
-
+    stored = _store_pdf(invoice, pdf_bytes)
+    if stored is None:
+        logger.info(
+            "Receipt %s of order %s was registered while it rendered; its "
+            "registration renders it again",
+            invoice.invoice_number,
+            order.id,
+        )
+        return Invoice.objects.get(pk=invoice.pk)
     logger.info(
         "Generated invoice %s for order %s (%s bytes)",
         invoice.invoice_number,
         order.id,
         len(pdf_bytes),
     )
-    return invoice
+    return stored
+
+
+def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
+    """Store the PDF just rendered for *invoice* in place of the one the
+    row holds, and return the row; ``None``, storing nothing, when AADE's
+    registration landed while it rendered (the row's MARK is not the one
+    the PDF prints): the registration clears the PDF it found and renders
+    its own (``mydata.service._persist_success``).
+
+    The old file is removed only now, once its replacement exists, so a
+    render that fails leaves the row and its file as they were; it is
+    removed first so the new one lands at the same storage key (Django's
+    ``get_available_name`` would add a suffix and orphan the old one)."""
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.mydata_mark != invoice.mydata_mark:
+            return None
+        if locked.document_file:
+            locked.document_file.delete(save=False)
+        locked.document_file.save(
+            f"{locked.invoice_number}.pdf", ContentFile(pdf_bytes), save=False
+        )
+        locked.save(update_fields=["document_file"])
+    return locked
 
 
 def render_specimen_pdf(order: Order) -> bytes:

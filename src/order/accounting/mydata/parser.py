@@ -15,6 +15,7 @@ Status codes per the spec: ``Success``, ``ValidationError``,
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal, cast, get_args
 from xml.etree.ElementTree import Element, ParseError
 
@@ -209,9 +210,10 @@ class TransmittedDoc:
     AADE's ``RequestTransmittedDocs`` returns a ``RequestedDoc`` whose
     ``<invoicesDoc>`` wraps ``<invoice>`` children (``AadeBookInvoiceType``).
     Each invoice carries ``<uid>`` (the submitter-generated SHA-1 we sent)
-    and ``<mark>`` (the AADE-assigned Registration Number). Only those two
-    fields are extracted — they're all MARK recovery needs; the rest of
-    the invoice (issuer, lines, totals) is present but ignored.
+    and ``<mark>`` (the AADE-assigned Registration Number), which MARK
+    recovery matches on, and what recovery keeps of the registered
+    document: its ``<qrCodeUrl>`` and its header's ``<dispatchDate>``. The
+    rest of the invoice (issuer, lines, totals) is present but ignored.
 
     Element names validated against the AADE myDATA invoice schema
     (``AadeBookInvoiceType``: ``uid`` + ``mark`` as direct children of
@@ -223,6 +225,13 @@ class TransmittedDoc:
     #: ``cancelledByMark``: the MARK of the cancellation of this
     #: document, filled by AADE (``AadeBookInvoiceType``, v2.0.2).
     cancelled_by_mark: int | None = None
+    #: ``qrCodeUrl``: AADE's verification URL of the document, the
+    #: listing's name for what a ``SendInvoices`` answer calls ``qrUrl``;
+    #: empty when AADE lists none.
+    qr_code_url: str = ""
+    #: ``invoiceHeader/dispatchDate``: the movement's start as AADE
+    #: registered it, ``None`` for a document without movement.
+    dispatch_date: date | None = None
 
 
 @dataclass(frozen=True)
@@ -293,6 +302,8 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
                     cancelled_by_mark=_int_or_none(
                         _text(invoice_el, "cancelledByMark")
                     ),
+                    qr_code_url=_text(invoice_el, "qrCodeUrl") or "",
+                    dispatch_date=_dispatch_date(invoice_el),
                 )
             )
 
@@ -323,6 +334,20 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
         next_row_key=next_row_key,
         cancellations=cancellations,
     )
+
+
+def _dispatch_date(invoice_el: Element) -> date | None:
+    """The ``dispatchDate`` of an ``<invoice>``'s header, or ``None`` when
+    it has none or AADE's value is not an ``xs:date``."""
+    for header_el in _iter_children(invoice_el, "invoiceHeader"):
+        value = _text(header_el, "dispatchDate")
+        if not value:
+            return None
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _int_or_none(value: str | None) -> int | None:

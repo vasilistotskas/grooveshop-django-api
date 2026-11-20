@@ -247,6 +247,25 @@ class ShippingService:
         )
 
     @classmethod
+    def carrier_holds_the_parcel(cls, order: Order) -> bool:
+        """Whether the order's carrier has accepted its parcel (a voucher or
+        parcel at the carrier, ``holds_the_parcel``). A tracking number
+        typed on the order, or a shipment row written at checkout, is not
+        that."""
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return False
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return False
+        # As stored: the order may hold the row cached from before the
+        # carrier path saved the voucher or parcel on its own (locked)
+        # copy and then recorded the tracking number on the order.
+        return adapter.holds_the_parcel(
+            type(shipment)._default_manager.get(pk=shipment.pk)
+        )
+
+    @classmethod
     def delivery_address(cls, order: Order) -> PostalAddress | None:
         """Where the order's carrier takes the parcel, or ``None`` when the
         order does not move through a carrier (no provider, or one with no

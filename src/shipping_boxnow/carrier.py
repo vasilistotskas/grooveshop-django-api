@@ -84,6 +84,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
     def shipment_for_order(self, order: Order):
         return getattr(order, "boxnow_shipment", None)
 
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """BOX NOW holds a parcel for the shipment (created, or taken over
+        after a P410)."""
+        return shipment.has_parcel
+
     def pickup_point_address(self, shipment: Any) -> PostalAddress:
         """The locker's address as BOX NOW lists it. Its destinations carry
         no city field: the city is ``addressLine2`` (BOX NOW API manual

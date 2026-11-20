@@ -60,6 +60,9 @@ class _NoThresholdCarrier(ShippingCarrierInterface):
     def shipment_for_order(self, order):
         return None
 
+    def holds_the_parcel(self, shipment):
+        return False
+
     def serialize_shipment(self, shipment, *, context):
         return None
 

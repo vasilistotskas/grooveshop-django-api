@@ -73,6 +73,10 @@ class AcsCarrier(ShippingCarrierInterface):
     def shipment_for_order(self, order: Order):
         return getattr(order, "acs_shipment", None)
 
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """ACS minted (or staff adopted) the voucher."""
+        return bool(shipment.voucher_no)
+
     def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
         """The station's address, only from the catalogue row of the exact
         station ACS books: the (external_id, branch_code) pair the voucher

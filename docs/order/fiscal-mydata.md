@@ -120,7 +120,15 @@ code). A refused or unanswered receipt is **never emailed**: the customer's
 email (`send_invoice_email`, "Receipt ...") goes out only after AADE registered
 it and the PDF carries the MARK; staff resubmit with "Send receipt to myDATA".
 The 228 duplicate-uid MARK recovery through `RequestTransmittedDocs` is
-unchanged.
+unchanged. The PDF rendered before the registration prints no MARK, so the
+save that records the MARK clears it (`service._drop_the_unregistered_pdf`)
+and `send_invoice_to_mydata` renders the registered one: until then the
+receipt is not deliverable (no stored PDF), and a render that fails leaves
+a row without a PDF, which that task renders first when it runs again,
+without a second submission. A re-render replaces the stored PDF only
+once the new one exists (`invoicing._store_pdf`), so a failed one leaves
+the old file in place, and only while the row's MARK is the one it
+prints: a render that a registration overtook is discarded.
 
 **A courier or locker sale's receipt carries the movement and is issued when
 its voucher or parcel is recorded, before the pickup (#747).** Α.1123/2024
@@ -178,7 +186,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   an outage keeps its date. Every payload is checked against AADE's v2.0.2 XSDs,
   vendored in `src/order/accounting/mydata/xsd/`, before it is sent.
 - **When it is issued.** The order is issuable before it ships
-  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online). Every
+  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, and the
+  carrier holds the parcel, `ShippingService.carrier_holds_the_parcel`:
+  ACS's voucher, BOX NOW's parcel; neither the shipment row checkout
+  writes nor a tracking number staff type on the order is one). Every
   path that makes a shipment live records it through `Order.add_tracking_info`
   (an ACS voucher minted or adopted, a BOX NOW parcel created, taken over
   after P410 or settled), and the order's first tracking number sends
@@ -205,7 +216,11 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   is the one thing that moves: AADE refuses a date before the current one
   (error 280), so a plain resend on a later day is dated today, and only
   when the lookup read AADE's whole window and found no document under the
-  uid (`MarkLookup.ABSENT`); a registered one keeps the date AADE holds. **Once the parcel leaves (SHIPPED) without a MARK**, its
+  uid (`MarkLookup.ABSENT`; a listed document without a uid, which the
+  schema allows, makes it `UNKNOWN`); a registered one keeps the date AADE
+  holds, and a MARK the lookup recovers brings it back: the row's block
+  takes the `dispatchDate` AADE lists, since the send that registered it
+  may not be the one whose block the row holds. **Once the parcel leaves (SHIPPED) without a MARK**, its
   movement started during a loss of connection, AADE's procedure:
   Α.1233/2026 annex §12.1 has such a movement document issued «με διακριτή
   ένδειξη για την απώλεια διασύνδεσης» and transmitted «άμεσα με την
@@ -214,7 +229,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `Invoice.transmission_failed_at` on an unanswered receipt and sends it at
   once; a send that goes unanswered after the parcel left is stamped where
   the answer is missed (`service._persist_send_error`), so whichever comes
-  second stamps it. From then on every transmission carries
+  second stamps it. A sender that built the document before the stamp
+  landed (it was looking the MARK up) finds it when it stores its intent
+  under the row lock, and builds the document again. From then on every transmission carries
   `transmissionFailure` 3, «Απώλεια διασύνδεσης», the one value of that
   element (`xs:byte` 1-4 in the v2.0.2 XSD) the REST API documentation
   allows an ERP to send (1, 2 and 4 are a licensed provider's). A receipt
@@ -224,7 +241,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `retry-receipts-with-mydata`, every 5 minutes, every store suspended or
   not) sends every unanswered receipt with movement not touched for
   `MYDATA_RETRY_AFTER_MINUTES` (15) again, up to `MYDATA_RETRY_SWEEP_BATCH`
-  per run, until it is registered. Overlapping sends are harmless: they
+  per run, least recently touched first, until it is registered. Overlapping sends are harmless: they
   carry the same uid, AADE registers one and answers the other with 228,
   and `submit_document` never demotes a row that holds a MARK (every write
   re-reads it under its lock). Staff see one warning on the dashboard
@@ -257,8 +274,8 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   pickup point whose address is not known is refused before sending
   (BUILD).
 - **The QR on the parcel.** The registered receipt PDF carries AADE's QR
-  (`mydata_qr_url`, the `qrUrl` of the response; empty after a 228
-  recovery, which reads no URL). Printing it with the parcel is what §7.3
+  (`mydata_qr_url`, the `qrUrl` of the response; after a MARK recovery,
+  the `qrCodeUrl` `RequestTransmittedDocs` lists, when it lists one). Printing it with the parcel is what §7.3
   allows («δύναται επί του δέματος να επικολλάται ... QR code»); neither
   carrier's label takes our content (ACS returns its own label PDF, BOX NOW
   its own).
@@ -299,7 +316,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     canceled in myDATA (`cancel_document`, an order note with the
     cancellation MARK) and no credit follows. A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
-    reaches the customer, and goes the credit path as before.
+    reaches the customer, and goes the credit path as before; one never
+    sent (its worker stopped before the send) is sent then, since the hold
+    was what the sweep sent it for.
   - **myDATA's answers.** Only AADE refusing the cancel
     (`MyDataValidationError`) sends the receipt the credit path too, with the
     reason in an order note. Credentials AADE refuses keep it set aside with

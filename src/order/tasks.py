@@ -1185,9 +1185,9 @@ def send_invoice_email(self, order_id: int) -> bool:
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.has_document():
             # A row with no PDF is recoverable, so retry rather than give
-            # up on the first look: the re-render after the MARK lands
-            # DELETES the stored PDF before rendering the replacement, and
-            # if that render fails the only copy is gone until the retry.
+            # up on the first look: the registration clears the PDF
+            # rendered before it (it prints no MARK) until its re-render
+            # stores the registered one.
             if invoice is not None and self.request.retries < self.max_retries:
                 logger.warning(
                     "Receipt PDF for order #%s is not ready — retrying",
@@ -1505,7 +1505,9 @@ def retry_receipts_with_mydata() -> int:
                 mydata_status=MyDataStatus.NOT_SENT,
             )
         )
-        .order_by("id")
+        # Least recently touched first, so no batch of receipts that keep
+        # failing keeps an older one out.
+        .order_by("updated_at", "id")
         .values_list("order_id", flat=True)[:batch]
     )
     to_cancel = list(
@@ -1516,7 +1518,7 @@ def retry_receipts_with_mydata() -> int:
             mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
         )
         .exclude(order_id__in=to_send)
-        .order_by("id")
+        .order_by("updated_at", "id")
         .values_list("order_id", flat=True)[:batch]
     )
     # One whose parcel left meanwhile goes with the loss-of-connection
@@ -1758,6 +1760,11 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
         if current.mydata_mark:
             # It stands, so it reaches the customer (``awaits_the_parcel``).
             dispatch_on_commit(send_invoice_email, [order.id])
+        elif current.mydata_status == MyDataStatus.NOT_SENT:
+            # Never sent (its worker stopped before the send): the hold
+            # was what the sweep sent it for, so it is sent now; its
+            # registration releases the credits and the email.
+            dispatch_on_commit(send_invoice_to_mydata, [order.id])
     return "credited"
 
 

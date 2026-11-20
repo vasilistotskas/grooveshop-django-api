@@ -31,6 +31,10 @@ Rules both carriers share:
   the receipt with movement indication (`issue_receipt_for_pickup`) for a
   store whose receipts the platform issues and that has set its dispatch
   point ([§7.4](fiscal-mydata.md)), dated the day the voucher is created.
+  Only a voucher or parcel the carrier holds counts
+  (`ShippingCarrierInterface.holds_the_parcel`, asked through
+  `ShippingService.carrier_holds_the_parcel`): a tracking number staff type
+  on an order whose carrier holds none issues nothing.
   Nothing in shipping waits for myDATA: a receipt AADE does not answer for
   is sent again, and once its parcel leaves unregistered, with AADE's
   loss-of-connection indication. A voucher made again after the receipt

@@ -127,8 +127,10 @@ receipt is not deliverable (no stored PDF), and a render that fails leaves
 a row without a PDF, which that task renders first when it runs again,
 without a second submission. A re-render replaces the stored PDF only
 once the new one exists (`invoicing._store_pdf`), so a failed one leaves
-the old file in place, and only while the row's MARK is the one it
-prints: a render that a registration overtook is discarded.
+the old file in place, and only while the row still holds what it was
+rendered from (`invoicing._rendered_from`: the MARK, the seller and buyer
+snapshots, the movement block): a render that a registration or a newer
+regeneration overtook is discarded.
 
 **A courier or locker sale's receipt carries the movement and is issued when
 its voucher or parcel is recorded, before the pickup (#747).** That part of

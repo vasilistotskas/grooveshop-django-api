@@ -838,8 +838,8 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     stored = _store_pdf(invoice, pdf_bytes)
     if stored is None:
         logger.info(
-            "Receipt %s of order %s was registered while it rendered; its "
-            "registration renders it again",
+            "Receipt %s of order %s changed while it rendered (registered, "
+            "or regenerated again); the newer one renders it",
             invoice.invoice_number,
             order.id,
         )
@@ -853,12 +853,25 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     return stored
 
 
+def _rendered_from(invoice: Invoice) -> tuple[Any, ...]:
+    """What of the row a receipt PDF prints and a later write can change:
+    AADE's MARK, the seller and buyer snapshots a regeneration takes again,
+    and the movement block (the figures are frozen once the row exists)."""
+    return (
+        invoice.mydata_mark,
+        invoice.seller_snapshot,
+        invoice.buyer_snapshot,
+        invoice.movement,
+    )
+
+
 def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
     """Store the PDF just rendered for *invoice* in place of the one the
-    row holds, and return the row; ``None``, storing nothing, when AADE's
-    registration landed while it rendered (the row's MARK is not the one
-    the PDF prints): the registration clears the PDF it found and renders
-    its own (``mydata.service._persist_success``).
+    row holds, and return the row; ``None``, storing nothing, when the row
+    no longer holds what the PDF was rendered from (:func:`_rendered_from`):
+    AADE's registration landed while it rendered (which clears the PDF it
+    found and renders its own, ``mydata.service._persist_success``), or a
+    later regeneration saved newer snapshots and renders those.
 
     The old file is removed only now that its replacement is rendered, so
     a render that fails leaves the row and its file as they were. It is
@@ -868,9 +881,10 @@ def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
     of the new file that fails leaves a row with no PDF, which
     ``send_invoice_to_mydata`` and the receipt email see and render again,
     never a row naming a file that is gone."""
+    rendered = _rendered_from(invoice)
     with transaction.atomic():
         locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
-        if locked.mydata_mark != invoice.mydata_mark:
+        if _rendered_from(locked) != rendered:
             return None
         stale = locked.document_file.name
         if stale:
@@ -880,10 +894,10 @@ def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
         locked.document_file.storage.delete(stale)
     with transaction.atomic():
         locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
-        if locked.mydata_mark != invoice.mydata_mark:
+        if _rendered_from(locked) != rendered:
             return None
         if locked.document_file:
-            # Another render for the same MARK stored its PDF meanwhile.
+            # Another render of the same row stored its PDF meanwhile.
             return locked
         locked.document_file.save(
             f"{locked.invoice_number}.pdf", ContentFile(pdf_bytes), save=False

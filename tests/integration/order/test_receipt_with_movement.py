@@ -2508,3 +2508,43 @@ class TestAReceiptMyDataCannotSee:
         assert aade.cancelled == []
         assert len(aade.credits) == 1
         assert any("staff issued its credit" in n for n in _notes(order))
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestCodeRabbitThirdReview:
+    """CodeRabbit's review of #760 at 01f4df945."""
+
+    def test_a_render_a_newer_regeneration_overtook_is_discarded(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Two regenerations share the MARK; the slower one, rendered from
+        the older snapshot, must not replace the newer one's PDF."""
+        from django.core.files.base import ContentFile
+
+        from order.accounting.invoicing import generate_invoice
+
+        order, invoice = _registered_cod_receipt_in(
+            django_capture_on_commit_callbacks
+        )
+
+        def regenerated_meanwhile(_context):
+            row = Invoice.objects.get(pk=invoice.pk)
+            row.seller_snapshot = {**row.seller_snapshot, "name": "Renamed"}
+            row.document_file.save(
+                f"{row.invoice_number}.pdf",
+                ContentFile(b"%PDF-1.4 newer"),
+                save=False,
+            )
+            row.save(update_fields=["seller_snapshot", "document_file"])
+            return b"%PDF-1.4 older"
+
+        with patch(
+            "order.accounting.invoicing._render_pdf_bytes",
+            side_effect=regenerated_meanwhile,
+        ):
+            generate_invoice(order, force=True)
+
+        invoice.refresh_from_db()
+        assert invoice.seller_snapshot["name"] == "Renamed"
+        with invoice.document_file.open("rb") as stored:
+            assert stored.read() == b"%PDF-1.4 newer"

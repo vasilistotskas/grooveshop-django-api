@@ -7011,6 +7011,10 @@ msgstr "Καλά νέα! Η παραγγελία σας #%(order_id)s έχει �
 msgid "Goods"
 msgstr "Προϊόντα"
 
+#, python-format
+msgid "Goods and charges at %(rate)s%% VAT"
+msgstr "Εμπορεύματα και χρεώσεις με ΦΠΑ %(rate)s%%"
+
 msgid "Goods claimed"
 msgstr "Εμπορεύματα που διεκδικήθηκαν"
 

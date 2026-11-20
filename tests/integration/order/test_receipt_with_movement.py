@@ -82,12 +82,17 @@ LOADING = {
 }
 
 
+#: The store's name, which a receipt with movement names its issuer by.
+SELLER = {"INVOICE_SELLER_NAME": "Κατάστημα ΑΕ"}
+
+
 @pytest.fixture
 def dispatch_point():
-    """The store's dispatch point, written as its setting rows."""
+    """The store's dispatch point and its seller's details, written as its
+    setting rows."""
     from extra_settings.models import Setting
 
-    for name, value in LOADING.items():
+    for name, value in (LOADING | SELLER).items():
         Setting.objects.update_or_create(
             name=name,
             defaults={"value_type": "string", "value_string": value},
@@ -311,11 +316,8 @@ class TestTheReceiptCarriesTheMovement:
         it; error 228 means AADE holds it as it was sent."""
         order = _acs_order()
         stored = receipt_movement(Invoice(order=order, movement={}))
-        past = ReceiptMovement(
-            dispatch_date=timezone.localdate() - timedelta(days=2),
-            loading=stored.loading,
-            delivery=stored.delivery,
-            goods=stored.goods,
+        past = replace(
+            stored, dispatch_date=timezone.localdate() - timedelta(days=2)
         )
 
         def sent_as(status, code=""):
@@ -1920,6 +1922,32 @@ class TestCodeRabbitSecondReview:
         assert invoice.has_document()
         assert _stored_file_exists(invoice)
 
+    def test_a_failed_write_of_the_new_pdf_leaves_a_row_without_one(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The old file is gone once the new one is written: a write that
+        fails must not leave the row naming it, or nothing renders it
+        again (``has_document`` would still say yes)."""
+        from order.accounting.invoicing import generate_invoice
+
+        order, invoice = _registered_cod_receipt_in(
+            django_capture_on_commit_callbacks
+        )
+        storage = type(invoice.document_file.storage)
+
+        with (
+            patch.object(storage, "_save", side_effect=OSError("disk full")),
+            pytest.raises(OSError),
+        ):
+            generate_invoice(order, force=True)
+
+        invoice.refresh_from_db()
+        assert not invoice.has_document()
+
+        regenerated = generate_invoice(order, force=True)
+        assert regenerated.has_document()
+        assert _stored_file_exists(regenerated)
+
     def test_the_registration_clears_the_pdf_rendered_before_it(
         self, django_capture_on_commit_callbacks
     ):
@@ -2158,3 +2186,98 @@ class TestCodeRabbitSecondReview:
                     taken.append(settle.call_args.kwargs["args"][0])
 
         assert taken == [second.order_id, first.order_id, second.order_id]
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestWhatAadesSandboxSaid:
+    """#760 sent to AADE's myDATA sandbox (2026-11-20)."""
+
+    def test_a_cancel_aade_cannot_see_yet_is_retried_not_credited(
+        self, django_capture_on_commit_callbacks
+    ):
+        """A CancelInvoice sent within a second of the registration was
+        answered 301 ("not found"); seconds later it went through. Read as
+        a refusal it would credit a receipt that is to be canceled."""
+        not_found = (
+            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+            b"<index>1</index><statusCode>ValidationError</statusCode>"
+            b"<errors><error><message>Invoice with MARK 1 not found for VAT "
+            b"number 1</message><code>301</code></error></errors>"
+            b"</response></ResponseDoc>"
+        )
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            _staff_cancel(
+                order,
+                django_capture_on_commit_callbacks,
+                settle=False,
+                return_value=True,
+            )
+            with (
+                patch(
+                    "order.accounting.mydata.client.MyDataClient."
+                    "cancel_invoice",
+                    return_value=not_found,
+                ),
+                pytest.raises(MyDataTransportError),
+            ):
+                settle_canceled_receipt(order.id)
+
+            invoice.refresh_from_db()
+            assert invoice.cancel_requested_at is not None
+            assert aade.credits == []
+            with django_capture_on_commit_callbacks(execute=True):
+                assert settle_canceled_receipt(order.id) == "canceled"
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CANCELED
+        assert aade.credits == []
+
+    def test_a_store_without_its_name_and_address_gets_a_build_refusal(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE requires the issuer's name and address on a movement
+        document (error 204): without them nothing is sent, and staff are
+        told (a BUILD refusal)."""
+        from extra_settings.models import Setting
+
+        Setting.objects.filter(name="INVOICE_SELLER_NAME").update(
+            value_string=""
+        )
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _issue(_acs_order(), django_capture_on_commit_callbacks)
+
+        assert aade.sent == []
+        assert invoice.mydata_status == MyDataStatus.REJECTED
+        assert invoice.mydata_error_code == "BUILD"
+
+    def test_a_dispatch_point_without_its_number_is_not_set(self):
+        """It is also the issuer's address, whose number AADE requires
+        (error 204): until it is set the receipt stays plain, at SHIPPED,
+        and the dashboard asks for it."""
+        from extra_settings.models import Setting
+
+        from order.accounting.movement import loading_address
+
+        Setting.objects.filter(name="MYDATA_LOADING_NUMBER").update(
+            value_string=""
+        )
+
+        assert loading_address() is None
+        assert not receipt_issuable(_acs_order())
+
+    def test_a_buyer_address_without_its_number_gets_a_build_refusal(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE requires the counterpart's street number (error 204)."""
+        order = _acs_order()
+        type(order).objects.filter(pk=order.pk).update(street_number="")
+        order.refresh_from_db()
+
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+
+        assert aade.sent == []
+        assert invoice.mydata_error_code == "BUILD"

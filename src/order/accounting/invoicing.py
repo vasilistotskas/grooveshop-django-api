@@ -860,16 +860,31 @@ def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
     the PDF prints): the registration clears the PDF it found and renders
     its own (``mydata.service._persist_success``).
 
-    The old file is removed only now, once its replacement exists, so a
-    render that fails leaves the row and its file as they were; it is
+    The old file is removed only now that its replacement is rendered, so
+    a render that fails leaves the row and its file as they were. It is
     removed first so the new one lands at the same storage key (Django's
-    ``get_available_name`` would add a suffix and orphan the old one)."""
+    ``get_available_name`` would add a suffix and orphan the old one), and
+    the row stops naming it in a commit of its own before it goes: a write
+    of the new file that fails leaves a row with no PDF, which
+    ``send_invoice_to_mydata`` and the receipt email see and render again,
+    never a row naming a file that is gone."""
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked.mydata_mark != invoice.mydata_mark:
+            return None
+        stale = locked.document_file.name
+        if stale:
+            locked.document_file = ""
+            locked.save(update_fields=["document_file"])
+    if stale:
+        locked.document_file.storage.delete(stale)
     with transaction.atomic():
         locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if locked.mydata_mark != invoice.mydata_mark:
             return None
         if locked.document_file:
-            locked.document_file.delete(save=False)
+            # Another render for the same MARK stored its PDF meanwhile.
+            return locked
         locked.document_file.save(
             f"{locked.invoice_number}.pdf", ContentFile(pdf_bytes), save=False
         )

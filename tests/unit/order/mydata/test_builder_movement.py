@@ -21,7 +21,11 @@ import pytest
 from djmoney.money import Money
 
 from order.accounting.invoicing import generate_invoice
-from order.accounting.movement import ReceiptMovement, moving_goods
+from order.accounting.movement import (
+    MovementParty,
+    ReceiptMovement,
+    moving_goods,
+)
 from order.accounting.mydata.builder import build_receipt_xml
 from order.accounting.mydata.validator import validate_invoice_doc
 from order.factories.item import OrderItemFactory
@@ -42,6 +46,20 @@ MOVEMENT = ReceiptMovement(
         street="Ερμού", number="10", postal_code="10563", city="Αθήνα"
     ),
     goods=(),
+    issuer=MovementParty(
+        name="Κατάστημα ΑΕ",
+        country="GR",
+        address=PostalAddress(
+            street="Τατοΐου 5", number="", postal_code="14561", city="Κηφισιά"
+        ),
+    ),
+    recipient=MovementParty(
+        name="Μαρία Παπαδοπούλου",
+        country="GR",
+        address=PostalAddress(
+            street="Ερμού", number="10", postal_code="105 63", city="Αθήνα"
+        ),
+    ),
 )
 
 
@@ -103,6 +121,7 @@ def test_the_header_carries_the_movement_in_the_schema_order():
         "movePurpose",
         "otherDeliveryNoteHeader",
         "isDeliveryNote",
+        "nonObligatedRecipient",
     ]
     assert header.find(f"{AADE_NS}dispatchDate").text == "2026-11-19"
     # Optional in phase A, and when the courier collects is not known.
@@ -136,8 +155,9 @@ def test_goods_lines_carry_their_quantity_in_pieces_and_shipping_none():
     root = fromstring(_build(*_with_movement(_receipt())).xml_bytes)
     goods, shipping = root.findall(f"{AADE_NS}invoice/{AADE_NS}invoiceDetails")
 
-    assert [_local(e) for e in goods][:4] == [
+    assert [_local(e) for e in goods][:5] == [
         "lineNumber",
+        "itemDescr",
         "quantity",
         "measurementUnit",
         "netValue",
@@ -146,6 +166,48 @@ def test_goods_lines_carry_their_quantity_in_pieces_and_shipping_none():
     # Annex 8.13: 1 = «Τεμάχια».
     assert goods.find(f"{AADE_NS}measurementUnit").text == "1"
     assert shipping.find(f"{AADE_NS}quantity") is None
+
+
+def test_it_names_what_aade_requires_of_a_movement_document():
+    """AADE's sandbox (2026-11-20) refused every 11.1 with
+    ``isDeliveryNote`` without these, although the XSD makes them optional:
+    error 230, an ``itemDescr`` on every line; error 204, the issuer's name
+    and address, and a counterpart with its name and address. A consumer
+    has no VAT number: ``000000000`` (error 289), and
+    ``nonObligatedRecipient``, since they take no part in the digital
+    movement process. Never ``withoutDigitalTransportTracking``: AADE
+    cannot cancel such a document (error 801)."""
+    invoice, movement = _with_movement(_receipt())
+    root = fromstring(_build(invoice, movement).xml_bytes)
+    document = root.find(f"{AADE_NS}invoice")
+    issuer = document.find(f"{AADE_NS}issuer")
+    counterpart = document.find(f"{AADE_NS}counterpart")
+    header = document.find(f"{AADE_NS}invoiceHeader")
+
+    assert [_local(e) for e in document][:3] == [
+        "issuer",
+        "counterpart",
+        "invoiceHeader",
+    ]
+    assert [(_local(e), e.text) for e in issuer][3] == (
+        "name",
+        "Κατάστημα ΑΕ",
+    )
+    assert _text(issuer.find(f"{AADE_NS}address"), "city") == "Κηφισιά"
+    assert [(_local(e), e.text) for e in counterpart][:4] == [
+        ("vatNumber", "000000000"),
+        ("country", "GR"),
+        ("branch", "0"),
+        ("name", "Μαρία Παπαδοπούλου"),
+    ]
+    address = counterpart.find(f"{AADE_NS}address")
+    assert _text(address, "postalCode") == "10563"
+    assert _text(header, "nonObligatedRecipient") == "true"
+    assert header.find(f"{AADE_NS}withoutDigitalTransportTracking") is None
+    goods, shipping = _details(root)
+    assert _text(goods, "itemDescr") == invoice.order.items.get().product_name
+    assert _text(shipping, "itemDescr")
+    validate_invoice_doc(_build(invoice, movement).xml_bytes)
 
 
 def test_a_receipt_without_movement_is_unchanged():
@@ -157,9 +219,15 @@ def test_a_receipt_without_movement_is_unchanged():
         "movePurpose",
         "otherDeliveryNoteHeader",
         "isDeliveryNote",
+        "nonObligatedRecipient",
     ):
         assert invoice.find(f"{AADE_NS}invoiceHeader/{AADE_NS}{tag}") is None
     assert invoice.find(f".//{AADE_NS}quantity") is None
+    # AADE refuses a Greek issuer's name (219) and every itemDescr outside
+    # a movement document.
+    assert invoice.find(f"{AADE_NS}counterpart") is None
+    assert invoice.find(f"{AADE_NS}issuer/{AADE_NS}name") is None
+    assert invoice.find(f".//{AADE_NS}itemDescr") is None
     assert invoice.find(f"{AADE_NS}transmissionFailure") is None
 
 
@@ -227,6 +295,10 @@ def test_a_free_gift_moves_on_a_line_of_no_value():
     assert _text(gift, "netValue") == "0.00"
     assert _text(gift, "vatAmount") == "0.00"
     assert _text(gift, "vatCategory") == "2"  # 13 %
+    assert (
+        _text(gift, "itemDescr")
+        == invoice.order.items.get(price=Money(0, "EUR")).product_name
+    )
     for tag in ("totalNetValue", "totalVatAmount", "totalGrossValue"):
         assert _summary(root, tag) == _summary(plain, tag)
     validate_invoice_doc(_build(invoice, _moving(invoice)).xml_bytes)
@@ -250,6 +322,7 @@ def test_a_receipt_netted_by_a_refund_declares_what_still_moves():
 
     assert _text(money, "quantity") is None
     assert _text(money, "netValue") == "24.03"
+    assert _text(money, "itemDescr")
     assert _text(moving, "quantity") == "2"
     assert _text(moving, "netValue") == "0.00"
     assert _summary(root, "totalGrossValue") == Decimal("29.80")

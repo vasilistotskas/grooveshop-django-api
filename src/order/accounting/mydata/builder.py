@@ -50,11 +50,15 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from django.utils.translation import gettext as _
+
 from order.accounting.mydata.types import (
     CLASSIFICATION_CATEGORY_GOODS_SALES,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
+    COUNTERPART_WITHOUT_VAT_NUMBER,
     INVOICE_TYPE_RETAIL_CREDIT,
     INVOICE_TYPE_RETAIL_RECEIPT,
+    ITEM_DESCRIPTION_MAX_LENGTH,
     MEASUREMENT_UNIT_PIECES,
     MOVE_PURPOSE_SALE,
     PAYMENT_METHOD_CASH,
@@ -77,7 +81,7 @@ from pay_way.enum.settlement import PaySettlement
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
 if TYPE_CHECKING:
-    from order.accounting.movement import ReceiptMovement
+    from order.accounting.movement import MovementParty, ReceiptMovement
     from shipping.interfaces import PostalAddress
 
 # VAT rate → AADE ``vatCategory``. Strict whitelist per v1.0.10 annex
@@ -135,6 +139,7 @@ def _emit_detail(
     parent: Element,
     *,
     line_number: int,
+    description: str | None,
     quantity: int | None,
     line_net: Decimal,
     line_vat: Decimal,
@@ -150,6 +155,10 @@ def _emit_detail(
     ``vatCategory=7`` (error 217)."""
     row = SubElement(parent, "invoiceDetails")
     SubElement(row, "lineNumber").text = str(line_number)
+    if description is not None:
+        SubElement(row, "itemDescr").text = description[
+            :ITEM_DESCRIPTION_MAX_LENGTH
+        ]
     if quantity is not None:
         SubElement(row, "quantity").text = str(quantity)
         SubElement(row, "measurementUnit").text = str(MEASUREMENT_UNIT_PIECES)
@@ -306,6 +315,9 @@ class _Line:
     net: Decimal
     vat: Decimal
     quantity: int | None = None
+    #: What the line is (``itemDescr``), which a receipt with movement
+    #: states on every line.
+    description: str = ""
 
     @property
     def gross(self) -> Decimal:
@@ -330,12 +342,14 @@ def _receipt_lines(
     lines, priced = _money_lines(invoice, movement)
     if movement is None:
         return lines
+    names = dict(invoice.order.items.values_list("pk", "product_name"))
     return lines + [
         _Line(
             rate=good.rate,
             net=Decimal(0),
             vat=Decimal(0),
             quantity=good.quantity,
+            description=names.get(good.item, ""),
         )
         for good in movement.goods
         if good.item not in priced
@@ -353,6 +367,11 @@ def _money_lines(
         else {}
     )
     vat_lines = order_vat_lines(invoice.order)
+    names = (
+        dict(invoice.order.items.values_list("pk", "product_name"))
+        if movement is not None
+        else {}
+    )
     lines = [
         _Line(
             rate=line.rate,
@@ -361,6 +380,9 @@ def _money_lines(
             quantity=quantities.get(line.item_pk)
             if line.kind == ChargeKind.GOODS and line.item_pk is not None
             else None,
+            description=names.get(line.item_pk, "")
+            if line.kind == ChargeKind.GOODS
+            else str(ChargeKind(line.kind).label),
         )
         for line in vat_lines
     ]
@@ -381,6 +403,8 @@ def _money_lines(
             rate=Decimal(row["rate"]),
             net=Decimal(row["subtotal"]),
             vat=Decimal(row["vat"]),
+            description=_("Goods and charges at %(rate)s%% VAT")
+            % {"rate": row["rate"]},
         )
         for row in invoice.vat_breakdown
     ], set()
@@ -522,6 +546,15 @@ def _build(
     SubElement(issuer, "vatNumber").text = issuer_vat
     SubElement(issuer, "country").text = issuer_country
     SubElement(issuer, "branch").text = str(branch)
+    if movement is not None:
+        _emit_party_details(issuer, movement.issuer)
+        counterpart = SubElement(invoice_el, "counterpart")
+        SubElement(
+            counterpart, "vatNumber"
+        ).text = COUNTERPART_WITHOUT_VAT_NUMBER
+        SubElement(counterpart, "country").text = movement.recipient.country
+        SubElement(counterpart, "branch").text = "0"
+        _emit_party_details(counterpart, movement.recipient)
 
     # Actual XSD sequence (verified via live AADE dev response): the
     # PDF field-list table orders things differently to the XSD, so
@@ -559,6 +592,7 @@ def _build(
         _emit_detail(
             invoice_el,
             line_number=line_number,
+            description=line.description if movement is not None else None,
             quantity=line.quantity if movement is not None else None,
             line_net=line.net,
             line_vat=line.vat,
@@ -617,6 +651,15 @@ def _emit_movement(header: Element, movement: ReceiptMovement) -> None:
     _emit_address(other, "loadingAddress", movement.loading)
     _emit_address(other, "deliveryAddress", movement.delivery)
     SubElement(header, "isDeliveryNote").text = "true"
+    # A consumer takes no part in the digital movement process.
+    SubElement(header, "nonObligatedRecipient").text = "true"
+
+
+def _emit_party_details(party_el: Element, party: MovementParty) -> None:
+    """The ``name`` and ``address`` of a ``PartyType``, after its
+    ``branch``."""
+    SubElement(party_el, "name").text = party.name
+    _emit_address(party_el, "address", party.address)
 
 
 def _emit_address(parent: Element, tag: str, address: PostalAddress) -> None:

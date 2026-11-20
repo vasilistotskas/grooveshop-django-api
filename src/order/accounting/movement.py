@@ -39,9 +39,10 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
-from core.store_settings import store_settings
+from core.store_settings import store_setting, store_settings
 from shipping.interfaces import PostalAddress
 from shipping.services import ShippingService
+from tenant.legal_identity import SELLER_SETTING_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,13 @@ LOADING_ADDRESS_SETTINGS = {
 
 #: AADE's ``AddressType`` caps ``street`` and ``city`` at 150 characters.
 ADDRESS_TEXT_MAX_LENGTH = 150
+
+#: AADE's ``PartyType`` caps ``name`` at 200 characters.
+PARTY_NAME_MAX_LENGTH = 200
+
+#: The issuer is the store, a Greek business
+#: (``order.accounting.mydata.service`` sends ``GR``).
+ISSUER_COUNTRY = "GR"
 
 #: Α.1123/2024 art. 7(1), as replaced by Α.1233/2026: the movement a
 #: document declares starts at most this many days after it is issued.
@@ -99,8 +107,10 @@ def validate_loading_postal_code_setting(value: object) -> bool:
 
 
 def loading_address() -> PostalAddress | None:
-    """The store's dispatch point, or ``None`` while the postcode or the
-    city, which AADE requires, is blank.
+    """The store's dispatch point, or ``None`` while any part of it is
+    blank: AADE requires the postcode and the city of every address, and
+    the street number of the issuer's, which the receipt names it as
+    (:func:`_issuer`; error 204, AADE's sandbox, 2026-11-20).
 
     A store without one keeps the plain receipt at SHIPPED for every order
     (``movement_receipts_on``), so setting up the platform never turns a
@@ -113,7 +123,7 @@ def loading_address() -> PostalAddress | None:
             for field, name in LOADING_ADDRESS_SETTINGS.items()
         }
     )
-    if not (address.postal_code and address.city):
+    if not all(asdict(address).values()):
         return None
     return address
 
@@ -139,6 +149,19 @@ class MovingGoods:
 
 
 @dataclass(frozen=True)
+class MovementParty:
+    """The issuer or the recipient as a receipt with movement names them:
+    AADE requires both with their name and address when ``isDeliveryNote``
+    is true (error 204), although it refuses a Greek party's name and
+    address on its other documents (errors 219, 220)."""
+
+    name: str
+    #: ISO 3166-1 alpha-2.
+    country: str
+    address: PostalAddress
+
+
+@dataclass(frozen=True)
 class ReceiptMovement:
     """What a receipt with movement indication declares about the parcel."""
 
@@ -158,12 +181,18 @@ class ReceiptMovement:
     #: their own with no value (myDATA REST API v2.0.2, §5.4: ``netValue``
     #: and ``vatAmount`` have a minimum of 0).
     goods: tuple[MovingGoods, ...]
+    #: The store, and the buyer, as of the receipt's issue: sent as they
+    #: are again on a resend.
+    issuer: MovementParty
+    recipient: MovementParty
 
     def as_json(self) -> dict[str, Any]:
         return {
             "dispatch_date": self.dispatch_date.isoformat(),
             "loading": asdict(self.loading),
             "delivery": asdict(self.delivery),
+            "issuer": asdict(self.issuer),
+            "recipient": asdict(self.recipient),
             "goods": [
                 {
                     "item": good.item,
@@ -188,7 +217,17 @@ class ReceiptMovement:
                 )
                 for good in data["goods"]
             ),
+            issuer=_party_from_json(data["issuer"]),
+            recipient=_party_from_json(data["recipient"]),
         )
+
+
+def _party_from_json(data: dict[str, Any]) -> MovementParty:
+    return MovementParty(
+        name=data["name"],
+        country=data["country"],
+        address=PostalAddress(**data["address"]),
+    )
 
 
 def moving_goods(order: Any) -> tuple[MovingGoods, ...]:
@@ -280,7 +319,56 @@ def receipt_movement(
             loading=_within_aade_limits(loading),
             delivery=_within_aade_limits(delivery),
             goods=moving_goods(order),
+            issuer=_issuer(),
+            recipient=_recipient(order),
         ),
+    )
+
+
+def _issuer() -> MovementParty:
+    """The store as the receipt names it: its name (``INVOICE_SELLER_NAME``,
+    the one the receipt prints) and, as its address, its dispatch point,
+    the establishment the parcel leaves from. AADE requires the issuer's
+    street number (error 204), which the store's own address, one free
+    line (``INVOICE_SELLER_ADDRESS_LINE_1``), does not hold apart. Raises
+    ``ValueError``, a BUILD refusal, while the name is blank."""
+    name = str(store_setting(SELLER_SETTING_KEYS["name"]) or "").strip()
+    address = loading_address()
+    if not name or address is None:
+        raise ValueError(
+            "a receipt with movement names the store, and its name "
+            "(INVOICE_SELLER_NAME) is blank"
+        )
+    return MovementParty(
+        name=name[:PARTY_NAME_MAX_LENGTH],
+        country=ISSUER_COUNTRY,
+        address=_within_aade_limits(address),
+    )
+
+
+def _recipient(order: Any) -> MovementParty:
+    """The buyer as the receipt names them: their name and their own
+    address, wherever the parcel goes. Raises ``ValueError``, a BUILD
+    refusal, when the order lacks the name or any part of the address."""
+    name = f"{order.first_name} {order.last_name}".strip()
+    address = PostalAddress(
+        street=(order.street or "").strip(),
+        number=(order.street_number or "").strip(),
+        postal_code=(order.zipcode or "").strip(),
+        city=(order.city or "").strip(),
+    )
+    country = order.country.alpha_2 if order.country_id else ""
+    if not (name and country and all(asdict(address).values())):
+        # AADE requires the counterpart's street number too (error 204).
+        raise ValueError(
+            f"order #{order.pk} lacks the buyer's name or a part of their "
+            "address (street, number, postcode, city, country), which a "
+            "receipt with movement names"
+        )
+    return MovementParty(
+        name=name[:PARTY_NAME_MAX_LENGTH],
+        country=country,
+        address=_within_aade_limits(address),
     )
 
 

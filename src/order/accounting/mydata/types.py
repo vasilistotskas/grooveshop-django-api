@@ -73,6 +73,18 @@ CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_1"
 # applied where the block is built (``order.accounting.movement``).
 MOVE_PURPOSE_SALE = 1
 MEASUREMENT_UNIT_PIECES = 1
+# With ``isDeliveryNote`` AADE requires what it refuses on a Greek party's
+# other documents (errors 219, 220): the issuer's name and address, a
+# counterpart with its name and address, and an ``itemDescr`` (at most 300
+# characters) on every line (errors 204 and 230, AADE's sandbox,
+# 2026-11-20). A consumer has no VAT number: the counterpart carries the
+# one AADE names for that (error 289), and ``nonObligatedRecipient`` (a
+# recipient who takes no part in the digital movement process; the REST
+# API documentation, §5.3, note 23). Never ``withoutDigitalTransportTracking``:
+# its document is "Completed" at issue and AADE refuses to cancel it (error
+# 801), and a cancel before the pickup must cancel the receipt.
+COUNTERPART_WITHOUT_VAT_NUMBER = "000000000"
+ITEM_DESCRIPTION_MAX_LENGTH = 300
 
 # ── transmissionFailure (AadeBookInvoiceType, v2.0.2) ─────────────
 # xs:byte 1-4 in the XSD. The REST API documentation (§5, the invoice
@@ -89,6 +101,12 @@ TRANSMISSION_FAILURE_ERP_CONNECTION_LOST = 3
 # ones with custom handling. Everything else is treated as a
 # terminal ``ValidationError``.
 ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
+# "Invoice with MARK ... not found": a CancelInvoice sent right after the
+# registration gets it until the document is visible to the cancel (AADE's
+# sandbox, 2026-11-20: within a second of the MARK; seconds later the
+# cancel went through), so it is retried like no answer, never read as a
+# refusal of the cancel.
+ERROR_MARK_NOT_FOUND = "301"
 
 # Our own code (``mydata_error_code`` is ours to fill): the last send of the
 # document reached AADE without an answer (a transport error, or AADE's

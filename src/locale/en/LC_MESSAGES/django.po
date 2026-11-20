@@ -7005,6 +7005,10 @@ msgstr "Good news! Your order #%(order_id)s has been shipped and is on its way t
 msgid "Goods"
 msgstr "Goods"
 
+#, python-format
+msgid "Goods and charges at %(rate)s%% VAT"
+msgstr "Goods and charges at %(rate)s%% VAT"
+
 msgid "Goods claimed"
 msgstr "Goods claimed"
 

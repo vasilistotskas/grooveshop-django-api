@@ -141,7 +141,8 @@ holds for an ACS or BOX NOW parcel. All of this applies only to a store whose
 receipts the platform issues (`MyDataConfig.is_ready`, the one gate above)
 and that has set its dispatch point (`movement.movement_receipts_on`: the
 `MYDATA_LOADING_STREET` / `_NUMBER` / `_POSTAL_CODE` / `_CITY` settings,
-postcode and city required). A store that issues in its own ΦΗΜ or provider
+all four required: the dispatch point is also the issuer's address, whose
+street number AADE requires). A store that issues in its own ΦΗΜ or provider
 sees no change at all; one without a dispatch point keeps the plain receipt
 at SHIPPED, and its dashboard (when ACS or BOX NOW is active) asks for the
 dispatch point. For an order whose carrier keeps a shipment of its own
@@ -167,14 +168,30 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   receipt netted by an earlier refund (one money line per rate, mixing
   goods and shipping); shipping and the fee carry no quantity. myDATA REST
   API v2.0.2 §5.4 gives `netValue` and `vatAmount` a minimum of 0, and its
-  error table refuses no zero-value line in general; the shape has not
-  been sent to AADE's sandbox (no working credentials). `movePurpose`
-  stays 1 «Πώληση» for a gift: it moves with the sale. No
-  `counterpart`: a consumer has no ΑΦΜ, the annex asks the recipient's ΑΦΜ
-  only of an entity of ν.4308/2014 art. 1, and AADE refuses the name of a
-  Greek counterpart (error 220); the buyer's name and address are printed on
-  the receipt, with a "Movement of goods" box (purpose, start, loading and
-  delivery place, unit). The block is decided when the receipt is first sent
+  error table refuses no zero-value line in general, and AADE's sandbox
+  registered such a receipt (2026-11-20). `movePurpose` stays 1 «Πώληση»
+  for a gift: it moves with the sale.
+  **What AADE requires of a movement document beyond the XSD** (its
+  sandbox refused every 11.1 with `isDeliveryNote` without these,
+  2026-11-20, although its documentation forbids a Greek party's name and
+  address on other documents, errors 219 and 220): an `itemDescr` on every
+  line (error 230; the product's name, the charge's label, or for a
+  per-rate line "Goods and charges at N% VAT"), the issuer's `name` and
+  `address` with its street number, and a `counterpart` with `name` and
+  `address`, its number included (error 204). The issuer is named by the
+  store's `INVOICE_SELLER_NAME` at its dispatch point (the store's own
+  address is one free line, which holds no number apart); the counterpart
+  is the buyer, by name and own address (`movement.MovementParty`, stored
+  with the block), with `vatNumber` `000000000`, the value AADE names for
+  a party without one (error 289; a Greek and a Cypriot buyer were both
+  accepted), and the header carries `nonObligatedRecipient` (a recipient
+  who takes no part in the digital movement process, §5.3 note 23).
+  Never `withoutDigitalTransportTracking`: such a document is "Completed"
+  at issue and AADE refuses to cancel it (error 801), which a cancel before
+  the pickup needs. A missing store name, dispatch point number or buyer
+  address is a `BUILD` refusal, before anything is sent. The receipt prints
+  the buyer's name and address, with a "Movement of goods" box (purpose,
+  start, loading and delivery place, unit). The block is decided when the receipt is first sent
   and stored on the row (`Invoice.movement`) with its identity fields: the
   PDF registered after it prints what AADE received, and a resubmission
   sends the document as issued, its dispatch date included, unless AADE
@@ -217,7 +234,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (error 280), so a plain resend on a later day is dated today, and only
   when the lookup read AADE's whole window and found no document under the
   uid (`MarkLookup.ABSENT`; a listed document without a uid, which the
-  schema allows, makes it `UNKNOWN`); a registered one keeps the date AADE
+  schema allows, makes it `UNKNOWN`. The uid is AADE's: SHA-1 over the
+  identity fields joined by `-`, in upper-case hex, `uid.build_uid`, read
+  off the `invoiceUid` AADE's sandbox returned; any other form never
+  matches what AADE lists); a registered one keeps the date AADE
   holds, and a MARK the lookup recovers brings it back: the row's block
   takes the `dispatchDate` AADE lists, since the send that registered it
   may not be the one whose block the row holds. **Once the parcel leaves (SHIPPED) without a MARK**, its
@@ -314,7 +334,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     `CancelInvoice` again; a claim a dead worker left expires, and the next
     run finds the cancellation AADE recorded. Stopped, or no parcel to stop: the receipt is
     canceled in myDATA (`cancel_document`, an order note with the
-    cancellation MARK) and no credit follows. A refusal, or a courier that
+    cancellation MARK) and no credit follows. AADE answers a cancel sent
+    within a second of the registration with 301 ("not found"; its
+    sandbox, 2026-11-20): that is retried like no answer, never read as a
+    refusal. A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
     reaches the customer, and goes the credit path as before; one never
     sent (its worker stopped before the send) is sent then, since the hold

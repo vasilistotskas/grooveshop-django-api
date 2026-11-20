@@ -574,6 +574,8 @@ class TestAlerts:
         )
         if dispatch_point:
             for name, value in (
+                ("MYDATA_LOADING_STREET", "Τατοΐου"),
+                ("MYDATA_LOADING_NUMBER", "5"),
                 ("MYDATA_LOADING_POSTAL_CODE", "14561"),
                 ("MYDATA_LOADING_CITY", "Κηφισιά"),
             ):

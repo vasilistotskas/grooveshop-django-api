@@ -55,7 +55,11 @@ from order.accounting.mydata.parser import (
     parse_requested_doc,
     parse_response_doc,
 )
-from order.accounting.mydata.types import ERROR_DUPLICATE_UID, ERROR_NO_ANSWER
+from order.accounting.mydata.types import (
+    ERROR_DUPLICATE_UID,
+    ERROR_MARK_NOT_FOUND,
+    ERROR_NO_ANSWER,
+)
 from order.accounting.mydata.validator import validate_invoice_doc
 from order.models.retail_credit import RetailCredit
 
@@ -322,9 +326,11 @@ def cancel_document(invoice: Any) -> ResponseRow | None:
     code = first_error.code if first_error else ""
     message = first_error.message if first_error else row.status_code
 
-    if row.status_code == "TechnicalError":
+    if row.status_code == "TechnicalError" or code == ERROR_MARK_NOT_FOUND:
         # Transient AADE gateway fault — retryable, not a terminal
         # rejection. See ``submit_invoice`` for the full rationale (G0260).
+        # So is a document the cancel cannot see yet: AADE answers 301
+        # to a cancel sent right after the registration.
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
     # A FAILED cancellation must NOT flip the invoice from CONFIRMED to

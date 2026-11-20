@@ -1050,8 +1050,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": (
             "Street of the place the store's parcels leave from (Τόπος "
             "Φόρτωσης). A courier or locker order's receipt is issued with "
-            "movement indication and names it as the loading address. "
-            "Optional for AADE, up to 150 characters."
+            "movement indication and names it as the loading address and "
+            "as the store's address, which AADE requires with its number. "
+            "Up to 150 characters."
         ),
     },
     {
@@ -1061,7 +1062,8 @@ EXTRA_SETTINGS_DEFAULTS = [
         "validator": "order.setting_validators.validate_loading_text_setting",
         "description": (
             "Street number of the place the store's parcels leave from. "
-            "Optional for AADE."
+            "AADE requires it of the store's address on a receipt with "
+            "movement indication."
         ),
     },
     {
@@ -1073,10 +1075,11 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
         "description": (
             "Postcode of the place the store's parcels leave from (a Greek "
-            "postcode). With MYDATA_LOADING_CITY it turns on the receipt "
-            "with movement indication for courier and locker orders, issued "
-            "when the voucher is created; until both are set those receipts "
-            "are issued when the order ships, without it."
+            "postcode). With the street, number and city it turns on the "
+            "receipt with movement indication for courier and locker "
+            "orders, issued when the voucher is created; until all four "
+            "are set those receipts are issued when the order ships, "
+            "without it."
         ),
     },
     {
@@ -1086,8 +1089,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "validator": "order.setting_validators.validate_loading_text_setting",
         "description": (
             "City of the place the store's parcels leave from, up to 150 "
-            "characters. With MYDATA_LOADING_POSTAL_CODE it turns on the "
-            "receipt with movement indication for courier and locker orders."
+            "characters. With the street, number and postcode it turns on "
+            "the receipt with movement indication for courier and locker "
+            "orders."
         ),
     },
     {

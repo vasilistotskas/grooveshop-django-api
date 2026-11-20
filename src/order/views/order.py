@@ -804,6 +804,8 @@ class OrderViewSet(BaseModelViewSet):
             from_gateway = is_internal_caller(
                 request.headers.get("X-Internal-Gateway", "")
             )
+            if not from_gateway:
+                self._refuse_agent_checkout(request)
             agent_checkout = (
                 self._named_agent_checkout(request) if from_gateway else None
             )
@@ -814,7 +816,6 @@ class OrderViewSet(BaseModelViewSet):
             try:
                 return self._validate_and_create(
                     request,
-                    from_gateway=from_gateway,
                     agent_checkout=agent_checkout,
                 )
             except Exception:
@@ -1110,7 +1111,6 @@ class OrderViewSet(BaseModelViewSet):
         self,
         request,
         *,
-        from_gateway: bool,
         agent_checkout: UUID | None,
     ) -> Response:
         """Validate the body, pick the pay way's flow and create the order.
@@ -1126,11 +1126,6 @@ class OrderViewSet(BaseModelViewSet):
         # serializer so they no longer touch ``request.data`` directly.
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
-        if not from_gateway:
-            # Only the gateway names a checkout. From any other caller the
-            # field is ignored, a malformed value included, rather than
-            # refused.
-            del request_serializer.fields["agent_checkout"]
         request_serializer.is_valid(raise_exception=True)
         validated_data = request_serializer.validated_data
 
@@ -1383,16 +1378,36 @@ class OrderViewSet(BaseModelViewSet):
             response_serializer.data, status=status.HTTP_201_CREATED
         )
 
+    @staticmethod
+    def _refuse_agent_checkout(request) -> None:
+        """Refuse ``agentCheckout`` from a caller without the gateway's
+        secret.
+
+        Only the agent gateway names a checkout, so no one else can tie
+        an order to one, or be answered an order by naming one. The field
+        is refused, not dropped: a gateway whose secret Django does not
+        hold would otherwise have its checkout ignored, and each repeat
+        of an order whose answer it lost would place another.
+        """
+        data = request.data
+        if isinstance(data, Mapping) and "agent_checkout" in data:
+            raise ValidationError(
+                {
+                    "agent_checkout": [
+                        _("Only the agent gateway can name an agent checkout.")
+                    ]
+                },
+                code="agent_checkout_not_allowed",
+            )
+
     def _named_agent_checkout(self, request) -> UUID | None:
         """The agent checkout the order is placed for, when the agent
         gateway names one.
 
         Asked only beside the gateway's shared secret
         (``X-Internal-Gateway``), as ``attribution.agentProtocol`` is
-        believed: ``create`` checks it, and from any other caller the
-        field is ignored (``_validate_and_create`` drops it), so no one
-        else can tie an order to a checkout, or be answered an order by
-        naming one.
+        believed: ``create`` checks it, and refuses the field from any
+        other caller (``_refuse_agent_checkout``).
 
         Read from the raw body, through the request serializer's own
         ``agent_checkout`` field, before the body is validated: the

@@ -13,8 +13,9 @@ What is pinned here:
   stock taken once, even after the first order kept, emptied or deleted
   the cart;
 * only the gateway can name a checkout: without its secret the field is
-  ignored, so no other caller ties an order to a checkout or is answered
-  an order by naming one;
+  refused (400 ``agent_checkout_not_allowed``) before anything is looked
+  up or created, so no other caller ties an order to a checkout or is
+  answered an order by naming one;
 * ``Order.agent_checkout`` is unique in the database, NULL repeatable,
   and a second order that raced the lookup on another cart is rejected by
   the index and answered with the first;
@@ -437,7 +438,11 @@ class TestThroughTheEndpoint:
         assert other.stock() == STOCK, "the refused call kept its stock"
 
     @pytest.mark.parametrize("secret", ["", "guess"])
-    def test_without_the_secret_the_checkout_is_ignored(self, secret):
+    def test_without_the_secret_the_checkout_is_refused(self, secret):
+        """Only the gateway names a checkout. A caller without its secret
+        that names one is refused, not answered with the order and not
+        given a new one: a gateway whose secret Django does not hold
+        would otherwise place an order on every repeat."""
         checkout = uuid4()
         placed = self._post(self.viva, checkout).json()
         other = _Cart()
@@ -446,18 +451,22 @@ class TestThroughTheEndpoint:
             self.viva, checkout, secret=secret, cart=other.cart
         )
 
-        assert response.status_code == status.HTTP_201_CREATED, response.json()
-        assert response.json()["id"] != placed["id"]
-        assert response.json()["agentCheckout"] is None
-        assert Order.objects.count() == 2
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert body["code"] == "agent_checkout_not_allowed", body
+        assert "agentCheckout" in body["fields"], body
+        assert "id" not in body
+        assert Order.objects.count() == 1
+        assert Order.objects.get().id == placed["id"]
+        assert other.stock() == STOCK, "the refused call took stock"
 
-    def test_without_the_secret_a_malformed_checkout_is_ignored(self):
-        """Only the gateway's checkout is validated: anyone else's field
-        is dropped before the body is, so it cannot refuse an order."""
+    def test_without_the_secret_a_malformed_checkout_is_refused(self):
+        """Refused for being named, before its value is read."""
         response = self._post(self.cod, "not-a-uuid", secret="")
 
-        assert response.status_code == status.HTTP_201_CREATED, response.json()
-        assert response.json()["agentCheckout"] is None
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "agent_checkout_not_allowed"
+        assert not Order.objects.exists()
 
     def test_an_order_without_a_checkout_shows_none(self):
         response = APIClient().post(

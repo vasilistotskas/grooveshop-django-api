@@ -348,10 +348,14 @@ caller:
   - **Only the gateway names one.** `agentCheckout` is believed beside the
     gateway's secret in `X-Internal-Gateway` alone
     (`OrderViewSet._named_agent_checkout`), as `agentProtocol` is
-    ([§3.4](creation-records.md)). From any other caller it is ignored,
-    a malformed value included (`OrderViewSet._validate_and_create` drops
-    the field before the body is validated): the order stores none and no
-    order is looked up by it.
+    ([§3.4](creation-records.md)). From any other caller it is refused,
+    a malformed value included, before anything is looked up or created
+    (`OrderViewSet._refuse_agent_checkout`: 400 with `code`
+    `agent_checkout_not_allowed` under `fields.agentCheckout`). Refused,
+    not dropped: a gateway whose secret Django does not hold would
+    otherwise have its checkout ignored, and every repeat of an order
+    whose answer it lost would place another. The storefront never sends
+    the field.
   - **First, before anything is judged, the body's validation included.**
     `OrderViewSet.create` reads the bare id from the body (through the
     request serializer's own `agent_checkout` field; a malformed value

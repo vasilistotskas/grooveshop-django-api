@@ -9680,6 +9680,9 @@ msgstr "Only staff can update order status"
 msgid "Only store staff may perform this action."
 msgstr "Only store staff may perform this action."
 
+msgid "Only the agent gateway can name an agent checkout."
+msgstr "Only the agent gateway can name an agent checkout."
+
 msgid "Only used when target scope is 'Specific categories'; subcategories are included automatically"
 msgstr "Only used when target scope is 'Specific categories'; subcategories are included automatically"
 

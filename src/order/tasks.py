@@ -1512,7 +1512,6 @@ def retry_receipts_with_mydata() -> int:
     """
     from order.accounting.movement import (
         sends_without_an_answer,
-        stamp_the_parcels_left_unregistered,
     )
     from order.accounting.mydata.config import load_config
     from order.accounting.mydata.types import ERROR_PICKUP_POINT_UNKNOWN
@@ -1562,10 +1561,8 @@ def retry_receipts_with_mydata() -> int:
         .values_list("order_id", flat=True)[:batch]
     )
     # One whose parcel left meanwhile goes with the loss-of-connection
-    # indication, stamped before it is built again.
-    stamp_the_parcels_left_unregistered(
-        Invoice.objects.filter(order_id__in=to_send)
-    )
+    # indication: the claim of its send stamps it, under the row's lock
+    # (``movement.stamp_if_left_unregistered``), before it is sent.
     # A broker that is down keeps each one as a DeferredDispatch, and the
     # sweep goes on to the next (``dispatch_on_commit``).
     for order_id in to_send:

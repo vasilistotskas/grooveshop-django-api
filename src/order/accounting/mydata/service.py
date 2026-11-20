@@ -43,7 +43,7 @@ from order.accounting.movement import (
     ReceiptMovement,
     receipt_movement,
     send_in_flight,
-    stamp_the_parcels_left_unregistered,
+    stamp_if_left_unregistered,
 )
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
@@ -340,20 +340,10 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
                 "mydata_error_message",
                 "updated_at",
             ]
-        now = timezone.now()
-        another_in_flight = not latest and send_in_flight(locked, at=now)
-        if (
-            locked.mydata_unanswered_since is not None
-            and not another_in_flight
-            and getattr(locked, "movement", None)
-            and locked.transmission_failed_at is None
-            and locked.order.shipped_at is not None
-        ):
-            locked.transmission_failed_at = now
-            fields.append("transmission_failed_at")
-            invoice.transmission_failed_at = now
         if fields:
             locked.save(update_fields=fields)
+        if stamp_if_left_unregistered(locked):
+            invoice.transmission_failed_at = locked.transmission_failed_at
     if latest:
         invoice.mydata_error_code = code[:10]
         invoice.mydata_error_message = message or ""
@@ -920,16 +910,11 @@ def _persist_submission_intent(
         if send_in_flight(locked, at=now):
             invoice.mydata_send_deadline = locked.mydata_send_deadline
             return _SendClaim.IN_FLIGHT
-        if not isinstance(locked, RetailCredit) and (
-            stamp_the_parcels_left_unregistered(
-                type(locked)._default_manager.filter(pk=locked.pk)
-            )
-        ):
-            # Its parcel left while a send of it has no answer, and nothing
-            # stamped it yet (a sender that stopped was still in flight when
-            # the parcel left): stamped now, whoever sends it, and the
-            # document is built again with the indication.
-            locked.refresh_from_db(fields=["transmission_failed_at"])
+        # Its parcel left while a send of it has no answer, and nothing
+        # stamped it yet (a sender that stopped was still in flight when the
+        # parcel left): stamped now, whoever sends it, and the document is
+        # built again with the indication below.
+        stamp_if_left_unregistered(locked)
         stamp = getattr(locked, "transmission_failed_at", None)
         if stamp != getattr(invoice, "transmission_failed_at", None):
             invoice.transmission_failed_at = stamp

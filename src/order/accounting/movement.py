@@ -35,6 +35,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -521,32 +522,48 @@ def parcel_left_unregistered(order_id: int) -> bool:
     unanswered is sent again plainly. Not for a receipt AADE refused or
     whose credentials it refused: that is no loss of connection. A send
     that goes unanswered after the parcel left is stamped by
-    ``service._persist_send_error``, so whichever comes second stamps it."""
+    ``service._persist_send_error``, so whichever comes second stamps it.
+    Its receipt is locked first (:func:`stamp_if_left_unregistered`)."""
     from order.models.invoice import Invoice
 
-    return bool(
-        stamp_the_parcels_left_unregistered(
-            Invoice.objects.filter(order_id=order_id)
+    with transaction.atomic():
+        receipt = (
+            Invoice.objects.select_for_update()
+            .filter(order_id=order_id)
+            .first()
         )
-    )
+        return receipt is not None and stamp_if_left_unregistered(receipt)
 
 
-def stamp_the_parcels_left_unregistered(invoices: Any) -> int:
-    """Stamp ``transmission_failed_at`` on every receipt among *invoices*
-    whose parcel left (``Order.shipped_at``) while its last send has no
-    answer (:func:`unanswered_sends`), before anything sends it again:
-    SHIPPED does it for its order (:func:`parcel_left_unregistered`), and
-    every claim of a send for its receipt
-    (``service._persist_submission_intent``), which covers one found
-    unanswered only later (a sender that stopped mid-request looks
-    unanswered only once its deadline passed), whoever sends it then.
-    Returns how many were stamped."""
-    now = timezone.now()
-    return unanswered_sends(
-        invoices.filter(
-            order__shipped_at__isnull=False, transmission_failed_at__isnull=True
+def stamp_if_left_unregistered(locked: Any) -> bool:
+    """The one way a receipt is stamped (``transmission_failed_at``): when
+    its parcel left (``Order.shipped_at``) while a send of it has no
+    answer (:func:`unanswered_sends`, never one in flight), and nothing
+    stamped it yet. Returns whether it stamped *locked*.
+
+    *locked* is a row its caller holds the lock on (``select_for_update``,
+    every field it changed saved), so no send can be claimed between the
+    check and the write, and a send claimed before it is in flight and
+    never stamped. Its callers: SHIPPED (:func:`parcel_left_unregistered`),
+    every claim of a send (``service._persist_submission_intent``), and a
+    send that goes unanswered (``service._persist_send_error``). A credit
+    document carries no movement and is never stamped."""
+    from order.models.invoice import Invoice
+
+    if not isinstance(locked, Invoice):
+        return False
+    left_unregistered = unanswered_sends(
+        Invoice.objects.filter(
+            pk=locked.pk,
+            order__shipped_at__isnull=False,
+            transmission_failed_at__isnull=True,
         )
-    ).update(transmission_failed_at=now, updated_at=now)
+    ).exists()
+    if not left_unregistered:
+        return False
+    locked.transmission_failed_at = timezone.now()
+    locked.save(update_fields=["transmission_failed_at", "updated_at"])
+    return True
 
 
 def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:

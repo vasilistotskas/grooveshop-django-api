@@ -228,13 +228,15 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   Α.1233/2026 annex §12.1 has such a movement document issued «με διακριτή
   ένδειξη για την απώλεια διασύνδεσης» and transmitted «άμεσα με την
   επαναφορά της» (a distinct series is asked only of one issued by hand).
-  `movement.parcel_left_unregistered` (in `handle_order_shipped`) stamps
-  `Invoice.transmission_failed_at` on an unanswered receipt and sends it at
-  once; a send that goes unanswered after the parcel left is stamped where
-  the answer is missed (`service._persist_send_error`), so whichever comes
-  second stamps it. A sender that built the document before the stamp
-  landed (it was looking the MARK up) finds it when it stores its intent
-  under the row lock, and builds the document again. From then on every transmission carries
+  `Invoice.transmission_failed_at` is stamped one way only,
+  `movement.stamp_if_left_unregistered`, on the receipt's row held under
+  its lock: by `movement.parcel_left_unregistered` (in
+  `handle_order_shipped`, which then sends it at once), where a send's
+  answer is missed after the parcel left (`service._persist_send_error`),
+  and by every claim of a send, so whichever comes second stamps it and no
+  send claimed meanwhile is ever stamped. A sender that built the document
+  before the stamp landed (it was looking the MARK up) finds it when it
+  stores its intent under the row lock, and builds the document again. From then on every transmission carries
   `transmissionFailure` 3, «Απώλεια διασύνδεσης», the one value of that
   element (`xs:byte` 1-4 in the v2.0.2 XSD) the REST API documentation
   allows an ERP to send (1, 2 and 4 are a licensed provider's). A receipt

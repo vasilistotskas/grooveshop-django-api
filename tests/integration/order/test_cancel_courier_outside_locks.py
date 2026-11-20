@@ -17,7 +17,6 @@ connection, at the moment the carrier's HTTP boundary is called.
 from __future__ import annotations
 
 import threading
-import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -54,6 +53,7 @@ from shipping_acs.models import AcsShipment
 from shipping_acs.services import AcsService
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowShipmentFactory
+from tests.utils.concurrency import in_thread, wait_for_a_blocked_backend
 from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -641,36 +641,6 @@ def test_a_flag_left_beside_an_answer_is_removed_without_asking_again(
     assert finish_pending_shipment_cancels() == NOTHING_PENDING
 
 
-def _wait_for_a_blocked_backend() -> None:
-    """Return once some connection of this database waits for a lock."""
-    deadline = time.monotonic() + WAIT
-    while time.monotonic() < deadline:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT count(*) FROM pg_stat_activity "
-                "WHERE datname = current_database() "
-                "AND wait_event_type = 'Lock'"
-            )
-            if cursor.fetchone()[0]:
-                return
-        time.sleep(0.05)
-    pytest.fail("no connection waited for a row lock")
-
-
-def _in_thread(run, errors: list[BaseException]) -> threading.Thread:
-    def target() -> None:
-        try:
-            run()
-        except BaseException as exc:
-            errors.append(exc)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    return thread
-
-
 def test_an_acs_tracking_poll_and_a_staff_cancel_do_not_deadlock(monkeypatch):
     """#613. The cancel holds the order; the poll, which found the parcel
     moving, has to write the order too. The poll used to lock the shipment
@@ -693,17 +663,17 @@ def test_an_acs_tracking_poll_and_a_staff_cancel_do_not_deadlock(monkeypatch):
     monkeypatch.setattr(StockManager, "lock_products", hold_the_order_lock)
 
     errors: list[BaseException] = []
-    cancel = _in_thread(
+    cancel = in_thread(
         lambda: _staff_cancel(Order.objects.get(pk=order_id)), errors
     )
     assert order_is_locked.wait(WAIT)
-    poll = _in_thread(
+    poll = in_thread(
         lambda: AcsService.poll_shipment_tracking(
             AcsShipment.objects.get(pk=shipment.pk)
         ),
         errors,
     )
-    _wait_for_a_blocked_backend()
+    wait_for_a_blocked_backend(WAIT)
     go_on.set()
     cancel.join(WAIT)
     poll.join(WAIT)

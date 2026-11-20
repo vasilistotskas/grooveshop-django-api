@@ -12,6 +12,7 @@ canceled in myDATA, not credited.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
@@ -21,6 +22,7 @@ import pytest
 from django.conf import settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db import transaction
 from django.db.models import F
 from django.test import RequestFactory
 from django.utils import timezone, translation
@@ -72,6 +74,7 @@ from shipping.interfaces import PickupPointUnknown
 from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory, AcsStationFactory
 from shipping_boxnow.factories import BoxNowLockerFactory, BoxNowShipmentFactory
+from tests.utils.concurrency import in_thread, wait_for_a_blocked_backend
 from tests.utils.mydata import ISSUER_VAT, FakeAade, mydata_enabled
 from tests.utils.orders import courier_cash_order
 from user.factories import UserAccountFactory
@@ -3693,3 +3696,56 @@ class TestCodeRabbitThirdReview:
         assert invoice.mydata_mark is not None
         [sent] = aade.receipts
         assert sent.is_delivery_note
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.usefixtures("dispatch_point")
+class TestTheStampBesideAClaim:
+    """The stamp and a claim of a send meet on the receipt's row lock."""
+
+    def test_a_send_claimed_while_the_stamp_waited_is_not_stamped(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The sender stopped long ago and the parcel left. A claim of a
+        new send holds the receipt while SHIPPED comes to stamp it: the
+        stamp waits for the lock, then finds that send in flight and
+        stamps nothing, so the row never says a send AADE may register
+        without the indication carried it."""
+        wait = 10
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        _stalled(invoice)
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.SHIPPED, shipped_at=timezone.now()
+        )
+        claimed = threading.Event()
+        go_on = threading.Event()
+        failures: list[BaseException] = []
+        stamped: list[bool] = []
+
+        def claim() -> None:
+            with transaction.atomic():
+                Invoice.objects.select_for_update().get(pk=invoice.pk)
+                now = timezone.now()
+                Invoice.objects.filter(pk=invoice.pk).update(
+                    mydata_sent_at=now,
+                    mydata_send_deadline=now + timedelta(hours=1),
+                    mydata_error_code="",
+                )
+                claimed.set()
+                assert go_on.wait(wait)
+
+        claiming = in_thread(claim, failures)
+        assert claimed.wait(wait)
+        stamping = in_thread(
+            lambda: stamped.append(parcel_left_unregistered(order.id)),
+            failures,
+        )
+        wait_for_a_blocked_backend(wait)
+        go_on.set()
+        claiming.join(wait)
+        stamping.join(wait)
+
+        assert failures == []
+        assert stamped == [False]
+        assert Invoice.objects.get(pk=invoice.pk).transmission_failed_at is None

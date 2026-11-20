@@ -1,7 +1,9 @@
 """Calls racing on real database connections.
 
 For ``django_db(transaction=True)`` tests: each call runs on a thread of its
-own, so on a connection of its own, and the calls start together.
+own, so on a connection of its own. :func:`race` starts calls together;
+:func:`in_thread` and :func:`wait_for_a_blocked_backend` order them, one
+holding a row lock while another waits on it.
 """
 
 from __future__ import annotations
@@ -78,3 +80,38 @@ def race[T](
             f"{JOIN_TIMEOUT_SECONDS} s; their sessions were terminated"
         )
     return results, failures
+
+
+def in_thread(
+    run: Callable[[], object], failures: list[BaseException]
+) -> threading.Thread:
+    """Start *run* on a thread of its own, so on a connection of its own;
+    what it raises goes to *failures*. The caller joins the thread."""
+
+    def target() -> None:
+        try:
+            run()
+        except BaseException as exc:
+            failures.append(exc)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    return thread
+
+
+def wait_for_a_blocked_backend(timeout: float) -> None:
+    """Return once some connection of this database waits for a lock."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM pg_stat_activity "
+                "WHERE datname = current_database() "
+                "AND wait_event_type = 'Lock'"
+            )
+            if cursor.fetchone()[0]:
+                return
+        time.sleep(0.05)
+    pytest.fail("no connection waited for a row lock")

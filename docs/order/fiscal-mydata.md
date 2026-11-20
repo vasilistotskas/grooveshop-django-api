@@ -152,9 +152,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `_emit_movement`): the same 11.1 with `dispatchDate` (the day the receipt
   is issued, which is the day the voucher or parcel is created: a later day,
   such as the next business day after `DISPATCH_CUTOFF`, would date the
-  document after the movement started, and AADE refuses an earlier one,
-  error 280; no `dispatchTime`, optional in phase A and not known when the
-  receipt is issued), `movePurpose` 1 «Πώληση»,
+  document after the movement started, and AADE's error table refuses an
+  earlier one, error 280, unverified; no `dispatchTime`, optional in phase
+  A and not known when the receipt is issued), `movePurpose` 1 «Πώληση»,
   `otherDeliveryNoteHeader` (`loadingAddress`: the dispatch point;
   `deliveryAddress`: the ACS station's or the BOX NOW locker's address for a
   pickup order, `ShippingCarrierInterface.pickup_point_address`, BOX NOW's
@@ -168,13 +168,14 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   receipt netted by an earlier refund (one money line per rate, mixing
   goods and shipping); shipping and the fee carry no quantity. myDATA REST
   API v2.0.2 §5.4 gives `netValue` and `vatAmount` a minimum of 0, and its
-  error table refuses no zero-value line in general, and AADE's sandbox
-  registered such a receipt (2026-11-20). `movePurpose` stays 1 «Πώληση»
-  for a gift: it moves with the sale.
-  **What AADE requires of a movement document beyond the XSD** (its
-  sandbox refused every 11.1 with `isDeliveryNote` without these,
-  2026-11-20, although its documentation forbids a Greek party's name and
-  address on other documents, errors 219 and 220): an `itemDescr` on every
+  error table refuses no zero-value line in general (a receipt with one
+  verified against the myDATA sandbox on 2026-11-20). `movePurpose` stays
+  1 «Πώληση» for a gift: it moves with the sale.
+  **What AADE requires of a movement document beyond the XSD** (verified
+  against the myDATA sandbox on 2026-11-20: it refused every 11.1 with
+  `isDeliveryNote` without these, although its documentation forbids a
+  Greek party's name and address on other documents, errors 219 and 220):
+  an `itemDescr` on every
   line (error 230; the product's name, the charge's label, or for a
   per-rate line "Goods and charges at N% VAT"), the issuer's `name` and
   `address` with its street number, and a `counterpart` with `name` and
@@ -198,10 +199,42 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   refused it for its content (`movement.refused_for_its_content`: a
   validation code, `BUILD` or `XSD`; nothing was registered, so it is built
   anew, dated the day it is sent). Error 228 is no such refusal: AADE holds
-  the document as it was sent. AADE's documentation says nothing of error
-  280 for a `transmissionFailure` document, so one whose parcel left during
-  an outage keeps its date. Every payload is checked against AADE's v2.0.2 XSDs,
-  vendored in `src/order/accounting/mydata/xsd/`, before it is sent.
+  the document as it was sent (unverified: no 228 was provoked in the
+  sandbox). AADE's documentation says nothing of error 280 for a
+  `transmissionFailure` document, so one whose parcel left during an outage
+  keeps its date (unverified). Every payload is checked against AADE's
+  v2.0.2 XSDs, vendored in `src/order/accounting/mydata/xsd/`, before it is
+  sent.
+- **AADE's rules this section relies on, and which were checked.** #760
+  was sent to AADE's myDATA sandbox (`mydataapidev.aade.gr`) through the
+  platform's own builder, service and client.
+  *Verified against the myDATA sandbox on 2026-11-20:* the movement
+  document's shape above (`itemDescr` on every line, error 230; issuer
+  name and address with its number, counterpart with name and address
+  and its number, error 204; counterpart `vatNumber` `000000000` for a GR
+  and a CY buyer; `nonObligatedRecipient`), registered for a home
+  delivery, an ACS station, a BOX NOW locker, cash on delivery, a
+  zero-value gift line and `transmissionFailure` 3; a plain 11.1; the uid
+  (SHA-1 over the fields joined by `-`, upper-case hex); a
+  `withoutDigitalTransportTracking` document refused cancel (error 801);
+  `CancelInvoice` of an 11.1 with movement, and 301 for one sent within a
+  second of the registration; `RequestTransmittedDocs` listing the uid,
+  `qrCodeUrl`, the movement's `dispatchDate` and each cancellation.
+  *Not exercised, unverified:* error 280 (a `dispatchDate` before the
+  current date) and that AADE does not apply it to a `transmissionFailure`
+  document; error 228 on a resend and its MARK recovery against AADE (the
+  lookup's matching is verified, the 228 answer is not); error 289's own
+  condition; whether AADE wants the issuer's seat rather than its dispatch
+  point as the issuer's address (it accepts either shape; the platform
+  sends the dispatch point, since the seat is one free line); the
+  `MOVEMENT_START_MAX_DAYS` limit, which is the decision's, not the API's.
+- **The buyer's personal data.** AADE requires the counterpart's name and
+  address on a movement document (error 204, verified against the myDATA
+  sandbox on 2026-11-20); that requirement is the ground for sending them,
+  and they are sent nowhere else. They are stored with the block
+  (`Invoice.movement`), which the staging refresh scrubs
+  (`devtools/anonymise/rules.py`, `order.Invoice`), like the receipt's
+  `buyer_snapshot`.
 - **When it is issued.** The order is issuable before it ships
   (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, and the
   carrier holds the parcel, `ShippingService.carrier_holds_the_parcel`:
@@ -231,14 +264,15 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   While the parcel is still with the store, a resend is the document as
   issued, plainly: one timeout is no loss of connection. Its `dispatchDate`
   is the one thing that moves: AADE refuses a date before the current one
-  (error 280), so a plain resend on a later day is dated today, and only
+  (error 280, from AADE's error table; unverified), so a plain resend on a
+  later day is dated today, and only
   when the lookup read AADE's whole window and found no document under the
   uid (`MarkLookup.ABSENT`; a listed document without a uid, which the
   schema allows, makes it `UNKNOWN`. The uid is AADE's: SHA-1 over the
-  identity fields joined by `-`, in upper-case hex, `uid.build_uid`, read
-  off the `invoiceUid` AADE's sandbox returned; any other form never
-  matches what AADE lists); a registered one keeps the date AADE
-  holds, and a MARK the lookup recovers brings it back: the row's block
+  identity fields joined by `-`, in upper-case hex, `uid.build_uid`,
+  verified against the myDATA sandbox on 2026-11-20 (the documentation
+  names the fields, not the join); any other form never matches what AADE
+  lists); a registered one keeps the date AADE holds, and a MARK the lookup recovers brings it back: the row's block
   takes the `dispatchDate` AADE lists, since the send that registered it
   may not be the one whose block the row holds. **Once the parcel leaves (SHIPPED) without a MARK**, its
   movement started during a loss of connection, AADE's procedure:
@@ -295,7 +329,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (BUILD).
 - **The QR on the parcel.** The registered receipt PDF carries AADE's QR
   (`mydata_qr_url`, the `qrUrl` of the response; after a MARK recovery,
-  the `qrCodeUrl` `RequestTransmittedDocs` lists, when it lists one). Printing it with the parcel is what §7.3
+  the `qrCodeUrl` `RequestTransmittedDocs` lists, which it did for every
+  document, verified against the myDATA sandbox on 2026-11-20). Printing it
+  with the parcel is what §7.3
   allows («δύναται επί του δέματος να επικολλάται ... QR code»); neither
   carrier's label takes our content (ACS returns its own label PDF, BOX NOW
   its own).
@@ -335,9 +371,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     run finds the cancellation AADE recorded. Stopped, or no parcel to stop: the receipt is
     canceled in myDATA (`cancel_document`, an order note with the
     cancellation MARK) and no credit follows. AADE answers a cancel sent
-    within a second of the registration with 301 ("not found"; its
-    sandbox, 2026-11-20): that is retried like no answer, never read as a
-    refusal. A refusal, or a courier that
+    within a second of the registration with 301 ("not found"; verified
+    against the myDATA sandbox on 2026-11-20): that is retried like no
+    answer, never read as a refusal. A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
     reaches the customer, and goes the credit path as before; one never
     sent (its worker stopped before the send) is sent then, since the hold

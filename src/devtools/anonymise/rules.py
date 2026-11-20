@@ -244,6 +244,10 @@ REGISTRY: dict[str, Scrub | Delete] = {
         order_fk="order",
         fields={
             "buyer_snapshot": Kind.JSON,
+            # A receipt with movement names the buyer, by name and address,
+            # to AADE (its counterpart, which AADE requires of a movement
+            # document), and a home delivery's address.
+            "movement": Kind.JSON,
             "mydata_error_message": Kind.TEXT,
         },
     ),

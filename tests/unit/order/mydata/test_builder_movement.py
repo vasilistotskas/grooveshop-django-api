@@ -37,11 +37,15 @@ from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
+#: The dispatch point, which is also the issuer's address
+#: (``movement._issuer``).
+DISPATCH_POINT = PostalAddress(
+    street="Τατοΐου", number="5", postal_code="145 61", city="Κηφισιά"
+)
+
 MOVEMENT = ReceiptMovement(
     dispatch_date=date(2026, 11, 19),
-    loading=PostalAddress(
-        street="Τατοΐου", number="5", postal_code="145 61", city="Κηφισιά"
-    ),
+    loading=DISPATCH_POINT,
     delivery=PostalAddress(
         street="Ερμού", number="10", postal_code="10563", city="Αθήνα"
     ),
@@ -49,9 +53,7 @@ MOVEMENT = ReceiptMovement(
     issuer=MovementParty(
         name="Κατάστημα ΑΕ",
         country="GR",
-        address=PostalAddress(
-            street="Τατοΐου 5", number="", postal_code="14561", city="Κηφισιά"
-        ),
+        address=DISPATCH_POINT,
     ),
     recipient=MovementParty(
         name="Μαρία Παπαδοπούλου",
@@ -184,28 +186,60 @@ def test_it_names_what_aade_requires_of_a_movement_document():
     counterpart = document.find(f"{AADE_NS}counterpart")
     header = document.find(f"{AADE_NS}invoiceHeader")
 
+    def shape(element):
+        return [
+            (_local(e), e.text if len(e) == 0 else shape(e)) for e in element
+        ]
+
     assert [_local(e) for e in document][:3] == [
         "issuer",
         "counterpart",
         "invoiceHeader",
     ]
-    assert [(_local(e), e.text) for e in issuer][3] == (
-        "name",
-        "Κατάστημα ΑΕ",
-    )
-    assert _text(issuer.find(f"{AADE_NS}address"), "city") == "Κηφισιά"
-    assert [(_local(e), e.text) for e in counterpart][:4] == [
+    assert shape(issuer) == [
+        ("vatNumber", "123456789"),
+        ("country", "GR"),
+        ("branch", "0"),
+        ("name", "Κατάστημα ΑΕ"),
+        (
+            "address",
+            [
+                ("street", "Τατοΐου"),
+                ("number", "5"),
+                ("postalCode", "14561"),
+                ("city", "Κηφισιά"),
+            ],
+        ),
+    ]
+    assert shape(counterpart) == [
         ("vatNumber", "000000000"),
         ("country", "GR"),
         ("branch", "0"),
         ("name", "Μαρία Παπαδοπούλου"),
+        (
+            "address",
+            [
+                ("street", "Ερμού"),
+                ("number", "10"),
+                ("postalCode", "10563"),
+                ("city", "Αθήνα"),
+            ],
+        ),
     ]
-    address = counterpart.find(f"{AADE_NS}address")
-    assert _text(address, "postalCode") == "10563"
+    assert [_local(e) for e in header][-2:] == [
+        "isDeliveryNote",
+        "nonObligatedRecipient",
+    ]
     assert _text(header, "nonObligatedRecipient") == "true"
     assert header.find(f"{AADE_NS}withoutDigitalTransportTracking") is None
     goods, shipping = _details(root)
+    assert [_local(e) for e in goods][:2] == ["lineNumber", "itemDescr"]
     assert _text(goods, "itemDescr") == invoice.order.items.get().product_name
+    assert [_local(e) for e in shipping][:3] == [
+        "lineNumber",
+        "itemDescr",
+        "netValue",
+    ]
     assert _text(shipping, "itemDescr")
     validate_invoice_doc(_build(invoice, movement).xml_bytes)
 

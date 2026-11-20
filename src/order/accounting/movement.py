@@ -110,7 +110,8 @@ def loading_address() -> PostalAddress | None:
     """The store's dispatch point, or ``None`` while any part of it is
     blank: AADE requires the postcode and the city of every address, and
     the street number of the issuer's, which the receipt names it as
-    (:func:`_issuer`; error 204, AADE's sandbox, 2026-11-20).
+    (:func:`_issuer`; error 204, verified against the myDATA sandbox on
+    2026-11-20).
 
     A store without one keeps the plain receipt at SHIPPED for every order
     (``movement_receipts_on``), so setting up the platform never turns a

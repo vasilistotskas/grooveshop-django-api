@@ -68,6 +68,38 @@ def test_json_keys_that_name_a_person_are_replaced_whatever_the_shape():
     assert request["items"][0]["carrier_name"] == "ACS"
 
 
+def test_a_receipts_movement_block_loses_the_buyer():
+    """``Invoice.movement`` names the buyer to AADE, which requires it of a
+    movement document (``order.accounting.movement.MovementParty``), and a
+    home delivery's address: none of it reaches staging."""
+    subject = _subject()
+    address = {
+        "street": "Real Street",
+        "number": "10",
+        "postal_code": "10563",
+        "city": "Real City",
+    }
+    block = {
+        "dispatch_date": "2026-11-20",
+        "delivery": address,
+        "recipient": {
+            "name": "Real Person",
+            "country": "GR",
+            "address": address,
+        },
+        "goods": [{"item": 1, "rate": "24", "quantity": 2}],
+    }
+
+    out = redaction.redact_json(block, subject)
+
+    assert "Real" not in str(out)
+    assert "10563" not in str(out)
+    assert out["recipient"]["name"] == subject.person.full_name
+    assert out["recipient"]["country"] == "GR"
+    assert out["dispatch_date"] == "2026-11-20"
+    assert out["goods"] == block["goods"]
+
+
 def test_known_values_and_addresses_are_replaced_inside_any_string():
     subject = _subject()
     known = [("Real Person", subject.person.full_name)]

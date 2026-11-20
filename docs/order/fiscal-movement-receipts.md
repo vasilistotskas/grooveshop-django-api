@@ -151,7 +151,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (`movement.unanswered_sends`); one whose credentials AADE refused keeps
   AADE's code and waits for staff. Before any SUBMITTED document is sent
   again its MARK is looked up (`service.look_up_mark`: `RequestTransmittedDocs`
-  by its uid, the 228 recovery), since the send may have been registered.
+  by its uid, the 228 recovery), since the send may have been registered;
+  credentials AADE refuses there are recorded the same way. Every send
+  stores the movement block it carries with it, `{}` for a receipt sent
+  plain, so a receipt rebuilt plain keeps no block AADE was not sent.
   While the parcel is still with the store, a resend is the document as
   issued, plainly: one timeout is no loss of connection. Its `dispatchDate`
   is the one thing that moves: AADE refuses a date before the current one
@@ -280,8 +283,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     too). A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
     reaches the customer, and goes the credit path as before; one never
-    sent (its worker stopped before the send) is sent then, since the hold
-    was what the sweep sent it for.
+    sent (its worker stopped before the send), or whose last send has no
+    answer, is sent then, its MARK looked up first, since the hold was what
+    the sweep sent it for.
   - **myDATA's answers.** Only AADE refusing the cancel
     (`MyDataValidationError`) sends the receipt the credit path too, with the
     reason in an order note. Credentials AADE refuses keep it set aside with

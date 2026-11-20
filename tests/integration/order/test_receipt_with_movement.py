@@ -582,6 +582,36 @@ def _unanswered(order, django_capture_on_commit_callbacks):
         return _issue(order, django_capture_on_commit_callbacks)
 
 
+def _unanswered_plain(order):
+    """The receipt issued while the store's dispatch point was set, which
+    was cleared before its first send: that send went out plain, and
+    unanswered. Returns the receipt and the payload sent."""
+    from extra_settings.models import Setting
+
+    from order.accounting.invoicing import generate_invoice
+
+    payloads = []
+
+    def unanswered(xml_bytes):
+        payloads.append(xml_bytes)
+        raise MyDataTransportError("connection refused")
+
+    with mydata_enabled():
+        generate_invoice(order)
+    Setting.objects.filter(name__in=LOADING).delete()
+    with (
+        mydata_enabled(),
+        patch(
+            "order.accounting.mydata.client.MyDataClient.send_invoices",
+            side_effect=unanswered,
+        ),
+        patch.object(send_invoice_to_mydata, "max_retries", 0),
+    ):
+        send_invoice_to_mydata.apply_async(args=[order.id])
+    [payload] = payloads
+    return Invoice.objects.get(order=order), payload
+
+
 def _untouched_for_a_while(invoice) -> None:
     Invoice.objects.filter(pk=invoice.pk).update(
         updated_at=timezone.now() - timedelta(hours=1)
@@ -1571,6 +1601,7 @@ class TestASendWithNoAnswerOnRecord:
         today, its addresses as issued."""
         invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
         issued = invoice.movement
+        uid = invoice.mydata_uid
         _issued_days_ago(invoice, 1)
         _untouched_for_a_while(invoice)
 
@@ -1586,6 +1617,9 @@ class TestASendWithNoAnswerOnRecord:
         assert f"<dispatchDate>{today}</dispatchDate>".encode() in sent.xml
         invoice.refresh_from_db()
         assert invoice.movement == issued
+        # The start of the movement is no part of the uid: the resend is
+        # the same document, which AADE answers with 228 if it holds it.
+        assert invoice.mydata_uid == uid
 
     def test_not_when_aade_could_not_say_whether_it_holds_it(
         self, django_capture_on_commit_callbacks
@@ -2198,6 +2232,99 @@ class TestCodeRabbitSecondReview:
         assert invoice.mydata_mark is not None
         assert len(aade.receipts) == 1
 
+    def test_a_held_plain_receipt_without_an_answer_is_sent_when_credited(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Its plain send went unanswered, and the courier could not stop
+        the parcel: released from the hold, it is in no sweep any more, so
+        it is sent at once, its MARK looked up first."""
+        order = _acs_order()
+        invoice, _payload = _unanswered_plain(order)
+        assert invoice.mydata_status == MyDataStatus.SUBMITTED
+
+        with mydata_enabled(), FakeAade() as aade:
+            _staff_cancel(
+                order,
+                django_capture_on_commit_callbacks,
+                side_effect=CarrierError("voucher on a pickup list"),
+            )
+
+        invoice.refresh_from_db()
+        assert invoice.cancel_requested_at is None
+        assert invoice.mydata_mark is not None
+        [sent] = aade.receipts
+        assert not sent.is_delivery_note
+
+    def test_a_receipt_refused_and_sent_again_plain_keeps_no_block(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE refused the receipt with movement for its content, and the
+        store cleared its dispatch point before staff sent it again: the
+        registered receipt is plain, and so is the row the PDF prints."""
+        from extra_settings.models import Setting
+
+        refusal = (
+            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+            b"<index>1</index><statusCode>ValidationError</statusCode>"
+            b"<errors><error><message>dispatchDate is before the current "
+            b"date</message><code>280</code></error></errors></response>"
+            b"</ResponseDoc>"
+        )
+        order = _acs_order()
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                return_value=refusal,
+            ),
+        ):
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+        assert invoice.mydata_status == MyDataStatus.REJECTED
+        assert invoice.movement != {}
+        Setting.objects.filter(name__in=LOADING).delete()
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            send_invoice_to_mydata(order.id)
+
+        [sent] = aade.receipts
+        assert not sent.is_delivery_note
+        invoice.refresh_from_db()
+        assert invoice.mydata_mark is not None
+        assert invoice.movement == {}
+
+    def test_credentials_refused_while_its_mark_is_looked_up_leave_it_to_staff(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The lookup before a resend is refused for the credentials: the
+        code is recorded as for a send, so the sweep stops asking."""
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            patch(
+                "order.accounting.mydata.client.MyDataClient."
+                "request_transmitted_docs",
+                side_effect=MyDataAuthError(
+                    "subscription key rejected", code="401"
+                ),
+            ),
+        ):
+            with django_capture_on_commit_callbacks(execute=True):
+                retry_receipts_with_mydata()
+            assert aade.sent == []
+            invoice.refresh_from_db()
+            assert invoice.mydata_error_code == "401"
+            _untouched_for_a_while(invoice)
+            with patch.object(send_invoice_to_mydata, "apply_async") as sent:
+                assert retry_receipts_with_mydata() == 0
+        sent.assert_not_called()
+
     def test_the_sweep_takes_the_least_recently_touched_first(
         self, django_capture_on_commit_callbacks, settings
     ):
@@ -2673,9 +2800,12 @@ class TestCodeRabbitThirdReview:
         out plain and unanswered; its order was canceled before the pickup.
         Its cancel waits for a MARK, so the sweep sends it again."""
         order = _acs_order()
-        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        invoice, payload = _unanswered_plain(order)
+        assert b"<isDeliveryNote>true</isDeliveryNote>" not in payload
+        assert invoice.movement == {}
+        assert invoice.mydata_error_code == ERROR_NO_ANSWER
         Invoice.objects.filter(pk=invoice.pk).update(
-            movement={}, cancel_requested_at=timezone.now()
+            cancel_requested_at=timezone.now()
         )
         _untouched_for_a_while(invoice)
 

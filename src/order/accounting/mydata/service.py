@@ -104,7 +104,14 @@ def submit_document(invoice: Any) -> ResponseRow | None:
     # before anything is built or sent again.
     nothing_registered = False
     if invoice.mydata_status == MyDataStatus.SUBMITTED and invoice.mydata_uid:
-        lookup = look_up_mark(invoice)
+        try:
+            lookup = look_up_mark(invoice)
+        except MyDataAuthError as exc:
+            # AADE refused the credentials before anything was sent:
+            # recorded as for a send, so the sweep leaves it to staff
+            # instead of asking again with the same credentials.
+            _persist_send_error(invoice, code=exc.code, message=exc.message)
+            raise
         if lookup is MarkLookup.FOUND:
             return _registered_row(invoice)
         nothing_registered = lookup is MarkLookup.ABSENT
@@ -171,6 +178,15 @@ def submit_document(invoice: Any) -> ResponseRow | None:
                 return _registered_row(invoice)
             raise MyDataValidationError(str(exc), code="XSD") from exc
 
+        # The movement block this send carries, stored with it: ``{}`` for
+        # a receipt sent plain (its dispatch point cleared since a block
+        # was stored), so the row never keeps a block AADE was not sent.
+        # A credit has none.
+        movement = (
+            None
+            if isinstance(invoice, RetailCredit)
+            else (built.movement.as_json() if built.movement else {})
+        )
         # Persist UID + request-scope identity BEFORE the HTTP call so a
         # transport failure leaves enough state to recover on retry.
         claim = _persist_submission_intent(
@@ -179,7 +195,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             invoice_type=built.invoice_type,
             series=built.series,
             aa=built.aa,
-            movement=built.movement.as_json() if built.movement else None,
+            movement=movement,
         )
         if claim is _SendClaim.REGISTERED:
             # Another sender registered it since this one read the row.
@@ -207,11 +223,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
     row = response.first()
 
     if row.is_success:
-        _persist_success(
-            invoice,
-            row,
-            movement=built.movement.as_json() if built.movement else None,
-        )
+        _persist_success(invoice, row, movement=movement)
         return row
 
     # AADE explicitly distinguishes ``XMLSyntaxError`` from
@@ -688,8 +700,9 @@ def _persist_submission_intent(
     movement: dict[str, Any] | None = None,
 ) -> _SendClaim:
     """Lock + save the identity fields before the HTTP round-trip, and a
-    receipt's movement indication with them (``Invoice.movement``), so the
-    PDF registered after it prints what AADE received.
+    receipt's movement indication with them (``Invoice.movement``, ``{}``
+    for one sent plain), so the PDF registered after it prints what AADE
+    received.
 
     Writes nothing when the row holds a MARK already (another sender
     registered it since this one read it: ``REGISTERED``, its registered

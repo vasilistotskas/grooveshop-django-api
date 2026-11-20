@@ -1776,6 +1776,7 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
     """Release the receipt of a canceled order from its hold: it stands,
     goes the credit path, reaches the customer, and an order note says
     why (*reason*)."""
+    from order.accounting.movement import sends_without_an_answer
     from order.models.invoice import Invoice, MyDataStatus
 
     with transaction.atomic():
@@ -1791,6 +1792,11 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
         )
         if current is None:
             return "nothing_to_settle"
+        # Read before the release touches the row: a send stopped
+        # mid-request counts once it has been still for a while.
+        unanswered = sends_without_an_answer(
+            Invoice.objects.filter(pk=current.pk)
+        ).exists()
         current.cancel_requested_at = None
         current.save(update_fields=["cancel_requested_at", "updated_at"])
         OrderHistory.log_note(
@@ -1805,10 +1811,12 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
         if current.mydata_mark:
             # It stands, so it reaches the customer (``awaits_the_parcel``).
             dispatch_on_commit(send_invoice_email, [order.id])
-        elif current.mydata_status == MyDataStatus.NOT_SENT:
-            # Never sent (its worker stopped before the send): the hold
-            # was what the sweep sent it for, so it is sent now; its
-            # registration releases the credits and the email.
+        elif current.mydata_status == MyDataStatus.NOT_SENT or unanswered:
+            # Never sent (its worker stopped before the send), or its last
+            # send has no answer: the hold was what the sweep sent it for
+            # (a plain receipt's send is in no other sweep), so it is sent
+            # now, its MARK looked up first; its registration releases the
+            # credits and the email.
             dispatch_on_commit(send_invoice_to_mydata, [order.id])
     return "credited"
 

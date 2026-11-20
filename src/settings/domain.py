@@ -80,6 +80,29 @@ CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
     getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
 )
 CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# A receipt whose business with myDATA is unfinished (issued while it could
+# not be reached, or of an order canceled before its parcel left;
+# ``order.tasks.retry_receipts_with_mydata``) is taken up again once this
+# many minutes passed since it was last touched (its own tasks retry for
+# about ten), at most this many of each kind per store and run.
+MYDATA_RETRY_AFTER_MINUTES = int(getenv("MYDATA_RETRY_AFTER_MINUTES", "15"))
+MYDATA_RETRY_SWEEP_BATCH = int(getenv("MYDATA_RETRY_SWEEP_BATCH", "100"))
+# AADE answers a CancelInvoice sent right after a document's registration
+# with 301 ("not found") until the cancel can see it (seconds, in the
+# sandbox). Within this many minutes of the registration
+# (``mydata_confirmed_at``) a 301 is retried as no answer; after them AADE
+# does not hold that MARK for the credentials asking, and it is a refusal
+# (``order.accounting.mydata.service.cancel_document``). Shorter than the
+# admin cancel's own retries (3 x 300 s), so that path records it too.
+MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES = int(
+    getenv("MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES", "10")
+)
+# How long one settle of a canceled order's receipt holds its claim
+# (``order.tasks.settle_canceled_receipt``): its AADE calls, a cancel and a
+# lookup of the cancellations, each bounded by the store's
+# MYDATA_REQUEST_TIMEOUT_SECONDS. A worker that dies holding it frees it
+# after this long.
+MYDATA_SETTLE_CLAIM_SECONDS = int(getenv("MYDATA_SETTLE_CLAIM_SECONDS", "300"))
 # The review reminder (``order.tasks.send_review_request_emails``) runs
 # daily: an order delivered up to this many days earlier than its due day
 # is still reminded, so a run that did not happen costs nothing.

@@ -284,6 +284,9 @@ def create_pending_credits(order_id: int) -> list[int]:
             invoice is None
             or not invoice.mydata_mark
             or invoice.mydata_status != MyDataStatus.CONFIRMED
+            # Set aside to be canceled in myDATA: the order was canceled
+            # before its parcel left (``invoicing.hold_receipt_for_cancel``).
+            or invoice.cancel_requested_at is not None
         ):
             return created
 

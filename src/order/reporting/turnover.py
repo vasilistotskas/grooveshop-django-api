@@ -8,14 +8,28 @@ net of VAT, on an accrual basis.
 When a sale is earned
     The moment the order **left the store** (``Order.shipped_at``,
     stamped by ``Order.save`` the first time the order is in a dispatched
-    status), for every payment method alike. The retail receipt is issued
-    when the parcel ships (``order.accounting.invoicing.receipt_issuable``,
-    ``docs/order/fiscal-mydata.md`` section 7.4), and the books of a Greek store
-    are accrual books (ν.4308/2014): the sale belongs to the period of its
-    receipt, not to the day the courier pays the cash on delivery out, nor
-    to the day an online payment cleared before the parcel left. So a
-    month, once it is over, only changes by a return booked in the month
-    it happened, never because a collection arrived late.
+    status), for every payment method alike. The books of a Greek store
+    are accrual books (ν.4308/2014): a sale is earned when the goods go,
+    not on the day the courier pays the cash on delivery out, nor on the
+    day an online payment cleared before the parcel left. So a month, once
+    it is over, only changes by a return booked in the month it happened,
+    never because a collection arrived late.
+
+    Not the receipt's date. Most receipts are issued when the parcel
+    ships, but a courier or locker order's receipt carries the movement
+    and is issued when its voucher is created, up to five days before the
+    pickup (``order.accounting.movement``,
+    ``docs/order/fiscal-movement-receipts.md``, section 7.4). Until the parcel leaves that sale can still be undone: an
+    order canceled before the pickup is no sale here, and in myDATA its
+    receipt is either canceled (``CancelInvoice``, a document never used)
+    or, when the courier could not stop the parcel or AADE refused the
+    cancel, stands with a credit document that reverses it in full; myDATA
+    nets to nothing either way. Counting the sale from the receipt's date
+    would put it in a month before it was certain and take it out again
+    after the month closed. So such a receipt can sit in myDATA's month
+    before the one this report counts its sale in, when the voucher is
+    created in the last days of a month and the parcel leaves in the next;
+    the two agree once both months are read together.
 
     An order canceled or refunded before it shipped is never a sale; one
     that is still being prepared is not one yet.

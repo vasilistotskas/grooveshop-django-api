@@ -23,6 +23,7 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.urls import reverse
 from django.utils import formats, timezone
 from django.utils.text import Truncator
@@ -1210,7 +1211,9 @@ class StoreAlerts(DashboardWidget):
         ]
 
     def _mydata(self) -> list[dict[str, Any]]:
+        from order.accounting.movement import loading_address
         from order.accounting.mydata.config import load_config
+        from order.models.invoice import Invoice, MyDataStatus
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.
@@ -1274,6 +1277,101 @@ class StoreAlerts(DashboardWidget):
                     link=(
                         self.changelist_url("tenant.Tenant"),
                         _("Fix in settings"),
+                    ),
+                )
+            )
+        offline = Invoice.objects.filter(
+            transmission_failed_at__isnull=False, mydata_mark__isnull=True
+        ).exclude(
+            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
+        waiting = offline.count()
+        if waiting:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cloud_sync",
+                    _("Parcels that left while myDATA was unreachable"),
+                    ngettext(
+                        "%(count)s parcel left before myDATA registered its "
+                        "receipt, because myDATA did not answer. The receipt "
+                        "is sent again automatically, with AADE's "
+                        "loss-of-connection indication, until it is "
+                        "registered.",
+                        "%(count)s parcels left before myDATA registered "
+                        "their receipts, because myDATA did not answer. The "
+                        "receipts are sent again automatically, with AADE's "
+                        "loss-of-connection indication, until they are "
+                        "registered.",
+                        waiting,
+                    )
+                    % {"count": waiting},
+                )
+            )
+        # Set aside when their orders were canceled before the parcel left,
+        # and settled within minutes; one still here waits for myDATA to
+        # answer (sent and canceled automatically), or for staff: myDATA
+        # refused the receipt or the store's credentials (its order's notes
+        # say so).
+        held = (
+            Invoice.objects.filter(
+                cancel_requested_at__isnull=False,
+                cancel_requested_at__lte=timezone.now()
+                - timedelta(minutes=settings.MYDATA_RETRY_AFTER_MINUTES),
+            )
+            .exclude(mydata_status=MyDataStatus.CANCELED)
+            .count()
+        )
+        if held:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cancel_schedule_send",
+                    _("Receipts of canceled orders not canceled in myDATA"),
+                    ngettext(
+                        "%(count)s receipt of an order canceled before its "
+                        "parcel left is still waiting to be canceled in "
+                        "myDATA. It is canceled automatically once myDATA "
+                        "answers; if myDATA refused the receipt or the "
+                        "store's credentials, the order's notes say what "
+                        "to do.",
+                        "%(count)s receipts of orders canceled before their "
+                        "parcels left are still waiting to be canceled in "
+                        "myDATA. They are canceled automatically once "
+                        "myDATA answers; if myDATA refused a receipt or the "
+                        "store's credentials, its order's notes say what "
+                        "to do.",
+                        held,
+                    )
+                    % {"count": held},
+                )
+            )
+        # Only a store whose parcels a carrier integration takes owes a
+        # movement receipt (``order.accounting.movement``).
+        carrier_apps = {"shipping_acs", "shipping_boxnow"}
+        uses_a_carrier = bool(
+            carrier_apps - store_features(self.request).inactive_carrier_apps()
+        )
+        if uses_a_carrier and loading_address() is None:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "local_shipping",
+                    _("Set the dispatch point for courier receipts"),
+                    _(
+                        "A receipt for a courier or locker order must carry "
+                        "the movement of goods and be issued before the "
+                        "courier collects the parcel. Until the dispatch "
+                        "point is set, receipts are issued when the order "
+                        "ships, without it. Fill in "
+                        "MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY "
+                        "(and the street)."
+                    ),
+                    link=(
+                        self.changelist_url(
+                            "extra_settings.Setting", "q=MYDATA_LOADING_"
+                        ),
+                        _("Open the dispatch point settings"),
                     ),
                 )
             )

@@ -29,6 +29,8 @@ the linked section or the originating commit's message.
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | [§3.4](creation-records.md) |
 | A cart records its first touch (`CartAttribution`) only through `CartAttributionService.capture`, called before the line is written: an empty cart takes it, a cart holding lines keeps it, a merge keeps the earlier; both order creation paths copy it to `OrderAttribution.cart_source*` because the cart is deleted with its lines | [§3.4](creation-records.md) |
 | An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`src/order/accounting/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | [§3.5](creation-records.md) |
+| A MARK is final: every write of a myDATA send (`service.submit_document`: the intent, a refusal, an unanswered send) re-reads the document's row under its lock and leaves one that holds a MARK as it is, so overlapping senders (retry chain, sweep, SHIPPED, staff) can never demote it to SUBMITTED or REJECTED | [§7.4](fiscal-mydata.md) (#760) |
+| A courier order's receipt is set aside for its cancel (`hold_receipt_for_cancel`) inside `_cancel_order_locked`, under the order lock and before the save that asks for credits; credits are created under the same lock, and the receipt email checks `Invoice.is_deliverable` when it runs | [§7.1](cancel.md), [§7.4](fiscal-movement-receipts.md) (#760) |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `src/devtools/demo_account.py: _restore_gift_card` |
 | The checkout total is computed once, by `OrderQuoteService.quote`: `POST /cart/quote`, the payment-intent amount and both creation paths (`lock=True`) read it. An order is built from the quote's rows and refused (`OrderService._require_quoted_total`) when its own sum is not the quote's `amount_due` | [§3.0](creation.md) (#635) |
 | An order created with `expectedTotal` exists only at that total: compared exactly (minor units and currency) with the quote computed under the cart lock, else 409 `code: total_changed` with the quote and nothing created. Its `error.type` stays `invalid_order_data` until the storefront in production lists `total_changed` | [§3.0](creation.md) (#635) |
@@ -143,7 +145,12 @@ These invariants need more than a table row. Each ends with its anchor.
   the remainder
   - Anchor: [§7.2](refunds.md), [§7.3](payment-ledger.md)
 - The platform issues retail myDATA documents only: an 11.1 receipt when a
-  RECEIPT order ships (`order_shipped`, exactly once) and an 11.4 credit per
+  RECEIPT order ships (`order_shipped`), or, for a courier or locker order of
+  a store with its dispatch point set, with movement indication before the
+  pickup, once the carrier holds its voucher or parcel and the order awaits
+  no online payment (cash on delivery included: it is not awaiting one)
+  (`order_shipment_dispatched`, `receipt_issuable`,
+  [§7.4](fiscal-mydata.md)); exactly once either way. An 11.4 credit per
   ledger REFUND row of an order whose receipt has a MARK, plus one settlement
   credit when the order closes without a sale. `document_type=INVOICE` orders
   submit nothing: invoices are issued by hand in timologio (AADE decision

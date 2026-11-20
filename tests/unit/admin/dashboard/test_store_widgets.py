@@ -548,6 +548,100 @@ class TestAlerts:
         assert "myDATA has no valid environment" in titles
         assert "myDATA is using the AADE sandbox" not in titles
 
+    @pytest.mark.parametrize(
+        ("carriers", "dispatch_point", "shown"),
+        [
+            pytest.param({"acs"}, False, True, id="acs-without-point"),
+            pytest.param({"boxnow"}, False, True, id="boxnow-without-point"),
+            pytest.param({"acs"}, True, False, id="point-set"),
+            pytest.param(set(), False, False, id="no-carrier"),
+        ],
+    )
+    def test_the_dispatch_point_is_asked_of_a_store_a_carrier_serves(
+        self, bind_tenant, carriers, dispatch_point, shown
+    ):
+        """Without it a courier order's receipt is issued at shipment with
+        no movement indication (``order.accounting.movement``): only a store
+        whose parcels ACS or BOX NOW take is asked to set it."""
+        from shipping.models import ShippingProvider
+        from tests.utils.staff import store_tenant
+
+        ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
+            is_active=False
+        )
+        ShippingProvider.objects.filter(code__in=carriers).update(
+            is_active=True
+        )
+        if dispatch_point:
+            for name, value in (
+                ("MYDATA_LOADING_STREET", "Τατοΐου"),
+                ("MYDATA_LOADING_NUMBER", "5"),
+                ("MYDATA_LOADING_POSTAL_CODE", "14561"),
+                ("MYDATA_LOADING_CITY", "Κηφισιά"),
+            ):
+                Setting.objects.update_or_create(
+                    name=name,
+                    defaults={"value_type": "string", "value_string": value},
+                )
+
+        titles = self._mydata_titles(
+            store_tenant(
+                f"widget_dispatch_{'_'.join(sorted(carriers)) or 'none'}"
+                f"_{int(dispatch_point)}",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+        )
+
+        assert (
+            "Set the dispatch point for courier receipts" in titles
+        ) is shown
+
+    @pytest.mark.parametrize(
+        ("held_minutes_ago", "status", "shown"),
+        [
+            pytest.param(60, "CONFIRMED", True, id="held-an-hour"),
+            pytest.param(60, "REJECTED", True, id="held-and-refused"),
+            pytest.param(1, "CONFIRMED", False, id="just-held"),
+            pytest.param(60, "CANCELED", False, id="canceled-in-mydata"),
+        ],
+    )
+    def test_receipts_of_canceled_orders_left_uncanceled_are_counted(
+        self, bind_tenant, held_minutes_ago, status, shown
+    ):
+        """Set aside when its order was canceled before the parcel left and
+        normally canceled in myDATA within minutes (``settle_canceled_
+        receipt``); one still waiting after the sweep's interval is shown
+        like the other myDATA alerts."""
+        from datetime import timedelta
+
+        from order.models.invoice import Invoice
+        from tests.utils.staff import store_tenant
+
+        Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000747",
+            mydata_status=status,
+            cancel_requested_at=timezone.now()
+            - timedelta(minutes=held_minutes_ago),
+        )
+
+        titles = self._mydata_titles(
+            store_tenant(
+                f"widget_held_{held_minutes_ago}_{status.lower()}",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+        )
+
+        assert (
+            "Receipts of canceled orders not canceled in myDATA" in titles
+        ) is shown
+
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch
     ):

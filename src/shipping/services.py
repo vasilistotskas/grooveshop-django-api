@@ -28,6 +28,7 @@ from shipping.exceptions import (
     ShippingWeightExceededError,
 )
 from shipping.interfaces import (
+    PostalAddress,
     ShippingCarrierInterface,
     get_provider,
     is_registered,
@@ -233,6 +234,60 @@ class ShippingService:
             if (rule := adapter.canceled_shipment_q()) is not None
         ]
         return reduce(operator.or_, rules) if rules else None
+
+    @classmethod
+    def moves_by_carrier(cls, order: Order) -> bool:
+        """Whether a carrier takes the order's parcel: its provider keeps a
+        shipment of its own (a voucher, a locker parcel). The merchant's
+        own ``flat_rate`` delivery keeps none."""
+        adapter = cls.adapter_for_order(order)
+        return (
+            adapter is not None
+            and adapter.shipment_for_order(order) is not None
+        )
+
+    @classmethod
+    def carrier_holds_the_parcel(cls, order: Order) -> bool:
+        """Whether the order's carrier has accepted its parcel (a voucher or
+        parcel at the carrier, ``holds_the_parcel``). A tracking number
+        typed on the order, or a shipment row written at checkout, is not
+        that."""
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return False
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return False
+        # As stored: the order may hold the row cached from before the
+        # carrier path saved the voucher or parcel on its own (locked)
+        # copy and then recorded the tracking number on the order.
+        return adapter.holds_the_parcel(
+            type(shipment)._default_manager.get(pk=shipment.pk)
+        )
+
+    @classmethod
+    def delivery_address(cls, order: Order) -> PostalAddress | None:
+        """Where the order's carrier takes the parcel, or ``None`` when the
+        order does not move through a carrier (no provider, or one with no
+        shipment of its own, like the merchant's ``flat_rate`` delivery).
+
+        The pickup point's address for a locker or station order
+        (:meth:`ShippingCarrierInterface.pickup_point_address`), the
+        buyer's shipping address otherwise. Raises ``ValueError`` when the
+        pickup point's address is not known.
+        """
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return None
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return None
+        return adapter.pickup_point_address(shipment) or PostalAddress(
+            street=order.street,
+            street_number=order.street_number,
+            postal_code=order.zipcode,
+            city=order.city,
+        )
 
     @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:

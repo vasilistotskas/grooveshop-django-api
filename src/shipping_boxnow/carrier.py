@@ -15,7 +15,12 @@ from django.db.models import Q
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping.interfaces import (
+    PickupPointUnknown,
+    PostalAddress,
+    ShippingCarrierInterface,
+    register_provider,
+)
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
@@ -79,6 +84,34 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
     def shipment_for_order(self, order: Order):
         return getattr(order, "boxnow_shipment", None)
+
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """BOX NOW holds a parcel for the shipment (created, or taken over
+        after a P410)."""
+        return shipment.has_parcel
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress:
+        """The locker's address as BOX NOW lists it. Its destinations carry
+        no city field: the city is ``addressLine2`` (BOX NOW API manual
+        v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
+        "ΑΘΗΝΑ"``). Read from the catalogue now, so a locker a later sync
+        added is found (``PickupPointUnknown`` until then)."""
+        from shipping_boxnow.models import BoxNowLocker
+
+        locker = BoxNowLocker.objects.filter(
+            external_id=shipment.locker_external_id
+        ).first()
+        if locker is None or not (locker.postal_code and locker.address_line_2):
+            raise PickupPointUnknown(
+                "The address of BOX NOW locker "
+                f"{shipment.locker_external_id} is not known."
+            )
+        return PostalAddress(
+            street=locker.address_line_1,
+            street_number="",
+            postal_code=locker.postal_code,
+            city=locker.address_line_2,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

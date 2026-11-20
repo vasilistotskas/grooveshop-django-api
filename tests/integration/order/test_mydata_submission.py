@@ -18,17 +18,21 @@ separate manual smoke-test suite (gated by env var).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+from celery.exceptions import Retry
+from django.conf import settings
 from django.core import mail
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from djmoney.money import Money
 from kombu.exceptions import OperationalError
 
 from order.accounting.invoicing import generate_invoice
 from order.accounting.mydata.exceptions import MyDataTransportError
+from order.accounting.mydata.types import ERROR_MARK_NOT_FOUND
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
@@ -124,6 +128,21 @@ _VALIDATION_ERROR_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
         <errors>
             <code>216</code>
             <message>vatCategory must have value other than 8 for this invoice type</message>
+        </errors>
+    </response>
+</ResponseDoc>
+"""
+
+_MARK_NOT_FOUND_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ResponseDoc>
+    <response>
+        <index>1</index>
+        <statusCode>ValidationError</statusCode>
+        <errors>
+            <error>
+                <message>Invoice with MARK 800000165789545 not found for VAT number 1</message>
+                <code>301</code>
+            </error>
         </errors>
     </response>
 </ResponseDoc>
@@ -640,6 +659,73 @@ class CancelMydataInvoiceTestCase(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.mydata_status, MyDataStatus.CANCELED)
         self.assertEqual(invoice.mydata_cancellation_mark, 900000000000001)
+
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.cancel_invoice")
+    @patch("order.tasks.issue_pending_credits.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
+    def test_a_mark_aade_no_longer_finds_is_recorded_not_retried(
+        self, _mock_email, _mock_credits, mock_cancel, mock_send, _mock_render
+    ):
+        """A 301 past MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES of the
+        registration is AADE's refusal: the receipt keeps it as its error
+        and stays CONFIRMED, with no retry."""
+        self.enterContext(mydata_enabled())
+        order, invoice = _make_invoice()
+        mock_send.return_value = _SUCCESS_XML
+        send_invoice_to_mydata(order.id)
+        Invoice.objects.filter(pk=invoice.pk).update(
+            mydata_confirmed_at=timezone.now()
+            - timedelta(
+                minutes=settings.MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES + 1
+            )
+        )
+
+        mock_cancel.return_value = _MARK_NOT_FOUND_XML
+        result = cancel_mydata_invoice(order.id)
+
+        self.assertFalse(result)
+        mock_cancel.assert_called_once()
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_status, MyDataStatus.CONFIRMED)
+        self.assertEqual(invoice.mydata_error_code, ERROR_MARK_NOT_FOUND)
+        self.assertIn("not found", invoice.mydata_error_message)
+
+    @patch(
+        "order.accounting.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4 test",
+    )
+    @patch("order.accounting.mydata.client.MyDataClient.send_invoices")
+    @patch("order.accounting.mydata.client.MyDataClient.cancel_invoice")
+    @patch("order.tasks.issue_pending_credits.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
+    def test_a_mark_aade_does_not_show_yet_is_retried(
+        self, _mock_email, _mock_credits, mock_cancel, mock_send, _mock_render
+    ):
+        """Right after the registration a 301 is AADE not showing the
+        cancel the document yet: retried, nothing recorded."""
+        self.enterContext(mydata_enabled())
+        order, invoice = _make_invoice()
+        mock_send.return_value = _SUCCESS_XML
+        send_invoice_to_mydata(order.id)
+
+        mock_cancel.return_value = _MARK_NOT_FOUND_XML
+        with (
+            patch.object(
+                cancel_mydata_invoice, "retry", side_effect=Retry()
+            ) as retry,
+            self.assertRaises(Retry),
+        ):
+            cancel_mydata_invoice(order.id)
+
+        retry.assert_called_once()
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_status, MyDataStatus.CONFIRMED)
+        self.assertEqual(invoice.mydata_error_code, "")
 
     def test_no_mark_skips_without_error(self):
         self.enterContext(mydata_enabled())

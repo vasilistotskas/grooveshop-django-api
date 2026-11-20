@@ -26,11 +26,13 @@ that is neither is refused (the store is not ready), never guessed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Literal
 
 from django.conf import settings
 
 from core.store_settings import store_setting
+from order.accounting.movement import xml_character
 from tenant.credentials import mydata_credentials
 from tenant.membership import is_demo_store
 
@@ -41,6 +43,29 @@ _BASE_URLS: dict[Environment, str] = {
     "dev": "https://mydataapidev.aade.gr",
     "prod": "https://mydatapi.aade.gr/myDATA",
 }
+
+#: The longest ``series`` AADE takes (``InvoiceHeaderType``, the XSD's
+#: ``maxLength``); a document's series is its prefix and ``-<year>``.
+SERIES_MAX_LENGTH = 50
+SERIES_PREFIX_MAX_LENGTH = SERIES_MAX_LENGTH - len("-YYYY")
+
+
+def validate_series_prefix_setting(value: object) -> bool:
+    """Validator for ``MYDATA_INVOICE_SERIES_PREFIX`` and
+    ``MYDATA_CREDIT_SERIES_PREFIX``: text whose series fits AADE's, and
+    that AADE reads exactly as it was hashed. The uid is the hash of the
+    series as given, while the payload leaves out what XML cannot carry and
+    a parser reads a carriage return as a line feed (XML 1.0 §2.11): such
+    a character, or any line break or tab, would give a uid AADE never
+    lists for the series it received."""
+    return (
+        isinstance(value, str)
+        and len(value) <= SERIES_PREFIX_MAX_LENGTH
+        and all(
+            xml_character(character) and character not in "\t\n\r"
+            for character in value
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -94,6 +119,21 @@ class MyDataConfig:
             and (self.fhm_exemption_ground or self.issues_to_sandbox_only)
             and self.user_id
             and self.subscription_key
+        )
+
+    @property
+    def send_window(self) -> timedelta:
+        """How long after it began a send to AADE may still register: the
+        one rule for whether a send has ended. :class:`MyDataClient` gives
+        up after ``request_timeout_seconds`` to connect and as long again
+        for AADE's answer to start, and ``MYDATA_RETRY_AFTER_MINUTES``
+        past that is the margin in which nothing is concluded of it (AADE
+        may finish a request whose client gave up, and its worker may still
+        be recording the answer). Within it a send with no answer on record
+        is in flight, and a lookup that finds nothing does not decide it."""
+        return timedelta(
+            seconds=2 * self.request_timeout_seconds,
+            minutes=settings.MYDATA_RETRY_AFTER_MINUTES,
         )
 
     def issues_automatically(self) -> bool:

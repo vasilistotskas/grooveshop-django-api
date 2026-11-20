@@ -86,6 +86,9 @@ class FlatRateCarrier(ShippingCarrierInterface):
     def shipment_for_order(self, order: Order) -> Any | None:
         return None
 
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        return False
+
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:

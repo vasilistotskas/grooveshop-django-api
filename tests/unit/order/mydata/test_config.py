@@ -243,3 +243,40 @@ def test_the_exemption_ground_is_a_store_setting_that_ships_blank():
     ground = defaults["MYDATA_FHM_EXEMPTION_GROUND"]
     assert ground["type"] == "string"
     assert ground["value"] == ""
+
+
+@pytest.mark.parametrize(
+    ("value", "accepted"),
+    [
+        ("GRVP", True),
+        ("x" * 45, True),
+        ("x" * 46, False),
+        ("GRVP\x01", False),
+        ("GR\rVP", False),
+        ("GR\nVP", False),
+        ("GR\tVP", False),
+        (5, False),
+    ],
+)
+def test_a_series_prefix_is_what_the_uid_and_aade_see_alike(value, accepted):
+    """The uid hashes the series as given and the payload leaves out what
+    XML cannot carry, so a prefix holding such a character, or one too long
+    for AADE's series, is refused where it is saved."""
+    from order.setting_validators import validate_series_prefix_setting
+
+    assert validate_series_prefix_setting(value) is accepted
+
+
+@pytest.mark.parametrize(
+    "name", ["MYDATA_INVOICE_SERIES_PREFIX", "MYDATA_CREDIT_SERIES_PREFIX"]
+)
+def test_both_series_prefixes_are_validated_where_they_are_saved(name):
+    from order.setting_validators import validate_series_prefix_setting
+
+    defaults = {
+        item["name"]: item for item in django_settings.EXTRA_SETTINGS_DEFAULTS
+    }
+    assert defaults[name]["validator"] == (
+        "order.setting_validators.validate_series_prefix_setting"
+    )
+    assert validate_series_prefix_setting(defaults[name]["value"])

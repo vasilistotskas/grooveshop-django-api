@@ -284,6 +284,15 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_purge_expired_builder_preview_links",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
+        "retry-receipts-with-mydata": {
+            # Fanout: a receipt issued while myDATA could not be reached
+            # (AADE's loss-of-connection procedure) is sent again, and one
+            # of an order canceled before its parcel left is canceled
+            # there; shipping never waits for either, this finds them by
+            # state.
+            "task": "tenant.tasks.fanout_retry_receipts_with_mydata",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
+        },
         "rescan-pending-contact-attachments": {
             # Fanout: an attachment whose scan was queued by a worker that
             # died before the publish stays PENDING; this finds it by state.

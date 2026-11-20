@@ -312,10 +312,22 @@ msgstr[0] "%(count)s order · %(share)s"
 msgstr[1] "%(count)s orders · %(share)s"
 
 #, python-format
+msgid "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgid_plural "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+msgstr[0] "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgstr[1] "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+
+#, python-format
 msgid "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgid_plural "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[0] "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[1] "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
+
+#, python-format
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
+msgstr[0] "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgstr[1] "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
@@ -880,6 +892,9 @@ msgstr "A publish can be scheduled at most %(days)s days ahead."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
+
+msgid "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
+msgstr "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
 
 msgid "A refund by lines is worth what its lines are worth: do not give an amount with them."
 msgstr "A refund by lines is worth what its lines are worth: do not give an amount with them."
@@ -2723,6 +2738,9 @@ msgstr "Cancel"
 msgid "Cancel ACS voucher"
 msgstr "Cancel ACS voucher"
 
+msgid "Cancel Held For Staff At"
+msgstr "Cancel Held For Staff At"
+
 msgid "Cancel Requested At"
 msgstr "Cancel Requested At"
 
@@ -4247,6 +4265,9 @@ msgstr "Delivery flag"
 
 msgid "Delivery kind"
 msgstr "Delivery kind"
+
+msgid "Delivery place"
+msgstr "Delivery place"
 
 msgid "Delivery products"
 msgstr "Delivery products"
@@ -6987,8 +7008,15 @@ msgstr "Good news! Your order #%(order_id)s has been shipped and is on its way t
 msgid "Goods"
 msgstr "Goods"
 
+#, python-format
+msgid "Goods and charges at %(rate)s%% VAT"
+msgstr "Goods and charges at %(rate)s%% VAT"
+
 msgid "Goods claimed"
 msgstr "Goods claimed"
+
+msgid "Goods moved"
+msgstr "Goods moved"
 
 msgid "Goods not yet settled"
 msgstr "Goods not yet settled"
@@ -8265,6 +8293,9 @@ msgstr "Live key counts are unavailable — the cache backend did not answer. Th
 msgid "Live promotion"
 msgstr "Live promotion"
 
+msgid "Loading place"
+msgstr "Loading place"
+
 msgid "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 msgstr "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 
@@ -8850,6 +8881,12 @@ msgstr "Most posts to return, from 1 to {max} (the default)."
 
 msgid "Moved at"
 msgstr "Moved at"
+
+msgid "Movement"
+msgstr "Movement"
+
+msgid "Movement of goods"
+msgstr "Movement of goods"
 
 msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 msgstr "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
@@ -9667,6 +9704,9 @@ msgstr "Open full stock history chart"
 msgid "Open the credit documents"
 msgstr "Open the credit documents"
 
+msgid "Open the dispatch point settings"
+msgstr "Open the dispatch point settings"
+
 msgid "Open the email log"
 msgstr "Open the email log"
 
@@ -10321,6 +10361,9 @@ msgstr "Parcel & COD"
 msgid "Parcel ID"
 msgstr "Parcel ID"
 
+msgid "Parcel Left Unregistered At"
+msgstr "Parcel Left Unregistered At"
+
 msgid "Parcel State"
 msgstr "Parcel State"
 
@@ -10350,6 +10393,9 @@ msgstr "Parcel sender"
 
 msgid "Parcel_COD_Amount from ACS."
 msgstr "Parcel_COD_Amount from ACS."
+
+msgid "Parcels that left while myDATA was unreachable"
+msgstr "Parcels that left while myDATA was unreachable"
 
 msgid "Parent"
 msgstr "Parent"
@@ -11553,6 +11599,9 @@ msgstr "Purged %(d)s Django + %(n)s Nuxt keys across %(s)s surface(s)."
 msgid "Purged At"
 msgstr "Purged At"
 
+msgid "Purpose of movement"
+msgstr "Purpose of movement"
+
 msgid "Put the returned units back in stock"
 msgstr "Put the returned units back in stock"
 
@@ -11571,6 +11620,9 @@ msgstr "QR code for the authenticator app"
 
 msgid "Qty"
 msgstr "Qty"
+
+msgid "Quantities are in pieces."
+msgstr "Quantities are in pieces."
 
 msgid "Quantity"
 msgstr "Quantity"
@@ -11762,6 +11814,9 @@ msgstr "Receipt {document_number} for your order #{order_id}"
 
 msgid "Receipts"
 msgstr "Receipts"
+
+msgid "Receipts of canceled orders not canceled in myDATA"
+msgstr "Receipts of canceled orders not canceled in myDATA"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Receipts rejected by myDATA"
@@ -12683,6 +12738,10 @@ msgstr "SVG files containing script elements are not allowed for security reason
 msgid "SVG files with javascript: or data: URLs are not allowed for security reasons."
 msgstr "SVG files with javascript: or data: URLs are not allowed for security reasons."
 
+msgctxt "purpose of movement"
+msgid "Sale"
+msgstr "Sale"
+
 msgid "Sales"
 msgstr "Sales"
 
@@ -13229,6 +13288,9 @@ msgstr "Set the Google Ads conversion ID first; a label cannot be sent without i
 msgid "Set the VAT percentage rate (0.0% - 100.0%)"
 msgstr "Set the VAT percentage rate (0.0% - 100.0%)"
 
+msgid "Set the dispatch point for courier receipts"
+msgstr "Set the dispatch point for courier receipts"
+
 msgid "Set this address as the user's main address."
 msgstr "Set this address as the user's main address."
 
@@ -13744,6 +13806,9 @@ msgstr "Standard property"
 
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
+
+msgid "Start of movement"
+msgstr "Start of movement"
 
 msgid "Started At"
 msgstr "Started At"
@@ -14798,6 +14863,9 @@ msgstr "The last voucher request for order #%(order)s may have reached ACS witho
 msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
 msgstr "The last voucher request whose answer was lost, as ACS or the network reported it."
 
+msgid "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+msgstr "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -14840,6 +14908,9 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "The money beyond the receipt and the goods short of it are acknowledged."
+
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
@@ -16964,6 +17035,9 @@ msgstr "When staff recorded that this payout was accounted for. A payout matchin
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 
+msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+msgstr "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "When the current confirmation link was issued. The link expires a week later."
 
@@ -16973,14 +17047,26 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
+msgid "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+msgstr "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+
 msgid "When the export can no longer be downloaded."
 msgstr "When the export can no longer be downloaded."
+
+msgid "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+msgstr "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
 
 msgid "When the money moved; empty while it is in flight."
 msgstr "When the money moved; empty while it is in flight."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
+
+msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+msgstr "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+
+msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+msgstr "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
 
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
@@ -17888,6 +17974,12 @@ msgstr "myDATA MARK"
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
 
+msgid "myDATA Send Deadline"
+msgstr "myDATA Send Deadline"
+
+msgid "myDATA Sent At"
+msgstr "myDATA Sent At"
+
 msgid "myDATA Serial Number (aa)"
 msgstr "myDATA Serial Number (aa)"
 
@@ -17902,6 +17994,9 @@ msgstr "myDATA Submitted At"
 
 msgid "myDATA UID"
 msgstr "myDATA UID"
+
+msgid "myDATA Unanswered Since"
+msgstr "myDATA Unanswered Since"
 
 msgid "myDATA has no valid environment"
 msgstr "myDATA has no valid environment"
@@ -18062,8 +18157,17 @@ msgid "…and {count} more lines with errors."
 msgstr "…and {count} more lines with errors."
 
 #, python-format
+#~ msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+#~ msgstr[0] "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgstr[1] "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+
+#, python-format
 #~ msgid "%(slot)s navigation"
 #~ msgstr "%(slot)s navigation"
+
+#~ msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
+#~ msgstr "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
 
 #~ msgid "A document has more than one version."
 #~ msgstr "A document has more than one version."
@@ -18217,6 +18321,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Contact Panel"
 #~ msgstr "Contact Panel"
+
+#~ msgid "Courier receipts cannot be sent: no dispatch point"
+#~ msgstr "Courier receipts cannot be sent: no dispatch point"
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Critical Stock (1-5)"
@@ -18384,6 +18491,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Is Visible"
 #~ msgstr "Is Visible"
+
+#~ msgid "Issued Without Connection At"
+#~ msgstr "Issued Without Connection At"
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"

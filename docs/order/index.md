@@ -28,6 +28,7 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 | 7.2, second half | [`refund-execution.md`](refund-execution.md) | how `refund_order` runs: the plan from the ledger, attempts and idempotency keys, reconciliation, provider statuses, the `order_refunded` contract |
 | 7.3 | [`payment-ledger.md`](payment-ledger.md) | `PaymentTransaction` and `PaymentLedger`: recording money, what is refundable, `amount_due`, an order paid twice |
 | 7.4 | [`fiscal-mydata.md`](fiscal-mydata.md) | myDATA: the receipt at shipment, credit documents, who may issue, the settings |
+| 7.4, movement | [`fiscal-movement-receipts.md`](fiscal-movement-receipts.md) | a courier or locker sale's receipt: issued when the carrier holds the parcel, its movement block, an unanswered send, an order canceled before the pickup (canceled in myDATA, credited, or held for staff) |
 | 7.4, VAT split | [`fiscal-credit-vat-split.md`](fiscal-credit-vat-split.md) | how a credit document is split over VAT rates (`CreditAllocation`), decided and undecided claims |
 | 8 | [`invariants.md`](invariants.md) | anything: the rules that must not be undone, each with where it is explained |
 | 9 | [`playbook.md`](playbook.md) | step lists: a new order email, a new status, a new API field, after a manual fix in production, a wrong email subject |

@@ -9,6 +9,11 @@ code it names. This module is the address the data uses: it never moves,
 and the functions it names may move freely with their modules.
 """
 
+from order.accounting.movement import (
+    validate_loading_postal_code_setting,
+    validate_loading_text_setting,
+)
+from order.accounting.mydata.config import validate_series_prefix_setting
 from order.communications.review_request import (
     validate_review_request_delay_days_setting,
 )
@@ -22,7 +27,10 @@ from order.payments.payment_hold import (
 __all__ = [
     "validate_grace_minutes_setting",
     "validate_hold_minutes_setting",
+    "validate_loading_postal_code_setting",
+    "validate_loading_text_setting",
     "validate_max_hold_minutes_setting",
     "validate_reservation_ttl_minutes_setting",
     "validate_review_request_delay_days_setting",
+    "validate_series_prefix_setting",
 ]

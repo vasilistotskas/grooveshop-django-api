@@ -125,6 +125,30 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    `refund_info["dispute_open"]` is true, the history says the refund waits
    until the dispute closes, and the admin cancel action says the same.
 
+**The receipt of an order canceled before its parcel left** (#747). Where the
+platform issues the store's receipts, a courier or locker order's receipt
+(with movement indication) is registered when its voucher or parcel is
+created and handed to the customer only when the parcel leaves. So every
+cancel path above (customer, staff, the auto-cancel sweep, ACS's dead
+shipment) goes through `_cancel_order_locked`, which sets that receipt aside
+under its lock on the order row, before the save that asks for the credits
+(`invoicing.hold_receipt_for_cancel`, `Invoice.cancel_requested_at`): no
+credit can be created for it and no email sent between the cancel and the
+hold; a receipt that already has a credit document (money went back before
+the pickup) is not set aside and is credited for the rest. `order_canceled`,
+after the commit, queues the settle.
+Once the courier's answer is recorded (step 0 for a customer; step 4 or
+`finish_pending_shipment_cancels` otherwise, where `_record_shipment_cancel`
+sends `order_shipment_cancel_answered`), `order.tasks.settle_canceled_receipt`
+cancels the receipt in myDATA when the courier stopped the parcel or there was
+none, and releases it to the refund and credit path, and to the customer, when
+the courier refused or never answered, since the goods may be moving.
+myDATA's silence keeps it set aside and is retried by
+`retry_receipts_with_mydata`; only AADE's refusal sends it the credit path,
+with the reason in an order note, and only after AADE confirmed it holds no
+cancellation of it already. The cancel and the refund never wait for either.
+Detail: [§7.4](fiscal-movement-receipts.md).
+
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record
 and the courier, and nothing catches it afterwards. Always go through

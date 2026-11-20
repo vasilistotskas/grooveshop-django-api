@@ -6,7 +6,8 @@ and says which file holds each § number used here.
 ## 7.4 Retail tax documents (myDATA): a receipt at shipment, a credit per refund
 
 `src/order/accounting/mydata/` (builder, client, parser, service),
-`src/order/accounting/invoicing.py`, `src/order/accounting/credit_documents.py`,
+`src/order/accounting/invoicing.py`, `src/order/accounting/movement.py`,
+`src/order/accounting/credit_documents.py`,
 `src/order/models/invoice.py` and `retail_credit.py`. The platform issues
 **retail** documents only, over the ERP `SendInvoices` channel, with the
 tenant's own credentials (`tenant.credentials.mydata_credentials()`):
@@ -91,14 +92,20 @@ exception), or when the environment is invalid. "Regenerate receipt" only
 re-renders a receipt that exists; it never creates one. The customer sees a
 receipt (`hasInvoice`, `/order/{id}/invoice`, `/invoice/download`; a guest with
 the order's `?uuid=` too) only once AADE registered it
-(`Invoice.is_deliverable`: CONFIRMED and a stored PDF). `MYDATA_AUTO_SUBMIT`
+(`Invoice.is_deliverable`: CONFIRMED and a stored PDF, and for a receipt
+with movement indication its parcel left). `MYDATA_AUTO_SUBMIT`
 makes the platform issue by itself (`MyDataConfig.issues_automatically()`: the
 receipt at shipment, the credits on refunds); with it off the same work is done
 by the order's admin actions ("Issue receipt (myDATA)", "Issue credit documents
 (myDATA)"), which run whenever myDATA is ready. `MYDATA_INVOICE_SERIES_PREFIX`
 and `MYDATA_CREDIT_SERIES_PREFIX` name the two series (`GRVP-2026`,
 `GRVC-2026`); the credits have their own gapless counter (`CreditCounter`,
-numbers `CRD-YYYY-NNNNNN`).
+numbers `CRD-YYYY-NNNNNN`). A prefix is refused where it is saved
+(`config.validate_series_prefix_setting`) when its series would be longer
+than AADE's 50 characters, or it holds a character XML cannot carry, a line
+break or a tab: the uid hashes the series as given, and AADE would read
+another (the payload leaves such a character out, a parser reads a carriage
+return as a line feed).
 
 **The receipt is issued when the order ships.** ΕΛΠ art. 13(a): a retail
 receipt for goods is issued "at the delivery or the start of the shipment". The
@@ -108,14 +115,35 @@ included): `handle_order_shipped` dispatches `generate_order_invoice` when
 `receipt_issuable(order)` holds (a RECEIPT order at SHIPPED, DELIVERED,
 COMPLETED or RETURNED) and `issues_automatically()`. Exactly once:
 `generate_invoice` returns the existing row, `submit_document` returns the
-existing MARK, and a receipt that already has one is not dispatched again. The
+existing MARK, and a receipt that already has one is not dispatched again.
+That is the path of an order no carrier takes (the merchant's own
+`flat_rate` delivery); a courier or locker order's receipt was issued
+before the pickup (below), so SHIPPED issues nothing for it. The
 payment rows are the ones `src/order/accounting/mydata/builder.py` always emitted
 (card/online, cash for COD, the gift-card share under its own configurable
 code). A refused or unanswered receipt is **never emailed**: the customer's
 email (`send_invoice_email`, "Receipt ...") goes out only after AADE registered
 it and the PDF carries the MARK; staff resubmit with "Send receipt to myDATA".
 The 228 duplicate-uid MARK recovery through `RequestTransmittedDocs` is
-unchanged.
+unchanged. The PDF rendered before the registration prints no MARK, so the
+save that records the MARK clears it (`service._drop_the_unregistered_pdf`)
+and `send_invoice_to_mydata` renders the registered one: until then the
+receipt is not deliverable (no stored PDF), and a render that fails leaves
+a row without a PDF, which that task renders first when it runs again,
+without a second submission. A re-render replaces the stored PDF only
+once the new one exists (`invoicing._store_pdf`), so a failed one leaves
+the old file in place, and only while the row still holds what it was
+rendered from (`invoicing._rendered_from`: the MARK, the seller and buyer
+snapshots, the movement block): a render that a registration or a newer
+regeneration overtook is discarded.
+
+**A courier or locker sale's receipt carries the movement and is issued when
+its voucher or parcel is recorded, before the pickup (#747).** That part of
+this section is its own file:
+[`fiscal-movement-receipts.md`](fiscal-movement-receipts.md): when it is
+issued, the movement block AADE requires, an unanswered send and the
+loss-of-connection indication, and an order canceled before the pickup (its
+receipt canceled in myDATA, credited, or held for staff).
 
 **The receipt is for the consideration actually paid: net of money returned
 BEFORE it.** A retail receipt (11.1) documents the sale at shipment; a credit
@@ -232,10 +260,11 @@ still holds and no credit covers (the whole receipt of a returned COD parcel;
 the gift-card share of a fully refunded order). Nothing is created until the
 receipt is CONFIRMED (it has a MARK and was not canceled): a credit cannot be
 linked without it. A refund recorded before the receipt existed needs no
-document (nothing was issued to credit), and neither does a cancellation before
-shipment: `cancel_order` accepts only PENDING and PROCESSING, so it always
-precedes the receipt. After shipment the order is RETURNED, and the refund (or
-the COD settlement) is what credits it.
+document (nothing was issued to credit). A cancellation before shipment
+precedes the receipt only for an order no carrier takes: a courier or locker
+order's receipt is issued when its voucher or parcel is created, and a cancel
+before the pickup cancels it in myDATA instead (above). After shipment the order is RETURNED, and the
+refund (or the COD settlement) is what credits it.
 
 **VAT split.** Where a credit sits on the receipt's VAT rates is fixed when
 the money is claimed (`CreditAllocation`). That part of this section is its
@@ -246,7 +275,10 @@ delivered, sent or made available to the customer (Α.1138/2020 annex, «μη χ
 παραστατικού»; AADE Q&A 2025 §8 Q24); once it has reached the customer the
 correction is a credit document. Neither the law nor the API sets a time limit.
 Receipts and credits are emailed as soon as AADE registers them, so in practice
-a credit document is the tool. The admin actions ("Cancel receipt in myDATA
+a credit document is the tool, except for a receipt with movement indication,
+which reaches the customer only when its parcel leaves: an order canceled
+before that has it canceled
+([`fiscal-movement-receipts.md`](fiscal-movement-receipts.md)). The admin actions ("Cancel receipt in myDATA
 (issued in error)", and "Cancel in myDATA" on the Retail Credit Documents list)
 do not enforce the "never used" rule yet; the guard is listed in issue #197.
 

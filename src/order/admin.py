@@ -2976,9 +2976,15 @@ class OrderAdmin(BaseModelAdmin):
 
         Automatic while ``MYDATA_AUTO_SUBMIT`` is on (one per refund, once
         the receipt is registered); this is for a store that issues by
-        hand and for a credit that was refused or never answered.
+        hand and for a credit that was refused or never answered, and it
+        releases a canceled order's receipt myDATA could not see, held for
+        staff (``order.tasks.credit_receipt_held_for_staff``), to the
+        credit path.
         """
-        from order.tasks import issue_pending_credits
+        from order.tasks import (
+            credit_receipt_held_for_staff,
+            issue_pending_credits,
+        )
 
         try:
             order = Order.objects.get(pk=object_id)
@@ -2986,7 +2992,10 @@ class OrderAdmin(BaseModelAdmin):
             messages.error(request, _("Order not found."))
             return self._redirect_to_order_change(object_id)
 
-        issue_pending_credits.delay(order.id)
+        # A receipt myDATA could not see, held for staff, is released to
+        # the credit path, which issues them itself.
+        if not credit_receipt_held_for_staff(order):
+            issue_pending_credits.delay(order.id)
         messages.success(
             request,
             _(

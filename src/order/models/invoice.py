@@ -263,6 +263,39 @@ class MyDataRegistration(models.Model):
             "across retries so reporting reflects the original send time."
         ),
     )
+    mydata_sent_at = models.DateTimeField(
+        _("myDATA Sent At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the latest send to AADE began. A send with no answer on "
+            "record still runs until this is older than the retry delay, "
+            "whatever else touched the document since."
+        ),
+    )
+    mydata_send_deadline = models.DateTimeField(
+        _("myDATA Send Deadline"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The latest moment a send of this document may still register "
+            "at AADE: each send moves it to its own start plus the window "
+            "the store's settings gave it then, never back. Until it passes "
+            "a send with no answer is in flight, and a lookup that finds "
+            "nothing decides nothing."
+        ),
+    )
+    mydata_unanswered_since = models.DateTimeField(
+        _("myDATA Unanswered Since"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the earliest send AADE has not decided began: it may "
+            "hold the document from then on. Kept through later errors, "
+            "cleared when AADE answers a send (registered, or 228) or a "
+            "lookup finds the document or finds nothing."
+        ),
+    )
     mydata_confirmed_at = models.DateTimeField(
         _("myDATA Confirmed At"),
         null=True,
@@ -396,6 +429,52 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             "Buyer name / email / billing address captured at issue time."
         ),
     )
+    movement = models.JSONField(
+        _("Movement"),
+        default=dict,
+        db_default={},
+        blank=True,
+        help_text=_(
+            "The movement indication the receipt was sent to myDATA with: "
+            "dispatch date, loading and delivery address, and the goods "
+            "that move with their quantities. Empty for a receipt without "
+            "one (an order that does not move through a carrier)."
+        ),
+    )
+    transmission_failed_at = models.DateTimeField(
+        _("Parcel Left Unregistered At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the parcel left while the receipt, which carries a "
+            "movement indication, was not registered because myDATA did "
+            "not answer. From then on it is sent with AADE's "
+            "loss-of-connection indication (transmissionFailure 3) until "
+            "it is registered."
+        ),
+    )
+    cancel_requested_at = models.DateTimeField(
+        _("Cancel Requested At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the order was canceled before its parcel left the store: "
+            "the receipt, never handed to the customer, is canceled in "
+            "myDATA instead of credited, unless the courier could not stop "
+            "the parcel."
+        ),
+    )
+    cancel_held_for_staff_at = models.DateTimeField(
+        _("Cancel Held For Staff At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the cancel of this receipt stopped for staff: myDATA "
+            "shows it neither to the cancel (error 301) nor in the list of "
+            "the store's documents, so its state there is unknown. Staff "
+            "cancel it in myDATA or issue its credit documents."
+        ),
+    )
     currency = models.CharField(
         _("Currency"),
         max_length=10,
@@ -432,13 +511,36 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         """True when the PDF has been generated and stored."""
         return bool(self.document_file and self.document_file.name)
 
+    def awaits_the_parcel(self) -> bool:
+        """True for a receipt that is not handed to the customer yet
+        because its parcel has not left: one with movement indication, so
+        that an order canceled meanwhile can have it canceled in myDATA,
+        which AADE allows only for a document never used (Α.1138/2020
+        annex).
+
+        A receipt set aside for that cancel (``cancel_requested_at``)
+        waits whatever it carries (``invoicing.hold_receipt_for_cancel``).
+        Once a canceled order's receipt stands (the courier could not stop
+        the parcel, AADE refused the cancel) it no longer waits, and
+        reaches the customer with its credit."""
+        from order.enum.status import OrderStatus
+
+        order = self.order
+        if order.shipped_at is not None:
+            return False
+        if self.cancel_requested_at is not None:
+            return True
+        return bool(self.movement) and order.status != OrderStatus.CANCELED
+
     def is_deliverable(self) -> bool:
         """True when the receipt may reach the customer: AADE registered it
-        (CONFIRMED, with its MARK) and its PDF is stored. A receipt that is
+        (CONFIRMED, with its MARK), its PDF is stored, and the parcel it
+        moves with has left (:meth:`awaits_the_parcel`). A receipt that is
         pending, rejected or cancelled is not a valid tax document, so it
         is never offered for download."""
         return (
             self.mydata_status == MyDataStatus.CONFIRMED
             and self.mydata_mark is not None
             and self.has_document()
+            and not self.awaits_the_parcel()
         )

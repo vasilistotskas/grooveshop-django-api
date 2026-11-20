@@ -107,6 +107,7 @@ class TestSuspendedStores:
         "order.tasks.finish_pending_shipment_cancels",
         "order.tasks.purge_expired_pending_payment_fees",
         "order.tasks.reconcile_pending_refunds",
+        "order.tasks.retry_receipts_with_mydata",
         "product.tasks.purge_unconfirmed_guest_alerts",
         "recommendation.tasks.purge_expired_recommendation_events",
         "shipping_acs.tasks.purge_expired_acs_api_calls",

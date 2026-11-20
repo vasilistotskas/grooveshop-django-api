@@ -317,10 +317,22 @@ msgstr[0] "%(count)s παραγγελία · %(share)s"
 msgstr[1] "%(count)s παραγγελίες · %(share)s"
 
 #, python-format
+msgid "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgid_plural "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+msgstr[0] "%(count)s δέμα έφυγε πριν το myDATA καταχωρίσει την απόδειξή του, επειδή το myDATA δεν απάντησε. Η απόδειξη στέλνεται ξανά αυτόματα, με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ, μέχρι να καταχωριστεί."
+msgstr[1] "%(count)s δέματα έφυγαν πριν το myDATA καταχωρίσει τις αποδείξεις τους, επειδή το myDATA δεν απάντησε. Οι αποδείξεις στέλνονται ξανά αυτόματα, με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ, μέχρι να καταχωριστούν."
+
+#, python-format
 msgid "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgid_plural "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[0] "Επιλέχθηκε %(count)s προϊόν: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
 msgstr[1] "Επιλέχθηκαν %(count)s προϊόντα: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
+
+#, python-format
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
+msgstr[0] "%(count)s απόδειξη παραγγελίας που ακυρώθηκε πριν φύγει το δέμα της περιμένει ακόμη να ακυρωθεί στο myDATA. Ακυρώνεται αυτόματα μόλις απαντήσει το myDATA· αν το myDATA απέρριψε την απόδειξη ή τα διαπιστευτήρια του καταστήματος, οι σημειώσεις της παραγγελίας λένε τι να κάνετε."
+msgstr[1] "%(count)s αποδείξεις παραγγελιών που ακυρώθηκαν πριν φύγουν τα δέματά τους περιμένουν ακόμη να ακυρωθούν στο myDATA. Ακυρώνονται αυτόματα μόλις απαντήσει το myDATA· αν το myDATA απέρριψε μια απόδειξη ή τα διαπιστευτήρια του καταστήματος, οι σημειώσεις της παραγγελίας της λένε τι να κάνετε."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
@@ -885,6 +897,9 @@ msgstr "Μια δημοσίευση μπορεί να προγραμματιστ
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "Ένα ρεαλιστικό παράδειγμα αριθμού κινητού σε εθνική μορφή (π.χ. GR «6912345678», CY «96123456»)."
+
+msgid "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
+msgstr "Η απόδειξη μιας παραγγελίας με courier ή locker πρέπει να φέρει τη διακίνηση των αγαθών και να εκδίδεται πριν παραλάβει ο μεταφορέας το δέμα. Μέχρι να οριστεί ο τόπος φόρτωσης, οι αποδείξεις εκδίδονται όταν αποστέλλεται η παραγγελία, χωρίς αυτήν. Συμπληρώστε τα MYDATA_LOADING_POSTAL_CODE και MYDATA_LOADING_CITY (και την οδό)."
 
 msgid "A refund by lines is worth what its lines are worth: do not give an amount with them."
 msgstr "Η επιστροφή ανά γραμμή αξίζει όσο οι γραμμές της: μην δίνετε ποσό μαζί τους."
@@ -2729,6 +2744,9 @@ msgstr "Ακύρωση"
 msgid "Cancel ACS voucher"
 msgstr "Ακύρωση voucher ACS"
 
+msgid "Cancel Held For Staff At"
+msgstr "Ημερομηνία αναμονής ακύρωσης για το προσωπικό"
+
 msgid "Cancel Requested At"
 msgstr "Ημερομηνία αιτήματος ακύρωσης"
 
@@ -4252,6 +4270,9 @@ msgstr "Ένδειξη παράδοσης"
 
 msgid "Delivery kind"
 msgstr "Τρόπος παράδοσης"
+
+msgid "Delivery place"
+msgstr "Τόπος παράδοσης"
 
 msgid "Delivery products"
 msgstr "Προϊόντα παράδοσης"
@@ -6993,8 +7014,15 @@ msgstr "Καλά νέα! Η παραγγελία σας #%(order_id)s έχει �
 msgid "Goods"
 msgstr "Προϊόντα"
 
+#, python-format
+msgid "Goods and charges at %(rate)s%% VAT"
+msgstr "Εμπορεύματα και χρεώσεις με ΦΠΑ %(rate)s%%"
+
 msgid "Goods claimed"
 msgstr "Εμπορεύματα που διεκδικήθηκαν"
+
+msgid "Goods moved"
+msgstr "Αγαθά που διακινούνται"
 
 msgid "Goods not yet settled"
 msgstr "Προϊόντα που δεν έχουν διευθετηθεί"
@@ -8273,6 +8301,9 @@ msgstr "Οι τρέχουσες μετρήσεις κλειδιών δεν εί�
 msgid "Live promotion"
 msgstr "Ενεργή προσφορά"
 
+msgid "Loading place"
+msgstr "Τόπος φόρτωσης"
+
 msgid "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 msgstr "Διαδρομή του καταστήματος χωρίς γλώσσα (π.χ. /account/orders/42) ή κενή τιμή· ανοίγει στη γλώσσα του αναγνώστη"
 
@@ -8858,6 +8889,12 @@ msgstr "Μέγιστος αριθμός άρθρων προς επιστροφή
 
 msgid "Moved at"
 msgstr "Μετακινήθηκε"
+
+msgid "Movement"
+msgstr "Διακίνηση"
+
+msgid "Movement of goods"
+msgstr "Διακίνηση αποθεμάτων"
 
 msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 msgstr "Αλλάζει με κάθε αλλαγή του πρόχειρου· κάθε αποθήκευση δηλώνει την αναθεώρηση πάνω στην οποία έγινε (If-Match)."
@@ -9673,6 +9710,9 @@ msgstr "Άνοιγμα πλήρους ιστορικού αποθέματος �
 msgid "Open the credit documents"
 msgstr "Άνοιγμα των πιστωτικών στοιχείων"
 
+msgid "Open the dispatch point settings"
+msgstr "Άνοιγμα ρυθμίσεων τόπου φόρτωσης"
+
 msgid "Open the email log"
 msgstr "Άνοιγμα του αρχείου email"
 
@@ -10328,6 +10368,9 @@ msgstr "Δέμα & Αντικαταβολή"
 msgid "Parcel ID"
 msgstr "ID δέματος"
 
+msgid "Parcel Left Unregistered At"
+msgstr "Το δέμα έφυγε χωρίς καταχώριση στις"
+
 msgid "Parcel State"
 msgstr "Κατάσταση Δέματος"
 
@@ -10357,6 +10400,9 @@ msgstr "Αποστολέας δέματος"
 
 msgid "Parcel_COD_Amount from ACS."
 msgstr "Parcel_COD_Amount από την ACS."
+
+msgid "Parcels that left while myDATA was unreachable"
+msgstr "Δέματα που έφυγαν ενώ το myDATA δεν ήταν διαθέσιμο"
 
 msgid "Parent"
 msgstr "Γονική κατηγορία"
@@ -11560,6 +11606,9 @@ msgstr "Καθαρίστηκαν %(d)s κλειδιά Django + %(n)s κλειδ�
 msgid "Purged At"
 msgstr "Εκκαθαρίστηκε στις"
 
+msgid "Purpose of movement"
+msgstr "Σκοπός διακίνησης"
+
 msgid "Put the returned units back in stock"
 msgstr "Επαναφορά των επιστρεφόμενων τεμαχίων στο απόθεμα"
 
@@ -11578,6 +11627,9 @@ msgstr "Κωδικός QR για την εφαρμογή ταυτοποίηση�
 
 msgid "Qty"
 msgstr "Ποσ."
+
+msgid "Quantities are in pieces."
+msgstr "Οι ποσότητες είναι σε τεμάχια."
 
 msgid "Quantity"
 msgstr "Ποσότητα"
@@ -11769,6 +11821,9 @@ msgstr "Απόδειξη {document_number} για την παραγγελία σ
 
 msgid "Receipts"
 msgstr "Αποδείξεις"
+
+msgid "Receipts of canceled orders not canceled in myDATA"
+msgstr "Αποδείξεις ακυρωμένων παραγγελιών που δεν ακυρώθηκαν στο myDATA"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Αποδείξεις που απέρριψε το myDATA"
@@ -12689,6 +12744,10 @@ msgstr "Δεν επιτρέπονται αρχεία SVG που περιέχου
 msgid "SVG files with javascript: or data: URLs are not allowed for security reasons."
 msgstr "Δεν επιτρέπονται αρχεία SVG με URL javascript: ή data:, για λόγους ασφαλείας."
 
+msgctxt "purpose of movement"
+msgid "Sale"
+msgstr "Πώληση"
+
 msgid "Sales"
 msgstr "Πωλήσεις"
 
@@ -13235,6 +13294,9 @@ msgstr "Ορίστε πρώτα το αναγνωριστικό μετατροπ
 msgid "Set the VAT percentage rate (0.0% - 100.0%)"
 msgstr "Ορίστε το ποσοστό ΦΠΑ (0.0% - 100.0%)"
 
+msgid "Set the dispatch point for courier receipts"
+msgstr "Ορίστε τον τόπο φόρτωσης για τις αποδείξεις courier"
+
 msgid "Set this address as the user's main address."
 msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας διεύθυνσης του χρήστη."
 
@@ -13750,6 +13812,9 @@ msgstr "Βασική ιδιότητα προϊόντος"
 
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Ημερομηνία έναρξης για το εύρος αναλυτικών (μορφή ISO: YYYY-MM-DD). Αν δεν δοθεί, συμπεριλαμβάνει όλα τα ιστορικά δεδομένα."
+
+msgid "Start of movement"
+msgstr "Έναρξη διακίνησης"
 
 msgid "Started At"
 msgstr "Ξεκίνησε στις"
@@ -14800,6 +14865,9 @@ msgstr "Το τελευταίο αίτημα voucher για την παραγγ�
 msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
 msgstr "Το τελευταίο αίτημα voucher του οποίου η απάντηση χάθηκε, όπως το ανέφερε η ACS ή το δίκτυο."
 
+msgid "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+msgstr "Η τελευταία στιγμή κατά την οποία μια αποστολή του παραστατικού μπορεί ακόμη να καταχωριστεί στην ΑΑΔΕ: κάθε αποστολή τη μεταφέρει στην έναρξή της συν το διάστημα που έδιναν τότε οι ρυθμίσεις του καταστήματος, ποτέ προς τα πίσω. Μέχρι να περάσει, μια αποστολή χωρίς απάντηση θεωρείται σε εξέλιξη και μια αναζήτηση που δεν βρίσκει τίποτα δεν αποφαίνεται."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "Ο νόμος απαιτεί να εμφανίζονται στο ηλεκτρονικό σας κατάστημα τα στοιχεία της επιχείρησης. Συμπληρώστε όσα λείπουν:"
 
@@ -14842,6 +14910,9 @@ msgstr "Τα προωθητικά email που στέλνει αυτό το κα
 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "Τα χρήματα πέρα από την απόδειξη και τα εμπορεύματα που λείπουν από αυτήν επιβεβαιώθηκαν."
+
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "Η ένδειξη διακίνησης με την οποία στάλθηκε η απόδειξη στο myDATA: ημερομηνία αποστολής, διεύθυνση φόρτωσης και παράδοσης, και τα αγαθά που διακινούνται με τις ποσότητές τους. Κενή για απόδειξη χωρίς ένδειξη (παραγγελία που δεν διακινείται μέσω μεταφορέα)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
@@ -16966,6 +17037,9 @@ msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδο
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "Πότε η αυτόματη αναζήτηση ρώτησε τελευταία φορά τον πάροχο πληρωμών γι' αυτή την επιστροφή χωρίς να μπορέσει να αποφασίσει."
 
+msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+msgstr "Πότε η ακύρωση αυτής της απόδειξης σταμάτησε για το προσωπικό: το myDATA δεν τη δείχνει ούτε στην ακύρωση (σφάλμα 301) ούτε στη λίστα των παραστατικών του καταστήματος, οπότε η κατάστασή της εκεί είναι άγνωστη. Το προσωπικό την ακυρώνει στο myDATA ή εκδίδει τα πιστωτικά της."
+
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "Πότε εκδόθηκε ο τρέχων σύνδεσμος επιβεβαίωσης. Λήγει μία εβδομάδα αργότερα."
 
@@ -16975,14 +17049,26 @@ msgstr "Πότε ενημερώθηκε ο πελάτης ότι το δέμα �
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "Πότε η απόφαση πήρε τελευταία την τρέχουσα τιμή. Μια απόδειξη που εκδίδεται μετά μειώνεται κατά το chargeback· μια που εκδόθηκε πριν πιστώνεται."
 
+msgid "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+msgstr "Πότε ξεκίνησε η παλαιότερη αποστολή για την οποία η ΑΑΔΕ δεν έχει αποφανθεί: από τότε μπορεί να έχει καταχωρίσει το παραστατικό. Διατηρείται μετά από επόμενα σφάλματα και διαγράφεται όταν η ΑΑΔΕ απαντήσει σε αποστολή (καταχώριση ή 228) ή όταν μια αναζήτηση βρει το παραστατικό ή δεν βρει τίποτα."
+
 msgid "When the export can no longer be downloaded."
 msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
+
+msgid "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+msgstr "Πότε ξεκίνησε η τελευταία αποστολή στην ΑΑΔΕ. Μια αποστολή χωρίς καταγεγραμμένη απάντηση θεωρείται σε εξέλιξη μέχρι να περάσει η καθυστέρηση επανάληψης από τότε, ό,τι άλλο κι αν άλλαξε στο παραστατικό στο μεταξύ."
 
 msgid "When the money moved; empty while it is in flight."
 msgstr "Πότε μετακινήθηκαν τα χρήματα· κενό όσο είναι σε εξέλιξη."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία από το κατάστημα. Η πώληση μετράει στον μήνα αυτής της στιγμής (αναφορά τζίρου)· μια παραγγελία που δεν στάλθηκε ποτέ δεν έχει τιμή."
+
+msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+msgstr "Πότε ακυρώθηκε η παραγγελία πριν φύγει το δέμα της από το κατάστημα: η απόδειξη, που δεν παραδόθηκε ποτέ στον πελάτη, ακυρώνεται στο myDATA αντί να πιστωθεί, εκτός αν ο μεταφορέας δεν μπόρεσε να σταματήσει το δέμα."
+
+msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+msgstr "Πότε το δέμα έφυγε ενώ η απόδειξη, που φέρει ένδειξη διακίνησης, δεν είχε καταχωριστεί επειδή το myDATA δεν απάντησε. Από τότε στέλνεται με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ (transmissionFailure 3) μέχρι να καταχωριστεί."
 
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "Πότε παύει να ισχύει ο τελευταίος σύνδεσμος ή η τελευταία συνεδρία πληρωμής που άνοιξε για αυτή την παραγγελία. Το απόθεμα παραμένει δεσμευμένο μέχρι τότε (συν ένα σύντομο περιθώριο), και μετά η παραγγελία ακυρώνεται αν παραμένει απλήρωτη. Κενό μέχρι να ανοίξει πληρωμή."
@@ -17890,6 +17976,12 @@ msgstr "myDATA MARK"
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
 
+msgid "myDATA Send Deadline"
+msgstr "Προθεσμία αποστολής myDATA"
+
+msgid "myDATA Sent At"
+msgstr "Τελευταία αποστολή στο myDATA"
+
 msgid "myDATA Serial Number (aa)"
 msgstr "Αριθμός Σειράς myDATA (aa)"
 
@@ -17904,6 +17996,9 @@ msgstr "Υποβλήθηκε στο myDATA"
 
 msgid "myDATA UID"
 msgstr "myDATA UID"
+
+msgid "myDATA Unanswered Since"
+msgstr "Αναπάντητη αποστολή myDATA από"
 
 msgid "myDATA has no valid environment"
 msgstr "Το myDATA δεν έχει έγκυρο περιβάλλον"
@@ -18123,6 +18218,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgstr "%(count)d συνδρομές ενεργοποιήθηκαν."
 
 #, python-format
+#~ msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+#~ msgstr[0] "%(count)s απόδειξη εκδόθηκε με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχει καταχωριστεί ακόμη. Το δέμα της αποστέλλεται κανονικά· η απόδειξη στέλνεται ξανά αυτόματα μόλις απαντήσει το myDATA."
+#~ msgstr[1] "%(count)s αποδείξεις εκδόθηκαν με τη διαδικασία απώλειας διασύνδεσης της ΑΑΔΕ και δεν έχουν καταχωριστεί ακόμη. Τα δέματά τους αποστέλλονται κανονικά· οι αποδείξεις στέλνονται ξανά αυτόματα μόλις απαντήσει το myDATA."
+
+#, python-format
 #~ msgid "%(counter)s background task failed in the last 24h"
 #~ msgid_plural "%(counter)s background tasks failed in the last 24h"
 #~ msgstr[0] "%(counter)s εργασία απέτυχε τις τελευταίες 24 ώρες"
@@ -18150,6 +18251,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "90 days"
 #~ msgstr "90 ημέρες"
+
+#~ msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
+#~ msgstr "Η απόδειξη μιας παραγγελίας με courier ή locker αναγράφει τον τόπο από τον οποίο φεύγει το δέμα και απορρίπτεται μέχρι να οριστεί. Συμπληρώστε τα MYDATA_LOADING_POSTAL_CODE και MYDATA_LOADING_CITY (και την οδό) και στείλτε ξανά τις απορριφθείσες αποδείξεις από τις παραγγελίες τους."
 
 #~ msgid "A document has more than one version."
 #~ msgstr "Ένα έγγραφο έχει περισσότερες από μία εκδόσεις."
@@ -18420,6 +18524,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Country Analytics"
 #~ msgstr "Αναλυτικά ανά χώρα"
+
+#~ msgid "Courier receipts cannot be sent: no dispatch point"
+#~ msgstr "Οι αποδείξεις courier δεν μπορούν να σταλούν: δεν έχει οριστεί τόπος φόρτωσης"
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Κρίσιμο απόθεμα (1-5)"
@@ -18725,6 +18832,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Is Visible"
 #~ msgstr "Ορατό"
+
+#~ msgid "Issued Without Connection At"
+#~ msgstr "Εκδόθηκε χωρίς σύνδεση στις"
 
 #~ msgid "Item Analytics"
 #~ msgstr "Αναλυτικά αντικειμένων"

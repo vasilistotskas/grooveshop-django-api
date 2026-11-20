@@ -65,8 +65,59 @@ CLASSIFICATION_TYPE_RETAIL_GOODS = "E3_561_003"
 CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_1"
 
 
+# ── Movement indication (myDATA REST API v2.0.2) ─────────────────
+# A receipt that is also the movement document (``isDeliveryNote``) states
+# why the goods move (annex 8.14, ``movePurpose`` 1 = «Πώληση») and, per
+# goods line, the unit its quantity counts (annex 8.13, ``measurementUnit``
+# 1 = «Τεμάχια»). The address lengths AADE's ``AddressType`` allows are
+# applied where the block is built (``order.accounting.movement``).
+MOVE_PURPOSE_SALE = 1
+MEASUREMENT_UNIT_PIECES = 1
+# With ``isDeliveryNote`` AADE requires what it refuses on a Greek party's
+# other documents (errors 219, 220): the issuer's name and address, a
+# counterpart with its name and address, and an ``itemDescr`` (at most 300
+# characters) on every line (errors 204 and 230, AADE's sandbox,
+# 2026-11-20). A consumer has no VAT number: the counterpart carries the
+# one AADE names for that (error 289), and ``nonObligatedRecipient`` (a
+# recipient who takes no part in the digital movement process; the REST
+# API documentation, §5.3, note 23). Never ``withoutDigitalTransportTracking``:
+# its document is "Completed" at issue and AADE refuses to cancel it (error
+# 801), and a cancel before the pickup must cancel the receipt.
+COUNTERPART_WITHOUT_VAT_NUMBER = "000000000"
+ITEM_DESCRIPTION_MAX_LENGTH = 300
+
+# ── transmissionFailure (AadeBookInvoiceType, v2.0.2) ─────────────
+# xs:byte 1-4 in the XSD. The REST API documentation (§5, the invoice
+# table): 1, 2 and 4 are for documents sent by a licensed provider; 3,
+# «Απώλεια διασύνδεσης», is the one value an ERP may send. Α.1233/2026 annex
+# §12.1: a movement document issued during a loss of connection is issued
+# «με διακριτή ένδειξη για την απώλεια διασύνδεσης» and transmitted as soon
+# as the connection is back.
+TRANSMISSION_FAILURE_ERP_CONNECTION_LOST = 3
+
+
 # ── AADE error codes we branch on explicitly ─────────────────────
 # Full catalogue lives in the AADE portal; we only name-check the
 # ones with custom handling. Everything else is treated as a
 # terminal ``ValidationError``.
 ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
+# "Invoice with MARK ... not found": a CancelInvoice sent right after the
+# registration gets it until the document is visible to the cancel (AADE's
+# sandbox, 2026-11-20: within a second of the MARK; seconds later the
+# cancel went through), so within MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES of
+# the registration it is retried like no answer. After that AADE does not
+# hold the MARK for the credentials asking (a VAT or credentials change,
+# sandbox against production), and it is a refusal like any other.
+ERROR_MARK_NOT_FOUND = "301"
+
+# Our own code: the receipt names a pickup point whose address the
+# carrier's catalogue does not hold yet (``shipping.interfaces.
+# PickupPointUnknown``), so nothing was sent. Its daily sync may add it,
+# so the sweep builds it again (``order.tasks.retry_receipts_with_mydata``).
+ERROR_PICKUP_POINT_UNKNOWN = "PICKUP"
+
+# Our own code (``mydata_error_code`` is ours to fill): the last send of the
+# document reached AADE without an answer (a transport error, or AADE's
+# ``TechnicalError``), so it may or may not be registered. Recorded with
+# the status left SUBMITTED; the next send's intent clears it.
+ERROR_NO_ANSWER = "NO_ANSWER"

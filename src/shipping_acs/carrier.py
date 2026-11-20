@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping.interfaces import (
+    PickupPointUnknown,
+    PostalAddress,
+    ShippingCarrierInterface,
+    register_provider,
+)
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -68,6 +73,40 @@ class AcsCarrier(ShippingCarrierInterface):
 
     def shipment_for_order(self, order: Order):
         return getattr(order, "acs_shipment", None)
+
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """ACS minted (or staff adopted) the voucher."""
+        return bool(shipment.voucher_no)
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
+        """The station's address, only from the catalogue row of the exact
+        station ACS books: the (external_id, branch_code) pair the voucher
+        carries, read from the catalogue now, so a pair a later sync added
+        is found. ``station_destination`` may be a row of the same area but
+        another branch (the code-only fallback when the pair was not in the
+        catalogue at checkout), whose address the receipt must not name; a
+        booking without a branch names only the row without one, never the
+        first station of its area."""
+        from shipping_acs.models import AcsStation
+
+        if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
+            return None
+        station = AcsStation.objects.filter(
+            external_id=shipment.station_destination_external_id,
+            branch_code=shipment.station_branch_destination,
+        ).first()
+        if station is None or not (station.postal_code and station.city):
+            raise PickupPointUnknown(
+                "The address of ACS station "
+                f"{shipment.station_destination_external_id} "
+                f"{shipment.station_branch_destination} is not known."
+            )
+        return PostalAddress(
+            street=station.address_line_1,
+            street_number="",
+            postal_code=station.postal_code,
+            city=station.city,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

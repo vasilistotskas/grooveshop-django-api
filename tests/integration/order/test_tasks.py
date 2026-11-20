@@ -23,7 +23,7 @@ from order.tasks import (
 )
 from pay_way.factories import PayWayFactory
 from tests.utils.dispatch import assert_published_once
-from tests.utils.mydata import issuable, mydata_enabled
+from tests.utils.mydata import issuable, mydata_enabled, registered
 
 
 def _sell_something(order):
@@ -735,7 +735,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         _sell_something(self.order)
         with mydata_enabled(auto_submit=False):
-            generate_invoice(issuable(self.order))
+            registered(generate_invoice(issuable(self.order)))
 
         # Clear any emails the order_created signal already sent so we
         # only assert on the invoice email below.

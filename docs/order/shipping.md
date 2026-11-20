@@ -25,6 +25,24 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **The receipt follows the voucher, never the other way round.** Every
+  path that makes a voucher or parcel live records it with
+  `Order.add_tracking_info`, and recording it issues the receipt with
+  movement indication (`issue_receipt_for_pickup`), also over a number
+  staff typed before the carrier held the parcel, the voucher's own number
+  included, for a
+  store whose receipts the platform issues and that has set its dispatch
+  point ([§7.4](fiscal-movement-receipts.md)), dated the day the voucher is
+  created.
+  Only a voucher or parcel the carrier holds counts
+  (`ShippingCarrierInterface.holds_the_parcel`, asked through
+  `ShippingService.carrier_holds_the_parcel`): a tracking number staff type
+  on an order whose carrier holds none issues nothing.
+  Nothing in shipping waits for myDATA: a receipt AADE does not answer for
+  is sent again, and once its parcel leaves unregistered, with AADE's
+  loss-of-connection indication. A voucher made again after the receipt
+  was issued (a new locker or address, or days later) is flagged to staff
+  when the parcel leaves.
 - **One HTTP retry rule.** Both clients build their `requests` session
   with `carrier_session` (`src/shipping/carrier_http.py`), whose
   `CARRIER_RETRY` sends a request again only when it never connected

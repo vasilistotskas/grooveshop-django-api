@@ -39,7 +39,11 @@ from django.utils import timezone
 from xmlschema import XMLSchemaValidationError
 
 from core.store_settings import store_setting
-from order.accounting.movement import ReceiptMovement, receipt_movement
+from order.accounting.movement import (
+    ReceiptMovement,
+    receipt_movement,
+    send_in_flight,
+)
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
 from order.accounting.mydata.config import MyDataConfig, load_config
@@ -189,12 +193,15 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             aa=built.aa,
             movement=movement,
             verdict=verdict,
+            config=config,
         )
         if claim is _SendClaim.REGISTERED:
             # Another sender registered it since this one read the row.
             return _registered_row(invoice)
         if claim is _SendClaim.CLAIMED:
             break
+        if claim is _SendClaim.IN_FLIGHT:
+            raise _in_flight_error(invoice)
         if claim is _SendClaim.ADVANCED:
             # Another sender began a send since this one read the row: its
             # lookup said nothing of that send, so the row is read again
@@ -211,17 +218,13 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         response = parse_response_doc(client.send_invoices(built.xml_bytes))
     except MyDataTransportError as exc:
         # No answer, or none that can be read (an empty or cut-off body).
-        _persist_send_error(
-            invoice, code=ERROR_NO_ANSWER, message=exc.message, config=config
-        )
+        _persist_send_error(invoice, code=ERROR_NO_ANSWER, message=exc.message)
         raise
     except MyDataAuthError as exc:
         # AADE refused the credentials, so the document was not taken in:
         # recorded, so the sweep leaves it to staff instead of resending it
         # as a send whose answer was lost.
-        _persist_send_error(
-            invoice, code=exc.code, message=exc.message, config=config
-        )
+        _persist_send_error(invoice, code=exc.code, message=exc.message)
         raise
     row = response.first()
 
@@ -264,7 +267,6 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             invoice,
             code=ERROR_NO_ANSWER,
             message=message or "AADE TechnicalError",
-            config=config,
         )
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
@@ -285,9 +287,7 @@ def _registered_row(invoice: Any) -> ResponseRow:
     )
 
 
-def _persist_send_error(
-    invoice: Any, *, code: str, message: str, config: MyDataConfig
-) -> None:
+def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
     """Record why the send just made has no registration, the status left
     SUBMITTED: ``ERROR_NO_ANSWER`` when AADE did not answer (or not
     readably), so it may be registered, the next send first looks its MARK
@@ -310,10 +310,9 @@ def _persist_send_error(
     whose parcel left without a MARK because myDATA did not answer:
     stamped here when the parcel left before this answer while a send of it
     is undecided and none may still be in flight (the latest one ended:
-    this one, one AADE answered, or one past its window,
-    ``MyDataConfig.send_window``), whichever send owns the row's outcome;
+    this one, one AADE answered, or one past its deadline,
+    ``movement.send_in_flight``), whichever send owns the row's outcome;
     by ``movement.parcel_left_unregistered`` when it leaves after."""
-    from order.models.invoice import MyDataStatus
 
     attempt = invoice.mydata_sent_at
     with transaction.atomic():
@@ -340,12 +339,7 @@ def _persist_send_error(
                 "updated_at",
             ]
         now = timezone.now()
-        another_in_flight = (
-            not latest
-            and locked.mydata_status == MyDataStatus.SUBMITTED
-            and locked.mydata_error_code == ""
-            and now < locked.mydata_sent_at + config.send_window
-        )
+        another_in_flight = not latest and send_in_flight(locked, at=now)
         if (
             locked.mydata_unanswered_since is not None
             and not another_in_flight
@@ -364,6 +358,18 @@ def _persist_send_error(
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
 
 
+def _in_flight_error(invoice: Any) -> MyDataTransportError:
+    """The send *invoice*'s row records may still be running: nothing is
+    sent over it before its deadline, and the caller tries again later
+    (the task's retries, then the sweep, which takes it up once the
+    deadline passed)."""
+    return MyDataTransportError(
+        f"A send of {invoice.document_number} to myDATA may still be running "
+        f"until {invoice.mydata_send_deadline:%Y-%m-%d %H:%M:%S}; nothing is "
+        "sent over it before then."
+    )
+
+
 def _look_up_before_sending(
     invoice: Any, *, config: MyDataConfig, issuer_vat: str
 ) -> MarkLookup | None:
@@ -376,9 +382,9 @@ def _look_up_before_sending(
     *issuer_vat* the resend goes with.
 
     Finding nothing decides only sends that could no longer register when
-    AADE was asked: one whose window (``MyDataConfig.send_window``) had
-    not passed may still land after the listing was read, so the verdict
-    is ``UNKNOWN`` then. What the lookup concludes of the send the row
+    AADE was asked: before the row's deadline (``mydata_send_deadline``,
+    the latest any of its sends may still land) one may still register
+    after the listing was read, so the verdict is ``UNKNOWN`` then. What the lookup concludes of the send the row
     records (``mydata_sent_at``) is written with the next write that
     replaces it (:func:`_settle_the_last_send`), and only if no other send
     began since."""
@@ -400,8 +406,8 @@ def _look_up_before_sending(
         raise
     if (
         verdict is MarkLookup.ABSENT
-        and invoice.mydata_sent_at is not None
-        and asked_at < invoice.mydata_sent_at + config.send_window
+        and invoice.mydata_send_deadline is not None
+        and asked_at < invoice.mydata_send_deadline
     ):
         return MarkLookup.UNKNOWN
     return verdict
@@ -850,6 +856,9 @@ class _SendClaim(Enum):
     #: Another sender began a send after this one read the row: read it
     #: again, and look it up again, before building anything.
     ADVANCED = "advanced"
+    #: The send the row records may still be running
+    #: (``movement.send_in_flight``): send nothing now.
+    IN_FLIGHT = "in_flight"
 
 
 def _persist_submission_intent(
@@ -859,6 +868,7 @@ def _persist_submission_intent(
     invoice_type: str,
     series: str,
     aa: int,
+    config: MyDataConfig,
     movement: dict[str, Any] | None = None,
     verdict: MarkLookup | None = None,
 ) -> _SendClaim:
@@ -881,9 +891,15 @@ def _persist_submission_intent(
     (``mydata_sent_at``), and this claim is a compare-and-set on it:
     another sender that began a send after *invoice* was read
     (``ADVANCED``) leaves this one to read the row and look it up again,
-    since its lookup (*verdict*) said nothing of that send. Otherwise the
-    verdict settles the send the row recorded before this one
-    (:func:`_settle_the_last_send`)."""
+    since its lookup (*verdict*) said nothing of that send. A send the row
+    records that may still be running (``IN_FLIGHT``, before its deadline
+    with no answer on record) is never sent over: a lookup cannot decide
+    it yet. Otherwise the verdict settles the send the row recorded before
+    this one (:func:`_settle_the_last_send`), and this send's deadline
+    (``mydata_send_deadline``) is its start plus the window *config* gives
+    it now (``MyDataConfig.send_window``), never earlier than the one
+    before: a send begun under a longer window may still register until
+    then."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -897,6 +913,10 @@ def _persist_submission_intent(
             return _SendClaim.REGISTERED
         if locked.mydata_sent_at != invoice.mydata_sent_at:
             return _SendClaim.ADVANCED
+        now = timezone.now()
+        if send_in_flight(locked, at=now):
+            invoice.mydata_send_deadline = locked.mydata_send_deadline
+            return _SendClaim.IN_FLIGHT
         stamp = getattr(locked, "transmission_failed_at", None)
         if stamp != getattr(invoice, "transmission_failed_at", None):
             invoice.transmission_failed_at = stamp
@@ -907,10 +927,17 @@ def _persist_submission_intent(
         locked.mydata_series = series
         locked.mydata_aa = aa
         locked.mydata_status = MyDataStatus.SUBMITTED
-        now = timezone.now()
         if locked.mydata_submitted_at is None:
             locked.mydata_submitted_at = now
         locked.mydata_sent_at = now
+        locked.mydata_send_deadline = max(
+            deadline
+            for deadline in (
+                locked.mydata_send_deadline,
+                now + config.send_window,
+            )
+            if deadline is not None
+        )
         locked.mydata_error_code = ""
         locked.mydata_error_message = ""
         fields = [
@@ -921,6 +948,7 @@ def _persist_submission_intent(
             "mydata_status",
             "mydata_submitted_at",
             "mydata_sent_at",
+            "mydata_send_deadline",
             "mydata_error_code",
             "mydata_error_message",
             "updated_at",
@@ -938,6 +966,7 @@ def _persist_submission_intent(
     invoice.mydata_aa = aa
     invoice.mydata_status = MyDataStatus.SUBMITTED
     invoice.mydata_sent_at = locked.mydata_sent_at
+    invoice.mydata_send_deadline = locked.mydata_send_deadline
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
     invoice.mydata_error_code = ""
     invoice.mydata_error_message = ""

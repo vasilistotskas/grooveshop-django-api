@@ -150,14 +150,17 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   send whose worker stopped mid-request is left SUBMITTED with no code, and
   counts as unanswered once its window passed since that send began
   (`Invoice.mydata_sent_at`, never the row's last write).
-  **A send's window** (`MyDataConfig.send_window`) is the one rule for
-  whether a send has ended: the client's `MYDATA_REQUEST_TIMEOUT_SECONDS`
-  to connect and as long again for AADE's answer to start, plus
-  `MYDATA_RETRY_AFTER_MINUTES` as the margin in which AADE may still finish
-  a request whose client gave up. Within it a send with no answer on record
-  is in flight (never resent, never stamped), and a lookup that finds
-  nothing does not decide it: it may still register after the listing was
-  read.
+  **A send's deadline** (`Invoice.mydata_send_deadline`) is the one rule
+  for whether a send has ended (`movement.send_in_flight`). Each claim sets
+  it to its start plus the store's window then (`MyDataConfig.send_window`:
+  the client's `MYDATA_REQUEST_TIMEOUT_SECONDS` to connect and as long
+  again for AADE's answer to start, plus `MYDATA_RETRY_AFTER_MINUTES` as
+  the margin in which AADE may still finish a request whose client gave
+  up), and never moves it back, so a timeout changed later never shortens a
+  send already made. Before it a send with no answer on record is in
+  flight (never sent over, by the sweep or any other sender, and never
+  stamped), and a lookup that finds nothing does not decide it: a send may
+  still register after the listing was read.
   **Undecided is a fact on the row, not an error code**: it is kept through
   every later error (a resend refused for the store's credentials or for
   its content), and cleared only when AADE answers a send (it registers it,
@@ -170,8 +173,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   code and waits for staff; one refused while an earlier send is
   undecided is sent again as issued, its block unchanged even after a 280
   for its past date, until a lookup decides the earlier send (found: it is
-  registered as issued; nothing, once that send's window passed: it is
-  dated today).
+  registered as issued; nothing, once the row's send deadline passed:
+  nothing of it is registered, so it is built anew like any refused
+  document, from the order as it is).
   **Every result belongs to one send.** A send is named by its start
   (`mydata_sent_at`), and every result is written with a compare-and-set
   on it: an answer, a refusal or a lookup's verdict reaches the row's

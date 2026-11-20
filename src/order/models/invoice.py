@@ -273,6 +273,18 @@ class MyDataRegistration(models.Model):
             "whatever else touched the document since."
         ),
     )
+    mydata_send_deadline = models.DateTimeField(
+        _("myDATA Send Deadline"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The latest moment a send of this document may still register "
+            "at AADE: each send moves it to its own start plus the window "
+            "the store's settings gave it then, never back. Until it passes "
+            "a send with no answer is in flight, and a lookup that finds "
+            "nothing decides nothing."
+        ),
+    )
     mydata_unanswered_since = models.DateTimeField(
         _("myDATA Unanswered Since"),
         null=True,

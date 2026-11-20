@@ -621,13 +621,16 @@ def _unanswered_plain(order, *, stopped: bool = False):
 
 def _untouched_for_a_while(invoice) -> None:
     """Nobody wrote the receipt for an hour, past its send's window
-    (``MyDataConfig.send_window``): its last send, and any send of it left
-    undecided, began before that."""
+    and past its sends' deadline: its last send, and any send of it left
+    undecided, began and ended before that."""
     a_while_ago = timezone.now() - timedelta(hours=1)
     receipt = Invoice.objects.filter(pk=invoice.pk)
     receipt.update(updated_at=a_while_ago)
     receipt.filter(mydata_sent_at__gt=a_while_ago).update(
         mydata_sent_at=a_while_ago
+    )
+    receipt.filter(mydata_send_deadline__gt=a_while_ago).update(
+        mydata_send_deadline=a_while_ago
     )
     receipt.filter(mydata_unanswered_since__gt=a_while_ago).update(
         mydata_unanswered_since=a_while_ago
@@ -1332,7 +1335,7 @@ class TestWhatHappensBetweenTwoSteps:
             )
             return duplicate
 
-        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+        _stalled(invoice)
         invoice.refresh_from_db()
         with (
             mydata_enabled(),
@@ -1497,6 +1500,7 @@ def _stalled(invoice) -> None:
         mydata_error_message="",
         mydata_unanswered_since=None,
         mydata_sent_at=a_while_ago,
+        mydata_send_deadline=a_while_ago,
         updated_at=a_while_ago,
     )
 
@@ -1800,9 +1804,7 @@ class TestCodeRabbitReview:
             ):
                 from order.accounting.mydata.service import submit_document
 
-                Invoice.objects.filter(pk=invoice.pk).update(
-                    mydata_error_code=""
-                )
+                _stalled(invoice)
                 submit_document(Invoice.objects.get(pk=invoice.pk))
 
         invoice.refresh_from_db()
@@ -2288,8 +2290,9 @@ class TestCodeRabbitSecondReview:
         invoice, _payload = _unanswered_plain(order, stopped=True)
         assert invoice.mydata_status == MyDataStatus.SUBMITTED
         assert invoice.mydata_error_code == ""
+        an_hour_ago = timezone.now() - timedelta(hours=1)
         Invoice.objects.filter(pk=invoice.pk).update(
-            mydata_sent_at=timezone.now() - timedelta(hours=1)
+            mydata_sent_at=an_hour_ago, mydata_send_deadline=an_hour_ago
         )
 
         with mydata_enabled(), FakeAade() as aade:
@@ -2604,10 +2607,7 @@ class TestCodeRabbitSecondReview:
             status=OrderStatus.SHIPPED, shipped_at=timezone.now()
         )
 
-        with mydata_enabled() as config:
-            _persist_send_error(
-                send_a, code=ERROR_NO_ANSWER, message="timeout", config=config
-            )
+        _persist_send_error(send_a, code=ERROR_NO_ANSWER, message="timeout")
 
         invoice.refresh_from_db()
         assert invoice.mydata_sent_at == send_b_start
@@ -2626,16 +2626,22 @@ class TestCodeRabbitSecondReview:
 
         order = _acs_order()
         invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        # Send A ended long ago, so finding nothing decides it.
+        _untouched_for_a_while(invoice)
         stale_copy = Invoice.objects.get(pk=invoice.pk)
+        send_a_start = stale_copy.mydata_sent_at
         send_b_start = timezone.now()
         verdicts = iter([MarkLookup.ABSENT, MarkLookup.UNKNOWN])
+        looked_up = []
 
         def lookup(_invoice, **_asked_with):
             verdict = next(verdicts)
+            looked_up.append(_invoice.mydata_sent_at)
             if verdict is MarkLookup.ABSENT:
                 # Send B begins and loses its answer meanwhile.
                 Invoice.objects.filter(pk=invoice.pk).update(
                     mydata_sent_at=send_b_start,
+                    mydata_send_deadline=send_b_start + timedelta(hours=1),
                     mydata_error_code=ERROR_NO_ANSWER,
                     mydata_unanswered_since=send_b_start,
                 )
@@ -2657,6 +2663,8 @@ class TestCodeRabbitSecondReview:
         ):
             submit_document(stale_copy)
 
+        # A looked B up before it sent anything.
+        assert looked_up == [send_a_start, send_b_start]
         invoice.refresh_from_db()
         assert invoice.mydata_error_code == "401"
         assert invoice.mydata_unanswered_since == send_b_start
@@ -2685,7 +2693,9 @@ class TestCodeRabbitSecondReview:
 
         a_while_ago = timezone.now() - timedelta(hours=1)
         Invoice.objects.filter(pk=invoice.pk).update(
-            mydata_sent_at=a_while_ago, updated_at=a_while_ago
+            mydata_sent_at=a_while_ago,
+            mydata_send_deadline=a_while_ago,
+            updated_at=a_while_ago,
         )
         with (
             mydata_enabled(),
@@ -2796,10 +2806,7 @@ class TestCodeRabbitSecondReview:
             status=OrderStatus.SHIPPED, shipped_at=timezone.now()
         )
 
-        with mydata_enabled() as config:
-            _persist_send_error(
-                send_a, code=ERROR_NO_ANSWER, message="timeout", config=config
-            )
+        _persist_send_error(send_a, code=ERROR_NO_ANSWER, message="timeout")
 
         invoice.refresh_from_db()
         assert invoice.mydata_error_code == "401"
@@ -2856,6 +2863,97 @@ class TestCodeRabbitSecondReview:
 
         assert aade.sent == []
         assert Invoice.objects.get(pk=invoice.pk).updated_at > before
+
+    def test_a_send_keeps_the_deadline_it_was_claimed_with(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The send began 17 minutes ago under a long timeout that gave it
+        until 38 minutes from now; the store's timeout is shorter now. Its
+        own deadline still holds: a listing without it decides nothing, and
+        a resend never moves the deadline back."""
+        from order.accounting.mydata.service import submit_document
+
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        claimed_until = timezone.now() + timedelta(minutes=38)
+        Invoice.objects.filter(pk=invoice.pk).update(
+            mydata_sent_at=timezone.now() - timedelta(minutes=17),
+            mydata_send_deadline=claimed_until,
+        )
+        with (
+            mydata_enabled(),
+            FakeAade(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataAuthError(
+                    "subscription key rejected", code="401"
+                ),
+            ),
+            pytest.raises(MyDataAuthError),
+        ):
+            submit_document(Invoice.objects.get(pk=invoice.pk))
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_unanswered_since is not None
+        assert invoice.mydata_send_deadline == claimed_until
+
+    def test_no_send_goes_over_one_still_running(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Another worker claimed the receipt a moment ago and its send has
+        no answer yet: nothing is sent over it before its deadline."""
+        from order.accounting.mydata.service import submit_document
+
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+        running = Invoice.objects.get(pk=invoice.pk)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            pytest.raises(MyDataTransportError),
+        ):
+            submit_document(running)
+
+        assert aade.sent == []
+        assert (
+            Invoice.objects.get(pk=invoice.pk).mydata_sent_at
+            == running.mydata_sent_at
+        )
+
+    def test_a_send_begun_while_this_one_looked_is_not_sent_over(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Another worker claims the receipt while this one looks its MARK
+        up: this one reads the row again and sends nothing over the send
+        still running."""
+        from order.accounting.mydata.service import submit_document
+
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        _untouched_for_a_while(invoice)
+        copy = Invoice.objects.get(pk=invoice.pk)
+        other_send = timezone.now()
+
+        def another_worker_claims(_invoice, **_asked_with):
+            Invoice.objects.filter(pk=invoice.pk).update(
+                mydata_sent_at=other_send,
+                mydata_send_deadline=other_send + timedelta(hours=1),
+                mydata_error_code="",
+            )
+            return MarkLookup.UNKNOWN
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            patch(
+                "order.accounting.mydata.service.look_up_mark",
+                side_effect=another_worker_claims,
+            ),
+            pytest.raises(MyDataTransportError),
+        ):
+            submit_document(copy)
+
+        assert aade.sent == []
+        assert Invoice.objects.get(pk=invoice.pk).mydata_sent_at == other_send
 
     def test_the_sweep_takes_the_least_recently_touched_first(
         self, django_capture_on_commit_callbacks, settings

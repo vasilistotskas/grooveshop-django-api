@@ -14863,6 +14863,9 @@ msgstr "The last voucher request for order #%(order)s may have reached ACS witho
 msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
 msgstr "The last voucher request whose answer was lost, as ACS or the network reported it."
 
+msgid "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+msgstr "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -17970,6 +17973,9 @@ msgstr "myDATA MARK"
 
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
+
+msgid "myDATA Send Deadline"
+msgstr "myDATA Send Deadline"
 
 msgid "myDATA Sent At"
 msgstr "myDATA Sent At"

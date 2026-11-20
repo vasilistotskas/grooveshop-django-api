@@ -14865,6 +14865,9 @@ msgstr "Το τελευταίο αίτημα voucher για την παραγγ�
 msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
 msgstr "Το τελευταίο αίτημα voucher του οποίου η απάντηση χάθηκε, όπως το ανέφερε η ACS ή το δίκτυο."
 
+msgid "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+msgstr "Η τελευταία στιγμή κατά την οποία μια αποστολή του παραστατικού μπορεί ακόμη να καταχωριστεί στην ΑΑΔΕ: κάθε αποστολή τη μεταφέρει στην έναρξή της συν το διάστημα που έδιναν τότε οι ρυθμίσεις του καταστήματος, ποτέ προς τα πίσω. Μέχρι να περάσει, μια αποστολή χωρίς απάντηση θεωρείται σε εξέλιξη και μια αναζήτηση που δεν βρίσκει τίποτα δεν αποφαίνεται."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "Ο νόμος απαιτεί να εμφανίζονται στο ηλεκτρονικό σας κατάστημα τα στοιχεία της επιχείρησης. Συμπληρώστε όσα λείπουν:"
 
@@ -17972,6 +17975,9 @@ msgstr "myDATA MARK"
 
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
+
+msgid "myDATA Send Deadline"
+msgstr "Προθεσμία αποστολής myDATA"
 
 msgid "myDATA Sent At"
 msgstr "Τελευταία αποστολή στο myDATA"

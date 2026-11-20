@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import asdict, dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -298,10 +298,12 @@ def receipt_movement(
     A refused one is built anew, unless an earlier send of it is undecided
     (:func:`refused_for_its_content`): it is then sent as issued, even
     after AADE refused that send's past date (error 280), and stays
-    followed (``movement.sends_without_an_answer``) until a lookup decides
-    the earlier send: found, it is registered as issued; nothing found
-    (once that send can no longer land, ``MyDataConfig.send_window``), it
-    is dated today as above.
+    followed (:func:`sends_without_an_answer`) until a lookup decides the
+    earlier send. Found, it is registered as issued. Nothing found (once no
+    send of it can still land, ``mydata_send_deadline``), nothing of it is
+    registered: it is a refused document like any other and is built anew
+    from the order as it is, the corrections staff made since and the
+    goods that still move included.
 
     Raises ``ValueError`` when the pickup point's address is not known.
     """
@@ -456,28 +458,44 @@ def sends_without_an_answer(invoices: Any) -> Any:
     stopped mid-request (a worker killed during the call), which leaves
     them SUBMITTED with no code at all.
 
-    Never one whose latest send may still be in flight, which looks like a
-    stopped one until its window passed since that send began
-    (``MyDataConfig.send_window`` from ``mydata_sent_at``): the send's own
-    start, never the row's last write, which setting a receipt aside for a
-    cancel or the sweep's touch moves. Every reader of "may be registered, not answered" goes through
-    here: the sweep, the stamp when a parcel leaves
-    (:func:`unanswered_sends`), and a receipt released from its cancel
-    hold."""
-    from order.accounting.mydata.config import load_config
+    Never one whose latest send may still be in flight
+    (:func:`send_in_flight`), which looks like a stopped one until its
+    deadline passed: the send's own deadline, never the row's last write,
+    which setting a receipt aside for a cancel or the sweep's touch moves.
+    Every reader of "may be registered, not answered" goes through here:
+    the sweep, the stamp when a parcel leaves (:func:`unanswered_sends`),
+    and a receipt released from its cancel hold."""
     from order.models.invoice import MyDataStatus
 
-    stalled_before = timezone.now() - load_config().send_window
+    now = timezone.now()
     no_answer_on_record = Q(
         mydata_status=MyDataStatus.SUBMITTED, mydata_error_code=""
     )
     return (
         invoices.filter(mydata_mark__isnull=True)
-        .exclude(no_answer_on_record, mydata_sent_at__gt=stalled_before)
+        .exclude(no_answer_on_record, mydata_send_deadline__gt=now)
         .filter(
             Q(mydata_unanswered_since__isnull=False)
-            | (no_answer_on_record & Q(mydata_sent_at__lte=stalled_before))
+            | (no_answer_on_record & Q(mydata_send_deadline__lte=now))
         )
+    )
+
+
+def send_in_flight(document: Any, *, at: datetime) -> bool:
+    """Whether the latest send of *document* may still be running at *at*:
+    claimed (SUBMITTED, no MARK) with no answer on record, before its
+    deadline (``mydata_send_deadline``, which each claim sets from its own
+    start and the store's window then, ``MyDataConfig.send_window``, and
+    never moves back). The one rule, with :func:`sends_without_an_answer`
+    as its query, for whether a send has ended."""
+    from order.models.invoice import MyDataStatus
+
+    return (
+        not document.mydata_mark
+        and document.mydata_status == MyDataStatus.SUBMITTED
+        and document.mydata_error_code == ""
+        and document.mydata_send_deadline is not None
+        and at < document.mydata_send_deadline
     )
 
 

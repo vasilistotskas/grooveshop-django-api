@@ -36,6 +36,8 @@ from rest_framework import status
 from rest_framework.exceptions import APIException
 
 from core.api.tokens import is_auth_token_live
+from core.canonical_uuid import canonical_uuid
+from core.cart_id import cart_uuid_from_request
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -143,3 +145,61 @@ def resolve_cart_token(token: str) -> Cart:
     if cart is None:
         raise CartTokenInvalid
     return cart
+
+
+def existing_gateway_subject(
+    request: Request | HttpRequest, *, order: bool = False
+) -> str | None:
+    """The cart, or with ``order`` the order, an agent gateway call names,
+    as a key to budget it on, only when it EXISTS in this store.
+
+    A name that resolves to nothing earns nothing: a client that makes up
+    ids would otherwise take a fresh budget for each one, and the cart
+    writes that create a cart when the named one is missing (a cart-item
+    create, a coupon apply) would escape the per-address burst limit. So
+    ``None`` means "budget it on the address", and what counts as existing
+    is what the route resolves.
+
+    Without ``order`` (the cart and order-create budgets):
+
+    * a cart token that was minted and has not expired, keyed by the cart
+      its grant names (several live tokens for one cart are one budget);
+    * else a guest cart, by the uuid the cart lookup parses (any
+      spelling). ``?uuid=`` names nothing here.
+
+    With ``order`` (the payment budgets), only the order the route
+    authorizes: the one its ``pk`` URL kwarg names, when ``?uuid=`` is
+    that order's uuid in its canonical spelling (``core.canonical_uuid``),
+    keyed by the uuid's hash. Cart headers are never read: a payment
+    route acts on the order, so a cart header that keyed it would give
+    one order a fresh budget per cart sent. No ``pk`` (a gift-card
+    purchase), or a ``?uuid=`` that is not that order's (another order's
+    charges nothing to it), is the address's.
+    """
+    from cart.models import Cart
+    from order.models import Order
+
+    if order:
+        # The view authorizes the order its URL names, then checks
+        # ``?uuid=`` opens it (``OrderViewSet.check_object_permissions``):
+        # same two sources here, so a uuid that opens nothing there
+        # spends nothing.
+        parser_context = getattr(request, "parser_context", None) or {}
+        pk = parser_context.get("kwargs", {}).get("pk")
+        order_uuid = canonical_uuid(request.GET.get("uuid"))
+        if (
+            pk is not None
+            and order_uuid is not None
+            and Order.objects.filter(pk=pk, uuid=order_uuid).exists()
+        ):
+            digest = hashlib.sha256(str(order_uuid).encode()).hexdigest()
+            return f"order:{digest}"
+        return None
+    token = cart_token_from_request(request)
+    if token and (stored := cache.get(_cache_key(token))) is not None:
+        return f"cart:{CartTokenGrant(**stored).cart_id}"
+    if (cart_uuid := cart_uuid_from_request(request)) is not None and (
+        Cart.objects.guest_carts().filter(uuid=cart_uuid).exists()
+    ):
+        return str(cart_uuid)
+    return None

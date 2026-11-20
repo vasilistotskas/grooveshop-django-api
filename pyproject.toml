@@ -668,7 +668,6 @@ ignore_imports = [
     "core.management.commands.reset_staff_mfa -> admin.staff_mfa",
     "core.management.commands.reset_staff_mfa -> user.models",
     "core.middleware.idempotency -> cart.agent_token",
-    "core.middleware.idempotency -> cart.services",
     "core.tasks -> cart.models",
     "core.tasks -> emails.send",
     "core.templatetags.store_brand -> admin.branding",

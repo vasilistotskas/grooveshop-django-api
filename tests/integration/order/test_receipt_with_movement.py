@@ -2578,3 +2578,25 @@ class TestCodeRabbitThirdReview:
         order.refresh_from_db()
         refused.transmission_failed_at = None
         assert receipt_movement(refused).dispatch_date == timezone.localdate()
+
+    def test_a_destination_that_cannot_be_checked_is_flagged(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The new voucher names a pickup point the catalogue lacks: staff
+        are told it could not be compared, the receipt is left as it is."""
+        from order.accounting.movement import (
+            flag_a_movement_the_receipt_does_not_cover,
+        )
+
+        order, invoice = _registered_cod_receipt_in(
+            django_capture_on_commit_callbacks
+        )
+        with patch(
+            "shipping.services.ShippingService.delivery_address",
+            side_effect=ValueError("ACS station ATH 99 is not known."),
+        ):
+            flag_a_movement_the_receipt_does_not_cover(order)
+
+        [note] = [n for n in _notes(order) if "movement indication" in n]
+        assert "address is not known" in note
+        assert Invoice.objects.get(pk=invoice.pk).movement == invoice.movement

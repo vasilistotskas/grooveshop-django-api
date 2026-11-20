@@ -497,7 +497,8 @@ def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
     happens when the voucher was made again after the receipt was issued.
 
     - The parcel goes to another place than the receipt declares (a new
-      locker, station or address on the new voucher).
+      locker, station or address on the new voucher), or to a pickup point
+      whose address is not known, so it cannot be compared.
     - It left more than ``MOVEMENT_START_MAX_DAYS`` after the receipt was
       issued, later than the law lets a document's movement start.
 
@@ -526,6 +527,13 @@ def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
     try:
         actual = ShippingService.delivery_address(order)
     except ValueError:
+        # A pickup point whose address the catalogue lacks: whether it is
+        # the one declared cannot be checked, which staff are told too.
+        problems.append(
+            "the parcel goes to a pickup point whose address is not known, "
+            "so whether it is the declared delivery place cannot be checked"
+        )
+        kinds.append("delivery place (unknown)")
         actual = None
     if actual is not None and _within_aade_limits(actual) != declared.delivery:
         problems.append(

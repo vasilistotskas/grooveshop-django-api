@@ -176,6 +176,24 @@ def _load_order(order_id: int) -> Order | None:
     return order
 
 
+def _notify_order(
+    order: Order, *, sent_extra: dict | None = None, **notification
+) -> dict:
+    """Write the order's in-app notification and report what happened.
+
+    ``create_user_notification`` returns ``None`` when it wrote nothing
+    (customer accounts switched off after ``_load_order`` looked), so the
+    task says "skipped" only then and "sent" only for a written row.
+    ``sent_extra`` adds keys to the "sent" result.
+    """
+    written = create_user_notification(
+        order.user, link=_order_link(order), **notification
+    )
+    if written is None:
+        return {"status": "skipped"}
+    return {"status": "sent", "order_id": order.id, **(sent_extra or {})}
+
+
 @celery_app.task(name="notify_order_created_live", **TASK_DEFAULTS)
 def notify_order_created_live(self, order_id: int) -> dict:
     """Fire the initial 'order placed' live notification."""
@@ -183,12 +201,11 @@ def notify_order_created_live(self, order_id: int) -> dict:
     if order is None:
         return {"status": "skipped"}
 
-    create_user_notification(
-        order.user,
+    return _notify_order(
+        order,
         kind=NotificationKindEnum.SUCCESS,
         category=NotificationCategoryEnum.ORDER,
         notification_type=NotificationTypeEnum.ORDER_CREATED,
-        link=_order_link(order),
         translations=_render_translations(
             gettext_noop("Order #{order_id} placed"),
             gettext_noop(
@@ -198,7 +215,6 @@ def notify_order_created_live(self, order_id: int) -> dict:
             order_id=order.id,
         ),
     )
-    return {"status": "sent", "order_id": order.id}
 
 
 @celery_app.task(name="notify_order_status_changed_live", **TASK_DEFAULTS)
@@ -221,17 +237,16 @@ def notify_order_status_changed_live(
         return {"status": "skipped"}
 
     category, kind, notification_type, (title_msgid, message_msgid) = copy
-    create_user_notification(
-        order.user,
+    return _notify_order(
+        order,
         kind=kind,
         category=category,
         notification_type=notification_type,
-        link=_order_link(order),
         translations=_render_translations(
             title_msgid, message_msgid, order_id=order.id
         ),
+        sent_extra={"new_status": new_status},
     )
-    return {"status": "sent", "order_id": order.id, "new_status": new_status}
 
 
 @celery_app.task(name="notify_payment_confirmed_live", **TASK_DEFAULTS)
@@ -241,12 +256,11 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
     if order is None:
         return {"status": "skipped"}
 
-    create_user_notification(
-        order.user,
+    return _notify_order(
+        order,
         kind=NotificationKindEnum.SUCCESS,
         category=NotificationCategoryEnum.PAYMENT,
         notification_type=NotificationTypeEnum.PAYMENT_CONFIRMED,
-        link=_order_link(order),
         translations=_render_translations(
             gettext_noop("Payment confirmed for order #{order_id}"),
             gettext_noop(
@@ -255,7 +269,6 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
             order_id=order.id,
         ),
     )
-    return {"status": "sent", "order_id": order.id}
 
 
 @celery_app.task(name="notify_payment_failed_live", **TASK_DEFAULTS)
@@ -265,12 +278,11 @@ def notify_payment_failed_live(self, order_id: int) -> dict:
     if order is None:
         return {"status": "skipped"}
 
-    create_user_notification(
-        order.user,
+    return _notify_order(
+        order,
         kind=NotificationKindEnum.ERROR,
         category=NotificationCategoryEnum.PAYMENT,
         notification_type=NotificationTypeEnum.PAYMENT_FAILED,
-        link=_order_link(order),
         translations=_render_translations(
             gettext_noop("Payment failed for order #{order_id}"),
             gettext_noop(
@@ -280,7 +292,6 @@ def notify_payment_failed_live(self, order_id: int) -> dict:
             order_id=order.id,
         ),
     )
-    return {"status": "sent", "order_id": order.id}
 
 
 @celery_app.task(name="notify_order_refunded_live", **TASK_DEFAULTS)
@@ -290,12 +301,11 @@ def notify_order_refunded_live(self, order_id: int) -> dict:
     if order is None:
         return {"status": "skipped"}
 
-    create_user_notification(
-        order.user,
+    return _notify_order(
+        order,
         kind=NotificationKindEnum.INFO,
         category=NotificationCategoryEnum.PAYMENT,
         notification_type=NotificationTypeEnum.ORDER_REFUNDED,
-        link=_order_link(order),
         translations=_render_translations(
             gettext_noop("Refund processed for order #{order_id}"),
             gettext_noop(
@@ -305,4 +315,3 @@ def notify_order_refunded_live(self, order_id: int) -> dict:
             order_id=order.id,
         ),
     )
-    return {"status": "sent", "order_id": order.id}

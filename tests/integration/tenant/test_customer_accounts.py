@@ -266,6 +266,37 @@ def test_an_account_holders_order_notifies_only_while_accounts_are_on(
     assert result["status"] == ("sent" if on else "skipped")
 
 
+@pytest.mark.parametrize(
+    ("task_name", "args"),
+    [
+        ("notify_order_created_live", ()),
+        ("notify_order_status_changed_live", ("SHIPPED",)),
+        ("notify_payment_confirmed_live", ()),
+        ("notify_payment_failed_live", ()),
+        ("notify_order_refunded_live", ()),
+    ],
+)
+def test_an_order_notification_reports_skipped_when_the_writer_wrote_none(
+    task_name, args, shopper, bind_tenant_and_schema
+):
+    """Accounts can be switched off between the task's own check and the
+    writer's: the writer then returns ``None``. Every order notification
+    task reports that as skipped, never as sent."""
+    from order.communications import notifications
+    from order.factories.order import OrderFactory
+
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=True)
+    _store_host(bind_tenant_and_schema)
+    order = OrderFactory(user=shopper, num_order_items=0)
+
+    with patch.object(
+        notifications, "create_user_notification", return_value=None
+    ):
+        result = getattr(notifications, task_name).run(order.id, *args)
+
+    assert result == {"status": "skipped"}
+
+
 @pytest.mark.usefixtures("open_email_gates")
 @pytest.mark.parametrize("on", [True, False])
 def test_the_already_subscribed_mail_offers_the_account_page_only_with_accounts(

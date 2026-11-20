@@ -148,34 +148,25 @@ def handle_order_post_save(
 
         transaction.on_commit(send_status_changed_signal)
 
-    # Detect the null → set transition on tracking info. We treat an
-    # empty string the same as None because the field is declared with
-    # ``blank=True`` and Django serializers happily round-trip "" as
-    # "no value". Fire on commit to avoid a race where the Celery task
-    # reads a not-yet-visible row.
-    #
-    # Additionally require the *value* to have actually changed between
-    # original and current — protects against the clear-then-reset case
-    # where an admin blanks the tracking, saves (post_save refreshes
-    # the ``_original_*`` snapshot to ""), then re-enters the same
-    # tracking number. Without the equality check the signal would
-    # fire a second time and the shopper would get a duplicate
-    # "Tracking available" notification.
-    # Fires only on the transition INTO having tracking: at least one
-    # field was empty before and both are set now. That already rules out
-    # a re-save with identical values — if the old value equalled the new
-    # non-empty one, the old one was non-empty too, which the "not both
-    # set before" term excludes. An extra equality check read as a second
-    # safeguard but could never change the outcome.
+    # Fires whenever the order's tracking becomes a value it did not have:
+    # set for the first time, or replaced (a carrier's voucher recorded
+    # over a number staff typed before the carrier held the parcel), both
+    # fields set. A save with the same values fires nothing. Every receiver
+    # is safe to run again: the tracking email is sent once
+    # (``shipping_notification_email_sent``), and the receipt is issued
+    # once (``issue_receipt_when_the_shipment_is_live``: an order's
+    # receipt is never issued twice). Fire on commit to avoid a race where
+    # the Celery task reads a not-yet-visible row.
     tracking_dispatched = (
         hasattr(instance, "_original_tracking_number")
         and hasattr(instance, "_original_shipping_carrier")
-        and not (
-            instance._original_tracking_number
-            and instance._original_shipping_carrier
-        )
         and bool(instance.tracking_number)
         and bool(instance.shipping_carrier)
+        and (
+            instance._original_tracking_number,
+            instance._original_shipping_carrier,
+        )
+        != (instance.tracking_number, instance.shipping_carrier)
     )
     if tracking_dispatched:
 
@@ -601,8 +592,9 @@ def issue_receipt_when_the_shipment_is_live(
 
     Every path that makes a shipment live records it through
     ``Order.add_tracking_info`` (an ACS voucher minted or adopted, a BOX NOW
-    parcel created, taken over or settled), whose first tracking number
-    sends this signal, so none of them can skip the receipt.
+    parcel created, taken over or settled), which sends this signal each
+    time the tracking changes, a voucher recorded over a number staff typed
+    included, so none of them can skip the receipt.
     """
     if order.status in PRE_SHIPMENT_STATUSES and receipt_issuable(order):
         issue_receipt_for_pickup(order.id)

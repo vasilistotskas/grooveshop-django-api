@@ -27,8 +27,9 @@ Rules both carriers share:
   reaches the page.
 - **The receipt follows the voucher, never the other way round.** Every
   path that makes a voucher or parcel live records it with
-  `Order.add_tracking_info`, and the order's first tracking number issues
-  the receipt with movement indication (`issue_receipt_for_pickup`) for a
+  `Order.add_tracking_info`, and recording it issues the receipt with
+  movement indication (`issue_receipt_for_pickup`), also over a number
+  staff typed before the carrier held the parcel, for a
   store whose receipts the platform issues and that has set its dispatch
   point ([§7.4](fiscal-movement-receipts.md)), dated the day the voucher is
   created.

@@ -424,10 +424,14 @@ class TestIssuedWhenTheShipmentIsLive:
     def test_the_first_tracking_number_of_a_carrier_order_issues_it(
         self, django_capture_on_commit_callbacks
     ):
-        """Where every carrier path records a live voucher or parcel."""
+        """Where every carrier path records a live voucher or parcel. The
+        carrier saves the voucher on its own locked shipment row, so the
+        order's cached shipment is stale: what decides is the stored row."""
+        from shipping_acs.models import AcsShipment
+
         order = _acs_order(voucher=False)
-        order.acs_shipment.voucher_no = "9810000747"
-        order.acs_shipment.save(update_fields=["voucher_no"])
+        assert not order.acs_shipment.voucher_no
+        AcsShipment.objects.filter(order=order).update(voucher_no="9810000747")
 
         with (
             mydata_enabled(),
@@ -455,6 +459,32 @@ class TestIssuedWhenTheShipmentIsLive:
             )
 
         assert aade.sent == []
+
+    @pytest.mark.usefixtures("dispatch_point")
+    def test_a_voucher_recorded_over_a_number_staff_typed_issues_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Staff typed a tracking number before ACS held the parcel; the
+        voucher recorded after it is still the carrier taking the parcel."""
+        from shipping_acs.models import AcsShipment
+
+        order = _acs_order(voucher=False)
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            OrderService.add_tracking_info(
+                order, "STAFF-TYPED-1", "acs", auto_update_status=False
+            )
+            assert aade.sent == []
+            AcsShipment.objects.filter(order=order).update(
+                voucher_no="9810000748"
+            )
+            order.add_tracking_info("9810000748", "acs")
+
+        [sent] = aade.receipts
+        assert sent.is_delivery_note
 
     @pytest.mark.usefixtures("dispatch_point")
     def test_a_tracking_number_on_an_order_the_merchant_delivers_does_not(

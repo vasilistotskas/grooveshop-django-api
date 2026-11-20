@@ -46,6 +46,7 @@ from order.accounting.mydata.config import load_config
 from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
+    MyDataNotListedError,
     MyDataTransportError,
     MyDataValidationError,
 )
@@ -368,8 +369,9 @@ def find_cancellation_mark(invoice: Any) -> int | None:
 
     Asked before a canceled order's receipt goes to the credit path, so a
     cancel whose answer was lost never ends as a cancellation and a
-    credit. Raises ``MyDataTransportError`` when AADE cannot be asked, or
-    when it does not list the document at all (nothing can be concluded).
+    credit. Raises ``MyDataTransportError`` when AADE cannot be asked, and
+    ``MyDataNotListedError`` (one of them) when it answers without listing
+    the document at all (nothing can be concluded).
     """
     config = load_config()
     issuer_vat = _resolve_issuer_vat()
@@ -395,7 +397,7 @@ def find_cancellation_mark(invoice: Any) -> int | None:
                 return doc.cancelled_by_mark
             listed = True
     if not listed:
-        raise MyDataTransportError(
+        raise MyDataNotListedError(
             f"myDATA does not list the document with MARK "
             f"{invoice.mydata_mark} issued on {invoice.issue_date}."
         )

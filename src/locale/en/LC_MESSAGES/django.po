@@ -2738,6 +2738,9 @@ msgstr "Cancel"
 msgid "Cancel ACS voucher"
 msgstr "Cancel ACS voucher"
 
+msgid "Cancel Held For Staff At"
+msgstr "Cancel Held For Staff At"
+
 msgid "Cancel Requested At"
 msgstr "Cancel Requested At"
 
@@ -17028,6 +17031,9 @@ msgstr "When staff recorded that this payout was accounted for. A payout matchin
 
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
+
+msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+msgstr "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
 
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "When the current confirmation link was issued. The link expires a week later."

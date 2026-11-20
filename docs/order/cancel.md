@@ -147,7 +147,7 @@ myDATA's silence keeps it set aside and is retried by
 `retry_receipts_with_mydata`; only AADE's refusal sends it the credit path,
 with the reason in an order note, and only after AADE confirmed it holds no
 cancellation of it already. The cancel and the refund never wait for either.
-Detail: [§7.4](fiscal-mydata.md).
+Detail: [§7.4](fiscal-movement-receipts.md).
 
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record

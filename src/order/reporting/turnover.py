@@ -18,8 +18,8 @@ When a sale is earned
     Not the receipt's date. Most receipts are issued when the parcel
     ships, but a courier or locker order's receipt carries the movement
     and is issued when its voucher is created, up to five days before the
-    pickup (``order.accounting.movement``, ``docs/order/fiscal-mydata.md``
-    section 7.4). Until the parcel leaves that sale can still be undone: an
+    pickup (``order.accounting.movement``,
+    ``docs/order/fiscal-movement-receipts.md``, section 7.4). Until the parcel leaves that sale can still be undone: an
     order canceled before the pickup is no sale here, and in myDATA its
     receipt is either canceled (``CancelInvoice``, a document never used)
     or, when the courier could not stop the parcel or AADE refused the

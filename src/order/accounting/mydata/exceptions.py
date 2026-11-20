@@ -40,6 +40,14 @@ class MyDataTransportError(MyDataError, ConnectionError):
     network set, like any other service that did not answer."""
 
 
+class MyDataNotListedError(MyDataTransportError):
+    """AADE answered ``RequestTransmittedDocs`` and does not list the
+    document: nothing about it can be concluded from the listing. Still a
+    transport error to every caller that only retries; the settle of a
+    canceled order's receipt tells it apart after a 301 to its cancel
+    (``order.tasks.settle_canceled_receipt``)."""
+
+
 class MyDataAuthError(MyDataError):
     """Authentication / authorization failure — ``aade-user-id`` or
     ``Ocp-Apim-Subscription-Key`` rejected, or subscription not

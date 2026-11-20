@@ -1517,6 +1517,8 @@ def retry_receipts_with_mydata() -> int:
         .exclude(
             mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
         )
+        # One myDATA cannot see waits for staff (``_hold_for_staff``).
+        .filter(cancel_held_for_staff_at__isnull=True)
         .exclude(order_id__in=to_send)
         .order_by("updated_at", "id")
         .values_list("order_id", flat=True)[:batch]
@@ -1571,7 +1573,10 @@ def settle_canceled_receipt(order_id: int) -> str:
       (``issue_pending_credits``), as for any refund after a receipt.
 
     Only AADE refusing the cancel (``MyDataValidationError``) sends the
-    receipt the credit path as well, with the reason in an order note.
+    receipt the credit path as well, with the reason in an order note;
+    unless the refusal is a 301 and AADE does not list the receipt either:
+    the store's credentials do not reach it, and it is held for staff
+    (``_hold_for_staff``), with one note, out of the sweep.
     Credentials AADE refuses keep it set aside, with a note for staff; no
     answer from AADE (``MyDataTransportError``, a ``ConnectionError``) is
     retried here, then by ``retry_receipts_with_mydata``. Before any
@@ -1615,9 +1620,11 @@ def settle_canceled_receipt(order_id: int) -> str:
 def _settle_canceled_receipt(order_id: int) -> str:
     from order.accounting.mydata import (
         MyDataAuthError,
+        MyDataNotListedError,
         MyDataValidationError,
         cancel_document,
     )
+    from order.accounting.mydata.types import ERROR_MARK_NOT_FOUND
     from order.models.invoice import Invoice, MyDataStatus
 
     with transaction.atomic():
@@ -1630,6 +1637,9 @@ def _settle_canceled_receipt(order_id: int) -> str:
         )
         if order is None or invoice is None:
             return "nothing_to_settle"
+        if invoice.cancel_held_for_staff_at is not None:
+            # Its order's note told staff; they settle it (``_hold_for_staff``).
+            return "held_for_staff"
         answer = ((order.metadata or {}).get("cancellation") or {}).get(
             "shipment_cancel"
         )
@@ -1673,11 +1683,16 @@ def _settle_canceled_receipt(order_id: int) -> str:
                 order_id,
                 exc,
             )
-            return _credit_receipt_instead(
-                order,
-                invoice,
-                f"myDATA refused to cancel it: {exc.code} {exc.message}",
-            )
+            try:
+                return _credit_receipt_instead(
+                    order,
+                    invoice,
+                    f"myDATA refused to cancel it: {exc.code} {exc.message}",
+                )
+            except MyDataNotListedError:
+                if exc.code != ERROR_MARK_NOT_FOUND:
+                    raise
+                return _hold_for_staff(order, invoice)
     except MyDataAuthError as exc:
         logger.error(
             "myDATA refused the store's credentials while settling receipt "
@@ -1718,7 +1733,6 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
         find_cancellation_mark,
         record_cancellation,
     )
-    from order.models.invoice import Invoice, MyDataStatus
 
     if invoice.mydata_mark:
         cancellation_mark = find_cancellation_mark(invoice)
@@ -1733,6 +1747,15 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
                 ),
             )
             return "canceled"
+    return _release_to_credit(order, invoice, reason)
+
+
+def _release_to_credit(order: Order, invoice, reason: str) -> str:
+    """Release the receipt of a canceled order from its hold: it stands,
+    goes the credit path, reaches the customer, and an order note says
+    why (*reason*)."""
+    from order.models.invoice import Invoice, MyDataStatus
+
     with transaction.atomic():
         # The MARK as it is now, under the row lock: a registration that
         # lands while this settles saw the hold and left the email to
@@ -1766,6 +1789,70 @@ def _credit_receipt_instead(order: Order, invoice, reason: str) -> str:
             # registration releases the credits and the email.
             dispatch_on_commit(send_invoice_to_mydata, [order.id])
     return "credited"
+
+
+def _hold_for_staff(order: Order, invoice) -> str:
+    """Stop settling a receipt myDATA cannot see: it answered its cancel
+    with 301 past ``MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES`` of the
+    registration, and does not list it either (``find_cancellation_mark``),
+    so the store's current credentials do not reach it. It may be
+    registered, or already canceled, under others: a credit could count a
+    tax document twice, and asking again changes nothing. It stays set
+    aside (counted on the dashboard), out of the sweep, and one order note
+    tells staff, who cancel it in myDATA or issue its credit documents
+    (:func:`credit_receipt_held_for_staff`)."""
+    from order.models.invoice import Invoice
+
+    now = timezone.now()
+    with transaction.atomic():
+        held = Invoice.objects.filter(
+            pk=invoice.pk,
+            cancel_requested_at__isnull=False,
+            cancel_held_for_staff_at__isnull=True,
+        ).update(cancel_held_for_staff_at=now, updated_at=now)
+        if held:
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    f"myDATA cannot see receipt {invoice.invoice_number} "
+                    "with the store's current myDATA credentials: it "
+                    "answers its cancel with 301 (not found) and does not "
+                    "list it. Check with your accountant whether it was "
+                    "registered or canceled under other credentials, then "
+                    'press "Cancel receipt in myDATA" or "Issue credit '
+                    'documents (myDATA)". It is not settled automatically.'
+                ),
+            )
+    return "held_for_staff"
+
+
+def credit_receipt_held_for_staff(order: Order) -> bool:
+    """Staff's way to credit a receipt held for them
+    (:func:`_hold_for_staff`): it stands, and goes the credit path like
+    any other canceled order's receipt that was not canceled in myDATA.
+    Returns ``False`` when the order has no receipt held for staff."""
+    from order.models.invoice import Invoice, MyDataStatus
+
+    invoice = (
+        Invoice.objects.filter(
+            order=order,
+            cancel_requested_at__isnull=False,
+            cancel_held_for_staff_at__isnull=False,
+        )
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .first()
+    )
+    if invoice is None:
+        return False
+    return (
+        _release_to_credit(
+            order,
+            invoice,
+            "myDATA could not see it with the store's credentials, and "
+            "staff issued its credit documents",
+        )
+        == "credited"
+    )
 
 
 @celery_app.task(

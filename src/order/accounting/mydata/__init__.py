@@ -38,6 +38,7 @@ from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
     MyDataError,
+    MyDataNotListedError,
     MyDataTransportError,
     MyDataValidationError,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "MyDataAuthError",
     "MyDataDuplicateError",
     "MyDataError",
+    "MyDataNotListedError",
     "MyDataTransportError",
     "MyDataValidationError",
     "cancel_document",

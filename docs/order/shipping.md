@@ -30,7 +30,8 @@ Rules both carriers share:
   `Order.add_tracking_info`, and the order's first tracking number issues
   the receipt with movement indication (`issue_receipt_for_pickup`) for a
   store whose receipts the platform issues and that has set its dispatch
-  point ([§7.4](fiscal-mydata.md)), dated the day the voucher is created.
+  point ([§7.4](fiscal-movement-receipts.md)), dated the day the voucher is
+  created.
   Only a voucher or parcel the carrier holds counts
   (`ShippingCarrierInterface.holds_the_parcel`, asked through
   `ShippingService.carrier_holds_the_parcel`): a tracking number staff type

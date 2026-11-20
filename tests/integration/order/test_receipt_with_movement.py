@@ -19,7 +19,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.conf import settings
+from django.contrib.admin.sites import AdminSite
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db.models import F
+from django.test import RequestFactory
 from django.utils import timezone
 from djmoney.money import Money
 
@@ -39,12 +42,14 @@ from order.accounting.mydata.types import (
     ERROR_MARK_NOT_FOUND,
     ERROR_NO_ANSWER,
 )
+from order.admin import OrderAdmin
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
+from order.models.order import Order
 from order.services import OrderService
 from order.tasks import (
     finish_pending_shipment_cancels,
@@ -64,6 +69,7 @@ from shipping_acs.factories import AcsShipmentFactory, AcsStationFactory
 from shipping_boxnow.factories import BoxNowLockerFactory, BoxNowShipmentFactory
 from tests.utils.mydata import FakeAade, mydata_enabled
 from tests.utils.orders import courier_cash_order
+from user.factories import UserAccountFactory
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -2194,6 +2200,14 @@ class TestCodeRabbitSecondReview:
         assert taken == [second.order_id, first.order_id, second.order_id]
 
 
+def _past_the_retry_window(invoice) -> None:
+    """Registered longer ago than a 301 to its cancel is retried for."""
+    Invoice.objects.filter(pk=invoice.pk).update(
+        mydata_confirmed_at=timezone.now()
+        - timedelta(minutes=settings.MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES + 1)
+    )
+
+
 #: AADE's answer to a CancelInvoice of a MARK it does not show the cancel.
 _NOT_FOUND = (
     b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
@@ -2255,12 +2269,7 @@ class TestWhatAadesSandboxSaid:
             order, invoice = _registered_cod_receipt(
                 django_capture_on_commit_callbacks
             )
-            Invoice.objects.filter(pk=invoice.pk).update(
-                mydata_confirmed_at=timezone.now()
-                - timedelta(
-                    minutes=settings.MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES + 1
-                )
-            )
+            _past_the_retry_window(invoice)
             _staff_cancel(
                 order,
                 django_capture_on_commit_callbacks,
@@ -2333,3 +2342,139 @@ class TestWhatAadesSandboxSaid:
 
         assert aade.sent == []
         assert invoice.mydata_error_code == "BUILD"
+
+
+def _out_of_sight(order) -> list[str]:
+    return [note for note in _notes(order) if "cannot see receipt" in note]
+
+
+def _admin_request():
+    request = RequestFactory().post("/admin/order/order/")
+    request.user = UserAccountFactory(is_staff=True, is_superuser=True)
+    request.session = {}
+    request._messages = FallbackStorage(request)
+    return request
+
+
+@pytest.mark.usefixtures("dispatch_point")
+class TestAReceiptMyDataCannotSee:
+    """AADE answers the cancel with 301 long after the registration and
+    does not list the receipt either: the store's current credentials do
+    not reach it (a VAT or credentials change, sandbox against
+    production). It may be registered, or canceled, under others, so it
+    is held for staff: never credited on its own, never asked again."""
+
+    def _held(self, django_capture_on_commit_callbacks):
+        order, invoice = _registered_cod_receipt(
+            django_capture_on_commit_callbacks
+        )
+        _past_the_retry_window(invoice)
+        _staff_cancel(
+            order,
+            django_capture_on_commit_callbacks,
+            settle=False,
+            return_value=True,
+        )
+        with (
+            patch(
+                "order.accounting.mydata.client.MyDataClient.cancel_invoice",
+                return_value=_NOT_FOUND,
+            ) as cancel,
+            _listing_patch(return_value=_listing()),
+        ):
+            assert settle_canceled_receipt(order.id) == "held_for_staff"
+            assert settle_canceled_receipt(order.id) == "held_for_staff"
+        assert cancel.call_count == 1
+        invoice.refresh_from_db()
+        return order, invoice
+
+    def test_it_is_held_for_staff_with_one_note_and_leaves_the_sweep(
+        self, django_capture_on_commit_callbacks
+    ):
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = self._held(django_capture_on_commit_callbacks)
+            _untouched_for_a_while(invoice)
+            with patch.object(settle_canceled_receipt, "apply_async") as queued:
+                assert retry_receipts_with_mydata() == 0
+
+        queued.assert_not_called()
+        invoice.refresh_from_db()
+        assert invoice.cancel_held_for_staff_at is not None
+        assert invoice.cancel_requested_at is not None
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert aade.cancelled == []
+        assert aade.credits == []
+        assert len(_out_of_sight(order)) == 1
+
+    def test_a_listing_that_does_not_answer_is_retried_not_held(
+        self, django_capture_on_commit_callbacks
+    ):
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            _past_the_retry_window(invoice)
+            _staff_cancel(
+                order,
+                django_capture_on_commit_callbacks,
+                settle=False,
+                return_value=True,
+            )
+            with patch(
+                "order.accounting.mydata.client.MyDataClient.cancel_invoice",
+                return_value=_NOT_FOUND,
+            ):
+                with (
+                    _listing_patch(side_effect=MyDataTransportError("timeout")),
+                    pytest.raises(MyDataTransportError),
+                ):
+                    settle_canceled_receipt(order.id)
+                invoice.refresh_from_db()
+                assert invoice.cancel_held_for_staff_at is None
+                assert _out_of_sight(order) == []
+                _untouched_for_a_while(invoice)
+                with patch.object(
+                    settle_canceled_receipt, "apply_async"
+                ) as queued:
+                    assert retry_receipts_with_mydata() == 1
+                queued.assert_called_once_with(args=[order.id])
+
+                with _listing_patch(return_value=_listing()):
+                    assert settle_canceled_receipt(order.id) == (
+                        "held_for_staff"
+                    )
+
+        assert aade.credits == []
+        assert len(_out_of_sight(order)) == 1
+
+    def test_staff_cancel_it_in_mydata(
+        self, django_capture_on_commit_callbacks
+    ):
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = self._held(django_capture_on_commit_callbacks)
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderAdmin(Order, AdminSite()).cancel_mydata_invoice_now(
+                    _admin_request(), object_id=order.pk
+                )
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.CANCELED
+        assert aade.cancelled == [invoice.mydata_mark]
+        assert aade.credits == []
+
+    def test_staff_issue_its_credit_documents(
+        self, django_capture_on_commit_callbacks
+    ):
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = self._held(django_capture_on_commit_callbacks)
+            with django_capture_on_commit_callbacks(execute=True):
+                OrderAdmin(Order, AdminSite()).issue_credit_documents_now(
+                    _admin_request(), object_id=order.pk
+                )
+
+        invoice.refresh_from_db()
+        assert invoice.cancel_requested_at is None
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert aade.cancelled == []
+        assert len(aade.credits) == 1
+        assert any("staff issued its credit" in n for n in _notes(order))

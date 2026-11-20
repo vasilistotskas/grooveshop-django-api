@@ -431,6 +431,17 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             "the parcel."
         ),
     )
+    cancel_held_for_staff_at = models.DateTimeField(
+        _("Cancel Held For Staff At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the cancel of this receipt stopped for staff: myDATA "
+            "shows it neither to the cancel (error 301) nor in the list of "
+            "the store's documents, so its state there is unknown. Staff "
+            "cancel it in myDATA or issue its credit documents."
+        ),
+    )
     currency = models.CharField(
         _("Currency"),
         max_length=10,

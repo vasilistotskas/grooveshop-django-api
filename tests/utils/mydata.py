@@ -18,6 +18,8 @@ from typing import Self
 from unittest import mock
 from xml.etree.ElementTree import fromstring
 
+from extra_settings.models import Setting
+
 from order.accounting.mydata.config import MyDataConfig
 
 AADE_NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
@@ -59,22 +61,21 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         "order.signals.handlers.load_mydata_config",
         "order.accounting.invoicing.load_mydata_config",
     )
-    from emails import gates
+    # The receipt and credit emails are gated on the store's switch, read
+    # through ``Setting.get`` like every store setting.
+    read_setting = Setting.get
 
-    store_setting = gates.store_setting
-
-    def setting_as_configured(name: str):
-        # The receipt and credit emails are gated on the store's switch.
-        return (
-            config.enabled if name == "MYDATA_ENABLED" else store_setting(name)
-        )
+    def setting_as_configured(name: str, default=None):
+        if name == "MYDATA_ENABLED":
+            return config.enabled
+        return read_setting(name, default=default)
 
     with ExitStack() as stack:
+        stack.enter_context(
+            mock.patch.object(Setting, "get", side_effect=setting_as_configured)
+        )
         for target in targets:
             stack.enter_context(mock.patch(target, return_value=config))
-        stack.enter_context(
-            mock.patch.object(gates, "store_setting", setting_as_configured)
-        )
         stack.enter_context(
             mock.patch(
                 "order.accounting.mydata.service._resolve_issuer_vat",

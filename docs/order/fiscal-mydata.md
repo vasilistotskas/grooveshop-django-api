@@ -239,7 +239,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   sandbox on 2026-11-20); that requirement is the ground for sending them,
   and they are sent nowhere else. They are stored with the block
   (`Invoice.movement`), which the staging refresh scrubs
-  (`devtools/anonymise/rules.py`, `order.Invoice`), like the receipt's
+  (`src/devtools/anonymise/rules.py`, `order.Invoice`), like the receipt's
   `buyer_snapshot`.
 - **When it is issued.** The order is issuable before it ships
   (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, and the

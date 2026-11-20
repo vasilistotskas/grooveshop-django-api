@@ -3,6 +3,222 @@
 
 
 
+## v3.255.2 (2026-11-20)
+
+### Bug fixes
+
+* fix(tenant): no in-app notification or account link for shoppers of a store without accounts (#761) ([`1dac236`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dac236b77bd077440a562ca638c20f42280e818))
+
+* fix(tenant): no in-app notification or account link for shoppers of a store without accounts
+
+On a store with CUSTOMER_ACCOUNTS_ENABLED off no shopper can sign in, so
+nobody reads an in-app notification there, and a kept one would come back
+as a backlog once accounts are on again. create_user_notification, the one
+writer of every in-app notification (order, ACS, BOX NOW, loyalty,
+favourites, blog), now writes none for such a shopper and returns None.
+A store team member is a platform identity and is still notified.
+
+The newsletter form stays on such a store, so the "already subscribed"
+mail is still sent for an address an account holds; it no longer links to
+/account/subscriptions/, which that store answers 404.
+
+Part of #198. ([`1dac236`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dac236b77bd077440a562ca638c20f42280e818))
+
+* fix(order): a live order notification on a store without accounts reports skipped, not sent
+
+The order's live-notification tasks loaded the order, called
+create_user_notification and returned "sent". On a store with customer
+accounts off that writer now writes nothing, so the tasks reported a
+notification that never existed. _load_order, which every one of them goes
+through, now also stops at an order served as a guest's
+(Order.served_as_guest: no account, or accounts off), logs why, and the
+task returns "skipped".
+
+Part of #198. ([`1dac236`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dac236b77bd077440a562ca638c20f42280e818))
+
+* fix(order): an order notification task reports skipped when the writer wrote nothing ([`1dac236`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dac236b77bd077440a562ca638c20f42280e818))
+
+* fix(tenant): reach suspended stores in include_suspended fan-outs (#758) ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(tenant): reach suspended stores in include_suspended fan-outs
+
+run_for_all_tenants(..., include_suspended=True) always required
+is_active=True, and suspend_tenant sets is_active=False, so the flag
+matched no suspended store. The retention sweeps, the pending-refund
+reconcile, the credit allocation, the BoxNow creation settle and the
+courier cancel sweep never ran for one.
+
+The fan-out now reads the lifecycle state through a Tenant queryset:
+Tenant.objects.active() (not suspended, not switched off) without the
+flag, Tenant.objects.stores() (every store, suspended ones included)
+with it. A store being removed needs no state of its own: destroy_tenant
+drops the schema and deletes the row in one transaction, so every row
+read has its schema.
+
+The one gap is a task queued for a suspended store whose destroy commits
+before a worker takes it. TenantTask then finds no row, and its bare
+schema fallback would put the search path on a missing schema, so the
+task would act on public's tables of every app the two schemas share.
+A schema destroy_tenant recorded in TenantArchive is now not run.
+
+The agent outbox sweep now reaches suspended stores too, where
+_store_is_active holds their events with no attempt spent.
+
+Closes #753 ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(tenant): run the deploy backfills in suspended stores too
+
+backfill_recommendation_slots (a PreSync step) and
+backfill_extra_settings_defaults brought only active stores up to date
+with the code. A store suspended through a few deploys came back
+without the slot rows and setting rows those releases added. Both only
+create missing rows in the store's own schema and start no work, the
+same reasoning as the retention sweeps, so they now read
+Tenant.objects.stores().
+
+meilisearch_apply_settings --all-tenants stays on the active stores:
+it calls Meilisearch for each store, and a suspended store's index is
+not kept in sync either. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(notification): reach suspended stores when deleting expired notifications
+
+Deleting expired notifications is a retention sweep, and every retention
+sweep reaches suspended stores: a store's billing state does not pause a
+deletion the platform promised. fanout_clear_expired_notifications now
+passes include_suspended=True. expire_notifications, the command its
+task runs, sets include_suspended_stores so that --all-tenants does the
+same. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(meta_capi): send no Conversions API events for a suspended store
+
+Refunds reconciled for a suspended store now fire order_refunded. The
+refund email and the myDATA credit document are owed to the customer
+and still go out; a marketing event is not owed, so is_capi_enabled
+returns False for a suspended store (new Tenant.is_suspended).
+
+Also corrects the tenant/celery.py comments: the archive skip covers
+only a task that starts after destroy_tenant commits. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(tenant): wait for a store's running tasks before destroying it
+
+include_suspended fan-outs now run tasks in suspended stores, the only
+ones that can be destroyed. A destroy that committed between two of a
+task's transactions left the task's next query with the search path
+`<dropped>, public`: a retention sweep's next batch deleted public's
+admin log or email log rows by the store's own retention window.
+
+TenantTask holds a shared advisory lock on its store while it runs
+(tenant.celery.holding_store): the session's in autocommit, the
+transaction's inside one. destroy_tenant takes it exclusively first and
+waits up to DESTROY_TASKS_WAIT for the running tasks; after that it
+refuses with DestroyRefused("busy"), which the platform API answers as
+tenant_destroy_busy. A task that starts during the destroy waits, then
+finds no row and is skipped (TenantArchive).
+
+The API reads the refusal from DestroyRefused instead of re-judging the
+row, so it no longer answers tenant_destroy_invalid. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(tenant): refuse before the task wait, and reach a reactivated store's search
+
+destroy_tenant judges the gates on the current row before it waits for
+the store's tasks, so a protected or live store is refused at once with
+its gate instead of busy after DESTROY_TASKS_WAIT; the row is judged
+again under lock after the wait. The wait is taken before the row lock.
+
+hold_store_for_destroy turns statement_timeout off for its one lock
+statement: outside CI the connection's statement_timeout (30 s) equals
+the wait, so the wait could end as QueryCanceled instead of a refusal.
+Both timeouts are put back.
+
+The psycopg pool gets a reset that runs pg_advisory_unlock_all(): Django's
+close() returns the server session to the pool, so a task that closed
+its connection mid-run left its session-level store lock on a pooled
+session, and a later destroy of that store waited for it.
+
+activate_tenant queues sync_meilisearch_indexes for a store it brings back
+from suspension: the deploy's settings and the daily sync reach active
+stores only, and the sync applies each index's settings before its
+documents. Tests record a queued sync instead of running it, since the
+sync closes the connection inside a transaction.
+
+seed_all's public-schema guard refuses while any store exists, suspended
+ones included. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* fix(tenant): hold a task's store lock on a session of its own
+
+A TenantTask held its store's shared advisory lock on the task's own
+connection. A task that closed that connection mid-run
+(meilisearch_sync_all_indexes does) lost the lock with it, through the
+pool's reset or the end of the session, and a destroy could then drop the
+schema under the rest of the task. The lock statement also ran under the
+worker connection's 30 s statement_timeout, so a task that started during
+a long destroy failed with QueryCanceled instead of being skipped.
+
+holding_store now takes the lock on a dedicated session, opened for the
+task and closed when it ends, with statement_timeout and lock_timeout off.
+The destroy bounds that wait: DESTROY_TASKS_WAIT, then its own
+transaction under the connection's timeouts.
+
+The connection pool's reset, added for the old design, is removed. With a
+reset psycopg_pool returns every connection on a pool worker thread, and
+at a prefork worker's task boundaries, where Celery's Django fixup closes
+the pool, the queued return was dropped and its server session stayed
+open until the connection object was freed. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+### Refactoring
+
+* refactor(tenant): read the active-store rule from Tenant.objects
+
+"Active and not suspended" was written out by hand in eleven store
+filters: the Viva, BoxNow and Stripe webhook resolvers, the billing
+cycle, the Resend setup guard, the demo-store reset, bootstrap_stripe,
+and the tenant-wide management commands. The Viva resolvers also spelled
+out its complement, "suspended or switched off". They now read
+Tenant.objects.active() and the new Tenant.objects.unavailable(), so the
+rule lives in TenantQuerySet alone.
+
+The management commands that filtered on is_active alone now also leave
+out a store with is_active set and suspended_at stamped. The lifecycle
+never produces that row: activate_tenant clears both fields together. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* refactor(core): decide per tenant command whether it reaches suspended stores
+
+TenantCommandMixin gains include_suspended_stores. With it set,
+--all-tenants selects Tenant.objects.stores(); otherwise it selects
+Tenant.objects.active(). It is set on the commands that only bring a
+store's own data up to date with the code:
+
+- the snapshot and allocation backfills
+- the builder document, media and backup commands, which read the
+  storefront's tenant-free block catalogue and nothing else
+- normalise_rich_text
+
+A store suspended through a few releases then comes back with what those
+releases wrote, as it does with the retention sweeps.
+
+The Meilisearch commands, the ACS reconciles, mydata_readiness and
+expire_notifications keep active stores only. They call a service per
+store, start work through order signals, report rather than backfill,
+or follow their beat fan-out.
+
+The two deploy backfills read the same attribute through
+target_stores(), so the rule lives in the mixin. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+### Testing
+
+* test(tenant): a destroy waits for a task that closed its own connection
+
+A real TenantTask closes its connection and pauses: destroy_tenant is
+refused busy until the task ends, then goes ahead. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
+* test(tenant): prove the task waited out the destroy
+
+The destroy now commits only once the task's lock request shows as an
+ungranted ShareLock in pg_locks, then holds on past both connection
+timeouts, and the test asserts that wait was seen. A timer could fire
+before the task asked for the lock, and the test then passed without any
+wait. ([`5ad9e20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ad9e20be7002c87cb5ef9f4d0920532b4bbe281))
+
 ## v3.255.1 (2026-11-20)
 
 ### Bug fixes

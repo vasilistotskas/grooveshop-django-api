@@ -56,7 +56,7 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from cart.agent_token import cart_token_from_request, hash_cart_token
-from cart.services import cart_uuid_from_request
+from core.cart_id import cart_uuid_from_request
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)

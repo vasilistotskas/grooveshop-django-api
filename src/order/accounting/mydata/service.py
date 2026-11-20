@@ -42,7 +42,7 @@ from core.store_settings import store_setting
 from order.accounting.movement import ReceiptMovement, receipt_movement
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
-from order.accounting.mydata.config import load_config
+from order.accounting.mydata.config import MyDataConfig, load_config
 from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
@@ -118,7 +118,9 @@ def submit_document(invoice: Any) -> ResponseRow | None:
     look_up = True
     while True:
         if look_up:
-            verdict = _look_up_before_sending(invoice)
+            verdict = _look_up_before_sending(
+                invoice, config=config, issuer_vat=issuer_vat
+            )
             if verdict is MarkLookup.FOUND:
                 return _registered_row(invoice)
             look_up = False
@@ -209,13 +211,17 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         response = parse_response_doc(client.send_invoices(built.xml_bytes))
     except MyDataTransportError as exc:
         # No answer, or none that can be read (an empty or cut-off body).
-        _persist_send_error(invoice, code=ERROR_NO_ANSWER, message=exc.message)
+        _persist_send_error(
+            invoice, code=ERROR_NO_ANSWER, message=exc.message, config=config
+        )
         raise
     except MyDataAuthError as exc:
         # AADE refused the credentials, so the document was not taken in:
         # recorded, so the sweep leaves it to staff instead of resending it
         # as a send whose answer was lost.
-        _persist_send_error(invoice, code=exc.code, message=exc.message)
+        _persist_send_error(
+            invoice, code=exc.code, message=exc.message, config=config
+        )
         raise
     row = response.first()
 
@@ -240,7 +246,9 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # recovered via RequestTransmittedDocs.
         if not _persist_failure(invoice, code=code, message=message):
             return _registered_row(invoice)
-        if recover_mark_for_document(invoice):
+        if recover_mark_for_document(
+            invoice, config=config, issuer_vat=issuer_vat
+        ):
             return _registered_row(invoice)
         raise MyDataDuplicateError(message, code=code)
 
@@ -256,6 +264,7 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             invoice,
             code=ERROR_NO_ANSWER,
             message=message or "AADE TechnicalError",
+            config=config,
         )
         raise MyDataTransportError(message or "AADE TechnicalError", code=code)
 
@@ -276,7 +285,9 @@ def _registered_row(invoice: Any) -> ResponseRow:
     )
 
 
-def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
+def _persist_send_error(
+    invoice: Any, *, code: str, message: str, config: MyDataConfig
+) -> None:
     """Record why the send just made has no registration, the status left
     SUBMITTED: ``ERROR_NO_ANSWER`` when AADE did not answer (or not
     readably), so it may be registered, the next send first looks its MARK
@@ -297,9 +308,13 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
     AADE's loss-of-connection indication (``transmissionFailure``,
     ``Invoice.transmission_failed_at``) belongs to a receipt with movement
     whose parcel left without a MARK because myDATA did not answer:
-    stamped here when the parcel left before this send while a send of it
-    is undecided and none is in flight, by
-    ``movement.parcel_left_unregistered`` when it leaves after."""
+    stamped here when the parcel left before this answer while a send of it
+    is undecided and none may still be in flight (the latest one ended:
+    this one, one AADE answered, or one past its window,
+    ``MyDataConfig.send_window``), whichever send owns the row's outcome;
+    by ``movement.parcel_left_unregistered`` when it leaves after."""
+    from order.models.invoice import MyDataStatus
+
     attempt = invoice.mydata_sent_at
     with transaction.atomic():
         locked = (
@@ -324,15 +339,23 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
                 "mydata_error_message",
                 "updated_at",
             ]
-            if (
-                locked.mydata_unanswered_since is not None
-                and getattr(locked, "movement", None)
-                and locked.transmission_failed_at is None
-                and locked.order.shipped_at is not None
-            ):
-                locked.transmission_failed_at = timezone.now()
-                fields.append("transmission_failed_at")
-                invoice.transmission_failed_at = locked.transmission_failed_at
+        now = timezone.now()
+        another_in_flight = (
+            not latest
+            and locked.mydata_status == MyDataStatus.SUBMITTED
+            and locked.mydata_error_code == ""
+            and now < locked.mydata_sent_at + config.send_window
+        )
+        if (
+            locked.mydata_unanswered_since is not None
+            and not another_in_flight
+            and getattr(locked, "movement", None)
+            and locked.transmission_failed_at is None
+            and locked.order.shipped_at is not None
+        ):
+            locked.transmission_failed_at = now
+            fields.append("transmission_failed_at")
+            invoice.transmission_failed_at = now
         if fields:
             locked.save(update_fields=fields)
     if latest:
@@ -341,16 +364,24 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
 
 
-def _look_up_before_sending(invoice: Any) -> MarkLookup | None:
+def _look_up_before_sending(
+    invoice: Any, *, config: MyDataConfig, issuer_vat: str
+) -> MarkLookup | None:
     """Look the MARK of *invoice* up before it is built and sent again, when
     it may be registered: its latest send has no answer yet (SUBMITTED, with
     a uid: unanswered, or its sender stopped mid-request), or an earlier one
     went unanswered and nothing decided it since
     (``mydata_unanswered_since``, whatever refused a later send). ``None``
-    when nothing of it can be registered. What the lookup concludes of the
-    send the row records (``mydata_sent_at``) is written with the next
-    write that replaces it (:func:`_settle_the_last_send`), and only if no
-    other send began since."""
+    when nothing of it can be registered. Asked with the *config* and
+    *issuer_vat* the resend goes with.
+
+    Finding nothing decides only sends that could no longer register when
+    AADE was asked: one whose window (``MyDataConfig.send_window``) had
+    not passed may still land after the listing was read, so the verdict
+    is ``UNKNOWN`` then. What the lookup concludes of the send the row
+    records (``mydata_sent_at``) is written with the next write that
+    replaces it (:func:`_settle_the_last_send`), and only if no other send
+    began since."""
     from order.models.invoice import MyDataStatus
 
     if not invoice.mydata_uid or (
@@ -358,14 +389,22 @@ def _look_up_before_sending(invoice: Any) -> MarkLookup | None:
         and invoice.mydata_unanswered_since is None
     ):
         return None
+    asked_at = timezone.now()
     try:
-        return look_up_mark(invoice)
+        verdict = look_up_mark(invoice, config=config, issuer_vat=issuer_vat)
     except MyDataAuthError as exc:
         # AADE refused the credentials the lookup asked with: that says
         # nothing of the document, which stays as it is (and stamped when
         # its parcel leaves).
         _persist_lookup_refusal(invoice, message=exc.message)
         raise
+    if (
+        verdict is MarkLookup.ABSENT
+        and invoice.mydata_sent_at is not None
+        and asked_at < invoice.mydata_sent_at + config.send_window
+    ):
+        return MarkLookup.UNKNOWN
+    return verdict
 
 
 def _settle_the_last_send(locked: Any, verdict: MarkLookup | None) -> list[str]:
@@ -581,7 +620,12 @@ class MarkLookup(Enum):
     UNKNOWN = "unknown"
 
 
-def recover_mark_for_document(invoice: Any) -> bool:
+def recover_mark_for_document(
+    invoice: Any,
+    *,
+    config: MyDataConfig | None = None,
+    issuer_vat: str | None = None,
+) -> bool:
     """Attempt to recover a MARK for an invoice that received error 228.
 
     Error 228 means AADE already has our ``uid`` registered under a MARK
@@ -589,12 +633,21 @@ def recover_mark_for_document(invoice: Any) -> bool:
     received). Returns ``True`` when the MARK was recovered and the
     invoice flipped to ``CONFIRMED`` (:func:`look_up_mark`), ``False``
     otherwise; the caller (``send_invoice_to_mydata``) keeps the existing
-    ``REJECTED`` state and manual-reconciliation path then.
+    ``REJECTED`` state and manual-reconciliation path then. The send that
+    got the 228 passes its own *config* and *issuer_vat*.
     """
-    return look_up_mark(invoice) is MarkLookup.FOUND
+    return (
+        look_up_mark(invoice, config=config, issuer_vat=issuer_vat)
+        is MarkLookup.FOUND
+    )
 
 
-def look_up_mark(invoice: Any) -> MarkLookup:
+def look_up_mark(
+    invoice: Any,
+    *,
+    config: MyDataConfig | None = None,
+    issuer_vat: str | None = None,
+) -> MarkLookup:
     """Ask AADE whether it holds *invoice* under its uid:
     ``RequestTransmittedDocs`` scoped to the invoice's issue date ± 1 day
     and our entity VAT, and the single transmitted doc whose ``uid``
@@ -610,6 +663,10 @@ def look_up_mark(invoice: Any) -> MarkLookup:
     VAT or issue date to look up with, a transport error during the
     query, several matches (a uid collision, which should never happen),
     or a match without a MARK.
+
+    A lookup made for a send asks with that send's *config* and
+    *issuer_vat*, so it reads the AADE environment and VAT the send goes
+    to; a lookup on its own reads them now.
     """
     uid_to_find = getattr(invoice, "mydata_uid", "") or ""
     if not uid_to_find:
@@ -620,7 +677,8 @@ def look_up_mark(invoice: Any) -> MarkLookup:
         )
         return MarkLookup.UNKNOWN
 
-    config = load_config()
+    if config is None:
+        config = load_config()
     if not config.is_ready():
         logger.debug(
             "recover_mark_for_invoice: myDATA not ready, skipping recovery "
@@ -629,7 +687,8 @@ def look_up_mark(invoice: Any) -> MarkLookup:
         )
         return MarkLookup.UNKNOWN
 
-    issuer_vat = _resolve_issuer_vat()
+    if issuer_vat is None:
+        issuer_vat = _resolve_issuer_vat()
     if not issuer_vat:
         logger.warning(
             "recover_mark_for_invoice: INVOICE_SELLER_VAT_ID is empty, "
@@ -773,8 +832,8 @@ def _build_document(
 
 
 def _resolve_issuer_vat() -> str:
-    """Read the seller VAT from extra_settings. Kept separate so
-    tests can monkey-patch without spinning the whole config stack."""
+    """The seller VAT the store issues its documents under
+    (``INVOICE_SELLER_VAT_ID``)."""
     return str(store_setting("INVOICE_SELLER_VAT_ID") or "")
 
 

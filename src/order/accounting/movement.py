@@ -31,11 +31,10 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import asdict, dataclass, replace
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
@@ -245,17 +244,28 @@ def moving_goods(order: Any) -> tuple[MovingGoods, ...]:
     )
 
 
-def refused_for_its_content(invoice: Any) -> bool:
+def refused_for_its_content(
+    invoice: Any, *, nothing_registered: bool = False
+) -> bool:
     """Whether AADE refused *invoice* for what it says (a validation code,
     or our own check before sending: ``BUILD``, ``XSD``), so nothing of it
     was registered and it may be built anew. Error 228 is no such refusal:
-    AADE holds the document under that uid already, as it was sent."""
+    AADE holds the document under that uid already, as it was sent.
+
+    A refusal answers one send only: while an earlier one is undecided
+    (``mydata_unanswered_since``) AADE may hold the document as issued,
+    so it is kept as issued, unless a lookup has just found nothing under
+    its uid (*nothing_registered*)."""
     from order.accounting.mydata.types import ERROR_DUPLICATE_UID
     from order.models.invoice import MyDataStatus
 
     return (
         invoice.mydata_status == MyDataStatus.REJECTED
         and invoice.mydata_error_code != ERROR_DUPLICATE_UID
+        and (
+            nothing_registered
+            or getattr(invoice, "mydata_unanswered_since", None) is None
+        )
     )
 
 
@@ -285,13 +295,23 @@ def receipt_movement(
     AADE has. One whose parcel left unregistered
     (``transmission_failed_at``) keeps its date, above.
 
+    A refused one is built anew, unless an earlier send of it is undecided
+    (:func:`refused_for_its_content`): it is then sent as issued, even
+    after AADE refused that send's past date (error 280), and stays
+    followed (``movement.sends_without_an_answer``) until a lookup decides
+    the earlier send: found, it is registered as issued; nothing found
+    (once that send can no longer land, ``MyDataConfig.send_window``), it
+    is dated today as above.
+
     Raises ``ValueError`` when the pickup point's address is not known.
     """
     from order.models.invoice import MyDataStatus
 
     today = timezone.localdate()
     if invoice.mydata_status != MyDataStatus.NOT_SENT and (
-        not refused_for_its_content(invoice)
+        not refused_for_its_content(
+            invoice, nothing_registered=nothing_registered
+        )
     ):
         # Sent before, and it may be registered as it was: a plain receipt
         # stays plain, one with movement keeps its block.
@@ -436,19 +456,18 @@ def sends_without_an_answer(invoices: Any) -> Any:
     stopped mid-request (a worker killed during the call), which leaves
     them SUBMITTED with no code at all.
 
-    Never one whose latest send is in flight right now, which looks like a
-    stopped one until ``MYDATA_RETRY_AFTER_MINUTES`` passed since that send
-    began (``mydata_sent_at``): the send's own start, never the row's last
-    write, which setting a receipt aside for a cancel or the sweep's touch
-    moves. Every reader of "may be registered, not answered" goes through
+    Never one whose latest send may still be in flight, which looks like a
+    stopped one until its window passed since that send began
+    (``MyDataConfig.send_window`` from ``mydata_sent_at``): the send's own
+    start, never the row's last write, which setting a receipt aside for a
+    cancel or the sweep's touch moves. Every reader of "may be registered, not answered" goes through
     here: the sweep, the stamp when a parcel leaves
     (:func:`unanswered_sends`), and a receipt released from its cancel
     hold."""
+    from order.accounting.mydata.config import load_config
     from order.models.invoice import MyDataStatus
 
-    stalled_before = timezone.now() - timedelta(
-        minutes=settings.MYDATA_RETRY_AFTER_MINUTES
-    )
+    stalled_before = timezone.now() - load_config().send_window
     no_answer_on_record = Q(
         mydata_status=MyDataStatus.SUBMITTED, mydata_error_code=""
     )

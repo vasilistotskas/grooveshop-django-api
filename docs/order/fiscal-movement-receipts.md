@@ -148,8 +148,16 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   unanswered (`mydata_error_code` `NO_ANSWER`, status SUBMITTED) and
   undecided (`Invoice.mydata_unanswered_since`, from the send's start). A
   send whose worker stopped mid-request is left SUBMITTED with no code, and
-  counts as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed since that
-  send began (`Invoice.mydata_sent_at`, never the row's last write).
+  counts as unanswered once its window passed since that send began
+  (`Invoice.mydata_sent_at`, never the row's last write).
+  **A send's window** (`MyDataConfig.send_window`) is the one rule for
+  whether a send has ended: the client's `MYDATA_REQUEST_TIMEOUT_SECONDS`
+  to connect and as long again for AADE's answer to start, plus
+  `MYDATA_RETRY_AFTER_MINUTES` as the margin in which AADE may still finish
+  a request whose client gave up. Within it a send with no answer on record
+  is in flight (never resent, never stamped), and a lookup that finds
+  nothing does not decide it: it may still register after the listing was
+  read.
   **Undecided is a fact on the row, not an error code**: it is kept through
   every later error (a resend refused for the store's credentials or for
   its content), and cleared only when AADE answers a send (it registers it,
@@ -159,7 +167,11 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   from its cancel hold): an undecided receipt of any status, or one whose
   sender stopped, never one whose latest send is in flight. One whose
   credentials or content AADE refused with nothing undecided keeps AADE's
-  code and waits for staff.
+  code and waits for staff; one refused while an earlier send is
+  undecided is sent again as issued, its block unchanged even after a 280
+  for its past date, until a lookup decides the earlier send (found: it is
+  registered as issued; nothing, once that send's window passed: it is
+  dated today).
   **Every result belongs to one send.** A send is named by its start
   (`mydata_sent_at`), and every result is written with a compare-and-set
   on it: an answer, a refusal or a lookup's verdict reaches the row's
@@ -171,7 +183,8 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   up again.
   Before any document that may be registered is sent again (SUBMITTED, or
   undecided) its MARK is looked up (`service.look_up_mark`:
-  `RequestTransmittedDocs` by its uid, the 228 recovery); what the lookup
+  `RequestTransmittedDocs` by its uid, the 228 recovery), asked with the
+  AADE configuration and seller VAT the resend goes with; what the lookup
   concludes of the send the row records is written with the claim of the
   resend, so a lookup that cannot decide keeps that send undecided.
   Credentials AADE refuses there are recorded as a message only, so a

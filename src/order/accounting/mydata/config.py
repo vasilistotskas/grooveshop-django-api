@@ -26,6 +26,7 @@ that is neither is refused (the store is not ready), never guessed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Literal
 
 from django.conf import settings
@@ -118,6 +119,21 @@ class MyDataConfig:
             and (self.fhm_exemption_ground or self.issues_to_sandbox_only)
             and self.user_id
             and self.subscription_key
+        )
+
+    @property
+    def send_window(self) -> timedelta:
+        """How long after it began a send to AADE may still register: the
+        one rule for whether a send has ended. :class:`MyDataClient` gives
+        up after ``request_timeout_seconds`` to connect and as long again
+        for AADE's answer to start, and ``MYDATA_RETRY_AFTER_MINUTES``
+        past that is the margin in which nothing is concluded of it (AADE
+        may finish a request whose client gave up, and its worker may still
+        be recording the answer). Within it a send with no answer on record
+        is in flight, and a lookup that finds nothing does not decide it."""
+        return timedelta(
+            seconds=2 * self.request_timeout_seconds,
+            minutes=settings.MYDATA_RETRY_AFTER_MINUTES,
         )
 
     def issues_automatically(self) -> bool:

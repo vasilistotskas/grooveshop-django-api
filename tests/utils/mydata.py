@@ -1,9 +1,11 @@
 """The myDATA boundary, for tests that issue retail documents.
 
-``mydata_enabled`` makes the integration read as enabled and configured (the
-config loader and the seller VAT are the seams the service documents as
-patchable); ``issuable`` turns an order into one the platform issues a
-receipt for; ``FakeAade`` is AADE's ``SendInvoices`` / ``CancelInvoice``: it
+``mydata_enabled`` makes the integration read as enabled and configured: the
+config loader, which joins the store's settings with its credentials on the
+tenant row, is the seam the service documents as patchable, and the store
+settings read beside it come through ``Setting.get``; ``issuable`` turns an
+order into one the platform issues a receipt for; ``FakeAade`` is AADE's
+``SendInvoices`` / ``CancelInvoice``: it
 records every payload it receives, parsed, and answers each with a Success
 carrying a new MARK. Nothing here reaches the network.
 """
@@ -23,6 +25,8 @@ from extra_settings.models import Setting
 from order.accounting.mydata.config import MyDataConfig
 
 AADE_NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
+#: The seller VAT the store issues under (``INVOICE_SELLER_VAT_ID``).
+ISSUER_VAT = "123456789"
 FIRST_MARK = 400000000000001
 
 READY_CONFIG = MyDataConfig(
@@ -61,13 +65,18 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         "order.signals.handlers.load_mydata_config",
         "order.accounting.invoicing.load_mydata_config",
     )
-    # The receipt and credit emails are gated on the store's switch, read
-    # through ``Setting.get`` like every store setting.
+    # The store settings the integration reads, through ``Setting.get``
+    # like every store setting: the switch the receipt and credit emails
+    # are gated on, and the seller VAT every document is issued under.
     read_setting = Setting.get
+    configured = {
+        "MYDATA_ENABLED": config.enabled,
+        "INVOICE_SELLER_VAT_ID": ISSUER_VAT,
+    }
 
     def setting_as_configured(name: str, default=None):
-        if name == "MYDATA_ENABLED":
-            return config.enabled
+        if name in configured:
+            return configured[name]
         return read_setting(name, default=default)
 
     with ExitStack() as stack:
@@ -76,12 +85,6 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         )
         for target in targets:
             stack.enter_context(mock.patch(target, return_value=config))
-        stack.enter_context(
-            mock.patch(
-                "order.accounting.mydata.service._resolve_issuer_vat",
-                return_value="123456789",
-            )
-        )
         yield config
 
 

@@ -388,11 +388,31 @@ def _starting_in_time(
     invoice: Any, movement: ReceiptMovement
 ) -> ReceiptMovement:
     """*movement*, when its start falls within ``MOVEMENT_START_MAX_DAYS``
-    of the receipt's issue. A receipt sent so late that today is past that
-    cannot declare a start AADE accepts (error 280 refuses an earlier
-    date, the law a later one): it raises ``ValueError``, a BUILD refusal
-    that stops it for staff (an order note, the "Receipts rejected by
-    myDATA" counter) instead of sending a pair of dates that is wrong."""
+    of the receipt's issue and is not after the parcel left. A receipt sent
+    so late that today is past that cannot declare a start AADE accepts
+    (error 280 refuses an earlier date, the law a later one): it raises
+    ``ValueError``, a BUILD refusal that stops it for staff (an order note,
+    the "Receipts rejected by myDATA" counter) instead of sending a pair of
+    dates that is wrong.
+
+    A block built on a later day than the parcel left (a receipt AADE
+    refused for its content, corrected after the pickup) would declare a
+    start after the movement happened. One sent under the loss-of-
+    connection procedure (``transmission_failed_at``) declares the day it
+    left, a past date AADE takes on such a document; any other is the same
+    BUILD refusal, for staff and the store's accountant."""
+    shipped_at = invoice.order.shipped_at
+    left = timezone.localdate(shipped_at) if shipped_at else None
+    if left is not None and left < movement.dispatch_date:
+        if invoice.transmission_failed_at is None:
+            raise ValueError(
+                f"the parcel of receipt {invoice.invoice_number} left on "
+                f"{left}, before the receipt was registered, and a movement "
+                "declared now cannot start then (AADE refuses a past "
+                "start, error 280) nor later than it did; ask the store's "
+                "accountant how to document it"
+            )
+        movement = replace(movement, dispatch_date=left)
     late = (movement.dispatch_date - invoice.issue_date).days
     if late > MOVEMENT_START_MAX_DAYS:
         raise ValueError(

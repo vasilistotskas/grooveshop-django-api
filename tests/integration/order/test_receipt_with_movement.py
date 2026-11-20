@@ -2548,3 +2548,33 @@ class TestCodeRabbitThirdReview:
         assert invoice.seller_snapshot["name"] == "Renamed"
         with invoice.document_file.open("rb") as stored:
             assert stored.read() == b"%PDF-1.4 newer"
+
+    def test_a_rebuild_never_declares_a_start_after_the_parcel_left(self):
+        """AADE refused it for its content and staff corrected it after the
+        pickup: built anew today it would start after the movement did."""
+        order = _acs_order()
+        yesterday = timezone.localdate() - timedelta(days=1)
+        type(order).objects.filter(pk=order.pk).update(
+            shipped_at=timezone.now() - timedelta(days=1)
+        )
+        order.refresh_from_db()
+        refused = Invoice(
+            order=order,
+            issue_date=yesterday,
+            movement={},
+            mydata_status=MyDataStatus.REJECTED,
+            mydata_error_code="BUILD",
+        )
+
+        with pytest.raises(ValueError, match="left on"):
+            receipt_movement(refused)
+        # Sent during a loss of connection, it declares the day it left.
+        refused.transmission_failed_at = timezone.now()
+        assert receipt_movement(refused).dispatch_date == yesterday
+        # Left today: built today, as before.
+        type(order).objects.filter(pk=order.pk).update(
+            shipped_at=timezone.now()
+        )
+        order.refresh_from_db()
+        refused.transmission_failed_at = None
+        assert receipt_movement(refused).dispatch_date == timezone.localdate()

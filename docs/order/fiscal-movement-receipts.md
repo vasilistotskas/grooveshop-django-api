@@ -78,7 +78,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   sends the document as issued, its dispatch date included, unless AADE
   refused it for its content (`movement.refused_for_its_content`: a
   validation code, `BUILD` or `XSD`; nothing was registered, so it is built
-  anew, dated the day it is sent). Error 228 is no such refusal: AADE holds
+  anew, dated the day it is sent, never after the day its parcel left
+  (`movement._starting_in_time`: one sent under the loss-of-connection
+  procedure declares that day, any other is a `BUILD` refusal for staff,
+  since AADE refuses a past start). Error 228 is no such refusal: AADE holds
   the document as it was sent. AADE does not apply error 280 to a
   `transmissionFailure` document, so one whose parcel left during an outage
   keeps its date. Every payload is checked against AADE's

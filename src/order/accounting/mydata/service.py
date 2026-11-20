@@ -824,7 +824,10 @@ def _drop_the_unregistered_pdf(locked: Any, fields: list[str]) -> None:
     name = locked.document_file.name
     locked.document_file = ""
     fields.append("document_file")
-    transaction.on_commit(lambda: storage.delete(name))
+    # robust: a file that cannot be removed is logged and left behind; the
+    # registration it follows stands, and the send goes on to render the
+    # registered PDF and email it.
+    transaction.on_commit(lambda: storage.delete(name), robust=True)
 
 
 def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:

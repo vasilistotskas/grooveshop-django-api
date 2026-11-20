@@ -2600,3 +2600,29 @@ class TestCodeRabbitThirdReview:
         [note] = [n for n in _notes(order) if "movement indication" in n]
         assert "address is not known" in note
         assert Invoice.objects.get(pk=invoice.pk).movement == invoice.movement
+
+    def test_a_pdf_that_cannot_be_removed_never_stops_the_registration(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The unregistered PDF is removed after the MARK is committed; a
+        storage error there is logged, and the send still renders the
+        registered PDF."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        assert Invoice.objects.get(pk=invoice.pk).has_document()
+
+        with (
+            mydata_enabled(),
+            FakeAade(),
+            patch(
+                "django.core.files.storage.FileSystemStorage.delete",
+                side_effect=OSError("read-only file system"),
+            ),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert send_invoice_to_mydata(order.id) is True
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_mark is not None
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert invoice.has_document()

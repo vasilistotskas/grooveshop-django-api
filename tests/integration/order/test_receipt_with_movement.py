@@ -2188,7 +2188,8 @@ class TestCodeRabbitSecondReview:
         ):
             assert retry_receipts_with_mydata() == 1
 
-        send.assert_called_once_with(args=[second.order_id])
+        send.assert_called_once()
+        assert send.call_args.kwargs["args"] == [second.order_id]
 
     def test_waiting_settles_take_turns_across_the_cooldown(
         self, django_capture_on_commit_callbacks, settings
@@ -2467,7 +2468,8 @@ class TestAReceiptMyDataCannotSee:
                     settle_canceled_receipt, "apply_async"
                 ) as queued:
                     assert retry_receipts_with_mydata() == 1
-                queued.assert_called_once_with(args=[order.id])
+                queued.assert_called_once()
+                assert queued.call_args.kwargs["args"] == [order.id]
 
                 with _listing_patch(return_value=_listing()):
                     assert settle_canceled_receipt(order.id) == (
@@ -2647,6 +2649,43 @@ class TestCodeRabbitThirdReview:
         ):
             assert retry_receipts_with_mydata() == 1
 
-        sent.assert_called_once_with(args=[order.id])
+        sent.assert_called_once()
+        assert sent.call_args.kwargs["args"] == [order.id]
         settled.assert_not_called()
         assert Invoice.objects.get(pk=invoice.pk).transmission_failed_at is None
+
+    def test_a_broker_that_is_down_never_stops_the_sweep(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Each settle it cannot publish is kept for later, and the sweep
+        goes on to the next instead of stopping at the first."""
+        from kombu.exceptions import OperationalError
+
+        from tenant.models import DeferredDispatch
+
+        held = []
+        with mydata_enabled(), FakeAade():
+            for _ in range(2):
+                _order, invoice = _registered_cod_receipt(
+                    django_capture_on_commit_callbacks
+                )
+                Invoice.objects.filter(pk=invoice.pk).update(
+                    cancel_requested_at=timezone.now()
+                )
+                _untouched_for_a_while(invoice)
+                held.append(invoice.order_id)
+
+        with (
+            mydata_enabled(),
+            patch.object(
+                settle_canceled_receipt,
+                "apply_async",
+                side_effect=OperationalError("broker unreachable"),
+            ),
+        ):
+            assert retry_receipts_with_mydata() == 2
+
+        kept = DeferredDispatch.objects.filter(
+            task_name=settle_canceled_receipt.name
+        )
+        assert sorted(row.args[0] for row in kept) == sorted(held)

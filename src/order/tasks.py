@@ -1536,15 +1536,17 @@ def retry_receipts_with_mydata() -> int:
     stamp_the_parcels_left_unregistered(
         Invoice.objects.filter(order_id__in=to_send)
     )
+    # A broker that is down keeps each one as a DeferredDispatch, and the
+    # sweep goes on to the next (``dispatch_on_commit``).
     for order_id in to_send:
-        send_invoice_to_mydata.apply_async(args=[order_id])
+        dispatch_on_commit(send_invoice_to_mydata, [order_id])
     # Touched, so a receipt still waiting (for the courier, for its MARK)
     # goes to the back and no batch of them keeps newer ones out.
     Invoice.objects.filter(order_id__in=to_cancel).update(
         updated_at=timezone.now()
     )
     for order_id in to_cancel:
-        settle_canceled_receipt.apply_async(args=[order_id])
+        dispatch_on_commit(settle_canceled_receipt, [order_id])
     if to_send or to_cancel:
         logger.warning(
             "Queued %s receipt(s) myDATA did not answer for and %s of "

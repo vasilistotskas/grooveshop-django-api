@@ -321,22 +321,21 @@ def receipt_movement(
             loading=_within_aade_limits(loading),
             delivery=_within_aade_limits(delivery),
             goods=moving_goods(order),
-            issuer=_issuer(),
+            issuer=_issuer(loading),
             recipient=_recipient(order),
         ),
     )
 
 
-def _issuer() -> MovementParty:
+def _issuer(loading: PostalAddress) -> MovementParty:
     """The store as the receipt names it: its name (``INVOICE_SELLER_NAME``,
-    the one the receipt prints) and, as its address, its dispatch point,
-    the establishment the parcel leaves from. AADE requires the issuer's
-    street number (error 204), which the store's own address, one free
-    line (``INVOICE_SELLER_ADDRESS_LINE_1``), does not hold apart. Raises
-    ``ValueError``, a BUILD refusal, while the name is blank."""
+    the one the receipt prints) and, as its address, its dispatch point
+    (*loading*, the establishment the parcel leaves from). AADE requires
+    the issuer's street number (error 204), which the store's own address,
+    one free line (``INVOICE_SELLER_ADDRESS_LINE_1``), does not hold apart.
+    Raises ``ValueError``, a BUILD refusal, while the name is blank."""
     name = str(store_setting(SELLER_SETTING_KEYS["name"]) or "").strip()
-    address = loading_address()
-    if not name or address is None:
+    if not name:
         raise ValueError(
             "a receipt with movement names the store, and its name "
             "(INVOICE_SELLER_NAME) is blank"
@@ -344,7 +343,7 @@ def _issuer() -> MovementParty:
     return MovementParty(
         name=name[:PARTY_NAME_MAX_LENGTH],
         country=ISSUER_COUNTRY,
-        address=_within_aade_limits(address),
+        address=_within_aade_limits(loading),
     )
 
 

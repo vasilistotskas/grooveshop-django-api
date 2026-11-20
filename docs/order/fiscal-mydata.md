@@ -189,8 +189,11 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   who takes no part in the digital movement process, §5.3 note 23).
   Never `withoutDigitalTransportTracking`: such a document is "Completed"
   at issue and AADE refuses to cancel it (error 801), which a cancel before
-  the pickup needs. A missing store name, dispatch point number or buyer
-  address is a `BUILD` refusal, before anything is sent. The receipt prints
+  the pickup needs. A blank store name, or a buyer without a name, a
+  country or any part of their address, is a `BUILD` refusal, before
+  anything is sent; a dispatch point missing any of its four parts is not
+  set, so the store's receipts stay plain and are issued at SHIPPED
+  (above). The receipt prints
   the buyer's name and address, with a "Movement of goods" box (purpose,
   start, loading and delivery place, unit). The block is decided when the receipt is first sent
   and stored on the row (`Invoice.movement`) with its identity fields: the

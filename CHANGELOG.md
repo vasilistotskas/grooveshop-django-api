@@ -3,6 +3,507 @@
 
 
 
+## v3.256.0 (2026-11-20)
+
+### Bug fixes
+
+* fix(order): settle movement receipts safely on cancel, outage and resend
+
+- A receipt that already has credits is never cancelled in myDATA; it
+  takes the credit path for the remainder.
+- Only an AADE refusal releases a held receipt to the credit path;
+  auth, configuration and transport errors keep the hold for the sweep.
+- After a lost cancel answer, AADE's real state is read before any
+  credit is issued, and settle_canceled_receipt locks the invoice row.
+- The receipt is issued wherever a shipment becomes live, including an
+  adopted ACS voucher and a BOX NOW parcel taken over by the sweep.
+- retry_receipts_with_mydata reaches suspended stores.
+- A receipt that stands on a cancelled order is delivered with its
+  credit.
+- Without a complete dispatch point a store keeps receipts at SHIPPED,
+  and the dashboard asks staff to set it; the alert shows only to stores
+  with ACS or BOX NOW.
+- A resend never rewrites a document that may have registered.
+- A staff cancel is settled as soon as the courier's answer is recorded.
+- AADE's public v2.0.2 XSDs are vendored, and the built payloads are
+  validated against them in tests. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): never demote a registered myDATA document, and read AADE's lists by date
+
+A MARK is final. Every write of a send (the intent, a refusal of any
+kind, an unanswered send) re-reads the document's row under its lock and
+leaves one that holds a MARK as it is, returning it as registered: a late
+retry, the sweep and the SHIPPED trigger can overlap, and a 228 answer or
+a stale copy no longer turns a CONFIRMED receipt into REJECTED or
+SUBMITTED.
+
+An unanswered send is recorded as such (ERROR_NO_ANSWER, status left
+SUBMITTED) and looked up before it is sent again. It no longer stamps
+the loss-of-connection indication by itself: that is stamped here only
+for a receipt with movement whose parcel already left.
+
+RequestTransmittedDocs is read page by page until AADE's continuation
+ends, bounded by the query (a MARK and a day either side of the issue
+date) instead of a 20-page cap; a repeated token raises.
+find_cancellation_mark starts at the receipt's MARK within that window
+and concludes nothing when AADE does not list the document.
+_persist_error_only leaves a canceled row without a late error. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): close the races and gaps in movement receipts found in review
+
+- The receipt of an order canceled before its parcel left is set aside
+  in OrderService._cancel_order_locked, under the order lock and before
+  the save that asks for credits; order_canceled only queues the settle.
+  A refused or never-sent receipt is held too, and a plain one AADE
+  registered is not. The receipt email checks is_deliverable when it runs.
+- send_invoice_to_mydata reads the order again after storing the MARK and
+  handle_order_shipped emails only a CONFIRMED receipt, so a SHIPPED
+  landing during the send no longer loses the email; a held receipt is
+  settled as soon as it is registered.
+- generate_invoice re-judges receipt_issuable on the locked order row.
+- The movement is rebuilt only after a refusal of its content, never
+  after error 228.
+- transmissionFailure 3 is stamped only when the parcel leaves without a
+  MARK after an unanswered send (whichever comes second); before that a
+  resend is plain. The sweep resends unanswered movement receipts.
+- The dispatch date is the day the receipt is issued, with no shift after
+  DISPATCH_CUTOFF, and no dispatchTime.
+- settle_canceled_receipt holds a per-order claim across its AADE calls,
+  so a second run sends no second CancelInvoice.
+- At SHIPPED, a parcel that goes elsewhere than its receipt declares, or
+  leaves more than 5 days after issue, is logged and noted for staff.
+- The store dashboard counts receipts of canceled orders still set aside,
+  and the outage alert counts parcels that left unregistered. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): declare every good that moves on a movement receipt, at its real quantity
+
+The movement block records the goods the parcel carries (units bought
+less those refunded), with the rest of the block at the first send, so a
+resend is the document as issued. A good with a money line states its
+quantity there; one without (a free gift, or any good of a receipt
+netted by an earlier refund, whose money lines are one per rate) gets a
+line of its own with netValue and vatAmount 0 at its VAT category, so no
+total changes. myDATA REST API v2.0.2 §5.4 gives both a minimum of 0, so
+the taxation comment that said myDATA rejects zero-amount lines is
+corrected: those lines are left out of the money lines because they
+carry no value, not because AADE refuses them. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): find every send without an answer, and date a plain resend today
+
+- An answer that is not XML (an empty or cut-off body behind an HTTP
+  200) is a MyDataTransportError, so the send is recorded unanswered
+  instead of escaping submit_document as a ParseError.
+- A send whose worker stopped mid-request (SUBMITTED, no code) counts as
+  unanswered once MYDATA_RETRY_AFTER_MINUTES passed
+  (movement.unanswered_sends), for the sweep and for the SHIPPED stamp; a
+  credentials refusal is recorded with AADE's code and left to staff.
+- Every SUBMITTED document is looked up in AADE before it is sent again
+  (service.look_up_mark: FOUND, ABSENT or UNKNOWN). Only when AADE read
+  the whole window and holds nothing under the uid is a plain resend
+  redated to today, since error 280 refuses a past dispatchDate; a
+  registered one keeps the date AADE holds.
+- The dashboard's held-receipt alert says such receipts are canceled
+  automatically once myDATA answers. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): close the gaps CodeRabbit found in movement receipts
+
+- Issue a receipt before the pickup only once the carrier holds the
+  voucher (Order.tracking_number): ACS's shipment row is written at
+  checkout, before the voucher is asked for.
+- A receipt sent before stays as sent: a plain one stays plain on a
+  resend. A movement can start at most 5 days after the receipt was
+  issued (MOVEMENT_START_MAX_DAYS): a redated or rebuilt block past that
+  is a BUILD refusal for staff instead of a wrong pair of dates.
+- Addresses are cut to AADE's 150 characters where the block is built, so
+  the payload and the registered PDF agree; the PDF lists the goods it
+  declares moving, at their declared quantities.
+- A success records the movement block that send carried, so an
+  overlapping sender's redated block never outlives the registration; a
+  late success or MARK recovery never turns a CANCELED row CONFIRMED.
+- A RequestTransmittedDocs answer whose root is not RequestedDoc is a
+  transport error, never "AADE holds nothing".
+- Regenerating a receipt writes back only what rendering owns, so a
+  cancel's hold set since is kept.
+- The sweep stamps a stopped send whose parcel left before resending it,
+  sends a held receipt that was never sent (rendering a missing PDF), and
+  touches the settles it queues so waiting ones rotate. The hold's
+  release reads the MARK under the row lock before deciding the email.
+- ACS: the receipt names a station's address only for the exact
+  (external_id, branch) pair ACS books, never the area fallback.
+- Loading-address settings refuse characters XML cannot carry; the
+  mismatch log at SHIPPED names what differs without the addresses, and
+  a goods difference is flagged too. MYDATA_AUTO_SUBMIT's description
+  names both triggers. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): check a dispatch point character without a regex, and give the adopted-voucher test an order with no tracking yet
+
+CodeQL read the XML Char class's ranges as overlapping; a plain code-point check says the same with nothing to misread. OrderFactory gives half its orders a tracking number, so an adopted voucher was not always the order's first and the receipt test failed at random. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): issue a movement receipt only once the carrier holds the parcel, and keep its PDF and recovered MARK true to AADE
+
+- receipt_issuable asks the carrier whether it holds the parcel
+  (ShippingCarrierInterface.holds_the_parcel: ACS's voucher, BOX NOW's
+  parcel), read as stored, so a tracking number staff type on the order
+  issues nothing.
+- The save that records a MARK clears the PDF rendered before it, so no
+  download or email hands out a receipt without its MARK; a re-render
+  replaces the stored PDF only once the new one exists, and only while the
+  row's MARK is the one it prints.
+- A MARK lookup that lists a document without a uid concludes nothing;
+  a recovered MARK keeps AADE's qrCodeUrl and the dispatchDate AADE holds.
+- A sender whose receipt was stamped as sent during a loss of connection
+  while it looked the MARK up builds the document again before sending.
+- A held receipt never sent is sent when the courier's refusal releases it.
+- The myDATA sweep takes the least recently touched receipts first. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): send movement receipts in the shape AADE registers, with AADE's uid
+
+AADE's myDATA sandbox refused every 11.1 with isDeliveryNote that #760
+built, although the XSD accepts it, and registered it with these:
+- an itemDescr on every line (error 230);
+- the issuer's name and address with its street number, and a
+  counterpart with name and address (error 204): the store's name at its
+  dispatch point, and the buyer with VAT number 000000000 and
+  nonObligatedRecipient; the parties are stored with the movement block;
+- never withoutDigitalTransportTracking, whose document AADE cannot
+  cancel (error 801).
+The dispatch point now needs all four of its fields.
+
+The uid is SHA-1 over the identity fields joined by "-", in upper-case
+hex, as AADE computes it: the old form never matched what
+RequestTransmittedDocs lists. A CancelInvoice answered 301 right after
+the registration is retried, not read as a refusal. A failed write of a
+re-rendered PDF leaves a row without one instead of a row naming a
+deleted file. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): retry a 301 to CancelInvoice only within minutes of the registration
+
+AADE answers a cancel sent right after the registration with 301 until the
+cancel can see the document, but it gives the same answer for a MARK it will
+never show the credentials asking. Retrying every 301 held a canceled order's
+receipt with nothing recorded, every sweep, and the admin cancel lost its
+record. Within MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES of mydata_confirmed_at a
+301 is still retried; after them it is a refusal recorded on the row, and the
+receipt goes the credit path with the reason in an order note. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): hold for staff a canceled order's receipt that myDATA cannot see
+
+A 301 refusal of the cancel past the retry window, with AADE's listing not
+showing the receipt either, means the store's current credentials do not
+reach it: it may be registered or canceled under others, so a credit could
+count a tax document twice and asking again changes nothing. The settle now
+stamps Invoice.cancel_held_for_staff_at and writes one order note naming the
+cause; the sweep leaves the receipt and later settles return at once. A
+listing that does not answer is still retried. Staff resolve it from the
+order: Cancel receipt in myDATA, or Issue credit documents, which releases
+it to the credit path.
+
+The movement-receipt part of docs/order/fiscal-mydata.md moves to its own
+file, fiscal-movement-receipts.md, so each stays under the 40,000-character
+limit. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): issue a movement receipt when a voucher is recorded over a number staff typed
+
+The dispatch signal fired only on the order's first tracking number, so an
+ACS voucher recorded after staff typed one never issued the receipt before
+the pickup. It now fires whenever the tracking becomes a value it did not
+have; its receivers already run once (the tracking email's flag, an order's
+one receipt). ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(devtools): scrub the street number of a receipt's movement block on staging
+
+A movement address stored its street number under a bare "number" key,
+which no anonymise rule names (order and invoice numbers share the word).
+The address field is now street_number, and a street_number key is
+replaced by the fake street number. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): never let a slower regeneration replace a newer receipt PDF
+
+Two renders of one receipt share its MARK, but a regeneration takes the
+seller and buyer snapshots again. A PDF is now stored only while the row
+still holds the MARK, snapshots and movement block it was rendered from. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): never declare a movement start after the parcel left
+
+A receipt refused for its content and rebuilt after the pickup was dated
+the day it was sent. Under the loss-of-connection procedure it now declares
+the day the parcel left; otherwise it is a BUILD refusal for staff, since
+AADE refuses a past start. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): tell staff when a parcel's new pickup point cannot be compared with its receipt
+
+A replacement locker or station the catalogue lacks raised while the
+movement check read its address, and the check then reported nothing. It
+is now flagged as a destination that could not be checked. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): leave characters XML cannot carry out of every myDATA document
+
+ElementTree writes control characters as they are, so a product, buyer or
+address text holding one (pasted in) made the payload ill-formed, and a line
+keeps its name from the order. Every text is now cleaned where the document
+is written. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): log a pre-registration PDF that cannot be removed instead of failing the send
+
+The file goes after the MARK commits; a storage error there escaped the send,
+which then skipped the registered PDF, its email and the credits. The removal
+is now robust: logged, and the send goes on. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): send again a held receipt whose plain send went unanswered
+
+A receipt sent plainly (its dispatch point cleared before the send) with no
+answer, then set aside for its order's cancel, waited for a MARK the sweep
+never asked for: it resent only receipts with movement. A held receipt with
+an unanswered send is now sent again, its MARK looked up first; the
+departure stamp stays with receipts with movement. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): keep the myDATA sweep going when the broker is down
+
+It published each send and settle directly, so the first publish that
+failed stopped the sweep and left the rest of the batch for a later run.
+It now queues through dispatch_on_commit, which keeps a publish that fails
+as a DeferredDispatch. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): build again a receipt whose pickup point the carrier's catalogue lacked
+
+A receipt naming a locker or station the catalogue did not hold was refused
+as BUILD and never retried. It is now refused with its own code, noted once,
+and built again by the sweep until a sync adds the address. An ACS station is
+read from the catalogue by the exact pair the voucher books, so a pair a
+later sync added is found, and a booking without a branch never names the
+first station of its area. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): name the cancel action exactly in the note on a receipt held for staff
+
+The note told staff to press "Cancel receipt in myDATA"; the action on the
+order reads "Cancel receipt in myDATA (issued in error)". The test now reads
+both labels the note names from the admin actions. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): issue the movement receipt when a carrier records the voucher number staff already typed
+
+Staff could type the voucher's own number before the voucher was adopted;
+recording it then changed no value, so the dispatch signal did not fire and
+the receipt waited for the parcel to ship. Order.add_tracking_info now
+records the tracking as dispatched whatever the order held, and its
+receivers still run once. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): refuse a myDATA series prefix whose series AADE would not receive as hashed
+
+The uid hashes the series as given, while the payload leaves out characters
+XML cannot carry, so such a prefix gave a uid AADE never lists. Both series
+prefixes are now validated where they are saved: XML characters only, and
+short enough for AADE's 50-character series. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): keep resending and recording a receipt as myDATA was sent it
+
+- A receipt released from its cancel hold whose last send has no answer is
+  sent again at once, its MARK looked up first: a plain one is in no sweep
+  once released.
+- Every send stores the movement block it carries, an empty one for a
+  receipt sent plain, so a receipt rebuilt plain after a refusal keeps no
+  block AADE was not sent.
+- Credentials AADE refuses while the MARK is looked up before a resend are
+  recorded as for a send, so the sweep stops asking. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): refuse line breaks and tabs in a myDATA series prefix
+
+A parser reads a carriage return as a line feed, so a prefix holding one
+gave a uid hashed from a series other than the one AADE stores. The prefix
+validator now refuses tabs and line breaks as well. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): judge an unanswered myDATA send by its own record, not the row's last write
+
+- A send whose worker stopped mid-request counted as unanswered only once
+  the row's updated_at was old, and setting the receipt aside for a cancel
+  rewrote that, so a plain receipt released right after was never sent
+  again. Each send now records when it began (mydata_sent_at), and that is
+  what is judged.
+- Credentials refused while the MARK is looked up no longer replace the
+  last send's no-answer code: the parcel leaving is still stamped, the
+  sweep tries again until the credentials work, and staff get one note. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): keep an unanswered myDATA send undecided until AADE or a lookup decides it
+
+A send AADE did not answer was known only by its NO_ANSWER code, which the
+next send replaced: a resend refused for the store's credentials after a
+lookup that could not decide made the earlier send look answered, so the
+sweep dropped it and its parcel was not stamped. The row now records it
+(mydata_unanswered_since, added to migration 0111): set when a send goes
+unanswered or a lookup cannot decide one, kept through later errors, and
+cleared only when AADE registers a send or answers 228, or a lookup finds
+the document or nothing. sends_without_an_answer, the one reader, judges by
+it. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): write every myDATA result against the send it belongs to
+
+Results were applied to the row without knowing which send they answered:
+a late lost answer overwrote a newer send's outcome and stamped it while in
+flight, and an older lookup's verdict cleared a newer unanswered send. Each
+send is named by its start (mydata_sent_at), and every answer, refusal and
+lookup verdict is now written with a compare-and-set on it; a sender whose
+row moved on to another send looks it up again. A lost answer is recorded
+as undecided from its own send's start.
+
+The sweep now takes up every receipt AADE may hold unanswered, plain or
+with movement and of any status, so a refused resend keeps an undecided
+earlier send followed, and a released plain receipt whose send was still
+in flight is resent once it is not. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): decide a myDATA send only once it can no longer register
+
+A lookup that found nothing cleared a send still within its request, which
+could register right after the listing was read. MyDataConfig.send_window
+is now the one rule for whether a send has ended (the client's connect and
+read timeouts plus MYDATA_RETRY_AFTER_MINUTES): within it a send with no
+answer is in flight, and finding nothing does not decide it.
+
+- A refused resend while an earlier send is undecided is sent again as
+  issued, its block kept, until a lookup decides the earlier send.
+- A lost answer stamps the departed parcel whenever no send may still be
+  in flight, whichever send owns the row's outcome.
+- The lookup before a resend asks with the configuration and seller VAT
+  that resend goes with.
+- The test helper reads the seller VAT through Setting.get. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): keep each myDATA send's own deadline and never send over a live one
+
+A send's end was computed from the store's current timeout, so a timeout
+shortened after a send could let a lookup decide a send still within its
+own request. Each claim now records the send's deadline
+(mydata_send_deadline, in migration 0111): its start plus the window the
+settings gave it then, never moved back. The lookup, the sweep and the
+stamp judge by it (movement.send_in_flight), and a claim over a send still
+before its deadline with no answer sends nothing (a transport error the
+task and the sweep retry). ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): sweep credit documents like receipts and never refuse over a live send
+
+A credit whose worker stopped mid-send was refused at each retry while the
+send's deadline ran, and no sweep took credits up afterwards. The sweep now
+sends again every credit document AADE may hold unanswered, by the same
+rule as receipts, and a claim over a live send raises MyDataSendInFlight,
+which the task leaves to the sweep instead of spending retries inside the
+deadline. A refusal of a document built to replace a live send raises it
+too, so it can no longer end the guard on that send. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): stamp a departed parcel's receipt at every claim of a send
+
+A sender that stopped mid-request was still in flight when the parcel left,
+so SHIPPED could not stamp it, and a resend by hand after the deadline,
+before the sweep, went without transmissionFailure 3. Every claim now
+stamps a receipt whose parcel left while a send of it has no answer, and
+builds it again with the indication, whoever sends it.
+
+The receipts doc now states the in-flight rule as the code applies it: a
+send recorded NO_ANSWER is not in flight and is resent under the same uid
+after the retry delay. The registered-movement test reads the winning
+block when it is sent, so it no longer depends on midnight. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* fix(order): stamp a receipt only under its row lock, in one place
+
+SHIPPED and the sweep stamped through an UPDATE whose self-subquery read
+the row before its lock, so a send claimed in between could be stamped
+while in flight. movement.stamp_if_left_unregistered is now the one stamp:
+it checks the rule on the row its caller holds locked and writes it there.
+SHIPPED locks the receipt and calls it, as do a missed answer and every
+claim; the sweep's own stamp, which the claim now covers, is gone.
+
+The row-lock thread helpers move to tests.utils.concurrency for the new
+race test and the courier-lock tests that already used them. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+### Chores
+
+* chore(order): renumber the invoice movement migration after the agent checkout ones
+
+0109_invoice_movement now depends on order 0108_order_agent_checkout_unique, which landed on main first. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+### Documentation
+
+* docs(order): describe the cancel hold, the loss-of-connection stamp and the dispatch date of movement receipts
+
+fiscal-mydata §7.4, cancel §7.1, shipping §5 and two invariants: a MARK is final, and a canceled order's receipt is set aside under the cancel's order lock. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): describe the zero-value goods lines of a movement receipt ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): say why turnover counts a sale when the parcel leaves, not on its receipt's date
+
+A courier or locker receipt is now issued when the voucher is created, up to five days before the pickup, and until the parcel leaves the sale can still be undone (the receipt is canceled in myDATA as never used). Turnover keeps Order.shipped_at so a closed month only changes by a return; the module docstring and docs/turnover-report.md no longer claim the sale follows its receipt's date, and name the month-boundary gap with myDATA. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): name both outcomes of a pre-pickup cancel in turnover, and early issuance in the invariants
+
+Turnover's docstring and docs/turnover-report.md tell CancelInvoice from the credit path (myDATA nets to nothing either way); the receipt-issuance invariant includes the movement receipt issued when the voucher is recorded. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): mark which AADE rules the myDATA sandbox verified, and scrub a receipt's movement block on staging ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): record that AADE refuses a past dispatchDate except on a transmissionFailure document, and answers a resent document with 228 ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* docs(order): say that a dispatch point missing a part turns movement receipts off, not a BUILD refusal
+
+The issuer is built from the dispatch point receipt_movement already read, so
+its only refusal is a blank store name. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+### Features
+
+* feat(order): issue a courier sale's receipt with movement indication before pickup (#760) ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* feat(order): issue a courier sale's receipt with movement indication before pickup
+
+A retail sale delivered through a courier or to a locker needs its receipt
+with movement indication (A.1123/2024 Annex II par. 7.3, as replaced by
+A.1233/2026), transmitted before the movement starts (A.1122/2024 art. 3).
+The platform issued a plain 11.1 at SHIPPED, which a carrier poll can set
+after the courier already took the parcel.
+
+For a store whose receipts the platform issues (MyDataConfig.is_ready):
+
+- the 11.1 of an order a carrier takes carries dispatchDate/dispatchTime,
+  movePurpose 1, otherDeliveryNoteHeader (the store's dispatch point from
+  the new MYDATA_LOADING_* settings, and the buyer's address or the ACS
+  station's / BOX NOW locker's) and isDeliveryNote, with the quantity and
+  unit on each goods line; the block is stored on the receipt
+  (Invoice.movement) and printed on its PDF;
+- it is issued when the carrier's voucher or parcel is created, and
+  shipping never waits for myDATA: a receipt AADE does not answer for is
+  sent with transmissionFailure 3 (loss of connection, the one value an
+  ERP may send) and retried by a per-store sweep until it is registered;
+  staff see one dashboard warning;
+- it reaches the customer when the parcel leaves, so an order canceled
+  before the pickup has it canceled in myDATA (CancelInvoice, lawful for a
+  document never used) instead of credited, decided by the courier's
+  answer the cancel paths already record; a parcel the courier could not
+  stop, or a refusal from myDATA, goes to the credit path as before.
+
+A store that issues its receipts outside the platform, and an order no
+carrier takes, are unchanged. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+### Testing
+
+* test(order): send the receipt email for a receipt AADE registered
+
+send_invoice_email now checks Invoice.is_deliverable when it runs, so the fixtures that emailed a receipt with no MARK or no CONFIRMED status give it the registered state (tests.utils.mydata.registered). ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* test(tenant): count the myDATA receipt sweep among the jobs a suspended store gets, and name the anonymise rules by their path ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* test(order): give the post-save handler's mock order no tracking
+
+A Mock answers every attribute with a distinct truthy Mock, so the status
+change test read as tracking recorded too and found the shipment-dispatched
+signal queued beside the status signal. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* test(order): read the myDATA switch through Setting.get in mydata_enabled
+
+The helper patched the email gate's own reader; the store's MYDATA_ENABLED
+now reads as configured through extra_settings' Setting.get, the seam every
+store setting goes through. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
+* test(order): bound the workers of ordered lock tests like racing ones
+
+in_thread started a plain thread with no lock or statement timeout, so a
+call blocked on a row lock could hold its session and keep the test run
+alive. It now runs as a daemon on a session bounded like a race worker,
+and Worker.finish fails the test, its session terminated, when the call is
+still running at the deadline. ([`fc04c4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc04c4eed864cfa87a253d0b5068fd7c540688b9))
+
 ## v3.255.3 (2026-11-20)
 
 ### Bug fixes

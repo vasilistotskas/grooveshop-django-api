@@ -12944,6 +12944,9 @@ msgstr "Επιλέξτε μια περιοχή που ανήκει στην επ
 msgid "Select a valid country."
 msgstr "Επιλέξτε έγκυρη χώρα."
 
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
+
 msgid "Select all"
 msgstr "Επιλογή όλων"
 

@@ -12938,6 +12938,9 @@ msgstr "Select a region that belongs to the selected country."
 msgid "Select a valid country."
 msgstr "Select a valid country."
 
+msgid "Select action"
+msgstr "Select action"
+
 msgid "Select all"
 msgstr "Select all"
 

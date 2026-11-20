@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.contrib.admin.options import ActionLocation
 from django.forms.models import _get_foreign_key
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from admin.features import (
@@ -16,7 +16,7 @@ from admin.features import (
 )
 
 
-class ActionLocationModelAdmin:
+class ActionLocationModelAdmin(UnfoldModelAdmin):
     """Keeps Django's ``action_location`` through Unfold's action choices.
 
     Replaces ``unfold.admin.ModelAdmin.get_action_choices``, which has

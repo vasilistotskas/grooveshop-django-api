@@ -11,7 +11,7 @@ from django.contrib.admin.options import ActionLocation
 from django.test import RequestFactory
 from django.utils.translation import gettext as _
 
-from admin.base import BaseModelAdmin
+from admin.mixins import ActionLocationModelAdmin
 from blog.models.post import BlogPost
 from user.factories.account import UserAccountFactory
 
@@ -24,8 +24,10 @@ def _request():
     return request
 
 
-def _model_admin() -> BaseModelAdmin:
-    return admin.site._registry[BlogPost]
+def _model_admin() -> ActionLocationModelAdmin:
+    model_admin = admin.site._registry[BlogPost]
+    assert isinstance(model_admin, ActionLocationModelAdmin)
+    return model_admin
 
 
 def test_choices_start_with_unfolds_blank_choice():

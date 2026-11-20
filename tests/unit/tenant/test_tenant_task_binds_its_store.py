@@ -10,6 +10,7 @@ the test suite) keeps them under ``request.headers``. Both must bind.
 from __future__ import annotations
 
 import threading
+import time
 from unittest.mock import patch
 
 import psycopg
@@ -175,22 +176,44 @@ class TestOutsideATransaction:
     ):
         """A task that starts while a destroy holds the store waits for it,
         however long the destroy takes, instead of failing on the worker
-        connection's timeouts (``statement_timeout`` is 30 s there)."""
+        connection's timeouts (``statement_timeout`` is 30 s there).
+
+        The destroy commits only once the task's lock request is seen
+        waiting in ``pg_locks``, and then holds on past both timeouts, so
+        the task has waited longer than the connection would allow."""
         from tenant.celery import _store_lock_key
 
         tenant = store_tenant("worker_waits_store")
+        key = _store_lock_key(tenant.schema_name)
         params = connection.get_connection_params()
         params["autocommit"] = True
         options = {**connection.settings_dict["OPTIONS"], "options": timeouts}
+        task_waited = threading.Event()
 
         with psycopg.connect(**params) as destroy:
             destroy.execute(
-                "SELECT pg_advisory_lock(hashtextextended(%s, 0))",
-                [_store_lock_key(tenant.schema_name)],
+                "SELECT pg_advisory_lock(hashtextextended(%s, 0))", [key]
             )
-            commit = threading.Timer(
-                1.0, destroy.execute, ["SELECT pg_advisory_unlock_all()"]
-            )
+
+            def commit_once_the_task_waits():
+                deadline = time.monotonic() + 30
+                while time.monotonic() < deadline:
+                    (waiting,) = destroy.execute(
+                        "SELECT count(*) FROM pg_locks "
+                        "WHERE locktype = 'advisory' AND mode = 'ShareLock' "
+                        "AND NOT granted "
+                        "AND ((classid::bigint << 32) | objid::bigint) "
+                        "= hashtextextended(%s, 0)",
+                        [key],
+                    ).fetchone()
+                    if waiting:
+                        task_waited.set()
+                        time.sleep(1.0)
+                        break
+                    time.sleep(0.02)
+                destroy.execute("SELECT pg_advisory_unlock_all()")
+
+            commit = threading.Thread(target=commit_once_the_task_waits)
             connection.close()
             with patch.dict(connection.settings_dict, {"OPTIONS": options}):
                 commit.start()
@@ -202,6 +225,7 @@ class TestOutsideATransaction:
                     commit.join()
                     connection.close()
 
+        assert task_waited.is_set()
         assert held == 1
 
 

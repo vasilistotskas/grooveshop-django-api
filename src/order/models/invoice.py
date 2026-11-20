@@ -273,6 +273,17 @@ class MyDataRegistration(models.Model):
             "whatever else touched the document since."
         ),
     )
+    mydata_unanswered_since = models.DateTimeField(
+        _("myDATA Unanswered Since"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the earliest send AADE has not decided began: it may "
+            "hold the document from then on. Kept through later errors, "
+            "cleared when AADE answers a send (registered, or 228) or a "
+            "lookup finds the document or finds nothing."
+        ),
+    )
     mydata_confirmed_at = models.DateTimeField(
         _("myDATA Confirmed At"),
         null=True,

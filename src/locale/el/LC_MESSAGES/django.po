@@ -17046,6 +17046,9 @@ msgstr "Πότε ενημερώθηκε ο πελάτης ότι το δέμα �
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "Πότε η απόφαση πήρε τελευταία την τρέχουσα τιμή. Μια απόδειξη που εκδίδεται μετά μειώνεται κατά το chargeback· μια που εκδόθηκε πριν πιστώνεται."
 
+msgid "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+msgstr "Πότε ξεκίνησε η παλαιότερη αποστολή για την οποία η ΑΑΔΕ δεν έχει αποφανθεί: από τότε μπορεί να έχει καταχωρίσει το παραστατικό. Διατηρείται μετά από επόμενα σφάλματα και διαγράφεται όταν η ΑΑΔΕ απαντήσει σε αποστολή (καταχώριση ή 228) ή όταν μια αναζήτηση βρει το παραστατικό ή δεν βρει τίποτα."
+
 msgid "When the export can no longer be downloaded."
 msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
 
@@ -17987,6 +17990,9 @@ msgstr "Υποβλήθηκε στο myDATA"
 
 msgid "myDATA UID"
 msgstr "myDATA UID"
+
+msgid "myDATA Unanswered Since"
+msgstr "Αναπάντητη αποστολή myDATA από"
 
 msgid "myDATA has no valid environment"
 msgstr "Το myDATA δεν έχει έγκυρο περιβάλλον"

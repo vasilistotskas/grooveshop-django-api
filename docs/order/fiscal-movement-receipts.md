@@ -145,18 +145,28 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `TechnicalError`, or an answer that is not XML, such as an empty body
   behind an HTTP 200, which the parser turns into a transport error). The
   receipt keeps its number and is recorded as issued; the send is marked
-  unanswered (`mydata_error_code` `NO_ANSWER`, status SUBMITTED). A send
-  whose worker stopped mid-request is left SUBMITTED with no code, and counts
-  as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed since that send
-  began (`Invoice.mydata_sent_at`, never the row's last write)
-  (`movement.unanswered_sends`); one whose credentials AADE refused keeps
-  AADE's code and waits for staff. Before any SUBMITTED document is sent
-  again its MARK is looked up (`service.look_up_mark`: `RequestTransmittedDocs`
-  by its uid, the 228 recovery), since the send may have been registered.
-  Credentials AADE refuses there are recorded as a message only: the last
-  send keeps its "no answer", so a parcel that leaves is still stamped, and
-  the sweep tries again every `MYDATA_RETRY_AFTER_MINUTES` until the
-  credentials work (one order note, not one per try). Every send
+  unanswered (`mydata_error_code` `NO_ANSWER`, status SUBMITTED) and
+  undecided (`Invoice.mydata_unanswered_since`, from the send's start). A
+  send whose worker stopped mid-request is left SUBMITTED with no code, and
+  counts as unanswered once `MYDATA_RETRY_AFTER_MINUTES` passed since that
+  send began (`Invoice.mydata_sent_at`, never the row's last write).
+  **Undecided is a fact on the row, not an error code**: it is kept through
+  every later error (a resend refused for the store's credentials or for
+  its content), and cleared only when AADE answers a send (it registers it,
+  or answers 228: it holds it) or a lookup decides (it finds the document,
+  or finds nothing under its uid). `movement.sends_without_an_answer` is the
+  one reader (the sweep, the stamp when a parcel leaves, a receipt released
+  from its cancel hold): an undecided receipt, or one whose sender stopped,
+  never one whose latest send is in flight. One whose credentials AADE
+  refused with nothing undecided keeps AADE's code and waits for staff.
+  Before any document that may be registered is sent again (SUBMITTED, or
+  undecided) its MARK is looked up (`service.look_up_mark`:
+  `RequestTransmittedDocs` by its uid, the 228 recovery); a lookup that
+  cannot decide records the send as undecided before the resend.
+  Credentials AADE refuses there are recorded as a message only, so a
+  parcel that leaves is still stamped, and the sweep tries again every
+  `MYDATA_RETRY_AFTER_MINUTES` until the credentials work (one order note,
+  not one per try). Every send
   stores the movement block it carries with it, `{}` for a receipt sent
   plain, so a receipt rebuilt plain keeps no block AADE was not sent.
   While the parcel is still with the store, a resend is the document as

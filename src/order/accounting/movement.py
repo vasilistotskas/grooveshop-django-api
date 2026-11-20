@@ -426,27 +426,37 @@ def _starting_in_time(
 
 
 def sends_without_an_answer(invoices: Any) -> Any:
-    """The receipts among *invoices* whose last send has no answer from
-    AADE, so they may or may not be registered: one it did not answer, or
-    not readably (``ERROR_NO_ANSWER``), and one whose sender stopped
-    mid-request (a worker killed during the call), which is left SUBMITTED
-    with no code at all; that one only once ``MYDATA_RETRY_AFTER_MINUTES``
-    passed since that send began (``mydata_sent_at``), as a send in flight
-    right now looks the same. The send's own start, never the row's last
-    write: setting a receipt aside for a cancel, or the sweep's touch,
-    says nothing of the send. A receipt AADE refused, or whose credentials
-    it refused, is not one: it carries AADE's code."""
-    from order.accounting.mydata.types import ERROR_NO_ANSWER
+    """The receipts among *invoices* AADE may hold although none of their
+    sends was answered with a registration: a send of theirs went
+    unanswered (or not readably, ``ERROR_NO_ANSWER``) and nothing has
+    decided it since (``mydata_unanswered_since``: kept through later
+    errors, a later send refused for the store's credentials included,
+    until AADE answers a send or a lookup finds the document or nothing),
+    or their latest sender stopped mid-request (a worker killed during the
+    call), which leaves them SUBMITTED with no code at all.
+
+    Never one whose latest send is in flight right now, which looks like a
+    stopped one until ``MYDATA_RETRY_AFTER_MINUTES`` passed since that send
+    began (``mydata_sent_at``): the send's own start, never the row's last
+    write, which setting a receipt aside for a cancel or the sweep's touch
+    moves. Every reader of "may be registered, not answered" goes through
+    here: the sweep, the stamp when a parcel leaves
+    (:func:`unanswered_sends`), and a receipt released from its cancel
+    hold."""
     from order.models.invoice import MyDataStatus
 
     stalled_before = timezone.now() - timedelta(
         minutes=settings.MYDATA_RETRY_AFTER_MINUTES
     )
-    return invoices.filter(
-        mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
-    ).filter(
-        Q(mydata_error_code=ERROR_NO_ANSWER)
-        | Q(mydata_error_code="", mydata_sent_at__lte=stalled_before)
+    return (
+        invoices.filter(
+            mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
+        )
+        .exclude(mydata_error_code="", mydata_sent_at__gt=stalled_before)
+        .filter(
+            Q(mydata_unanswered_since__isnull=False)
+            | Q(mydata_error_code="", mydata_sent_at__lte=stalled_before)
+        )
     )
 
 

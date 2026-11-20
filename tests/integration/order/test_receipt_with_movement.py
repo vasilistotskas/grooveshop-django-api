@@ -1477,12 +1477,14 @@ class TestAMovementTheReceiptDoesNotCover:
 
 def _stalled(invoice) -> None:
     """The receipt as a sender killed mid-request leaves it: its intent
-    stored (SUBMITTED, uid), no answer recorded, its send begun a while
-    ago and the row untouched since."""
+    stored (SUBMITTED, uid), nothing recorded after it (no code, no
+    undecided earlier send), its send begun a while ago and the row
+    untouched since."""
     a_while_ago = timezone.now() - timedelta(hours=1)
     Invoice.objects.filter(pk=invoice.pk).update(
         mydata_error_code="",
         mydata_error_message="",
+        mydata_unanswered_since=None,
         mydata_sent_at=a_while_ago,
         updated_at=a_while_ago,
     )
@@ -2369,6 +2371,147 @@ class TestCodeRabbitSecondReview:
             status=OrderStatus.SHIPPED, shipped_at=timezone.now()
         )
         assert parcel_left_unregistered(order.id)
+
+    def test_credentials_refused_on_a_resend_keep_the_earlier_send_undecided(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The first send went unanswered, the lookup could not say whether
+        AADE holds it, and the resend was refused for the store's
+        credentials. That refusal decides only the resend: the first send
+        stays undecided, so the sweep keeps it and its parcel is stamped."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        first_send = invoice.mydata_sent_at
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            _listing_patch(side_effect=MyDataTransportError("timeout")),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataAuthError(
+                    "subscription key rejected", code="401"
+                ),
+            ),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_error_code == "401"
+        assert invoice.mydata_unanswered_since == first_send
+        assert unanswered_sends(Invoice.objects.filter(pk=invoice.pk))
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.SHIPPED, shipped_at=timezone.now()
+        )
+        assert parcel_left_unregistered(order.id)
+
+    def test_a_stopped_send_the_lookup_cannot_decide_stays_undecided(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Its sender stopped mid-request, which records nothing; the
+        lookup before the resend cannot decide it, so it is recorded as
+        undecided from that send's start before the resend is refused."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        _stalled(invoice)
+        stopped_send = Invoice.objects.get(pk=invoice.pk).mydata_sent_at
+
+        with (
+            mydata_enabled(),
+            _listing_patch(side_effect=MyDataTransportError("timeout")),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataAuthError(
+                    "subscription key rejected", code="401"
+                ),
+            ),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_error_code == "401"
+        assert invoice.mydata_unanswered_since == stopped_send
+        assert unanswered_sends(Invoice.objects.filter(pk=invoice.pk))
+
+    def test_a_lookup_that_finds_nothing_decides_the_earlier_send(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE lists nothing under the uid: the unanswered send is decided,
+        and a resend refused for the credentials leaves nothing undecided;
+        it waits for staff."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=MyDataAuthError(
+                    "subscription key rejected", code="401"
+                ),
+            ),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_error_code == "401"
+        assert invoice.mydata_unanswered_since is None
+        assert not unanswered_sends(Invoice.objects.filter(pk=invoice.pk))
+
+    def test_an_answered_send_decides_every_earlier_one(
+        self, django_capture_on_commit_callbacks
+    ):
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        assert invoice.mydata_unanswered_since is not None
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade(),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            retry_receipts_with_mydata()
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_mark is not None
+        assert invoice.mydata_unanswered_since is None
+
+    def test_a_228_decides_every_earlier_send(
+        self, django_capture_on_commit_callbacks
+    ):
+        """AADE answers the resend with 228, that it holds the document:
+        no send of it is undecided, whether or not its MARK can be read
+        back yet."""
+        from order.accounting.mydata.exceptions import MyDataDuplicateError
+        from order.accounting.mydata.service import submit_document
+
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        assert invoice.mydata_unanswered_since is not None
+        duplicate = (
+            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+            b"<index>1</index><statusCode>ValidationError</statusCode>"
+            b"<errors><error><message>duplicate</message><code>228</code>"
+            b"</error></errors></response></ResponseDoc>"
+        )
+        with (
+            mydata_enabled(),
+            _listing_patch(side_effect=MyDataTransportError("timeout")),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                return_value=duplicate,
+            ),
+            pytest.raises(MyDataDuplicateError),
+        ):
+            submit_document(Invoice.objects.get(pk=invoice.pk))
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_error_code == ERROR_DUPLICATE_UID
+        assert invoice.mydata_unanswered_since is None
 
     def test_the_sweep_takes_the_least_recently_touched_first(
         self, django_capture_on_commit_callbacks, settings

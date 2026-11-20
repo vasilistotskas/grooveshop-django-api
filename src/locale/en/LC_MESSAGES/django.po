@@ -17044,6 +17044,9 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
+msgid "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+msgstr "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+
 msgid "When the export can no longer be downloaded."
 msgstr "When the export can no longer be downloaded."
 
@@ -17985,6 +17988,9 @@ msgstr "myDATA Submitted At"
 
 msgid "myDATA UID"
 msgstr "myDATA UID"
+
+msgid "myDATA Unanswered Since"
+msgstr "myDATA Unanswered Since"
 
 msgid "myDATA has no valid environment"
 msgstr "myDATA has no valid environment"

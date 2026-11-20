@@ -3743,8 +3743,8 @@ class TestTheStampBesideAClaim:
         )
         wait_for_a_blocked_backend(wait)
         go_on.set()
-        claiming.join(wait)
-        stamping.join(wait)
+        claiming.finish(wait)
+        stamping.finish(wait)
 
         assert failures == []
         assert stamped == [False]

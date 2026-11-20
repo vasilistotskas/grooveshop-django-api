@@ -675,11 +675,9 @@ def test_an_acs_tracking_poll_and_a_staff_cancel_do_not_deadlock(monkeypatch):
     )
     wait_for_a_blocked_backend(WAIT)
     go_on.set()
-    cancel.join(WAIT)
-    poll.join(WAIT)
+    cancel.finish(WAIT)
+    poll.finish(WAIT)
 
-    assert not cancel.is_alive()
-    assert not poll.is_alive()
     assert errors == []
     assert courier.calls == [UNLOCKED]
     assert _committed_status(order_id) == OrderStatus.CANCELED

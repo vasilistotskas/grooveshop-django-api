@@ -48,6 +48,13 @@ class PostalAddress:
     city: str
 
 
+class PickupPointUnknown(ValueError):
+    """The carrier's catalogue does not hold the address of the pickup
+    point a shipment goes to, or not of that exact point. Its daily sync
+    may add it, so a receipt that names it is tried again
+    (``order.tasks.retry_receipts_with_mydata``)."""
+
+
 class ShippingCarrierInterface(ABC):
     """Abstract adapter every shipping provider must implement.
 

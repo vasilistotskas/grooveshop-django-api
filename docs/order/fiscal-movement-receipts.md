@@ -206,7 +206,8 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   sale and is not touched; when the parcel leaves,
   `movement.flag_a_movement_the_receipt_does_not_cover` compares the
   movement that took place with the one declared, and when the parcel goes
-  elsewhere, or leaves more than `MOVEMENT_START_MAX_DAYS` (5, Α.1123/2024
+  elsewhere (or to a pickup point whose address is not known, so it cannot
+  be compared), or leaves more than `MOVEMENT_START_MAX_DAYS` (5, Α.1123/2024
   art. 7(1) as replaced) after the receipt was issued, it logs an ERROR (the
   logged-errors alert) and leaves an order note saying what differs, for
   the store's accountant to decide how that movement is documented.
@@ -214,8 +215,15 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   receipt is REJECTED with AADE's code and message on the row and in an
   order note, and counted on the dashboard ("Receipts rejected by myDATA");
   the parcel ships. Staff fix the data and press "Send receipt to myDATA". A
-  pickup point whose address is not known is refused before sending
-  (BUILD).
+  pickup point whose address the carrier's catalogue does not hold is
+  refused before sending with our own code `PICKUP`
+  (`shipping.interfaces.PickupPointUnknown`): noted once, and built again
+  by `retry_receipts_with_mydata` every `MYDATA_RETRY_AFTER_MINUTES` until
+  a catalogue sync adds it. The address is read from the catalogue at each
+  build: an ACS station by the exact (station, branch) pair the voucher
+  books, never the code-only fallback row checkout may have linked, and a
+  booking without a branch only by the row without one; a BOX NOW locker
+  by its id.
 - **The QR on the parcel.** The registered receipt PDF carries AADE's QR
   (`mydata_qr_url`, the `qrUrl` of the response; after a MARK recovery,
   the `qrCodeUrl` `RequestTransmittedDocs` lists, which it did for every

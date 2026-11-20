@@ -1291,8 +1291,10 @@ def _submit_document_to_mydata(task, order: Order, document):
         MyDataValidationError,
         submit_document,
     )
+    from order.accounting.mydata.types import ERROR_PICKUP_POINT_UNKNOWN
 
     number = document.document_number
+    refused_before = document.mydata_error_code
     try:
         return submit_document(document)
     except MyDataTransportError as exc:
@@ -1333,10 +1335,13 @@ def _submit_document_to_mydata(task, order: Order, document):
             exc.code,
             exc.message,
         )
-        OrderHistory.log_note(
-            order=order,
-            note=f"myDATA rejected {number}: {exc.code} {exc.message}",
-        )
+        if exc.code != refused_before or exc.code != ERROR_PICKUP_POINT_UNKNOWN:
+            # A pickup point still unknown is noted once, not at every
+            # sweep that builds it again.
+            OrderHistory.log_note(
+                order=order,
+                note=f"myDATA rejected {number}: {exc.code} {exc.message}",
+            )
         return None
     except MyDataError as exc:
         # Catch-all for future subclasses we haven't branched on yet.
@@ -1489,6 +1494,7 @@ def retry_receipts_with_mydata() -> int:
         unanswered_sends,
     )
     from order.accounting.mydata.config import load_config
+    from order.accounting.mydata.types import ERROR_PICKUP_POINT_UNKNOWN
     from order.models.invoice import Invoice, MyDataStatus
 
     if not load_config().is_ready():
@@ -1511,6 +1517,12 @@ def retry_receipts_with_mydata() -> int:
             )
             | sends_without_an_answer(
                 untouched.filter(cancel_requested_at__isnull=False)
+            )
+            # Refused before sending for a pickup point whose address the
+            # carrier's catalogue lacked: its sync may have added it.
+            | untouched.filter(
+                mydata_status=MyDataStatus.REJECTED,
+                mydata_error_code=ERROR_PICKUP_POINT_UNKNOWN,
             )
         )
         # Least recently touched first, so no batch of receipts that keep

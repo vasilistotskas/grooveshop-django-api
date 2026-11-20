@@ -16,6 +16,7 @@ from django.db.models import Q
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     register_provider,
@@ -93,14 +94,15 @@ class BoxNowCarrier(ShippingCarrierInterface):
         """The locker's address as BOX NOW lists it. Its destinations carry
         no city field: the city is ``addressLine2`` (BOX NOW API manual
         v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
-        "ΑΘΗΝΑ"``)."""
+        "ΑΘΗΝΑ"``). Read from the catalogue now, so a locker a later sync
+        added is found (``PickupPointUnknown`` until then)."""
         from shipping_boxnow.models import BoxNowLocker
 
         locker = BoxNowLocker.objects.filter(
             external_id=shipment.locker_external_id
         ).first()
         if locker is None or not (locker.postal_code and locker.address_line_2):
-            raise ValueError(
+            raise PickupPointUnknown(
                 "The address of BOX NOW locker "
                 f"{shipment.locker_external_id} is not known."
             )

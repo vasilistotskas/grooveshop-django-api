@@ -61,9 +61,11 @@ from order.accounting.mydata.types import (
     ERROR_DUPLICATE_UID,
     ERROR_MARK_NOT_FOUND,
     ERROR_NO_ANSWER,
+    ERROR_PICKUP_POINT_UNKNOWN,
 )
 from order.accounting.mydata.validator import validate_invoice_doc
 from order.models.retail_credit import RetailCredit
+from shipping.interfaces import PickupPointUnknown
 
 logger = logging.getLogger(__name__)
 
@@ -138,14 +140,21 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             # Unsupported VAT rate or malformed invoice_number — bad
             # master data, not transient. Record as a terminal validation
             # failure so the admin UI surfaces the reason rather than
-            # retrying 5 times and then burying the error.
+            # retrying 5 times and then burying the error. A pickup point
+            # the carrier's catalogue lacks has its own code: the sweep
+            # builds it again once a sync may have added it.
+            code = (
+                ERROR_PICKUP_POINT_UNKNOWN
+                if isinstance(exc, PickupPointUnknown)
+                else "BUILD"
+            )
             if not _persist_failure(
                 invoice,
-                code="BUILD",
+                code=code,
                 message=f"Failed to build myDATA payload: {exc}",
             ):
                 return _registered_row(invoice)
-            raise MyDataValidationError(str(exc), code="BUILD") from exc
+            raise MyDataValidationError(str(exc), code=code) from exc
 
         try:
             validate_invoice_doc(built.xml_bytes)

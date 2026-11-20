@@ -41,6 +41,7 @@ from order.accounting.mydata.types import (
     ERROR_DUPLICATE_UID,
     ERROR_MARK_NOT_FOUND,
     ERROR_NO_ANSWER,
+    ERROR_PICKUP_POINT_UNKNOWN,
 )
 from order.admin import OrderAdmin
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -64,6 +65,7 @@ from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from shipping.enum import ShippingKind
 from shipping.exceptions import CarrierError, CarrierUnavailableError
+from shipping.interfaces import PickupPointUnknown
 from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory, AcsStationFactory
 from shipping_boxnow.factories import BoxNowLockerFactory, BoxNowShipmentFactory
@@ -2689,3 +2691,79 @@ class TestCodeRabbitThirdReview:
             task_name=settle_canceled_receipt.name
         )
         assert sorted(row.args[0] for row in kept) == sorted(held)
+
+    def test_a_station_the_catalogue_adds_later_is_found(self):
+        """Checkout kept the code-only fallback row; once a sync adds the
+        exact station ACS books, the receipt names it."""
+        fallback = AcsStationFactory(
+            external_id="ATH", branch_code="1", postal_code="10434"
+        )
+        order = _acs_order(
+            delivery_kind=ShippingKind.PICKUP_POINT,
+            station_destination=fallback,
+            station_destination_external_id="ATH",
+            station_branch_destination="2",
+        )
+        with pytest.raises(PickupPointUnknown):
+            receipt_movement(Invoice(order=order, movement={}))
+
+        AcsStationFactory(
+            external_id="ATH",
+            branch_code="2",
+            address_line_1="Πατησίων 2",
+            postal_code="11257",
+            city="Αθήνα",
+        )
+
+        movement = receipt_movement(Invoice(order=order, movement={}))
+        assert movement.delivery.postal_code == "11257"
+
+    def test_a_booking_without_a_branch_names_no_station_of_its_area(self):
+        """ACS booked only the area: the first locker of that area is not
+        the place the parcel goes."""
+        locker = AcsStationFactory(
+            external_id="ATH", branch_code="1", postal_code="10434"
+        )
+        order = _acs_order(
+            delivery_kind=ShippingKind.PICKUP_POINT,
+            station_destination=locker,
+            station_destination_external_id="ATH",
+            station_branch_destination="",
+        )
+
+        with pytest.raises(PickupPointUnknown):
+            receipt_movement(Invoice(order=order, movement={}))
+
+    def test_a_receipt_for_an_unknown_locker_is_built_again_by_the_sweep(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Refused before sending, noted once; the sweep builds it again
+        until BOX NOW's catalogue holds the locker, and then it is sent."""
+        order = _paid_order("boxnow")
+        BoxNowShipmentFactory(
+            order=order, locker_external_id="apm-748", parcel_id="9200000748"
+        )
+
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _issue(order, django_capture_on_commit_callbacks)
+            assert invoice.mydata_error_code == ERROR_PICKUP_POINT_UNKNOWN
+            _untouched_for_a_while(invoice)
+            with django_capture_on_commit_callbacks(execute=True):
+                assert retry_receipts_with_mydata() == 1
+            refused = [n for n in _notes(order) if "myDATA rejected" in n]
+            assert len(refused) == 1
+
+            BoxNowLockerFactory(
+                external_id="apm-748",
+                address_line_1="ΛΕΩΦΟΡΟΣ ΚΗΦΙΣΙΑΣ 155",
+                address_line_2="ΑΘΗΝΑ",
+                postal_code="14661",
+            )
+            _untouched_for_a_while(invoice)
+            with django_capture_on_commit_callbacks(execute=True):
+                assert retry_receipts_with_mydata() == 1
+
+        invoice.refresh_from_db()
+        assert invoice.mydata_mark is not None
+        [sent] = aade.receipts
+        assert sent.is_delivery_note

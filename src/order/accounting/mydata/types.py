@@ -110,6 +110,12 @@ ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
 # sandbox against production), and it is a refusal like any other.
 ERROR_MARK_NOT_FOUND = "301"
 
+# Our own code: the receipt names a pickup point whose address the
+# carrier's catalogue does not hold yet (``shipping.interfaces.
+# PickupPointUnknown``), so nothing was sent. Its daily sync may add it,
+# so the sweep builds it again (``order.tasks.retry_receipts_with_mydata``).
+ERROR_PICKUP_POINT_UNKNOWN = "PICKUP"
+
 # Our own code (``mydata_error_code`` is ours to fill): the last send of the
 # document reached AADE without an answer (a transport error, or AADE's
 # ``TechnicalError``), so it may or may not be registered. Recorded with

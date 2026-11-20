@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     register_provider,
@@ -80,22 +81,22 @@ class AcsCarrier(ShippingCarrierInterface):
     def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
         """The station's address, only from the catalogue row of the exact
         station ACS books: the (external_id, branch_code) pair the voucher
-        carries. ``station_destination`` may be a row of the same area but
-        another branch (the code-only fallback when the pair is not in the
-        catalogue), whose address the receipt must not name."""
+        carries, read from the catalogue now, so a pair a later sync added
+        is found. ``station_destination`` may be a row of the same area but
+        another branch (the code-only fallback when the pair was not in the
+        catalogue at checkout), whose address the receipt must not name; a
+        booking without a branch names only the row without one, never the
+        first station of its area."""
+        from shipping_acs.models import AcsStation
+
         if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
             return None
-        station = shipment.station_destination
-        booked = (
-            station is not None
-            and station.external_id == shipment.station_destination_external_id
-            and (
-                not shipment.station_branch_destination
-                or station.branch_code == shipment.station_branch_destination
-            )
-        )
-        if not booked or not (station.postal_code and station.city):
-            raise ValueError(
+        station = AcsStation.objects.filter(
+            external_id=shipment.station_destination_external_id,
+            branch_code=shipment.station_branch_destination,
+        ).first()
+        if station is None or not (station.postal_code and station.city):
+            raise PickupPointUnknown(
                 "The address of ACS station "
                 f"{shipment.station_destination_external_id} "
                 f"{shipment.station_branch_destination} is not known."

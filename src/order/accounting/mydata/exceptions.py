@@ -12,6 +12,7 @@ MyDataTransportError           yes (network, 5xx, 429)
 MyDataAuthError                no (rotate creds)
 MyDataValidationError          no (fix master data)
 MyDataDuplicateError           no (recover via query)
+MyDataSendInFlight             no (the sweep, once it ended)
 =============================  =========================
 """
 
@@ -46,6 +47,14 @@ class MyDataNotListedError(MyDataTransportError):
     transport error to every caller that only retries; the settle of a
     canceled order's receipt tells it apart after a 301 to its cancel
     (``order.tasks.settle_canceled_receipt``)."""
+
+
+class MyDataSendInFlight(MyDataError):
+    """A send of the document may still be running (no answer on record,
+    before its deadline, ``movement.send_in_flight``), so nothing is sent
+    over it. Not retried by the task: retries would end inside the
+    deadline. ``order.tasks.retry_receipts_with_mydata`` takes the document
+    up once the deadline passed and no answer came."""
 
 
 class MyDataAuthError(MyDataError):

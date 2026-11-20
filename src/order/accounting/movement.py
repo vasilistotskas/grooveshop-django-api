@@ -448,8 +448,9 @@ def _starting_in_time(
 
 
 def sends_without_an_answer(invoices: Any) -> Any:
-    """The receipts among *invoices* AADE may hold although none of their
-    sends was answered with a registration: a send of theirs went
+    """The documents among *invoices* (receipts, or credit documents: the
+    fields are their shared ``MyDataRegistration``'s) AADE may hold
+    although none of their sends was answered with a registration: a send of theirs went
     unanswered (or not readably, ``ERROR_NO_ANSWER``) and nothing has
     decided it since (``mydata_unanswered_since``: kept through later
     errors, a later send refused for the store's credentials or for its
@@ -463,8 +464,9 @@ def sends_without_an_answer(invoices: Any) -> Any:
     deadline passed: the send's own deadline, never the row's last write,
     which setting a receipt aside for a cancel or the sweep's touch moves.
     Every reader of "may be registered, not answered" goes through here:
-    the sweep, the stamp when a parcel leaves (:func:`unanswered_sends`),
-    and a receipt released from its cancel hold."""
+    the sweep (receipts and credit documents alike), the stamp when a
+    parcel leaves (:func:`unanswered_sends`), and a receipt released from
+    its cancel hold."""
     from order.models.invoice import MyDataStatus
 
     now = timezone.now()

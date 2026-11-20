@@ -1287,6 +1287,7 @@ def _submit_document_to_mydata(task, order: Order, document):
         MyDataAuthError,
         MyDataDuplicateError,
         MyDataError,
+        MyDataSendInFlight,
         MyDataTransportError,
         MyDataValidationError,
         submit_document,
@@ -1298,6 +1299,17 @@ def _submit_document_to_mydata(task, order: Order, document):
     message_before = document.mydata_error_message
     try:
         return submit_document(document)
+    except MyDataSendInFlight as exc:
+        # Another send of it may still be running: retries would all end
+        # before its deadline, so none is spent; the sweep takes it up once
+        # the deadline passed with no answer.
+        logger.info(
+            "myDATA submission for order #%s (%s) left to the sweep: %s",
+            order.id,
+            number,
+            exc,
+        )
+        return None
     except MyDataTransportError as exc:
         logger.warning(
             "myDATA submission transport failure for order #%s (%s): %s",
@@ -1481,6 +1493,9 @@ def retry_receipts_with_mydata() -> int:
       (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»). So is
       one set aside for a cancel that was never sent: the cancel needs its
       MARK.
+    - A credit document (``RetailCredit``) AADE may hold without having
+      answered, by the same rule, is sent again
+      (``send_credit_to_mydata``).
     - A receipt set aside because its order was canceled before the parcel
       left (``Invoice.cancel_requested_at``) is settled
       (``settle_canceled_receipt``): its courier may have answered since, or
@@ -1501,6 +1516,7 @@ def retry_receipts_with_mydata() -> int:
     )
     from order.accounting.mydata.config import load_config
     from order.accounting.mydata.types import ERROR_PICKUP_POINT_UNKNOWN
+    from order.models import RetailCredit
     from order.models.invoice import Invoice, MyDataStatus
 
     if not load_config().is_ready():
@@ -1561,14 +1577,27 @@ def retry_receipts_with_mydata() -> int:
     )
     for order_id in to_cancel:
         dispatch_on_commit(settle_canceled_receipt, [order_id])
-    if to_send or to_cancel:
+    # Credit documents go through the same send and the same rule: one AADE
+    # may hold without having answered is sent again, its MARK looked up
+    # first (``send_credit_to_mydata``).
+    credits_to_send = list(
+        sends_without_an_answer(
+            RetailCredit.objects.filter(updated_at__lte=cutoff)
+        )
+        .order_by("updated_at", "id")
+        .values_list("pk", flat=True)[:batch]
+    )
+    for credit_id in credits_to_send:
+        dispatch_on_commit(send_credit_to_mydata, [credit_id])
+    if to_send or to_cancel or credits_to_send:
         logger.warning(
-            "Queued %s receipt(s) myDATA did not answer for and %s of "
-            "canceled orders",
+            "Queued %s receipt(s) and %s credit document(s) myDATA did not "
+            "answer for, and %s receipt(s) of canceled orders",
             len(to_send),
+            len(credits_to_send),
             len(to_cancel),
         )
-    return len(to_send) + len(to_cancel)
+    return len(to_send) + len(to_cancel) + len(credits_to_send)
 
 
 def _settle_claim_key(order_id: int) -> str:

@@ -158,9 +158,13 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   the margin in which AADE may still finish a request whose client gave
   up), and never moves it back, so a timeout changed later never shortens a
   send already made. Before it a send with no answer on record is in
-  flight (never sent over, by the sweep or any other sender, and never
-  stamped), and a lookup that finds nothing does not decide it: a send may
-  still register after the listing was read.
+  flight: never sent over or replaced, by the sweep or any other sender
+  (a claim over it, or a refusal of a document built to replace it, raises
+  `MyDataSendInFlight`, which the task leaves to the sweep rather than
+  spending retries inside the deadline), never stamped, and a lookup that
+  finds nothing does not decide it: a send may still register after the
+  listing was read. Credit documents share the send and the rule, and the
+  sweep takes them up the same way (`send_credit_to_mydata`).
   **Undecided is a fact on the row, not an error code**: it is kept through
   every later error (a resend refused for the store's credentials or for
   its content), and cleared only when AADE answers a send (it registers it,

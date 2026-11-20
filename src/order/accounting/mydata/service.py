@@ -51,6 +51,7 @@ from order.accounting.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
     MyDataNotListedError,
+    MyDataSendInFlight,
     MyDataTransportError,
     MyDataValidationError,
 )
@@ -358,12 +359,11 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
 
 
-def _in_flight_error(invoice: Any) -> MyDataTransportError:
+def _in_flight_error(invoice: Any) -> MyDataSendInFlight:
     """The send *invoice*'s row records may still be running: nothing is
-    sent over it before its deadline, and the caller tries again later
-    (the task's retries, then the sweep, which takes it up once the
-    deadline passed)."""
-    return MyDataTransportError(
+    sent over it, and nothing replaces it, before its deadline; the sweep
+    takes it up once the deadline passed with no answer."""
+    return MyDataSendInFlight(
         f"A send of {invoice.document_number} to myDATA may still be running "
         f"until {invoice.mydata_send_deadline:%Y-%m-%d %H:%M:%S}; nothing is "
         "sent over it before then."
@@ -1079,7 +1079,9 @@ def _persist_failure(
     The refusal belongs to one attempt: AADE's answer to the send *invoice*
     made, or, *before_sending*, our own refusal of a document built to
     replace the send the row records (its lookup's *verdict* settles that
-    send, :func:`_settle_the_last_send`). It is written only while the row
+    send, :func:`_settle_the_last_send`), which raises
+    ``MyDataSendInFlight`` instead while that send may still be running, as
+    a claim over it does. It is written only while the row
     names that attempt (``mydata_sent_at``): a send another sender began
     since owns the row's outcome, and this one is only raised.
 
@@ -1099,6 +1101,11 @@ def _persist_failure(
         if locked.mydata_mark:
             _mirror_registration(invoice, locked)
             return False
+        if before_sending and send_in_flight(locked, at=timezone.now()):
+            # The send it would replace may still be running: refusing a
+            # document built over it would end the guard that keeps every
+            # other sender off that send.
+            raise _in_flight_error(locked)
         fields = []
         if code == ERROR_DUPLICATE_UID and locked.mydata_unanswered_since:
             locked.mydata_unanswered_since = None

@@ -35,6 +35,7 @@ from order.accounting.movement import (
 )
 from order.accounting.mydata.exceptions import (
     MyDataAuthError,
+    MyDataSendInFlight,
     MyDataTransportError,
 )
 from order.accounting.mydata.service import MarkLookup
@@ -59,6 +60,7 @@ from order.tasks import (
     issue_pending_credits,
     issue_receipt_for_pickup,
     retry_receipts_with_mydata,
+    send_credit_to_mydata,
     send_invoice_to_mydata,
     settle_canceled_receipt,
 )
@@ -2910,7 +2912,7 @@ class TestCodeRabbitSecondReview:
         with (
             mydata_enabled(),
             FakeAade() as aade,
-            pytest.raises(MyDataTransportError),
+            pytest.raises(MyDataSendInFlight),
         ):
             submit_document(running)
 
@@ -2948,12 +2950,106 @@ class TestCodeRabbitSecondReview:
                 "order.accounting.mydata.service.look_up_mark",
                 side_effect=another_worker_claims,
             ),
-            pytest.raises(MyDataTransportError),
+            pytest.raises(MyDataSendInFlight),
         ):
             submit_document(copy)
 
         assert aade.sent == []
         assert Invoice.objects.get(pk=invoice.pk).mydata_sent_at == other_send
+
+    def test_a_credit_whose_sender_stopped_is_sent_again_by_the_sweep(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The worker sending a credit document stopped mid-request: its
+        retries would all end before the send's deadline, so the sweep
+        takes it up once the deadline passed, as it does a receipt."""
+        from order.models import RetailCredit
+
+        with mydata_enabled(), FakeAade():
+            order, _invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            with patch.object(send_credit_to_mydata, "apply_async"):
+                _staff_cancel(
+                    order,
+                    django_capture_on_commit_callbacks,
+                    side_effect=CarrierError("voucher on a pickup list"),
+                )
+        credit = RetailCredit.objects.get(order=order)
+        with (
+            mydata_enabled(),
+            patch(
+                "order.accounting.mydata.client.MyDataClient.send_invoices",
+                side_effect=RuntimeError("worker stopped"),
+            ),
+            pytest.raises(RuntimeError),
+        ):
+            send_credit_to_mydata(credit.pk)
+        credit.refresh_from_db()
+        assert credit.mydata_status == MyDataStatus.SUBMITTED
+        assert credit.mydata_error_code == ""
+        a_while_ago = timezone.now() - timedelta(hours=1)
+        RetailCredit.objects.filter(pk=credit.pk).update(
+            mydata_sent_at=a_while_ago,
+            mydata_send_deadline=a_while_ago,
+            updated_at=a_while_ago,
+        )
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        credit.refresh_from_db()
+        assert credit.mydata_mark is not None
+        assert len(aade.credits) == 1
+
+    def test_a_document_built_over_a_live_send_is_not_refused_over_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Another worker's send is still running when this sender's build
+        fails: recording that refusal would end the guard on the live send,
+        so nothing is written, and the task leaves it to the sweep."""
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            patch(
+                "order.accounting.mydata.service._build_document",
+                side_effect=ValueError("pickup point left the catalogue"),
+            ),
+        ):
+            assert send_invoice_to_mydata(invoice.order_id) is False
+
+        assert aade.sent == []
+        invoice.refresh_from_db()
+        assert invoice.mydata_status == MyDataStatus.SUBMITTED
+        assert invoice.mydata_error_code == ""
+        assert invoice.mydata_unanswered_since is not None
+        assert not unanswered_sends(Invoice.objects.filter(pk=invoice.pk))
+
+    def test_a_send_over_a_live_one_spends_no_retries(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The task finds another send of the receipt still running: its
+        retries would all end inside that send's deadline, so it stops at
+        once and the sweep takes the receipt up later."""
+        invoice = _unanswered(_acs_order(), django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(mydata_error_code="")
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            patch.object(send_invoice_to_mydata, "retry") as retried,
+        ):
+            assert send_invoice_to_mydata(invoice.order_id) is False
+
+        retried.assert_not_called()
+        assert aade.sent == []
 
     def test_the_sweep_takes_the_least_recently_touched_first(
         self, django_capture_on_commit_callbacks, settings

@@ -81,6 +81,141 @@ class TestRunForAllTenants:
             assert "_schema_name" in kwargs["headers"]
 
 
+class TestSuspendedStores:
+    """``include_suspended`` reaches a store suspended through the lifecycle.
+
+    ``suspend_tenant`` sets ``is_active`` false with ``suspended_at``, and the
+    fan-out once required ``is_active`` whatever the flag, so no
+    ``include_suspended`` job ever reached a suspended store (#753).
+    """
+
+    #: The jobs a suspended store still gets: the retention sweeps, the work
+    #: a customer's money or parcel waits on, and the agent outbox sweep,
+    #: whose attempts hold a suspended store's events.
+    INCLUDE_SUSPENDED = {
+        "agent.tasks.deliver_due_agent_order_events",
+        "agent.tasks.purge_expired_agent_order_events",
+        "builder.tasks.purge_expired_preview_links",
+        "contact.tasks.purge_expired_attachment_files",
+        "contact.tasks.purge_expired_contact_records",
+        "contact.tasks.reap_unclaimed_attachments",
+        "core.tasks.clear_expired_notifications_task",
+        "core.tasks.purge_expired_admin_log_entries",
+        "emails.tasks.purge_expired_email_logs",
+        "meta_capi.tasks.purge_expired_meta_capi_event_logs",
+        "order.tasks.allocate_credit_sources",
+        "order.tasks.finish_pending_shipment_cancels",
+        "order.tasks.purge_expired_pending_payment_fees",
+        "order.tasks.reconcile_pending_refunds",
+        "product.tasks.purge_unconfirmed_guest_alerts",
+        "recommendation.tasks.purge_expired_recommendation_events",
+        "shipping_acs.tasks.purge_expired_acs_api_calls",
+        "shipping_acs.tasks.purge_expired_acs_tracking_events",
+        "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
+        "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        "user.tasks.purge_unconfirmed_guest_subscriptions",
+    }
+
+    @staticmethod
+    def _suspended_store(schema_name: str):
+        from tenant.lifecycle import suspend_tenant
+        from tenant.models import SuspendedReason
+
+        store = store_tenant(schema_name)
+        with patch("tenant.tasks.flush_tenant_media_task.apply_async"):
+            assert suspend_tenant(store, reason=SuspendedReason.MANUAL)
+        return store
+
+    @staticmethod
+    def _run_every_fanout() -> list:
+        from tenant import tasks as tenant_tasks
+
+        wrappers = [
+            getattr(tenant_tasks, name)
+            for name in dir(tenant_tasks)
+            if name.startswith("fanout_")
+        ]
+        with (
+            patch("core.celery_app.send_task") as send,
+            patch("devtools.tasks.reset_demo_store_task.apply_async"),
+        ):
+            for wrapper in wrappers:
+                wrapper()
+        return send.call_args_list
+
+    @pytest.mark.django_db
+    def test_it_gets_every_include_suspended_job_and_no_other(self):
+        suspended = self._suspended_store("fanout_suspended")
+        active = store_tenant("fanout_still_active")
+
+        calls = self._run_every_fanout()
+
+        def reached(store) -> set[str]:
+            return {
+                call.args[0]
+                for call in calls
+                if call.kwargs["headers"]["_schema_name"] == store.schema_name
+            }
+
+        assert reached(suspended) == self.INCLUDE_SUSPENDED
+        assert self.INCLUDE_SUSPENDED < reached(active)
+
+    @pytest.mark.django_db
+    def test_active_and_unavailable_split_the_stores(self):
+        from django.utils import timezone
+
+        from tenant.models import Tenant
+
+        active = store_tenant("split_active")
+        suspended = self._suspended_store("split_suspended")
+        switched_off = store_tenant("split_off", is_active=False)
+        leftover = store_tenant("split_leftover", suspended_at=timezone.now())
+        mine = {active.pk, suspended.pk, switched_off.pk, leftover.pk}
+
+        def picked(queryset) -> set[int]:
+            return set(
+                queryset.filter(pk__in=mine).values_list("pk", flat=True)
+            )
+
+        assert picked(Tenant.objects.active()) == {active.pk}
+        assert picked(Tenant.objects.unavailable()) == {
+            suspended.pk,
+            switched_off.pk,
+            leftover.pk,
+        }
+        assert picked(Tenant.objects.stores()) == mine
+        assert not Tenant.objects.stores().filter(schema_name="public").exists()
+
+    @pytest.mark.django_db
+    def test_a_destroyed_store_gets_nothing(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from tenant.lifecycle import SUSPEND_COOLDOWN, destroy_tenant
+        from tenant.models import Tenant
+
+        store = self._suspended_store("fanout_destroyed")
+        Tenant.objects.filter(pk=store.pk).update(
+            suspended_at=timezone.now() - SUSPEND_COOLDOWN - timedelta(hours=1)
+        )
+        with (
+            patch("tenant.offboarding.latest_invoice_year", return_value=None),
+            patch("tenant.offboarding.purge_search_indexes", return_value=[]),
+            patch("tenant.offboarding.purge_tenant_files", return_value={}),
+            patch("tenant.tasks.flush_tenant_media_task.apply_async"),
+        ):
+            destroy_tenant(store)
+
+        calls = self._run_every_fanout()
+
+        assert calls, "nothing was dispatched"
+        assert all(
+            call.kwargs["headers"]["_schema_name"] != store.schema_name
+            for call in calls
+        )
+
+
 class TestFanoutTaskWrappers:
     """The ``tenant.tasks.fanout_*`` wrappers delegate to run_for_all_tenants."""
 

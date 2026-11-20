@@ -1,11 +1,13 @@
 """Management command: backfill_recommendation_slots
 
-Seeds ``RecommendationSlot`` rows for every active non-public tenant
-(or one ``--schema``) from the tenant's own ``vertical`` preset, or from
+Seeds ``RecommendationSlot`` rows for every store, suspended ones included
+(or one ``--schema``), from the tenant's own ``vertical`` preset, or from
 ``--vertical`` to override it for this run. New tenants get this at
 provisioning; the PreSync job runs it on every deploy so tenants that
 predate the engine — or a surface added in a later release — get their
-rows without a manual step.
+rows without a manual step. A suspended store is seeded too: this brings
+its data up to date with the code and starts no work, so a store
+suspended through a few deploys has its rows when it is reactivated.
 
 Usage:
     uv run python manage.py backfill_recommendation_slots
@@ -24,25 +26,29 @@ from __future__ import annotations
 import logging
 
 from django.core.management.base import BaseCommand, CommandError
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import schema_context
 
+from core.management.tenant_mixin import TenantCommandMixin
 from tenant.models import StoreVertical
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = (
         "Seed missing RecommendationSlot rows from each tenant's vertical "
-        "preset into all active tenant schemas (or a single --schema). "
+        "preset into every store's schema, suspended ones included (or a "
+        "single --schema). "
         "Idempotent — never overwrites an existing slot."
     )
+
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--schema",
             default=None,
-            help="Limit to one tenant schema. Defaults to all active tenants.",
+            help="Limit to one store's schema. Defaults to every store.",
         )
         parser.add_argument(
             "--vertical",
@@ -62,27 +68,20 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from tenant.models import Tenant
-
         target_schema = options["schema"]
         override = options["vertical"]
         dry_run = options["dry_run"]
-        public_schema = get_public_schema_name()
-
-        tenants = Tenant.objects.filter(is_active=True).exclude(
-            schema_name=public_schema
-        )
+        tenants = self.target_stores()
         if target_schema:
             tenants = tenants.filter(schema_name=target_schema)
             if not tenants.exists():
                 raise CommandError(
-                    f"No active non-public tenant with "
-                    f"schema_name={target_schema!r}."
+                    f"No store with schema_name={target_schema!r}."
                 )
 
         total = tenants.count()
         if total == 0:
-            self.stdout.write(self.style.WARNING("No active tenants."))
+            self.stdout.write(self.style.WARNING("No stores."))
             return
 
         prefix = "[DRY RUN] " if dry_run else ""

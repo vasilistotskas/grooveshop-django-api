@@ -16,6 +16,9 @@ class Command(TenantCommandMixin, BaseCommand):
     # clear_expired_notifications_task under TenantTask) is already
     # inside a tenant context and passes the guard without flags.
     require_tenant_scope = True
+    # A retention sweep: --all-tenants reaches suspended stores too, as
+    # its beat fan-out does.
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         parser.add_argument(

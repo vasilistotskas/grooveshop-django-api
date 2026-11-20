@@ -3,13 +3,17 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
+from datetime import timedelta
 from typing import Any
 
+import psycopg
 from celery import Task
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
+from psycopg.errors import LockNotAvailable
 
 from core.retry import TRANSIENT_NETWORK_ERRORS
 
@@ -53,12 +57,19 @@ class TenantTask(Task):
         from django_tenants.utils import (
             get_public_schema_name,
             schema_context,
-            tenant_context,
         )
 
         if schema_name == get_public_schema_name():
             with schema_context(schema_name):
                 return super().__call__(*args, **kwargs)
+
+        with holding_store(schema_name):
+            return self._run_in_store(schema_name, *args, **kwargs)
+
+    def _run_in_store(self, schema_name: str, *args: Any, **kwargs: Any) -> Any:
+        from django_tenants.utils import schema_context, tenant_context
+
+        from tenant.models import Tenant, TenantArchive
 
         # ``schema_context(schema_name)`` only sets ``connection.tenant``
         # to a bare ``FakeTenant(schema_name=...)`` (django-tenants
@@ -69,11 +80,23 @@ class TenantTask(Task):
         # unconfigured regardless of what the tenant actually has set.
         # ``tenant_context(tenant)`` sets ``connection.tenant`` to the
         # real row instead.
-        from tenant.models import Tenant
-
         try:
             tenant = Tenant.objects.get(schema_name=schema_name)
         except Tenant.DoesNotExist:
+            # The store was destroyed after the task was queued: a fan-out
+            # reaches suspended stores, which are the ones that can be
+            # destroyed, and ``destroy_tenant`` records each one it drops in
+            # ``TenantArchive``. With the schema gone the search path falls
+            # through to public, so the task would read and write the
+            # platform's own tables of every app the two share.
+            if TenantArchive.objects.filter(schema_name=schema_name).exists():
+                logger.warning(
+                    "TenantTask: the store of schema=%s was destroyed; %s "
+                    "not run",
+                    schema_name,
+                    self.name,
+                )
+                return None
             logger.warning(
                 "TenantTask: no Tenant row for schema=%s — falling back to "
                 "a bare schema context (tenant.credentials.* will read as "
@@ -87,13 +110,133 @@ class TenantTask(Task):
             return super().__call__(*args, **kwargs)
 
 
+def _store_lock_key(schema_name: str) -> str:
+    return f"store-tasks:{schema_name}"
+
+
+@contextmanager
+def holding_store(schema_name: str) -> Generator[None]:
+    """Keep the store of *schema_name* from being destroyed while a task
+    runs in it.
+
+    ``destroy_tenant`` drops the schema between two of a task's
+    transactions. The task's next query then falls through the search
+    path to public's table of any app both schemas have (``user``,
+    ``emails``, ``admin``): a sweep's next batch deleted the platform's own
+    rows, by the store's retention window. A task holds a shared advisory
+    lock on its store while it runs, and ``destroy_tenant`` takes it
+    exclusively (``hold_store_for_destroy``), so a destroy waits for the
+    store's running tasks and a task waits for a destroy in progress. That
+    task then finds no row and is not run (``TenantArchive``).
+
+    Inside a transaction (a task called within one, or applied eagerly)
+    the lock is the transaction's and ends with it. Otherwise it is held on
+    a database session of its own, opened for the task and closed when the
+    task ends. The task's own connection can then close mid-run
+    (``meilisearch_sync_all_indexes`` does), go back to the connection
+    pool or break, and the store stays held until the task ends: a lock on
+    that connection would be lost or left behind with it.
+
+    The session has no ``statement_timeout`` and no ``lock_timeout``, so a
+    task that starts during a destroy waits for it and is then skipped,
+    instead of failing on the worker connection's 30 s statement timeout.
+    The destroy bounds that wait: it waits ``DESTROY_TASKS_WAIT`` for the
+    running tasks, then holds the store only for its own transaction, whose
+    statements run under the connection's timeouts. The task's hard time
+    limit is the last bound.
+    """
+    key = _store_lock_key(schema_name)
+    if connection.in_atomic_block:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock_shared(hashtextextended(%s, 0))",
+                [key],
+            )
+        yield
+        return
+    params = connection.get_connection_params()
+    params["autocommit"] = True
+    params["options"] = (
+        f"{params.get('options', '')} -c statement_timeout=0 -c lock_timeout=0"
+    ).strip()
+    with connection.wrap_database_errors:
+        session = psycopg.connect(**params)
+    try:
+        with connection.wrap_database_errors:
+            session.execute(
+                "SELECT pg_advisory_lock_shared(hashtextextended(%s, 0))",
+                [key],
+            )
+        yield
+    finally:
+        # Unlocked first so the store is free when the task returns;
+        # closing alone frees it only once the server ends the session.
+        try:
+            session.execute(
+                "SELECT pg_advisory_unlock_shared(hashtextextended(%s, 0))",
+                [key],
+            )
+        except psycopg.Error:
+            logger.warning(
+                "TenantTask: the store lock session of schema=%s broke "
+                "during the task; the lock went with it",
+                schema_name,
+            )
+        finally:
+            session.close()
+
+
+def hold_store_for_destroy(schema_name: str, *, wait: timedelta) -> bool:
+    """Take the store's task lock exclusively for the current transaction.
+
+    Waits up to *wait* for the tasks running in the store to end; ``False``
+    when they did not. Tasks that start meanwhile wait for the transaction
+    to end (``holding_store``). For this one statement ``lock_timeout`` is
+    *wait* and ``statement_timeout`` is off, so the wait ends as a lock
+    timeout and never as the connection's statement timeout (30 s, the
+    same length, outside CI); both are put back afterwards.
+    """
+    key = _store_lock_key(schema_name)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT current_setting('lock_timeout'), "
+            "current_setting('statement_timeout')"
+        )
+        previous_lock, previous_statement = cursor.fetchone()
+        cursor.execute(
+            "SELECT set_config('lock_timeout', %s, true), "
+            "set_config('statement_timeout', '0', true)",
+            [f"{int(wait.total_seconds() * 1000)}ms"],
+        )
+        try:
+            with transaction.atomic():
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    [key],
+                )
+        except OperationalError as exc:
+            if not isinstance(exc.__cause__, LockNotAvailable):
+                raise
+            return False
+        finally:
+            cursor.execute(
+                "SELECT set_config('lock_timeout', %s, true), "
+                "set_config('statement_timeout', %s, true)",
+                [previous_lock, previous_statement],
+            )
+    return True
+
+
 def run_for_all_tenants(
     task_name: str,
     *,
     include_suspended: bool = False,
     **kwargs: Any,
 ) -> list[dict[str, str]]:
-    """Fan-out a task to all active tenant schemas.
+    """Fan-out a task to every active store, or every store.
+
+    ``include_suspended`` reaches suspended stores too
+    (``Tenant.objects.stores()`` against ``Tenant.objects.active()``).
 
     Returns JSON-serializable dispatch records, NOT ``AsyncResult``
     objects. Celery encodes a task's return value into the result
@@ -133,15 +276,25 @@ def run_for_all_tenants(
     #   parcel is delivered.
     #
     # Anything that starts new work for the store (polls, syncs, mail)
-    # stays off.
+    # stays off. What finishing such work sets off divides the same way:
+    # what the store owes its customer still runs (the refund confirmation
+    # email, the myDATA credit document or receipt), marketing and
+    # analytics do not (``meta_capi.services.is_capi_enabled`` refuses a
+    # suspended store). The agent outbox sweep is passed the flag too and
+    # sends nothing for a suspended store (``agent.outbox._store_is_active``
+    # holds its events).
     #
-    # ``is_active`` stays required either way: an inactive tenant may
-    # be mid-offboarding and its schema may already be gone.
-    tenants = Tenant.objects.filter(is_active=True).exclude(
-        schema_name="public"
+    # A store being destroyed needs no filter: ``destroy_tenant`` drops
+    # its schema and deletes its row in one transaction, so every row read
+    # here has its schema. It first waits for the tasks running in the
+    # store (``holding_store``). A task queued for it that starts after the
+    # destroy commits finds no row, and ``TenantTask`` does not run it
+    # (``TenantArchive``).
+    tenants = (
+        Tenant.objects.stores()
+        if include_suspended
+        else Tenant.objects.active()
     )
-    if not include_suspended:
-        tenants = tenants.filter(suspended_at__isnull=True)
     for tenant in tenants:
         from core import celery_app
 

@@ -108,8 +108,8 @@ its read of the order.
 
 The first attempt is queued when the change commits (`dispatch_on_commit`).
 Every attempt after it is the sweep's: `deliver-due-agent-order-events` runs
-every minute, per store the gateway can resolve (an active one; a leftover
-`suspended_at` does not matter), and attempts at most
+every minute, per store, suspended ones included (`include_suspended=True`),
+and attempts at most
 `AGENT_ORDER_EVENT_SWEEP_BATCH` due events. It takes no new event once it has
 spent `AGENT_ORDER_EVENT_SWEEP_BUDGET_SECONDS` (25 s), so a run lasts at most
 the budget plus one call's timeouts, under the minute between runs, and slow
@@ -124,9 +124,9 @@ the store's row each time, so a store suspended while a sweep run goes on gets
 no further attempt and the run stops there. For a suspended store
 (`is_active` false), or a schema with no store row, an attempt sends nothing
 and spends no attempt, so the events stay `pending` and go out once the store
-is active again. The sweep never reaches a suspended store anyway
-(`run_for_all_tenants` requires `is_active`); the check is what holds the
-first attempt queued at commit and **Send again now**.
+is active again. The check holds a suspended store's events in the sweep, whose
+run there stops at the first event, as it holds the first attempt queued at
+commit and **Send again now**.
 
 - **One attempt at a time.** An attempt first claims its row by moving
   `next_attempt_at` to when a failure would set it, so a second worker finds

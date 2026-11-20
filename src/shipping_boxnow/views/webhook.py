@@ -24,7 +24,6 @@ import logging
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django_tenants.utils import (
-    get_public_schema_name,
     schema_context,
     tenant_context,
 )
@@ -70,10 +69,7 @@ def _resolve_tenant_for_parcel(parcel_id: str):
 
     # Skip suspended tenants — mirrors the Viva webhook resolver;
     # BoxNow retries will resolve once the operator reactivates.
-    public = get_public_schema_name()
-    for tenant in Tenant.objects.filter(
-        is_active=True, suspended_at__isnull=True
-    ).exclude(schema_name=public):
+    for tenant in Tenant.objects.active():
         with schema_context(tenant.schema_name):
             if BoxNowShipment.objects.filter(parcel_id=parcel_id).exists():
                 return tenant

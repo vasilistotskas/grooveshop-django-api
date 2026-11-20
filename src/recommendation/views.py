@@ -36,6 +36,7 @@ from core.api.throttling import (
     RecommendationEventThrottle,
     UserBudgetThrottle,
 )
+from core.cart_id import cart_uuid_from_request
 from core.sessions import persisted_session_key
 from recommendation.engine import SuggestionContext, suggest
 from recommendation.hydrate import hydrate_pairs
@@ -154,7 +155,6 @@ def recommendation_event(request):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    from cart.services import cart_uuid_from_request
     from recommendation.tasks import record_recommendation_event
 
     # The cart is the identity an ``attach`` is later matched on: the

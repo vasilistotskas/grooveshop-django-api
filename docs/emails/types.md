@@ -139,7 +139,8 @@ so neither the body nor the cost tells a known address from a new one. What the
 address's owner learns arrives by email: a new, expired-pending, unsubscribed or
 bounced address gets `newsletter.confirmation`; an address that is already
 ACTIVE gets `newsletter.already_subscribed`. An account row's notice carries the
-link to `/account/subscriptions/`. A guest row's carries no link: the mail
+link to `/account/subscriptions/`, except on a store with customer accounts off,
+where no account has that page. A guest row's carries no link: the mail
 says the address IS subscribed, so it offers no unsubscribe; the copy points
 at the unsubscribe link every newsletter carries.
 

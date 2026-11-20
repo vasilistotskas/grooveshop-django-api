@@ -30,6 +30,7 @@ from emails.declare import customer_email, marketing_email
 from emails.gates import FeatureGate, ScheduleGate
 from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
+from tenant.customer_accounts import customer_accounts_on
 from user.utils.subscription import subscription_confirmation_url
 
 if TYPE_CHECKING:
@@ -87,9 +88,10 @@ def _already_subscribed(
 ) -> dict[str, Any]:
     # An account manages its subscriptions where it signs in. A guest has
     # no login and gets no link: this mail tells them they ARE subscribed,
-    # so it offers no unsubscribe.
+    # so it offers no unsubscribe. On a store with customer accounts off
+    # (where the newsletter form stays) no account has a page either.
     context = _subscription_context(subscription, env)
-    if subscription.user_id:
+    if subscription.user_id and customer_accounts_on():
         context["manage_url"] = get_tenant_frontend_url(
             "/account/subscriptions/", language=env.language
         )

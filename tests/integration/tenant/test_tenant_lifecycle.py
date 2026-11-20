@@ -10,6 +10,7 @@ never call ``tenant.delete()`` on real schemas; the suite turns
 
 from __future__ import annotations
 
+import threading
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -18,9 +19,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.messages import storage as messages_storage
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.utils import timezone, translation
 
+from core import celery_app
 from tenant.admin import TenantAdmin
+from tenant.celery import TenantTask
 from tenant.models import Tenant
 from tests.utils.staff import store_tenant
 
@@ -29,6 +33,20 @@ User = get_user_model()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_task_paused = threading.Event()
+_task_may_finish = threading.Event()
+
+
+@celery_app.task(
+    base=TenantTask, name="tests.task_paused_after_closing_its_connection"
+)
+def task_paused_after_closing_its_connection() -> None:
+    """Closes its connection mid-run, as ``meilisearch_sync_all_indexes``
+    does, then waits to be let finish."""
+    connection.close()
+    _task_paused.set()
+    _task_may_finish.wait(timeout=30)
 
 
 def _admin_request(post=None, user=None):
@@ -145,6 +163,39 @@ class TestActivateTenant:
         )
         tenant.refresh_from_db()
         assert tenant.suspended_at is None
+
+    def test_activating_a_suspended_store_queues_its_search_sync(self):
+        """Its indexes missed the deploys' settings and the daily sync."""
+        from core.tasks import sync_meilisearch_indexes
+        from tenant.lifecycle import activate_tenant
+
+        tenant = store_tenant(
+            "activate_search",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=2),
+        )
+
+        with patch("tenant.celery.dispatch_on_commit") as dispatch:
+            activate_tenant(tenant)
+
+        assert (
+            (sync_meilisearch_indexes,),
+            {"schema_name": "activate_search"},
+        ) in [(c.args, c.kwargs) for c in dispatch.call_args_list]
+
+    def test_activating_an_active_store_queues_no_search_sync(self):
+        from core.tasks import sync_meilisearch_indexes
+        from tenant.lifecycle import activate_tenant
+
+        tenant = store_tenant("activate_already_active")
+
+        with patch("tenant.celery.dispatch_on_commit") as dispatch:
+            activate_tenant(tenant)
+
+        assert all(
+            sync_meilisearch_indexes not in c.args
+            for c in dispatch.call_args_list
+        )
 
     def test_activate_skips_protected_tenants(self):
         tenant = store_tenant(
@@ -346,6 +397,204 @@ class TestDestroyTenants:
                 Tenant.objects.filter(pk=tenant.pk),
             )
             mock_delete.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestDestroyWaitsForTheStoresTasks:
+    """A task running in the store holds its lock (``holding_store``), as a
+    worker's session does; the destroy waits for it, then refuses."""
+
+    @pytest.fixture
+    def worker(self):
+        from django.db import connections
+
+        session = connections.create_connection("default")
+        yield session
+        session.close()
+
+    @staticmethod
+    def _run_a_task_in(session, schema_name):
+        from tenant.celery import _store_lock_key
+
+        with session.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_lock_shared(hashtextextended(%s, 0))",
+                [_store_lock_key(schema_name)],
+            )
+
+    @staticmethod
+    def _end_the_task_in(session, schema_name):
+        from tenant.celery import _store_lock_key
+
+        with session.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_unlock_shared(hashtextextended(%s, 0))",
+                [_store_lock_key(schema_name)],
+            )
+
+    def test_a_running_task_makes_the_destroy_refuse(self, worker):
+        from django.db import connection
+
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_busy",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('lock_timeout')")
+            (before,) = cursor.fetchone()
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=200),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "busy"
+        mock_delete.assert_not_called()
+        assert Tenant.objects.filter(pk=tenant.pk).exists()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('lock_timeout')")
+            assert cursor.fetchone() == (before,)
+
+    def test_a_store_the_gates_refuse_is_refused_without_waiting(self, worker):
+        """A live store always has tasks running: its refusal is its gate,
+        not ``busy`` after the wait."""
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant("destroy_live_busy")
+        self._run_a_task_in(worker, tenant.schema_name)
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=200),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "not_suspended"
+        mock_delete.assert_not_called()
+
+    def test_the_wait_ends_as_busy_under_a_statement_timeout(self, worker):
+        """Outside CI the connection's ``statement_timeout`` is as long as
+        the wait: the wait must still end as a refusal, not a cancelled
+        query."""
+        from django.db import connection
+
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_busy_timeout",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT set_config('statement_timeout', '300ms', true)"
+            )
+
+        with (
+            patch(
+                "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                timedelta(milliseconds=300),
+            ),
+            patch.object(Tenant, "delete") as mock_delete,
+            pytest.raises(DestroyRefused) as caught,
+        ):
+            destroy_tenant(tenant)
+
+        assert caught.value.refusal == "busy"
+        mock_delete.assert_not_called()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('statement_timeout')")
+            assert cursor.fetchone() == ("300ms",)
+
+    def test_the_destroy_goes_ahead_once_the_task_ended(self, worker):
+        from tenant.lifecycle import destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_after_task",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, tenant.schema_name)
+        self._end_the_task_in(worker, tenant.schema_name)
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            destroy_tenant(tenant)
+
+        mock_delete.assert_called_once_with(force_drop=True)
+
+    def test_a_task_that_closed_its_connection_still_holds_the_store(self):
+        """A real task, paused after it closed its own connection: the
+        destroy is refused ``busy`` until the task ends, then goes ahead."""
+        from tenant.lifecycle import DestroyRefused, destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_closing_task",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        _task_paused.clear()
+        _task_may_finish.clear()
+
+        def run_the_task():
+            try:
+                task_paused_after_closing_its_connection.apply_async(
+                    headers={"_schema_name": tenant.schema_name}
+                ).get()
+            finally:
+                connection.close()
+
+        task = threading.Thread(target=run_the_task)
+        task.start()
+        try:
+            assert _task_paused.wait(timeout=30)
+            with (
+                patch(
+                    "tenant.lifecycle.DESTROY_TASKS_WAIT",
+                    timedelta(milliseconds=200),
+                ),
+                patch.object(Tenant, "delete") as mock_delete,
+                pytest.raises(DestroyRefused) as caught,
+            ):
+                destroy_tenant(tenant)
+            assert caught.value.refusal == "busy"
+            mock_delete.assert_not_called()
+        finally:
+            _task_may_finish.set()
+            task.join(timeout=30)
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            destroy_tenant(tenant)
+
+        mock_delete.assert_called_once_with(force_drop=True)
+
+    def test_a_task_in_another_store_does_not_hold_it(self, worker):
+        from tenant.lifecycle import destroy_tenant
+
+        tenant = store_tenant(
+            "destroy_other_busy",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        self._run_a_task_in(worker, "some_other_store")
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            destroy_tenant(tenant)
+
+        mock_delete.assert_called_once_with(force_drop=True)
 
 
 # ---------------------------------------------------------------------------

@@ -203,7 +203,13 @@ need accounts. Off, on that store's hosts:
   `loyalty` (a `LoyaltyPause` opens, as it does for `LOYALTY_ENABLED`) and
   `wholesale` list the switch in their rows. The account mail (allauth's,
   the data export, re-engagement) and the abandoned-checkout reminder are
-  skipped as "Off: Customer accounts feature".
+  skipped as "Off: Customer accounts feature". No in-app notification is
+  written for a shopper (`notification.services.create_user_notification`,
+  the one writer the order, carrier, loyalty, favourites and blog tasks
+  share, returns `None`): no sign-in that could read it is accepted, and a
+  kept one would greet the shopper as a backlog once accounts are back.
+  The newsletter's "already subscribed" mail to an account's address
+  leaves out its link to `/account/subscriptions/`, as a guest's does.
 - **Every order is served as a guest's.** An account holder cannot sign in
   to reach their orders, so the order's uuid opens it as it opens a guest's
   (`Order.served_as_guest`, for `GUEST_ORDER_ACCESS_DAYS`): the order API's
@@ -213,7 +219,8 @@ need accounts. Off, on that store's hosts:
   AADE's) send such an order, and a guest's on any store, to the order
   confirmation by uuid, `/checkout/success/{uuid}`, and only an account
   holder's order on a store with accounts to `/account/orders/{id}`. In-app
-  notifications, read only signed in, keep the account page.
+  notifications, read only signed in (so written only where accounts are
+  on), keep the account page.
 
 What stays: guest checkout and guest orders by UUID, the newsletter form,
 product alerts, the contact and feedback forms, gift-card purchase and

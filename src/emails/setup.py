@@ -11,7 +11,6 @@ dashboards, so none of them can disagree.
 from __future__ import annotations
 
 from django.conf import settings
-from django_tenants.utils import get_public_schema_name
 
 from emails.models import EmailProvider
 from tenant.models import Tenant
@@ -53,10 +52,8 @@ def stores_lacking_resend_key() -> list[Tenant]:
     if not resend_is_selected():
         return []
     return list(
-        Tenant.objects.exclude(schema_name=get_public_schema_name())
+        Tenant.objects.active()
         .filter(
-            is_active=True,
-            suspended_at__isnull=True,
             from_email_verified=True,
             resend_api_key="",
         )

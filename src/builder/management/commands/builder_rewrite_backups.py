@@ -63,6 +63,7 @@ class Command(TenantCommandMixin, BaseCommand):
         "builder documents in place kept of them."
     )
     require_tenant_scope = True
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         self.add_tenant_arguments(parser)

@@ -162,11 +162,11 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
                 # Stripe events must not mutate its frozen data. Stripe
                 # will redeliver until the operator reactivates or the
                 # event ages out.
-                tenant = Tenant.objects.filter(
-                    schema_name=schema_name,
-                    is_active=True,
-                    suspended_at__isnull=True,
-                ).first()
+                tenant = (
+                    Tenant.objects.active()
+                    .filter(schema_name=schema_name)
+                    .first()
+                )
             except Exception:
                 tenant = None
 

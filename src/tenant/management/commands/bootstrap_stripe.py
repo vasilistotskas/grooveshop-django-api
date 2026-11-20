@@ -67,9 +67,7 @@ class Command(BaseCommand):
         if bool(schema) == bool(all_tenants):
             raise CommandError("Pass exactly one of --schema/--all-tenants.")
 
-        tenants = Tenant.objects.filter(
-            is_active=True, suspended_at__isnull=True
-        ).exclude(schema_name="public")
+        tenants = Tenant.objects.active()
         if schema:
             tenants = tenants.filter(schema_name=schema)
             if not tenants.exists():

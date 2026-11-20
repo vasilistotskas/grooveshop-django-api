@@ -36,10 +36,8 @@ proven visitor instead, and no module outside this one imports
 ``rest_framework.throttling`` (``tests/unit/core/test_throttle_outage.py``).
 """
 
-import hashlib
 import hmac
 import logging
-import uuid
 from collections.abc import Iterable, Mapping
 from contextlib import suppress
 from typing import ClassVar
@@ -57,6 +55,7 @@ from rest_framework.throttling import (
 )
 
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
+from core.cart_id import cart_uuid_from_request
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)
@@ -118,15 +117,26 @@ class ResilientThrottleMixin:
         return super().allow_request(request, view)  # type: ignore[misc]
 
 
-def _gateway_ident(request) -> str | None:
+def _gateway_ident(request, *, order: bool = False) -> str | None:
     """The cart or order to throttle on when the agent gateway calls.
 
     The gateway authenticates itself with the ``X-Internal-Gateway``
     shared secret (its ``INTERNAL_EVENTS_SECRET``). Returns ``None`` —
-    meaning "throttle normally" — unless the secret is configured,
-    matches, and the request names a cart (cart writes, order creation)
-    or an order (``?uuid=``, the payment-link calls). A cart token and an
-    order uuid both open what they name, so each is keyed by its hash.
+    meaning "throttle normally", on the address — unless the secret is
+    configured, matches, and the request names what it acts on and that
+    exists in this store: a cart (a cart token, or ``X-Cart-Id``) or, for
+    the payment calls that ask with ``order``, only the order the route
+    authorizes (its ``pk`` with that order's ``?uuid=``; cart headers are
+    not read, so they cannot give an order a fresh budget, and a payment
+    route without an order, the gift-card purchase, keeps the address).
+    A cart token and an order uuid both open what they name, so neither
+    is ever kept in a key. What counts as existing, and how each id is
+    read, is
+    ``cart.agent_token.existing_gateway_subject``: an id that names nothing
+    must not open a budget of its own, or a client making ids up would
+    never meet a limit.
+
+    Settled once per request: every throttle of the view asks.
     """
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
     provided = request.headers.get("X-Internal-Gateway", "")
@@ -140,21 +150,48 @@ def _gateway_ident(request) -> str | None:
         secret.encode("utf-8", "surrogateescape"),
     ):
         return None
-    # Imported here, not at the top: ``DEFAULT_THROTTLE_CLASSES`` names
-    # this module, so DRF imports it while ``rest_framework.views`` is
-    # still loading, and ``cart.agent_token`` reaches drf-spectacular,
-    # which needs ``APIView`` (a circular import at start-up).
-    from cart.agent_token import cart_token_from_request, hash_cart_token
+    settled = getattr(request, "_gateway_idents", None)
+    if settled is None:
+        settled = request._gateway_idents = {}
+    if order not in settled:
+        # Imported here, not at the top: ``DEFAULT_THROTTLE_CLASSES`` names
+        # this module, so DRF imports it while ``rest_framework.views`` is
+        # still loading, and ``cart.agent_token`` reaches drf-spectacular,
+        # which needs ``APIView`` (a circular import at start-up).
+        from cart.agent_token import existing_gateway_subject
 
-    token = cart_token_from_request(request)
-    if token:
-        # The token names the cart; key on its hash, never the token.
-        return hash_cart_token(token)
-    if cart_id := request.headers.get("X-Cart-Id"):
-        return cart_id
-    if order_uuid := request.GET.get("uuid"):
-        return "order:" + hashlib.sha256(order_uuid.encode()).hexdigest()
-    return None
+        settled[order] = existing_gateway_subject(request, order=order)
+    return settled[order]
+
+
+class GatewayIdentMixin(ResilientThrottleMixin):
+    """Identify a request the agent gateway authenticates by what it names.
+
+    Every buyer an AI platform serves reaches Django through the gateway
+    from the platform's address, so the per-address identity would put
+    them all in one budget. A request carrying the gateway's secret and
+    a cart or an order is identified by it instead (``_gateway_ident``),
+    so one cart or order still cannot exceed the rate; everyone else
+    keeps the proven visitor. DRF asks ``get_ident`` only for a caller
+    who is not signed in, so a signed-in agent is keyed on its account.
+
+    Only a cart or order that exists earns the key, never a bare id
+    (``_gateway_ident``). A throttle that guards the payment calls sets
+    ``gateway_names_order``, which cart routes never do: it is keyed on
+    the order the route authorizes alone, never on a cart, and on the
+    address where the route names no order (the gift-card purchase).
+
+    The rule lives here, once, for both halves of a pair
+    (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it),
+    for ``GiftCardCodeThrottle`` and for ``CouponApplyThrottle``.
+    """
+
+    gateway_names_order: ClassVar[bool] = False
+
+    def get_ident(self, request) -> str:
+        if ident := _gateway_ident(request, order=self.gateway_names_order):
+            return f"gw:{ident}"
+        return super().get_ident(request)
 
 
 class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
@@ -255,46 +292,33 @@ class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
     """
 
 
-class GatewayAnonThrottle(AnonIpRateThrottle):
-    """Key a request the agent gateway authenticates on its cart or order.
+class GatewayAnonThrottle(GatewayIdentMixin, AnonIpRateThrottle):
+    """The anonymous half of an Anon/User pair, keyed on the cart or order
+    when the agent gateway asks (``GatewayIdentMixin``), else on the
+    visitor.
 
-    Every buyer an AI platform serves reaches Django through the gateway
-    from the platform's address, so the per-address key would put them
-    all in one budget. A request carrying the gateway's secret and a cart
-    or an order is keyed on it instead (``_gateway_ident``); one cart or
-    order still cannot exceed the rate. Everyone else keeps the
-    per-address key.
+    Anonymous only, as its parent: a gateway request signed in as an
+    account (a linked agent) is throttled by the user budget alone.
     """
 
-    def get_cache_key(self, request, view):
-        # Anonymous only, as the parent: a gateway request signed in as an
-        # account (a linked agent) is throttled by the user budget alone.
-        user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated:
-            return None
-        ident = _gateway_ident(request)
-        if ident:
-            return self.cache_format % {
-                "scope": self.scope,
-                "ident": f"gw:{ident}",
-            }
-        return super().get_cache_key(request, view)
 
-
-class PaymentAttemptThrottle(ResilientThrottleMixin, UserRateThrottle):
+class PaymentAttemptThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
+    gateway_names_order = True
 
 
 class PaymentAttemptAnonThrottle(GatewayAnonThrottle):
     """Starting a payment, keyed per order when the agent gateway asks for
-    the link it needs right after placing an online order."""
+    the link it needs right after placing an online order (the order the
+    route authorizes, never a cart: ``GatewayIdentMixin``)."""
 
     scope = "payment_anon"
     fail_closed = True
+    gateway_names_order = True
 
 
-class OrderCreateThrottle(ResilientThrottleMixin, UserRateThrottle):
+class OrderCreateThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "order_create"
     fail_closed = True
 
@@ -313,7 +337,7 @@ class OrderCreateAnonThrottle(GatewayAnonThrottle):
     fail_closed = True
 
 
-class CartMutationThrottle(ResilientThrottleMixin, UserRateThrottle):
+class CartMutationThrottle(GatewayIdentMixin, UserRateThrottle):
     scope = "cart_mutation"
 
 
@@ -368,9 +392,19 @@ class CartQuoteAnonThrottle(GatewayAnonThrottle):
     scope = "cart_quote_anon"
 
 
-class CouponApplyThrottle(UserOrIpRateThrottle):
+class CouponApplyThrottle(GatewayIdentMixin, UserOrIpRateThrottle):
     """Tight per-caller throttle for coupon application — the endpoint is a
-    brute-forceable code oracle (valid/invalid distinguishes codes)."""
+    brute-forceable code oracle (valid/invalid distinguishes codes).
+
+    Behind the verified gateway secret the caller is the cart the request
+    names, when that cart exists (``GatewayIdentMixin``, as
+    ``GiftCardCodeThrottle``): the UCP and ACP coupon calls of every buyer
+    of a platform arrive from the platform's address, so per address one
+    buyer's attempts would spend everyone's. Guessing stays bounded: a
+    request that names no cart, a cart that does not exist (the apply
+    creates one) or no secret is keyed on the address as before, and a
+    cart is minted by a cart write, which is budgeted per address.
+    """
 
     scope = "coupon_apply"
     fail_closed = True
@@ -490,13 +524,11 @@ def _checkout_cart_ident(request) -> str | None:
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
         return f"user:{user.pk}"
-    try:
-        return "cart:" + str(uuid.UUID(request.headers.get("X-Cart-Id", "")))
-    except ValueError:
-        return None
+    cart_uuid = cart_uuid_from_request(request)
+    return f"cart:{cart_uuid}" if cart_uuid else None
 
 
-class GiftCardCodeThrottle(GiftCardCheckThrottle):
+class GiftCardCodeThrottle(GatewayIdentMixin, GiftCardCheckThrottle):
     """Bound GUESSING a gift-card code through checkout, not using one.
 
     The quote, the payment intent and order creation each say what a
@@ -532,17 +564,6 @@ class GiftCardCodeThrottle(GiftCardCheckThrottle):
     def __init__(self, codes: Iterable[str] = ()):
         super().__init__()
         self.codes = set(codes)
-
-    def get_cache_key(self, request, view):
-        user = getattr(request, "user", None)
-        if user is None or not user.is_authenticated:
-            ident = _gateway_ident(request)
-            if ident:
-                return self.cache_format % {
-                    "scope": self.scope,
-                    "ident": f"gw:{ident}",
-                }
-        return super().get_cache_key(request, view)
 
     @staticmethod
     def _digest(code: str) -> str:

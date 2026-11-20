@@ -14,11 +14,13 @@ from __future__ import annotations
 import pytest
 from django.test import RequestFactory, override_settings
 
+from cart.models import Cart
 from core.api.throttling import _gateway_ident
 from tenant.internal import is_internal_caller
 from tenant.views import _is_gateway
 
 HIGH_BYTE = "\xff"
+CART_ID = "521b14f2-da94-48eb-9426-9cfa922606f8"
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
@@ -50,16 +52,30 @@ def test_throttle_bypass_refuses_a_non_ascii_header():
     request = RequestFactory().get(
         "/",
         HTTP_X_INTERNAL_GATEWAY=HIGH_BYTE,
-        HTTP_X_CART_ID="abc",
+        HTTP_X_CART_ID=CART_ID,
     )
     assert _gateway_ident(request) is None
 
 
 @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
+@pytest.mark.django_db
 def test_throttle_bypass_still_works_for_the_real_secret():
+    cart = Cart.objects.create(user=None)
     request = RequestFactory().get(
         "/",
         HTTP_X_INTERNAL_GATEWAY="s3cret",
-        HTTP_X_CART_ID="abc",
+        HTTP_X_CART_ID=str(cart.uuid),
     )
-    assert _gateway_ident(request) == "abc"
+    assert _gateway_ident(request) == str(cart.uuid)
+
+
+@override_settings(AGENT_GATEWAY_INTERNAL_SECRET="s3cret")
+@pytest.mark.django_db
+@pytest.mark.parametrize("cart_id", ["abc", CART_ID])
+def test_a_cart_id_that_names_no_cart_is_not_an_identity(cart_id):
+    request = RequestFactory().get(
+        "/",
+        HTTP_X_INTERNAL_GATEWAY="s3cret",
+        HTTP_X_CART_ID=cart_id,
+    )
+    assert _gateway_ident(request) is None

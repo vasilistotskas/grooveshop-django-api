@@ -24,6 +24,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 
 from blog.factories.post import BlogPostFactory
 from product.factories.product import ProductFactory
+from tests.utils.emails import open_email_gates  # noqa: F401
 from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
@@ -201,6 +202,139 @@ def test_mail_for_an_account_holder_is_not_sent_without_accounts(key, on):
 
     assert len(accounts) == 1
     assert accounts[0].is_open() is on
+
+
+#: An in-app notification's words, in the one language a test needs.
+NOTIFICATION_WORDS = {"en": {"title": "Order placed", "message": "Thanks"}}
+
+
+@pytest.mark.parametrize("on", [True, False])
+def test_an_in_app_notification_is_written_only_while_accounts_are_on(
+    on, shopper, bind_tenant_and_schema
+):
+    """Nobody can read one on a store without accounts (the session, the
+    token and the WebSocket ticket that would show it are refused), so
+    none is written: no row, and no backlog if accounts come back."""
+    from notification.models import Notification, NotificationUser
+    from notification.services import create_user_notification
+
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=on)
+    _store_host(bind_tenant_and_schema)
+
+    result = create_user_notification(shopper, translations=NOTIFICATION_WORDS)
+
+    assert (result is not None) is on
+    assert NotificationUser.objects.filter(user=shopper).exists() is on
+    assert Notification.objects.exists() is on
+
+
+def test_a_store_team_member_is_still_notified_without_accounts(
+    bind_tenant_and_schema,
+):
+    from notification.services import create_user_notification
+    from tests.utils.staff import stamp_platform_identity
+
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=False)
+    _store_host(bind_tenant_and_schema)
+    staff = stamp_platform_identity(UserAccountFactory(is_staff=True))
+
+    assert (
+        create_user_notification(staff, translations=NOTIFICATION_WORDS)
+        is not None
+    )
+
+
+@pytest.mark.parametrize("on", [True, False])
+def test_an_account_holders_order_notifies_only_while_accounts_are_on(
+    on, shopper, bind_tenant_and_schema
+):
+    """The order's live notifications go through the same writer as the
+    carriers' (ACS, BOX NOW), so one of them stands for all."""
+    from notification.models import NotificationUser
+    from order.communications.notifications import notify_order_created_live
+    from order.factories.order import OrderFactory
+
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=on)
+    _store_host(bind_tenant_and_schema)
+    order = OrderFactory(user=shopper, num_order_items=0)
+    NotificationUser.objects.all().delete()
+
+    result = notify_order_created_live.run(order.id)
+
+    assert NotificationUser.objects.filter(user=shopper).exists() is on
+    # The task says what it did: "sent" only when a notification was written.
+    assert result["status"] == ("sent" if on else "skipped")
+
+
+@pytest.mark.parametrize(
+    ("task_name", "args"),
+    [
+        ("notify_order_created_live", ()),
+        ("notify_order_status_changed_live", ("SHIPPED",)),
+        ("notify_payment_confirmed_live", ()),
+        ("notify_payment_failed_live", ()),
+        ("notify_order_refunded_live", ()),
+    ],
+)
+def test_an_order_notification_reports_skipped_when_the_writer_wrote_none(
+    task_name, args, shopper, bind_tenant_and_schema
+):
+    """Accounts can be switched off between the task's own check and the
+    writer's: the writer then returns ``None``. Every order notification
+    task reports that as skipped, never as sent."""
+    from order.communications import notifications
+    from order.factories.order import OrderFactory
+
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=True)
+    _store_host(bind_tenant_and_schema)
+    order = OrderFactory(user=shopper, num_order_items=0)
+
+    with patch.object(
+        notifications, "create_user_notification", return_value=None
+    ):
+        result = getattr(notifications, task_name).run(order.id, *args)
+
+    assert result == {"status": "skipped"}
+
+
+@pytest.mark.usefixtures("open_email_gates")
+@pytest.mark.parametrize("on", [True, False])
+def test_the_already_subscribed_mail_offers_the_account_page_only_with_accounts(
+    on, shopper, bind_tenant_and_schema, settings
+):
+    """The newsletter form stays on a store without accounts, so a
+    subscription an account holds can still be told it exists; its link
+    to the account's subscriptions page would answer 404 there."""
+    from django.core import mail
+
+    from user.models.subscription import SubscriptionTopic, UserSubscription
+    from user.tasks import send_newsletter_already_subscribed_email_task
+
+    settings.NUXT_BASE_URL = "https://shop.example"
+    mail.outbox = []
+    switch_store_settings(CUSTOMER_ACCOUNTS_ENABLED=on)
+    _store_host(bind_tenant_and_schema)
+    topic = SubscriptionTopic.objects.create(
+        slug="newsletter",
+        name="Newsletter",
+        category=SubscriptionTopic.TopicCategory.NEWSLETTER,
+        is_active=True,
+        is_default=True,
+    )
+    subscription = UserSubscription.objects.create(
+        user=shopper,
+        topic=topic,
+        status=UserSubscription.SubscriptionStatus.ACTIVE,
+        language="en",
+    )
+
+    assert send_newsletter_already_subscribed_email_task.run(subscription.id)
+
+    [message] = mail.outbox
+    body = message.body + "".join(
+        content for content, _mime in message.alternatives
+    )
+    assert ("/account/subscriptions/" in body) is on
 
 
 # --- a credential given before the switch-off ----------------------------

@@ -425,31 +425,34 @@ def _starting_in_time(
     return movement
 
 
-def unanswered_sends(invoices: Any) -> Any:
-    """The receipts with movement among *invoices* whose last send has no
-    answer from AADE, so they may or may not be registered: one it did not
-    answer, or not readably (``ERROR_NO_ANSWER``), and one whose sender
-    stopped mid-request (a worker killed during the call), which is left
-    SUBMITTED with no code at all; that one only once
-    ``MYDATA_RETRY_AFTER_MINUTES`` passed since it was touched, as a send
-    in flight right now looks the same. A receipt AADE refused, or whose
-    credentials it refused, is not one: it carries AADE's code."""
+def sends_without_an_answer(invoices: Any) -> Any:
+    """The receipts among *invoices* whose last send has no answer from
+    AADE, so they may or may not be registered: one it did not answer, or
+    not readably (``ERROR_NO_ANSWER``), and one whose sender stopped
+    mid-request (a worker killed during the call), which is left SUBMITTED
+    with no code at all; that one only once ``MYDATA_RETRY_AFTER_MINUTES``
+    passed since it was touched, as a send in flight right now looks the
+    same. A receipt AADE refused, or whose credentials it refused, is not
+    one: it carries AADE's code."""
     from order.accounting.mydata.types import ERROR_NO_ANSWER
     from order.models.invoice import MyDataStatus
 
     stalled_before = timezone.now() - timedelta(
         minutes=settings.MYDATA_RETRY_AFTER_MINUTES
     )
-    return (
-        invoices.filter(
-            mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
-        )
-        .exclude(movement={})
-        .filter(
-            Q(mydata_error_code=ERROR_NO_ANSWER)
-            | Q(mydata_error_code="", updated_at__lte=stalled_before)
-        )
+    return invoices.filter(
+        mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
+    ).filter(
+        Q(mydata_error_code=ERROR_NO_ANSWER)
+        | Q(mydata_error_code="", updated_at__lte=stalled_before)
     )
+
+
+def unanswered_sends(invoices: Any) -> Any:
+    """The receipts with movement among *invoices* whose last send has no
+    answer (:func:`sends_without_an_answer`): sent again until registered,
+    and stamped once their parcel leaves unregistered."""
+    return sends_without_an_answer(invoices).exclude(movement={})
 
 
 def parcel_left_unregistered(order_id: int) -> bool:

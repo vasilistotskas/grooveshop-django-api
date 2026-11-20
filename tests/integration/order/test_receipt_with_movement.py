@@ -2626,3 +2626,27 @@ class TestCodeRabbitThirdReview:
         assert invoice.mydata_mark is not None
         assert invoice.mydata_status == MyDataStatus.CONFIRMED
         assert invoice.has_document()
+
+    def test_a_held_plain_receipt_without_an_answer_is_sent_again(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Its dispatch point was cleared before its first send, which went
+        out plain and unanswered; its order was canceled before the pickup.
+        Its cancel waits for a MARK, so the sweep sends it again."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(
+            movement={}, cancel_requested_at=timezone.now()
+        )
+        _untouched_for_a_while(invoice)
+
+        with (
+            mydata_enabled(),
+            patch.object(send_invoice_to_mydata, "apply_async") as sent,
+            patch.object(settle_canceled_receipt, "apply_async") as settled,
+        ):
+            assert retry_receipts_with_mydata() == 1
+
+        sent.assert_called_once_with(args=[order.id])
+        settled.assert_not_called()
+        assert Invoice.objects.get(pk=invoice.pk).transmission_failed_at is None

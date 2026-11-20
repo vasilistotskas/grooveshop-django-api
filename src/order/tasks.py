@@ -1465,7 +1465,10 @@ def retry_receipts_with_mydata() -> int:
       stopped mid-request) is sent again (``send_invoice_to_mydata``),
       whose own retries an outage outlasts: plainly while its parcel is
       with the store, with ``transmissionFailure`` 3 once it left
-      (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»).
+      (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»). So is
+      one set aside for a cancel whose send, plain or not, has no answer
+      (``movement.sends_without_an_answer``), or that was never sent: the
+      cancel needs its MARK.
     - A receipt set aside because its order was canceled before the parcel
       left (``Invoice.cancel_requested_at``) is settled
       (``settle_canceled_receipt``): its courier may have answered since, or
@@ -1481,6 +1484,7 @@ def retry_receipts_with_mydata() -> int:
     call).
     """
     from order.accounting.movement import (
+        sends_without_an_answer,
         stamp_the_parcels_left_unregistered,
         unanswered_sends,
     )
@@ -1498,11 +1502,15 @@ def retry_receipts_with_mydata() -> int:
         (
             unanswered_sends(untouched)
             # Set aside for a cancel before it was ever sent (its worker
-            # stopped before the send): nothing of it reached AADE, and its
+            # stopped before the send), or sent plainly without an answer
+            # (its dispatch point was cleared before the send): its
             # registration is what lets the cancel go through.
             | untouched.filter(
                 cancel_requested_at__isnull=False,
                 mydata_status=MyDataStatus.NOT_SENT,
+            )
+            | sends_without_an_answer(
+                untouched.filter(cancel_requested_at__isnull=False)
             )
         )
         # Least recently touched first, so no batch of receipts that keep

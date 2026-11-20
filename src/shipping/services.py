@@ -284,7 +284,7 @@ class ShippingService:
             return None
         return adapter.pickup_point_address(shipment) or PostalAddress(
             street=order.street,
-            number=order.street_number,
+            street_number=order.street_number,
             postal_code=order.zipcode,
             city=order.city,
         )

@@ -106,7 +106,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
             )
         return PostalAddress(
             street=locker.address_line_1,
-            number="",
+            street_number="",
             postal_code=locker.postal_code,
             city=locker.address_line_2,
         )

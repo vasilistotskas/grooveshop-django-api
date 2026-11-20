@@ -670,8 +670,8 @@ def _emit_address(parent: Element, tag: str, address: PostalAddress) -> None:
     element = SubElement(parent, tag)
     if address.street:
         SubElement(element, "street").text = address.street
-    if address.number:
-        SubElement(element, "number").text = address.number
+    if address.street_number:
+        SubElement(element, "number").text = address.street_number
     SubElement(element, "postalCode").text = "".join(
         address.postal_code.split()
     )

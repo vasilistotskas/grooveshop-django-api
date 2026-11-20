@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 #: order of AADE's ``AddressType``.
 LOADING_ADDRESS_SETTINGS = {
     "street": "MYDATA_LOADING_STREET",
-    "number": "MYDATA_LOADING_NUMBER",
+    "street_number": "MYDATA_LOADING_NUMBER",
     "postal_code": "MYDATA_LOADING_POSTAL_CODE",
     "city": "MYDATA_LOADING_CITY",
 }
@@ -354,7 +354,7 @@ def _recipient(order: Any) -> MovementParty:
     name = f"{order.first_name} {order.last_name}".strip()
     address = PostalAddress(
         street=(order.street or "").strip(),
-        number=(order.street_number or "").strip(),
+        street_number=(order.street_number or "").strip(),
         postal_code=(order.zipcode or "").strip(),
         city=(order.city or "").strip(),
     )
@@ -549,7 +549,9 @@ def flag_a_movement_the_receipt_does_not_cover(order: Any) -> None:
 
 
 def _one_line(address: PostalAddress) -> str:
-    street = " ".join(part for part in (address.street, address.number) if part)
+    street = " ".join(
+        part for part in (address.street, address.street_number) if part
+    )
     return ", ".join(
         part
         for part in (street, f"{address.postal_code} {address.city}")

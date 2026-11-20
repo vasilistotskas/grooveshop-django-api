@@ -43,7 +43,7 @@ class PostalAddress:
     the postcode and the city are not."""
 
     street: str
-    number: str
+    street_number: str
     postal_code: str
     city: str
 

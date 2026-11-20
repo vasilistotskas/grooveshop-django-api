@@ -40,14 +40,14 @@ pytestmark = pytest.mark.django_db
 #: The dispatch point, which is also the issuer's address
 #: (``movement._issuer``).
 DISPATCH_POINT = PostalAddress(
-    street="Τατοΐου", number="5", postal_code="145 61", city="Κηφισιά"
+    street="Τατοΐου", street_number="5", postal_code="145 61", city="Κηφισιά"
 )
 
 MOVEMENT = ReceiptMovement(
     dispatch_date=date(2026, 11, 19),
     loading=DISPATCH_POINT,
     delivery=PostalAddress(
-        street="Ερμού", number="10", postal_code="10563", city="Αθήνα"
+        street="Ερμού", street_number="10", postal_code="10563", city="Αθήνα"
     ),
     goods=(),
     issuer=MovementParty(
@@ -59,7 +59,10 @@ MOVEMENT = ReceiptMovement(
         name="Μαρία Παπαδοπούλου",
         country="GR",
         address=PostalAddress(
-            street="Ερμού", number="10", postal_code="105 63", city="Αθήνα"
+            street="Ερμού",
+            street_number="10",
+            postal_code="105 63",
+            city="Αθήνα",
         ),
     ),
 )

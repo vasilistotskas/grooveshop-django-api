@@ -240,8 +240,8 @@
       <h2>{% trans "Movement of goods" %}</h2>
       <p>{% trans "Purpose of movement" %}: {% trans "Sale" context "purpose of movement" %}</p>
       <p>{% trans "Start of movement" %}: {{ movement.dispatch_date|date:"Y-m-d" }}</p>
-      <p>{% trans "Loading place" %}: {% if movement.loading.street %}{{ movement.loading.street }}{% if movement.loading.number %} {{ movement.loading.number }}{% endif %}, {% endif %}{{ movement.loading.postal_code }} {{ movement.loading.city }}</p>
-      <p>{% trans "Delivery place" %}: {% if movement.delivery.street %}{{ movement.delivery.street }}{% if movement.delivery.number %} {{ movement.delivery.number }}{% endif %}, {% endif %}{{ movement.delivery.postal_code }} {{ movement.delivery.city }}</p>
+      <p>{% trans "Loading place" %}: {% if movement.loading.street %}{{ movement.loading.street }}{% if movement.loading.street_number %} {{ movement.loading.street_number }}{% endif %}, {% endif %}{{ movement.loading.postal_code }} {{ movement.loading.city }}</p>
+      <p>{% trans "Delivery place" %}: {% if movement.delivery.street %}{{ movement.delivery.street }}{% if movement.delivery.street_number %} {{ movement.delivery.street_number }}{% endif %}, {% endif %}{{ movement.delivery.postal_code }} {{ movement.delivery.city }}</p>
       <p>{% trans "Goods moved" %}:</p>
       <ul>
         {% for good in movement_goods %}<li>{{ good.name }} × {{ good.quantity }}</li>{% endfor %}

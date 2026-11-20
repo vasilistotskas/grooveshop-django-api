@@ -75,7 +75,7 @@ def test_a_receipts_movement_block_loses_the_buyer():
     subject = _subject()
     address = {
         "street": "Real Street",
-        "number": "10",
+        "street_number": "717",
         "postal_code": "10563",
         "city": "Real City",
     }
@@ -94,6 +94,10 @@ def test_a_receipts_movement_block_loses_the_buyer():
 
     assert "Real" not in str(out)
     assert "10563" not in str(out)
+    assert "717" not in str(out)
+    assert out["recipient"]["address"]["street_number"] == (
+        subject.place.street_number
+    )
     assert out["recipient"]["name"] == subject.person.full_name
     assert out["recipient"]["country"] == "GR"
     assert out["dispatch_date"] == "2026-11-20"
@@ -131,6 +135,9 @@ def test_key_kinds():
     assert redaction.key_kind("email") is Kind.EMAIL
     assert redaction.key_kind("ip") is Kind.IP
     assert redaction.key_kind("address_line_1") is Kind.STREET_LINE
+    assert redaction.key_kind("street_number") is Kind.STREET_NUMBER
+    assert redaction.key_kind("number") is None
+    assert redaction.key_kind("invoice_number") is None
     assert redaction.key_kind("file_name") is None
     assert redaction.key_kind("voucher_no") is None
 

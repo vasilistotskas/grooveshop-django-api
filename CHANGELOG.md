@@ -3,6 +3,134 @@
 
 
 
+## v3.255.1 (2026-11-20)
+
+### Bug fixes
+
+* fix(core): gateway guests share one address budget on the cart, order and payment throttles (#756) ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): identify gateway guests on the cart, order and payment throttles by their cart
+
+CartMutationThrottle, OrderCreateThrottle and PaymentAttemptThrottle are
+UserRateThrottles, which key a caller who is not signed in on get_ident,
+the address. Every buyer the agent gateway serves arrives from the
+gateway's address, so all agent guests shared one budget per route
+(60, 20 and 10 a minute) and a busy platform throttled every other agent
+checkout. Only the anonymous halves (GatewayAnonThrottle) knew the
+gateway's cart.
+
+The rule now lives once, in GatewayIdentMixin.get_ident: behind the
+verified gateway secret a request is identified by the cart or order it
+names, otherwise by the proven visitor. The three throttles,
+GatewayAnonThrottle and GiftCardCodeThrottle all take it from the mixin,
+so the two get_cache_key copies in GatewayAnonThrottle and
+GiftCardCodeThrottle are gone and the cache keys they produced are
+unchanged. Storefront guests, signed-in callers, the outage policy and
+the key layout are not affected. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): budget the gateway's coupon calls per cart
+
+CouponApplyThrottle keyed a caller on the address, so the UCP and ACP
+coupon calls of every buyer a platform serves, all arriving from the
+gateway's address, spent one 10/minute budget. It now takes
+GatewayIdentMixin: behind the verified gateway secret the caller is the
+cart the request names, as for the gift-card code budget. Guessing stays
+bounded, since a cart is minted by a cart write that names none yet and
+is budgeted per address. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): key a gateway cart or order on the uuid it parses to
+
+The gateway identity keyed a cart on the raw X-Cart-Id string and an
+order on the raw uuid query value. The cart lookup reads the header with
+uuid.UUID, which takes upper case, no hyphens, braces and urn:uuid: as
+one cart, so one cart got a fresh budget for every spelling, with the id
+supplied by an untrusted client through the gateway. The cart is now the
+uuid cart_uuid_from_request parses, the order the hash of its uuid's hex,
+and a value that is no uuid names nothing and is keyed on the address.
+
+cart_uuid_from_request moves to core.cart_id so the cart lookup, the
+idempotency middleware, the recommendation events and the throttles read
+the header with one parser without core importing the cart app; the
+core.middleware.idempotency -> cart.services ignored import is deleted.
+_checkout_cart_ident uses the same parser. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): budget a gateway call per cart or order only when it exists
+
+The gateway identity keyed any well-formed cart uuid, so a client that
+made ids up took a fresh budget for each. The cart-item create and the
+coupon apply create a cart when the named one does not resolve, so such
+a client escaped the per-address burst limit on cart creation and the
+tight coupon-guessing limit. A call behind the verified gateway secret
+now earns a per-cart budget only for a cart that exists in this store (a
+minted cart token, or a guest cart the cart lookup resolves); otherwise
+it is keyed on the address as before the gateway rule.
+
+The ?uuid= order key applied to every route, so a cart-item create
+without X-Cart-Id took its budget from it. Only the payment throttles
+read it now (gateway_names_order), and only for an order that exists.
+
+Guest authorization accepts an order uuid only in its canonical spelling
+while the payment key accepted every spelling, so refused attempts spent
+the budget of a corrected retry. Both go through core.canonical_uuid, and
+a non-canonical spelling is keyed on the address.
+
+The lookups live in cart.agent_token.existing_gateway_subject and are
+settled once per request, not once per throttle. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): budget a gateway payment call on the order its route authorizes
+
+The payment throttles keyed on the order named by ?uuid= alone, but every
+payment route authorizes the order its pk URL kwarg names and then checks
+that ?uuid= opens it. A call on order A carrying order B's uuid was
+refused by the view and still spent B's budget. The key now needs the
+order the route authorizes (the pk from the request's parser context)
+to carry that uuid; any other pairing is keyed on the address, and so is a
+route with no order pk.
+
+A cart token is keyed by the cart its grant names instead of its own
+hash, so several live tokens for one cart share one budget instead of one
+each (the coupon guessing limit followed the token, not the cart).
+
+core.canonical_uuid and docs/client-ip.md now say the throttle and
+authorization share the spelling rule only: the guest link's access
+window is checked by Order.opens_for_guest alone. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* fix(core): budget a gateway payment call on its order alone, never a cart
+
+existing_gateway_subject(order=True) returned the cart a call named
+(X-Cart-Token or X-Cart-Id) before it looked at the order, so a gateway
+caller paying a valid order got a fresh payment and payment_anon budget
+for each cart it sent. In order mode the subject is now only the order
+the route authorizes (path pk plus that order's canonical ?uuid=); cart
+headers are not read. No pk (the gift-card purchase) or a uuid that is
+not the route's order keys on the address. Cart mode is unchanged.
+
+Tests cover a valid order sent with an existing guest cart or a live
+cart token on both payment throttles, rotating the cart header against
+the budget, an invalid pairing with a cart header, and a gift-card
+purchase with a cart header. The payment budget integration test now
+builds its order without an earlier payment, which the route refused
+to replace, and asserts a payment is started where the budget allows. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+### Testing
+
+* test(core): hold the gateway subject lookup to one per request
+
+A view asks several throttles for the caller's key, and each one resolves
+the cart or order a gateway call names. Assert the existence lookup runs
+once across the throttles of an order create, a cart write that names an
+unknown cart and a payment route, and not at all without the secret. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
+* test(order): start the gateway payment budget test from a payable order and an in-memory Stripe
+
+The test went on to start a payment for the order it did not throttle, and
+that depended on the factory's random status and pay way and on Stripe
+credentials in the environment: with a payable order and no credentials
+the route raised ImproperlyConfigured. The orders are now pending, unpaid
+and on an online Stripe pay way, and the provider is the in-memory
+fake_stripe the payment-intent tests use, so the test asserts only the
+budget. ([`553f759`](https://github.com/vasilistotskas/grooveshop-django-api/commit/553f759e76f49dcc14d4f7de2d4b2ff390d34721))
+
 ## v3.255.0 (2026-11-19)
 
 ### Bug fixes

@@ -252,6 +252,9 @@ def test_the_exemption_ground_is_a_store_setting_that_ships_blank():
         ("x" * 45, True),
         ("x" * 46, False),
         ("GRVP\x01", False),
+        ("GR\rVP", False),
+        ("GR\nVP", False),
+        ("GR\tVP", False),
         (5, False),
     ],
 )

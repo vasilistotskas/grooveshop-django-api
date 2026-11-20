@@ -52,14 +52,18 @@ SERIES_PREFIX_MAX_LENGTH = SERIES_MAX_LENGTH - len("-YYYY")
 def validate_series_prefix_setting(value: object) -> bool:
     """Validator for ``MYDATA_INVOICE_SERIES_PREFIX`` and
     ``MYDATA_CREDIT_SERIES_PREFIX``: text whose series fits AADE's, and
-    only characters an XML document can carry. The uid is the hash of the
-    series as given, and the payload leaves out what XML cannot carry, so
-    such a character would give a uid AADE never lists for the series it
-    received."""
+    that AADE reads exactly as it was hashed. The uid is the hash of the
+    series as given, while the payload leaves out what XML cannot carry and
+    a parser reads a carriage return as a line feed (XML 1.0 §2.11): such
+    a character, or any line break or tab, would give a uid AADE never
+    lists for the series it received."""
     return (
         isinstance(value, str)
         and len(value) <= SERIES_PREFIX_MAX_LENGTH
-        and all(xml_character(character) for character in value)
+        and all(
+            xml_character(character) and character not in "\t\n\r"
+            for character in value
+        )
     )
 
 

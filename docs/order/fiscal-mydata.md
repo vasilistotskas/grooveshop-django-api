@@ -102,8 +102,10 @@ and `MYDATA_CREDIT_SERIES_PREFIX` name the two series (`GRVP-2026`,
 `GRVC-2026`); the credits have their own gapless counter (`CreditCounter`,
 numbers `CRD-YYYY-NNNNNN`). A prefix is refused where it is saved
 (`config.validate_series_prefix_setting`) when its series would be longer
-than AADE's 50 characters or it holds a character XML cannot carry: the uid
-hashes the series as given, and the payload would leave that character out.
+than AADE's 50 characters, or it holds a character XML cannot carry, a line
+break or a tab: the uid hashes the series as given, and AADE would read
+another (the payload leaves such a character out, a parser reads a carriage
+return as a line feed).
 
 **The receipt is issued when the order ships.** ΕΛΠ art. 13(a): a retail
 receipt for goods is issued "at the delivery or the start of the shipment". The

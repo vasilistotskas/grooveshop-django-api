@@ -9652,6 +9652,9 @@ msgstr "Μόνο το προσωπικό μπορεί να ενημερώσει 
 msgid "Only store staff may perform this action."
 msgstr "Μόνο το προσωπικό του καταστήματος μπορεί να εκτελέσει αυτή την ενέργεια."
 
+msgid "Only the agent gateway can name an agent checkout."
+msgstr "Μόνο το agent gateway μπορεί να ορίσει ολοκλήρωση αγοράς πράκτορα."
+
 msgid "Only used when target scope is 'Specific categories'; subcategories are included automatically"
 msgstr "Χρησιμοποιείται μόνο όταν το εύρος στόχευσης είναι 'Συγκεκριμένες κατηγορίες'· οι υποκατηγορίες συμπεριλαμβάνονται αυτόματα"
 

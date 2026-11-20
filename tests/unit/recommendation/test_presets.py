@@ -107,5 +107,5 @@ def test_reset_overwrites_every_preset_field_and_nothing_else():
 
 @pytest.mark.django_db
 def test_backfill_command_refuses_an_unknown_schema():
-    with pytest.raises(CommandError, match="No active non-public tenant"):
+    with pytest.raises(CommandError, match="No store with schema_name"):
         call_command("backfill_recommendation_slots", schema="nope")

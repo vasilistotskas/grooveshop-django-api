@@ -813,3 +813,68 @@ class TestScheduled:
         entry = settings.CELERY_BEAT_SCHEDULE["reconcile-pending-refunds"]
 
         assert entry["task"] == "tenant.tasks.fanout_reconcile_pending_refunds"
+
+
+class TestASuspendedStore:
+    """A refund reconciled for a suspended store finishes what the store
+    owes its customer: the confirmation email and the credit document. The
+    Meta Conversions API refund event is marketing, which is not owed, so a
+    suspended store sends none; an active one does."""
+
+    @pytest.mark.parametrize(
+        ("suspended", "meta_sent"), [(True, False), (False, True)]
+    )
+    def test_the_customer_is_told_and_credited_but_meta_only_if_active(
+        self, suspended, meta_sent
+    ):
+        from extra_settings.models import Setting
+
+        from meta_capi.client import MetaCapiResponse
+        from tenant.lifecycle import suspend_tenant
+        from tenant.models import SuspendedReason
+        from tests.utils.staff import store_tenant
+
+        store = store_tenant(
+            "refund_capi_store",
+            meta_pixel_id="1234567890",
+            meta_capi_access_token="EAA-test-token",
+        )
+        if suspended:
+            with mock.patch("tenant.tasks.flush_tenant_media_task.apply_async"):
+                assert suspend_tenant(store, reason=SuspendedReason.MANUAL)
+        Setting.objects.update_or_create(
+            name="META_CAPI_ENABLED",
+            defaults={"value": True, "value_type": "bool"},
+        )
+        # Ad consent given, and a phone the Facebook SDK accepts, so the
+        # store's state is the only thing that can hold the event back.
+        order = _order(
+            metadata={"meta": {"consent": {"ads": True}}},
+            phone="+302101234567",
+        )
+        stripe_api = _stripe_unknown(order)
+        _age(order)
+
+        with (
+            stripe_api,
+            mock.patch(
+                "order.signals.handlers.send_refund_confirmation_email"
+            ) as email,
+            mock.patch(
+                "order.signals.handlers.request_credit_documents"
+            ) as credit,
+            mock.patch("meta_capi.tasks.MetaCapiClient") as meta,
+        ):
+            meta.return_value.send.return_value = MetaCapiResponse(
+                events_received=1, fbtrace_id="trace", messages=[]
+            )
+            counts = reconcile_pending_refunds.apply(
+                headers={"_schema_name": store.schema_name}
+            ).get()
+
+        assert counts == {"settled": 1, "declined": 0, "unresolved": 0}
+        [refund] = _rows(order)
+        email.apply_async.assert_called_once()
+        assert email.apply_async.call_args.kwargs["args"] == [refund.pk]
+        credit.assert_any_call(order.id)
+        assert meta.return_value.send.called is meta_sent

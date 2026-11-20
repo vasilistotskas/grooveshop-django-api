@@ -84,3 +84,33 @@ class TestSeedAllSchemaFlag:
     def test_unknown_schema_rejected(self):
         with pytest.raises(CommandError, match="not found"):
             call_command("seed_all", "--schema", "nope-nope")
+
+    @pytest.mark.parametrize(
+        ("is_active", "suspended_at"),
+        [
+            (False, timezone.now() - timedelta(hours=2)),
+            (True, timezone.now() - timedelta(hours=2)),
+        ],
+        ids=["suspended", "active_with_leftover_suspended_at"],
+    )
+    def test_a_bare_run_on_public_refuses_while_any_store_exists(
+        self, is_active, suspended_at
+    ):
+        """Store existence decides it, not whether the store is active:
+        public's copies of the tenant tables serve no store."""
+        from tests.utils.staff import store_tenant
+
+        # The seeded stores go for this test (rolled back after it), so the
+        # one below is the only store there is.
+        Tenant.objects.stores().delete()
+        store_tenant(
+            "seed_guard_store",
+            is_active=is_active,
+            suspended_at=suspended_at,
+        )
+
+        with (
+            schema_context("public"),
+            pytest.raises(CommandError, match="seed_guard_store"),
+        ):
+            call_command("seed_all")

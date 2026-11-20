@@ -69,6 +69,7 @@ def capi_enabled(bind_tenant):
         SimpleNamespace(
             schema_name="test-capi-tenant",
             meta_pixel_id="1234567890",
+            is_suspended=False,
             meta_capi_access_token="EAA-test-token",
         )
     )

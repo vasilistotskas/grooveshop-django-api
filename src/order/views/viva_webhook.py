@@ -18,7 +18,6 @@ from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_tenants.utils import (
-    get_public_schema_name,
     schema_context,
     tenant_context,
 )
@@ -76,11 +75,8 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     from giftcard.models import GiftCardPurchase
     from tenant.models import Tenant
 
-    public = get_public_schema_name()
     candidates = []
-    for tenant in Tenant.objects.filter(
-        is_active=True, suspended_at__isnull=True
-    ).exclude(schema_name=public):
+    for tenant in Tenant.objects.active():
         with schema_context(tenant.schema_name):
             if (
                 Order.objects.filter(viva_order_code_q(order_code)).exists()
@@ -111,11 +107,7 @@ def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
 
     from tenant.models import Tenant
 
-    public = get_public_schema_name()
-    unavailable = Tenant.objects.filter(
-        is_active=False
-    ) | Tenant.objects.filter(suspended_at__isnull=False)
-    for tenant in unavailable.exclude(schema_name=public).distinct():
+    for tenant in Tenant.objects.unavailable():
         try:
             with schema_context(tenant.schema_name):
                 from giftcard.models import (
@@ -1957,17 +1949,7 @@ def _sale_exists_on_unavailable_tenant(sale_id: str) -> bool:
     "come back later", not "this means nothing here"."""
     from tenant.models import Tenant
 
-    unavailable = Tenant.objects.filter(
-        is_active=False
-    ) | Tenant.objects.filter(suspended_at__isnull=False)
-    return bool(
-        _tenants_holding_sale(
-            unavailable.exclude(
-                schema_name=get_public_schema_name()
-            ).distinct(),
-            sale_id,
-        )
-    )
+    return bool(_tenants_holding_sale(Tenant.objects.unavailable(), sale_id))
 
 
 def _resolve_tenant_candidates_for_sale(sale_id: str) -> list:
@@ -1983,12 +1965,7 @@ def _resolve_tenant_candidates_for_sale(sale_id: str) -> list:
     """
     from tenant.models import Tenant
 
-    return _tenants_holding_sale(
-        Tenant.objects.filter(
-            is_active=True, suspended_at__isnull=True
-        ).exclude(schema_name=get_public_schema_name()),
-        sale_id,
-    )
+    return _tenants_holding_sale(Tenant.objects.active(), sale_id)
 
 
 def _handle_account_transaction_event(request, event_data: dict):

@@ -31,8 +31,13 @@ def _schemas(**options):
 
 
 class _FakeQuerySet:
+    """Every schema it holds is an active store's, or public."""
+
     def __init__(self, schemas):
         self._schemas = schemas
+
+    def active(self):
+        return _FakeQuerySet([s for s in self._schemas if s != "public"])
 
     def filter(self, **kwargs):
         if "schema_name" in kwargs:

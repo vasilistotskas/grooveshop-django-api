@@ -25,6 +25,7 @@ class Command(TenantCommandMixin, BaseCommand):
     )
 
     require_tenant_scope = True
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         self.add_tenant_arguments(parser)

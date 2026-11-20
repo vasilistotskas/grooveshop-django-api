@@ -147,9 +147,11 @@ class Command(BaseCommand):
         if options["schema"]:
             if options["schema"] == public:
                 return [public]
-            exists = Tenant.objects.filter(
-                schema_name=options["schema"], is_active=True
-            ).exists()
+            exists = (
+                Tenant.objects.active()
+                .filter(schema_name=options["schema"])
+                .exists()
+            )
             if not exists:
                 raise CommandError(
                     f"No active tenant with schema "
@@ -159,8 +161,7 @@ class Command(BaseCommand):
             return [options["schema"]]
 
         schemas = list(
-            Tenant.objects.filter(is_active=True)
-            .exclude(schema_name=public)
+            Tenant.objects.active()
             .order_by("schema_name")
             .values_list("schema_name", flat=True)
         )

@@ -681,9 +681,9 @@ class Command(BaseCommand):
         current = getattr(db_connection, "schema_name", "public")
         if current == "public":
             tenants = list(
-                Tenant.objects.filter(is_active=True)
-                .exclude(schema_name="public")
-                .values_list("schema_name", flat=True)[:10]
+                Tenant.objects.stores().values_list("schema_name", flat=True)[
+                    :10
+                ]
             )
             if tenants:
                 raise CommandError(

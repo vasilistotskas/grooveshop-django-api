@@ -27,8 +27,8 @@ from tenant.legal_identity import (
     missing_disclosure_fields,
 )
 from tenant.lifecycle import (
+    DestroyRefused,
     activate_tenant,
-    destroy_refusal,
     destroy_tenant,
     is_protected_tenant,
     suspend_tenant,
@@ -327,15 +327,15 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
             result = destroy_tenant(
                 tenant, actor=getattr(request.user, "email", "") or ""
             )
-        except ValueError as exc:
-            # Protected, still live, or inside the suspension cooldown —
-            # the gates are the lifecycle function's, not this view's. The
-            # client gets the gate as a stable code, never the exception.
+        except DestroyRefused as exc:
+            # Protected, still live, inside the suspension cooldown, or with
+            # tasks still running in it — the gates are the lifecycle
+            # function's, not this view's. The client gets the gate as a
+            # stable code, never the exception.
             logger.warning("Tenant destroy refused: %s", exc)
-            refusal = destroy_refusal(tenant) or "invalid"
             raise ValidationError(
                 {"detail": _("This tenant cannot be destroyed right now.")},
-                code=f"tenant_destroy_{refusal}",
+                code=f"tenant_destroy_{exc.refusal}",
             ) from exc
         return Response(
             {

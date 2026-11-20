@@ -347,6 +347,23 @@ def _start_with_an_empty_worker_cache():
 
 
 @pytest.fixture(autouse=True)
+def _queued_search_syncs_do_not_run(monkeypatch):
+    """A queued ``sync_meilisearch_indexes`` (``activate_tenant`` queues one)
+    is recorded, not run.
+
+    ``meilisearch_sync_all_indexes`` closes the connection when it is called
+    inside a transaction, and every non-transactional test is one, with its
+    on_commit callbacks run at once and Celery eager. A test that means the
+    sync patches it itself.
+    """
+    from unittest.mock import MagicMock
+
+    from core.tasks import sync_meilisearch_indexes
+
+    monkeypatch.setattr(sync_meilisearch_indexes, "apply_async", MagicMock())
+
+
+@pytest.fixture(autouse=True)
 def _broker_not_known_down(monkeypatch):
     """One test failing a publish must not stop the next from trying its own."""
     monkeypatch.setattr("tenant.celery._broker_down_until", 0.0)

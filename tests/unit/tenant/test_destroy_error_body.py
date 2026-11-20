@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from rest_framework.exceptions import ValidationError
 
+from tenant.lifecycle import DestroyRefused
 from tenant.views import TenantAdminViewSet
 
 LEAK = "Refusing to destroy 'secret_schema': internal detail"
@@ -18,7 +19,7 @@ LEAK = "Refusing to destroy 'secret_schema': internal detail"
         ("protected", "tenant_destroy_protected"),
         ("not_suspended", "tenant_destroy_not_suspended"),
         ("cooldown", "tenant_destroy_cooldown"),
-        (None, "tenant_destroy_invalid"),
+        ("busy", "tenant_destroy_busy"),
     ],
 )
 def test_a_refused_destroy_carries_a_code_and_no_exception_text(refusal, code):
@@ -28,8 +29,10 @@ def test_a_refused_destroy_carries_a_code_and_no_exception_text(refusal, code):
     view.get_object = MagicMock()
 
     with (
-        patch("tenant.views.destroy_tenant", side_effect=ValueError(LEAK)),
-        patch("tenant.views.destroy_refusal", return_value=refusal),
+        patch(
+            "tenant.views.destroy_tenant",
+            side_effect=DestroyRefused("secret_schema", refusal, LEAK),
+        ),
         pytest.raises(ValidationError) as caught,
     ):
         view.destroy(view.request)

@@ -34,11 +34,27 @@ if TYPE_CHECKING:
 # irreversible mistake this window exists to prevent.
 SUSPEND_COOLDOWN = timedelta(hours=24)
 
+# How long a destroy waits for the tasks running in the store to end
+# (``tenant.celery.holding_store``) before it refuses.
+DESTROY_TASKS_WAIT = timedelta(seconds=30)
+
 DESTROY_REFUSALS = {
     "protected": "it is a protected tenant",
     "not_suspended": "it must be suspended first",
     "cooldown": f"it was suspended less than {SUSPEND_COOLDOWN} ago",
 }
+
+
+class DestroyRefused(ValueError):
+    """``destroy_tenant`` refused; ``refusal`` names why.
+
+    A key of ``DESTROY_REFUSALS``, or ``"busy"``: tasks were still running
+    in the store after ``DESTROY_TASKS_WAIT``.
+    """
+
+    def __init__(self, schema_name: str, refusal: str, reason: str) -> None:
+        super().__init__(f"Refusing to destroy {schema_name!r}: {reason}.")
+        self.refusal = refusal
 
 
 def is_protected_tenant(tenant) -> bool:
@@ -161,10 +177,24 @@ def activate_tenant(tenant) -> bool:
     if is_protected_tenant(tenant):
         return False
 
+    was_suspended = tenant.is_suspended
     tenant.is_active = True
     tenant.suspended_at = None
     tenant.suspended_reason = ""
     tenant.save(update_fields=["is_active", "suspended_at", "suspended_reason"])
+
+    if was_suspended:
+        # The search fan-outs and the deploy's ``meilisearch_apply_settings``
+        # reach active stores only, so the store's indexes may hold old
+        # settings and documents. One sync brings both back
+        # (``meilisearch_sync_all_indexes`` applies each model's settings
+        # first), in the store's schema, once the activation commits.
+        from core.tasks import sync_meilisearch_indexes
+        from tenant.celery import dispatch_on_commit
+
+        dispatch_on_commit(
+            sync_meilisearch_indexes, schema_name=tenant.schema_name
+        )
 
     # The flush is what makes media-stream re-read the tenant feed and
     # serve the store's images again at once rather than at its next poll.
@@ -242,6 +272,14 @@ def has_tenant_export(tenant) -> bool:
     return os.path.isdir(export_dir) and any(os.scandir(export_dir))
 
 
+def _refuse_unless_destroyable(tenant) -> None:
+    refusal = destroy_refusal(tenant)
+    if refusal is not None:
+        raise DestroyRefused(
+            tenant.schema_name, refusal, DESTROY_REFUSALS[refusal]
+        )
+
+
 def destroy_tenant(tenant, *, actor: str = "") -> dict:
     """Destroy a tenant: erase what must go, retain what must stay.
 
@@ -273,21 +311,35 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
     from django.utils import timezone
 
     from tenant import offboarding
+    from tenant.celery import hold_store_for_destroy
     from tenant.models import Tenant, TenantArchive
 
+    # A store the gates refuse is refused at once, before any wait for its
+    # tasks: a live store always has some running. The row is judged again
+    # under lock below, after the wait.
+    _refuse_unless_destroyable(Tenant.objects.get(pk=tenant.pk))
+
     with transaction.atomic():
+        # A task running in the store would find its schema gone between
+        # two queries and fall through to public's tables; wait for those
+        # to end, and hold off new ones until the drop commits. Taken
+        # before the row lock, so a task that writes the row cannot wait on
+        # this transaction while it waits on the task.
+        if not hold_store_for_destroy(
+            tenant.schema_name, wait=DESTROY_TASKS_WAIT
+        ):
+            raise DestroyRefused(
+                tenant.schema_name,
+                "busy",
+                f"its tasks were still running after {DESTROY_TASKS_WAIT}",
+            )
         # Judge the row as it is NOW, under lock — not the caller's
         # snapshot. Between an operator loading the changelist and
         # confirming, someone else may have re-activated or protected
         # the store; the gate must see that write, and the lock holds a
         # concurrent activate off until the drop has committed.
         tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
-        refusal = destroy_refusal(tenant)
-        if refusal is not None:
-            raise ValueError(
-                f"Refusing to destroy {tenant.schema_name!r}: "
-                f"{DESTROY_REFUSALS[refusal]}."
-            )
+        _refuse_unless_destroyable(tenant)
 
         schema_name = tenant.schema_name
         tenant_name = tenant.name

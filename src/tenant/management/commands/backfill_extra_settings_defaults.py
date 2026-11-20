@@ -1,10 +1,12 @@
 """Management command: backfill_extra_settings_defaults
 
-Iterates all active non-public tenants and calls
+Iterates every store, suspended ones included, and calls
 ``Setting.set_defaults_from_settings()`` inside each tenant's schema
 context.  This backfills any entries added to ``EXTRA_SETTINGS_DEFAULTS``
 in settings/store_settings.py that are not yet present in existing tenant
-databases.
+databases. A suspended store is backfilled too: this brings its data up
+to date with the code and starts no work, so a store suspended through a
+few deploys has every setting when it is reactivated.
 
 Usage:
     uv run python manage.py backfill_extra_settings_defaults
@@ -25,13 +27,15 @@ from __future__ import annotations
 import logging
 
 from django.core.management.base import BaseCommand
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import schema_context
+
+from core.management.tenant_mixin import TenantCommandMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
-    """Backfill EXTRA_SETTINGS_DEFAULTS entries across all active tenants.
+class Command(TenantCommandMixin, BaseCommand):
+    """Backfill EXTRA_SETTINGS_DEFAULTS entries across every store.
 
     Useful after adding new rows to EXTRA_SETTINGS_DEFAULTS in
     settings/store_settings.py: running this command propagates the
@@ -40,18 +44,21 @@ class Command(BaseCommand):
     """
 
     help = (
-        "Backfill missing EXTRA_SETTINGS_DEFAULTS entries into all active "
-        "tenant schemas (or a single --schema). Idempotent — skips rows "
+        "Backfill missing EXTRA_SETTINGS_DEFAULTS entries into every "
+        "store's schema, suspended ones included (or a single --schema). "
+        "Idempotent — skips rows "
         "that already exist."
     )
+
+    include_suspended_stores = True
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--schema",
             default=None,
             help=(
-                "Limit backfill to a single tenant schema name. "
-                "Defaults to all active non-public tenants."
+                "Limit backfill to a single store's schema name. "
+                "Defaults to every store."
             ),
         )
         parser.add_argument(
@@ -65,35 +72,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from tenant.models import Tenant
-
         target_schema = options["schema"]
         dry_run = options["dry_run"]
-        public_schema = get_public_schema_name()
-
         if target_schema:
-            tenants = Tenant.objects.filter(
-                schema_name=target_schema,
-                is_active=True,
-            ).exclude(schema_name=public_schema)
+            tenants = self.target_stores().filter(schema_name=target_schema)
             if not tenants.exists():
                 self.stdout.write(
                     self.style.WARNING(
-                        f"No active non-public tenant with "
-                        f"schema_name='{target_schema}' found."
+                        f"No store with schema_name='{target_schema}' found."
                     )
                 )
                 return
         else:
-            tenants = Tenant.objects.filter(is_active=True).exclude(
-                schema_name=public_schema
-            )
+            tenants = self.target_stores()
 
         total = tenants.count()
         if total == 0:
-            self.stdout.write(
-                self.style.WARNING("No active tenants to backfill.")
-            )
+            self.stdout.write(self.style.WARNING("No stores to backfill."))
             return
 
         self.stdout.write(

@@ -1841,8 +1841,9 @@ def _hold_for_staff(order: Order, invoice) -> str:
                     "answers its cancel with 301 (not found) and does not "
                     "list it. Check with your accountant whether it was "
                     "registered or canceled under other credentials, then "
-                    'press "Cancel receipt in myDATA" or "Issue credit '
-                    'documents (myDATA)". It is not settled automatically.'
+                    'press "Cancel receipt in myDATA (issued in error)" or '
+                    '"Issue credit documents (myDATA)". It is not settled '
+                    "automatically."
                 ),
             )
     return "held_for_staff"

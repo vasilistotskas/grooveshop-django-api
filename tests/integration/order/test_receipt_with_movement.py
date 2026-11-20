@@ -23,7 +23,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db.models import F
 from django.test import RequestFactory
-from django.utils import timezone
+from django.utils import timezone, translation
 from djmoney.money import Money
 
 from order.accounting.invoicing import receipt_issuable
@@ -2437,7 +2437,15 @@ class TestAReceiptMyDataCannotSee:
         assert invoice.mydata_status == MyDataStatus.CONFIRMED
         assert aade.cancelled == []
         assert aade.credits == []
-        assert len(_out_of_sight(order)) == 1
+        [note] = _out_of_sight(order)
+        # It names the two actions as staff see them on the order.
+        with translation.override("en"):
+            for name in (
+                "cancel_mydata_invoice_now",
+                "issue_credit_documents_now",
+            ):
+                label = getattr(OrderAdmin, name).short_description
+                assert f'"{label}"' in note
 
     def test_a_listing_that_does_not_answer_is_retried_not_held(
         self, django_capture_on_commit_callbacks

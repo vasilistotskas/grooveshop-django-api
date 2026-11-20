@@ -269,11 +269,12 @@ def receipt_movement(
     A block already sent is the document as issued and is sent again as it
     is, its dispatch date included, unless AADE refused it for its content
     (:func:`refused_for_its_content`): a send that went unanswered, or one
-    AADE answered with error 228, may be registered as it was. AADE's
-    documentation says nothing of error 280 (a ``dispatchDate`` before the
-    current date) for a document sent with ``transmissionFailure``, so a
-    receipt whose parcel left while myDATA was unreachable keeps the date
-    it was issued with.
+    AADE answered with error 228, may be registered as it was. AADE does
+    not apply error 280 (a ``dispatchDate`` before the current date) to a
+    document sent with ``transmissionFailure`` (its sandbox registered one
+    issued and dated the day before, and refused the same document without
+    it, 2026-11-20), so a receipt whose parcel left while myDATA was
+    unreachable keeps the date it was issued with.
 
     One date moves: AADE refuses a ``dispatchDate`` before the current
     date (error 280), so a plain receipt sent again on a later day (its

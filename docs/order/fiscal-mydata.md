@@ -152,9 +152,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   `_emit_movement`): the same 11.1 with `dispatchDate` (the day the receipt
   is issued, which is the day the voucher or parcel is created: a later day,
   such as the next business day after `DISPATCH_CUTOFF`, would date the
-  document after the movement started, and AADE's error table refuses an
-  earlier one, error 280, unverified; no `dispatchTime`, optional in phase
-  A and not known when the receipt is issued), `movePurpose` 1 «Πώληση»,
+  document after the movement started, and AADE refuses an earlier one,
+  error 280; no `dispatchTime`, optional in phase A and not known when the
+  receipt is issued), `movePurpose` 1 «Πώληση»,
   `otherDeliveryNoteHeader` (`loadingAddress`: the dispatch point;
   `deliveryAddress`: the ACS station's or the BOX NOW locker's address for a
   pickup order, `ShippingCarrierInterface.pickup_point_address`, BOX NOW's
@@ -199,10 +199,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   refused it for its content (`movement.refused_for_its_content`: a
   validation code, `BUILD` or `XSD`; nothing was registered, so it is built
   anew, dated the day it is sent). Error 228 is no such refusal: AADE holds
-  the document as it was sent (unverified: no 228 was provoked in the
-  sandbox). AADE's documentation says nothing of error 280 for a
+  the document as it was sent. AADE does not apply error 280 to a
   `transmissionFailure` document, so one whose parcel left during an outage
-  keeps its date (unverified). Every payload is checked against AADE's
+  keeps its date. Every payload is checked against AADE's
   v2.0.2 XSDs, vendored in `src/order/accounting/mydata/xsd/`, before it is
   sent.
 - **AADE's rules this section relies on, and which were checked.** #760
@@ -218,16 +217,23 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (SHA-1 over the fields joined by `-`, upper-case hex); a
   `withoutDigitalTransportTracking` document refused cancel (error 801);
   `CancelInvoice` of an 11.1 with movement, and 301 for one sent within a
-  second of the registration; `RequestTransmittedDocs` listing the uid,
-  `qrCodeUrl`, the movement's `dispatchDate` and each cancellation.
-  *Not exercised, unverified:* error 280 (a `dispatchDate` before the
-  current date) and that AADE does not apply it to a `transmissionFailure`
-  document; error 228 on a resend and its MARK recovery against AADE (the
-  lookup's matching is verified, the 228 answer is not); error 289's own
-  condition; whether AADE wants the issuer's seat rather than its dispatch
-  point as the issuer's address (it accepts either shape; the platform
-  sends the dispatch point, since the seat is one free line); the
-  `MOVEMENT_START_MAX_DAYS` limit, which is the decision's, not the API's.
+  second of the registration (seen in one run, not in the next, where the
+  same cancel went through at once); `RequestTransmittedDocs` listing the
+  uid, `qrCodeUrl`, the movement's `dispatchDate` and each cancellation;
+  error 280 for a document issued and dated the day before, and the same
+  document registered with `transmissionFailure` 3; error 228 for the
+  same document sent again; a registered receipt whose answer was lost
+  recovered by `look_up_mark` with no second send; and a receipt issued
+  the day before, its send unanswered and nothing registered, found
+  `ABSENT`, sent again dated today and registered.
+  *Not exercised, unverified:* the service's handling of a 228 answer (the
+  answer is verified, its handling only by tests, since the lookup runs
+  first); a `transmissionFailure` document dated more than a day back;
+  error 289's own condition; whether AADE wants the issuer's seat rather
+  than its dispatch point as the issuer's address (it accepts either
+  shape; the platform sends the dispatch point, since the seat is one free
+  line); the `MOVEMENT_START_MAX_DAYS` limit, which is the decision's, not
+  the API's.
 - **The buyer's personal data.** AADE requires the counterpart's name and
   address on a movement document (error 204, verified against the myDATA
   sandbox on 2026-11-20); that requirement is the ground for sending them,
@@ -264,8 +270,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   While the parcel is still with the store, a resend is the document as
   issued, plainly: one timeout is no loss of connection. Its `dispatchDate`
   is the one thing that moves: AADE refuses a date before the current one
-  (error 280, from AADE's error table; unverified), so a plain resend on a
-  later day is dated today, and only
+  (error 280), so a plain resend on a later day is dated today, and only
   when the lookup read AADE's whole window and found no document under the
   uid (`MarkLookup.ABSENT`; a listed document without a uid, which the
   schema allows, makes it `UNKNOWN`. The uid is AADE's: SHA-1 over the

@@ -310,10 +310,11 @@ class TestTheReceiptCarriesTheMovement:
         assert movement.dispatch_date == timezone.localdate()
 
     def test_a_document_sent_is_sent_again_as_issued(self):
-        """Its dispatch date included, even once past: AADE says nothing
-        of error 280 for a ``transmissionFailure`` document, which was
-        issued during the outage. Only a refusal of its content rebuilds
-        it; error 228 means AADE holds it as it was sent."""
+        """Its dispatch date included, even once past: AADE does not apply
+        error 280 to a ``transmissionFailure`` document, which was issued
+        during the outage (its sandbox registered one dated the day before,
+        2026-11-20). Only a refusal of its content rebuilds it; error 228
+        means AADE holds it as it was sent."""
         order = _acs_order()
         stored = receipt_movement(Invoice(order=order, movement={}))
         past = replace(

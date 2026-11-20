@@ -157,14 +157,24 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   again for AADE's answer to start, plus `MYDATA_RETRY_AFTER_MINUTES` as
   the margin in which AADE may still finish a request whose client gave
   up), and never moves it back, so a timeout changed later never shortens a
-  send already made. Before it a send with no answer on record is in
-  flight: never sent over or replaced, by the sweep or any other sender
-  (a claim over it, or a refusal of a document built to replace it, raises
-  `MyDataSendInFlight`, which the task leaves to the sweep rather than
-  spending retries inside the deadline), never stamped, and a lookup that
-  finds nothing does not decide it: a send may still register after the
-  listing was read. Credit documents share the send and the rule, and the
-  sweep takes them up the same way (`send_credit_to_mydata`).
+  send already made. Before it, a send with no answer on record at all
+  (SUBMITTED with an empty `mydata_error_code`: its sender is still
+  waiting, or stopped mid-request) is in flight: never sent over or
+  replaced, by the sweep or any other sender (a claim over it, or a
+  refusal of a document built to replace it, raises `MyDataSendInFlight`,
+  which the task leaves to the sweep rather than spending retries inside
+  the deadline), and never stamped. A send recorded unanswered
+  (`NO_ANSWER`: its client gave up, or AADE answered `TechnicalError`) is
+  not in flight: the sweep sends it again once `MYDATA_RETRY_AFTER_MINUTES`
+  passed since the row's last write, which can fall before its deadline,
+  under the same uid, so if AADE registers both requests it registers one
+  and answers the other with error 228, whose MARK is recovered. Whatever
+  the code, a lookup made before the deadline that finds nothing decides
+  no send: one may still register after the listing was read. Every claim
+  of a send first stamps a receipt whose parcel left while a send of it has
+  no answer, whoever sends it, so the document goes with
+  `transmissionFailure` 3. Credit documents share the send and the rule,
+  and the sweep takes them up the same way (`send_credit_to_mydata`).
   **Undecided is a fact on the row, not an error code**: it is kept through
   every later error (a resend refused for the store's credentials or for
   its content), and cleared only when AADE answers a send (it registers it,

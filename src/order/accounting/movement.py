@@ -536,9 +536,11 @@ def stamp_the_parcels_left_unregistered(invoices: Any) -> int:
     whose parcel left (``Order.shipped_at``) while its last send has no
     answer (:func:`unanswered_sends`), before anything sends it again:
     SHIPPED does it for its order (:func:`parcel_left_unregistered`), and
-    the sweep for the ones only found unanswered later (a sender that
-    stopped mid-request looks unanswered only once it is stale). Returns
-    how many were stamped."""
+    every claim of a send for its receipt
+    (``service._persist_submission_intent``), which covers one found
+    unanswered only later (a sender that stopped mid-request looks
+    unanswered only once its deadline passed), whoever sends it then.
+    Returns how many were stamped."""
     now = timezone.now()
     return unanswered_sends(
         invoices.filter(

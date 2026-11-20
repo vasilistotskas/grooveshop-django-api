@@ -43,6 +43,7 @@ from order.accounting.movement import (
     ReceiptMovement,
     receipt_movement,
     send_in_flight,
+    stamp_the_parcels_left_unregistered,
 )
 from order.accounting.mydata.builder import build_credit_xml, build_receipt_xml
 from order.accounting.mydata.client import MyDataClient
@@ -882,7 +883,9 @@ def _persist_submission_intent(
     state mirrored onto *invoice*), or when it was stamped as sent during
     a loss of connection after *invoice* was read (``STAMPED``, the stamp
     mirrored onto *invoice*): the document built from the stale copy
-    misses ``transmissionFailure`` and is built again. The stamp lands
+    misses ``transmissionFailure`` and is built again; so is one whose
+    parcel left while a send of it has no answer and that nothing stamped
+    yet, which this claim stamps first. The stamp lands
     only on a row whose send has no answer
     (``movement.unanswered_sends``), and this write starts a new send
     (``mydata_sent_at``), so once claimed it cannot land before the send.
@@ -917,6 +920,16 @@ def _persist_submission_intent(
         if send_in_flight(locked, at=now):
             invoice.mydata_send_deadline = locked.mydata_send_deadline
             return _SendClaim.IN_FLIGHT
+        if not isinstance(locked, RetailCredit) and (
+            stamp_the_parcels_left_unregistered(
+                type(locked)._default_manager.filter(pk=locked.pk)
+            )
+        ):
+            # Its parcel left while a send of it has no answer, and nothing
+            # stamped it yet (a sender that stopped was still in flight when
+            # the parcel left): stamped now, whoever sends it, and the
+            # document is built again with the indication.
+            locked.refresh_from_db(fields=["transmission_failed_at"])
         stamp = getattr(locked, "transmission_failed_at", None)
         if stamp != getattr(invoice, "transmission_failed_at", None):
             invoice.transmission_failed_at = stamp

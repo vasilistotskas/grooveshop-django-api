@@ -1790,13 +1790,16 @@ class TestCodeRabbitReview:
         AADE; AADE registered this one, so its block is what the row keeps."""
         order = _acs_order()
         invoice = _unanswered(order, django_capture_on_commit_callbacks)
-        sent = invoice.movement
-        other = dict(sent, dispatch_date="2099-01-01")
+        other = dict(invoice.movement, dispatch_date="2099-01-01")
+        # The block this send carries, as its claim stored it (a resend
+        # after midnight is dated that day): read when the send goes out.
+        sent = []
 
         with mydata_enabled(), FakeAade() as aade:
             answer = aade._send
 
             def another_sender_writes(xml_bytes):
+                sent.append(Invoice.objects.get(pk=invoice.pk).movement)
                 Invoice.objects.filter(pk=invoice.pk).update(movement=other)
                 return answer(xml_bytes)
 
@@ -1811,7 +1814,8 @@ class TestCodeRabbitReview:
 
         invoice.refresh_from_db()
         assert invoice.mydata_mark is not None
-        assert invoice.movement == sent
+        assert [invoice.movement] == sent
+        assert invoice.movement != other
 
     def test_a_canceled_receipt_stays_canceled_when_a_late_answer_lands(
         self, django_capture_on_commit_callbacks
@@ -3050,6 +3054,37 @@ class TestCodeRabbitSecondReview:
 
         retried.assert_not_called()
         assert aade.sent == []
+
+    def test_a_resend_by_hand_carries_the_stamp_for_a_parcel_that_left(
+        self, django_capture_on_commit_callbacks
+    ):
+        """The sender stopped mid-request, and the parcel left while that
+        send was still in flight, so SHIPPED could not stamp it. Staff send
+        it again once the send's deadline passed, before the sweep: the
+        claim stamps it, and the document goes with the indication."""
+        order = _acs_order()
+        invoice = _unanswered(order, django_capture_on_commit_callbacks)
+        Invoice.objects.filter(pk=invoice.pk).update(
+            mydata_error_code="", mydata_unanswered_since=None
+        )
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.SHIPPED, shipped_at=timezone.now()
+        )
+        assert not parcel_left_unregistered(order.id)
+        _stalled(invoice)
+
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            _listing_patch(side_effect=MyDataTransportError("timeout")),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            assert send_invoice_to_mydata(order.id) is True
+
+        [sent] = aade.receipts
+        assert sent.transmission_failure == "3"
+        invoice.refresh_from_db()
+        assert invoice.transmission_failed_at is not None
 
     def test_the_sweep_takes_the_least_recently_touched_first(
         self, django_capture_on_commit_callbacks, settings

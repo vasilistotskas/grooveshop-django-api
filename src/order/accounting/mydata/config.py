@@ -31,6 +31,7 @@ from typing import Literal
 from django.conf import settings
 
 from core.store_settings import store_setting
+from order.accounting.movement import xml_character
 from tenant.credentials import mydata_credentials
 from tenant.membership import is_demo_store
 
@@ -41,6 +42,25 @@ _BASE_URLS: dict[Environment, str] = {
     "dev": "https://mydataapidev.aade.gr",
     "prod": "https://mydatapi.aade.gr/myDATA",
 }
+
+#: The longest ``series`` AADE takes (``InvoiceHeaderType``, the XSD's
+#: ``maxLength``); a document's series is its prefix and ``-<year>``.
+SERIES_MAX_LENGTH = 50
+SERIES_PREFIX_MAX_LENGTH = SERIES_MAX_LENGTH - len("-YYYY")
+
+
+def validate_series_prefix_setting(value: object) -> bool:
+    """Validator for ``MYDATA_INVOICE_SERIES_PREFIX`` and
+    ``MYDATA_CREDIT_SERIES_PREFIX``: text whose series fits AADE's, and
+    only characters an XML document can carry. The uid is the hash of the
+    series as given, and the payload leaves out what XML cannot carry, so
+    such a character would give a uid AADE never lists for the series it
+    received."""
+    return (
+        isinstance(value, str)
+        and len(value) <= SERIES_PREFIX_MAX_LENGTH
+        and all(xml_character(character) for character in value)
+    )
 
 
 @dataclass(frozen=True)

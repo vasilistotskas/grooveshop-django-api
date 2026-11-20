@@ -13,6 +13,7 @@ from order.accounting.movement import (
     validate_loading_postal_code_setting,
     validate_loading_text_setting,
 )
+from order.accounting.mydata.config import validate_series_prefix_setting
 from order.communications.review_request import (
     validate_review_request_delay_days_setting,
 )
@@ -31,4 +32,5 @@ __all__ = [
     "validate_max_hold_minutes_setting",
     "validate_reservation_ttl_minutes_setting",
     "validate_review_request_delay_days_setting",
+    "validate_series_prefix_setting",
 ]

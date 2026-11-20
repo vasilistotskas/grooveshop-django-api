@@ -1018,14 +1018,16 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "MYDATA_INVOICE_SERIES_PREFIX",
         "type": "string",
+        "validator": "order.setting_validators.validate_series_prefix_setting",
         "value": "GRVP",
-        "description": "Prefix for the AADE series code. Combined with the issuer VAT + year to form e.g. 'GRVP-2026'.",
+        "description": "Prefix for the AADE series code. Combined with the year to form e.g. 'GRVP-2026'. At most 45 characters, so the series fits AADE's 50.",
     },
     {
         "name": "MYDATA_CREDIT_SERIES_PREFIX",
         "type": "string",
+        "validator": "order.setting_validators.validate_series_prefix_setting",
         "value": "GRVC",
-        "description": "Prefix for the AADE series code of the retail credit documents (11.4), which are a gapless series of their own. Combined with the year to form e.g. 'GRVC-2026'.",
+        "description": "Prefix for the AADE series code of the retail credit documents (11.4), which are a gapless series of their own. Combined with the year to form e.g. 'GRVC-2026'. At most 45 characters, so the series fits AADE's 50.",
     },
     {
         "name": "MYDATA_ISSUER_BRANCH",

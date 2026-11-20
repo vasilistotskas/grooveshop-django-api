@@ -377,8 +377,13 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     canceled in myDATA (`cancel_document`, an order note with the
     cancellation MARK) and no credit follows. AADE answers a cancel sent
     within a second of the registration with 301 ("not found"; verified
-    against the myDATA sandbox on 2026-11-20): that is retried like no
-    answer, never read as a refusal. A refusal, or a courier that
+    against the myDATA sandbox on 2026-11-20): within
+    `MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES` (10) of the registration
+    (`mydata_confirmed_at`) that is retried like no answer. After them AADE
+    does not hold the MARK for the credentials asking (a VAT or credentials
+    change, sandbox against production): a refusal like any other,
+    recorded on the row (the admin's cancel of a document issued in error
+    too). A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
     reaches the customer, and goes the credit path as before; one never
     sent (its worker stopped before the send) is sent then, since the hold

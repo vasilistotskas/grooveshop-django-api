@@ -18,6 +18,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 from djmoney.money import Money
@@ -33,7 +34,11 @@ from order.accounting.mydata.exceptions import (
     MyDataTransportError,
 )
 from order.accounting.mydata.service import MarkLookup
-from order.accounting.mydata.types import ERROR_DUPLICATE_UID, ERROR_NO_ANSWER
+from order.accounting.mydata.types import (
+    ERROR_DUPLICATE_UID,
+    ERROR_MARK_NOT_FOUND,
+    ERROR_NO_ANSWER,
+)
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
@@ -2189,6 +2194,16 @@ class TestCodeRabbitSecondReview:
         assert taken == [second.order_id, first.order_id, second.order_id]
 
 
+#: AADE's answer to a CancelInvoice of a MARK it does not show the cancel.
+_NOT_FOUND = (
+    b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
+    b"<index>1</index><statusCode>ValidationError</statusCode>"
+    b"<errors><error><message>Invoice with MARK 1 not found for VAT "
+    b"number 1</message><code>301</code></error></errors>"
+    b"</response></ResponseDoc>"
+)
+
+
 @pytest.mark.usefixtures("dispatch_point")
 class TestWhatAadesSandboxSaid:
     """#760 sent to AADE's myDATA sandbox (2026-11-20)."""
@@ -2199,13 +2214,6 @@ class TestWhatAadesSandboxSaid:
         """A CancelInvoice sent within a second of the registration was
         answered 301 ("not found"); seconds later it went through. Read as
         a refusal it would credit a receipt that is to be canceled."""
-        not_found = (
-            b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc><response>'
-            b"<index>1</index><statusCode>ValidationError</statusCode>"
-            b"<errors><error><message>Invoice with MARK 1 not found for VAT "
-            b"number 1</message><code>301</code></error></errors>"
-            b"</response></ResponseDoc>"
-        )
         with mydata_enabled(), FakeAade() as aade:
             order, invoice = _registered_cod_receipt(
                 django_capture_on_commit_callbacks
@@ -2220,7 +2228,7 @@ class TestWhatAadesSandboxSaid:
                 patch(
                     "order.accounting.mydata.client.MyDataClient."
                     "cancel_invoice",
-                    return_value=not_found,
+                    return_value=_NOT_FOUND,
                 ),
                 pytest.raises(MyDataTransportError),
             ):
@@ -2235,6 +2243,49 @@ class TestWhatAadesSandboxSaid:
         invoice.refresh_from_db()
         assert invoice.mydata_status == MyDataStatus.CANCELED
         assert aade.credits == []
+
+    def test_a_cancel_aade_never_finds_is_refused_noted_and_credited(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Past MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES of the registration a
+        301 is no lag: AADE does not hold the MARK for the credentials
+        asking (a VAT or credentials change). Retried, it would hold the
+        receipt with nothing recorded, every sweep, for good."""
+        with mydata_enabled(), FakeAade() as aade:
+            order, invoice = _registered_cod_receipt(
+                django_capture_on_commit_callbacks
+            )
+            Invoice.objects.filter(pk=invoice.pk).update(
+                mydata_confirmed_at=timezone.now()
+                - timedelta(
+                    minutes=settings.MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES + 1
+                )
+            )
+            _staff_cancel(
+                order,
+                django_capture_on_commit_callbacks,
+                settle=False,
+                return_value=True,
+            )
+            with (
+                patch(
+                    "order.accounting.mydata.client.MyDataClient."
+                    "cancel_invoice",
+                    return_value=_NOT_FOUND,
+                ) as cancel,
+                django_capture_on_commit_callbacks(execute=True),
+            ):
+                assert settle_canceled_receipt(order.id) == "credited"
+
+        invoice.refresh_from_db()
+        assert cancel.call_count == 1
+        assert invoice.cancel_requested_at is None
+        assert invoice.mydata_status == MyDataStatus.CONFIRMED
+        assert invoice.mydata_error_code == ERROR_MARK_NOT_FOUND
+        assert len(aade.credits) == 1
+        assert any(
+            "refused to cancel it: 301" in note for note in _notes(order)
+        )
 
     def test_a_store_without_its_name_and_address_gets_a_build_refusal(
         self, django_capture_on_commit_callbacks

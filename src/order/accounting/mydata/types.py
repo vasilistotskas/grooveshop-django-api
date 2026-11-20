@@ -104,8 +104,10 @@ ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
 # "Invoice with MARK ... not found": a CancelInvoice sent right after the
 # registration gets it until the document is visible to the cancel (AADE's
 # sandbox, 2026-11-20: within a second of the MARK; seconds later the
-# cancel went through), so it is retried like no answer, never read as a
-# refusal of the cancel.
+# cancel went through), so within MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES of
+# the registration it is retried like no answer. After that AADE does not
+# hold the MARK for the credentials asking (a VAT or credentials change,
+# sandbox against production), and it is a refusal like any other.
 ERROR_MARK_NOT_FOUND = "301"
 
 # Our own code (``mydata_error_code`` is ours to fill): the last send of the

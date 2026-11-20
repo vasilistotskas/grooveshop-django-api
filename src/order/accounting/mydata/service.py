@@ -33,6 +33,7 @@ from datetime import date, timedelta
 from enum import Enum
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from xmlschema import XMLSchemaValidationError
@@ -326,7 +327,9 @@ def cancel_document(invoice: Any) -> ResponseRow | None:
     code = first_error.code if first_error else ""
     message = first_error.message if first_error else row.status_code
 
-    if row.status_code == "TechnicalError" or code == ERROR_MARK_NOT_FOUND:
+    if row.status_code == "TechnicalError" or (
+        code == ERROR_MARK_NOT_FOUND and _registered_moments_ago(invoice)
+    ):
         # Transient AADE gateway fault — retryable, not a terminal
         # rejection. See ``submit_invoice`` for the full rationale (G0260).
         # So is a document the cancel cannot see yet: AADE answers 301
@@ -338,6 +341,17 @@ def cancel_document(invoice: Any) -> ResponseRow | None:
     # attempt failed. Record the error without touching mydata_status (G0262).
     _persist_error_only(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
+
+
+def _registered_moments_ago(document: Any) -> bool:
+    """Whether AADE registered *document* (``mydata_confirmed_at``) within
+    ``MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES``: the time a cancel may be
+    answered 301 because AADE does not show it the document yet. A row
+    with no registration time is past it."""
+    registered = document.mydata_confirmed_at
+    return registered is not None and timezone.now() - registered <= (
+        timedelta(minutes=settings.MYDATA_CANCEL_NOT_FOUND_RETRY_MINUTES)
+    )
 
 
 def find_cancellation_mark(invoice: Any) -> int | None:

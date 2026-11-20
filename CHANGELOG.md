@@ -3,6 +3,26 @@
 
 
 
+## v3.255.3 (2026-11-20)
+
+### Bug fixes
+
+* fix(order): refuse agentCheckout from a caller without the gateway's secret (#762) ([`f6197ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6197edc3a491375672739e5e13c4ec705d3174b))
+
+* fix(order): refuse agentCheckout from a caller without the gateway's secret
+
+An order create that names an agent checkout without the gateway's
+X-Internal-Gateway secret is refused with 400 agent_checkout_not_allowed
+under fields.agentCheckout, before anything is looked up or created,
+instead of having the field dropped. A gateway whose secret Django does
+not hold would otherwise have every checkout ignored, and each repeat
+of an order whose answer it lost would place another. The storefront
+never sends the field. ([`f6197ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6197edc3a491375672739e5e13c4ec705d3174b))
+
+### Testing
+
+* test(order): the agent checkout tests' summary says the field is refused without the secret ([`f6197ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6197edc3a491375672739e5e13c4ec705d3174b))
+
 ## v3.255.2 (2026-11-20)
 
 ### Bug fixes

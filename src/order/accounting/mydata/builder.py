@@ -52,6 +52,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from django.utils.translation import gettext as _
 
+from order.accounting.movement import xml_character
 from order.accounting.mydata.types import (
     CLASSIFICATION_CATEGORY_GOODS_SALES,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
@@ -627,7 +628,7 @@ def _build(
             classification_category=category_code,
         )
 
-    xml_bytes = tostring(root, encoding="utf-8", xml_declaration=True)
+    xml_bytes = _serialise(root)
     return BuiltInvoice(
         xml_bytes=xml_bytes,
         uid=uid,
@@ -676,6 +677,23 @@ def _emit_address(parent: Element, tag: str, address: PostalAddress) -> None:
         address.postal_code.split()
     )
     SubElement(element, "city").text = address.city
+
+
+def _serialise(root: Element) -> bytes:
+    """The document as AADE receives it, every text without the characters
+    XML 1.0 cannot carry. ElementTree writes them as they are, and a
+    product name, a buyer's name or address can hold one (a control
+    character pasted in); a line keeps its name from the order, so the
+    text is cleaned here, where every document is written, never at its
+    source."""
+    for element in root.iter():
+        if element.text:
+            element.text = "".join(
+                character
+                for character in element.text
+                if xml_character(character)
+            )
+    return tostring(root, encoding="utf-8", xml_declaration=True)
 
 
 def _derive_aa_from_document_number(number: str) -> int:

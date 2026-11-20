@@ -70,7 +70,7 @@ ISSUER_COUNTRY = "GR"
 MOVEMENT_START_MAX_DAYS = 5
 
 
-def _xml_character(character: str) -> bool:
+def xml_character(character: str) -> bool:
     """Whether XML 1.0 can carry *character* (its ``Char`` production): a
     payload with any other is no well-formed document."""
     point = ord(character)
@@ -94,7 +94,7 @@ def validate_loading_text_setting(value: object) -> bool:
     return (
         isinstance(value, str)
         and len(value) <= ADDRESS_TEXT_MAX_LENGTH
-        and all(_xml_character(character) for character in value)
+        and all(xml_character(character) for character in value)
     )
 
 

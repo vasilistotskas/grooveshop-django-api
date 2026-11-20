@@ -393,3 +393,23 @@ def test_the_dispatch_point_text_is_what_an_aade_document_can_carry(
     from order.accounting.movement import validate_loading_text_setting
 
     assert validate_loading_text_setting(value) is accepted
+
+
+def test_text_xml_cannot_carry_is_left_out_of_the_document():
+    """A control character pasted into a product name stays on the order
+    line; the document AADE receives is still well-formed XML."""
+    invoice = _receipt()
+    invoice.order.items.update(product_name="Mug\x01 with lid")
+    movement = replace(
+        _moving(invoice),
+        recipient=replace(MOVEMENT.recipient, name="Maria\x0b Papadopoulou"),
+    )
+
+    root = fromstring(_build(invoice, movement).xml_bytes)
+
+    descriptions = [
+        element.text for element in root.iter(f"{AADE_NS}itemDescr")
+    ]
+    assert "Mug with lid" in descriptions
+    names = [element.text for element in root.iter(f"{AADE_NS}name")]
+    assert "Maria Papadopoulou" in names

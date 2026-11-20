@@ -148,25 +148,32 @@ def handle_order_post_save(
 
         transaction.on_commit(send_status_changed_signal)
 
-    # Fires whenever the order's tracking becomes a value it did not have:
-    # set for the first time, or replaced (a carrier's voucher recorded
-    # over a number staff typed before the carrier held the parcel), both
-    # fields set. A save with the same values fires nothing. Every receiver
-    # is safe to run again: the tracking email is sent once
-    # (``shipping_notification_email_sent``), and the receipt is issued
-    # once (``issue_receipt_when_the_shipment_is_live``: an order's
+    # Fires, both fields set, whenever the order's tracking becomes a value
+    # it did not have (set for the first time, or replaced: a carrier's
+    # voucher recorded over a number staff typed before the carrier held
+    # the parcel), and whenever ``Order.add_tracking_info`` records it,
+    # unchanged values included (the voucher number staff typed, which the
+    # carrier then records). Any other save with the same values fires
+    # nothing. Every receiver is safe to run again: the tracking email is
+    # sent once (``shipping_notification_email_sent``), and the receipt is
+    # issued once (``issue_receipt_when_the_shipment_is_live``: an order's
     # receipt is never issued twice). Fire on commit to avoid a race where
     # the Celery task reads a not-yet-visible row.
     tracking_dispatched = (
-        hasattr(instance, "_original_tracking_number")
-        and hasattr(instance, "_original_shipping_carrier")
-        and bool(instance.tracking_number)
+        bool(instance.tracking_number)
         and bool(instance.shipping_carrier)
         and (
-            instance._original_tracking_number,
-            instance._original_shipping_carrier,
+            getattr(instance, "_tracking_recorded", False)
+            or (
+                hasattr(instance, "_original_tracking_number")
+                and hasattr(instance, "_original_shipping_carrier")
+                and (
+                    instance._original_tracking_number,
+                    instance._original_shipping_carrier,
+                )
+                != (instance.tracking_number, instance.shipping_carrier)
+            )
         )
-        != (instance.tracking_number, instance.shipping_carrier)
     )
     if tracking_dispatched:
 

@@ -489,6 +489,33 @@ class TestIssuedWhenTheShipmentIsLive:
         assert sent.is_delivery_note
 
     @pytest.mark.usefixtures("dispatch_point")
+    def test_a_voucher_staff_typed_before_it_was_adopted_issues_it(
+        self, django_capture_on_commit_callbacks
+    ):
+        """Staff typed the voucher's own number before the voucher was
+        adopted: recording it changes no value, and the carrier now holds
+        the parcel all the same."""
+        from shipping_acs.models import AcsShipment
+
+        order = _acs_order(voucher=False)
+        with (
+            mydata_enabled(),
+            FakeAade() as aade,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            OrderService.add_tracking_info(
+                order, "9810000749", "acs", auto_update_status=False
+            )
+            assert aade.sent == []
+            AcsShipment.objects.filter(order=order).update(
+                voucher_no="9810000749"
+            )
+            order.add_tracking_info("9810000749", "acs")
+
+        [sent] = aade.receipts
+        assert sent.is_delivery_note
+
+    @pytest.mark.usefixtures("dispatch_point")
     def test_a_tracking_number_on_an_order_the_merchant_delivers_does_not(
         self, django_capture_on_commit_callbacks
     ):

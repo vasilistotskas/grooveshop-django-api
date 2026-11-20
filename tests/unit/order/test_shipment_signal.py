@@ -1,8 +1,8 @@
 """Regression tests for the ``order_shipment_dispatched`` signal guards.
 
 The key invariant: the signal fires once each time the order's tracking
-becomes a value it did not have (set, or replaced), and never for a save
-that leaves it as it is. Its receivers are safe to run again: the tracking
+becomes a value it did not have (set, or replaced) or ``add_tracking_info``
+records it, and never for any other save that leaves it as it is. Its receivers are safe to run again: the tracking
 email is sent once, and the receipt is issued once.
 """
 
@@ -78,6 +78,24 @@ class ShipmentDispatchedSignalTestCase(TestCase):
         self.assertEqual(
             mock_signal.send.call_args.kwargs["tracking_number"], "9810000747"
         )
+
+    @patch("order.signals.handlers.order_shipment_dispatched")
+    def test_fires_when_the_carrier_records_the_number_staff_typed(
+        self, mock_signal
+    ) -> None:
+        """``add_tracking_info`` records the tracking as dispatched even
+        when the order holds those values already: staff typed the voucher
+        number before the carrier path recorded it."""
+        order = self._fresh_order()
+        with self.captureOnCommitCallbacks(execute=True):
+            order.tracking_number = "9810000747"
+            order.shipping_carrier = "acs"
+            order.save()
+        mock_signal.send.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            order.add_tracking_info("9810000747", "acs")
+        mock_signal.send.assert_called_once()
+        self.assertFalse(hasattr(order, "_tracking_recorded"))
 
     @patch("order.signals.handlers.order_shipment_dispatched")
     def test_refires_after_clear_then_set_new_tracking(

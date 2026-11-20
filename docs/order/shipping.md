@@ -29,7 +29,8 @@ Rules both carriers share:
   path that makes a voucher or parcel live records it with
   `Order.add_tracking_info`, and recording it issues the receipt with
   movement indication (`issue_receipt_for_pickup`), also over a number
-  staff typed before the carrier held the parcel, for a
+  staff typed before the carrier held the parcel, the voucher's own number
+  included, for a
   store whose receipts the platform issues and that has set its dispatch
   point ([§7.4](fiscal-movement-receipts.md)), dated the day the voucher is
   created.

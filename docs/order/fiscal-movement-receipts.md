@@ -131,9 +131,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   writes nor a tracking number staff type on the order is one). Every
   path that makes a shipment live records it through `Order.add_tracking_info`
   (an ACS voucher minted or adopted, a BOX NOW parcel created, taken over
-  after P410 or settled), and every change of the order's tracking (its
-  first number, or a voucher recorded over a number staff typed) sends
-  `order_shipment_dispatched`, whose receiver
+  after P410 or settled). Recording it sends `order_shipment_dispatched`
+  even when the order already holds those values (staff typed the voucher's
+  own number first), as does any other change of the order's tracking (its
+  first number, or a voucher recorded over a number staff typed), whose receiver
   (`issue_receipt_when_the_shipment_is_live`) calls
   `order.tasks.issue_receipt_for_pickup`: `generate_order_invoice` is queued
   while `issues_automatically()`. A store that issues by hand issues it from

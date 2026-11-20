@@ -638,7 +638,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # change, e.g. a refund) for the agent gateway's order events.
         self._original_payment_status = self.payment_status
         # Cache tracking state so the post_save handler can detect the
-        # null → set transition that fires ``order_shipment_dispatched``.
+        # tracking change that fires ``order_shipment_dispatched``.
         # Using the field values (not pk) covers both fresh instances
         # and refreshed-from-DB ones without a second query.
         self._original_tracking_number = self.tracking_number
@@ -1169,9 +1169,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def add_tracking_info(
         self, tracking_number: str, shipping_carrier: str
     ) -> None:
+        """Record the order's tracking as dispatched: the post-save handler
+        sends ``order_shipment_dispatched`` for it even when the order
+        already holds these values (a voucher number staff typed before
+        the carrier held the parcel, which the carrier then records)."""
         self.tracking_number = tracking_number
         self.shipping_carrier = shipping_carrier
-        self.save(update_fields=["tracking_number", "shipping_carrier"])
+        self._tracking_recorded = True
+        try:
+            self.save(update_fields=["tracking_number", "shipping_carrier"])
+        finally:
+            del self._tracking_recorded
 
     @property
     def items_count(self) -> int:

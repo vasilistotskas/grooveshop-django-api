@@ -41,6 +41,18 @@ class TestOpensForGuest:
         order = _order(age_days=15)
         assert order.opens_for_guest(str(order.uuid)) is False
 
+    def test_only_the_canonical_spelling_opens(self):
+        """One rule with the payment throttle (``core.canonical_uuid``):
+        the same uuid in upper case, without hyphens or in braces opens
+        nothing."""
+        order = _order()
+        for spelling in (
+            str(order.uuid).upper(),
+            order.uuid.hex,
+            "{" + str(order.uuid) + "}",
+        ):
+            assert order.opens_for_guest(spelling) is False
+
     @pytest.mark.parametrize("wrong", [None, "", "not-the-uuid"])
     def test_a_wrong_uuid_does_not(self, wrong):
         assert _order().opens_for_guest(wrong) is False

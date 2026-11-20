@@ -24,14 +24,60 @@ every DRF throttle: they are all defined in `src/core/api/throttling.py`,
 whose `ResilientThrottleMixin.get_ident` is `client_ip_or_peer`, the
 `anon`/`user` defaults too (`AnonIpRateThrottle`, `UserBudgetThrottle`).
 DRF's own classes take the rightmost hop alone, the shared peer, and no
-module imports them (`tests/unit/core/test_throttle_outage.py`). Two
+module imports them (`tests/unit/core/test_throttle_outage.py`). Some
 budgets are not keyed on the address alone. A request carrying the agent
-gateway's secret is keyed on the cart or order it names
-(`GatewayAnonThrottle`, `_gateway_ident`): every buyer of an AI platform
-arrives from the platform's address. And the gift-card guessing budget
-(`GiftCardCodeThrottle`) is keyed on the signed-in customer, else the
+gateway's secret is identified by the cart or order it names
+(`GatewayIdentMixin.get_ident`, `_gateway_ident`), because every buyer of
+an AI platform arrives from the platform's address. The rule lives once, in
+that mixin, and every pair of cart, order and payment budgets uses it: the
+anonymous half (`GatewayAnonThrottle`) and the signed-in half
+(`CartMutationThrottle`, `OrderCreateThrottle`, `PaymentAttemptThrottle`,
+whose `UserRateThrottle` keys a caller who is not signed in on
+`get_ident`), the coupon budget (`CouponApplyThrottle`) and the gift-card
+guessing budget (`GiftCardCodeThrottle`).
+
+**The address is the key unless the secret verifies and the request names
+something that exists.** What counts is settled once per request, by
+`cart.agent_token.existing_gateway_subject`. The cart and order-create
+budgets read the cart: a cart token that was minted and has not expired
+(keyed by the cart its grant names, so several live tokens for one cart are
+one budget); else a guest cart, by the uuid the cart lookup parses
+(`core.cart_id.cart_uuid_from_request`, so upper case, no hyphens, braces or
+`urn:uuid:` are one cart). A cart route's `?uuid=` names no order and is
+ignored. The payment throttles (`gateway_names_order`: `payment` and
+`payment_anon`) read only the order the route authorizes: the one its `pk`
+URL kwarg names, when `?uuid=` is that order's uuid (keyed by the uuid's
+hash; another order's uuid charges nothing to it). They never read a cart
+header, so a caller cannot give one order a fresh payment budget by sending
+another cart id or token. The same two throttles guard the gift-card
+purchase (`POST giftcard/purchase`), which has no order `pk`: a gateway call
+there is budgeted on the address. An id that is no uuid, names no cart or
+order, or comes without the secret is keyed on the address, as before the
+gateway rule. The cart writes create a cart when the one they
+name does not resolve (a cart-item create, a coupon apply), so an id that
+earned a budget just by being well formed would let a client that makes ids
+up escape the per-address burst limit on cart creation and the tight coupon
+guessing limit. For the coupon budget, guessing stays bounded for the same
+reason: a cart is minted by a cart write, which names no cart yet and is
+budgeted per address (`cart_mutation`).
+
+**Two readings of an order uuid, one spelling rule.** A cache key could accept
+any spelling, but guest authorization (`Order.opens_for_guest`) accepts only
+the canonical string (lower case, hyphenated), and refused spellings would
+use up the budget of a corrected retry. Both go through
+`core.canonical_uuid`: a non-canonical spelling is keyed on the address,
+never on the order. This is spelling parity, not authorization parity: the
+guest link's access window (`GUEST_ORDER_ACCESS_DAYS`) is checked by
+`opens_for_guest` alone, and the throttle may charge an expired link's
+order. (A cart's id is different: the cart lookup itself accepts every
+spelling, so the throttle follows it.)
+
+The gift-card guessing budget is keyed on the signed-in customer, else the
 gateway's cart, else the address, and counts only codes new to the cart
-(`docs/order/creation.md` §3.0). `edge_client_ip` itself never falls back to
+(`docs/order/creation.md` §3.0). The BoxNow nearest-locker budget stays
+per address: the endpoint calls BOX NOW live and the gateway's call names
+no cart.
+`edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
 (`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is

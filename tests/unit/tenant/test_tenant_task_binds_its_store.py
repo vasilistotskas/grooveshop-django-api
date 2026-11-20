@@ -9,6 +9,10 @@ the test suite) keeps them under ``request.headers``. Both must bind.
 
 from __future__ import annotations
 
+import threading
+from unittest.mock import patch
+
+import psycopg
 import pytest
 from celery.app.task import Context
 from django.db import connection
@@ -32,21 +36,33 @@ def probe_task() -> dict[str, object]:
     }
 
 
-@celery_app.task(base=TenantTask, name="tests.held_store_lock_probe")
-def held_store_lock_probe() -> int:
-    """Shared advisory locks this session holds on its store's key."""
+def _store_locks_held(schema_name: str) -> int:
+    """Shared advisory locks any session holds on the store's key."""
     from tenant.celery import _store_lock_key
 
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
-            "AND pid = pg_backend_pid() AND mode = 'ShareLock' "
-            "AND granted AND ((classid::bigint << 32) | objid::bigint) "
+            "AND mode = 'ShareLock' AND granted "
+            "AND ((classid::bigint << 32) | objid::bigint) "
             "= hashtextextended(%s, 0)",
-            [_store_lock_key(connection.schema_name)],
+            [_store_lock_key(schema_name)],
         )
         (count,) = cursor.fetchone()
     return count
+
+
+@celery_app.task(base=TenantTask, name="tests.held_store_lock_probe")
+def held_store_lock_probe() -> int:
+    return _store_locks_held(connection.schema_name)
+
+
+@celery_app.task(base=TenantTask, name="tests.closing_store_lock_probe")
+def closing_store_lock_probe() -> int:
+    """Closes its connection mid-run, as ``meilisearch_sync_all_indexes``
+    does, then goes on querying the store."""
+    connection.close()
+    return _store_locks_held(connection.schema_name)
 
 
 @pytest.mark.django_db
@@ -124,10 +140,10 @@ class TestEagerTaskBindsItsStore:
 
 @pytest.mark.django_db(transaction=True)
 class TestOutsideATransaction:
-    """A worker runs a task in autocommit: the lock is the session's, held
-    while the task runs and released when it ends."""
+    """A worker runs a task in autocommit: the lock is held on a session of
+    its own for the whole task and released when the task ends."""
 
-    def test_the_session_holds_the_store_only_while_the_task_runs(self):
+    def test_the_store_is_held_only_while_the_task_runs(self):
         tenant = store_tenant("worker_held_store")
 
         held = held_store_lock_probe.apply_async(
@@ -135,12 +151,58 @@ class TestOutsideATransaction:
         ).get()
 
         assert held == 1
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
-                "AND pid = pg_backend_pid()"
+        assert _store_locks_held(tenant.schema_name) == 0
+
+    def test_closing_the_task_connection_keeps_the_store_held(self):
+        """The task's own connection can end mid-run without opening a gap
+        in which a destroy could drop the schema under it."""
+        tenant = store_tenant("worker_closing_store")
+
+        held = closing_store_lock_probe.apply_async(
+            headers={"_schema_name": tenant.schema_name}
+        ).get()
+
+        assert held == 1
+        assert _store_locks_held(tenant.schema_name) == 0
+
+    @pytest.mark.parametrize(
+        "timeouts",
+        ["-c statement_timeout=300", "-c lock_timeout=300"],
+        ids=["statement_timeout", "lock_timeout"],
+    )
+    def test_a_task_waits_out_a_destroy_past_the_connection_timeouts(
+        self, timeouts
+    ):
+        """A task that starts while a destroy holds the store waits for it,
+        however long the destroy takes, instead of failing on the worker
+        connection's timeouts (``statement_timeout`` is 30 s there)."""
+        from tenant.celery import _store_lock_key
+
+        tenant = store_tenant("worker_waits_store")
+        params = connection.get_connection_params()
+        params["autocommit"] = True
+        options = {**connection.settings_dict["OPTIONS"], "options": timeouts}
+
+        with psycopg.connect(**params) as destroy:
+            destroy.execute(
+                "SELECT pg_advisory_lock(hashtextextended(%s, 0))",
+                [_store_lock_key(tenant.schema_name)],
             )
-            assert cursor.fetchone() == (0,)
+            commit = threading.Timer(
+                1.0, destroy.execute, ["SELECT pg_advisory_unlock_all()"]
+            )
+            connection.close()
+            with patch.dict(connection.settings_dict, {"OPTIONS": options}):
+                commit.start()
+                try:
+                    held = held_store_lock_probe.apply_async(
+                        headers={"_schema_name": tenant.schema_name}
+                    ).get()
+                finally:
+                    commit.join()
+                    connection.close()
+
+        assert held == 1
 
 
 class TestWorkerRequestCarriesTheSchema:

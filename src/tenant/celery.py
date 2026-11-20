@@ -8,10 +8,11 @@ from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
 
+import psycopg
 from celery import Task
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import DatabaseError, OperationalError, connection, transaction
+from django.db import OperationalError, connection, transaction
 from psycopg.errors import LockNotAvailable
 
 from core.retry import TRANSIENT_NETWORK_ERRORS
@@ -129,12 +130,20 @@ def holding_store(schema_name: str) -> Generator[None]:
     task then finds no row and is not run (``TenantArchive``).
 
     Inside a transaction (a task called within one, or applied eagerly)
-    the lock is the transaction's and ends with it. Otherwise it is the
-    session's, released when the task ends. A task that closes its
-    connection releases it then: closing ends the session, or under the
-    connection pool returns it, and the pool's ``reset``
-    (``settings.database._release_session_locks``) drops its advisory
-    locks.
+    the lock is the transaction's and ends with it. Otherwise it is held on
+    a database session of its own, opened for the task and closed when the
+    task ends. The task's own connection can then close mid-run
+    (``meilisearch_sync_all_indexes`` does), go back to the connection
+    pool or break, and the store stays held until the task ends: a lock on
+    that connection would be lost or left behind with it.
+
+    The session has no ``statement_timeout`` and no ``lock_timeout``, so a
+    task that starts during a destroy waits for it and is then skipped,
+    instead of failing on the worker connection's 30 s statement timeout.
+    The destroy bounds that wait: it waits ``DESTROY_TASKS_WAIT`` for the
+    running tasks, then holds the store only for its own transaction, whose
+    statements run under the connection's timeouts. The task's hard time
+    limit is the last bound.
     """
     key = _store_lock_key(schema_name)
     if connection.in_atomic_block:
@@ -145,35 +154,36 @@ def holding_store(schema_name: str) -> Generator[None]:
             )
         yield
         return
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT pg_advisory_lock_shared(hashtextextended(%s, 0))", [key]
-        )
+    params = connection.get_connection_params()
+    params["autocommit"] = True
+    params["options"] = (
+        f"{params.get('options', '')} -c statement_timeout=0 -c lock_timeout=0"
+    ).strip()
+    with connection.wrap_database_errors:
+        session = psycopg.connect(**params)
     try:
+        with connection.wrap_database_errors:
+            session.execute(
+                "SELECT pg_advisory_lock_shared(hashtextextended(%s, 0))",
+                [key],
+            )
         yield
     finally:
+        # Unlocked first so the store is free when the task returns;
+        # closing alone frees it only once the server ends the session.
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT pg_advisory_unlock_shared(hashtextextended(%s, 0))",
-                    [key],
-                )
-                (released,) = cursor.fetchone()
-        except DatabaseError:
-            # The connection broke during the task: its lock went with it.
+            session.execute(
+                "SELECT pg_advisory_unlock_shared(hashtextextended(%s, 0))",
+                [key],
+            )
+        except psycopg.Error:
             logger.warning(
-                "TenantTask: the connection of schema=%s broke before its "
-                "store lock was released; the lock went with the session",
+                "TenantTask: the store lock session of schema=%s broke "
+                "during the task; the lock went with it",
                 schema_name,
             )
-        else:
-            if not released:
-                # The task closed its connection, which released the lock
-                # (see the docstring).
-                logger.warning(
-                    "TenantTask: no store lock left to release for schema=%s",
-                    schema_name,
-                )
+        finally:
+            session.close()
 
 
 def hold_store_for_destroy(schema_name: str, *, wait: timedelta) -> bool:

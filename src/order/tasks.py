@@ -1471,15 +1471,16 @@ def retry_receipts_with_mydata() -> int:
     """Take up every receipt whose business with myDATA is unfinished: shipping
     never waits for it, so this sweep is how it gets done.
 
-    - A receipt with movement indication whose last send has no answer
-      (``movement.unanswered_sends``: AADE did not answer, or its sender
-      stopped mid-request) is sent again (``send_invoice_to_mydata``),
-      whose own retries an outage outlasts: plainly while its parcel is
-      with the store, with ``transmissionFailure`` 3 once it left
+    - A receipt AADE may hold without having answered
+      (``movement.sends_without_an_answer``: a send it did not answer and
+      nothing decided since, or whose sender stopped mid-request), plain
+      or with movement, held for a cancel or not, is sent again
+      (``send_invoice_to_mydata``, its MARK looked up first), whose own
+      retries an outage outlasts. One with movement goes plainly while its
+      parcel is with the store, with ``transmissionFailure`` 3 once it left
       (``Invoice.transmission_failed_at``, «Απώλεια διασύνδεσης»). So is
-      one set aside for a cancel whose send, plain or not, has no answer
-      (``movement.sends_without_an_answer``), or that was never sent: the
-      cancel needs its MARK.
+      one set aside for a cancel that was never sent: the cancel needs its
+      MARK.
     - A receipt set aside because its order was canceled before the parcel
       left (``Invoice.cancel_requested_at``) is settled
       (``settle_canceled_receipt``): its courier may have answered since, or
@@ -1497,7 +1498,6 @@ def retry_receipts_with_mydata() -> int:
     from order.accounting.movement import (
         sends_without_an_answer,
         stamp_the_parcels_left_unregistered,
-        unanswered_sends,
     )
     from order.accounting.mydata.config import load_config
     from order.accounting.mydata.types import ERROR_PICKUP_POINT_UNKNOWN
@@ -1512,17 +1512,13 @@ def retry_receipts_with_mydata() -> int:
     untouched = Invoice.objects.filter(updated_at__lte=cutoff)
     to_send = list(
         (
-            unanswered_sends(untouched)
+            sends_without_an_answer(untouched)
             # Set aside for a cancel before it was ever sent (its worker
-            # stopped before the send), or sent plainly without an answer
-            # (its dispatch point was cleared before the send): its
-            # registration is what lets the cancel go through.
+            # stopped before the send): its registration is what lets the
+            # cancel go through.
             | untouched.filter(
                 cancel_requested_at__isnull=False,
                 mydata_status=MyDataStatus.NOT_SENT,
-            )
-            | sends_without_an_answer(
-                untouched.filter(cancel_requested_at__isnull=False)
             )
             # Refused before sending for a pickup point whose address the
             # carrier's catalogue lacked: its sync may have added it.
@@ -1818,11 +1814,12 @@ def _release_to_credit(order: Order, invoice, reason: str) -> str:
                 Invoice.objects.filter(pk=current.pk)
             ).exists()
         ):
-            # Never sent (its worker stopped before the send), or its last
-            # send has no answer: the hold was what the sweep sent it for
-            # (a plain receipt's send is in no other sweep), so it is sent
-            # now, its MARK looked up first; its registration releases the
-            # credits and the email.
+            # Never sent (its worker stopped before the send), or AADE may
+            # hold it without having answered: sent now, its MARK looked
+            # up first, so its credits and email do not wait for the
+            # sweep, which takes up one whose send is still in flight once
+            # it is not. Its registration releases the credits and the
+            # email.
             dispatch_on_commit(send_invoice_to_mydata, [order.id])
     return "credited"
 

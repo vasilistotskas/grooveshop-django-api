@@ -35,8 +35,6 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 from xmlschema import XMLSchemaValidationError
 
@@ -98,34 +96,6 @@ def submit_document(invoice: Any) -> ResponseRow | None:
         # (idempotent), mirroring the 228-recovery path (G0262).
         return _registered_row(invoice)
 
-    from order.models.invoice import MyDataStatus
-
-    # A document sent before whose send has no answer on record may be
-    # registered: its latest send has no answer yet (SUBMITTED, with a
-    # uid: unanswered, or its sender stopped mid-request), or an earlier
-    # one went unanswered and nothing decided it since
-    # (``mydata_unanswered_since``, whatever refused a later send). Its MARK
-    # is looked up before anything is built or sent again, and the lookup
-    # decides it, or records it as undecided.
-    nothing_registered = False
-    if invoice.mydata_uid and (
-        invoice.mydata_status == MyDataStatus.SUBMITTED
-        or invoice.mydata_unanswered_since is not None
-    ):
-        try:
-            lookup = look_up_mark(invoice)
-        except MyDataAuthError as exc:
-            # AADE refused the credentials the lookup asked with: that says
-            # nothing of the document, which stays undecided (and stamped
-            # when its parcel leaves).
-            _record_lookup_outcome(invoice, decided=False)
-            _persist_lookup_refusal(invoice, message=exc.message)
-            raise
-        if lookup is MarkLookup.FOUND:
-            return _registered_row(invoice)
-        nothing_registered = lookup is MarkLookup.ABSENT
-        _record_lookup_outcome(invoice, decided=nothing_registered)
-
     config = load_config()
     if not config.is_ready():
         logger.debug(
@@ -145,13 +115,19 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             code="MISSING_SELLER_VAT",
         )
 
+    look_up = True
     while True:
+        if look_up:
+            verdict = _look_up_before_sending(invoice)
+            if verdict is MarkLookup.FOUND:
+                return _registered_row(invoice)
+            look_up = False
         try:
             built = _build_document(
                 invoice,
                 config=config,
                 issuer_vat=issuer_vat,
-                nothing_registered=nothing_registered,
+                nothing_registered=verdict is MarkLookup.ABSENT,
             )
         except ValueError as exc:
             # Unsupported VAT rate or malformed invoice_number — bad
@@ -169,6 +145,8 @@ def submit_document(invoice: Any) -> ResponseRow | None:
                 invoice,
                 code=code,
                 message=f"Failed to build myDATA payload: {exc}",
+                before_sending=True,
+                verdict=verdict,
             ):
                 return _registered_row(invoice)
             raise MyDataValidationError(str(exc), code=code) from exc
@@ -184,6 +162,8 @@ def submit_document(invoice: Any) -> ResponseRow | None:
                 invoice,
                 code="XSD",
                 message=f"Local XSD validation failed: {exc}",
+                before_sending=True,
+                verdict=verdict,
             ):
                 return _registered_row(invoice)
             raise MyDataValidationError(str(exc), code="XSD") from exc
@@ -206,12 +186,19 @@ def submit_document(invoice: Any) -> ResponseRow | None:
             series=built.series,
             aa=built.aa,
             movement=movement,
+            verdict=verdict,
         )
         if claim is _SendClaim.REGISTERED:
             # Another sender registered it since this one read the row.
             return _registered_row(invoice)
         if claim is _SendClaim.CLAIMED:
             break
+        if claim is _SendClaim.ADVANCED:
+            # Another sender began a send since this one read the row: its
+            # lookup said nothing of that send, so the row is read again
+            # and looked up again before anything is built.
+            invoice.refresh_from_db()
+            look_up = True
         # _SendClaim.STAMPED: the parcel left unregistered while this
         # sender looked its MARK up, so the document it built lacks the
         # loss-of-connection indication (and may carry a redated start).
@@ -298,17 +285,22 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
     credentials. A row registered meanwhile by another sender is left as
     it is.
 
-    A send AADE did not answer is recorded as undecided
-    (``mydata_unanswered_since``, from its start unless an earlier one is on
-    record); a refused one leaves an earlier undecided send as it is.
+    The answer belongs to the send *invoice* made (``mydata_sent_at``, as
+    its claim recorded it): it is written as the row's latest outcome only
+    while no other send began since, so a late answer never makes a newer
+    send look finished. A send AADE did not answer is recorded as
+    undecided either way (``mydata_unanswered_since``, from that send's
+    start unless an earlier one is on record); a refused one leaves an
+    earlier undecided send as it is.
 
     A receipt whose parcel is still with the store is sent again plainly.
     AADE's loss-of-connection indication (``transmissionFailure``,
     ``Invoice.transmission_failed_at``) belongs to a receipt with movement
     whose parcel left without a MARK because myDATA did not answer:
     stamped here when the parcel left before this send while a send of it
-    is undecided, by ``movement.parcel_left_unregistered`` when it leaves
-    after."""
+    is undecided and none is in flight, by
+    ``movement.parcel_left_unregistered`` when it leaves after."""
+    attempt = invoice.mydata_sent_at
     with transaction.atomic():
         locked = (
             type(invoice)
@@ -317,65 +309,110 @@ def _persist_send_error(invoice: Any, *, code: str, message: str) -> None:
         )
         if locked.mydata_mark:
             return
-        locked.mydata_error_code = code[:10]
-        locked.mydata_error_message = message or ""
-        fields = ["mydata_error_code", "mydata_error_message", "updated_at"]
-        if code == ERROR_NO_ANSWER and locked.mydata_unanswered_since is None:
-            locked.mydata_unanswered_since = locked.mydata_sent_at
-            fields.append("mydata_unanswered_since")
-        if (
-            locked.mydata_unanswered_since is not None
-            and getattr(locked, "movement", None)
-            and locked.transmission_failed_at is None
-            and locked.order.shipped_at is not None
-        ):
-            locked.transmission_failed_at = timezone.now()
-            fields.append("transmission_failed_at")
-            invoice.transmission_failed_at = locked.transmission_failed_at
-        locked.save(update_fields=fields)
-    invoice.mydata_error_code = code[:10]
-    invoice.mydata_error_message = message or ""
+        latest = locked.mydata_sent_at == attempt
+        fields = []
+        if code == ERROR_NO_ANSWER and attempt is not None:
+            since = locked.mydata_unanswered_since
+            if since is None or attempt < since:
+                locked.mydata_unanswered_since = attempt
+                fields.append("mydata_unanswered_since")
+        if latest:
+            locked.mydata_error_code = code[:10]
+            locked.mydata_error_message = message or ""
+            fields += [
+                "mydata_error_code",
+                "mydata_error_message",
+                "updated_at",
+            ]
+            if (
+                locked.mydata_unanswered_since is not None
+                and getattr(locked, "movement", None)
+                and locked.transmission_failed_at is None
+                and locked.order.shipped_at is not None
+            ):
+                locked.transmission_failed_at = timezone.now()
+                fields.append("transmission_failed_at")
+                invoice.transmission_failed_at = locked.transmission_failed_at
+        if fields:
+            locked.save(update_fields=fields)
+    if latest:
+        invoice.mydata_error_code = code[:10]
+        invoice.mydata_error_message = message or ""
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
 
 
-def _record_lookup_outcome(invoice: Any, *, decided: bool) -> None:
-    """Record what a lookup of *invoice*'s MARK concluded about the sends
-    AADE has not answered (``mydata_unanswered_since``): nothing of it is
-    registered (*decided*: the fact is cleared), or nothing can be said, so
-    the send is kept as undecided from the earliest one (the latest send's
-    start, ``mydata_sent_at``, unless an earlier one is on record), before
-    a send that may be refused for another reason replaces its code. A
-    lookup that finds it records its MARK (:func:`_persist_recovered_mark`).
-    A row registered meanwhile is left as it is."""
-    since = (
-        None
-        if decided
-        else Coalesce(F("mydata_unanswered_since"), F("mydata_sent_at"))
-    )
-    type(invoice)._default_manager.filter(
-        pk=invoice.pk, mydata_mark__isnull=True
-    ).update(mydata_unanswered_since=since)
-    invoice.mydata_unanswered_since = (
-        None
-        if decided
-        else invoice.mydata_unanswered_since or invoice.mydata_sent_at
-    )
+def _look_up_before_sending(invoice: Any) -> MarkLookup | None:
+    """Look the MARK of *invoice* up before it is built and sent again, when
+    it may be registered: its latest send has no answer yet (SUBMITTED, with
+    a uid: unanswered, or its sender stopped mid-request), or an earlier one
+    went unanswered and nothing decided it since
+    (``mydata_unanswered_since``, whatever refused a later send). ``None``
+    when nothing of it can be registered. What the lookup concludes of the
+    send the row records (``mydata_sent_at``) is written with the next
+    write that replaces it (:func:`_settle_the_last_send`), and only if no
+    other send began since."""
+    from order.models.invoice import MyDataStatus
+
+    if not invoice.mydata_uid or (
+        invoice.mydata_status != MyDataStatus.SUBMITTED
+        and invoice.mydata_unanswered_since is None
+    ):
+        return None
+    try:
+        return look_up_mark(invoice)
+    except MyDataAuthError as exc:
+        # AADE refused the credentials the lookup asked with: that says
+        # nothing of the document, which stays as it is (and stamped when
+        # its parcel leaves).
+        _persist_lookup_refusal(invoice, message=exc.message)
+        raise
+
+
+def _settle_the_last_send(locked: Any, verdict: MarkLookup | None) -> list[str]:
+    """The send *locked* records last (``mydata_sent_at``) is about to be
+    replaced: by a new send, or by a refusal of one built but never sent.
+    The caller has checked it is the send this sender's lookup covered.
+    Nothing registered under its uid (*verdict* ``ABSENT``) decides it and
+    every earlier one; otherwise a send that may still be held (no answer,
+    or none on record) is kept as undecided
+    (``mydata_unanswered_since``), so no later error can hide it. Returns
+    the fields written."""
+    from order.models.invoice import MyDataStatus
+
+    if verdict is MarkLookup.ABSENT:
+        if locked.mydata_unanswered_since is None:
+            return []
+        locked.mydata_unanswered_since = None
+        return ["mydata_unanswered_since"]
+    if (
+        locked.mydata_unanswered_since is None
+        and locked.mydata_status == MyDataStatus.SUBMITTED
+        and locked.mydata_error_code in ("", ERROR_NO_ANSWER)
+    ):
+        locked.mydata_unanswered_since = locked.mydata_sent_at
+        return ["mydata_unanswered_since"]
+    return []
 
 
 def _persist_lookup_refusal(invoice: Any, *, message: str) -> None:
     """Record that AADE refused the credentials the lookup of *invoice*'s
-    MARK asked with, keeping its last send's outcome (``mydata_error_code``):
-    the document may still be registered from that send. Staff read why
-    (``mydata_error_message``), and the touch spaces the sweep's next try
-    by ``MYDATA_RETRY_AFTER_MINUTES``, which registers it once the store's
-    credentials work again. A row registered meanwhile is left as it is."""
+    MARK asked with, keeping its last send's outcome (``mydata_error_code``)
+    and whether a send of it is undecided: the document may still be
+    registered. Staff read why (``mydata_error_message``), and the touch
+    spaces the sweep's next try by ``MYDATA_RETRY_AFTER_MINUTES``, which
+    registers it once the store's credentials work again. Written only
+    while the row records the send the lookup was about: a send that began
+    since, or a registration, is left as it is."""
     with transaction.atomic():
         locked = (
             type(invoice)
             ._default_manager.select_for_update()
             .get(pk=invoice.pk)
         )
-        if locked.mydata_mark:
+        if (
+            locked.mydata_mark
+            or locked.mydata_sent_at != invoice.mydata_sent_at
+        ):
             return
         locked.mydata_error_message = message
         locked.save(update_fields=["mydata_error_message", "updated_at"])
@@ -751,6 +788,9 @@ class _SendClaim(Enum):
     #: Its loss-of-connection stamp (``transmission_failed_at``) landed
     #: after the document was built: build it again from the row.
     STAMPED = "stamped"
+    #: Another sender began a send after this one read the row: read it
+    #: again, and look it up again, before building anything.
+    ADVANCED = "advanced"
 
 
 def _persist_submission_intent(
@@ -761,6 +801,7 @@ def _persist_submission_intent(
     series: str,
     aa: int,
     movement: dict[str, Any] | None = None,
+    verdict: MarkLookup | None = None,
 ) -> _SendClaim:
     """Lock + save the identity fields before the HTTP round-trip, and a
     receipt's movement indication with them (``Invoice.movement``, ``{}``
@@ -775,7 +816,15 @@ def _persist_submission_intent(
     misses ``transmissionFailure`` and is built again. The stamp lands
     only on a row whose send has no answer
     (``movement.unanswered_sends``), and this write starts a new send
-    (``mydata_sent_at``), so once claimed it cannot land before the send."""
+    (``mydata_sent_at``), so once claimed it cannot land before the send.
+
+    Each send is an attempt the row names by its start
+    (``mydata_sent_at``), and this claim is a compare-and-set on it:
+    another sender that began a send after *invoice* was read
+    (``ADVANCED``) leaves this one to read the row and look it up again,
+    since its lookup (*verdict*) said nothing of that send. Otherwise the
+    verdict settles the send the row recorded before this one
+    (:func:`_settle_the_last_send`)."""
     from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
@@ -787,10 +836,13 @@ def _persist_submission_intent(
         if locked.mydata_mark:
             _mirror_registration(invoice, locked)
             return _SendClaim.REGISTERED
+        if locked.mydata_sent_at != invoice.mydata_sent_at:
+            return _SendClaim.ADVANCED
         stamp = getattr(locked, "transmission_failed_at", None)
         if stamp != getattr(invoice, "transmission_failed_at", None):
             invoice.transmission_failed_at = stamp
             return _SendClaim.STAMPED
+        settled = _settle_the_last_send(locked, verdict)
         locked.mydata_uid = uid
         locked.mydata_invoice_type = invoice_type
         locked.mydata_series = series
@@ -813,6 +865,7 @@ def _persist_submission_intent(
             "mydata_error_code",
             "mydata_error_message",
             "updated_at",
+            *settled,
         ]
         if movement is not None:
             locked.movement = movement
@@ -826,6 +879,7 @@ def _persist_submission_intent(
     invoice.mydata_aa = aa
     invoice.mydata_status = MyDataStatus.SUBMITTED
     invoice.mydata_sent_at = locked.mydata_sent_at
+    invoice.mydata_unanswered_since = locked.mydata_unanswered_since
     invoice.mydata_error_code = ""
     invoice.mydata_error_message = ""
     if movement is not None:
@@ -922,15 +976,29 @@ def _drop_the_unregistered_pdf(locked: Any, fields: list[str]) -> None:
     transaction.on_commit(lambda: storage.delete(name), robust=True)
 
 
-def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:
+def _persist_failure(
+    invoice: Any,
+    *,
+    code: str,
+    message: str,
+    before_sending: bool = False,
+    verdict: MarkLookup | None = None,
+) -> bool:
     """Record a refusal: REJECTED, with its code and message. Returns
     ``False``, writing nothing, when the row holds a MARK (another sender
     registered it): a registration is never demoted.
 
+    The refusal belongs to one attempt: AADE's answer to the send *invoice*
+    made, or, *before_sending*, our own refusal of a document built to
+    replace the send the row records (its lookup's *verdict* settles that
+    send, :func:`_settle_the_last_send`). It is written only while the row
+    names that attempt (``mydata_sent_at``): a send another sender began
+    since owns the row's outcome, and this one is only raised.
+
     Error 228 answers that AADE holds the document under its uid, which
     decides every send of it (``mydata_unanswered_since`` is cleared; its
-    MARK is recovered next). Any other refusal is of this send's content
-    and says nothing of an earlier one AADE did not answer, which stays
+    MARK is recovered next). Any other refusal is of one document's content
+    and says nothing of an earlier send AADE did not answer, which stays
     undecided until a lookup decides it."""
     from order.models.invoice import MyDataStatus
 
@@ -943,22 +1011,28 @@ def _persist_failure(invoice: Any, *, code: str, message: str) -> bool:
         if locked.mydata_mark:
             _mirror_registration(invoice, locked)
             return False
-        locked.mydata_status = MyDataStatus.REJECTED
-        locked.mydata_error_code = code[:10]
-        locked.mydata_error_message = message or ""
-        fields = [
-            "mydata_status",
-            "mydata_error_code",
-            "mydata_error_message",
-            "updated_at",
-        ]
-        if code == ERROR_DUPLICATE_UID:
+        fields = []
+        if code == ERROR_DUPLICATE_UID and locked.mydata_unanswered_since:
             locked.mydata_unanswered_since = None
             fields.append("mydata_unanswered_since")
-        locked.save(update_fields=fields)
-    invoice.mydata_status = MyDataStatus.REJECTED
-    invoice.mydata_error_code = code[:10]
-    invoice.mydata_error_message = message or ""
+        if locked.mydata_sent_at == invoice.mydata_sent_at:
+            if before_sending:
+                fields += _settle_the_last_send(locked, verdict)
+            locked.mydata_status = MyDataStatus.REJECTED
+            locked.mydata_error_code = code[:10]
+            locked.mydata_error_message = message or ""
+            fields += [
+                "mydata_status",
+                "mydata_error_code",
+                "mydata_error_message",
+                "updated_at",
+            ]
+        if fields:
+            locked.save(update_fields=fields)
+    if locked.mydata_sent_at == invoice.mydata_sent_at:
+        invoice.mydata_status = MyDataStatus.REJECTED
+        invoice.mydata_error_code = code[:10]
+        invoice.mydata_error_message = message or ""
     invoice.mydata_unanswered_since = locked.mydata_unanswered_since
     return True
 

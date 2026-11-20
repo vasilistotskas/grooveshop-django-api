@@ -156,13 +156,24 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   or answers 228: it holds it) or a lookup decides (it finds the document,
   or finds nothing under its uid). `movement.sends_without_an_answer` is the
   one reader (the sweep, the stamp when a parcel leaves, a receipt released
-  from its cancel hold): an undecided receipt, or one whose sender stopped,
-  never one whose latest send is in flight. One whose credentials AADE
-  refused with nothing undecided keeps AADE's code and waits for staff.
+  from its cancel hold): an undecided receipt of any status, or one whose
+  sender stopped, never one whose latest send is in flight. One whose
+  credentials or content AADE refused with nothing undecided keeps AADE's
+  code and waits for staff.
+  **Every result belongs to one send.** A send is named by its start
+  (`mydata_sent_at`), and every result is written with a compare-and-set
+  on it: an answer, a refusal or a lookup's verdict reaches the row's
+  outcome only while the row still names the send it is about, so a late
+  answer never makes a newer send look finished and an older lookup never
+  clears a newer unanswered send. A lost answer is recorded as undecided
+  from its own send's start whatever send runs now. A sender whose row
+  moved on to another send before it claimed reads the row and looks it
+  up again.
   Before any document that may be registered is sent again (SUBMITTED, or
   undecided) its MARK is looked up (`service.look_up_mark`:
-  `RequestTransmittedDocs` by its uid, the 228 recovery); a lookup that
-  cannot decide records the send as undecided before the resend.
+  `RequestTransmittedDocs` by its uid, the 228 recovery); what the lookup
+  concludes of the send the row records is written with the claim of the
+  resend, so a lookup that cannot decide keeps that send undecided.
   Credentials AADE refuses there are recorded as a message only, so a
   parcel that leaves is still stamped, and the sweep tries again every
   `MYDATA_RETRY_AFTER_MINUTES` until the credentials work (one order note,
@@ -200,7 +211,8 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   loss of connection. The task retries as before, and
   `order.tasks.retry_receipts_with_mydata` (beat
   `retry-receipts-with-mydata`, every 5 minutes, every store suspended or
-  not) sends every unanswered receipt with movement not touched for
+  not) sends every receipt AADE may hold unanswered, plain or with
+  movement (`movement.sends_without_an_answer`), not touched for
   `MYDATA_RETRY_AFTER_MINUTES` (15) again, up to `MYDATA_RETRY_SWEEP_BATCH`
   per run, least recently touched first, until it is registered. Overlapping sends are harmless: they
   carry the same uid, AADE registers one and answers the other with 228,

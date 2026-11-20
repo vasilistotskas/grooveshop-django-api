@@ -430,10 +430,11 @@ def sends_without_an_answer(invoices: Any) -> Any:
     sends was answered with a registration: a send of theirs went
     unanswered (or not readably, ``ERROR_NO_ANSWER``) and nothing has
     decided it since (``mydata_unanswered_since``: kept through later
-    errors, a later send refused for the store's credentials included,
-    until AADE answers a send or a lookup finds the document or nothing),
-    or their latest sender stopped mid-request (a worker killed during the
-    call), which leaves them SUBMITTED with no code at all.
+    errors, a later send refused for the store's credentials or for its
+    content included, until AADE answers a send or a lookup finds the
+    document or nothing), whatever their status; or their latest sender
+    stopped mid-request (a worker killed during the call), which leaves
+    them SUBMITTED with no code at all.
 
     Never one whose latest send is in flight right now, which looks like a
     stopped one until ``MYDATA_RETRY_AFTER_MINUTES`` passed since that send
@@ -448,14 +449,15 @@ def sends_without_an_answer(invoices: Any) -> Any:
     stalled_before = timezone.now() - timedelta(
         minutes=settings.MYDATA_RETRY_AFTER_MINUTES
     )
+    no_answer_on_record = Q(
+        mydata_status=MyDataStatus.SUBMITTED, mydata_error_code=""
+    )
     return (
-        invoices.filter(
-            mydata_mark__isnull=True, mydata_status=MyDataStatus.SUBMITTED
-        )
-        .exclude(mydata_error_code="", mydata_sent_at__gt=stalled_before)
+        invoices.filter(mydata_mark__isnull=True)
+        .exclude(no_answer_on_record, mydata_sent_at__gt=stalled_before)
         .filter(
             Q(mydata_unanswered_since__isnull=False)
-            | Q(mydata_error_code="", mydata_sent_at__lte=stalled_before)
+            | (no_answer_on_record & Q(mydata_sent_at__lte=stalled_before))
         )
     )
 

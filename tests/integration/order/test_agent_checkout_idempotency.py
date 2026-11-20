@@ -13,8 +13,9 @@ What is pinned here:
   stock taken once, even after the first order kept, emptied or deleted
   the cart;
 * only the gateway can name a checkout: without its secret the field is
-  ignored, so no other caller ties an order to a checkout or is answered
-  an order by naming one;
+  refused (400 ``agent_checkout_not_allowed``) before anything is looked
+  up or created, so no other caller ties an order to a checkout or is
+  answered an order by naming one;
 * ``Order.agent_checkout`` is unique in the database, NULL repeatable,
   and a second order that raced the lookup on another cart is rejected by
   the index and answered with the first;

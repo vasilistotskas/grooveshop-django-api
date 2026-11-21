@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from typing import Literal
 
 from django.conf import settings
 from django.core.cache import cache
@@ -37,6 +38,7 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.exceptions import PaymentStatusUnavailableError
 from order.models import (
     Order,
     OrderHistory,
@@ -47,7 +49,7 @@ from order.models import (
 from order.models.order import (
     status_update_reservation_key,
 )
-from order.payments import payment_hold
+from order.payments import payment_hold, settlement
 from order.payments.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
 from order.services import (
@@ -2344,10 +2346,14 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
       succeed, so a late payment cannot book money for goods nobody
       reserved.
 
-    Before cancelling either bucket, the provider is asked to close a
-    payment that has no expiry of its own (a Stripe PaymentIntent). One the
-    provider says is past the point of no return (processing, succeeded)
-    leaves the order open: its webhook settles it.
+    Before cancelling either bucket, the provider is read: a payment it
+    took whose webhook never landed is settled through the code that
+    webhook runs (``order.payments.settlement``), so a charged order is
+    never canceled unpaid, and a provider that cannot be read leaves the
+    order for the next sweep. Then it is asked to close a payment that has
+    no expiry of its own (a Stripe PaymentIntent). One the provider says is
+    past the point of no return (processing) leaves the order open: its
+    webhook settles it.
 
     Delegates to OrderService.cancel_order which restores stock via
     StockManager.increment_stock and releases any outstanding
@@ -2394,26 +2400,45 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     canceled_failed = 0
     canceled_pending = 0
     skipped_open = 0
+    settled = 0
     errors = 0
 
-    def _payment_closed(order):
-        # Outside the row lock: this is a provider round trip. An order
+    def _payment_state(order) -> Literal["closed", "open", "settled"]:
+        # Outside the row lock: these are provider round trips. An order
         # with no pay way (SET_NULL when it is deleted) or a pay way with
         # no registered provider has no online payment to close. A
-        # provider that cannot be built (credentials removed) cannot close
-        # the payment either, but the payment may still land (a Viva
-        # payment order stays payable until it expires), so it waits for
-        # the stored hold like any payment that could not be closed.
+        # provider that cannot be built (credentials removed) cannot be
+        # read or close the payment either, but the payment may still land
+        # (a Viva payment order stays payable until it expires), so it
+        # waits for the stored hold like any payment that could not be
+        # closed.
         if order.pay_way is None:
-            return True
+            return "closed"
         provider_class = get_payment_provider_class(order.pay_way.provider_code)
         if provider_class is None:
-            return True
+            return "closed"
         try:
             provider = provider_class()
         except ImproperlyConfigured:
             closed = payment_hold.hold_ended(order)
         else:
+            # The webhook that marks an order paid can be lost: what the
+            # provider took is settled now, never canceled unpaid.
+            try:
+                if settlement.settle_landed_payment(order, provider.code):
+                    logger.warning(
+                        "Auto-cancel found order %s paid at its provider "
+                        "with no webhook: settled it instead",
+                        order.id,
+                    )
+                    return "settled"
+            except PaymentStatusUnavailableError:
+                logger.warning(
+                    "Auto-cancel skipped order %s: its provider could not "
+                    "be read, and a payment may have landed",
+                    order.id,
+                )
+                return "open"
             closed = provider.close_payment(order)
         if not closed:
             logger.warning(
@@ -2421,7 +2446,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 "(the provider is processing it, or its hold is running)",
                 order.id,
             )
-        return closed
+        return "closed" if closed else "open"
 
     def _cancel_with_lock(order, reason):
         # Re-fetch under row lock so concurrent beat workers can't both
@@ -2448,7 +2473,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             # A failed attempt leaves a Stripe PaymentIntent open for
             # another card: it is closed like a stale one, or the shopper
             # could still pay an order whose stock was released.
-            if not _payment_closed(order):
+            state = _payment_state(order)
+            if state == "settled":
+                settled += 1
+                continue
+            if state == "open":
                 skipped_open += 1
                 continue
             if _cancel_with_lock(
@@ -2465,7 +2494,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     for order in pending_qs.iterator():
         try:
-            if not _payment_closed(order):
+            state = _payment_state(order)
+            if state == "settled":
+                settled += 1
+                continue
+            if state == "open":
                 skipped_open += 1
                 continue
             if _cancel_with_lock(
@@ -2508,6 +2541,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         "canceled_failed": canceled_failed,
         "canceled_pending": canceled_pending,
         "skipped_open": skipped_open,
+        "settled": settled,
         "errors": errors,
     }
 

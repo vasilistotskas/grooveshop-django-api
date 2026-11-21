@@ -205,6 +205,15 @@ the session's `amount_total` under the session's PaymentIntent id, so the
 `payment_intent.succeeded` that follows adds nothing. An event without
 `amount_received` is dropped as malformed, like one without an id.
 
+**The session's code is shared.** `checkout.session.completed` settles through
+`src/order/payments/stripe_settlement.py::settle_paid_checkout_session`, the
+same code `stripe_settlement.settle_landed_payment` runs for a session or a
+succeeded intent read back from Stripe when the webhook never landed (the
+sweep, [cancel.md](cancel.md)). A session event for an order this very
+PaymentIntent already settled (a redelivery, or the webhook arriving after the
+sweep settled it) changes nothing: no second history row, shipment request or
+confirmation.
+
 ### 4.2a Stripe fee (`charge.succeeded`, `charge.updated`)
 
 `src/order/payments/payment_fees.py`. A Stripe fee is the `fee` of the charge's balance
@@ -420,12 +429,15 @@ defend. The Viva dispute path finds the purchase by `provider_transaction_id`
 
 ### 4.3 Viva Wallet online
 
-Webhook handler: `src/order/views/viva_webhook.py::_handle_payment_created`.
+Settlement: `src/order/payments/viva_settlement.py::handle_payment_created`,
+run by the webhook (`src/order/views/viva_webhook.py`) and by
+`viva_settlement.settle_landed_payment`, which reads back a payment whose
+webhook has not landed (see **A lost webhook** below).
 
 Differences from the Stripe path that are easy to miss:
 
-- **Row lock** is acquired in the view (`_process_event_in_tenant`), not inside
-  a service method. The whole webhook body runs inside one
+- **Row lock** is acquired in `viva_settlement.apply_event`, not inside
+  a service method. The whole event runs inside one
   ``select_for_update`` block.
 - **Idempotency** uses the ``VivaWebhookEvent`` table
   (``src/order/models/viva_webhook_event.py``), unique on
@@ -455,6 +467,21 @@ Differences from the Stripe path that are easy to miss:
   transaction id, before the canceled-order and settled guards. A second
   payment under another of the order's checkout codes is a second CHARGE
   row (`Order.payment_id` still names only the latest).
+
+**A lost webhook.** Viva's webhook is the only thing that marks an order paid,
+and it can be lost (an outage, an endpoint that cannot be reached). Two places
+read Viva instead: `auto_cancel_stuck_pending_orders` before it releases an
+unpaid order ([cancel.md](cancel.md), the sweep), and `viva_return` when the
+buyer comes back from the hosted page. `VivaWalletPaymentProvider.landed_charges`
+lists each payment order's transactions (`GET /api/transactions/?ordercode=`,
+Basic auth) and keeps the finished payments (`StatusId` `F`, a positive amount,
+no `ParentId`, which a refund carries); each is applied through
+`viva_settlement.apply_event` as the 1796 its webhook carries, so it is
+verified with Retrieve Transaction, booked, settled and confirmed exactly as
+the webhook would, and the `VivaWebhookEvent` row makes the webhook a no-op
+when it does land. A Viva that cannot be read raises
+`PaymentStatusUnavailableError`: the sweep keeps the order, `viva_return`
+answers with the order as it is.
 
 **Settlement is bound to the thing paid for.** A 1796 settles an order only
 when the verified transaction carries one of the order's own codes, states its

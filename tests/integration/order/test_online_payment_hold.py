@@ -32,8 +32,8 @@ from order.payments.payment import (
     VivaWalletPaymentProvider,
 )
 from order.payments.payment_binding import PaymentPurpose
+from order.payments.viva_settlement import handle_payment_created
 from order.tasks import auto_cancel_stuck_pending_orders
-from order.views.viva_webhook import _handle_payment_created
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
@@ -476,6 +476,10 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         with (
             _provider_with_stripe_key(),
             patch(
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
+                return_value=Mock(status="requires_payment_method"),
+            ),
+            patch(
                 "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
             ) as cancel,
@@ -500,7 +504,7 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
             ),
             patch(
                 "order.payments.payment.stripe.PaymentIntent.retrieve",
-                return_value=Mock(status="succeeded"),
+                return_value=Mock(status="processing"),
             ),
         ):
             result = auto_cancel_stuck_pending_orders()
@@ -516,13 +520,19 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payments.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 side_effect=stripe.APIConnectionError("down"),
             ),
+            patch(
+                "order.payments.payment.stripe.PaymentIntent.cancel",
+                side_effect=stripe.APIConnectionError("down"),
+            ) as cancel,
         ):
             result = auto_cancel_stuck_pending_orders()
 
-        assert result["errors"] == 1
+        assert result["skipped_open"] == 1
+        assert result["errors"] == 0
+        cancel.assert_not_called()
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
 
@@ -559,6 +569,10 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         with (
             _provider_with_stripe_key(),
             patch(
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
+                return_value=Mock(status="requires_payment_method"),
+            ),
+            patch(
                 "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
             ) as cancel,
@@ -589,40 +603,57 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
 
-    def test_an_intent_that_succeeded_meanwhile_keeps_the_order_open(self):
-        """The shopper's retry went through before the sweep: the order is
-        left for ``payment_intent.succeeded`` to settle, not canceled."""
+    def test_an_intent_that_succeeded_meanwhile_settles_the_order(self):
+        """The shopper's retry went through before the sweep and its
+        ``payment_intent.succeeded`` has not landed: the sweep settles the
+        order through that handler instead of canceling it."""
         order = self._failed("stripe", payment_id="pi_paid_late")
+        owed = order.calculate_order_total_amount()
+        intent = stripe.PaymentIntent.construct_from(
+            {
+                "id": "pi_paid_late",
+                "status": "succeeded",
+                "amount_received": round(owed.amount * 100),
+                "currency": str(owed.currency).lower(),
+            },
+            "sk_test_dummy",
+        )
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payments.payment.stripe.PaymentIntent.cancel",
-                side_effect=stripe.InvalidRequestError("succeeded", "id"),
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
+                return_value=intent,
             ),
             patch(
-                "order.payments.payment.stripe.PaymentIntent.retrieve",
-                return_value=Mock(status="succeeded"),
-            ),
+                "order.payments.payment.stripe.PaymentIntent.cancel"
+            ) as cancel,
         ):
             result = auto_cancel_stuck_pending_orders()
 
         assert result["canceled_failed"] == 0
-        assert result["skipped_open"] == 1
+        assert result["settled"] == 1
+        cancel.assert_not_called()
         order.refresh_from_db()
-        assert order.status == OrderStatus.PENDING
+        assert order.payment_status == PaymentStatus.COMPLETED
 
     def test_a_provider_outage_leaves_the_order_for_the_next_sweep(self):
         order = self._failed("stripe", payment_id="pi_declined")
         with (
             _provider_with_stripe_key(),
             patch(
-                "order.payments.payment.stripe.PaymentIntent.cancel",
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
                 side_effect=stripe.APIConnectionError("down"),
             ),
+            patch(
+                "order.payments.payment.stripe.PaymentIntent.cancel",
+                side_effect=stripe.APIConnectionError("down"),
+            ) as cancel,
         ):
             result = auto_cancel_stuck_pending_orders()
 
-        assert result["errors"] == 1
+        assert result["skipped_open"] == 1
+        assert result["errors"] == 0
+        cancel.assert_not_called()
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
 
@@ -633,6 +664,10 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         _age(order, hold_expires=timezone.now() + timedelta(minutes=20))
         with (
             _provider_with_stripe_key(),
+            patch(
+                "order.payments.payment.stripe.PaymentIntent.retrieve",
+                return_value=Mock(status="requires_payment_method"),
+            ),
             patch(
                 "order.payments.payment.stripe.PaymentIntent.cancel",
                 return_value=Mock(status="canceled"),
@@ -789,7 +824,7 @@ class TestALatePaymentAfterTheHoldIsBookedSafely:
 
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(
                     PaymentStatus.COMPLETED,
                     verified_payment(order, "OC9"),
@@ -800,7 +835,7 @@ class TestALatePaymentAfterTheHoldIsBookedSafely:
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,
         ):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "viva_txn_late"
             )
 

@@ -19,12 +19,12 @@ from djstripe.models import Event
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
+from order.payments.viva_settlement import handle_payment_created
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
     handle_stripe_payment_succeeded,
 )
-from order.views.viva_webhook import _handle_payment_created
 from tests.utils.payments import CAPTURED
 
 pytestmark = pytest.mark.django_db
@@ -208,7 +208,7 @@ class TestVivaPaymentCreated:
     @staticmethod
     def _verified(amount, order_code="OC1"):
         return patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {"order_code": order_code, "amount": amount, "currency": "EUR"},
@@ -231,12 +231,12 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.payments.viva_settlement.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
 
         [charge] = _charges(order)
         assert charge.provider == "viva_wallet"
@@ -249,18 +249,18 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount, "OC1"),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.payments.viva_settlement.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
             order.refresh_from_db()
         with (
             self._verified(amount, "OC2"),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.payments.viva_settlement.dispatch_on_commit"),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_b")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_b")
 
         assert sorted(c.provider_reference for c in _charges(order)) == [
             "viva_txn_a",
@@ -273,14 +273,14 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.payments.viva_settlement.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
             order.refresh_from_db()
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
 
         assert len(_charges(order)) == 1
 
@@ -290,6 +290,6 @@ class TestVivaPaymentCreated:
         amount = float(order.calculate_order_total_amount().amount) + 5
 
         with self._verified(amount):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_a")
 
         assert _charges(order) == []

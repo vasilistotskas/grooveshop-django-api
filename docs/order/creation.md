@@ -515,6 +515,13 @@ address it cannot place (prod order #316: street "1", street number
   (`street_number_is_postcode`) are reported on `street`: the caller sent
   no number field. A sent `streetNumber` is used as sent. The agent
   gateway sends the UCP and ACP destination's single street line this way.
+- **Address line 2** (#641). `addressLine2` is optional free text for what
+  the street line does not hold (a flat, a floor, a building; UCP's
+  `extended_address`), kept on `Order.address_line_2` apart from the
+  customer's notes. It prints under the street on the receipt and the
+  order emails, and the ACS voucher carries it in `Delivery_Notes`
+  ([§5.1](shipping-acs.md)). `Order.place` is a different field: a
+  district or area (Τοποθεσία), which nothing writes at checkout.
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

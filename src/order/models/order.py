@@ -175,6 +175,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
+    # What the street line does not hold: a flat, a floor, a building
+    # (UCP's ``extended_address``). Free text, separate from the notes; the
+    # ACS voucher carries it in ``Delivery_Notes``, as ACS's
+    # ``Recipient_Address`` is the street alone.
+    address_line_2 = models.CharField(
+        _("Address line 2"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     phone = PhoneNumberField(_("Phone Number"))
     customer_notes = models.TextField(
         _("Customer Notes"), blank=True, default=""

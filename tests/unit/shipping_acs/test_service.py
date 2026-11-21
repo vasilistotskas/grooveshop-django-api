@@ -1858,6 +1858,69 @@ class TestSanitizeDeliveryNotes:
         assert len(sanitize_delivery_notes(long_note)) == DELIVERY_NOTES_MAX_LEN
 
 
+class TestCourierDeliveryNotes:
+    """The address line 2 rides first in the notes, never cut (#641)."""
+
+    def test_the_address_line_comes_first(self):
+        from shipping.services import courier_delivery_notes
+
+        assert (
+            courier_delivery_notes(
+                address_line_2="Διαμ. 3,  2ος   όροφος",
+                customer_notes="Χτυπήστε\nδύο φορές.",
+            )
+            == "Διαμ. 3, 2ος όροφος | Χτυπήστε δύο φορές."
+        )
+
+    def test_either_alone_is_sent_alone(self):
+        from shipping.services import courier_delivery_notes
+
+        assert (
+            courier_delivery_notes(address_line_2="Διαμ. 3", customer_notes="")
+            == "Διαμ. 3"
+        )
+        assert (
+            courier_delivery_notes(address_line_2="", customer_notes="Θυρωρός")
+            == "Θυρωρός"
+        )
+        assert (
+            courier_delivery_notes(address_line_2="", customer_notes="") == ""
+        )
+
+    def test_the_customer_note_is_cut_first_to_the_limit(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            DELIVERY_NOTES_SEPARATOR,
+            courier_delivery_notes,
+        )
+
+        line = "β" * 255
+        sent = courier_delivery_notes(
+            address_line_2=line, customer_notes="α" * 800
+        )
+
+        assert len(sent) == DELIVERY_NOTES_MAX_LEN
+        assert sent.startswith(line + DELIVERY_NOTES_SEPARATOR)
+        assert sent.endswith("α")
+
+    def test_a_note_that_fits_is_kept_whole(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            DELIVERY_NOTES_SEPARATOR,
+            courier_delivery_notes,
+        )
+
+        line = "β" * 100
+        room = (
+            DELIVERY_NOTES_MAX_LEN - len(line) - len(DELIVERY_NOTES_SEPARATOR)
+        )
+        note = "α" * room
+
+        assert courier_delivery_notes(
+            address_line_2=line, customer_notes=note
+        ) == (line + DELIVERY_NOTES_SEPARATOR + note)
+
+
 class TestDeliveryNotesInPayload:
     def test_customer_notes_lands_in_Delivery_Notes(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
@@ -1875,6 +1938,24 @@ class TestDeliveryNotesInPayload:
         assert (
             sent["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές. Θυρωρός."
         )
+
+    def test_the_address_line_2_rides_ahead_of_the_notes(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            address_line_2="Διαμ. 3, 2ος όροφος",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == "Διαμ. 3, 2ος όροφος | Θυρωρός."
+        # ACS's ``Recipient_Address`` is the street alone.
+        assert sent["Recipient_Address"] == order.street
 
     def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus

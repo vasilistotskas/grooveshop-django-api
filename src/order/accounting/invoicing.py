@@ -232,7 +232,7 @@ def _buyer_snapshot(order: Order) -> dict[str, str]:
         "email": order.email,
         "phone": str(order.phone) if order.phone else "",
         "address_line_1": f"{order.street} {order.street_number}".strip(),
-        "address_line_2": order.place or "",
+        "address_line_2": order.address_line_2,
         "city": order.city,
         "postal_code": order.zipcode,
         "country": (order.country.name if order.country_id else "")

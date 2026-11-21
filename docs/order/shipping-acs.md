@@ -6,6 +6,17 @@ and says which file holds each § number used here.
 ## 5.1 ACS Courier (`src/shipping_acs/`)
 
 - **REST API**, polling-based (no webhooks).
+- **The recipient address** follows the manual's field meanings (p. 6-7):
+  `Recipient_Address` is the street alone ("η οδός του παραλήπτη δίχως την
+  περιοχή ή το τοπωνύμιο"), `Recipient_Address_Number` its number,
+  `Recipient_Region` the city. The order's `address_line_2` (a flat, a
+  floor, a building) has no field of its own, so it rides first in
+  `Delivery_Notes`, the free-text notes printed on the voucher, ahead of the
+  customer's note and within `DELIVERY_NOTES_MAX_LEN` (500); the customer's
+  note is cut first (`shipping.services.courier_delivery_notes`). The
+  manual's `Recipient_Floor` gives no format or allowed values, so the
+  order's `floor` choice is not sent until an ACS stage voucher shows how it
+  lands.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout`: the row lock used to be held

@@ -474,6 +474,7 @@ NOT_PRICED = {
     "floor",
     "location_type",
     "customer_notes",
+    "address_line_2",
     # The receipt or invoice the order is documented with.
     "document_type",
     "billing_vat_id",

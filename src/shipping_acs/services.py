@@ -32,7 +32,7 @@ from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.locks import lock_with_order
-from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
+from shipping.services import DELIVERY_NOTES_MAX_LEN, courier_delivery_notes
 from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
 from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
@@ -832,7 +832,7 @@ class AcsService:
         sent_notes = params.get("Delivery_Notes", "") or ""
         raw_notes_len = len(order.customer_notes or "")
         # ``notes_truncated`` derives from the post-sanitize length —
-        # ``sanitize_delivery_notes`` collapses whitespace runs before
+        # ``courier_delivery_notes`` collapses whitespace runs before
         # truncating, so a raw note of 600 spaces sanitises to "" and
         # was NOT truncated even though raw_len > MAX. The sanitiser
         # caps at exactly MAX, so sent_len == MAX is the truncation
@@ -1453,7 +1453,12 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            "Delivery_Notes": sanitize_delivery_notes(order.customer_notes),
+            # The address line 2 comes first: ACS's ``Recipient_Address``
+            # is the street alone, so the flat or floor rides here.
+            "Delivery_Notes": courier_delivery_notes(
+                address_line_2=order.address_line_2,
+                customer_notes=order.customer_notes,
+            ),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:

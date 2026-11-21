@@ -224,6 +224,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "last_name": Kind.LAST_NAME,
             "phone": Kind.PHONE,
             "place": Kind.PLACE,
+            "address_line_2": Kind.BLANK,
             "customer_notes": Kind.FREE_TEXT,
             "billing_vat_id": Kind.VAT_ID,
             "billing_company_name": Kind.COMPANY,

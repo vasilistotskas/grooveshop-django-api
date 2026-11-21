@@ -241,6 +241,7 @@ def compile_user_data(user) -> dict[str, Any]:
                 "phone": str(o.phone) if o.phone else None,
                 "street": o.street,
                 "street_number": o.street_number,
+                "address_line_2": o.address_line_2,
                 "city": o.city,
                 "zipcode": o.zipcode,
                 "created_at": _iso(o.created_at),

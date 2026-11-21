@@ -241,9 +241,9 @@ class HealthLiveViewTestCase(TestCase):
         # Liveness must never call the DB/Redis/Celery health paths, so a
         # downed dependency can never fail the probe and restart the pod.
         with (
-            patch("core.api.views.connection.cursor") as db_cursor,
-            patch("core.api.views.Redis.from_url") as redis_from_url,
-            patch("core.api.views.celery_app.control.ping") as celery_ping,
+            patch("core.api.health_api.connection.cursor") as db_cursor,
+            patch("core.api.health_api.Redis.from_url") as redis_from_url,
+            patch("core.api.health_api.celery_app.control.ping") as celery_ping,
         ):
             response = self.client.get(self.url)
 
@@ -267,8 +267,8 @@ class HealthCheckViewTestCase(TestCase):
 
     def _get(self, ping):
         with (
-            patch("core.api.views.Redis.from_url"),
-            patch("core.api.views.celery_app.control.ping", ping),
+            patch("core.api.health_api.Redis.from_url"),
+            patch("core.api.health_api.celery_app.control.ping", ping),
         ):
             return self.client.get(self.url)
 

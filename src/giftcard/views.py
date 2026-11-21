@@ -11,13 +11,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    GiftCardCheckThrottle,
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -36,8 +30,10 @@ from giftcard.serializers import (
     GiftCardSerializer,
 )
 from giftcard.services import GiftCardError, GiftCardService
+from giftcard.throttles import GiftCardCheckThrottle
 from order.payments.payment import provider_supports
 from order.payments.payment_binding import PaymentPurpose
+from order.throttles import PaymentAttemptAnonThrottle, PaymentAttemptThrottle
 from tenant.permissions import (
     IsCatalogueEnabled,
     IsGiftCardsEnabled,

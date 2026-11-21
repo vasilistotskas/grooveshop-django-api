@@ -22,7 +22,7 @@ from rest_framework.test import APIClient
 
 from contact.attachments import INTAKE_WINDOW_HOURS, AttachmentPolicy
 from contact.models import Contact, ContactAttachment
-from core.api.throttling import ContactAttachmentThrottle
+from contact.throttles import ContactAttachmentThrottle
 from tests.unit.contact.conftest import DWG_HEAD, ZIP_HEAD, pdf_bytes
 
 pytestmark = pytest.mark.django_db

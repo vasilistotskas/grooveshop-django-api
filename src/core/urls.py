@@ -18,11 +18,10 @@ from drf_spectacular.views import (
 
 import core.filters.camel_case_filters
 import core.filters.camel_case_ordering  # noqa
-from core.api.views import (
+from core.api.health_api import health_check, health_live
+from core.api.settings_api import (
     get_public_settings,
     get_setting_by_key,
-    health_check,
-    health_live,
     list_settings,
 )
 from core.rosetta_views import DBBackedTranslationFormView

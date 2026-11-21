@@ -1,9 +1,8 @@
 """The account emails: their types, builders and samples.
 
 The data-export link, the newsletter's double opt-in and the re-engagement
-mail. ``emails.EmailsConfig`` imports this module at boot; the tasks
-(``user.tasks``, ``core.tasks``) choose WHEN to send and keep the
-bookkeeping after a send.
+mail. ``emails.EmailsConfig`` imports this module at boot; ``user.tasks``
+chooses WHEN to send and keeps the bookkeeping after a send.
 """
 
 from __future__ import annotations

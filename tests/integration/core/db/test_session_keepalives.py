@@ -3,8 +3,8 @@
 A session can hold an advisory lock across a call to another service (the
 delivery lock of an email, a running task's store lock). If its client's
 node is lost, nothing closes the socket, and the server holds the lock for
-as long as it takes to notice: the kernel's default, hours, unless the
-session sets its own TCP keepalives. The test database's options are its
+as long as it takes to notice: about half an hour with the server's own
+probes, unless the session sets its own TCP keepalives. The test database's options are its
 own (``tests/conftest.py``), so this opens a session with the options the
 deployed settings give every connection.
 """

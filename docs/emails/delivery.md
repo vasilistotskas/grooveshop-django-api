@@ -130,7 +130,7 @@ transaction (a transaction open across the send would be ended by
 and the waiting copy sends instead: at once when its process ends, and within
 about a minute when its node is lost without closing the socket (every session
 sets TCP keepalives, `DB_TCP_KEEPALIVES_*` in `src/settings/database.py`; the
-server's own default is the kernel's, hours). Inside a transaction (a task applied
+server's own probe a lost client for about half an hour). Inside a transaction (a task applied
 eagerly) it is the transaction's and ends with it. A send outside a task has a
 fresh id and takes no lock. A wait that runs out (`statement_timeout`, or a
 `lock_timeout` a session sets) raises

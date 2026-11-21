@@ -21,11 +21,14 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 # its socket (a worker's node lost, a network partition): TCP keepalives on
 # each session, sent after DB_TCP_KEEPALIVES_IDLE idle seconds, every
 # DB_TCP_KEEPALIVES_INTERVAL, given up after DB_TCP_KEEPALIVES_COUNT unanswered
-# probes. The server's own setting is the kernel's default, hours. A session
-# that holds a lock across a call to another service holds it until then:
-# the delivery lock of an email (``core.db.locks``), and the store lock a
-# running task takes (``tenant.celery.holding_store``). These GUCs are set
-# per session, so they need no change to the server.
+# probes. Without them a session gets the server's own (on the cluster, a
+# first probe after 900 s, then 9 more 100 s apart: about half an hour), and
+# a session that holds a lock across a call to another service holds it
+# that long: the delivery lock of an email (``core.db.locks``), and the store
+# lock a running task takes (``tenant.celery.holding_store``). Django
+# connects to PostgreSQL directly (no pooler), so the server's probes reach
+# the worker's own socket. These GUCs are set per session, so they need no
+# change to the server.
 DB_TCP_KEEPALIVES_IDLE = int(getenv("DB_TCP_KEEPALIVES_IDLE", "30"))
 DB_TCP_KEEPALIVES_INTERVAL = int(getenv("DB_TCP_KEEPALIVES_INTERVAL", "10"))
 DB_TCP_KEEPALIVES_COUNT = int(getenv("DB_TCP_KEEPALIVES_COUNT", "3"))

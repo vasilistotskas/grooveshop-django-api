@@ -215,6 +215,15 @@ ACS_API_CALL_POLL_RETENTION_DAYS = int(
 CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
     getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
 )
+# The daily sweep of erased orders (``order.privacy.erase_late_carrier_data``)
+# clears the carrier records of an order erased, or written about by a
+# carrier, within this many days: a parcel still moving when its buyer is
+# erased goes on being tracked, delivered and paid out, and each of those
+# writes the recipient's details again. Longer than any gap between two
+# daily runs, so no write is missed while the scheduler is down a few days.
+ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS = int(
+    getenv("ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS", "7")
+)
 # A BoxNow webhook event whose signed time is older than this is ignored.
 # The ``BoxNowParcelEvent`` rows are the replay guard, so the window must
 # end before the sweep above can delete a row an event could still meet.

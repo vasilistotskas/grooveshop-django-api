@@ -1,5 +1,5 @@
 [project]
-version = "3.262.2"
+version = "3.262.3"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -752,8 +752,6 @@ ignore_imports = [
     "order.serializers.order -> shipping_boxnow.serializers.shipment",
     "order.views.order -> shipping_acs.exceptions",
     "order.views.order -> shipping_boxnow.exceptions",
-    "user.services.gdpr -> shipping_acs.models",
-    "user.services.gdpr -> shipping_boxnow.models.shipment",
 ]
 allow_indirect_imports = true
 

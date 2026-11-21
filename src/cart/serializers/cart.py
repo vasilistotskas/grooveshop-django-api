@@ -176,7 +176,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # promotion fields all read from it.
         cache = self.context.setdefault("_promotion_results", {})
         if obj.pk not in cache:
-            from promotion.services import PromotionEngine
+            from promotion.engine.evaluation import PromotionEngine
 
             cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
         return cache[obj.pk]
@@ -186,7 +186,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # With promotions off no code applies and the cart lists none, so
         # nothing dead is shown that the shopper could not remove; the
         # codes wait on the cart until the store turns promotions back on.
-        from promotion.services import PromotionEngine
+        from promotion.engine.evaluation import PromotionEngine
 
         return PromotionEngine.is_enabled()
 

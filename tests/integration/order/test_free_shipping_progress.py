@@ -30,10 +30,10 @@ from country.factories import CountryFactory
 from country.models import Country
 from order.checkout.quote import FreeShippingProgress, OrderQuoteService
 from product.factories import ProductCategoryFactory, ProductFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
-from promotion.services import PromotionEngine
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.interfaces import (
     _REGISTRY,

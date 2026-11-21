@@ -28,9 +28,9 @@ from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import (

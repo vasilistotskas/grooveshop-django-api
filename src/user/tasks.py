@@ -1,20 +1,35 @@
 import logging
+from datetime import timedelta
+from typing import Any
 
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import F
+from django.utils import timezone
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.net.safe_fetch import FetchError, safe_fetch
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
     is_recipient_refused,
 )
-from core.tasks import MonitoredTask
+from core.store_settings import store_setting
 from core.uploads import image_limits, prepare_servable_image
+from emails.send import Status, send_email, was_sent
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
+
+# ``send_inactive_user_notifications`` stops once MORE than this many
+# sends have failed in one run: that many failures points at the mail
+# backend, not at individual users, and the next run resumes anyway.
+_MAX_REENGAGEMENT_FAILURES = 50
 
 
 @celery_app.task(
@@ -589,3 +604,147 @@ def send_allauth_email_task(
         ),
     )
     return {"status": "sent" if was_sent(deliveries) else "skipped"}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    name="core.tasks.send_inactive_user_notifications",
+    max_retries=3,
+    soft_time_limit=600,
+    time_limit=900,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+)
+def send_inactive_user_notifications() -> dict[str, Any]:
+    """
+    Send re-engagement emails to inactive users.
+
+    Limits to ``REENGAGEMENT_EMAIL_MAX_COUNT`` emails per user with a
+    ``REENGAGEMENT_EMAIL_COOLDOWN_DAYS`` cooldown between sends (both
+    extra settings). Uses iterator() for memory-efficient processing.
+
+    Returns:
+        Dictionary with task execution statistics
+    """
+    now = timezone.now()
+    max_emails = store_setting("REENGAGEMENT_EMAIL_MAX_COUNT")
+    cooldown_days = store_setting("REENGAGEMENT_EMAIL_COOLDOWN_DAYS")
+    inactive_days = store_setting("INACTIVE_USER_THRESHOLD_DAYS")
+    cutoff_date = now - timedelta(days=inactive_days)
+    cooldown_cutoff = now - timedelta(days=cooldown_days)
+
+    # Who opted out is the pipeline's to decide (``EmailOptOut``).
+    inactive_users_qs = (
+        User.objects.filter(
+            last_login__lt=cutoff_date,
+            is_active=True,
+            email__isnull=False,
+            email__gt="",
+            reengagement_email_count__lt=max_emails,
+        )
+        .exclude(
+            last_reengagement_email_at__gt=cooldown_cutoff,
+        )
+        .only("id", "email", "first_name", "username")
+    )
+
+    success_count = 0
+    failed_emails: list[dict[str, Any]] = []
+    total_users = 0
+    timed_out = False
+
+    logger.info("Starting to send emails to inactive users")
+
+    for user in inactive_users_qs.iterator(chunk_size=200):
+        total_users += 1
+
+        try:
+            deliveries = send_email("user.reengagement", user)
+            if not was_sent(deliveries):
+                if deliveries[0].status in (
+                    Status.SKIPPED_FEATURE_OFF,
+                    Status.SKIPPED_SWITCHED_OFF,
+                ):
+                    # The whole run is off (not scheduled, or the store
+                    # switched the mail off): nobody is written to.
+                    logger.info(
+                        "Re-engagement run stopped: %s", deliveries[0].status
+                    )
+                    break
+                # Opted out through the one-click link: not counted as a
+                # send, so the cooldown and the count stay as they were.
+                continue
+
+            User.objects.filter(pk=user.pk).update(
+                reengagement_email_count=F("reengagement_email_count") + 1,
+                last_reengagement_email_at=now,
+            )
+
+            success_count += 1
+
+            if success_count % 100 == 0:
+                logger.info(f"Sent {success_count} emails so far...")
+
+        except SoftTimeLimitExceeded:
+            # Caught BEFORE the generic arm, and it has to be: Celery
+            # raises this INSIDE the task at ``soft_time_limit``, it is
+            # an ordinary ``Exception`` subclass, and it is raised ONCE.
+            # Landing in the per-user handler below, it was recorded as
+            # "failed to send email to user X" and the loop carried on —
+            # so the soft limit bought nothing and the run continued to
+            # the hard ``time_limit``, where Celery kills the worker
+            # process outright. That is the outcome the soft limit
+            # exists to prevent, and the kill also loses the summary and
+            # the in-flight user's bookkeeping.
+            #
+            # Stopping is safe and self-resuming rather than a failure:
+            # every user emailed already has ``last_reengagement_email_at``
+            # set, so the next scheduled run excludes them by the
+            # cooldown and continues from here. Re-raising instead would
+            # hand ``autoretry_for`` a full rescan that can
+            # only time out again.
+            timed_out = True
+            logger.error(
+                "Re-engagement run hit its soft time limit after %s users "
+                "(%s sent). The next scheduled run resumes from here.",
+                total_users,
+                success_count,
+            )
+            break
+        except Exception as e:
+            logger.error(
+                f"Failed to send email to user {user.pk}",
+                extra={"user_id": user.pk, "error": str(e)},
+            )
+            failed_emails.append(
+                {
+                    "user_id": user.pk,
+                    "email": (user.email or "")[:3] + "***",
+                    "error": str(e),
+                }
+            )
+
+            if len(failed_emails) > _MAX_REENGAGEMENT_FAILURES:
+                logger.error("Too many email failures, stopping task")
+                break
+
+    message = f"Sent {success_count} re-engagement emails to inactive users"
+    logger.info(
+        message,
+        extra={
+            "total_users": total_users,
+            "emails_sent": success_count,
+            "failed_count": len(failed_emails),
+            "timed_out": timed_out,
+        },
+    )
+
+    return {
+        "status": "completed",
+        "message": message,
+        "total_users": total_users,
+        "emails_sent": success_count,
+        "failed": len(failed_emails),
+        "failed_details": failed_emails[:10],
+        "timed_out": timed_out,
+    }

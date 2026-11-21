@@ -3,6 +3,21 @@
 
 
 
+## v3.259.1 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): the cart digest is the order's contents, without the pay way (#770)
+
+The quote returns cartDigest as soon as a delivery is chosen, and the
+digest no longer holds the pay way: a UCP checkout may name its payment
+method only when it completes, which left that path guarded by its own
+quote alone. The pay way's fee is in expectedTotal, which checks what is
+paid; the digest checks what the order is made of (lines, promotions,
+delivery, pickup point).
+
+Refs #755 ([`94d1053`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94d1053590b051b696b73e6553f51e52ac5849e8))
+
 ## v3.259.0 (2026-11-21)
 
 ### Bug fixes

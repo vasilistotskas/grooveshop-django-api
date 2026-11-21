@@ -37,6 +37,10 @@ class AcsCarrier(ShippingCarrierInterface):
         "acs_charge_type",
         "acs_item_quantity",
     )
+    location_keys: ClassVar[tuple[str, ...]] = (
+        "acs_station_external_id",
+        "acs_station_branch",
+    )
 
     def create_shipment(
         self,

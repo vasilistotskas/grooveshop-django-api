@@ -11,6 +11,14 @@ from django.utils.translation import gettext_lazy as _
 # becomes ``OrderCreateErrorType.TOTAL_CHANGED`` and both carry it (#635).
 TOTAL_CHANGED_CODE = "total_changed"
 
+# The ``code`` of an order create refused because the request's
+# ``expectedCartDigest`` is not the cart digest computed now (409): the
+# order would be made of something else than what the buyer was shown.
+# Sent only to a request carrying ``expectedCartDigest``, under
+# ``error.type`` ``invalid_order_data``, until the storefront in
+# production lists it (as ``TOTAL_CHANGED_CODE``, #755).
+CART_CHANGED_CODE = "cart_changed"
+
 
 class OrderCreateErrorType(models.TextChoices):
     """``error.type`` of a refused order create (``POST /order``).

@@ -63,7 +63,11 @@ from order.checkout.quote import (
     ShippingChoice,
 )
 from order.enum.cancel_error import OrderCancelErrorType
-from order.enum.create_error import TOTAL_CHANGED_CODE, OrderCreateErrorType
+from order.enum.create_error import (
+    CART_CHANGED_CODE,
+    TOTAL_CHANGED_CODE,
+    OrderCreateErrorType,
+)
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartHasUnpaidOrderError,
@@ -75,6 +79,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    OrderCartChangedError,
     OrderChangedDuringPaymentError,
     OrderTotalChangedError,
     ParcelWithCourierError,
@@ -636,12 +641,7 @@ class OrderViewSet(BaseModelViewSet):
         the carrier cannot perform. A home delivery that names no carrier
         is judged by every carrier that could take it.
         """
-        shipping = ShippingChoice(
-            kind=validated_data.get("shipping_kind"),
-            provider_code=validated_data.get("shipping_provider_code"),
-            country_id=validated_data.get("country_id"),
-            region_id=validated_data.get("region_id"),
-        )
+        shipping = ShippingChoice.of(validated_data)
         offered = OrderQuoteService.offered_pay_ways(shipping)
         if offered.filter(id=pay_way.id).exists():
             return
@@ -982,6 +982,27 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        except OrderCartChangedError as e:
+            # Nothing was created: the order would have been made of
+            # something else than what the buyer was shown. As for
+            # ``total_changed``, the quote is the cart now and
+            # ``error.type`` stays ``invalid_order_data``
+            # (``CART_CHANGED_CODE``).
+            return Response(
+                {
+                    "detail": _(
+                        "Your cart has changed since its total was shown. "
+                        "Review your order and place it again."
+                    ),
+                    "error": {
+                        "type": OrderCreateErrorType.INVALID_ORDER_DATA,
+                        "quote": CheckoutQuoteSerializer(e.quote).data,
+                    },
+                    "code": CART_CHANGED_CODE,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         except LegalDocumentUnavailableError as e:
             # A store fault, not the buyer's: the checkout linked a page
             # with no published text in this language, so nothing could
@@ -1272,6 +1293,7 @@ class OrderViewSet(BaseModelViewSet):
             ),
             legal_acceptance=legal_acceptance,
             expected_total=self._expected_total(validated_data),
+            expected_cart_digest=validated_data.get("expected_cart_digest"),
             agent_checkout=agent_checkout,
         )
 
@@ -1355,6 +1377,7 @@ class OrderViewSet(BaseModelViewSet):
             ),
             legal_acceptance=legal_acceptance,
             expected_total=self._expected_total(validated_data),
+            expected_cart_digest=validated_data.get("expected_cart_digest"),
             agent_checkout=agent_checkout,
         )
 

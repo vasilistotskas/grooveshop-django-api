@@ -15,18 +15,22 @@ comment cited one unseen while only Python was read.
 
 Neither rule has an allowlist: #561 fixed the last known failures.
 
-Python is read for one more thing: a ``docs/`` path named in a docstring
-or a comment must exist and stand on one line, since a pointer to a doc is
-what a docstring is for. Other repo paths in Python are not checked yet:
-about 240 comments still name a module by its path before ``src/``.
+Python is read for one more thing: a repository path named in a
+docstring or a comment must exist, backticked or not, and a ``docs/`` path
+must stand on one line. About 370 comments named a module by its path
+before ``src/`` until #669 fixed them. A string that is not a docstring is
+left alone: it is data (a template name, a test's input).
 
 The last rule keeps a doc small enough to read whole.
 """
 
 from __future__ import annotations
 
+import ast
+import io
 import os
 import re
+import tokenize
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +48,10 @@ _REPO_PATH = re.compile(
 # out. ``settings.py`` moved into ``src/`` and the docs went on citing
 # it by its bare name, unseen, because a path needed a slash.
 _ROOT_FILE = re.compile(r"^(?P<path>[\w.-]+" + _EXTENSION + r")(?=$|[\s:#,(])")
+# The same path in running text: ``(see order/services.py)`` in a comment.
+_PATH_IN_PROSE = re.compile(
+    r"(?<![\w/.-])([\w.-]+(?:/[\w.-]+)+" + _EXTENSION + r")(?![\w/-])"
+)
 # A template is named the way Django loads it, relative to this folder.
 _TEMPLATE_ROOT = "src/core/templates"
 # Directories whose entries are importable top-level packages.
@@ -137,17 +145,48 @@ def _python_files() -> list[Path]:
     ]
 
 
-def _missing_docs_named_in_python() -> set[str]:
-    """``<file>: <path>`` for every absent ``docs/`` path Python names."""
+def _comments_and_docstrings(source: str) -> list[str]:
+    """The text of every comment and docstring of a Python source."""
+    docstrings = {
+        (node.body[0].lineno, node.body[0].end_lineno)
+        for node in ast.walk(ast.parse(source))
+        if isinstance(
+            node,
+            (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef),
+        )
+        and ast.get_docstring(node, clean=False) is not None
+    }
+    return [
+        token.string
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT
+        or (
+            token.type == tokenize.STRING
+            and (token.start[0], token.end[0]) in docstrings
+        )
+    ]
+
+
+def _missing_paths_named_in_python() -> set[str]:
+    """``<file>: <path>`` for every absent path a comment or docstring names."""
+    roots = _first_party_roots()
     missing = set()
     for source in _python_files():
         rel = source.relative_to(REPO_ROOT).as_posix()
-        for token in _BACKTICKED.findall(source.read_text(encoding="utf-8")):
-            match = _REPO_PATH.match(token.strip())
-            if match is None or not match["path"].startswith("docs/"):
-                continue
-            if not (REPO_ROOT / match["path"]).exists():
-                missing.add(f"{rel}: {match['path']}")
+        for text in _comments_and_docstrings(
+            source.read_text(encoding="utf-8")
+        ):
+            paths = set(_PATH_IN_PROSE.findall(text))
+            for token in _BACKTICKED.findall(text):
+                if match := _ROOT_FILE.match(token.strip()):
+                    paths.add(match["path"])
+            missing.update(
+                f"{rel}: {path}"
+                for path in paths
+                if path.split("/")[0] in roots
+                and not (REPO_ROOT / path).exists()
+                and not (REPO_ROOT / _TEMPLATE_ROOT / path).exists()
+            )
     return missing
 
 
@@ -233,11 +272,13 @@ def test_the_app_map_names_every_app():
     )
 
 
-def test_a_doc_named_in_python_exists():
-    missing = sorted(_missing_docs_named_in_python())
+def test_a_path_named_in_python_exists():
+    missing = sorted(_missing_paths_named_in_python())
     assert not missing, (
-        "These docstrings or comments name a doc that does not exist. A "
-        "sibling repository's doc is written with its repository "
+        "These docstrings or comments name a file that does not exist. "
+        "Write the path from the repository root (src/order/services.py) "
+        "or the dotted module (order.services); a sibling repository's "
+        "file is written with its repository "
         "(grooveshop-infrastructure/docs/...):\n  " + "\n  ".join(missing)
     )
 
@@ -250,21 +291,27 @@ def test_no_doc_path_is_split_across_lines():
     )
 
 
-def test_a_split_or_absent_doc_path_in_python_is_reported(
-    tmp_path, monkeypatch
-):
+def test_a_split_or_absent_path_in_python_is_reported(tmp_path, monkeypatch):
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "product-pricing.md").touch()
-    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "order").mkdir(parents=True)
+    (tmp_path / "src" / "order" / "services.py").touch()
+    (tmp_path / "src" / "settings.py").touch()
     (tmp_path / "src" / "apps.py").write_text(
         '"""Read ``docs/product-pricing.md``, ``docs/gone.md`` and\n'
         "``docs/product-\n"
-        'pricing.md``; the code is ``order/services.py``."""\n',
+        'pricing.md``; the code is ``src/order/services.py``."""\n'
+        "# was order/services.py, set in ``settings.py``\n"
+        'TEMPLATE = "order/receipt.html"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
 
-    assert _missing_docs_named_in_python() == {"src/apps.py: docs/gone.md"}
+    assert _missing_paths_named_in_python() == {
+        "src/apps.py: docs/gone.md",
+        "src/apps.py: order/services.py",
+        "src/apps.py: settings.py",
+    }
     assert _split_doc_paths() == {"src/apps.py: docs/product-"}
 
 

@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
-# See order/tasks.py for rationale — eager gettext over lazy for email subjects.
+# See order.tasks for rationale — eager gettext over lazy for email subjects.
 from django.utils import timezone
 
 from core import celery_app

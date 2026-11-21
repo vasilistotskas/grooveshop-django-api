@@ -427,7 +427,7 @@ class TestBeatScheduleTenantCoverage:
         ]
         assert not offenders, (
             "Beat entries dispatch tenant-scoped tasks directly — add a "
-            "fanout_* wrapper in tenant/tasks.py (or allowlist a genuinely "
+            "fanout_* wrapper in src/tenant/tasks.py (or allowlist a genuinely "
             f"public-schema task above): {offenders}"
         )
 

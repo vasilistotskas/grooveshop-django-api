@@ -43167,10 +43167,11 @@ components:
           writeOnly: true
           nullable: true
           description: 'Πλαίσιο Meta Pixel: κλειδιά ``fbp``, ``fbc``, ``client_user_agent``,
-            ``client_ip_address``, ``event_ids`` (dict με {purchase, initiate_checkout,
-            add_payment_info}), ``consent`` (dict με boolean ``ads``). Κενό dict /
-            null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI
-            τότε παραλείπει την αποστολή.'
+            ``event_ids`` (dict με {purchase, initiate_checkout, add_payment_info}),
+            ``consent`` (dict με boolean ``ads``). Ένα ``client_ip_address`` που σταλεί
+            εδώ αγνοείται: ο server το ορίζει από την επαληθευμένη διεύθυνση του edge.
+            Κενό dict / null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας
+            CAPI τότε παραλείπει την αποστολή.'
         agentCheckout:
           type: string
           format: uuid

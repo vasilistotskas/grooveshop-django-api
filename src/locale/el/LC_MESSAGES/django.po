@@ -8805,8 +8805,8 @@ msgstr "Αναγνωριστικό Meta Pixel"
 msgid "Meta Pixel ID must contain digits only (e.g. '123456789012345')."
 msgstr "Το Meta Pixel ID πρέπει να περιέχει μόνο ψηφία (π.χ. '123456789012345')."
 
-msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
-msgstr "Πλαίσιο Meta Pixel: κλειδιά ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict με {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict με boolean ``ads``). Κενό dict / null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI τότε παραλείπει την αποστολή."
+msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). A ``client_ip_address`` sent here is ignored: the server sets it from the verified edge address. Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
+msgstr "Πλαίσιο Meta Pixel: κλειδιά ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict με {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict με boolean ``ads``). Ένα ``client_ip_address`` που σταλεί εδώ αγνοείται: ο server το ορίζει από την επαληθευμένη διεύθυνση του edge. Κενό dict / null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI τότε παραλείπει την αποστολή."
 
 msgid "Meta fbtrace_id"
 msgstr "Meta fbtrace_id"

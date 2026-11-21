@@ -81,6 +81,21 @@ starts; staff refund its payment (``OrderService.refund_order``, the admin
 Before delivery a customer cancels instead.
 """
 
+ORDER_STATUSES_SHIPPING_NOTHING: frozenset[str] = frozenset(
+    {OrderStatus.CANCELED, OrderStatus.REFUNDED}
+)
+"""The order statuses in which no parcel is to leave: the order was
+canceled, or it came back and was refunded. ``Order.ships_nothing``."""
+
+PAYMENT_STATUSES_KEEPING_NOTHING: frozenset[str] = frozenset(
+    {PaymentStatus.REFUNDED, PaymentStatus.CANCELED}
+)
+"""The payment states in which the store keeps nothing of the payment: all
+of it went back, or none was ever collected. An order in one of them ships
+nothing, whatever its own status: a full refund does not move the order
+(``PaymentLedger.refund_status``), so a refunded order can still read
+PROCESSING. ``Order.ships_nothing``."""
+
 SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
     {
         PaymentStatus.COMPLETED,

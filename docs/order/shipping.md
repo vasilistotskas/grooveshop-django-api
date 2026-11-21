@@ -27,6 +27,17 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **No shipment for an order that ships nothing.** `Order.ships_nothing`
+  (`order.managers.order.ships_nothing_q`): the order is CANCELED or
+  REFUNDED, or it was paid online and the store keeps nothing of the
+  payment (`PAYMENT_STATUSES_KEEPING_NOTHING`: a full refund leaves the
+  order PROCESSING). Both mint choke points raise
+  `shipping.exceptions.ShipmentNotNeededError` for it (ACS also for a
+  shipment it retired, `shipping_acs.attention.needs_no_voucher`; BOX NOW
+  first finishes a canceled order's cancel), the tasks return
+  `{"status": "not_needed"}` with no retry and no alert, and both admin
+  buttons refuse with a message. A retry that waited out a cancel in its
+  backoff therefore mints nothing.
 - **The receipt follows the voucher, never the other way round.** Every
   path that makes a voucher or parcel live records it with
   `Order.add_tracking_info`, and recording it issues the receipt with

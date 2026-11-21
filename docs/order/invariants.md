@@ -10,7 +10,7 @@ the linked section or the originating commit's message.
 
 | Invariant | Anchor |
 |---|---|
-| No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | [§5](shipping.md) |
+| No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`), nor for an order that ships nothing (`Order.ships_nothing`, `ShipmentNotNeededError`) | [§5](shipping.md) |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | [§2.2](state-machines.md) |
 | A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | [§7.3](payment-ledger.md) |
 | A placed order's lines (product, quantity, price) are read-only in every admin surface; the name and SKU on an invoice, email or API line are the line's own snapshot | [§3.7](creation-records.md) |

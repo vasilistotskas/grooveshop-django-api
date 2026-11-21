@@ -21,6 +21,8 @@ from core.managers import OptimizedManager, OptimizedQuerySet
 from core.mixins import SoftDeleteManagerMixin, SoftDeleteQuerySetMixin
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
+    ORDER_STATUSES_SHIPPING_NOTHING,
+    PAYMENT_STATUSES_KEEPING_NOTHING,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
@@ -40,6 +42,20 @@ def awaiting_online_payment_q(prefix: str = "") -> Q:
     """
     return Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE}) & ~Q(
         **{f"{prefix}payment_status__in": SETTLED_PAYMENT_STATUSES}
+    )
+
+
+def ships_nothing_q(prefix: str = "") -> Q:
+    """Orders no parcel is to leave for: canceled, or refunded as an order
+    (``ORDER_STATUSES_SHIPPING_NOTHING``), or paid online and the store
+    keeps nothing of the payment (``PAYMENT_STATUSES_KEEPING_NOTHING``),
+    whatever their own status. Online only: a cash or terminal payment is
+    collected when the parcel arrives, so before it leaves it has nothing
+    to have gone back. ``prefix`` reaches the order from a related model
+    (``"order__"``). The database form of ``Order.ships_nothing``."""
+    return Q(**{f"{prefix}status__in": ORDER_STATUSES_SHIPPING_NOTHING}) | (
+        Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE})
+        & Q(**{f"{prefix}payment_status__in": PAYMENT_STATUSES_KEEPING_NOTHING})
     )
 
 

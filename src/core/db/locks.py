@@ -7,7 +7,9 @@ need a transaction open across the call, and
 ``idle_in_transaction_session_timeout`` ends a transaction left idle that
 long. So the lock is the session's: taken outside any transaction, released
 when the block ends, and gone with the session if the process dies, which
-lets the copy that waits take over at once.
+lets the copy that waits take over: at once when the process ends, and
+within about a minute when its node is lost without closing the socket
+(the TCP keepalives every session sets, ``settings.database``).
 """
 
 from __future__ import annotations

@@ -478,6 +478,19 @@ address it cannot place (prod order #316: street "1", street number
   in the Country admin. A blank pattern means only "required".
 - **Street** must contain a letter; **street number** must not itself
   match the country's postcode pattern (4+ characters).
+- **One street line** (#641). Order creation takes `street` without
+  `streetNumber` (or with it blank) as one line whose number follows the
+  street, the Greek and Cypriot form: `split_street_line` cuts the
+  trailing number ("Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12", "12-14",
+  "12/3"; a number in the street's name stays in it: "28ης Οκτωβρίου 15")
+  and the order stores both columns, so the ACS voucher, invoices and
+  myDATA read them as before. A number written first ("12 Main St",
+  "28 Οκτωβρίου") is not guessed. A line it cannot split is a 400 with
+  `fields.street` code `street_number_missing`, and the errors of a split
+  number (`street_number_is_postcode`) are reported on `street`: the
+  caller sent no number field. A sent `streetNumber` is used as sent.
+  The agent gateway sends the UCP and ACP destination's single street
+  line this way.
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

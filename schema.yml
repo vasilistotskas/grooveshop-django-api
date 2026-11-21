@@ -42908,12 +42908,14 @@ components:
         street:
           type: string
           minLength: 1
-          description: Όνομα οδού
+          description: Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά
+            το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber.
           maxLength: 255
         streetNumber:
           type: string
-          minLength: 1
-          description: Αριθμός οδού
+          description: 'Αριθμός οδού. Προαιρετικός: χωρίς αυτόν, το street πρέπει
+            να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς
+            αριθμό απορρίπτεται με κωδικό street_number_missing στο street.'
           maxLength: 50
         city:
           type: string
@@ -43117,7 +43119,6 @@ components:
       - payWayId
       - phone
       - street
-      - streetNumber
       - termsAccepted
       - zipcode
     OrderDeliveryMethod:

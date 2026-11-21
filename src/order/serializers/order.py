@@ -1094,13 +1094,25 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         required=True, help_text=_("Customer email address")
     )
     street = serializers.CharField(
-        max_length=255, required=True, help_text=_("Street name")
+        max_length=255,
+        required=True,
+        help_text=_(
+            "Street name, or the whole street line with its number after "
+            "the name (Ermou 12) when streetNumber is not sent."
+        ),
     )
-    # Required: the courier voucher cannot be issued without one, and
-    # the service layer already rejected a blank value — the field
-    # declaration said otherwise.
+    # The courier voucher needs a number: without this field it is split
+    # from ``street`` (``address_rules.split_street_line``), and a line
+    # with none is refused, so the order always stores both.
     street_number = serializers.CharField(
-        max_length=50, required=True, help_text=_("Street number")
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Street number. Optional: without it, street must end in the "
+            "number, which is split from it; a street with no number is "
+            "refused with code street_number_missing on street."
+        ),
     )
     city = serializers.CharField(
         max_length=100, required=True, help_text=_("City name")
@@ -1477,7 +1489,10 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
            ⇒ ``boxnow_locker_id`` required and ``pay_way`` must be an
            online-payment method (BoxNow rejects COD at lockers).
         4. The delivery address passes ``core.validators.address`` for
-           its country, and the postcode is stored normalised.
+           its country, and the postcode is stored normalised. A street
+           sent without ``street_number`` is one line, split by
+           ``split_street_line``; the errors of its number are the
+           line's.
         """
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
@@ -1488,6 +1503,14 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         region = None
         if attrs.get("region_id"):
             region = Region.objects.filter(alpha=attrs["region_id"]).first()
+        one_line = not (attrs.get("street_number") or "").strip()
+        if one_line:
+            split = address_rules.split_street_line(attrs["street"])
+            if split is None:
+                raise serializers.ValidationError(
+                    {"street": [address_rules.street_number_missing()]}
+                )
+            attrs["street"], attrs["street_number"] = split
         errors = address_rules.address_errors(
             country=country,
             street=attrs["street"],
@@ -1495,6 +1518,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             zipcode=attrs["zipcode"],
             region=region,
         )
+        if one_line and "street_number" in errors:
+            # The caller sent no number field: its error is the line's.
+            errors.setdefault("street", []).extend(errors.pop("street_number"))
         if errors:
             raise serializers.ValidationError(errors)
         attrs["zipcode"] = address_rules.normalize_postcode(attrs["zipcode"])

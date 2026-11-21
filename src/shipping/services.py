@@ -21,13 +21,16 @@ from django.conf import settings
 from django.db.models import Q
 from djmoney.money import Money
 
+from core.cache_backend import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
+    PickupPointCheckUnavailableError,
     ShippingParcelTooLargeError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
 from shipping.interfaces import (
+    PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     get_provider,
@@ -40,6 +43,15 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+# How long after one checkout resynced a carrier's catalogue for an
+# unknown pickup point another miss refuses at once instead of syncing
+# again: a full catalogue fetch takes seconds, so a bad or malicious id
+# must not be able to start one per request. Per store and carrier (the
+# cache key is tenant-scoped). Ten minutes: a point BOX NOW's widget
+# shows after the 02:00 sync is found by the first resync, and the next
+# chance comes soon enough for a real point added in between.
+PICKUP_POINT_RESYNC_GUARD_SECONDS = 600
 
 
 # Defensive cap on free-text notes that ride along to the courier
@@ -138,6 +150,158 @@ class ShippingService:
     # ------------------------------------------------------------------
     # Lookup
     # ------------------------------------------------------------------
+
+    @classmethod
+    def pickup_point_address(
+        cls,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names, from the
+        carrier's catalogue, resyncing it once when the point is missing.
+
+        The storefront picks a BOX NOW locker in BOX NOW's own widget
+        (live data) while the catalogue syncs daily, so a new locker can
+        be missing for up to a day; an ACS station can be missing through
+        the gateway or a stale cache. On a miss the catalogue is fetched
+        again through the scheduled sync's own path
+        (``refresh_pickup_points``), before any transaction or lock, and
+        read once more. The point must be deliverable
+        (``deliverable_pickup_point``: held, active, in the order's
+        country); a withdrawn one counts as missing. No resync runs where
+        the store does not deliver to that kind in that country
+        (``active_rate``), and at most one per store and carrier in
+        ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
+        at once. A resync that fails or passes its deadline
+        (``_resync_within_deadline``) is logged and refused. Raises
+        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``, or
+        ``PickupPointCheckUnavailableError`` when the guard's cache is down
+        (no resync, nothing judged); never answers with any other address.
+        """
+        from django.core.cache import cache
+
+        carrier = get_provider(provider_code)
+        try:
+            return carrier.deliverable_pickup_point(
+                location, country_code=country_code
+            )
+        except PickupPointUnknown:
+            pass
+        # A store that cannot deliver to that kind in that country refuses
+        # anyway: no carrier is asked for it.
+        try:
+            cls.active_rate(
+                provider_code=provider_code,
+                kind=ShippingKind.PICKUP_POINT,
+                country_code=country_code,
+            )
+        except ShippingUnavailableError as e:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup points are not offered in "
+                f"{country_code}"
+            ) from e
+        guard = f"shipping:pickup-point-resync:{provider_code}"
+        try:
+            acquired = cache.add(
+                guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS
+            )
+        except REDIS_UNAVAILABLE as e:
+            # ``CustomCache.add`` raises while Redis is down: without the
+            # guard nothing bounds the resyncs, so none runs.
+            logger.warning(
+                "No resync of the %s catalogue for pickup point %s: the "
+                "cache holding its guard is unavailable",
+                provider_code,
+                dict(location),
+                exc_info=True,
+            )
+            raise PickupPointCheckUnavailableError(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue cannot be resynced without the cache"
+            ) from e
+        if not acquired:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue was resynced in the last "
+                f"{PICKUP_POINT_RESYNC_GUARD_SECONDS} s"
+            )
+        cls._resync_within_deadline(
+            carrier, provider_code, location, country_code=country_code
+        )
+        return carrier.deliverable_pickup_point(
+            location, country_code=country_code
+        )
+
+    @staticmethod
+    def _resync_within_deadline(
+        carrier: ShippingCarrierInterface,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> None:
+        """Run the carrier's resync, waiting at most
+        ``PICKUP_POINT_RESYNC_TIMEOUT_SECONDS`` for it.
+
+        The sync runs in a daemon thread of its own, on the request's
+        store schema (the pattern of ``agent.outbox``'s event call),
+        because a carrier client has no deadline for a whole sync
+        (each call retries within its own timeout, so a sync can take
+        minutes) and the order call has callers that wait seconds. Past
+        the deadline the order is refused; the thread finishes the sync,
+        so the next order finds the point. A failure is logged and
+        refused alike.
+        """
+        import threading
+
+        from django.db import connection
+        from django_tenants.utils import schema_context
+
+        schema = connection.schema_name
+        failure: list[BaseException] = []
+
+        def resync() -> None:
+            # A thread of its own outlives a request that stops waiting:
+            # it sets its store's schema, logs what goes wrong (nobody may
+            # read its result), and closes the connection it opened.
+            try:
+                with schema_context(schema):
+                    carrier.refresh_pickup_points(country_code=country_code)
+            except Exception as error:
+                logger.exception(
+                    "Resync of the %s catalogue for pickup point %s failed",
+                    provider_code,
+                    dict(location),
+                )
+                failure.append(error)
+            finally:
+                connection.close()
+
+        # The guard (``pickup_point_address``) is taken before this thread
+        # starts, so requests that stop waiting never run two syncs.
+        worker = threading.Thread(
+            target=resync, name="pickup-point-resync", daemon=True
+        )
+        worker.start()
+        worker.join(settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
+        if worker.is_alive():
+            logger.warning(
+                "Resync of the %s catalogue for pickup point %s did not "
+                "finish within %s s; the order is refused and the sync "
+                "goes on",
+                provider_code,
+                dict(location),
+                settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS,
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue resync passed its deadline"
+            )
+        if failure:
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue could not be resynced"
+            ) from failure[0]
 
     @classmethod
     def adapter_for(cls, provider_code: str):

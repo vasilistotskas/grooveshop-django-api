@@ -42,7 +42,6 @@ from contact.tasks import (
     send_contact_notification_email_task,
     send_feedback_notification_email_task,
 )
-from core.tasks import send_inactive_user_notifications
 from giftcard.enum import GiftCardPurchaseStatus, GiftCardStatus
 from giftcard.factories import GiftCardFactory, GiftCardPurchaseFactory
 from giftcard.models import GiftCard
@@ -78,7 +77,7 @@ from user.services.subscription_mail import (
     send_already_subscribed_notice,
     send_subscription_confirmation,
 )
-from user.tasks import export_user_data_task
+from user.tasks import export_user_data_task, send_inactive_user_notifications
 
 pytestmark = pytest.mark.django_db
 

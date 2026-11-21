@@ -27,6 +27,7 @@ from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
+from core.cache.invalidation import mark_surface_stale
 from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
@@ -81,7 +82,7 @@ _COD_PAYMENT_METHOD = "acs_cod"
 
 # State-transition tables (string literals to avoid importing
 # order.enum.status at module import time and risking a circular
-# import chain since order/services.py imports shipping providers).
+# import chain since src/order/services.py imports shipping providers).
 
 _SHIPPED_STATES: frozenset[AcsShipmentState] = frozenset(
     {
@@ -126,7 +127,7 @@ _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
 # DB without re-running the payload builder. Strictly operational —
 # recipient PII (name/address/phone/email) is intentionally excluded
 # because shipment.metadata is not cleared by GDPR anonymisation
-# (see user/services/gdpr.py) and we don't want a shadow PII copy.
+# (see src/user/services/gdpr.py) and we don't want a shadow PII copy.
 _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Pickup_Date",
     "Sender",
@@ -822,7 +823,7 @@ class AcsService:
                 # attempt so ops looking at the row don't mistake an old
                 # error for the current state. Mirrors BoxNow's success
                 # path which already nulls ``last_error`` (see
-                # shipping_boxnow/services.py).
+                # src/shipping_boxnow/services.py).
                 metadata.pop("last_error", None)
                 metadata["create_response"] = result
                 metadata["create_request"] = audit_request
@@ -3391,6 +3392,10 @@ class AcsService:
                 .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
+            if deactivated:
+                # ``update`` sends no ``post_save``: the cached station
+                # list would keep serving the withdrawn stations.
+                mark_surface_stale("shipping")
 
         return {"upserted": upserted, "deactivated": deactivated}
 
@@ -4027,7 +4032,7 @@ class AcsService:
         Fires ``order_paid`` so the standard signal chain (Meta CAPI
         Purchase dispatch) runs — ``mark_as_paid`` only persists
         ``payment_status``; the post_save handler in
-        ``order/signals/handlers.py`` only emits ``order_paid`` on a
+        ``src/order/signals/handlers.py`` only emits ``order_paid`` on a
         PENDING → PROCESSING status transition with ``is_paid=True``,
         and COD orders are already at PROCESSING by the time we reach
         here (status was advanced at voucher-mint time). After the

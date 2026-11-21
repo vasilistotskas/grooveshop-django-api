@@ -38,24 +38,16 @@ from core.api.permissions import (
     StoreStaffModelPermissions,
 )
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    OrderCreateAnonThrottle,
-    OrderCreateThrottle,
-    OrderSpecimenThrottle,
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-    UserBudgetThrottle,
-    VivaReturnThrottle,
-    gift_card_code_throttles,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
+from core.cache_backend import REDIS_UNAVAILABLE
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.checkout.quote import (
     ExpectedTotal,
@@ -134,10 +126,20 @@ from order.services import (
     OrderLegalAcceptanceService,
     OrderService,
 )
+from order.throttles import (
+    OrderCreateAnonThrottle,
+    OrderCreateThrottle,
+    OrderSpecimenThrottle,
+    PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
+    VivaReturnThrottle,
+)
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
+from shipping.api_errors import PickupPointCheckUnavailable
+from shipping.exceptions import PickupPointCheckUnavailableError
 from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
@@ -196,6 +198,7 @@ serializers_config: SerializersConfig = {
         responses={
             400: OrderCreateErrorSerializer,
             409: OrderCreateErrorSerializer,
+            503: ErrorResponseSerializer,
         },
     ),
     "update": ActionConfig(
@@ -1237,6 +1240,16 @@ class OrderViewSet(BaseModelViewSet):
         except ValidationError as e:
             logger.warning("Validation error: %s", e)
             # Re-raised so the API handler adds code and fields.
+            raise
+
+        except PickupPointCheckUnavailableError as e:
+            # Our cache is down, not the shopper's point wrong: a 503 with
+            # Retry-After and no field (logged by ``pickup_point_address``).
+            raise PickupPointCheckUnavailable() from e
+
+        except REDIS_UNAVAILABLE:
+            # Any other cache-held bound that fails closed: the strict-cache
+            # middleware answers it with its coded 503, never a 500.
             raise
 
         except PermissionDenied:

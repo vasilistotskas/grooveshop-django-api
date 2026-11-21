@@ -2,8 +2,8 @@ import logging
 
 from b2b.emails import REVIEW_EMAIL_KEYS
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 
 logger = logging.getLogger(__name__)

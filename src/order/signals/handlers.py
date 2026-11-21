@@ -374,7 +374,7 @@ def handle_order_status_changed(
     # filters internally for statuses we actually want to surface in the
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
-    # one place (``order/communications/notifications.py::_ORDER_STATUS_COPY``).
+    # one place (``order.communications.notifications._ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
         dispatch_on_commit(
             notify_order_status_changed_live, [order.id, new_status]

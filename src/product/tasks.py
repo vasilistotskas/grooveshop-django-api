@@ -6,12 +6,12 @@ from django.conf import settings
 from django.utils import timezone
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     SEARCH_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
 )
-from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 from emails.send import Status, send_email, was_sent
 from product.emails import ALERTS_GATE, LowStock, PriceDrop

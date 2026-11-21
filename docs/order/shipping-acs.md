@@ -6,6 +6,17 @@ and says which file holds each § number used here.
 ## 5.1 ACS Courier (`src/shipping_acs/`)
 
 - **REST API**, polling-based (no webhooks).
+- **The station list** (`GET /shipping/acs/stations`,
+  `src/shipping_acs/views/station.py`) serves active rows only. It takes
+  `shopKind` (default: the locker kinds of `countryCode`, or of every
+  configured country), `countryCode`, a `postalCode` prefix, and two exact
+  lookups of one station: `externalId` (the area code several Smartpoints
+  share) and `branch` (with it, one station; empty matches the station
+  without a branch). The agent gateway resolves a UCP pickup destination
+  with the exact pair. The list is cached (`cache_methods`) under the
+  `shipping` cache surface, which every station write purges: a saved row
+  through `invalidated_by`, a sync's deactivating `update` through
+  `mark_surface_stale`, the order-time resync included.
 - **The recipient address** follows the manual's field meanings (p. 6-7):
   `Recipient_Address` is the street alone ("η οδός του παραλήπτη δίχως την
   περιοχή ή το τοπωνύμιο"), `Recipient_Address_Number` its number,

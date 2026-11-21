@@ -164,10 +164,13 @@ ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/tasks.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
+App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/monitored_task.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
-- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
+- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session and history cleanup
+- `src/cart/tasks.py` — abandoned and old guest cart cleanup
+- `src/user/tasks.py` — account and allauth emails, data export, the inactive-user re-engagement email
+- `src/meili/tasks.py` — document indexing and the daily index sync
 - `src/product/tasks.py` — price drop notifications, price-record reconciliation (`reevaluate_price_episodes`)
 - `src/search/tasks.py` — search analytics
 - `src/blog/tasks.py` — comment liked notifications
@@ -193,7 +196,7 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `src/dev
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
 - `get_or_create_instance()` in `src/tag/factories/tagged_item.py`, its only caller, for dynamic model/factory resolution
-- `UserNameGenerator` in `src/core/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
+- `UserNameGenerator` in `src/user/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration
 

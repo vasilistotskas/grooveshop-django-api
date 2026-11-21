@@ -322,7 +322,7 @@ The search, product, blog and trending endpoints carry
 `SearchThrottle` (scope `search`); `/search/click` carries
 `SearchClickThrottle` (scope `search_click`), a budget of its own so clicks
 cannot starve searches. Both are per user or IP
-(`src/core/api/throttling.py`), and the global `anon` / `user` daily throttles
+(`src/search/throttles.py`), and the global `anon` / `user` daily throttles
 apply on top. `/search/analytics` has only the global DRF defaults. Rates
 live in `settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, all disabled
 when `DEBUG`. DRF returns

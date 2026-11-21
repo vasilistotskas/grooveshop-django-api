@@ -42820,8 +42820,9 @@ components:
           allOf:
           - $ref: '#/components/schemas/CheckoutQuote'
           description: 'Μόνο για ``total_changed`` και ``cart_changed``: τι χρεώνει
-            τώρα το ταμείο για το καλάθι. Εμφανίστε το και στείλτε τα ``expectedTotal``
-            και ``cartDigest`` του για να παραγγείλετε με αυτό.'
+            τώρα το ταμείο για το καλάθι. Εμφανίστε το και στείλτε το ``expectedTotal``
+            του, και το ``cartDigest`` του ως ``expectedCartDigest``, για να παραγγείλετε
+            με αυτό.'
       required:
       - type
     OrderCreateErrorType:

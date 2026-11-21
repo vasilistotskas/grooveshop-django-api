@@ -28,6 +28,8 @@ from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
+from promotion.enum import BenefitType, PromotionTrigger, TargetScope
+from promotion.factories import PromotionFactory
 from promotion.services import PromotionEngine
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
@@ -41,6 +43,7 @@ from tests.integration.order.test_checkout_quote import (
     _post_order,
     _product,
     _quote,
+    _store_settings,
 )
 from tests.utils.fake_stripe import fake_stripe
 from tests.utils.shipping import enable_rate
@@ -132,6 +135,48 @@ class TestTheDigest:
 
         assert second["expectedTotal"] == first["expectedTotal"]
         assert second["cartDigest"] != first["cartDigest"]
+
+    def test_the_line_a_discount_lands_on_moves_it(self):
+        checkout = _checkout(price=Decimal("10.00"))
+        first = checkout.cart.items.get().product
+        second = _product(Decimal("10.00"))
+        checkout.cart.items.create(product=second, quantity=1)
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal("2.00"),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        with _store_settings():
+            promotion.products.set([first])
+            on_first = _quote(checkout, **_choices(checkout))
+
+            promotion.products.set([second])
+            on_second = _quote(checkout, **_choices(checkout))
+
+        assert on_first["discountTotal"] == on_second["discountTotal"] == 2.0
+        assert on_first["expectedTotal"] == on_second["expectedTotal"]
+        assert on_first["cartDigest"] != on_second["cartDigest"]
+
+    def test_the_carrier_a_home_delivery_is_routed_to_moves_it(self):
+        checkout = _checkout()
+        resolve = (
+            "shipping.services.ShippingService.resolve_home_delivery_provider"
+        )
+
+        with patch(resolve, return_value="flat_rate"):
+            flat = _quote(checkout, **_choices(checkout))
+        with patch(resolve, return_value="acs"):
+            promotion = PromotionEngine.evaluate(checkout.cart, user=None)
+            acs = OrderQuoteService.cart_digest(
+                checkout.cart,
+                promotion,
+                shipping=ShippingChoice.of(_choices(checkout)),
+                pay_way=checkout.pay_way,
+                weight_grams=0,
+            )
+
+        assert flat["cartDigest"] != acs
 
 
 class TestOrderCreation:
@@ -360,6 +405,7 @@ class TestTheShippingChoice:
                 promotion,
                 shipping=shipping,
                 pay_way=checkout.pay_way,
+                weight_grams=0,
             )
 
         digests = {digest(base), *(digest(v) for v in variants)}
@@ -377,6 +423,7 @@ class TestTheShippingChoice:
                     kind=kind, provider_code=None, country_id="GR"
                 ),
                 pay_way=checkout.pay_way,
+                weight_grams=0,
             )
 
         assert digest(None) == digest("home_delivery")

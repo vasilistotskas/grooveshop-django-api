@@ -349,7 +349,13 @@ class OrderQuoteService:
 
         # Only of a complete order: the one order creation compares.
         cart_digest = (
-            cls.cart_digest(cart, promotion, shipping=shipping, pay_way=pay_way)
+            cls.cart_digest(
+                cart,
+                promotion,
+                shipping=shipping,
+                pay_way=pay_way,
+                weight_grams=weight_grams,
+            )
             if shipping is not None and pay_way is not None
             else None
         )
@@ -392,25 +398,40 @@ class OrderQuoteService:
         *,
         shipping: ShippingChoice,
         pay_way: PayWay,
+        weight_grams: int,
     ) -> str:
         """What an order of ``cart`` is made of, as one opaque value.
 
-        Each line (product, quantity, unit price as priced), the
-        promotions that apply with their codes and gifts, the delivery
-        (kind, carrier, country, region, pickup point) and the pay way.
-        Two quotes of the same order give the same digest, and an order
-        whose contents changed since its quote gives another even when
-        its total did not (a line swapped for one at the same price).
+        Each line (product, quantity, unit price as priced, the promotion
+        money it carries), the promotions that apply with their codes,
+        amounts and gifts, the delivery (kind, the carrier that takes it,
+        as :meth:`_carrier` resolves one a home delivery does not name,
+        country, region, pickup point) and the pay way. Two quotes of the
+        same order give the same digest, and an order whose contents
+        changed since its quote gives another even when its total did not
+        (a line swapped for one at the same price). It holds no shipping
+        charge, fee, loyalty or gift-card amount: ``expectedTotal`` holds
+        the amount.
 
         An HMAC over a canonical form, keyed by the ``SECRET_KEY``: it
         reveals nothing of the cart, and no client can compute it.
         """
+        line_discounts = promotion.line_discounts
         lines = sorted(
-            [item.product_id, item.quantity, str(item.final_price.amount)]
+            [
+                item.product_id,
+                item.quantity,
+                str(item.final_price.amount),
+                str(line_discounts.get(item.pk, Decimal(0))),
+            ]
             for item in cart.items.all()
         )
         promotions = sorted(
-            [entry.promotion.id, entry.code.id if entry.code else 0]
+            [
+                entry.promotion.id,
+                entry.code.id if entry.code else 0,
+                str(entry.amount.amount),
+            ]
             for entry in promotion.applied
         ) + sorted(
             [promo.id, code.id if code else 0]
@@ -420,9 +441,15 @@ class OrderQuoteService:
             [gift.promotion.id, gift.product.id, gift.quantity]
             for gift in promotion.gift_items
         )
+        kind, carrier = OrderQuoteService._carrier(
+            shipping.kind,
+            shipping.provider_code,
+            shipping.country_id,
+            weight_grams,
+        )
         delivery = [
-            OrderQuoteService.delivery_kind(shipping.kind),
-            shipping.provider_code or "",
+            kind,
+            carrier or "",
             shipping.country_id or "",
             shipping.region_id or "",
             sorted(shipping.location),

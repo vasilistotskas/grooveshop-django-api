@@ -9,13 +9,13 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
 
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
-    TranslatedFieldExtended,
     create_schema_view_config,
     crud_config,
 )
+from core.utils.serializers import TranslatedFieldExtended
 
 
 class MockSerializerModel(models.Model):

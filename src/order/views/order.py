@@ -33,6 +33,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+)
 from core.api.permissions import (
     IsOwnerOrAdmin,
     IsOwnerOrAdminOrGuest,
@@ -45,11 +50,6 @@ from core.api.views import BaseModelViewSet
 from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-)
 from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.checkout.quote import (

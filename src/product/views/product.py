@@ -13,17 +13,17 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import ViewCountThrottle
-from core.api.views import BaseModelViewSet
-from core.filters.camel_case_ordering import ActionOrdering
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import ViewCountThrottle
+from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from product.filters.product import ProductFilter
 from product.models.image import ProductImage
 from product.models.product import Product

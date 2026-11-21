@@ -76,8 +76,8 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   permissions (`src/core/api/permissions.py`), Knox token authentication
   (`src/core/api/tokens.py`), the throttle bases and the shared throttles
   (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
-  the OpenAPI helpers (`src/core/utils/serializers.py`,
-  `src/core/api/schema.py`);
+  the per-action serializer and OpenAPI config (`src/core/api/action_config.py`)
+  and the OpenAPI helpers (`src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
 - the Celery app (`src/core/celery.py`) and the transport its publishing

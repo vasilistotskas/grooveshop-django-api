@@ -27,9 +27,11 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -153,7 +155,7 @@ class TestConfirmingATransfer:
         order = _transfer_order(status=OrderStatus.DELIVERED)
         _confirm(order_admin, staff_user, order)
 
-        result = OrderService.refund_order(
+        result = RefundService.refund_order(
             order, amount=_eur("30.00"), repayment_reference="IBAN-REFUND-1"
         )
 
@@ -217,7 +219,7 @@ class TestWhatItRefuses:
 
     def test_a_canceled_order(self, order_admin, staff_user):
         order = _transfer_order()
-        OrderService.cancel_order(order, customer_initiated=False)
+        OrderLifecycleService.cancel_order(order, customer_initiated=False)
 
         assert not order_admin.has_confirm_payment_permission(
             _post(staff_user, {}), object_id=order.pk

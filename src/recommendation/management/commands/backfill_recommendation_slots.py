@@ -29,7 +29,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import schema_context
 
 from core.management.tenant_mixin import TenantCommandMixin
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 
 logger = logging.getLogger(__name__)
 

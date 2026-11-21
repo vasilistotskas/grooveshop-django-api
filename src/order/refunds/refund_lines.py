@@ -25,7 +25,7 @@ Shipping is split over the rates the way the receipt splits it
 remainder), one piece per rate.
 
 :func:`plan_pieces` returns the *pieces* (``credit_allocation.Piece``: one
-per goods line or per shipping rate); ``OrderService`` lays them over the
+per goods line or per shipping rate); ``RefundService`` lays them over the
 shares a refund is paid in and stores them as the shares' allocation.
 """
 

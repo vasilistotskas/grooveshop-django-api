@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from core.api.action_config import (
+    ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
@@ -12,6 +16,7 @@ from core.api.action_config import (
 from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.views import cache_methods
 from country.filters import CountryFilter
 from country.models import Country
@@ -26,6 +31,18 @@ serializers_config: SerializersConfig = {
         list=CountrySerializer,
         detail=CountryDetailSerializer,
         write=CountryWriteSerializer,
+    ),
+    "all_countries": ActionConfig(
+        response=CountrySerializer,
+        many=True,
+        paginated=False,
+        operation_id="listAllCountries",
+        summary=_("Every country, in one list"),
+        description=_(
+            "The whole country list as one array, filtered and ordered as "
+            "the paginated list is: for a picker that needs every row."
+        ),
+        tags=["Countries"],
     ),
 }
 
@@ -46,7 +63,9 @@ UNPAGINATED_ACTIONS = frozenset({"list"})
         unpaginated_actions=UNPAGINATED_ACTIONS,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+@cache_methods(
+    settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "all_countries"]
+)
 class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
     serializers_config = serializers_config
@@ -81,6 +100,12 @@ class CountryViewSet(BaseModelViewSet):
         "phone_code",
         "translations__name",
     ]
+    # The whole list sorts as the paginated list does.
+    action_ordering = {
+        "all_countries": ActionOrdering(
+            fields=tuple(ordering_fields), default=tuple(ordering)
+        ),
+    }
 
     def get_queryset(self):
         """
@@ -89,6 +114,17 @@ class CountryViewSet(BaseModelViewSet):
         Uses Country.objects.for_list() for list views and
         Country.objects.for_detail() for detail views.
         """
-        if self.action == "list":
+        if self.action in ("list", "all_countries"):
             return Country.objects.for_list()
         return Country.objects.for_detail()
+
+    @action(detail=False, methods=["GET"], pagination_class=None)
+    def all_countries(self, request):
+        """GET /api/v1/country/all: the storefront's country pickers
+        (shipping, phone prefix) need every row, about 250, in one
+        request."""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_response_serializer()(
+            queryset, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)

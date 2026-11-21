@@ -37,6 +37,11 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.lifecycle.service import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    OrderLifecycleService,
+    shipment_cancel_retry_until,
+)
 from order.models import (
     Order,
     OrderHistory,
@@ -50,11 +55,6 @@ from order.models.order import (
 from order.payments import payment_hold
 from order.payments.payment import get_payment_provider_class
 from order.refunds import refund_reconciliation
-from order.services import (
-    SHIPMENT_CANCEL_PENDING_FLAG,
-    OrderService,
-    shipment_cancel_retry_until,
-)
 from recommendation.order_email import record_impression
 from tenant.celery import dispatch_on_commit
 
@@ -579,7 +579,7 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
 
     Triggered from ``handle_order_refunded``, which queues one task per
     refund the ledger takes, so every refund path converges here — the
-    in-app refund (``OrderService.refund_order``), the staff Refund
+    in-app refund (``RefundService.refund_order``), the staff Refund
     action, and dashboard refunds arriving as ``charge.refunded`` / Viva
     reversal webhooks. An order refunded in parts therefore sends one
     email per part, each claimed on its own row (``_claim_refund_email``):
@@ -2199,7 +2199,7 @@ def cleanup_expired_stock_reservations() -> int:
 def complete_paid_delivered_orders() -> dict[str, int]:
     """Advance every DELIVERED order that is paid to COMPLETED.
 
-    ``OrderService.maybe_advance_to_completed`` runs inline at exactly
+    ``OrderLifecycleService.maybe_advance_to_completed`` runs inline at exactly
     two moments — the carrier reporting DELIVERED and the COD reconcile
     flipping the payment — and nowhere else. Anything that pays a
     delivered order outside those two (staff entering a bank transfer or
@@ -2228,7 +2228,7 @@ def complete_paid_delivered_orders() -> dict[str, int]:
         try:
             with transaction.atomic():
                 order = Order.objects.get(pk=order_id)
-                after = OrderService.maybe_advance_to_completed(
+                after = OrderLifecycleService.maybe_advance_to_completed(
                     order, silent_for_customer=True
                 )
         except Exception:
@@ -2349,7 +2349,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     provider says is past the point of no return (processing, succeeded)
     leaves the order open: its webhook settles it.
 
-    Delegates to OrderService.cancel_order which restores stock via
+    Delegates to OrderLifecycleService.cancel_order which restores stock via
     StockManager.increment_stock and releases any outstanding
     StockReservation records.
     """
@@ -2435,7 +2435,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             )
             if locked is None:
                 return False
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 locked,
                 reason=reason,
                 refund_payment=False,
@@ -2526,7 +2526,7 @@ def finish_pending_shipment_cancels(
     that never got that far (#713).
 
     A staff or system cancel commits first and asks the courier
-    afterwards, with no row locked (``OrderService.cancel_order``). A
+    afterwards, with no row locked (``OrderLifecycleService.cancel_order``). A
     worker that stops between the two leaves the order CANCELED, and
     refunded, with a voucher the courier still holds. The cancel marks
     the order in its own transaction
@@ -2601,7 +2601,7 @@ def finish_pending_shipment_cancels(
             order.status_updated_at,
         )
         cancellation = (order.metadata or {}).get("cancellation") or {}
-        unanswered = OrderService.cancel_attached_shipment(
+        unanswered = OrderLifecycleService.cancel_attached_shipment(
             order, cancellation.get("reason", "")
         )
         if unanswered and order.shipping_provider_id is not None:

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -47,7 +49,7 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     # null=True (not blank=""): Postgres treats NULL as distinct in
     # UNIQUE constraints, so multiple "pending creation" rows can
     # coexist before the ACS API assigns real numbers (matches the
-    # BoxNow pattern at shipping_boxnow/models/shipment.py).
+    # BoxNow pattern at src/shipping_boxnow/models/shipment.py).
     voucher_no = models.CharField(
         _("Voucher number"),
         max_length=20,
@@ -323,6 +325,16 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "Multipart child voucher numbers, last create-voucher "
             "response, last error envelope, cached POD URL."
         ),
+    )
+    #: The paths inside ``metadata`` that hold the recipient's own data:
+    #: the failed request kept with its error (name, address, phone), the
+    #: customer's note the voucher carried, and the reason the order was
+    #: canceled with. GDPR erasure removes them
+    #: (``AcsCarrier.erase_recipient_data``).
+    PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("last_error",),
+        ("create_request", "Delivery_Notes"),
+        ("cancel_reason",),
     )
 
     # Audit trail for voucher mint, state transitions, cancellation,

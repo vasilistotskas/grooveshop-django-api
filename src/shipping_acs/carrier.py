@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -18,6 +19,8 @@ from shipping.interfaces import (
 )
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from order.models.order import Order
     from shipping.models import ShippingRate
     from shipping_acs.models import AcsShipment
@@ -159,6 +162,220 @@ class AcsCarrier(ShippingCarrierInterface):
             postal_code=station.postal_code,
             city=station.city,
         )
+
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
+        """The ACS records of the orders, cleared of the recipient:
+
+        - each shipment's ``metadata`` at ``AcsShipment.PERSONAL_METADATA``;
+          the request's operational fields, the billing code and the voucher
+          numbers stay;
+        - the call history (``AcsApiCall``) that names those orders or any
+          voucher they ever had (:func:`_order_vouchers`), by column or, for
+          a voucher, anywhere in the request or answer: deleted, as the
+          diagnostics it is. A COD or pickup-list answer lists many parcels
+          and has no order column, so the voucher in its content is what
+          finds it;
+        - what ACS sent back: the tracking checkpoints' notes and the
+          receiver a COD payout names, in their columns and the raw rows
+          they came in. The checkpoints, the payout amounts and the
+          payout's ``pod`` (the voucher number ACS reported) stay;
+        - what staff wrote about the money (the shipment's note of a COD
+          received outside ACS, its history copies, a payout's
+          reconciliation note), with *buyer_values* redacted.
+
+        Run again for orders already erased (``order.privacy``), it clears
+        what arrived since.
+        """
+        from django.db.models import Q, TextField
+        from django.db.models.functions import Cast
+
+        from core.utils.json_paths import drop_paths
+        from core.utils.redaction import redact
+        from shipping_acs.models import (
+            AcsApiCall,
+            AcsCodPayout,
+            AcsShipment,
+            AcsTrackingEvent,
+        )
+
+        by_order = _order_vouchers(order_ids)
+        vouchers = set().union(*by_order.values()) if by_order else set()
+        scrubbed = 0
+        for shipment in AcsShipment.objects.filter(order_id__in=order_ids):
+            metadata = shipment.metadata or {}
+            texts = buyer_values.get(shipment.order_id, [])
+            note = redact(shipment.cod_received_outside_acs_note, texts)
+            dropped = drop_paths(metadata, AcsShipment.PERSONAL_METADATA)
+            if dropped or note != shipment.cod_received_outside_acs_note:
+                AcsShipment.objects.filter(pk=shipment.pk).update(
+                    metadata=metadata, cod_received_outside_acs_note=note
+                )
+                scrubbed += 1
+            if texts:
+                for row in AcsShipment.history.filter(id=shipment.pk):
+                    redacted = redact(row.cod_received_outside_acs_note, texts)
+                    if redacted != row.cod_received_outside_acs_note:
+                        AcsShipment.history.filter(
+                            history_id=row.history_id
+                        ).update(cod_received_outside_acs_note=redacted)
+
+        # A voucher number is the order's own, exact and unique; a name or
+        # a phone is not (two customers can share one), so the content is
+        # searched for the vouchers alone, as whole numbers.
+        # A call with an order or voucher column is found by it (indexed);
+        # only one with neither (a COD or pickup-list answer) is searched.
+        by_column = AcsApiCall.objects.filter(
+            Q(order_id__in=order_ids) | Q(voucher_no__in=vouchers)
+        ).values_list("pk", flat=True)
+        by_content: list[int] = []
+        if vouchers:
+            content = Q()
+            for voucher in vouchers:
+                token = rf"(^|[^0-9]){re.escape(voucher)}([^0-9]|$)"
+                content |= Q(request_text__regex=token)
+                content |= Q(response_text__regex=token)
+            by_content = list(
+                AcsApiCall.objects.filter(order_id__isnull=True, voucher_no="")
+                .annotate(
+                    request_text=Cast("request_params", TextField()),
+                    response_text=Cast("response", TextField()),
+                )
+                .filter(content)
+                .values_list("pk", flat=True)
+            )
+        deleted = AcsApiCall.objects.filter(
+            pk__in=[*by_column, *by_content]
+        ).delete()[0]
+
+        events = 0
+        for event in AcsTrackingEvent.objects.filter(
+            shipment__order_id__in=order_ids
+        ):
+            raw = (
+                event.raw_payload if isinstance(event.raw_payload, dict) else {}
+            )
+            dropped = drop_paths(raw, (("checkpoint_notes",),))
+            if event.notes or dropped:
+                event.notes = ""
+                event.raw_payload = raw
+                event.save(update_fields=["notes", "raw_payload"])
+                events += 1
+        voucher_order = {
+            voucher: order_id
+            for order_id, numbers in by_order.items()
+            for voucher in numbers
+        }
+        for payout in AcsCodPayout.objects.filter(
+            Q(shipment__order_id__in=order_ids) | Q(voucher_no__in=vouchers)
+        ):
+            raw = (
+                payout.raw_payload
+                if isinstance(payout.raw_payload, dict)
+                else {}
+            )
+            order_id = (
+                payout.shipment.order_id
+                if payout.shipment_id
+                else voucher_order.get(payout.voucher_no)
+            )
+            note = redact(
+                payout.reconciliation_note, buyer_values.get(order_id, [])
+            )
+            dropped = drop_paths(raw, (("Parcel_Receiver",),))
+            if (
+                payout.parcel_receiver
+                or dropped
+                or note != payout.reconciliation_note
+            ):
+                payout.parcel_receiver = ""
+                payout.raw_payload = raw
+                payout.reconciliation_note = note
+                payout.save(
+                    update_fields=[
+                        "parcel_receiver",
+                        "raw_payload",
+                        "reconciliation_note",
+                    ]
+                )
+                events += 1
+
+        return {
+            "carrier_pii_scrubbed": scrubbed,
+            "acs_api_calls": deleted,
+            "carrier_events_scrubbed": events,
+        }
+
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders ACS wrote a record of since *since*: a shipment row,
+        a tracking checkpoint, a COD payout, or a call naming the order or
+        one of its vouchers. Read from the rows written since then (each
+        table's ``created_at``/``updated_at`` index), and a voucher back to
+        its order through :func:`_orders_of_vouchers`."""
+        from shipping_acs.models import (
+            AcsApiCall,
+            AcsCodPayout,
+            AcsShipment,
+            AcsTrackingEvent,
+        )
+
+        written = set(
+            AcsShipment.objects.filter(updated_at__gte=since).values_list(
+                "order_id", flat=True
+            )
+        )
+        written |= set(
+            AcsTrackingEvent.objects.filter(updated_at__gte=since).values_list(
+                "shipment__order_id", flat=True
+            )
+        )
+        vouchers: set[str] = set()
+        for order_id, voucher in (
+            AcsCodPayout.objects.filter(updated_at__gte=since)
+            .values_list("shipment__order_id", "voucher_no")
+            .distinct()
+        ):
+            if order_id:
+                written.add(order_id)
+            elif voucher:
+                vouchers.add(voucher)
+        for order_id, voucher in (
+            AcsApiCall.objects.filter(created_at__gte=since)
+            .values_list("order_id", "voucher_no")
+            .distinct()
+        ):
+            if order_id:
+                written.add(order_id)
+            elif voucher:
+                vouchers.add(voucher)
+        written |= _orders_of_vouchers(vouchers)
+        written.discard(None)
+        return written
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What ACS reported about the recipient of each order, for a data
+        export: the tracking checkpoints' notes and the receiver a COD
+        payout names (what :meth:`erase_recipient_data` clears)."""
+        from shipping_acs.models import AcsCodPayout, AcsTrackingEvent
+
+        data: dict[int, dict] = {}
+        for order_id, notes in (
+            AcsTrackingEvent.objects.filter(shipment__order_id__in=order_ids)
+            .exclude(notes="")
+            .order_by("event_time")
+            .values_list("shipment__order_id", "notes")
+        ):
+            entry = data.setdefault(order_id, {})
+            entry.setdefault("acs_tracking_notes", []).append(notes)
+        for order_id, receiver in (
+            AcsCodPayout.objects.filter(shipment__order_id__in=order_ids)
+            .exclude(parcel_receiver="")
+            .values_list("shipment__order_id", "parcel_receiver")
+        ):
+            entry = data.setdefault(order_id, {})
+            entry.setdefault("acs_cod_receivers", []).append(receiver)
+        return data
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
@@ -545,7 +762,7 @@ class AcsCarrier(ShippingCarrierInterface):
         # station codes. Empty/missing values return
         # ``Άγνωστο κατάστημα παραλαβής``. The merchant pickup branch
         # is parsed from the billing code (or via metadata override —
-        # see ``shipping_acs/config.py::station_origin``). When we
+        # see ``src/shipping_acs/config.py::station_origin``). When we
         # don't have a destination yet (sidebar quote pre-address)
         # we use origin for both — ACS prices intra-region same as
         # the merchant's home region (~+0.20€ delta to inter-region),
@@ -669,3 +886,70 @@ class AcsCarrier(ShippingCarrierInterface):
             )
             return None
         return amount
+
+
+def _order_vouchers(order_ids: list[int]) -> dict[int, set[str]]:
+    """Every ACS voucher number each order ever had: the live one, its
+    multipart children, those replaced by a re-mint
+    (``previous_vouchers``), the unused ones of a lost answer
+    (``orphan_vouchers``) and one staff adopted (``adopted_voucher``). A
+    shipment not yet minted has none."""
+    from shipping_acs.models import AcsShipment
+
+    vouchers: dict[int, set[str]] = {}
+    for order_id, voucher_no, metadata in AcsShipment.objects.filter(
+        order_id__in=order_ids
+    ).values_list("order_id", "voucher_no", "metadata"):
+        metadata = metadata if isinstance(metadata, dict) else {}
+        numbers: list[object] = [voucher_no]
+        for key in (
+            "multipart_vouchers",
+            "previous_vouchers",
+            "orphan_vouchers",
+        ):
+            listed = metadata.get(key)
+            if isinstance(listed, list):
+                numbers.extend(listed)
+        adopted = metadata.get("adopted_voucher")
+        if isinstance(adopted, dict):
+            numbers.append(adopted.get("voucher_no"))
+        vouchers.setdefault(order_id, set()).update(
+            str(number) for number in numbers if number
+        )
+    return vouchers
+
+
+def _orders_of_vouchers(vouchers: set[str]) -> set[int]:
+    """The orders any of *vouchers* belongs to, by every place
+    :func:`_order_vouchers` reads a voucher from: the live voucher column
+    first (indexed), and only the vouchers it does not hold (children,
+    replaced, orphaned, adopted, usually none) are looked up in the
+    metadata, with one "any of" test per list."""
+    from django.db.models import Q
+
+    from shipping_acs.models import AcsShipment
+
+    if not vouchers:
+        return set()
+    orders: set[int] = set()
+    live: set[str] = set()
+    for order_id, voucher in (
+        AcsShipment.objects.filter(voucher_no__in=vouchers)
+        .values_list("order_id", "voucher_no")
+        .distinct()
+    ):
+        orders.add(order_id)
+        live.add(voucher)
+    rest = sorted(vouchers - live)
+    if rest:
+        orders |= set(
+            AcsShipment.objects.filter(
+                Q(metadata__multipart_vouchers__has_any_keys=rest)
+                | Q(metadata__previous_vouchers__has_any_keys=rest)
+                | Q(metadata__orphan_vouchers__has_any_keys=rest)
+                | Q(metadata__adopted_voucher__voucher_no__in=rest)
+            )
+            .values_list("order_id", flat=True)
+            .distinct()
+        )
+    return orders

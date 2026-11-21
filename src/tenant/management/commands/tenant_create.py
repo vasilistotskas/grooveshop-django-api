@@ -15,7 +15,7 @@ class Command(BaseCommand):
         # so an unknown plan would be stored silently — reject it at the
         # parser instead (argparse choices; call_command surfaces the
         # violation as CommandError).
-        from tenant.models import TenantPlan
+        from tenant.enum import TenantPlan
 
         parser.add_argument("--name", required=True)
         parser.add_argument("--slug", required=True)
@@ -48,7 +48,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from django.core.exceptions import ValidationError
 
-        from tenant.models import Tenant, TenantDomain, TenantPlan
+        from tenant.enum import TenantPlan
+        from tenant.models import Tenant, TenantDomain
         from tenant.validators import validate_reserved_schema_name
 
         schema_name = options["schema_name"]

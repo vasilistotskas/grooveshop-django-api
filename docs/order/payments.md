@@ -327,7 +327,7 @@ order by the dispute's `payment_intent` and are guarded by the
   became a dispute): clears `metadata["disputed"]` and leaves a NOTE. No row.
 - **A refund is refused while a dispute is open.** Stripe: "you can't issue a
   refund on a disputed charge until your customer's card issuer decides in your
-  favor" (docs.stripe.com/disputes/withdrawing). `OrderService.refund_order`
+  favor" (docs.stripe.com/disputes/withdrawing). `RefundService.refund_order`
   raises `PaymentError` when `PaymentLedger.dispute_open` holds (flagged, no
   CHARGEBACK row for that dispute id yet). An inquiry (`dispute_status`
   `warning_*`) is not refused: Stripe lets the merchant refund one to resolve
@@ -434,12 +434,12 @@ Differences from the Stripe path that are easy to miss:
   ``webhook_processed_{event_id}``.
 - **Inline status mutation**: ``order.status = OrderStatus.PROCESSING``
   + ``order.save(update_fields=[...])``, NOT
-  ``OrderService.update_order_status(...)``. The post-save signal
+  ``OrderLifecycleService.update_order_status(...)``. The post-save signal
   still fires, but the canonical state-machine validator is
   skipped — Viva trusts that ``status==PENDING`` before the
   payment landed.
 - **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
-  handler calls ``OrderService.suppress_customer_status_notifications(
+  handler calls ``OrderLifecycleService.suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
   so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without

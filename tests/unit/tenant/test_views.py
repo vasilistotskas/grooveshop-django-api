@@ -15,11 +15,8 @@ from django.test.client import Client
 from rest_framework.test import APIClient
 
 from tenant.cache import tenant_resolve_key
-from tenant.models import (
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 User = get_user_model()
@@ -458,8 +455,8 @@ class TestInternalDomains:
 
     @pytest.mark.django_db
     def test_suspended_tenants_excluded(self, resolve_client, db, settings):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
         tenant = store_tenant("domains_suspended")
@@ -480,8 +477,8 @@ class TestInternalDomains:
     def test_lists_the_suspended_stores_media_stream_must_refuse(
         self, resolve_client, db, settings
     ):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
         store_tenant("feed_live")

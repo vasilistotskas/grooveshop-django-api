@@ -26,7 +26,7 @@ from emails.models import EmailEvent, EmailLog, EmailSuppression, EmailSwitch
 from emails.registry import registry
 from emails.status import Status
 from emails.testsend import Throttled, send_test
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.texts.conftest import staff_client
 from tests.utils.emails import probe
 from tests.utils.staff import store_staff

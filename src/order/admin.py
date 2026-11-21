@@ -84,6 +84,12 @@ from order.lifecycle.follow_up import (
     has_canceled_shipment,
     last_carrier_event_at,
 )
+from order.lifecycle.service import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
+    OrderLifecycleService,
+    shipment_cancel_wait_minutes,
+)
 from order.models.attribution import OrderAttribution
 from order.models.expense import Expense
 from order.models.history import OrderHistory, OrderItemHistory
@@ -109,12 +115,8 @@ from order.refunds.refund_lines import (
     pending_request,
     plan_pieces,
 )
-from order.services import (
-    SHIPMENT_CANCEL_PENDING_FLAG,
-    SHIPMENT_CANCEL_UNANSWERED_KEY,
-    OrderService,
-    shipment_cancel_wait_minutes,
-)
+from order.refunds.service import RefundService
+from order.services import OrderService
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
@@ -235,7 +237,7 @@ class RefundOwedFilter(DropdownFilter):
 
     A cancel refunds a paid order through its provider, and a refund the
     provider refuses leaves the order cancelled with its payment still
-    COMPLETED (``OrderService.refund_order`` records why in the order's
+    COMPLETED (``RefundService.refund_order`` records why in the order's
     history); a cancelled order refunded only in part still owes the
     rest. This is the worklist for refunding those by hand.
     """
@@ -369,7 +371,7 @@ class ReturnOrderForm(BaseDialogForm):
     shipping goes back too, and a reason from the fixed list; the amount is
     what those lines were sold for (price, discount and VAT rate frozen on
     the line), so the credit document carries exactly their VAT rates
-    (``OrderService.refund_order`` with ``lines``). Ticking "Put the units
+    (``RefundService.refund_order`` with ``lines``). Ticking "Put the units
     back in stock" restocks the same units once the refund is made.
 
     A goodwill refund, money back for no line, is the amount field instead
@@ -478,7 +480,7 @@ class ReturnOrderForm(BaseDialogForm):
     def _offer_stalled(self) -> None:
         """A gift card and points return of a bare amount that stopped
         before it finished is finished by refunding its own amount, so that
-        is the amount offered (``OrderService._attempts_to_resume``). The
+        is the amount offered (``RefundService._attempts_to_resume``). The
         shares of a refund by lines are finished by retrying the request
         (``_offer_retry``), never by an amount."""
         stalled = (
@@ -512,7 +514,7 @@ class ReturnOrderForm(BaseDialogForm):
         # Offered only where the locked path would resume it: a provider
         # that forgets keys, an overdue attempt and cash are never called
         # again, so staff are pointed to the reason instead.
-        why = OrderService.unresumable_reason(self.pending.shares)
+        why = RefundService.unresumable_reason(self.pending.shares)
         retry = self.fields["retry_pending"]
         if why is not None:
             retry.disabled = True
@@ -740,7 +742,7 @@ class ReturnOrderForm(BaseDialogForm):
             and not cleaned.get("repayment_reference")
             # A repeat that resumes a refund already claimed pays no new
             # cash share: it needs no word on how cash was paid back.
-            and not OrderService.resumes_a_refund(
+            and not RefundService.resumes_a_refund(
                 self.order,
                 Money(amount, self.order.amount_due.currency),
                 retry_request_id=(
@@ -1399,8 +1401,8 @@ class OrderAdmin(BaseModelAdmin):
         "uuid",
         # Changed only through the actions below, never the form. A form
         # save wrote ``status`` straight to the row, skipping both the
-        # transition table in ``OrderService.update_order_status`` and
-        # ``OrderService.cancel_order`` — so a CANCELED picked from the
+        # transition table in ``OrderLifecycleService.update_order_status`` and
+        # ``OrderLifecycleService.cancel_order`` — so a CANCELED picked from the
         # dropdown never restored stock (prod orders 242 and 213,
         # 2026-09-08). Every action routes through the service.
         "status",
@@ -2128,7 +2130,7 @@ class OrderAdmin(BaseModelAdmin):
     )
     def mark_as_refunded(self, request, queryset):
         # The order status only; the money moves through the "Refund"
-        # action below (``OrderService.refund_order``) or the provider's
+        # action below (``RefundService.refund_order``) or the provider's
         # refund webhook, neither of which changes ``status``
         # (docs/order/payments.md §4.2).
         self._bulk_update_status(
@@ -2241,7 +2243,7 @@ class OrderAdmin(BaseModelAdmin):
             free_lines = by_lines and value == 0
             if not free_lines:
                 requested = Money(value, currency)
-                result = OrderService.refund_order(
+                result = RefundService.refund_order(
                     order,
                     amount=None if by_lines else requested,
                     reason=note,
@@ -2261,7 +2263,7 @@ class OrderAdmin(BaseModelAdmin):
             # not paid through a provider).
             self.message_user(request, str(exc), messages.ERROR)
         else:
-            reason = OrderService.reason_text(reason_code, note)
+            reason = RefundService.reason_text(reason_code, note)
             if free_lines:
                 self._restock(request, order.pk, form.units(), reason)
                 return HttpResponse(
@@ -2657,7 +2659,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                OrderService.update_order_status(order, target_status)
+                OrderLifecycleService.update_order_status(order, target_status)
                 self.message_user(
                     request,
                     success_message % {"order_id": order.id},
@@ -2693,7 +2695,7 @@ class OrderAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def mark_as_canceled(self, request, queryset):
-        # No outer ``transaction.atomic`` here: ``OrderService.cancel_order``
+        # No outer ``transaction.atomic`` here: ``OrderLifecycleService.cancel_order``
         # is already wrapped in its own atomic, and a batch-wide
         # rollback would undo successful cancels just because one
         # selected row is in a terminal state. Verified by prod admin
@@ -2705,7 +2707,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                canceled, refund_info = OrderService.cancel_order(
+                canceled, refund_info = OrderLifecycleService.cancel_order(
                     order, customer_initiated=False
                 )
                 self.message_user(

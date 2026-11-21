@@ -29,9 +29,9 @@ from agent.serializers import AgentFavouriteSerializer, AgentProfileSerializer
 from core.api.serializers import ErrorResponseSerializer
 from loyalty.serializers.loyalty import LoyaltySummarySerializer
 from loyalty.services import LoyaltyService
+from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
 from order.serializers.order import OrderDetailSerializer, OrderSerializer
-from order.services import OrderService
 from product.models.favourite import ProductFavourite
 from tenant.features import feature_gates
 from tenant.internal import is_internal_caller
@@ -139,7 +139,7 @@ class AgentInternalOrderView(APIView):
         if not is_internal_caller(request.headers.get("X-Internal-Token", "")):
             raise NotFound
         try:
-            order = OrderService.get_agent_order_by_uuid(uuid)
+            order = OrderLifecycleService.get_agent_order_by_uuid(uuid)
         except Order.DoesNotExist as e:
             raise NotFound from e
         return Response(OrderDetailSerializer(order).data)
@@ -235,7 +235,7 @@ class AgentOrdersView(AgentAPIView):
     def get(self, request: Request) -> Response:
         # TokenPermission guarantees an authenticated user, but the
         # static ``request.user.pk`` type stays ``Any | None``.
-        orders = OrderService.get_user_orders(
+        orders = OrderLifecycleService.get_user_orders(
             request.user.pk  # ty: ignore[invalid-argument-type]
         )[:AGENT_ORDERS_LIMIT]
         serializer = OrderSerializer(

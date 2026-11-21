@@ -126,6 +126,99 @@ class TestCompileUserDataCompleteness:
         assert data["cart"]["items"][0]["product_id"] == item.product_id
         assert data["cart"]["items"][0]["quantity"] == 3
 
+    def test_an_order_exports_every_personal_field_it_erases(self):
+        """The export lists an order's ``Order.PERSONAL_FIELDS`` (contact,
+        address, the customer's note, the invoice's counterparty) and its
+        ``Order.PERSONAL_METADATA``, the same definition erasure clears."""
+        from order.factories.order import OrderFactory
+        from order.models.order import Order
+
+        user = UserAccountFactory()
+        meta = {"client_ip_address": "203.0.113.7", "fbp": "fb.1.2.3"}
+        OrderFactory(
+            user=user,
+            customer_notes="Θυρωρός",
+            billing_vat_id="123456789",
+            billing_company_name="Εταιρεία ΑΕ",
+            billing_street="Ερμού",
+            metadata={
+                "meta": meta,
+                "cancellation": {"reason": "Λάθος μέγεθος", "by": 1},
+                "promotions": [{"code": "WELCOME"}],
+            },
+        )
+
+        [exported] = compile_user_data(user)["orders"]
+
+        assert set(Order.PERSONAL_FIELDS) <= set(exported)
+        assert exported["customer_notes"] == "Θυρωρός"
+        assert exported["billing_vat_id"] == "123456789"
+        assert exported["billing_company_name"] == "Εταιρεία ΑΕ"
+        assert exported["billing_street"] == "Ερμού"
+        assert exported["metadata"] == {
+            "meta": meta,
+            "cancellation": {"reason": "Λάθος μέγεθος"},
+        }
+
+    def test_a_soft_deleted_order_is_exported(self):
+        """Deleting an order in the admin only hides it: its data is still
+        the subject's, so the export lists it."""
+        from order.factories.order import OrderFactory
+        from order.models.order import Order
+
+        user = UserAccountFactory()
+        order = OrderFactory(user=user)
+        Order.objects.filter(pk=order.pk).delete()
+
+        [exported] = compile_user_data(user)["orders"]
+
+        assert exported["id"] == order.id
+
+    def test_an_order_exports_what_its_carriers_reported(self):
+        """What the carriers wrote about the recipient (who took delivery,
+        a COD receiver, BOX NOW's event text), which erasure clears, is
+        exported with its order."""
+        from order.factories.order import OrderFactory
+        from shipping_acs.factories import (
+            AcsShipmentFactory,
+            AcsTrackingEventFactory,
+        )
+        from shipping_acs.models import AcsCodPayout
+        from shipping_boxnow.factories import (
+            BoxNowParcelEventFactory,
+            BoxNowShipmentFactory,
+        )
+
+        user = UserAccountFactory()
+        by_acs = OrderFactory(user=user)
+        acs = AcsShipmentFactory(order=by_acs, voucher_no="7400000009")
+        AcsTrackingEventFactory(shipment=acs, notes="Παρέλαβε ο θυρωρός")
+        AcsCodPayout.objects.create(
+            voucher_no="7400000009", shipment=acs, parcel_receiver="Ζ. Α."
+        )
+        by_boxnow = OrderFactory(user=user)
+        BoxNowParcelEventFactory(
+            shipment=BoxNowShipmentFactory(order=by_boxnow),
+            additional_information="Στο ντουλάπι 12",
+            raw_payload={
+                "data": {
+                    "customer": {"name": "Ζ. Α.", "phoneNumber": "+3069"},
+                    "additionalInformation": "Στο ντουλάπι 12",
+                }
+            },
+        )
+
+        exported = {o["id"]: o for o in compile_user_data(user)["orders"]}
+
+        assert exported[by_acs.id]["carrier"] == {
+            "acs_tracking_notes": ["Παρέλαβε ο θυρωρός"],
+            "acs_cod_receivers": ["Ζ. Α."],
+        }
+        assert exported[by_boxnow.id]["carrier"] == {
+            "boxnow_event_texts": ["Στο ντουλάπι 12"],
+            "boxnow_customers": [{"name": "Ζ. Α.", "phoneNumber": "+3069"}],
+        }
+
     def test_a_saved_address_exports_its_address_line_2(self):
         from user.factories.address import UserAddressFactory
 

@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise

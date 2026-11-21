@@ -15,8 +15,9 @@ import pytest
 from django.utils import timezone
 
 from tenant.billing import billing_state, run_billing_cycle, target_stage
+from tenant.enum import SuspendedReason
 from tenant.lifecycle import activate_tenant, suspend_tenant
-from tenant.models import SuspendedReason, Tenant
+from tenant.models import Tenant
 from tests.utils.staff import store_tenant
 
 _TODAY = date(2026, 8, 22)

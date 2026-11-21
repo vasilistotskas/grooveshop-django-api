@@ -21,7 +21,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.signals.handlers import (
     handle_stripe_refund_failed,
     handle_stripe_refund_made,
@@ -113,7 +113,7 @@ class TestAFailedRefundIsReversed:
     def test_a_fully_refunded_order_is_back_to_paid(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
         assert _status(order) == PaymentStatus.REFUNDED
         [re_1] = [c for c in stripe_api.created]
 
@@ -129,8 +129,8 @@ class TestAFailedRefundIsReversed:
     def test_one_of_two_refunds_failing_leaves_the_other_standing(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order, amount=_eur("30.00"))
-            OrderService.refund_order(order, amount=_eur("20.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("20.00"))
         second = stripe_api.created[1]
 
         _deliver(_event(second.id, 2000))
@@ -142,7 +142,7 @@ class TestAFailedRefundIsReversed:
     def test_staff_are_told_on_the_order_and_by_email(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         _deliver(_event(stripe_api.created[0].id, 10000))
 
@@ -176,7 +176,7 @@ class TestOnlyAFailureCounts:
     def test_a_refund_that_succeeded_changes_nothing(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         _deliver(
             _event(
@@ -194,7 +194,7 @@ class TestOnlyAFailureCounts:
     def test_the_three_events_and_a_redelivery_reverse_it_once(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order, amount=_eur("60.00"))
+            RefundService.refund_order(order, amount=_eur("60.00"))
         refund_id = stripe_api.created[0].id
 
         for kind in (
@@ -252,11 +252,11 @@ class TestTheLedgerKeepsAddingUpAfterAReversal:
     def test_a_failed_refund_can_be_refunded_again(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
             stripe_api.created[0].status = "failed"
             _deliver(_event(stripe_api.created[0].id, 10000))
             stripe_api.status = "succeeded"
-            result = OrderService.refund_order(order)
+            result = RefundService.refund_order(order)
 
         assert result.refunded == _eur("100.00")
         assert _status(order) == PaymentStatus.REFUNDED
@@ -288,9 +288,9 @@ class TestRefundEventsAroundAFailure:
     def test_30_succeeds_20_pending_then_fails_then_events_replay(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
             stripe_api.status = "pending"
-            OrderService.refund_order(order, amount=_eur("20.00"))
+            RefundService.refund_order(order, amount=_eur("20.00"))
         assert PaymentLedger.refunded(order) == Decimal("50.00")
         first, failed = stripe_api.created
 

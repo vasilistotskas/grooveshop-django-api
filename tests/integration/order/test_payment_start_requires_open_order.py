@@ -20,8 +20,8 @@ from rest_framework.test import APIClient
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from user.factories.account import UserAccountFactory
 
@@ -41,7 +41,7 @@ def canceled_order():
         payment_status=PaymentStatus.PENDING,
         payment_id="pi_before_cancel",
     )
-    OrderService.cancel_order(order, refund_payment=False)
+    OrderLifecycleService.cancel_order(order, refund_payment=False)
     order.refresh_from_db()
     assert order.status == OrderStatus.CANCELED
     return order

@@ -1,7 +1,7 @@
 """Vertical presets: the slot configuration a store starts from.
 
 A preset is a per-surface chain + weights + limits, keyed by
-``tenant.models.StoreVertical`` — the platform-level fact about what a
+``tenant.enum.StoreVertical`` — the platform-level fact about what a
 store sells. Provisioning seeds the tenant's vertical; the PreSync job's
 ``backfill_recommendation_slots`` seeds any tenant that has no slots
 yet; the slot admin's "Reset to preset" re-applies it on demand. Seeding
@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 from recommendation.enum import StrategyCode as S
 from recommendation.enum import Surface
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 
 if TYPE_CHECKING:
     from recommendation.models import RecommendationSlot

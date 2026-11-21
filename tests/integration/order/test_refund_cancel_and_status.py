@@ -27,11 +27,12 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import RefundOutstandingError
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
 from user.factories import UserAccountFactory
@@ -79,7 +80,7 @@ class TestACancelRefundsWhatIsStillRefundable:
         order.refresh_from_db()
 
         with FakeStripeRefunds() as stripe_api:
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind", customer_initiated=False
             )
 
@@ -100,7 +101,7 @@ class TestACancelRefundsWhatIsStillRefundable:
         )
 
         with FakeStripeRefunds() as stripe_api:
-            _canceled, refund_info = OrderService.cancel_order(
+            _canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, customer_initiated=False
             )
 
@@ -123,7 +124,7 @@ class TestADisputeHoldsTheRefundOfACancel:
         order = self._disputed()
 
         with FakeStripeRefunds() as stripe_api:
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="fraud", customer_initiated=False
             )
 
@@ -156,7 +157,9 @@ class TestMarkingAnOrderRefunded:
         order, _charge = _paid_order(status=OrderStatus.RETURNED)
 
         with pytest.raises(RefundOutstandingError) as excinfo:
-            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.REFUNDED
+            )
 
         assert excinfo.value.refundable == Decimal("100.00")
         order.refresh_from_db()
@@ -165,9 +168,9 @@ class TestMarkingAnOrderRefunded:
     def test_it_is_allowed_once_the_payment_is_refunded(self):
         order, _charge = _paid_order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
 
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
@@ -181,7 +184,7 @@ class TestMarkingAnOrderRefunded:
             payment_status=PaymentStatus.CANCELED,
         )
 
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
 
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
@@ -266,7 +269,9 @@ class TestAPaidOrderTheLedgerNeverRecorded:
         order = self._unrecorded()
 
         with pytest.raises(RefundOutstandingError) as excinfo:
-            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.REFUNDED
+            )
 
         assert excinfo.value.refundable == 0
 
@@ -291,7 +296,7 @@ class TestAPaidOrderTheLedgerNeverRecorded:
         order = self._unrecorded(pay_way=None, payment_id="")
 
         assert PaymentLedger.refund_open(order) is False
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
 
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
@@ -334,6 +339,6 @@ class TestMarkingRefundedOverTheApi:
     def test_it_succeeds_once_the_payment_is_refunded(self):
         order, _charge = _paid_order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         assert self._post(order).status_code == 200

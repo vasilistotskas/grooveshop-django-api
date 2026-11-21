@@ -3,7 +3,7 @@
 Before it, a return could only be refunded in the PSP dashboard and
 relied on a webhook: the admin's "Mark as refunded" moved the order's
 status and nothing else. The action goes through
-``OrderService.refund_order``, so it is exactly the in-app refund (ledger,
+``RefundService.refund_order``, so it is exactly the in-app refund (ledger,
 idempotency key, derived status) with a dialog in front of it.
 
 A dialog action is driven with real POST data, not a stub form: Unfold's
@@ -31,7 +31,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
-from order.services import OrderService
+from order.refunds.service import RefundService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
 from user.factories import UserAccountFactory
@@ -359,7 +359,7 @@ class TestWhereTheActionIsOffered:
     ):
         order = _delivered_order(status=order_status)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         assert not order_admin.has_refund_permission(
             _post(staff_user, {}), object_id=order.pk
@@ -431,7 +431,7 @@ class TestTheOrderPage:
     def test_it_is_not_offered_when_nothing_is_left_to_refund(self, client):
         order = _delivered_order("100.00", status=OrderStatus.DELIVERED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         assert "refund_payment" not in self._page(client, order)
 

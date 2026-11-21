@@ -124,7 +124,7 @@ class OrderItemViewSet(BaseModelViewSet):
     def restock(self, request, pk=None):
         # Restocking puts returned units back on the shelf and records them
         # on the line; it moves NO money. What the customer is paid back is
-        # the order's refund (``OrderService.refund_order``, the staff
+        # the order's refund (``RefundService.refund_order``, the staff
         # "Refund" admin action), decided at order level because a line's
         # snapshot price is not what the customer paid for it (tax, shared
         # discounts, shipping). It is a staff/merchant operation, never

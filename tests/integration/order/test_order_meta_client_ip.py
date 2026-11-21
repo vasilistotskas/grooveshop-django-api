@@ -150,3 +150,17 @@ class TestOrderMetaClientIp(APITestCase):
         )
 
         assert self._stored_meta(response)["client_ip_address"] == VISITOR_IP
+
+    @override_settings(ORIGIN_VERIFY_SECRET=SECRET)
+    def test_a_checkout_without_meta_context_stores_no_address(self, *_mocks):
+        response = self._post(
+            self._cod(),
+            headers={
+                "HTTP_X_ORIGIN_VERIFY": SECRET,
+                "HTTP_CF_CONNECTING_IP": VISITOR_IP,
+            },
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        order = Order.objects.get(id=response.json()["id"])
+        assert "meta" not in order.metadata

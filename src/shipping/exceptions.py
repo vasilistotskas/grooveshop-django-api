@@ -144,3 +144,11 @@ class ShippingLivePriceUnresolvedError(ShippingError):
     cached, before the locks are taken; a miss means what it was resolved
     for is no longer what is being priced.
     """
+
+
+class PickupPointCheckUnavailableError(Exception):
+    """A pickup point the catalogue misses could not be looked for again:
+    the cache that holds the resync guard is down
+    (``ShippingService.pickup_point_address``). Nothing is known about the
+    point, so it is not refused as unknown; the same order may succeed
+    once the cache is back."""

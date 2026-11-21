@@ -9,7 +9,7 @@ admin form, which edits both fields, could produce the same.
 from __future__ import annotations
 
 import pytest
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -33,16 +33,18 @@ def test_completed_with_nothing_due_and_no_deduction_is_refused():
 
     errors = order._payment_consistency_errors()
 
-    assert list(errors) == ["amount_due"]
+    assert list(errors) == [NON_FIELD_ERRORS]
 
 
-def test_clean_raises_it_on_the_amount_due_field():
+def test_clean_raises_it_as_a_non_field_error():
+    """The admin shows ``amount_due`` and ``payment_status`` read-only, so
+    an error under either would have no input to land on."""
     order = _order(PaymentStatus.COMPLETED, "0.00")
 
     with pytest.raises(ValidationError) as exc_info:
         order.clean()
 
-    assert "amount_due" in exc_info.value.message_dict
+    assert list(exc_info.value.message_dict) == [NON_FIELD_ERRORS]
 
 
 def test_completed_and_fully_covered_by_a_gift_card_is_valid():

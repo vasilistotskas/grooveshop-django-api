@@ -34,6 +34,7 @@ from shipping.exceptions import (
     CarrierUnavailableError,
     ShippingParcelTooLargeError,
 )
+from shipping_boxnow.filters import BoxNowLockerFilter
 from shipping_boxnow.models import BoxNowLocker
 from shipping_boxnow.packing import resolve_compartment_size
 from shipping_boxnow.serializers import (
@@ -84,6 +85,7 @@ class BoxNowLockerViewSet(BaseModelViewSet):
     queryset = BoxNowLocker.objects.filter(is_active=True)
     serializers_config = serializers_config
     permission_classes = [AllowAny]
+    filterset_class = BoxNowLockerFilter
     search_fields = [
         "external_id",
         "name",

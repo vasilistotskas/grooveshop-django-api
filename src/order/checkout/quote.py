@@ -95,10 +95,15 @@ class ShippingChoice:
         The quote and order creation build it here from the same field
         names, so they read one delivery. The pickup point is the
         carrier's own ``location_keys``: a key of another carrier names
-        nothing this order is sent to.
+        nothing this order is sent to. A pickup-point delivery has no
+        region: it goes to the point, and the order keeps none of the
+        buyer's address (``_deliver_to_pickup_point``), so the quote, the
+        digest and the order read the same delivery.
         """
+        from shipping.enum import ShippingKind
         from shipping.interfaces import get_provider, is_registered
 
+        kind = data.get("shipping_kind") or None
         provider_code = data.get("shipping_provider_code") or None
         keys = (
             get_provider(provider_code).location_keys
@@ -106,10 +111,14 @@ class ShippingChoice:
             else ()
         )
         return cls(
-            kind=data.get("shipping_kind") or None,
+            kind=kind,
             provider_code=provider_code,
             country_id=data.get("country_id") or None,
-            region_id=data.get("region_id") or None,
+            region_id=(
+                None
+                if kind == ShippingKind.PICKUP_POINT
+                else data.get("region_id") or None
+            ),
             location=tuple(
                 (key, str(data[key])) for key in keys if data.get(key)
             ),

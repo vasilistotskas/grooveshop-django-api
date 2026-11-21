@@ -27,6 +27,7 @@ from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
+from core.cache.invalidation import mark_surface_stale
 from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
@@ -3391,6 +3392,10 @@ class AcsService:
                 .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
+            if deactivated:
+                # ``update`` sends no ``post_save``: the cached station
+                # list would keep serving the withdrawn stations.
+                mark_surface_stale("shipping")
 
         return {"upserted": upserted, "deactivated": deactivated}
 

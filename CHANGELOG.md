@@ -3,6 +3,108 @@
 
 
 
+## v3.262.1 (2026-11-21)
+
+### Documentation
+
+* docs: name files by their path under src/ in the order and shipping comments (#792)
+
+35 more comments and docstrings, in 27 files that open pull requests
+held during the first pass. No code changes. ([`4234a4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4234a4b1261e24c366552a69955cc69ae69a8aff))
+
+### Refactoring
+
+* refactor(admin): store dashboard alerts read the owning apps' querysets (#780)
+
+StoreAlerts kept four domain queries and the myDATA readiness rules
+inline. Each now lives with the model it reads:
+
+- BuilderScheduledPublish.objects.failed_unacknowledged() (builder)
+- Order.objects.receipt_deferred() (order), which the order admin's
+  "Receipt waiting for a refund" filter uses too
+- Invoice.objects.transmission_failed() and .cancel_overdue(), a new
+  InvoiceQuerySet (order)
+- MyDataConfig.unmet(): the conditions of is_ready() a store does not
+  meet, as MyDataRequirement values. is_ready() is true exactly when the
+  list is empty, and the dashboard's environment, exemption-ground and
+  credential alerts read the same list, so the gate and the alerts
+  cannot drift.
+
+The filters and the alert texts are unchanged. A parametrized test pins
+is_ready() against unmet() over every combination of the conditions.
+
+Closes #591 ([`4bee767`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bee7670d5d7648c3e58e8b85e8a7e0cdb9d35cc))
+
+* refactor(core): throttles, the health and settings endpoints and UserNameGenerator move to their owners (#787) ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
+* refactor(throttles): each app defines its own throttles
+
+core/api/throttling.py held 27 domain throttles beside the bases. Each
+throttle one app uses moves to that app's throttles module (contact,
+user, product, emails, order, cart, agent, giftcard, b2b, search,
+shipping_acs, shipping_boxnow, recommendation); the bases, the
+fail-closed logic and the throttles several apps share (view counts,
+staff login) stay. Two empty bases, GatewayUserRateThrottle and
+UserIdRateThrottle, give the apps DRF's UserRateThrottle through core,
+which stays the one module importing rest_framework.throttling. Scopes,
+rates and outage policies are unchanged; the outage and scoped-throttle
+tests now read every app's throttles.
+
+Refs #593 ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
+* refactor(core): the health and settings endpoints leave core/api/views.py
+
+core/api/views.py held the health checks and the store-settings
+endpoints beside the base viewsets. They move to core/api/health_api.py
+and core/api/settings_api.py; the URL conf, the test patches and the
+contract's contact.attachments ignore follow them.
+
+Refs #593 ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
+* refactor(user): UserNameGenerator moves from core to user
+
+Its only callers are the user app's form and manager, so core no
+longer reaches user.models through it; the contract loses that ignore.
+
+Refs #593 ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
+* refactor(throttles): name the throttle bases where docs said core defines every throttle
+
+core/caches.py and core/api/throttling.py still said core.api.throttling
+defines every throttle; it holds the bases they are built on. The test
+helper that collects every project throttle refuses one name defined in
+two modules, which would hide the first from every check.
+
+Refs #593 ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
+* refactor(core): MonitoredTask in its own module; cart, user and meili tasks move to their apps (#775) ([`37715b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37715b5c58d6d1b13f08d754aab8626e04cf955f))
+
+* refactor(core): MonitoredTask in its own module; cart, user and meili tasks move to their apps
+
+MonitoredTask and the task-argument mask move from core/tasks.py to
+core/monitored_task.py, so an app's tasks module no longer loads
+cart.models and the email pipeline through it. The guest-cart cleanups
+move to cart/tasks.py, the re-engagement email to user/tasks.py and the
+daily index sync to meili/tasks.py, each keeping its core.tasks.* name.
+Their tests move with them; the contract loses core.tasks -> cart.models.
+
+Refs #592 ([`37715b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37715b5c58d6d1b13f08d754aab8626e04cf955f))
+
+* refactor(user): one import of each name in user/tasks.py
+
+The re-engagement task brought module-level imports of User, timezone,
+timedelta and the email send helpers; the function-local copies of the
+same names go. The MonitoredTask tests import it from its own module, and
+user/emails.py no longer names core.tasks as a sender.
+
+Refs #592 ([`37715b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37715b5c58d6d1b13f08d754aab8626e04cf955f))
+
+### Testing
+
+* test(order): the pickup-order test imports the order throttles from their app
+
+Refs #593 ([`e68b919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e68b91963ecbe803b9ad697b04f73818593f640e))
+
 ## v3.262.0 (2026-11-21)
 
 ### Bug fixes

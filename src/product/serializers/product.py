@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.db import connection
 from django.db.models import Count
@@ -158,6 +158,18 @@ class ProductMainImageSizeMixin(MainImageSizeMixin):
     main_image_height = serializers.IntegerField(
         read_only=True, allow_null=True
     )
+
+    def to_representation(self, instance: Product) -> dict[str, Any]:
+        # ``main_image_path`` and the two sizes each read
+        # ``Product.main_image``: without the optimizers' prefetch that is
+        # one query each. Resolve it once, the way the prefetch would.
+        if (
+            getattr(instance, "_prefetched_main_images", None) is None
+            and getattr(instance, "_prefetched_images", None) is None
+        ):
+            main = instance.main_image
+            instance._prefetched_main_images = [main] if main else []
+        return super().to_representation(instance)
 
 
 class ProductCardSerializer(

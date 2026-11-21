@@ -118,5 +118,14 @@ measures the rows that have no size: the ones stored before a model gained the
 columns, and the ones a release that did not measure yet wrote during a deploy.
 Run it once after the rollout of a release that adds the columns. It reads the
 header of each file only, writes the two columns directly (no save, history or
-reindex), reaches suspended stores, and reports SVGs and files missing from
-storage. Safe to run again.
+reindex) and then queues the purge of the cache surfaces that render a model it
+changed, as a save would. It reaches suspended stores and reports SVGs and
+files missing from storage. Safe to run again.
+
+A file Pillow cannot read (truncated, corrupt) has no size, like an SVG: the
+row keeps null and its save still succeeds. A PNG's EXIF orientation counts
+only when its `eXIf` chunk comes before the pixel data, because libvips ignores
+one after it (checked against Sharp: a quarter-turn tag after `IDAT` is served
+unrotated). A row with a file and no size (an SVG, an unreadable or missing
+file) is read again on each save that writes the image column, which is one
+header read.

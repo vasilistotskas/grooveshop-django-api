@@ -19,6 +19,7 @@ from PIL import Image
 
 from blog.factories.post import BlogPostFactory
 from blog.models.post import BlogPost
+from core.cache.registry import get_surface
 from core.management.commands.backfill_image_dimensions import (
     Command,
     backfill_current_schema,
@@ -42,6 +43,29 @@ def _jpeg(size: tuple[int, int], orientation: int | None = None) -> bytes:
         exif[0x0112] = orientation
     Image.new("RGB", size, "red").save(buffer, "JPEG", exif=exif)
     return buffer.getvalue()
+
+
+def _png(
+    size: tuple[int, int], orientation: int | None = None, *, late: bool
+) -> bytes:
+    """A PNG whose ``eXIf`` chunk sits before ``IDAT`` (Pillow's order) or,
+    with *late*, after it, where libvips ignores it."""
+    buffer = io.BytesIO()
+    exif = Image.Exif()
+    if orientation is not None:
+        exif[0x0112] = orientation
+    Image.new("RGB", size, "red").save(buffer, "PNG", exif=exif)
+    data = buffer.getvalue()
+    if not late:
+        return data
+    chunks, index = [], 8
+    while index < len(data):
+        length = int.from_bytes(data[index : index + 4], "big")
+        chunks.append(data[index : index + 12 + length])
+        index += 12 + length
+    exif_chunk = next(c for c in chunks if c[4:8] == b"eXIf")
+    rest = [c for c in chunks if c[4:8] != b"eXIf"]
+    return data[:8] + b"".join(rest[:-1]) + exif_chunk + rest[-1]
 
 
 def _upload(name: str, content: bytes) -> SimpleUploadedFile:
@@ -107,6 +131,32 @@ def test_a_save_naming_a_file_missing_from_storage_keeps_no_size():
     assert _sizes(post) == (None, None)
 
 
+@pytest.mark.parametrize(
+    ("late", "expected"),
+    [(False, (600, 800)), (True, (800, 600))],
+    ids=["exif-before-pixels", "exif-after-pixels-ignored-like-libvips"],
+)
+def test_a_png_orientation_counts_only_where_the_media_service_reads_it(
+    late, expected
+):
+    post = BlogPostFactory(
+        image=_upload("phone.png", _png((800, 600), ROTATE_90, late=late))
+    )
+
+    assert _sizes(post) == expected
+
+
+def test_an_unreadable_file_has_no_size_and_its_save_succeeds():
+    # Cut inside the IHDR chunk: Pillow raises OSError ("Truncated File
+    # Read"), not UnidentifiedImageError.
+    truncated = _png((300, 200), late=False)[:20]
+    post = BlogPostFactory(image=_upload("broken.png", truncated))
+
+    post.save()
+
+    assert _sizes(post) == (None, None)
+
+
 def test_loading_or_refreshing_a_row_never_opens_its_file():
     """Django's own ``ImageField`` opens the stored file of every row loaded
     with a null size, which an SVG row always has."""
@@ -167,6 +217,35 @@ class TestBackfill:
 
         assert (tally.scanned, tally.measured) == (1, 1)
         assert _sizes(post) == (None, None)
+
+    def test_queues_the_purge_of_the_surfaces_that_render_what_it_changed(
+        self,
+    ):
+        self._unmeasured(_jpeg((640, 480)), "todo.jpg")
+
+        with patch(
+            "core.management.commands.backfill_image_dimensions."
+            "mark_surface_stale"
+        ) as stale:
+            backfill_current_schema(measured_fields())
+
+        marked = {call.args[0] for call in stale.call_args_list}
+        assert marked
+        assert all(
+            "blog.BlogPost" in get_surface(code).invalidated_by
+            for code in marked
+        )
+
+    def test_a_dry_run_purges_nothing(self):
+        self._unmeasured(_jpeg((640, 480)), "todo.jpg")
+
+        with patch(
+            "core.management.commands.backfill_image_dimensions."
+            "mark_surface_stale"
+        ) as stale:
+            backfill_current_schema(measured_fields(), dry_run=True)
+
+        stale.assert_not_called()
 
     def test_the_command_measures_the_current_store(self):
         post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")

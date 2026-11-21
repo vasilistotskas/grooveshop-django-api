@@ -39,15 +39,29 @@ from core.utils.rich_text_images import displayed_size
 
 
 def displayed_dimensions(file: IO[bytes]) -> tuple[int, int] | None:
-    """``(width, height)`` a browser shows the raster *file* at, or ``None``
-    for a file Pillow cannot read as an image (an SVG). Reads the header
-    only; the file's position is restored."""
+    """``(width, height)`` the media service shows the raster *file* at, or
+    ``None`` for a file Pillow cannot read as an image (an SVG) or cannot
+    read at all (truncated, corrupt): no size is truer than a wrong one.
+
+    Reads the header only; the file's position is restored. A PNG's EXIF
+    orientation counts only when its ``eXIf`` chunk precedes the pixel data:
+    libvips (the media service's Sharp) ignores one after it, and finding
+    one there would make Pillow decode the whole image.
+    """
     position = file.tell() if file.seekable() else None
     try:
         file.seek(0)
         with Image.open(file) as opened:
+            if opened.format == "PNG" and "exif" not in opened.info:
+                return opened.size
             return displayed_size(opened)
-    except UnidentifiedImageError, Image.DecompressionBombError:
+    except (
+        UnidentifiedImageError,
+        Image.DecompressionBombError,
+        OSError,
+        SyntaxError,
+        ValueError,
+    ):
         return None
     finally:
         if position is not None:

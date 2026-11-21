@@ -5,11 +5,14 @@ save); this command measures the rows stored before a model gained
 ``width_field``/``height_field``, and the rows a release that did not
 measure yet wrote during a deploy, so run it once after the rollout of a
 release that adds the fields. Safe to run again: a row with both sizes is
-skipped, and only the header of each file is read.
+skipped, and only the header of each file is read
+(``core.fields.image.displayed_dimensions``).
 
 It writes the two columns directly rather than saving the row: a save
 re-validates, records history and re-indexes for a change no reader of
-those sees. An SVG has no raster size and stays null (it is read again on
+those sees. It then queues the purge of the cache surfaces that declare a
+model it changed (``invalidated_by``), as a save would, so the API serves
+the sizes at once. An SVG has no raster size and stays null (it is read again on
 the next run); a file missing from storage is reported and left alone.
 
 Fields come from the app registry, so a model that gains the fields is
@@ -24,6 +27,8 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.core.management.base import BaseCommand
 from django.db import models
 
+from core.cache.invalidation import mark_surface_stale
+from core.cache.registry import iter_surfaces
 from core.fields.image import ImageAndSvgField, displayed_dimensions
 from core.management.commands.media_reference_audit import tenant_models
 from core.management.tenant_mixin import TenantCommandMixin
@@ -91,7 +96,23 @@ def backfill_current_schema(
                         field.height_field: size[1],
                     }
                 )
+    if not dry_run:
+        _mark_surfaces_stale(
+            {
+                label.rsplit(".", 1)[0]
+                for label, tally in tallies.items()
+                if tally.measured
+            }
+        )
     return tallies
+
+
+def _mark_surfaces_stale(model_labels: set[str]) -> None:
+    """Queue the purge of every cache surface that renders one of
+    *model_labels* (``app.Model``)."""
+    for surface in iter_surfaces():
+        if model_labels & set(surface.invalidated_by):
+            mark_surface_stale(surface.code)
 
 
 class Command(TenantCommandMixin, BaseCommand):

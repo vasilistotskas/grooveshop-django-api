@@ -17,6 +17,7 @@ from core.validators.address import (
     address_errors,
     normalize_postcode,
     postcode_matches,
+    split_street_line,
     validate_postal_code_pattern,
 )
 from country.models import Country
@@ -251,3 +252,42 @@ class TestValidatePostalCodePattern:
     ):
         with pytest.raises(ValidationError):
             validate_postal_code_pattern(pattern)
+
+
+class TestSplitStreetLine:
+    """One street line, the number after the street (#641)."""
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("Ερμού 12", ("Ερμού", "12")),
+            ("Λεωφόρος Κηφισίας 123Α", ("Λεωφόρος Κηφισίας", "123Α")),
+            ("Ermou 12b", ("Ermou", "12b")),
+            ("Ερμού, 12", ("Ερμού", "12")),
+            ("  Ερμού   12 ", ("Ερμού", "12")),
+            ("Ermou 12-14", ("Ermou", "12-14")),
+            ("Ermou 12/3", ("Ermou", "12/3")),
+            # A number in the street's name stays in the name.
+            ("28ης Οκτωβρίου 15", ("28ης Οκτωβρίου", "15")),
+            ("Οδός 25ης Μαρτίου 3", ("Οδός 25ης Μαρτίου", "3")),
+        ],
+    )
+    def test_splits_the_trailing_number(self, line, expected):
+        assert split_street_line(line) == expected
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "Ερμού",
+            "",
+            "12",
+            "12 14",
+            # A number written first is not guessed: "28 Οκτωβρίου" is a
+            # street name.
+            "12 Main Street",
+            "28 Οκτωβρίου",
+            "Ερμού 12 Α",
+        ],
+    )
+    def test_refuses_a_line_with_no_number_after_the_street(self, line):
+        assert split_street_line(line) is None

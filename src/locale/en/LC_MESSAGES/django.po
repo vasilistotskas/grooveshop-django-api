@@ -1488,6 +1488,9 @@ msgstr "Actor email"
 msgid "Add synonyms, products or content for these."
 msgstr "Add synonyms, products or content for these."
 
+msgid "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+msgstr "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+
 msgid "Add tracking information to an existing order"
 msgstr "Add tracking information to an existing order"
 
@@ -14015,14 +14018,14 @@ msgstr "Street"
 msgid "Street Number"
 msgstr "Street Number"
 
-msgid "Street name"
-msgstr "Street name"
-
 msgid "Street name and number"
 msgstr "Street name and number"
 
-msgid "Street number"
-msgstr "Street number"
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+
+msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
+msgstr "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 
 msgid "Street, street number, and city are required."
 msgstr "Street, street number, and city are required."
@@ -18837,6 +18840,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 #~ msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+
+#~ msgid "Street name"
+#~ msgstr "Street name"
+
+#~ msgid "Street number"
+#~ msgstr "Street number"
 
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."

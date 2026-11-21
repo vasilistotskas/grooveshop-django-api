@@ -38,6 +38,17 @@ _WHITESPACE_RUN = re.compile(r"\s+")
 # Four, not five: Cyprus postcodes are four digits.
 _MIN_POSTCODE_LOOKALIKE_LENGTH = 4
 
+# One street line that ends in its number, the way Greek and Cypriot
+# addresses are written: "Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12",
+# "Ermou 12-14", "Ermou 12/3". The number is digits, at most one letter
+# after them, and an optional second number after a dash or a slash. A
+# number written first ("12 Main St") is not read: "28 Οκτωβρίου" is a
+# Greek street with no number, and guessing would send the parcel to
+# number 28 of "Οκτωβρίου".
+_STREET_LINE = re.compile(
+    r"(?P<street>.+?)[ ,]+(?P<number>\d+[^\W\d_]?(?:[-/]\d+[^\W\d_]?)?)"
+)
+
 
 def normalize_postcode(value: str) -> str:
     """Return the canonical form: trimmed, upper-case, single spaces.
@@ -79,6 +90,34 @@ def _coded(code: str, message: StrOrPromise) -> ErrorDetail:
     DRF reads ``ErrorDetail.code`` where Django just sees a ``str``.
     """
     return ErrorDetail(str(message), code)
+
+
+def split_street_line(line: str) -> tuple[str, str] | None:
+    """The street and its number from one line whose number follows the
+    street (``_STREET_LINE``), or ``None`` when the line ends in no
+    number or its street holds no letter. The one place Django splits a
+    street line: a caller that sends one line instead of a street and a
+    number gets the same two columns the courier voucher reads.
+    """
+    match = _STREET_LINE.fullmatch(_WHITESPACE_RUN.sub(" ", line).strip())
+    if match is None:
+        return None
+    street = match["street"].rstrip(" ,")
+    if not any(char.isalpha() for char in street):
+        return None
+    return street, match["number"]
+
+
+def street_number_missing() -> ErrorDetail:
+    """The error of a street line sent without a street number when no
+    number can be split from it (``split_street_line``)."""
+    return _coded(
+        "street_number_missing",
+        _(
+            "Add the street number after the street name, for example "
+            "Ermou 12, or enter it in the street number field."
+        ),
+    )
 
 
 def postcode_error(country: Country) -> StrOrPromise:

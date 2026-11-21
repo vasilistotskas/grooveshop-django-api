@@ -32,6 +32,7 @@ from order.emails import (
     suggestion_strip_of,
     unreviewed_products,
 )
+from order.enum.landed_payment import LandedPayment
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     CHARGED_PAYMENT_STATUSES,
@@ -2425,13 +2426,16 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             # The webhook that marks an order paid can be lost: what the
             # provider took is settled now, never canceled unpaid.
             try:
-                if settlement.settle_landed_payment(order, provider.code):
+                landed = settlement.settle_landed_payment(order, provider.code)
+                if landed == LandedPayment.SETTLED:
                     logger.warning(
                         "Auto-cancel found order %s paid at its provider "
                         "with no webhook: settled it instead",
                         order.id,
                     )
                     return "settled"
+                if landed == LandedPayment.UNSETTLED:
+                    return "open"
             except PaymentStatusUnavailableError:
                 logger.warning(
                     "Auto-cancel skipped order %s: its provider could not "

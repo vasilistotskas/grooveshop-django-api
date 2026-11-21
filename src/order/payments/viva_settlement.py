@@ -23,10 +23,12 @@ from typing import Any
 
 from django.db import transaction
 
+from order.enum.landed_payment import LandedPayment
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.payments import payment_hold
 from order.payments.payment import order_viva_codes
 from tenant.celery import dispatch_on_commit
 
@@ -161,7 +163,19 @@ def flag_amount_mismatch(
     )
 
 
-def handle_payment_created(order, event_data, transaction_id):
+def handle_payment_created(
+    order,
+    event_data,
+    transaction_id,
+    *,
+    verified: tuple[PaymentStatus | None, dict[str, Any]] | None = None,
+):
+    """Settle *order* for the Viva payment *transaction_id*.
+
+    *verified* is Retrieve Transaction's answer when the caller asked it
+    before locking the order (:func:`apply_event`); without it the
+    transaction is retrieved here.
+    """
     from django.utils import timezone
 
     from order.models.viva_webhook_event import (
@@ -212,7 +226,9 @@ def handle_payment_created(order, event_data, transaction_id):
         transaction_id,
         order.id,
     )
-    verified_status, verified_data = verify_transaction(transaction_id)
+    verified_status, verified_data = (
+        verified if verified is not None else verify_transaction(transaction_id)
+    )
     # Allowlisted fields only — never log the raw provider dict (it may
     # carry cardholder data; see the redaction policy at the top of the
     # webhook handler).
@@ -349,6 +365,20 @@ def handle_payment_created(order, event_data, transaction_id):
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
+    # The same payment again (a replay, or the webhook of a payment read
+    # back from Viva already): booked, settled and confirmed once.
+    # Viva's ids are GUIDs and compared without regard to case.
+    if (
+        order.payment_status == PaymentStatus.COMPLETED
+        and (order.payment_id or "").lower() == str(transaction_id).lower()
+    ):
+        logger.info(
+            "Viva transaction %s already settled order %s",
+            transaction_hash(transaction_id),
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
     logger.info(
         "Viva transaction %s VERIFIED COMPLETED — updating order %s",
         transaction_id,
@@ -406,7 +436,7 @@ def handle_payment_created(order, event_data, transaction_id):
     if (
         order.payment_status == PaymentStatus.COMPLETED
         and order.payment_id
-        and order.payment_id != transaction_id
+        and order.payment_id.lower() != str(transaction_id).lower()
     ):
         logger.error(
             "Viva transaction %s is a second payment on order %s, already "
@@ -531,7 +561,8 @@ def apply_event(
             transaction_id
             and event_type_id is not None
             and VivaWebhookEvent.objects.filter(
-                transaction_id=transaction_id, event_type_id=event_type_id
+                transaction_id__iexact=str(transaction_id),
+                event_type_id=event_type_id,
             ).exists()
         )
 
@@ -543,6 +574,22 @@ def apply_event(
             txn_hash,
         )
         return None
+
+    if (
+        handle is handle_payment_created
+        and transaction_id
+        and event_data.get("StatusId", "") in {"", "F"}
+    ):
+        # Retrieve Transaction is an HTTP call, reached from the webhook
+        # and the anonymous ``viva_return``: it is made before the order
+        # row is locked, so a slow Viva never holds the row, and what it
+        # answered is judged under the lock.
+        verified = verify_transaction(transaction_id)
+
+        def handle_verified(locked, data, txn):
+            return handle_payment_created(locked, data, txn, verified=verified)
+
+        handle = handle_verified
 
     with transaction.atomic():
         # Re-fetch with row lock to prevent race conditions
@@ -593,9 +640,9 @@ def apply_event(
     return outcome
 
 
-def settle_landed_payment(order: Order) -> bool:
+def settle_landed_payment(order: Order) -> LandedPayment:
     """Settle the payments Viva took for *order*, whether or not their
-    webhook landed. True when Viva holds one.
+    webhook landed, and say what Viva holds (``LandedPayment``).
 
     Each charge Viva lists on one of the order's payment orders
     (``VivaWalletPaymentProvider.landed_charges``) is applied as the
@@ -604,7 +651,9 @@ def settle_landed_payment(order: Order) -> bool:
     transaction is verified with Viva, and the ledger row, the status and
     the confirmation are the webhook's own, once. A charge Viva could not
     verify, or that settles nothing (another amount, a canceled order),
-    is left to those checks, which record and flag it as for the webhook.
+    is left to those checks, which record and flag it as for the webhook;
+    one they refused without a flag settled nothing, is logged as an
+    ERROR, and keeps the order (``UNSETTLED``) for a person.
 
     Raises ``PaymentStatusUnavailableError`` when Viva could not be read:
     a payment may have landed, so the caller must not act as if none did.
@@ -631,4 +680,17 @@ def settle_landed_payment(order: Order) -> bool:
             )
         except RuntimeError as e:
             raise PaymentStatusUnavailableError(transaction_id) from e
-    return bool(landed)
+    if not landed:
+        return LandedPayment.NONE
+    order.refresh_from_db()
+    if order.payment_status == PaymentStatus.COMPLETED or (
+        payment_hold.awaits_payment_review(order)
+    ):
+        return LandedPayment.SETTLED
+    logger.error(
+        "Viva holds %s payment(s) for order %s that settled nothing: the "
+        "order is kept for a person",
+        len(landed),
+        order.id,
+    )
+    return LandedPayment.UNSETTLED

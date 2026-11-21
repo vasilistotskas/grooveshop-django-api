@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from order.enum.landed_payment import LandedPayment
 from order.payments import stripe_settlement, viva_settlement
 from order.payments.payment import (
     StripePaymentProvider,
@@ -24,20 +25,19 @@ if TYPE_CHECKING:
 
 #: Each provider's settlement of a payment read back from it. One with no
 #: entry has no payment a webhook settles.
-_SETTLERS: dict[str, Callable[[Order], bool]] = {
+_SETTLERS: dict[str, Callable[[Order], LandedPayment]] = {
     VivaWalletPaymentProvider.code: viva_settlement.settle_landed_payment,
     StripePaymentProvider.code: stripe_settlement.settle_landed_payment,
 }
 
 
-def settle_landed_payment(order: Order, provider_code: str) -> bool:
+def settle_landed_payment(order: Order, provider_code: str) -> LandedPayment:
     """Settle the payment the provider *provider_code* took for the unpaid
-    *order*, through the code its webhook runs; True when the provider
-    holds a payment for it, settled now or on its way, so the order must
-    not be canceled.
+    *order*, through the code its webhook runs, and say what the provider
+    holds: only ``LandedPayment.NONE`` lets the order be canceled.
 
     Raises ``PaymentStatusUnavailableError`` when the provider could not be
     read: a payment may have landed, so the caller keeps the order.
     """
     settle = _SETTLERS.get(provider_code)
-    return settle(order) if settle is not None else False
+    return settle(order) if settle is not None else LandedPayment.NONE

@@ -5,7 +5,7 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from zoneinfo import ZoneInfo
 
@@ -1498,14 +1498,25 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     code,
                 )
                 raise PaymentStatusUnavailableError(code) from e
-            landed += [
-                (code, str(row["TransactionId"]))
-                for row in rows
-                if row.get("StatusId") == "F"
-                and not row.get("ParentId")
-                and row.get("TransactionId")
-                and Decimal(str(row.get("Amount") or 0)) > 0
-            ]
+            for row in rows:
+                if not (
+                    row.get("StatusId") == "F"
+                    and not row.get("ParentId")
+                    and row.get("TransactionId")
+                ):
+                    continue
+                try:
+                    amount = Decimal(str(row.get("Amount") or 0))
+                except InvalidOperation as e:
+                    # A finished payment whose amount cannot be read is an
+                    # answer that cannot be read, never "no payment".
+                    logger.warning(
+                        "Viva payment order %s lists an unreadable amount",
+                        code,
+                    )
+                    raise PaymentStatusUnavailableError(code) from e
+                if amount > 0:
+                    landed.append((code, str(row["TransactionId"])))
         return landed
 
     def __init__(self):

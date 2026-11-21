@@ -13,6 +13,7 @@ import stripe
 from django.db import transaction
 from djmoney.money import Money
 
+from order.enum.landed_payment import LandedPayment
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -21,6 +22,7 @@ from order.enum.status import (
 from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.payments import payment_hold
 from order.payments.payment import (
     StripePaymentProvider,
     money_from_minor_units,
@@ -211,16 +213,18 @@ def settle_checkout_session(
         )
 
 
-def settle_landed_payment(order: Order) -> bool:
-    """Settle what Stripe took for *order* whose webhook has not landed;
-    True when Stripe holds a payment for it, settled now or on its way.
+def settle_landed_payment(order: Order) -> LandedPayment:
+    """Settle what Stripe took for *order* whose webhook has not landed,
+    and say what Stripe holds (``LandedPayment``).
 
     A succeeded PaymentIntent is settled as a poll settles one
     (``OrderService.settle_polled_completion``: the
     ``payment_intent.succeeded`` handler and its announcement). A paid
     hosted Checkout Session is settled by its ``checkout.session.completed``
-    code (:func:`settle_checkout_session`); a complete one whose payment is
-    still in flight (a delayed method) is on its way.
+    code (:func:`settle_checkout_session`). A complete session whose
+    payment is still in flight (a delayed method) settled nothing yet and
+    keeps the order (``UNSETTLED``), as does a payment the checks refused
+    without a flag.
 
     Raises ``PaymentStatusUnavailableError`` when Stripe could not be read.
     """
@@ -235,7 +239,7 @@ def settle_landed_payment(order: Order) -> bool:
             logger.warning("PaymentIntent %s could not be read", payment_id)
             raise PaymentStatusUnavailableError(payment_id) from e
         if intent.status != "succeeded":
-            return False
+            return LandedPayment.NONE
         from order.services import OrderService
 
         received = money_from_minor_units(
@@ -245,11 +249,11 @@ def settle_landed_payment(order: Order) -> bool:
             order,
             {"amount": received.amount, "currency": str(received.currency)},
         )
-        return True
+        return _what_settled(order)
 
     session_id = provider.recorded_checkout_session(order.metadata or {})
     if not session_id:
-        return False
+        return LandedPayment.NONE
     try:
         session = stripe.checkout.Session.retrieve(
             session_id, api_key=provider.api_key, expand=["payment_intent"]
@@ -258,11 +262,19 @@ def settle_landed_payment(order: Order) -> bool:
         logger.warning("Checkout Session %s could not be read", session_id)
         raise PaymentStatusUnavailableError(session_id) from e
     if session.status != "complete":
-        return False
+        return LandedPayment.NONE
     intent = session.payment_intent
     intent_id = intent if isinstance(intent, str) else getattr(intent, "id", "")
     if session.payment_status != "paid" or not intent_id:
-        return StripePaymentProvider.session_payment_may_land(session)
+        if not StripePaymentProvider.session_payment_may_land(session):
+            return LandedPayment.NONE
+        logger.warning(
+            "Checkout Session %s of order %s is complete and its payment "
+            "is still in flight: the order is kept for its webhook",
+            session_id,
+            order.id,
+        )
+        return LandedPayment.UNSETTLED
     if session.amount_total is None or not session.currency:
         # A paid session states what it collected; one that does not is
         # an answer that could not be read.
@@ -274,4 +286,21 @@ def settle_landed_payment(order: Order) -> bool:
         payment_intent_id=intent_id,
         captured=money_from_minor_units(session.amount_total, session.currency),
     )
-    return True
+    return _what_settled(order)
+
+
+def _what_settled(order: Order) -> LandedPayment:
+    """``SETTLED`` when the payment Stripe took left *order* paid or
+    waiting for the store's review; otherwise it settled nothing, which
+    is logged as an ERROR and keeps the order for a person."""
+    order.refresh_from_db()
+    if order.payment_status == PaymentStatus.COMPLETED or (
+        payment_hold.awaits_payment_review(order)
+    ):
+        return LandedPayment.SETTLED
+    logger.error(
+        "Stripe holds a payment for order %s that settled nothing: the "
+        "order is kept for a person",
+        order.id,
+    )
+    return LandedPayment.UNSETTLED

@@ -442,3 +442,161 @@ class TestStripeLostWebhook:
         assert result["canceled_pending"] == 0
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
+
+
+class TestAPaymentThatSettlesNothingIsNotCountedSettled:
+    def test_a_viva_charge_refused_without_a_flag_keeps_the_order_open(
+        self, caplog
+    ):
+        """A charge the checks refuse without flagging it (Retrieve
+        Transaction names another payment order) settled nothing: the
+        sweep keeps the order for a person instead of calling it settled
+        for ever."""
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        api.transactions[TXN] = (
+            200,
+            retrieve_transaction(
+                orderCode=9999999999999999,
+                amount=float(order.calculate_order_total_amount().amount),
+                statusId="F",
+                currencyCode="978",
+            ),
+        )
+
+        with api, caplog.at_level("ERROR", logger="order.payments"):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["settled"] == 0
+        assert result["skipped_open"] == 1
+        assert result["canceled_pending"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert any(r.levelname == "ERROR" for r in caplog.records)
+
+    def test_a_stripe_session_still_being_paid_is_not_settled(self):
+        order = _expired_unpaid(
+            "stripe", metadata={"stripe_checkout_session_id": SESSION}
+        )
+        session = TestStripeLostWebhook()._session(
+            order, payment_status="unpaid", payment_intent=None
+        )
+
+        with (
+            _stripe_credentials(),
+            patch("stripe.checkout.Session.retrieve", return_value=session),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["settled"] == 0
+        assert result["skipped_open"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+
+class TestAnUnreadableAmountIsAnUnreadableViva:
+    def test_the_return_page_answers_with_the_order_as_it_is(self):
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        api.by_order_code[CODE][1]["Transactions"][0]["Amount"] = "n/a"
+
+        with api:
+            response = Client().get(
+                reverse("order-viva-return"), {"t": TXN, "s": CODE}
+            )
+
+        assert response.status_code == 200
+        assert response.json()["paymentStatus"] == PaymentStatus.PENDING
+
+    def test_the_sweep_keeps_the_order(self):
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        api.by_order_code[CODE][1]["Transactions"][0]["Amount"] = "n/a"
+
+        with api:
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["skipped_open"] == 1
+        assert result["canceled_pending"] == 0
+
+
+class TestAViva:
+    def test_replay_in_other_letter_case_changes_nothing(
+        self, django_capture_on_commit_callbacks, confirmations, monkeypatch
+    ):
+        """Viva's ids are GUIDs, compared without regard to case: the same
+        payment spelled in capitals is the same payment."""
+        order = _viva_order()
+        with (
+            _paid_at_viva(order),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            auto_cancel_stuck_pending_orders()
+
+        tenant = Tenant(
+            schema_name="viva_case_replay",
+            name="viva-case-replay",
+            slug="viva-case-replay",
+            owner_email="owner-viva-case-replay@example.com",
+            is_active=True,
+            suspended_at=None,
+        )
+        tenant.auto_create_schema = False
+        tenant.save()
+
+        @contextmanager
+        def _here(_tenant):
+            yield
+
+        monkeypatch.setattr("order.views.viva_webhook.tenant_context", _here)
+        api = _paid_at_viva(order)
+        api.transactions[TXN.upper()] = api.transactions[TXN]
+        with api, django_capture_on_commit_callbacks(execute=True):
+            response = Client().post(
+                reverse("viva-wallet-webhook"),
+                data=json.dumps(
+                    {
+                        "EventTypeId": 1796,
+                        "EventData": {
+                            "TransactionId": TXN.upper(),
+                            "OrderCode": CODE,
+                            "StatusId": "F",
+                        },
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        assert response.status_code == 200
+        order.refresh_from_db()
+        assert order.payment_id == TXN
+        assert PaymentTransaction.objects.filter(order=order).count() == 1
+        assert VivaWebhookEvent.objects.filter(order=order).count() == 1
+        assert confirmations.call_count == 1
+
+    def test_transaction_is_verified_before_the_order_row_is_locked(self):
+        """Retrieve Transaction is an HTTP call, now also made for an
+        anonymous return: a slow Viva must not hold the order row."""
+        from order.payments import viva_settlement
+
+        order = _viva_order()
+        calls: list[str] = []
+        verify = viva_settlement.verify_transaction
+        lock = Order.objects.select_for_update
+
+        def _verify(transaction_id):
+            calls.append("verify")
+            return verify(transaction_id)
+
+        def _lock(*args, **kwargs):
+            calls.append("lock")
+            return lock(*args, **kwargs)
+
+        with (
+            _paid_at_viva(order),
+            patch.object(viva_settlement, "verify_transaction", _verify),
+            patch.object(Order.objects, "select_for_update", _lock),
+        ):
+            auto_cancel_stuck_pending_orders()
+
+        assert calls[:2] == ["verify", "lock"]

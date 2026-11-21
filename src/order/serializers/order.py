@@ -382,6 +382,11 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             # alongside an unchanged pay way would survive.
             "pay_way_key",
         )
+        # Always present, and empty on a pickup order whose point's street
+        # line names no number (``_deliver_to_pickup_point``).
+        extra_kwargs = {
+            "street_number": {"required": True, "allow_blank": True},
+        }
 
 
 class OrderDetailSerializer(OrderSerializer):
@@ -1864,7 +1869,8 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         Judged only when the payload changes the address, so editing an
         old order's notes does not demand a fix to an address that
         predates the rules. The country and region are not editable at
-        all: see ``PRICED_ADDRESS_FIELDS``.
+        all: see ``PRICED_ADDRESS_FIELDS``; nor is any address field of a
+        pickup-point order: see ``PICKUP_POINT_ADDRESS_FIELDS``.
         """
         locked = {
             field: [
@@ -1873,11 +1879,26 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                     "shipping cost and VAT were priced for it."
                 )
             ]
-            for field in self.PRICED_ADDRESS_FIELDS
-            if self.instance is not None
-            and field in attrs
-            and attrs[field] != getattr(self.instance, field)
+            for field in self._changed(attrs, self.PRICED_ADDRESS_FIELDS)
         }
+        if (
+            self.instance is not None
+            and self.instance.shipping_kind == ShippingKind.PICKUP_POINT
+        ):
+            locked.update(
+                {
+                    field: [
+                        _(
+                            "A pickup-point order is delivered to its "
+                            "point's address, which can't be changed."
+                        )
+                    ]
+                    for field in self._changed(
+                        attrs, self.PICKUP_POINT_ADDRESS_FIELDS
+                    )
+                    if field not in locked
+                }
+            )
         if locked:
             raise serializers.ValidationError(locked, code="order_field_locked")
         errors = address_rules.address_update_errors(attrs, self.instance)
@@ -1892,6 +1913,32 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     #: order costs. The rest of the address stays editable: it reprices
     #: nothing.
     PRICED_ADDRESS_FIELDS = ("country", "region")
+
+    #: A pickup-point order's delivery address is its point's, from the
+    #: carrier's catalogue (``OrderCreateFromCartSerializer.
+    #: _deliver_to_pickup_point``). A street, a floor or a line 2 written
+    #: over it would reach the courier's voucher; a change of point is
+    #: staff work.
+    PICKUP_POINT_ADDRESS_FIELDS = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
+
+    def _changed(self, attrs, fields) -> list[str]:
+        """The ``fields`` this payload sets to a value the order lacks."""
+        if self.instance is None:
+            return []
+        return [
+            field
+            for field in fields
+            if field in attrs and attrs[field] != getattr(self.instance, field)
+        ]
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a
@@ -1973,7 +2020,10 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         extra_kwargs = {
             "user": {
                 "help_text": _("User ID. Leave empty for guest orders."),
-            }
+            },
+            # The model allows a blank number for a pickup order's point;
+            # an address an owner writes still needs one.
+            "street_number": {"required": True, "allow_blank": False},
         }
 
 

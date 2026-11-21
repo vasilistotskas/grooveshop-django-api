@@ -881,6 +881,9 @@ msgstr "Μια πληρωμή για αυτή την παραγγελία ελή
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "Απαιτείται payment intent — οι εφαρμοσμένες εκπτώσεις δεν καλύπτουν το σύνολο της παραγγελίας."
 
+msgid "A pickup-point order is delivered to its point's address, which can't be changed."
+msgstr "Μια παραγγελία σε σημείο παραλαβής παραδίδεται στη διεύθυνση του σημείου, η οποία δεν μπορεί να αλλάξει."
+
 msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 msgstr "Το πλάνο δεν ενεργοποιεί ούτε απενεργοποιεί καμία λειτουργία από μόνο του: οι διακόπτες loyalty και blog είναι ξεχωριστά flags ανά κατάστημα, επίσης ελεγχόμενα από την πλατφόρμα. Η αλλαγή πλάνου αλλάζει την ετικέτα και τίποτα άλλο."
 
@@ -14046,9 +14049,6 @@ msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού
 msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 msgstr "Αριθμός οδού. Προαιρετικός: χωρίς αυτόν, το street πρέπει να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς αριθμό απορρίπτεται με κωδικό street_number_missing στο street."
 
-msgid "Street, street number, and city are required."
-msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
-
 msgid "Stripe"
 msgstr "Stripe"
 
@@ -19588,6 +19588,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Street number"
 #~ msgstr "Αριθμός οδού"
+
+#~ msgid "Street, street number, and city are required."
+#~ msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
 
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."

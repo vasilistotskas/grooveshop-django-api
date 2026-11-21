@@ -188,7 +188,9 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     first_name = models.CharField(_("First Name"), max_length=255)
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
-    street_number = models.CharField(_("Street Number"), max_length=255)
+    street_number = models.CharField(
+        _("Street Number"), max_length=255, blank=True
+    )
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
@@ -844,17 +846,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         if not self.zipcode:
             errors["zipcode"] = [_("Zipcode is required.")]
 
-        required_address_fields = ["street", "street_number", "city"]
-        missing_fields = [
-            field
-            for field in required_address_fields
-            if not getattr(self, field)
-        ]
-
-        if missing_fields:
-            errors["address"] = [
-                _("Street, street number, and city are required.")
-            ]
+        # Each under its own field, so a form shows it on that input (a key
+        # that is no field makes ``ModelForm.add_error`` raise: a 500 in the
+        # admin). A pickup point's street line may name no number
+        # (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
+        required_address_fields = ["street", "city"]
+        if self.shipping_kind != ShippingKind.PICKUP_POINT:
+            required_address_fields.append("street_number")
+        for field in required_address_fields:
+            if not getattr(self, field):
+                errors[field] = [
+                    self._meta.get_field(field).error_messages["blank"]
+                ]
 
         if not errors:
             # Postcode format + street/number mix-ups, only for an

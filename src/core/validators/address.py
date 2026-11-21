@@ -40,14 +40,22 @@ _MIN_POSTCODE_LOOKALIKE_LENGTH = 4
 
 # One street line that ends in its number, the way Greek and Cypriot
 # addresses are written: "Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12",
-# "Ermou 12-14", "Ermou 12/3". The number is digits, at most one letter
-# after them, and an optional second number after a dash or a slash. A
-# number written first ("12 Main St") is not read: "28 Οκτωβρίου" is a
-# Greek street with no number, and guessing would send the parcel to
-# number 28 of "Οκτωβρίου".
-_STREET_LINE = re.compile(
-    r"(?P<street>.+?)[ ,]+(?P<number>\d+[^\W\d_]?(?:[-/]\d+[^\W\d_]?)?)"
-)
+# "Ermou 12-14", "Ermou 12/3". The number is ASCII digits (the postcode
+# guard reads ASCII alone, like the storefront), at most one letter after
+# them, and an optional second number after a dash or a slash. A number
+# written first ("12 Main St") is not read: "28 Οκτωβρίου" is a Greek
+# street with no number, and guessing would send the parcel to number 28
+# of "Οκτωβρίου".
+_LETTER = r"[^\W\d_]"
+_HOUSE_NUMBER = rf"[0-9]+{_LETTER}?(?:[-/][0-9]+{_LETTER}?)?"
+_STREET_LINE = re.compile(rf"(?P<street>.+?)[ ,]+(?P<number>{_HOUSE_NUMBER})")
+# A range or a slash written with spaces is one number: "12 - 14".
+_SPACED_RANGE = re.compile(r"(?<=[0-9])\s*([-/])\s*(?=[0-9])")
+# A number a street's own name holds: an ordinal ("28ης Οκτωβρίου",
+# "25ης Μαρτίου"), digits and at least two letters, so "12Α" (a house
+# number) is not one.
+_ORDINAL = re.compile(rf"[0-9]+{_LETTER}{{2,}}")
+_DIGIT = re.compile(r"\d")
 
 
 def normalize_postcode(value: str) -> str:
@@ -94,16 +102,29 @@ def _coded(code: str, message: StrOrPromise) -> ErrorDetail:
 
 def split_street_line(line: str) -> tuple[str, str] | None:
     """The street and its number from one line whose number follows the
-    street (``_STREET_LINE``), or ``None`` when the line ends in no
-    number or its street holds no letter. The one place Django splits a
-    street line: a caller that sends one line instead of a street and a
-    number gets the same two columns the courier voucher reads.
+    street (``_STREET_LINE``), or ``None`` when it cannot be split
+    without guessing. The one place Django splits a street line: a caller
+    that sends one line instead of a street and a number gets the same
+    two columns the courier voucher reads.
+
+    A wrong number sends the parcel elsewhere, which is worse than asking
+    for the number again, so the split is taken only when what is left
+    is plainly a street name: it ends in a letter (not a digit, a
+    separator or a dangling mark), and the only numbers it holds are
+    ordinals of its own name. "Ερμού 12, όροφος 3", "Εγνατίας 12, 546 22"
+    and a number in other digits than 0-9 are refused.
     """
-    match = _STREET_LINE.fullmatch(_WHITESPACE_RUN.sub(" ", line).strip())
+    flat = _SPACED_RANGE.sub(r"\1", _WHITESPACE_RUN.sub(" ", line).strip())
+    match = _STREET_LINE.fullmatch(flat)
     if match is None:
         return None
     street = match["street"].rstrip(" ,")
-    if not any(char.isalpha() for char in street):
+    if not street or not street[-1].isalpha():
+        return None
+    if any(
+        _DIGIT.search(token) and not _ORDINAL.fullmatch(token)
+        for token in street.replace(",", " ").split()
+    ):
         return None
     return street, match["number"]
 

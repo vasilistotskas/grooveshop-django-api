@@ -472,6 +472,14 @@ def get_celery_beat_schedule():
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_2am"]),
             "options": {"queue": "celery"},
         },
+        "sync-boxnow-locker-catalogue": {
+            # The sizes and availability of the lockers, from BOX NOW's
+            # public catalogue (``shipping_boxnow.catalogue``): fetched once
+            # here, applied by each store's own task.
+            "task": "shipping_boxnow.tasks.sync_boxnow_locker_catalogue",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 1800},
+        },
         # Poll BoxNow's REST API every 15 min for non-terminal
         # shipments. Defence-in-depth against a missed webhook
         # delivery: BoxNow's webhook URL is partner-managed by

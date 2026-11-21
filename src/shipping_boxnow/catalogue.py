@@ -1,0 +1,200 @@
+"""BOX NOW's public locker catalogue: compartment sizes and availability.
+
+The partner API's destinations carry neither, and its ``requiredSize``
+filter returns every locker for every size. BOX NOW's own map widget reads
+``<base>/<env>/<country>/lockers/all.json`` for both, and filters a locker
+by exact membership of the parcel's size in ``sizes``
+(``BOXNOW_LOCKER_CATALOGUE_URL``). BOX NOW documents neither the file nor
+the rule: they are the widget's internals, so the file is validated
+strictly (:data:`CATALOGUE_SCHEMA`), and anything else keeps what the
+lockers hold and logs an ERROR. A locker the catalogue lacks stays
+unknown, never fitting.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+
+import jsonschema
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
+from core.cache.invalidation import mark_surface_stale
+from core.net.safe_fetch import FetchError, safe_fetch
+from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
+from shipping_boxnow.models import BoxNowLocker
+
+logger = logging.getLogger(__name__)
+
+_SIZE_NAMES = [str(size.value) for size in BoxNowCompartmentSize]
+
+#: A JSON object keyed by locker id; every value holds exactly these
+#: fields with these types, its ``id`` equal to its key.
+CATALOGUE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {
+        "type": "object",
+        "required": [
+            "address",
+            "id",
+            "lat",
+            "lng",
+            "postalCode",
+            "probability",
+            "sizes",
+            "title",
+        ],
+        "additionalProperties": False,
+        "properties": {
+            "address": {"type": "string"},
+            "id": {"type": "string", "minLength": 1},
+            "lat": {"type": "string"},
+            "lng": {"type": "string"},
+            "postalCode": {"type": "string"},
+            "probability": {"type": "number", "minimum": 0, "maximum": 1},
+            "sizes": {
+                "type": "array",
+                "items": {"enum": _SIZE_NAMES},
+                "uniqueItems": True,
+            },
+            "title": {"type": "string"},
+        },
+    },
+}
+_VALIDATOR = jsonschema.Draft202012Validator(CATALOGUE_SCHEMA)
+
+BATCH_SIZE = 500
+
+
+class CatalogueError(Exception):
+    """The catalogue of a country could not be read as expected."""
+
+
+@dataclass(frozen=True, slots=True)
+class LockerFacts:
+    sizes: list[int]
+    probability: float
+
+
+def parse_catalogue(raw: bytes) -> dict[str, LockerFacts]:
+    """The catalogue's lockers by id, or :class:`CatalogueError`."""
+    try:
+        document = json.loads(raw)
+    except ValueError as exc:
+        raise CatalogueError(f"not JSON: {exc}") from exc
+    error = jsonschema.exceptions.best_match(_VALIDATOR.iter_errors(document))
+    if error is not None:
+        where = "/".join(str(part) for part in error.absolute_path)
+        raise CatalogueError(
+            f"shape changed at {where or 'root'}: {error.message}"
+        )
+    facts: dict[str, LockerFacts] = {}
+    for key, value in document.items():
+        if value["id"] != key:
+            raise CatalogueError(f"key {key} names locker {value['id']}")
+        facts[key] = LockerFacts(
+            sizes=sorted(int(size) for size in value["sizes"]),
+            probability=float(value["probability"]),
+        )
+    return facts
+
+
+def fetch_catalogue(country_code: str) -> dict[str, LockerFacts]:
+    """One country's catalogue, fetched and validated."""
+    slug = settings.BOXNOW_LOCKER_CATALOGUE_COUNTRIES.get(country_code.upper())
+    if slug is None:
+        raise CatalogueError(f"no catalogue for {country_code}")
+    url = settings.BOXNOW_LOCKER_CATALOGUE_URL.format(country=slug)
+    try:
+        response = safe_fetch(
+            url, max_bytes=settings.BOXNOW_LOCKER_CATALOGUE_MAX_BYTES
+        )
+    except FetchError as exc:
+        raise CatalogueError(f"fetch failed: {exc}") from exc
+    return parse_catalogue(response.content)
+
+
+def fetch_catalogues() -> dict[str, dict[str, list]]:
+    """Every served country's catalogue, fetched once for all stores.
+
+    ``{country: {locker id: [sizes, probability]}}``, JSON-serialisable
+    so the fan-out hands the same copy to each store
+    (``tenant.tasks.fanout_sync_boxnow_locker_catalogue``). A country whose
+    catalogue cannot be read is logged at ERROR and left out: its lockers
+    keep what they hold.
+    """
+    catalogues: dict[str, dict[str, list]] = {}
+    for country_code in sorted(settings.BOXNOW_LOCKER_CATALOGUE_COUNTRIES):
+        try:
+            facts = fetch_catalogue(country_code)
+        except CatalogueError as exc:
+            logger.error(
+                "BOX NOW catalogue for %s not used, sizes kept: %s",
+                country_code,
+                exc,
+                extra={"boxnow_country": country_code},
+            )
+            continue
+        catalogues[country_code] = {
+            locker_id: [fact.sizes, fact.probability]
+            for locker_id, fact in facts.items()
+        }
+    return catalogues
+
+
+def apply_catalogues(
+    catalogues: dict[str, dict[str, list]],
+) -> dict[str, int]:
+    """Set the sizes and availability of this store's active lockers from
+    ``catalogues`` (:func:`fetch_catalogues`).
+
+    A locker of a country in ``catalogues`` that the catalogue lacks gets
+    empty sizes and no probability (unknown), and the count and ids are
+    logged at WARNING. Lockers of a country that is not in ``catalogues``
+    keep what they hold. Returns ``{"updated": N, "unknown": M}``.
+    """
+    updated = unknown = 0
+    for country_code, facts in sorted(catalogues.items()):
+        lockers = list(
+            BoxNowLocker.objects.filter(
+                is_active=True, country_code__iexact=country_code
+            )
+        )
+        missing = [
+            locker.external_id
+            for locker in lockers
+            if locker.external_id not in facts
+        ]
+        for locker in lockers:
+            known = facts.get(locker.external_id)
+            locker.compartment_sizes = known[0] if known else []
+            locker.availability_probability = known[1] if known else None
+        with transaction.atomic():
+            BoxNowLocker.objects.bulk_update(
+                lockers,
+                ["compartment_sizes", "availability_probability"],
+                batch_size=BATCH_SIZE,
+            )
+        updated += len(lockers) - len(missing)
+        unknown += len(missing)
+        if missing:
+            logger.warning(
+                "BOX NOW catalogue for %s lacks %d active lockers, which "
+                "stay unknown: %s",
+                country_code,
+                len(missing),
+                ", ".join(sorted(missing)),
+                extra={"boxnow_country": country_code},
+            )
+    if updated or unknown:
+        mark_surface_stale("shipping")
+    logger.info(
+        "BOX NOW catalogue applied: updated=%d unknown=%d at %s",
+        updated,
+        unknown,
+        timezone.now().isoformat(),
+    )
+    return {"updated": updated, "unknown": unknown}

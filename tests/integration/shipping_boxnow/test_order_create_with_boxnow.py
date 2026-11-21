@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
+from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -39,6 +40,13 @@ pytestmark = [
     pytest.mark.usefixtures("trust_intent_binding"),
     pytest.mark.usefixtures("checkout_legal_documents"),
 ]
+
+
+def _default_size(size: int) -> None:
+    Setting.objects.update_or_create(
+        name="BOXNOW_DEFAULT_COMPARTMENT_SIZE",
+        defaults={"value_type": "int", "value_int": size},
+    )
 
 
 @pytest.mark.django_db
@@ -508,3 +516,102 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
         assert "shippingProviderCode" in response.json()["fieldErrors"]
         assert not BoxNowShipment.objects.exists()
+
+    def _place(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        provider,
+        locker,
+        *,
+        refused=False,
+    ):
+        self._bind_boxnow_tenant()
+        mock_validate_cart.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        mock_validate_address.return_value = None
+        self._mock_payment_success(provider)
+        self.client.force_authenticate(user=self.user)
+        return self._create(
+            self._build_payload(
+                pay_way_id=self.online_pay_way.id,
+                locker_id=locker.external_id,
+            ),
+            # A refused locker has no quote to send: creation refuses the
+            # order before it compares a total.
+            expected_total=UNQUOTED if refused else None,
+        )
+
+    @patch("order.payments.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_without_the_orders_size_is_refused(
+        self, mock_validate_address, mock_validate_cart, mock_provider
+    ):
+        from order.models.order import Order
+
+        # The cart carries no dimensions: the store's default size, medium.
+        _default_size(2)
+        small_and_large = BoxNowLockerFactory(
+            external_id="sz-1-3",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[1, 3],
+        )
+        before = Order.objects.count()
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_provider,
+            small_and_large,
+            refused=True,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert body["code"] == "pickup_point_too_small"
+        assert "boxnowLockerId" in body["fields"]
+        assert Order.objects.count() == before
+
+    @patch("order.payments.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_with_no_known_sizes_is_refused_the_same(
+        self, mock_validate_address, mock_validate_cart, mock_provider
+    ):
+        unsynced = BoxNowLockerFactory(
+            external_id="sz-none",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[],
+        )
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_provider,
+            unsynced,
+            refused=True,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "pickup_point_too_small"
+
+    @patch("order.payments.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_with_every_size_takes_the_order(
+        self, mock_validate_address, mock_validate_cart, mock_provider
+    ):
+        _default_size(2)
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_provider,
+            self.locker,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()

@@ -252,6 +252,7 @@ class TestPartialQuote:
         assert _money(option["price"]) == SHIPPING
         assert option["waivedBy"] is None
         assert option["exceedsMaxWeight"] is False
+        assert option["compartmentSize"] is None
 
     def test_a_delivery_without_a_pay_way(self):
         checkout = _checkout()

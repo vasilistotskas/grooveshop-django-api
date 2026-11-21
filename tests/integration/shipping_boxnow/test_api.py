@@ -52,6 +52,43 @@ class TestLockerListEndpoint:
 
 
 @pytest.mark.django_db
+class TestLockerListExactFilters:
+    """Exact lookups of one locker a client names (the agent gateway's
+    UCP pickup destination); the active-only rule still holds."""
+
+    @staticmethod
+    def _list(**params):
+        response = APIClient().get(
+            reverse("shipping-boxnow-locker-list"), params
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+        return {
+            (row["externalId"], row["countryCode"])
+            for row in response.json()["results"]
+        }
+
+    def test_external_id_is_exact(self):
+        BoxNowLockerFactory(external_id="exact-4")
+        BoxNowLockerFactory(external_id="exact-40")
+
+        assert self._list(externalId="exact-4") == {("exact-4", "GR")}
+
+    def test_country_code(self):
+        BoxNowLockerFactory(external_id="exact-cy", country_code="CY")
+        BoxNowLockerFactory(external_id="exact-gr", country_code="GR")
+
+        assert self._list(externalId="exact-cy", countryCode="cy") == {
+            ("exact-cy", "CY")
+        }
+        assert self._list(externalId="exact-gr", countryCode="CY") == set()
+
+    def test_a_withdrawn_locker_is_never_listed(self):
+        BoxNowLockerFactory(external_id="exact-gone", is_active=False)
+
+        assert self._list(externalId="exact-gone") == set()
+
+
+@pytest.mark.django_db
 class TestLockerRetrieveEndpoint:
     """GET /api/v1/shipping/boxnow/lockers/<pk>"""
 

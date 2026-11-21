@@ -33,7 +33,8 @@ class BoxNowLockerFactory(CustomDjangoModelFactory):
         "pydecimal", left_digits=2, right_digits=7, positive=True
     )
     address_line_1 = factory.Faker("street_address")
-    address_line_2 = ""
+    # BOX NOW's destinations carry the city here (``addressLine2``).
+    address_line_2 = factory.Faker("city")
     postal_code = factory.Faker("postcode")
     country_code = "GR"
     note = ""

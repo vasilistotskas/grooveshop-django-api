@@ -141,7 +141,33 @@ on every route, with **503** and the code `temporarily_unavailable`
 shape: `{detail, code}` on a DRF view, allauth's
 `{status, errors: [{code, message}]}` on `/_allauth/`, OAuth's
 `{error, error_description}` on the IdP's `identity/o/api/` endpoints, and an
-HTML page anywhere else. Never a 429 and never a 500.
+HTML page anywhere else. Never a 429 and never a 500: a view's own
+catch-all re-raises `REDIS_UNAVAILABLE` so the middleware answers it
+(`OrderViewSet.create`).
+
+## Temporary 503s with Retry-After
+
+A 503 whose cause is ours and passes on its own says when to try again in
+`Retry-After` (DRF sends it from the exception's `wait`), names no field,
+and keeps the body `{detail, code}`. A client retries the same request
+after that delay (the idempotency middleware stores no 5xx, so the same
+`Idempotency-Key` runs again) and never asks the shopper to change a
+choice for it:
+
+- `pickup_point_check_unavailable` (`shipping.api_errors.
+  PickupPointCheckUnavailable`, `POST /order`): the order names a pickup
+  point its carrier's catalogue does not hold, and Redis failed after the
+  order throttles counted the request but before the resync guard was
+  taken, so the point could not be looked for again
+  (`ShippingService.pickup_point_address`). `Retry-After` is
+  `PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS` (30 s). No order is created and
+  no resync runs. A Redis outage that lasts the whole request never gets
+  this far: the fail-closed order-create throttles refuse it first with
+  `temporarily_unavailable` ([a security store that is down](#a-security-store-that-is-down)), so
+  a client retrying `POST /order` treats both codes as "try again".
+
+`carrier_unavailable` (`shipping.api_errors.CarrierUnavailable`) is the
+courier's outage, a 503 without `Retry-After`.
 
 ## Which codes are returned (monitoring)
 

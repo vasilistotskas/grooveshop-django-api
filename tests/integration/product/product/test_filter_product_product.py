@@ -21,7 +21,7 @@ class ProductFilterTest(APITestCase):
     """
 
     def setUp(self):
-        Product.objects.all().delete()
+        Product.objects.all().hard_delete()
 
         self.category1 = ProductCategoryFactory(name="Electronics")
         self.category2 = ProductCategoryFactory(name="Clothing")
@@ -502,4 +502,4 @@ class ProductFilterTest(APITestCase):
         self.assertEqual(len(result_ids), 3)
 
     def tearDown(self):
-        Product.objects.all().delete()
+        Product.objects.all().hard_delete()

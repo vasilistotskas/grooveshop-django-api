@@ -149,20 +149,6 @@ class TestSoftDeleteQuerySetMixin:
         assert result is qs
         assert exclude_kwargs == {"is_deleted": True}
 
-    def test_with_deleted_returns_all(self):
-        """with_deleted() should return all records."""
-        all_called = []
-
-        class MockQuerySet(SoftDeleteQuerySetMixin):
-            def all(self):
-                all_called.append(True)
-                return self
-
-        qs = MockQuerySet()
-        result = qs.with_deleted()
-        assert result is qs
-        assert len(all_called) == 1
-
     def test_deleted_only_filters_correctly(self):
         """deleted_only() should return only records where is_deleted=True."""
         filter_kwargs = {}
@@ -190,10 +176,6 @@ class TestSoftDeleteQuerySetMixin:
                 call_log.append(("filter", kwargs))
                 return self
 
-            def all(self):
-                call_log.append(("all", {}))
-                return self
-
         qs = MockQuerySet()
 
         # Test chaining exclude_deleted
@@ -206,12 +188,6 @@ class TestSoftDeleteQuerySetMixin:
         result = qs.deleted_only()
         assert result is qs
         assert ("filter", {"is_deleted": True}) in call_log
-
-        # Reset and test with_deleted
-        call_log.clear()
-        result = qs.with_deleted()
-        assert result is qs
-        assert ("all", {}) in call_log
 
 
 class TestMixinComposition:

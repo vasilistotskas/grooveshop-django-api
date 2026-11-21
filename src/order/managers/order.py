@@ -18,7 +18,7 @@ from django.db.models import (
 from djmoney.models.fields import MoneyField
 
 from core.managers import OptimizedManager, OptimizedQuerySet
-from core.mixins import SoftDeleteQuerySetMixin
+from core.mixins import SoftDeleteManagerMixin, SoftDeleteQuerySetMixin
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -313,26 +313,8 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def refunded(self) -> Self:
         return self.filter(status=OrderStatus.REFUNDED)
 
-    def delete(self) -> tuple[int, dict[str, int]]:
-        """Bulk SOFT-delete, mirroring the per-instance
-        ``SoftDeleteModel.delete()`` contract: ``Order.objects.filter(...)
-        .delete()`` must mark rows deleted, not hard-delete them (G0246).
-        Use ``hard_delete()`` for a real DELETE."""
-        from django.utils import timezone
 
-        count = super().update(is_deleted=True, deleted_at=timezone.now())
-        return count, {self.model._meta.label: count}
-
-    def hard_delete(self) -> tuple[int, dict[str, int]]:
-        """Permanently DELETE the rows, bypassing soft-delete."""
-        return super().delete()
-
-    def restore(self) -> int:
-        """Un-delete previously soft-deleted rows."""
-        return super().update(is_deleted=False, deleted_at=None)
-
-
-class OrderManager(OptimizedManager):
+class OrderManager(SoftDeleteManagerMixin, OptimizedManager):
     """
     Manager for Order model with optimized queryset methods.
 
@@ -345,10 +327,6 @@ class OrderManager(OptimizedManager):
 
     queryset_class = OrderQuerySet
 
-    def get_queryset(self) -> OrderQuerySet:
-        """Return base queryset excluding deleted orders."""
-        return OrderQuerySet(self.model, using=self._db).exclude_deleted()
-
     def for_list(self) -> OrderQuerySet:
         """Return optimized queryset for list views."""
         return OrderQuerySet(self.model, using=self._db).for_list()
@@ -356,13 +334,3 @@ class OrderManager(OptimizedManager):
     def for_detail(self) -> OrderQuerySet:
         """Return optimized queryset for detail views."""
         return OrderQuerySet(self.model, using=self._db).for_detail()
-
-    def all_with_deleted(self) -> OrderQuerySet:
-        """Base queryset INCLUDING soft-deleted orders — the default
-        ``get_queryset`` applies ``exclude_deleted()``, so deleted rows are
-        otherwise unreachable for admin / audit / reconciliation (G0246)."""
-        return OrderQuerySet(self.model, using=self._db)
-
-    def deleted_only(self) -> OrderQuerySet:
-        """Only the soft-deleted orders."""
-        return OrderQuerySet(self.model, using=self._db).deleted_only()

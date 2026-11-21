@@ -6,7 +6,7 @@ storefront's visual editor and publish together. Source: `src/builder/`
 (`models.py`, `services.py`, `validation.py`, `storefront.py`,
 `references.py`, `published.py`, `views/` (one module per resource), `rendering.py`,
 `media_services.py`, `media_api.py`), the
-`builder` cache surface in `src/core/cache/surfaces.py`,
+`builder` cache surface in `src/builder/cache_surfaces.py`,
 `src/tenant/role_scopes.py`. The code wins over this page.
 
 `builder` is a tenant app: every table lives in the store's schema, with its

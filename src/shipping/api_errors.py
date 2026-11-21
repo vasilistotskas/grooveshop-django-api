@@ -7,6 +7,7 @@ raises for one of them, so the API error contract
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import APIException
@@ -47,6 +48,26 @@ class CarrierBusy(APIException):
     default_detail = _(
         "This shipment is already being worked on. Try again in a few minutes."
     )
+
+
+class PickupPointCheckUnavailable(APIException):
+    """A 503 for a :class:`shipping.exceptions.PickupPointCheckUnavailableError`.
+
+    The point is not judged, so the answer names no field: the shopper's
+    choice may be right, and the same request may succeed after
+    ``Retry-After`` (``PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS``, sent by
+    DRF's handler from ``wait``).
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "pickup_point_check_unavailable"
+    default_detail = _(
+        "The pickup point cannot be checked right now. Try again in a moment."
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.wait = settings.PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS
 
 
 def unanswered(exc: CarrierUnavailableError) -> APIException:

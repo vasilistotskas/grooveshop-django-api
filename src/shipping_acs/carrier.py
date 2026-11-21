@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PickupPointInAnotherCountry,
     PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
@@ -92,19 +93,66 @@ class AcsCarrier(ShippingCarrierInterface):
         catalogue at checkout), whose address the receipt must not name; a
         booking without a branch names only the row without one, never the
         first station of its area."""
-        from shipping_acs.models import AcsStation
 
         if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
             return None
-        station = AcsStation.objects.filter(
-            external_id=shipment.station_destination_external_id,
-            branch_code=shipment.station_branch_destination,
+        return self.address_of_pickup_point(
+            {
+                "acs_station_external_id": (
+                    shipment.station_destination_external_id
+                ),
+                "acs_station_branch": shipment.station_branch_destination,
+            }
+        )
+
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """``sync_acs_stations`` for the order's country, now: ACS lists
+        its stations per country and kind, with no lookup of one by id."""
+        from shipping_acs.services import AcsService
+
+        AcsService.sync_stations(country=country_code)
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The address of the exact station ``location`` names: its
+        (external_id, branch) pair, a blank branch naming only the row
+        without one, read from the catalogue now."""
+        return self._address(self._station(location), location)
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        station = self._station(location)
+        if station is not None and not station.is_active:
+            raise PickupPointUnknown(
+                f"ACS station {station.external_id} "
+                f"{station.branch_code} is withdrawn."
+            )
+        address = self._address(station, location)
+        if (station.country_code or "").upper() != country_code.upper():
+            raise PickupPointInAnotherCountry(
+                f"ACS station {station.external_id} {station.branch_code} "
+                f"is in {station.country_code}, not {country_code}."
+            )
+        return address
+
+    @staticmethod
+    def _station(location: Mapping[str, str]):
+        from shipping_acs.models import AcsStation
+
+        return AcsStation.objects.filter(
+            external_id=location.get("acs_station_external_id") or "",
+            branch_code=location.get("acs_station_branch") or "",
         ).first()
+
+    @staticmethod
+    def _address(station, location: Mapping[str, str]) -> PostalAddress:
         if station is None or not (station.postal_code and station.city):
             raise PickupPointUnknown(
                 "The address of ACS station "
-                f"{shipment.station_destination_external_id} "
-                f"{shipment.station_branch_destination} is not known."
+                f"{location.get('acs_station_external_id') or ''} "
+                f"{location.get('acs_station_branch') or ''} is not known."
             )
         return PostalAddress(
             street=station.address_line_1,
@@ -296,7 +344,14 @@ class AcsCarrier(ShippingCarrierInterface):
                 )
             )
             return {"acs_station_external_id": [error]}
-        return {}
+        return self.pickup_point_errors(
+            "acs_station_external_id",
+            {
+                "acs_station_external_id": payload["acs_station_external_id"],
+                "acs_station_branch": payload.get("acs_station_branch") or "",
+            },
+            country_code=payload.get("country_id") or "",
+        )
 
     # ------------------------------------------------------------------
     # Per-kind feature gating

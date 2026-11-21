@@ -222,10 +222,14 @@ def register_default_surfaces() -> None:
             # active/capability flags do too. ``/shipping/policy`` is
             # cached here and also depends on the per-kind gate, which
             # for ACS lockers is the synced ``AcsStation`` rows.
+            # The locker and station rows are what the two pickup-point
+            # lists serve; a sync's deactivation is an unsignalled
+            # ``update`` and marks the surface itself.
             invalidated_by=(
                 "shipping.ShippingRate",
                 "shipping.ShippingProvider",
                 "shipping_acs.AcsStation",
+                "shipping_boxnow.BoxNowLocker",
             ),
             icon="local_shipping",
             group="commerce",

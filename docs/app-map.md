@@ -134,7 +134,7 @@ not declare. Read `docs/scheduler.md`.
 
 `Country` and `Region`: reference rows shared by every store, seeded from
 `src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
-of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+of their own; `docs/order/creation-address.md` (section 3.3) has the delivery-address
 rules that read them.
 
 ### `devtools/`

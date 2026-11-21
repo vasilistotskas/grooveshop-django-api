@@ -881,6 +881,9 @@ msgstr "Μια πληρωμή για αυτή την παραγγελία ελή
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "Απαιτείται payment intent — οι εφαρμοσμένες εκπτώσεις δεν καλύπτουν το σύνολο της παραγγελίας."
 
+msgid "A pickup-point order is delivered to its point's address, which can't be changed."
+msgstr "Μια παραγγελία σε σημείο παραλαβής παραδίδεται στη διεύθυνση του σημείου, η οποία δεν μπορεί να αλλάξει."
+
 msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 msgstr "Το πλάνο δεν ενεργοποιεί ούτε απενεργοποιεί καμία λειτουργία από μόνο του: οι διακόπτες loyalty και blog είναι ξεχωριστά flags ανά κατάστημα, επίσης ελεγχόμενα από την πλατφόρμα. Η αλλαγή πλάνου αλλάζει την ετικέτα και τίποτα άλλο."
 
@@ -3266,6 +3269,9 @@ msgstr "Νέος κωδικός πρόσβασης για %(store)s"
 msgid "Choose a new password for {store_name}"
 msgstr "Νέος κωδικός πρόσβασης για {store_name}"
 
+msgid "Choose a pickup point."
+msgstr "Επιλέξτε σημείο παραλαβής."
+
 msgid "Choose a time in the future."
 msgstr "Διάλεξε μια ώρα στο μέλλον."
 
@@ -3291,11 +3297,11 @@ msgctxt "legal details alert"
 msgid "City"
 msgstr "Πόλη"
 
-msgid "City name"
-msgstr "Όνομα πόλης"
-
 msgid "City name for nearest-locker lookup"
 msgstr "Όνομα πόλης για αναζήτηση πλησιέστερου locker"
+
+msgid "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
+msgstr "Όνομα πόλης. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτό την πόλη του σημείου."
 
 msgid "Claim"
 msgstr "Δέσμευση"
@@ -4854,6 +4860,9 @@ msgstr "Πληκτρολογήστε τον κωδικό της εφαρμογή
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης. Αν δεν έχετε πια το κινητό σας, χρησιμοποιήστε έναν από τους κωδικούς ανάκτησης."
+
+msgid "Enter the company's address: a pickup point is not one."
+msgstr "Εισαγάγετε τη διεύθυνση της εταιρείας: ένα σημείο παραλαβής δεν είναι διεύθυνση εταιρείας."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
@@ -7450,6 +7459,9 @@ msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 — υποχρεωτικό�
 
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 κωδικός χώρας."
+
+msgid "ISO 3166-1 alpha-2 country of the locker."
+msgstr "Χώρα του locker κατά ISO 3166-1 alpha-2."
 
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Αφαιρεί τους τρόπους πληρωμής που ο διαχειριστής έχει αποκλείσει για τη χώρα αυτή (π.χ. BoxNow PAY ON THE GO στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."
@@ -11122,8 +11134,8 @@ msgstr "Ταχυδρομικός κώδικας της τοποθεσίας το
 msgid "Postal code of the locker"
 msgstr "Ταχ. κώδικας του locker"
 
-msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
-msgstr "Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern`` της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία, μονά κενά)."
+msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
+msgstr "Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern`` της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία, μονά κενά). Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτόν τον ταχυδρομικό κώδικα του σημείου."
 
 msgid "Posts"
 msgstr "Άρθρα"
@@ -13012,6 +13024,9 @@ msgstr "Επιλέξτε μια περιοχή που ανήκει στην επ
 msgid "Select a valid country."
 msgstr "Επιλέξτε έγκυρη χώρα."
 
+msgid "Select a valid region."
+msgstr "Επιλέξτε έγκυρη περιοχή."
+
 msgid "Select all"
 msgstr "Επιλογή όλων"
 
@@ -14031,14 +14046,11 @@ msgstr "Αριθμός"
 msgid "Street name and number"
 msgstr "Οδός και αριθμός"
 
-msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
-msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber."
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
+msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτό τη διεύθυνση του σημείου."
 
 msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 msgstr "Αριθμός οδού. Προαιρετικός: χωρίς αυτόν, το street πρέπει να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς αριθμό απορρίπτεται με κωδικό street_number_missing στο street."
-
-msgid "Street, street number, and city are required."
-msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
 
 msgid "Stripe"
 msgstr "Stripe"
@@ -14914,6 +14926,9 @@ msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από �
 msgid "The link search is not valid."
 msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη."
 
+msgid "The locker's BOX NOW id, exactly."
+msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει."
 
@@ -15010,6 +15025,9 @@ msgstr "Το αποτέλεσμα του παρόχου πληρωμών για 
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο· καμία για δωροκάρτες και πόντους."
+
+msgid "The pickup point cannot be checked right now. Try again in a moment."
+msgstr "Το σημείο παραλαβής δεν μπορεί να ελεγχθεί αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο."
 
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "Η πλατφόρμα πρόσθεσε το παρακάτω κείμενο στη δική της εκδοχή αυτού του εγγράφου. Η σελίδα σας δεν άλλαξε αυτόματα, επειδή το κείμενό της (ή μια μετάφρασή της) είναι δικό σας. Προσθέστε το κείμενο σε κάθε γλώσσα που εξυπηρετεί το κατάστημά σας, προσαρμόζοντάς το αν το κατάστημά σας λειτουργεί διαφορετικά, και μετά επιλέξτε τη σελίδα στη λίστα και εκτελέστε «Σήμανση ενημέρωσης νομικού κειμένου ως ελεγμένης»."
@@ -15188,9 +15206,6 @@ msgstr "Η ίδια τιμή με το ``reason``."
 
 msgid "The scheduled database backup failed with this error:"
 msgstr "Το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε με αυτό το σφάλμα:"
-
-msgid "The selected locker is not in the delivery country."
-msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
 
 msgid "The selected payment method cannot be paid with a card on this page."
 msgstr "Η επιλεγμένη μέθοδος πληρωμής δεν μπορεί να εξοφληθεί με κάρτα σε αυτή τη σελίδα."
@@ -15575,6 +15590,12 @@ msgstr "Αυτή η απόδοση συνδέεται με αποστολή· δ
 
 msgid "This person is already on the team."
 msgstr "Αυτό το άτομο είναι ήδη στην ομάδα."
+
+msgid "This pickup point is not available. Choose another one."
+msgstr "Αυτό το σημείο παραλαβής δεν είναι διαθέσιμο. Επιλέξτε άλλο."
+
+msgid "This pickup point is not in the delivery country. Choose another one."
+msgstr "Αυτό το σημείο παραλαβής δεν βρίσκεται στη χώρα παράδοσης. Επιλέξτε άλλο."
 
 msgid "This product is already in the user's favorites."
 msgstr "Αυτό το προϊόν βρίσκεται ήδη στα αγαπημένα του χρήστη."
@@ -18483,6 +18504,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Category Analytics"
 #~ msgstr "Αναλυτικά κατηγοριών"
 
+#~ msgid "City name"
+#~ msgstr "Όνομα πόλης"
+
 #~ msgid "Clear search"
 #~ msgstr "Καθαρισμός αναζήτησης"
 
@@ -19571,6 +19595,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Street number"
 #~ msgstr "Αριθμός οδού"
 
+#~ msgid "Street, street number, and city are required."
+#~ msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."
 
@@ -19619,6 +19646,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgstr ""
 #~ "Ευχαριστούμε που χρησιμοποιείτε το %(site_name)s!\n"
 #~ "%(site_domain)s"
+
+#~ msgid "The selected locker is not in the delivery country."
+#~ msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."

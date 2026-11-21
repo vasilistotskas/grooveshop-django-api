@@ -4,7 +4,7 @@ from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
@@ -120,6 +120,19 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         final order (audit trail, stock-discrepancy debugging).
     """
 
+    #: The buyer's delivery address: what a pickup-point order locks against
+    #: an owner's edit (``OrderWriteSerializer``), and part of
+    #: ``PERSONAL_FIELDS``.
+    SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
     #: The invoice's counterparty: personal, and GDPR erasure keeps it only
     #: on an order whose invoice was issued (``order.privacy``), with
     #: that invoice (tax law).
@@ -144,14 +157,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         "last_name",
         "email",
         "phone",
-        "street",
-        "street_number",
-        "address_line_2",
-        "city",
-        "zipcode",
-        "place",
-        "floor",
-        "location_type",
+        *SHIPPING_ADDRESS_FIELDS,
         "customer_notes",
         *BILLING_FIELDS,
     )
@@ -215,7 +221,9 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     first_name = models.CharField(_("First Name"), max_length=255)
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
-    street_number = models.CharField(_("Street Number"), max_length=255)
+    street_number = models.CharField(
+        _("Street Number"), max_length=255, blank=True
+    )
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
@@ -880,17 +888,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         if not self.zipcode:
             errors["zipcode"] = [_("Zipcode is required.")]
 
-        required_address_fields = ["street", "street_number", "city"]
-        missing_fields = [
-            field
-            for field in required_address_fields
-            if not getattr(self, field)
-        ]
-
-        if missing_fields:
-            errors["address"] = [
-                _("Street, street number, and city are required.")
-            ]
+        # Each under its own field, so a form shows it on that input (a key
+        # that is no field makes ``ModelForm.add_error`` raise: a 500 in the
+        # admin). A pickup point's street line may name no number
+        # (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
+        required_address_fields = ["street", "city"]
+        if self.shipping_kind != ShippingKind.PICKUP_POINT:
+            required_address_fields.append("street_number")
+        for field in required_address_fields:
+            if not getattr(self, field):
+                errors[field] = [
+                    self._meta.get_field(field).error_messages["blank"]
+                ]
 
         if not errors:
             # Postcode format + street/number mix-ups, only for an
@@ -909,10 +918,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         when deductions — promotion, loyalty redemption, gift card —
         cover the whole total (see ``is_paid``); ``calculate_order_total_
         amount`` is exactly that remainder. Anything else is a payment
-        booked on an order whose amount due was never set: the admin
-        form, which edits both fields, is the path this guards (the demo
+        booked on an order whose amount due was never set (the demo
         fixtures that produced eight such rows no longer go through
-        ``save`` at all).
+        ``save`` at all). Model validation refuses to save such a row,
+        whatever the save changes; the admin shows both fields read-only
+        (``OrderAdmin.readonly_fields``), so the error is the order's, not
+        a field's.
 
         Not a ``CheckConstraint``: the total is a sum over the order's
         lines, which a row constraint cannot see. An unsaved order has
@@ -924,8 +935,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             return {}
         if self.calculate_order_total_amount().amount == 0:
             return {}
+        # Not under ``amount_due``: a form error on a read-only field has no
+        # input to land on (``ModelForm.add_error`` raises: a 500).
         return {
-            "amount_due": [
+            NON_FIELD_ERRORS: [
                 _(
                     "A completed payment needs an amount due, unless "
                     "discounts, loyalty points or gift cards cover the "

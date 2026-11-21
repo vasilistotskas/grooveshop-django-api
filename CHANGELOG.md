@@ -3,6 +3,47 @@
 
 
 
+## v3.258.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): the cart digest holds each line's promotion money and the routed carrier
+
+The digest now carries each applied promotion's amount and the
+promotion money every line carries, so discounts that move between
+lines at the same total change it, and the carrier a home delivery is
+routed to when it names none. Its docs say it is a check of contents:
+the shipping charge, the fee and the loyalty and gift-card amounts are
+expectedTotal's. The 409's quote help text names expectedCartDigest.
+
+Refs #755 ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
+### Features
+
+* feat(order): the quote returns a cart digest and order creation can refuse a changed cart (#765) ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
+* feat(order): the quote returns a cart digest and order creation can refuse a changed cart
+
+POST /cart/quote returns cartDigest once a delivery and a pay way are
+chosen: an HMAC over the lines (product, quantity, unit price as
+priced), the promotions with their codes and gifts, the delivery with
+its pickup point, and the pay way. POST /order takes an optional
+expectedCartDigest, compared under the cart lock on both creation
+paths before the total; a difference creates nothing and answers 409
+cart_changed with the fresh quote. It refuses an order whose contents
+changed at the same total, which expectedTotal cannot see.
+
+The quote now takes the pickup point with the field names order
+creation uses (PickupPointSerializer), and both build the delivery
+with ShippingChoice.of, which keeps only the chosen carrier's
+location_keys. A test places every order-creation field as digested,
+priced or not priced, so the two bodies cannot drift apart.
+
+cart_changed is a code under error.type invalid_order_data, sent only
+to a request carrying expectedCartDigest, until the storefront lists it.
+
+Refs #755 ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
 ## v3.257.0 (2026-11-21)
 
 ### Documentation

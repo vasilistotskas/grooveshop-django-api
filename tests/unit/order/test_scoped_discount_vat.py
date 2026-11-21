@@ -32,9 +32,9 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductCategoryFactory, ProductFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.mydata import issuable, mydata_enabled

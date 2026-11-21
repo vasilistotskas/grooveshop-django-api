@@ -46,7 +46,7 @@ class StoreVertical(models.TextChoices):
     A platform-level fact about the tenant, set at onboarding, that
     downstream features read to pick sensible defaults — today the
     recommendation engine's per-surface strategy presets
-    (``recommendation/presets.py``), keyed by this enum. A store that
+    (``src/recommendation/presets.py``), keyed by this enum. A store that
     fits none of the specific verticals is ``general``.
     """
 
@@ -63,7 +63,7 @@ class SuspendedReason(models.TextChoices):
     ``MANUAL`` is any operator-initiated suspension (abuse, legal,
     operator judgement); ``BILLING`` is the dunning task acting on a
     lapsed term. The distinction is load-bearing: renewal-driven
-    auto-reactivation (tenant/signals.py) is scoped to BILLING only, so
+    auto-reactivation (src/tenant/signals.py) is scoped to BILLING only, so
     recording a payment can never resurrect a store an operator took
     down on purpose.
     """
@@ -378,7 +378,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # statement or transaction as each write that changes them. A
     # committed write moves every reader to a new key, so no Redis
     # DELETE has to land for a stale entry to stop being served — and
-    # the fail-open cache (``core/caches.py``) drops deletes during an
+    # the fail-open cache (``src/core/caches.py``) drops deletes during an
     # outage. Only ever written relatively, as ``F() + 1`` (``save``
     # below, ``tenant.cache.bump_cache_generation``), so a stale
     # in-memory copy can never write an older generation back — and the
@@ -1737,7 +1737,7 @@ class TenantMembershipRole(models.TextChoices):
     the public-schema admin). These per-tenant roles govern what a user
     can do *inside* a tenant they belong to. Customers hold none: they
     are scoped to a store by living in that store's schema, not by a
-    membership row (see tenant/membership.py).
+    membership row (see src/tenant/membership.py).
 
     - STAFF   — can view the tenant's operational admin (orders,
                 products) but cannot change tenant settings or invite
@@ -2210,7 +2210,7 @@ class TenantStatsSnapshot(models.Model):
     The control plane lists every store with its order count and
     revenue. Computing those per page view meant a schema switch and
     two queries per store on every render; ``refresh_stats_snapshot``
-    (``tenant/tasks.py``) reads them inside each store's schema on a
+    (``src/tenant/tasks.py``) reads them inside each store's schema on a
     schedule instead, and the platform dashboard and the Tenants list
     read this row. Kept apart from ``Tenant`` because saving a ``Tenant``
     bumps its ``cache_generation`` - a refresh must not evict the

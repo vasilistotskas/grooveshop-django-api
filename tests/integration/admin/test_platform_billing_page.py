@@ -4,7 +4,7 @@ The PAGE's contract: mounted only on ``PlatformAdminSite``
 (structurally absent from merchant admins), gated exactly like the rest
 of the control plane, and rendering the estate's billing state from
 public-schema data alone. The classifier it renders lives in
-``tenant/billing.py`` and is pinned by
+``src/tenant/billing.py`` and is pinned by
 ``tests/unit/tenant/test_billing_dunning.py``.
 """
 
@@ -20,7 +20,7 @@ from django.test import (
 )
 from django.urls import NoReverseMatch, resolve, reverse
 
-# The classifier itself lives in tenant/billing.py and is pinned by
+# The classifier itself lives in src/tenant/billing.py and is pinned by
 # tests/unit/tenant/test_billing_dunning.py — this file covers only the
 # PAGE's shaping and gating.
 from admin.platform_billing import _billing_rows, _billing_table

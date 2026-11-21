@@ -286,6 +286,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "status_display",
@@ -1114,6 +1115,16 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             "refused with code street_number_missing on street."
         ),
     )
+    address_line_2 = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "What the street line does not hold: a flat, a floor, a "
+            "building. Optional free text, printed under the street and "
+            "given to the courier."
+        ),
+    )
     city = serializers.CharField(
         max_length=100, required=True, help_text=_("City name")
     )
@@ -1768,6 +1779,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "first_name",

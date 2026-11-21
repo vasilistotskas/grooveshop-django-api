@@ -343,7 +343,7 @@ class BlogPostTranslation(
     def get_search_result_queryset(cls):
         """Optimized queryset for hydrating Meilisearch blog hits.
 
-        `meili/querysets.py::_enrich_results` looks this classmethod up
+        `src/meili/querysets.py::_enrich_results` looks this classmethod up
         with `getattr` and falls back to the plain manager when a model
         does not define it. `ProductTranslation` had one; this did not,
         so every blog hit paid a query for `obj.master` in

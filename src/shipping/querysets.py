@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.db import models
 
-#: ``metadata`` key the demo seed (``devtools/demo_shipments.py``) stamps
+#: ``metadata`` key the demo seed (``src/devtools/demo_shipments.py``) stamps
 #: on the carrier rows it writes.
 DEMO_SEED_KEY = "demo_seed"
 

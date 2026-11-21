@@ -37,9 +37,9 @@ def generate_indexnow_key() -> str:
 # ---------------------------------------------------------------------------
 #
 # ANNOUNCEMENT_BAR, AUTH_PANEL, FUNDING_BANNER, STORE_OFFICES and
-# BUSINESS_HOURS are each a serializer in ``core/store_setting_shapes.py``:
+# BUSINESS_HOURS are each a serializer in ``src/core/store_setting_shapes.py``:
 # the same class validates the save here and describes the value in the
-# OpenAPI schema. These are the dotted paths ``settings/store_settings.py``
+# OpenAPI schema. These are the dotted paths ``src/settings/store_settings.py``
 # names; a validator returns a BOOLEAN (``Setting.validate()`` wraps a
 # falsy result in its own ``ValidationError``).
 
@@ -176,7 +176,7 @@ def validate_longitude_setting(value: object) -> bool:
 #   (``information_schema``) or by django-tenants (``public`` is the
 #   shared schema; ``TenantMixin.save()`` would still create a
 #   colliding schema for a tenant literally named "public").
-# * ``global`` — special-cased by ``tenant/cache.py``'s tenant-scoped
+# * ``global`` — special-cased by ``src/tenant/cache.py``'s tenant-scoped
 #   cache-key function as the platform-wide cache namespace; a tenant
 #   schema named "global" would silently share cache keys with the
 #   platform routines instead of getting its own isolated namespace.

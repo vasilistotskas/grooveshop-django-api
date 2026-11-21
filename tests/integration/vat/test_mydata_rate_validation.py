@@ -2,7 +2,7 @@
 
 Regression coverage for the production incident where a live tenant
 ran products at 23% (invalid since June 2016) — a rate absent from
-``order/accounting/mydata/builder.py``'s ``_VAT_CATEGORY_BY_RATE``, which would
+``order.accounting.mydata.builder``'s ``_VAT_CATEGORY_BY_RATE``, which would
 have raised ``ValueError`` for every order the moment myDATA was
 enabled. ``Vat.value``'s ``validate_mydata_vat_rate`` validator now
 rejects it up front, at row-save time, via ``full_clean()`` — the same

@@ -242,6 +242,9 @@ class TestEveryCreationPathCarriesTheExpiry:
             },
         )
         provider.checkout_session_params.return_value = {}
+        # No link of the order is payable yet, so one is opened (#643).
+        provider.live_checkout_session.return_value = None
+        provider.recorded_checkout_session.return_value = None
         provider.min_hosted_session = timedelta(0)
 
         with (
@@ -962,6 +965,9 @@ class TestTheTotalHoldIsBounded:
         provider = Mock()
         provider.min_hosted_session = timedelta(0)
         provider.checkout_session_params.return_value = {}
+        # No link of the order is payable yet, so one is opened (#643).
+        provider.live_checkout_session.return_value = None
+        provider.recorded_checkout_session.return_value = None
         provider.create_checkout_session.return_value = (
             True,
             {
@@ -1017,6 +1023,9 @@ class TestTheTotalHoldIsBounded:
         provider = Mock()
         provider.min_hosted_session = StripePaymentProvider.min_hosted_session
         provider.checkout_session_params.return_value = {}
+        # No link of the order is payable yet, so one is opened (#643).
+        provider.live_checkout_session.return_value = None
+        provider.recorded_checkout_session.return_value = None
 
         first, second, third = self._providers(provider)
         with first, second, third:

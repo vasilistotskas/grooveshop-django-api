@@ -66,7 +66,7 @@ def _provider_metadata() -> dict[str, Any]:
     """Return the ``acs`` provider's metadata dict, or ``{}`` on miss.
 
     Lazy import inside the function keeps this module importable from
-    everywhere (including ``shipping_acs/services.py`` at import time)
+    everywhere (including ``src/shipping_acs/services.py`` at import time)
     without circular-import risk on ``ShippingProvider``.
     """
     from shipping.models import ShippingProvider

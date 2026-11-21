@@ -1,6 +1,6 @@
 """Dispatch, audit and retry behaviour of the Meta CAPI Celery tasks.
 
-Covers ``meta_capi/tasks.py``: every ``dispatch_*`` task's gates (kill
+Covers ``src/meta_capi/tasks.py``: every ``dispatch_*`` task's gates (kill
 switch, missing row, consent), ``_dispatch``'s SENT short-circuit and its
 FAILED/SENT audit rows for transient, permanent and config errors, and the
 ``schedule_*`` helpers. ``MetaCapiClient`` — the facade over the Graph API

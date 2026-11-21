@@ -9,10 +9,17 @@ from django.utils.translation import gettext_lazy as _
 from order.enum.status import (
     PaymentStatus,
 )
-from order.exceptions import OrderChangedDuringPaymentError
+from order.exceptions import (
+    OrderChangedDuringPaymentError,
+    PaymentInProgressError,
+)
 from order.models import Order
 from order.payments import payment_hold
-from order.payments.payment import get_payment_provider
+from order.payments.payment import (
+    OpenPayment,
+    PaymentProvider,
+    get_payment_provider,
+)
 from order.payments.payment_binding import PaymentPurpose
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
@@ -350,6 +357,33 @@ class PayWayService:
                     "code": "previous_payment_in_progress",
                 }
 
+        # The reverse holds too: an open hosted session of the order is
+        # ended before an intent replaces it, so the two are never
+        # payable together (#643). One that was paid stays the payment.
+        if provider.supports_hosted_checkout:
+            try:
+                live = provider.live_checkout_session(order)
+                if live is not None:
+                    provider.discard_checkout_session(live.session_id)
+            except PaymentInProgressError:
+                return False, {
+                    "error": _("The previous payment is still in progress."),
+                    "code": "previous_payment_in_progress",
+                }
+            except Exception:
+                logger.exception(
+                    "Could not close the open checkout session of order %s",
+                    order.id,
+                )
+                return False, {
+                    "error": _("The previous payment could not be closed."),
+                    "code": "previous_payment_not_closed",
+                }
+
+        # What the order records now, after closing the old payments: a
+        # concurrent request that opens one before this intent is recorded
+        # makes this one lose (``OpenPayment.lock_unchanged``).
+        observed = OpenPayment.of(order, provider)
         hold_expires_at = payment_hold.deadline(order)
         success, payment_data = provider.process_payment(
             # Amount owed, not the raw total — a loyalty redemption is
@@ -372,6 +406,8 @@ class PayWayService:
                 order,
                 pay_way,
                 payment_data,
+                observed=observed,
+                provider=provider,
                 # The expiry the provider applied, else the one asked for
                 # (a PaymentIntent has none: the sweep cancels it).
                 hold_expires_at=payment_data.get("expires_at", hold_expires_at),
@@ -391,6 +427,8 @@ class PayWayService:
         pay_way: PayWay,
         payment_data: dict[str, Any],
         *,
+        observed: OpenPayment,
+        provider: PaymentProvider,
         hold_expires_at: datetime,
     ) -> None:
         """Store the payment the provider just opened on *order*.
@@ -404,12 +442,8 @@ class PayWayService:
             OrderChangedDuringPaymentError: the order changed meanwhile.
         """
         with transaction.atomic():
-            locked = Order.objects.select_for_update().get(pk=order.pk)
-            if (locked.status, locked.payment_status, locked.payment_id) != (
-                order.status,
-                order.payment_status,
-                order.payment_id,
-            ):
+            locked = observed.lock_unchanged(order, provider)
+            if locked is None:
                 raise OrderChangedDuringPaymentError(order.id)
             locked.payment_method = pay_way.key
             locked.payment_status = payment_data.get(

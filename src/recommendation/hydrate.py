@@ -7,7 +7,7 @@ context and locale; caching the serialized form would hand a B2B
 price to a retail shopper. ``Product.objects.for_full_list()`` carries the
 prefetches ``ProductSerializer`` needs, so the cost is constant in the
 number of items rather than a query per product (the same lesson the
-cart recommenders learned in ``cart/serializers/item.py``).
+cart recommenders learned in ``src/cart/serializers/item.py``).
 """
 
 from __future__ import annotations

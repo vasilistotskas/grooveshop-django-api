@@ -28,15 +28,17 @@ from order.exceptions import (
     ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
+from promotion.engine.benefits import gift_pairs
+from promotion.engine.evaluation import PromotionEngine
+from promotion.engine.teasers import teaser_cost
 from promotion.enum import BenefitType
-from promotion.services import PromotionEngine
 from shipping.enum import FreeShippingSource, ShippingRefusal
 
 if TYPE_CHECKING:
     from cart.models import Cart
     from giftcard.services import RedemptionPlan
     from pay_way.models import PayWay
-    from promotion.services import CartDiscountResult
+    from promotion.engine.results import CartDiscountResult
     from shipping.services import ShippingCharge
 
 logger = logging.getLogger(__name__)
@@ -478,7 +480,7 @@ class OrderQuoteService:
 
         parcel_items = (
             *((item.product, item.quantity) for item in cart.items.all()),
-            *PromotionEngine.gift_pairs(promotion),
+            *gift_pairs(promotion),
         )
         return parcel_items, compute_total_weight_grams(parcel_items)
 
@@ -682,7 +684,7 @@ class OrderQuoteService:
         holds in every country. Of the routes left, the one that costs
         the shopper least wins, a promotion on a tie since it does not
         depend on the carrier; a units teaser costs what the engine's
-        own simulation adds (``PromotionEngine.teaser_cost``).
+        own simulation adds (``promotion.engine.teasers.teaser_cost``).
 
         A threshold's distance is measured on :meth:`threshold_value`,
         the products after discounts, as checkout judges it; a
@@ -706,7 +708,7 @@ class OrderQuoteService:
         cart_items = list(cart.items.all())
         pairs = [
             (item.product, item.quantity) for item in cart_items
-        ] + PromotionEngine.gift_pairs(promotion_result)
+        ] + gift_pairs(promotion_result)
         value = cls.threshold_value(
             cart.total_price, promotion_result.discount_total
         ).amount
@@ -760,7 +762,7 @@ class OrderQuoteService:
                     )
                 )
                 continue
-            cost = PromotionEngine.teaser_cost(entry, cart_items)
+            cost = teaser_cost(entry, cart_items)
             if cost is None:
                 continue
             routes.append(

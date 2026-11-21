@@ -117,7 +117,7 @@ def blog_post_meili_search(request):
     )
 
     # Greeklish queries match the indexed ``*_greeklish`` shadow fields
-    # directly (see search/transliteration.py) — no query rewriting.
+    # directly (see src/search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
 
     search_qs = BlogPostTranslation.meilisearch.paginate(

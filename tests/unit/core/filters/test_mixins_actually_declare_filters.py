@@ -7,7 +7,7 @@ dict. A plain-class mixin has neither, so its `Filter` attributes are
 dropped with no error and no warning — the query parameter simply never
 exists, and the endpoint answers 200 with the whole unfiltered list.
 
-Every mixin in `core/filters/core.py` was a plain class. `schema.yml`
+Every mixin in `src/core/filters/core.py` was a plain class. `schema.yml`
 carried zero occurrences of the affected parameter names, and two
 staff-gated filters read as authorization while doing nothing at all.
 The camel-case FilterSets appeared to work only because they restated

@@ -159,7 +159,7 @@ class AgentAPIView(APIView):
     ``UserTenantMembership``, which is a public-schema row keyed to a
     public user id; shoppers are created in the tenant schema and can
     hold none, so the check denied every legitimate customer.
-    Membership is a staff concept (see ``tenant/membership.py``).
+    Membership is a staff concept (see ``src/tenant/membership.py``).
     """
 
     authentication_classes = [AgentTokenAuthentication]

@@ -57,7 +57,7 @@ class AcsLabelView(APIView):
         # key inherits the view's JSON renderer and put an
         # ``application/json`` 200 in the schema. Same correction, and
         # the same reasoning, as ``getShipmentLabelForOrder`` in
-        # ``order/views/order.py``.
+        # ``src/order/views/order.py``.
         responses={
             (200, "application/pdf"): OpenApiTypes.BINARY,
             403: None,

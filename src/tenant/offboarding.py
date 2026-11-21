@@ -130,7 +130,7 @@ def purge_search_indexes(schema_name: str) -> list[str]:
             if not index.uid.startswith(prefix):
                 continue
             # ``meili_client.client``, not ``meili_client``. The wrapper
-            # in ``meili/_client.py`` exposes create/get/get_search
+            # in ``src/meili/_client.py`` exposes create/get/get_search
             # index helpers and NO ``delete_index`` — the raw SDK client
             # underneath is what has it, which is why
             # ``meilisearch_drop.py`` reaches through in exactly this

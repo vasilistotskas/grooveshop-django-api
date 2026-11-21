@@ -1,4 +1,4 @@
-"""Exercises page_config/migrations/0021_seed_legal_documents.py directly.
+"""Exercises src/page_config/migrations/0021_seed_legal_documents.py directly.
 
 This migration is the one that put real legal text into four live
 tenants, so the property that matters most is the one it must NEVER

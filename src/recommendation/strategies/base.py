@@ -1,6 +1,6 @@
 """The strategy contract and its registry.
 
-Mirrors ``shipping/interfaces.py``: a small ABC, a class decorator
+Mirrors ``src/shipping/interfaces.py``: a small ABC, a class decorator
 that instantiates and registers, a module-level ``_REGISTRY`` populated
 when the package is imported from ``AppConfig.ready()``.
 

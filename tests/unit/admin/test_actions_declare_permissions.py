@@ -366,7 +366,7 @@ def test_every_first_party_admin_extends_the_base():
 
     A first-party admin on bare ``unfold.admin.ModelAdmin`` skipped
     them; seven did (tenant, contact, core). Third-party admins
-    re-wrapped in ``core/admin.py`` are covered by the three guards
+    re-wrapped in ``src/core/admin.py`` are covered by the three guards
     below.
     """
     first_party = {

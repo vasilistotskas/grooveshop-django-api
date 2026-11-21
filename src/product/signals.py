@@ -100,7 +100,7 @@ def post_create_historical_record_callback(
 
     if old_stock != new_stock:
         # Detect if this is a programmatic stock operation from
-        # order/inventory/stock.py
+        # src/order/inventory/stock.py
         # Programmatic operations use save(update_fields=['stock', 'updated_at'])
         # Admin changes typically update multiple fields or use save() without update_fields
         history_change_reason = getattr(
@@ -148,7 +148,7 @@ def reindex_products_by_pk(product_ids) -> int:
     values. Measured: a bulk update fires **0** post_save receivers
     where an instance save fires 1.
 
-    Both flags are indexed and filtered on — ``search/views/product.py`` filters
+    Both flags are indexed and filtered on — ``search.views.product`` filters
     the INDEXED ``active`` — so bulk-deactivating products left them
     fully searchable and buyable until the nightly sync. The admin
     reported success either way.

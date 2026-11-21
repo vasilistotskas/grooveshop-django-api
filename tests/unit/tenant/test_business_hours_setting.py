@@ -1,4 +1,4 @@
-"""BUSINESS_HOURS extra_setting validator (tenant/validators.py).
+"""BUSINESS_HOURS extra_setting validator (src/tenant/validators.py).
 
 extra_settings validators return a boolean — Setting.validate() wraps a
 falsy result in its ValidationError. Mirrored render-side by

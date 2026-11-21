@@ -1,6 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -120,6 +120,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         final order (audit trail, stock-discrepancy debugging).
     """
 
+    #: The delivery address fields that are the buyer's own: what GDPR
+    #: erasure blanks and a data export lists (``user.services.gdpr``). A
+    #: new address field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_address_field.py``
+    #: fails for one that is scrubbed by the staging anonymiser but neither
+    #: listed here nor kept on purpose.
+    SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
+
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
@@ -175,6 +192,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
+    # What the street line does not hold: a flat, a floor, a building
+    # (UCP's ``extended_address``). Free text, separate from the notes; the
+    # ACS voucher carries it in ``Delivery_Notes``, as ACS's
+    # ``Recipient_Address`` is the street alone.
+    address_line_2 = models.CharField(
+        _("Address line 2"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     phone = PhoneNumberField(_("Phone Number"))
     customer_notes = models.TextField(
         _("Customer Notes"), blank=True, default=""
@@ -951,7 +979,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def full_address(self) -> str:
-        return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
+        """The delivery address on one line: the street and its number, the
+        address line 2 when there is one, then the postcode and the city
+        ("Ερμού 12, 3ος όροφος, 10563 Αθήνα")."""
+        street = f"{self.street} {self.street_number}".strip()
+        place = f"{self.zipcode} {self.city}".strip()
+        return ", ".join(
+            part for part in (street, self.address_line_2, place) if part
+        )
 
     @property
     def customer_full_name(self) -> str:

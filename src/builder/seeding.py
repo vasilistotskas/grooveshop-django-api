@@ -1,7 +1,7 @@
 """The documents a new store starts with.
 
-``builder/seeds/*.json`` are the storefront's default documents, COPIED from
-it (pinned, drift-checked: ``.github/scripts/sync_storefront_sources.py``)
+``src/builder/seeds/*.json`` are the storefront's default documents, COPIED
+from it (pinned, drift-checked: ``.github/scripts/sync_upstream_sources.py``)
 because the storefront owns the blocks and so what a sensible default is.
 Each file is ``{key, document, i18n}``: the key it is for, the document and
 its translations.

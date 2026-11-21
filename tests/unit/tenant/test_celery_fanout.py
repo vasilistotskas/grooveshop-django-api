@@ -402,7 +402,7 @@ class TestBeatScheduleTenantCoverage:
         # reached through their own fanout entry.
         "emails.tasks.purge_expired_email_logs",
         # Billing terms + dunning bookkeeping are public-schema Tenant
-        # rows; the cycle never enters a tenant schema (tenant/billing.py).
+        # rows; the cycle never enters a tenant schema (src/tenant/billing.py).
         "tenant.tasks.process_tenant_billing",
         # TenantArchive rows live in the public schema BECAUSE the
         # schemas they describe have been dropped — there is no tenant

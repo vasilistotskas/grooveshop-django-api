@@ -2,8 +2,8 @@
 rebuild of the affected seed after the transaction commits.
 
 Connected explicitly from ``RecommendationConfig.ready()`` with
-``weak=False`` — the documented trap in ``meili/apps.py`` and
-``core/celery.py``: a receiver that is not strongly referenced is
+``weak=False`` — the documented trap in ``src/meili/apps.py`` and
+``src/core/celery.py``: a receiver that is not strongly referenced is
 garbage-collected and the signal silently stops firing.
 
 Dispatch goes through ``tenant.celery.dispatch_on_commit`` so the
@@ -20,7 +20,7 @@ from tenant.celery import dispatch_on_commit
 
 # Writes that change nothing a strategy reads. ``view_count`` and
 # ``click_score`` move on every visit and every search click; rebuilding
-# candidates for each would be the query storm ``product/signals.py``
+# candidates for each would be the query storm ``src/product/signals.py``
 # already avoids for reindexing.
 _NOISE_FIELDS = frozenset({"view_count", "click_score", "updated_at"})
 
@@ -51,7 +51,7 @@ def on_relation_changed(sender, instance, raw=False, **kwargs):
 
 def on_order_created(sender, order, **kwargs):
     # ``order_created`` is emitted from an on_commit hook inside the
-    # owning schema (order/signals/handlers.py), so the row is
+    # owning schema (src/order/signals/handlers.py), so the row is
     # committed and the schema is right; the task then ties the
     # order's lines back to the impressions that showed them.
     from recommendation.tasks import record_recommendation_attach

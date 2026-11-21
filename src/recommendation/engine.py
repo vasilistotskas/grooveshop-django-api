@@ -165,7 +165,7 @@ def _collect(
     # answered without them — it has none for these strategies, or its
     # rows are still on the way from its own ``post_save``; computing
     # them here would put the expensive path on the request after all
-    # (see ``recommendation/candidates.py``).
+    # (see ``src/recommendation/candidates.py``).
     stored = [s.code for s in chain if s.precompute]
     if stored:
         for seed_rows in _stored_rows(seed_ids, stored).values():

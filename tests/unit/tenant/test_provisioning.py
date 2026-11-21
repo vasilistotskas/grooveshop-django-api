@@ -1,13 +1,11 @@
-"""Unit tests for ``tenant/provisioning.py`` — the shared post-row
+"""Unit tests for ``src/tenant/provisioning.py`` — the shared post-row
 provisioning steps used by BOTH ``manage.py tenant_create`` and
 ``TenantAdmin.save_related`` (the "New Store" admin form).
 
 No real Postgres schema is created (the suite turns
 ``Tenant.auto_create_schema`` off) — ``seed_tenant_defaults``'s
 ``schema_context`` switch is still exercised (it does not require the
-schema to physically exist; see ``admin/platform_dashboard.py``'s own
-``_schema_exists`` comment for why a missing schema silently falls
-through rather than erroring), and every step it runs is individually
+schema to physically exist), and every step it runs is individually
 best-effort/try-except'd already.
 """
 

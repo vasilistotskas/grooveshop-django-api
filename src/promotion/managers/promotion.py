@@ -115,7 +115,7 @@ class PromotionQuerySet(TranslatableOptimizedQuerySet):
     def with_scope_relations(self) -> Self:
         """Prefetch every relation the scope/exclusion walk reads.
 
-        ``PromotionEngine._matching_items`` and the product-page
+        ``promotion.engine.scope.matching_items`` and the product-page
         relation walk both touch all five per candidate, so without
         this the cost grows with the number of live promotions.
         """

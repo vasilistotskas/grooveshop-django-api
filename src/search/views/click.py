@@ -24,7 +24,7 @@ from search.serializers import (
 from tenant.celery import publish_or_drop
 
 
-# The `ty: ignore` below is explained in `search/views/blog.py`.
+# The `ty: ignore` below is explained in `src/search/views/blog.py`.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Log a click on a search result"),
     description=_(

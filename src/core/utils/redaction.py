@@ -5,9 +5,11 @@ the carriers' ``erase_recipient_data``).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 REDACTED = "[deleted]"
+_EMAIL_ADDRESS = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 # Shorter values (a two-letter name) would match unrelated text.
 MIN_REDACTED_LENGTH = 6
 # A copy cut at its column's length ends with the start of the value; one
@@ -26,18 +28,24 @@ def redaction_texts(*values: object) -> list[str]:
     return sorted(texts, key=len, reverse=True)
 
 
-def redact(value: Any, texts: list[str]) -> Any:
+def redact(value: Any, texts: list[str], *, emails: bool = False) -> Any:
     """*value* (a string, or JSON holding strings) with each of *texts*
-    replaced by ``REDACTED``, also where a column's length cut one short.
-    Keys of JSON objects are left alone."""
+    replaced by ``REDACTED``, also where a column's length cut one short,
+    and with *emails*, every email address it names. Keys of JSON objects
+    are left alone."""
     if isinstance(value, dict):
-        return {key: redact(item, texts) for key, item in value.items()}
+        return {
+            key: redact(item, texts, emails=emails)
+            for key, item in value.items()
+        }
     if isinstance(value, list):
-        return [redact(item, texts) for item in value]
+        return [redact(item, texts, emails=emails) for item in value]
     if not isinstance(value, str):
         return value
     for text in texts:
         value = _without(value, text)
+    if emails:
+        value = _EMAIL_ADDRESS.sub(REDACTED, value)
     return value
 
 

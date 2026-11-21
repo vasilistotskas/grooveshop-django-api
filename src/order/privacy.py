@@ -99,10 +99,19 @@ def erase_orders(
         if field not in Order.BILLING_FIELDS
     }
     orders = Order.objects.all_with_deleted().filter(id__in=order_ids)
-    now = timezone.now()
-    counts["orders_anonymised"] = orders.update(
-        user=None, personal_data_erased_at=now, **erased
-    )
+    counts["orders_anonymised"] = orders.update(user=None, **erased)
+    _clear_and_stamp(order_ids)
+    return counts
+
+
+def _clear_and_stamp(order_ids: list[int]) -> None:
+    """What every erased order ends with: the billing fields cleared unless
+    an invoice needs them (:func:`keeps_billing`), ``PERSONAL_METADATA``
+    dropped, and the ``personal_data_erased_at`` stamp the daily sweep
+    reads."""
+    from order.models.order import Order
+
+    orders = Order.objects.all_with_deleted().filter(id__in=order_ids)
     orders.exclude(keeps_billing()).update(
         **dict.fromkeys(Order.BILLING_FIELDS, "")
     )
@@ -111,7 +120,7 @@ def erase_orders(
             Order.objects.all_with_deleted().filter(id=order_id).update(
                 metadata=metadata
             )
-    return counts
+    orders.update(personal_data_erased_at=timezone.now())
 
 
 def erase_carrier_data(
@@ -134,7 +143,8 @@ def erase_carrier_data(
 
 
 def erase_late_carrier_data() -> dict[str, int]:
-    """Clear the carrier data that arrived for an order after its erasure.
+    """Clear the carrier data that arrived for an order after its erasure,
+    and finish the orders an earlier erasure left (:func:`finish_earlier_erasures`).
 
     A parcel still moving when its buyer is erased goes on being tracked,
     delivered and paid out: each poll, webhook and COD answer writes the
@@ -147,6 +157,7 @@ def erase_late_carrier_data() -> dict[str, int]:
     """
     from order.models.order import Order
 
+    finished = finish_earlier_erasures()
     since = timezone.now() - timedelta(
         days=settings.ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS
     )
@@ -166,7 +177,44 @@ def erase_late_carrier_data() -> dict[str, int]:
     if older:
         for carrier in registered_providers():
             swept |= carrier.orders_written_since(older, since)
-    return erase_carrier_data(sorted(swept), buyer_values={})
+    counts = erase_carrier_data(sorted(swept), buyer_values={})
+    counts["earlier_erasures_finished"] = finished
+    return counts
+
+
+def finish_earlier_erasures() -> int:
+    """Finish the orders an erasure from before this module left: it
+    blanked the order's columns, with the placeholder email
+    (``deleted-<hex>@deleted.invalid``), and kept every copy (the browser
+    identity and cancel reason in ``metadata``, the reason's copies, the
+    "email sent to <address>" history notes, the carriers' records).
+
+    Their copies are redacted by what is left on the order (the cancel
+    reason), and their history by every email address it names, as the
+    buyer's is gone; then they get what every erased order ends with
+    (:func:`_clear_and_stamp`). Stamped today, the sweep clears their
+    carrier records in the same run. Idempotent: a stamped order is never
+    matched again. Found through the email's trigram index
+    (``order_email_search_ix``). A soft-deleted order that erasure skipped
+    was unlinked from its account with its data and cannot be told apart
+    from a guest's."""
+    from order.models.order import Order
+
+    order_ids = list(
+        Order.objects.all_with_deleted()
+        .filter(
+            user__isnull=True,
+            email__startswith="deleted-",
+            email__endswith="@deleted.invalid",
+            personal_data_erased_at__isnull=True,
+        )
+        .values_list("id", flat=True)
+    )
+    if not order_ids:
+        return 0
+    _erase_copies(_buyer_values(order_ids), emails=True)
+    _clear_and_stamp(order_ids)
+    return len(order_ids)
 
 
 def _buyer_values(order_ids: list[int]) -> dict[int, list[str]]:
@@ -200,13 +248,14 @@ def _buyer_values(order_ids: list[int]) -> dict[int, list[str]]:
     return values
 
 
-def _erase_copies(values: dict[int, list[str]]) -> int:
+def _erase_copies(values: dict[int, list[str]], *, emails: bool = False) -> int:
     """Remove the buyer's values from the free text the order's own records
     copy them into: its history (``OrderHistory``: "email sent to <their
     address>", a refund's reason), the stock log of restocked lines, the
     refund attempts and the ledger rows. The carriers' copies are in their
     own records; the order's own are its ``PERSONAL_FIELDS`` and
-    ``PERSONAL_METADATA``."""
+    ``PERSONAL_METADATA``. With *emails*, every email address in them goes
+    too, for an order whose buyer's address is already gone."""
     from order.models.history import OrderHistory
     from order.models.payment_transaction import PaymentTransaction
     from order.models.refund_attempt import RefundAttempt
@@ -223,7 +272,7 @@ def _erase_copies(values: dict[int, list[str]]) -> int:
             update = {}
             for column in columns:
                 value = getattr(row, column)
-                redacted = redact(value, values[row.order_id])
+                redacted = redact(value, values[row.order_id], emails=emails)
                 if redacted != value:
                     update[column] = redacted
             if update:

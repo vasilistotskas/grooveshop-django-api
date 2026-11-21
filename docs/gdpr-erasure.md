@@ -99,14 +99,20 @@ cleared within a day.
 
 ## Orders erased before this
 
-Migration `order.0115_erase_previously_erased_orders` finishes the orders the
-earlier erasure left: those with the old placeholder email and no stamp.
+The same daily sweep first finishes the orders an earlier erasure left
+(`order.privacy.finish_earlier_erasures`): those with the old placeholder
+email (`deleted-<hex>@deleted.invalid`) and no stamp. It finds them through
+the email's trigram index (`order_email_search_ix`).
 
-- It drops their `PERSONAL_METADATA`.
 - It redacts the cancel reason's copies, and every email address in their
-  history notes.
-- It applies the billing rule, and stamps them.
-- The next daily sweep then clears their carrier records.
+  history, because the buyer's own address is gone.
+- It drops their `PERSONAL_METADATA`, applies the billing rule and stamps
+  them.
+- Being stamped that day, their carrier records are cleared in the same run.
+
+The step is idempotent, and it also covers an order erased the old way during
+a deploy's window. Run the sweep once by hand right after the deploy that
+ships this (the platform admin's schedule page, `erase-late-carrier-data`).
 
 A soft-deleted order that the earlier erasure skipped was unlinked from its
 account with its data. It cannot be told apart from a guest's, so it cannot be

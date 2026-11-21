@@ -828,35 +828,32 @@ def test_an_order_whose_voucher_was_never_minted_is_erased(subject):
     assert "last_error" not in shipment.metadata
 
 
-def test_orders_erased_before_are_finished(subject):
-    """Orders the earlier erasure left (the old placeholder email, no
-    stamp) lose what it kept: the browser identity and the cancel reason,
-    the reason's copies, the email addresses in their history; they are
-    stamped, so the daily sweep clears their carrier records next."""
-    import importlib
-
-    from django.apps import apps
-
+def test_an_order_erased_the_old_way_is_finished_by_the_next_sweep(subject):
+    """An order the earlier erasure left (the placeholder email, no stamp)
+    loses what it kept at the next daily sweep: the browser identity and
+    the cancel reason, the reason's copies, the email addresses in its
+    history, and its carrier records, in the same run. A stamped order is
+    not matched again."""
     from order.factories import OrderFactory
     from order.inventory.stock import StockManager
     from order.models.history import OrderHistory
     from order.models.order import Order
     from order.models.stock_log import StockLog
     from product.factories import ProductFactory
-
-    migration = importlib.import_module(
-        "order.migrations.0115_erase_previously_erased_orders"
+    from shipping_acs.factories import (
+        AcsShipmentFactory,
+        AcsTrackingEventFactory,
     )
+    from user.tasks import erase_late_carrier_data
+
+    reason = "Μετακομίζω στη Λάρισα οριστικά"
     order = OrderFactory(
         user=None,
         email="deleted-0123456789ab@deleted.invalid",
         first_name="[deleted]",
         metadata={
             "meta": {"client_ip_address": "203.0.113.9"},
-            "cancellation": {
-                "reason": "Μετακομίζω στη Λάρισα οριστικά",
-                "previous_status": "PENDING",
-            },
+            "cancellation": {"reason": reason, "previous_status": "PENDING"},
             "promotions": [{"code": "WELCOME"}],
         },
         billing_vat_id="998877665",
@@ -870,19 +867,24 @@ def test_orders_erased_before_are_finished(subject):
         product_id=product.id,
         quantity=1,
         order_id=order.id,
-        reason=f"Order {order.id} canceled: Μετακομίζω στη Λάρισα οριστικά",
+        reason=f"Order {order.id} canceled: {reason}",
     )
-    fresh = OrderFactory(
+    event = AcsTrackingEventFactory(
+        shipment=AcsShipmentFactory(order=order, voucher_no="7400000010"),
+        notes="Παρέλαβε η αγοράστρια",
+    )
+    done = OrderFactory(
         user=None,
         email="deleted-fffff@deleted.invalid",
         billing_vat_id="111222333",
     )
-    Order.objects.filter(pk=fresh.pk).update(
+    Order.objects.filter(pk=done.pk).update(
         personal_data_erased_at=timezone.now()
     )
 
-    migration.finish_erasure(apps, None)
+    result = erase_late_carrier_data()
 
+    assert result["earlier_erasures_finished"] == 1
     order.refresh_from_db()
     assert "meta" not in order.metadata
     assert order.metadata["cancellation"] == {"previous_status": "PENDING"}
@@ -894,6 +896,9 @@ def test_orders_erased_before_are_finished(subject):
     assert not StockLog.objects.filter(
         order=order, reason__contains="Λάρισα"
     ).exists()
-    # An order already stamped by the new erasure is not touched.
-    fresh.refresh_from_db()
-    assert fresh.billing_vat_id == "111222333"
+    event.refresh_from_db()
+    assert event.notes == ""
+    # An order already stamped is not matched again.
+    done.refresh_from_db()
+    assert done.billing_vat_id == "111222333"
+    assert erase_late_carrier_data()["earlier_erasures_finished"] == 0

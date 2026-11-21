@@ -21,6 +21,7 @@ from country.factories import CountryFactory
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from vat.factories import VatFactory
@@ -86,11 +87,13 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(),
-            user=profile.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(),
+                user=profile.user,
+            )
         )
 
         item = order.items.get()
@@ -109,11 +112,13 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(),
-            user=profile.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(),
+                user=profile.user,
+            )
         )
 
         assert order.items.get().price.amount == Decimal("60.00")
@@ -127,14 +132,16 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(
-                cost=Money(Decimal("5.00"), "EUR"),
-                free_threshold=Money(Decimal("95.00"), "EUR"),
-            ),
-            user=profile.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(
+                    cost=Money(Decimal("5.00"), "EUR"),
+                    free_threshold=Money(Decimal("95.00"), "EUR"),
+                ),
+                user=profile.user,
+            )
         )
 
         assert order.payment_method_fee.amount == Decimal("5.00")
@@ -145,11 +152,13 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(),
-            user=None,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(),
+                user=None,
+            )
         )
 
         assert order.items.get().price.amount == product.final_price.amount
@@ -163,11 +172,13 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(),
-            user=profile.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(),
+                user=profile.user,
+            )
         )
 
         assert order.items.get().price.amount == product.final_price.amount
@@ -190,11 +201,13 @@ class TestGroupPricingCheckout:
         # (Greek when the compiled .mo is present, English in CI).
         with pytest.raises(InvalidOrderDataError, match="500"):
             OrderService.create_order_from_cart_offline(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address=_shipping_address(country),
-                pay_way=_pay_way(),
-                user=profile.user,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=cart,
+                    shipping_address=_shipping_address(country),
+                    pay_way=_pay_way(),
+                    user=profile.user,
+                )
             )
 
     def test_feature_off_stays_retail(self):
@@ -204,11 +217,13 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_shipping_address(country),
-            pay_way=_pay_way(),
-            user=profile.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_shipping_address(country),
+                pay_way=_pay_way(),
+                user=profile.user,
+            )
         )
 
         assert order.items.get().price.amount == product.final_price.amount

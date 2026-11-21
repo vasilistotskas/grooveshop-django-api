@@ -115,9 +115,8 @@ accepting Cyprus orders at the Greek flat rate.
   cart's create-payment-intent and `POST /cart/quote` price through that
   one function ([§3.0](creation.md)), so they agree for the same pricing
   inputs. The inputs can change between two requests (a price, a
-  promotion, a rate), and then the later total differs: a client that
-  must know sends the quote's `expectedTotal` with the order, which is
-  then created only at that total. The cart response
+  promotion, a rate), and then the later total differs: every order is
+  created with the quote's `expectedTotal`, and only at that total. The cart response
   reports it as `freeThresholdValue`, and `/shipping/options` takes it as
   `orderValueAmount`; a client shows "X more for free" from that number,
   never from `totalPrice`. (Before, the fee compared items + shipping and

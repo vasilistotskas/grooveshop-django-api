@@ -3,6 +3,67 @@
 
 
 
+## v3.263.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(giftcard): my cards' balances in the list query, and sharper whole-list tests
+
+The independent review: a card's balance summed its ledger once per card
+(an aggregate is never served from the prefetch), which the whole list
+made unbounded; both card actions now annotate ledger_total, as the admin
+does. The country tests now prove the ordering (rows created against the
+requested order, the documented key) and the default order, and the
+whole list past the list's page without a page-size parameter it ignores.
+
+Refs #684 ([`753068b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/753068b6d1af9002a66d6156db28562496619412))
+
+* fix(product): a description with no text is an empty string, never NULL (release 1 of 2) (#797) ([`abfd55a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abfd55a2f1f87769f3c3daa85ee65be7c2854d5b))
+
+* fix(product): a description with no text is an empty string, never NULL (release 1 of 2)
+
+The search hit declares description a string and served a NULL one as
+null, which the storefront answers 422 to. The field's empty value is now
+"" in Django's state, so the ORM default, the API's translation
+serializers and the admin write "", and a data migration turns every
+stored NULL into "". The column stays nullable in the database for the
+release still serving; the next release backfills again and adds the
+NOT NULL constraint, then reindexes.
+
+The search test that met the drift loses its marker, the search test
+data no longer spells out an empty description, and the field leaves the
+nullable-string rule's deferred list.
+
+Refs #684 ([`abfd55a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abfd55a2f1f87769f3c3daa85ee65be7c2854d5b))
+
+### Chores
+
+* chore(i18n): the whole-list routes' summaries in the catalogues
+
+Refs #684 ([`753068b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/753068b6d1af9002a66d6156db28562496619412))
+
+### Features
+
+* feat(api): whole-list routes for the countries and my gift cards (#799) ([`753068b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/753068b6d1af9002a66d6156db28562496619412))
+
+* feat(api): whole-list routes for the countries and my gift cards
+
+GET /country/all answers every country as one array, filtered and
+ordered as the list is, and GET /giftcard/mine/all every card linked to
+the account, newest first. The storefront read both with
+?pagination=false on the paginated operations, which answered a bare
+array where the schema documents the envelope (#684). The storefront
+moves to these routes next; ?pagination=false goes once that release is
+in production.
+
+Refs #684 ([`753068b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/753068b6d1af9002a66d6156db28562496619412))
+
+### Testing
+
+* test(product): refuse a null description at the request, and say what release 2 removes
+
+Refs #684 ([`abfd55a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abfd55a2f1f87769f3c3daa85ee65be7c2854d5b))
+
 ## v3.262.4 (2026-11-21)
 
 ### Bug fixes

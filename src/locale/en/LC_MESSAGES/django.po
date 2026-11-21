@@ -4935,6 +4935,9 @@ msgstr "Event Type ID"
 msgid "Event fingerprint"
 msgstr "Event fingerprint"
 
+msgid "Event key"
+msgstr "Event key"
+
 msgid "Event name"
 msgstr "Event name"
 

@@ -4940,6 +4940,9 @@ msgstr "Αναγνωριστικό τύπου συμβάντος"
 msgid "Event fingerprint"
 msgstr "Αποτύπωμα συμβάντος"
 
+msgid "Event key"
+msgstr "Κλειδί συμβάντος"
+
 msgid "Event name"
 msgstr "Όνομα συμβάντος"
 

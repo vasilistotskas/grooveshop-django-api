@@ -38707,11 +38707,7 @@ components:
             που θα φέρει το τιμολόγιο. Οι πόντοι πιστότητας εξαργυρώνονται στην παραγγελία
             και δεν αντικατοπτρίζονται εδώ.
         totalItems:
-          oneOf:
-          - type: integer
-          - enum:
-            - 0
-            type: integer
+          type: integer
           description: |-
             Return the total quantity of all items in the cart.
 

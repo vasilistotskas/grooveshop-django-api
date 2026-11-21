@@ -61,6 +61,14 @@ class TestProfileEndpoint:
         assert response.data["vies_name"] == "EXAMPLE IKE"
         mock_vies.assert_called_once_with("EL", "123456783")
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "PUT",
+        "/api/v1/b2b/profile",
+        400,
+        at=("$.detail", "$.reason"),
+        issue=684,
+    )
     def test_checksum_invalid_vat_rejected(
         self, b2b_tenant, enable_wholesale, mock_vies
     ):
@@ -98,6 +106,10 @@ class TestProfileEndpoint:
 
 
 class TestGates:
+    # Its 404 body is documented as the view's own only, not a gate's plain error (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/b2b/profile", 404, at="$.reason", issue=684
+    )
     def test_plan_flag_off_404s(self, b2b_tenant, enable_wholesale):
         b2b_tenant.b2b_enabled = False
         b2b_tenant.save(update_fields=["b2b_enabled"])
@@ -106,6 +118,10 @@ class TestGates:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    # Its 404 body is documented as the view's own only, not a gate's plain error (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/b2b/profile", 404, at="$.reason", issue=684
+    )
     def test_runtime_setting_off_404s(self, b2b_tenant):
         # No enable_wholesale fixture — the setting defaults to False,
         # and IsB2BWholesaleEnabled fails CLOSED.

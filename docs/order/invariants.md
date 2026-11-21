@@ -14,7 +14,7 @@ the linked section or the originating commit's message.
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | [§2.2](state-machines.md) |
 | A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | [§7.3](payment-ledger.md) |
 | A placed order's lines (product, quantity, price) are read-only in every admin surface; the name and SKU on an invoice, email or API line are the line's own snapshot | [§3.7](creation-records.md) |
-| Order `status` changes only through admin actions / `OrderService`, never the change form; CANCELED only through `OrderService.cancel_order`, never `update_order_status` or the `update_status` endpoint | [§2.1](state-machines.md), [§7.1](cancel.md) |
+| Order `status` changes only through admin actions / `OrderService`, never the change form; CANCELED only through `OrderLifecycleService.cancel_order`, never `update_order_status` or the `update_status` endpoint | [§2.1](state-machines.md), [§7.1](cancel.md) |
 | A BoxNow `canceled` parcel event never changes the order (status, stock, payment): it records the shipment CANCELED, and an open order behind it is "follow up" until staff re-issue the parcel or cancel the order. Only ACS routes a canceled shipment to `cancel_for_dead_shipment` | [§2.1](state-machines.md), [§2.3](state-machines.md), [§7.1](cancel.md) (#600) |
 | An order cancel never calls the courier inside its transaction: `_cancel_order_locked` commits the cancel with `metadata['shipment_cancel_pending']`, `cancel_attached_shipment` asks the courier after the commit (`transaction.on_commit`, so after the caller's own transaction too) and removes the flag with the answer, and `finish_pending_shipment_cancels` asks for a cancel whose worker stopped in between, and again for one whose courier gave no answer, until `ORDER_SHIPMENT_CANCEL_RETRY_HOURS` after the cancel | [§7.1.2](cancel.md) (#713) |
 | An order row and its carrier shipment row are locked order first, through `shipping.locks.lock_with_order` alone; a joined `select_for_update().select_related("order")` locks them the other way round | [§5](shipping.md) (#613) |
@@ -78,7 +78,7 @@ These invariants need more than a table row. Each ends with its anchor.
   `_original_status`, `_original_tracking_number` and the rest, which recurses
   through the manager without end
   - Anchor: commit `6521f8f2a` (2026-05-01), the docstring of
-    `OrderService.maybe_advance_to_completed`
+    `OrderLifecycleService.maybe_advance_to_completed`
 - `suppress_customer_status_notifications` on chained transitions. A carrier
   DELIVERED that completes the order, a payment that moves it to PROCESSING
   (the confirmation email follows at once) and tracking added from PENDING

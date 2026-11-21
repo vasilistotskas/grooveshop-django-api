@@ -700,7 +700,7 @@ class BoxNowService:
         creating its parcel.
 
         A staff or system order cancel goes on when the courier step is
-        refused (``OrderService.cancel_attached_shipment`` never raises):
+        refused (``OrderLifecycleService.cancel_attached_shipment`` never raises):
         while a creation of uncertain outcome settles, or one is in
         flight. The order is then CANCELED while its shipment still waits
         for a parcel, and a pending retry of the creation would create one,
@@ -806,7 +806,7 @@ class BoxNowService:
     def report_cancel_refused(order_id: int, error: str) -> None:
         """Tell staff that a canceled order's parcel was not canceled.
 
-        The record ``OrderService.cancel_attached_shipment`` leaves when
+        The record ``OrderLifecycleService.cancel_attached_shipment`` leaves when
         the courier refuses an order's cancel: an ERROR line (the
         logged-errors alert) and a staff note on the order. Not the
         creation-failed email: nothing is to be created, and its remedy
@@ -3059,7 +3059,7 @@ class BoxNowService:
         """
         Advance the Order's status based on the BoxNow parcel event.
 
-        Uses ``OrderService.update_order_status`` so signals and history
+        Uses ``OrderLifecycleService.update_order_status`` so signals and history
         logging fire correctly.  Swallows ``InvalidStatusTransitionError``
         with a warning so that an out-of-order or duplicate webhook event
         cannot roll back the already-recorded ``BoxNowParcelEvent``.
@@ -3090,7 +3090,7 @@ class BoxNowService:
         """
         # Lazy imports avoid circular dependencies at startup.
         from order.exceptions import InvalidStatusTransitionError
-        from order.services import OrderService
+        from order.lifecycle.service import OrderLifecycleService
 
         order: Order = shipment.order
         current_status: str = order.status
@@ -3161,7 +3161,7 @@ class BoxNowService:
             and current_status in _PRE_SHIPPED_STATUSES
         ):
             try:
-                OrderService.update_order_status(
+                OrderLifecycleService.update_order_status(
                     order,
                     "SHIPPED",
                     silent_for_customer=new_status == "RETURNED",
@@ -3195,7 +3195,7 @@ class BoxNowService:
             mapped_state,
         )
         try:
-            OrderService.update_order_status(order, new_status)
+            OrderLifecycleService.update_order_status(order, new_status)
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "_apply_order_status_transition: invalid transition for "
@@ -3221,7 +3221,7 @@ class BoxNowService:
         if new_status == "DELIVERED":
             if shipment.payment_mode == BoxNowPaymentMode.COD:
                 cls._mark_cod_order_paid_on_delivery(shipment)
-            OrderService.maybe_advance_to_completed(
+            OrderLifecycleService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
 
@@ -3269,8 +3269,8 @@ class BoxNowService:
         path.
         """
         from order.exceptions import InvalidStatusTransitionError
+        from order.lifecycle.service import OrderLifecycleService
         from order.models.order import Order as _Order
-        from order.services import OrderService
 
         current_status = (
             _Order.objects.filter(pk=order.pk)
@@ -3281,7 +3281,7 @@ class BoxNowService:
             return
         order.status = current_status
         try:
-            OrderService.update_order_status(order, "PROCESSING")
+            OrderLifecycleService.update_order_status(order, "PROCESSING")
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "BoxNow voucher mint: could not advance order=%s PENDING -> "

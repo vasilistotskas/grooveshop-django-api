@@ -28,8 +28,8 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
 from shipping_acs.admin import AcsShipmentAdmin
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -104,7 +104,9 @@ def test_recording_stamps_the_shipment_and_pays_the_order_silently(
 ):
     shipment = _shipment()
 
-    with patch.object(OrderService, "maybe_advance_to_completed") as advance:
+    with patch.object(
+        OrderLifecycleService, "maybe_advance_to_completed"
+    ) as advance:
         AcsService.record_cod_received_outside_acs(
             shipment, user=staff_user, note="Bank transfer 2026-05-30"
         )
@@ -125,7 +127,9 @@ def test_recording_is_a_noop_for_an_order_already_marked_paid(staff_user):
     """Order 73: an admin had already flipped the payment by hand."""
     shipment = _shipment(payment_status=PaymentStatus.COMPLETED)
 
-    with patch.object(OrderService, "maybe_advance_to_completed") as advance:
+    with patch.object(
+        OrderLifecycleService, "maybe_advance_to_completed"
+    ) as advance:
         AcsService.record_cod_received_outside_acs(
             shipment, user=staff_user, note="Paid in cash at the shop"
         )

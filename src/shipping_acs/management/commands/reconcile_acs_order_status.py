@@ -30,7 +30,7 @@ went back on the shelf is a separate, physical question (confirmed with
 the site owner on 2026-09-08 that stock was already correct for the nine
 above). A CANCELED shipment — a voucher retired before the parcel ever
 left — is different: the shared transition routes that order through
-``OrderService.cancel_order``, so stock IS restored, the payment settled
+``OrderLifecycleService.cancel_order``, so stock IS restored, the payment settled
 and the cancellation recorded exactly as a staff cancel would.
 """
 
@@ -191,7 +191,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
                 continue
             # ``values_list``, never ``refresh_from_db(fields=["status"])``
-            # — the same trap ``OrderService.maybe_advance_to_completed``
+            # — the same trap ``OrderLifecycleService.maybe_advance_to_completed``
             # documents. A partial refresh leaves the other columns
             # DEFERRED, and ``Order.__init__`` reads them while it
             # snapshots ``_original_status`` / ``_original_payment_status``

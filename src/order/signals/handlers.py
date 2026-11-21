@@ -36,6 +36,7 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
 from order.models.item import OrderItem
@@ -349,7 +350,7 @@ def handle_order_status_changed(
     )
 
     # Customer-notifications suppression flag (set by
-    # OrderService.suppress_customer_status_notifications for chained
+    # OrderLifecycleService.suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
     # email/toast and a second one ms later would feel like spam, e.g.
     # the DELIVERED → COMPLETED auto-advance). Gates both the email and
@@ -533,7 +534,7 @@ def handle_order_shipped(
     pre_shipped = (OrderStatus.PENDING.value, OrderStatus.PROCESSING.value)
     if order.status in pre_shipped:
         logger.info("Updating order %s status to shipped", order.id)
-        OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.SHIPPED)
     else:
         # Already at/past SHIPPED (e.g. a carrier same-poll
         # PROCESSING→DELIVERED bridge). Skipping the defensive re-bump is
@@ -1888,7 +1889,9 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             )
 
             if order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.PROCESSING
+                )
 
             # Stripe's guidance is to fulfil hosted Checkout Sessions on
             # checkout.session.completed (not payment_intent.succeeded).

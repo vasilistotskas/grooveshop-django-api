@@ -45,13 +45,13 @@ from order.exceptions import (
     ParcelWithCourierError,
 )
 from order.factories.order import OrderFactory
-from order.models.history import OrderHistory
-from order.models.order import Order
-from order.services import (
+from order.lifecycle.service import (
     SHIPMENT_CANCEL_PENDING_FLAG,
-    OrderService,
+    OrderLifecycleService,
     shipment_cancel_wait_minutes,
 )
+from order.models.history import OrderHistory
+from order.models.order import Order
 from pay_way.factories import PayWayFactory
 from shipping.models import ShippingProvider
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -412,7 +412,7 @@ class TestACustomerCancelTheCourierDoesNotConfirm:
         order, outcome = held
 
         with FakeVivaApi() as viva, pytest.raises(outcome.error):
-            OrderService.cancel_order(order, reason="changed mind")
+            OrderLifecycleService.cancel_order(order, reason="changed mind")
 
         assert viva.sent == []
         assert _row(order)["status"] == OrderStatus.PROCESSING
@@ -465,7 +465,7 @@ class TestAFaultOfOursIsNotTheCouriersAnswer:
 
     def test_the_service_raises_it_as_itself(self, order):
         with FakeVivaApi(), pytest.raises(KeyError):
-            OrderService.cancel_order(order, reason="changed mind")
+            OrderLifecycleService.cancel_order(order, reason="changed mind")
 
 
 @pytest.mark.assert_english
@@ -618,7 +618,7 @@ class TestAStaffCancelIsNotBoundByTheCourier:
         order = _acs_order(user=None, on_pickup_list=True)
 
         with FakeVivaApi() as viva:
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="auto", customer_initiated=False
             )
 

@@ -1113,7 +1113,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """Whether the customer's cancel button should be on offer.
 
         A customer cancel asks the courier to take the parcel back
-        before the order changes (``OrderService.cancel_order``), so on
+        before the order changes (``OrderLifecycleService.cancel_order``), so on
         top of the status rule the offer ends once local data shows the
         courier would refuse: an ACS voucher already on an issued pickup
         list, a BoxNow parcel past ``NEW``. Read from local rows only —

@@ -34,7 +34,7 @@ SCHEDULE_PRESETS = {
 
 # Minutes between two runs of ``finish-pending-shipment-cancels``. A name,
 # because staff are told how long a cancel left pending waits at most
-# (``order.services.shipment_cancel_wait_minutes``). It must divide 60.
+# (``order.lifecycle.service.shipment_cancel_wait_minutes``). It must divide 60.
 ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES = 15
 
 # The nightly pg_dump (and the pruning of its output) is production's

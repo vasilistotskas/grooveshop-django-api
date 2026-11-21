@@ -84,6 +84,12 @@ from order.lifecycle.follow_up import (
     has_canceled_shipment,
     last_carrier_event_at,
 )
+from order.lifecycle.service import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
+    OrderLifecycleService,
+    shipment_cancel_wait_minutes,
+)
 from order.models.attribution import OrderAttribution
 from order.models.expense import Expense
 from order.models.history import OrderHistory, OrderItemHistory
@@ -110,12 +116,7 @@ from order.refunds.refund_lines import (
     plan_pieces,
 )
 from order.refunds.service import RefundService
-from order.services import (
-    SHIPMENT_CANCEL_PENDING_FLAG,
-    SHIPMENT_CANCEL_UNANSWERED_KEY,
-    OrderService,
-    shipment_cancel_wait_minutes,
-)
+from order.services import OrderService
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
@@ -1400,8 +1401,8 @@ class OrderAdmin(BaseModelAdmin):
         "uuid",
         # Changed only through the actions below, never the form. A form
         # save wrote ``status`` straight to the row, skipping both the
-        # transition table in ``OrderService.update_order_status`` and
-        # ``OrderService.cancel_order`` — so a CANCELED picked from the
+        # transition table in ``OrderLifecycleService.update_order_status`` and
+        # ``OrderLifecycleService.cancel_order`` — so a CANCELED picked from the
         # dropdown never restored stock (prod orders 242 and 213,
         # 2026-09-08). Every action routes through the service.
         "status",
@@ -2658,7 +2659,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                OrderService.update_order_status(order, target_status)
+                OrderLifecycleService.update_order_status(order, target_status)
                 self.message_user(
                     request,
                     success_message % {"order_id": order.id},
@@ -2694,7 +2695,7 @@ class OrderAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def mark_as_canceled(self, request, queryset):
-        # No outer ``transaction.atomic`` here: ``OrderService.cancel_order``
+        # No outer ``transaction.atomic`` here: ``OrderLifecycleService.cancel_order``
         # is already wrapped in its own atomic, and a batch-wide
         # rollback would undo successful cancels just because one
         # selected row is in a terminal state. Verified by prod admin
@@ -2706,7 +2707,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                canceled, refund_info = OrderService.cancel_order(
+                canceled, refund_info = OrderLifecycleService.cancel_order(
                     order, customer_initiated=False
                 )
                 self.message_user(

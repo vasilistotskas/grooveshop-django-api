@@ -2,7 +2,7 @@
 
 Production orders 242 and 213 (2026-09-08) were canceled by picking
 CANCELED in the change form's status dropdown. The form wrote the column
-straight to the row, so ``OrderService.cancel_order`` never ran: no stock
+straight to the row, so ``OrderLifecycleService.cancel_order`` never ran: no stock
 restored, no reservation released, and the transition table in
 ``update_order_status`` was bypassed too (any status could follow any
 other). The field is now read-only and every transition is an action

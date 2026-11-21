@@ -21,10 +21,10 @@ from rest_framework.test import APIClient
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments.payment_binding import PaymentPurpose
-from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
@@ -237,7 +237,7 @@ class TestRetryPaymentRefusals:
     def test_canceled_order_is_refused(self):
         user = UserAccountFactory()
         order = _stripe_order(user=user, payment_status=PaymentStatus.PENDING)
-        OrderService.cancel_order(order, refund_payment=False)
+        OrderLifecycleService.cancel_order(order, refund_payment=False)
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
         assert order.payment_status == PaymentStatus.CANCELED

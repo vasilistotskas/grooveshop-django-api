@@ -21,13 +21,17 @@ from django.conf import settings
 from django.db.models import Q
 from djmoney.money import Money
 
+from core.cache_backend import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
+    PickupPointCheckUnavailableError,
     ShippingParcelTooLargeError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
 from shipping.interfaces import (
+    PickupPointUnknown,
+    PostalAddress,
     ShippingCarrierInterface,
     get_provider,
     is_registered,
@@ -39,6 +43,15 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+# How long after one checkout resynced a carrier's catalogue for an
+# unknown pickup point another miss refuses at once instead of syncing
+# again: a full catalogue fetch takes seconds, so a bad or malicious id
+# must not be able to start one per request. Per store and carrier (the
+# cache key is tenant-scoped). Ten minutes: a point BOX NOW's widget
+# shows after the 02:00 sync is found by the first resync, and the next
+# chance comes soon enough for a real point added in between.
+PICKUP_POINT_RESYNC_GUARD_SECONDS = 600
 
 
 # Defensive cap on free-text notes that ride along to the courier
@@ -69,6 +82,55 @@ def sanitize_delivery_notes(value: object) -> str:
     return text[:DELIVERY_NOTES_MAX_LEN]
 
 
+# Between the address line 2 and the customer's note in one notes field.
+DELIVERY_NOTES_SEPARATOR = " | "
+
+
+@dataclass(frozen=True, slots=True)
+class CourierNotes:
+    """The notes a voucher carries: the floor, the address line 2, then
+    the customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
+
+    For a courier whose recipient address field is the street alone (ACS's
+    ``Recipient_Address``: "the street without the area or place"), the
+    flat or floor rides in the free-text notes. The floor and the address
+    line are never cut (both are short: a label, and a field capped well
+    under the limit); the customer's note is cut first to make room. Each
+    part is sanitised as :func:`sanitize_delivery_notes` does.
+    """
+
+    address_line_2: str
+    customer_notes: str
+    floor: str = ""
+
+    def _parts(self) -> tuple[str, str, str]:
+        """The floor, the address line and the customer's note, each as
+        :attr:`sent` carries it."""
+        floor = sanitize_delivery_notes(self.floor)
+        line = sanitize_delivery_notes(self.address_line_2)
+        notes = sanitize_delivery_notes(self.customer_notes)
+        head = DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, line) if p)
+        if head and notes:
+            room = (
+                DELIVERY_NOTES_MAX_LEN
+                - len(head)
+                - len(DELIVERY_NOTES_SEPARATOR)
+            )
+            notes = notes[:room].rstrip() if room > 0 else ""
+        return floor, line, notes
+
+    @property
+    def sent(self) -> str:
+        """The text the courier receives."""
+        return DELIVERY_NOTES_SEPARATOR.join(p for p in self._parts() if p)
+
+    @property
+    def customer_part(self) -> str:
+        """The customer's note as :attr:`sent` carries it: cut to make room
+        for the floor and the address line, not cut again on its own."""
+        return self._parts()[2]
+
+
 @dataclass(frozen=True, slots=True)
 class ShippingCharge:
     """What a shipping option costs a cart, and what made it free.
@@ -88,6 +150,158 @@ class ShippingService:
     # ------------------------------------------------------------------
     # Lookup
     # ------------------------------------------------------------------
+
+    @classmethod
+    def pickup_point_address(
+        cls,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names, from the
+        carrier's catalogue, resyncing it once when the point is missing.
+
+        The storefront picks a BOX NOW locker in BOX NOW's own widget
+        (live data) while the catalogue syncs daily, so a new locker can
+        be missing for up to a day; an ACS station can be missing through
+        the gateway or a stale cache. On a miss the catalogue is fetched
+        again through the scheduled sync's own path
+        (``refresh_pickup_points``), before any transaction or lock, and
+        read once more. The point must be deliverable
+        (``deliverable_pickup_point``: held, active, in the order's
+        country); a withdrawn one counts as missing. No resync runs where
+        the store does not deliver to that kind in that country
+        (``active_rate``), and at most one per store and carrier in
+        ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
+        at once. A resync that fails or passes its deadline
+        (``_resync_within_deadline``) is logged and refused. Raises
+        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``, or
+        ``PickupPointCheckUnavailableError`` when the guard's cache is down
+        (no resync, nothing judged); never answers with any other address.
+        """
+        from django.core.cache import cache
+
+        carrier = get_provider(provider_code)
+        try:
+            return carrier.deliverable_pickup_point(
+                location, country_code=country_code
+            )
+        except PickupPointUnknown:
+            pass
+        # A store that cannot deliver to that kind in that country refuses
+        # anyway: no carrier is asked for it.
+        try:
+            cls.active_rate(
+                provider_code=provider_code,
+                kind=ShippingKind.PICKUP_POINT,
+                country_code=country_code,
+            )
+        except ShippingUnavailableError as e:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup points are not offered in "
+                f"{country_code}"
+            ) from e
+        guard = f"shipping:pickup-point-resync:{provider_code}"
+        try:
+            acquired = cache.add(
+                guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS
+            )
+        except REDIS_UNAVAILABLE as e:
+            # ``CustomCache.add`` raises while Redis is down: without the
+            # guard nothing bounds the resyncs, so none runs.
+            logger.warning(
+                "No resync of the %s catalogue for pickup point %s: the "
+                "cache holding its guard is unavailable",
+                provider_code,
+                dict(location),
+                exc_info=True,
+            )
+            raise PickupPointCheckUnavailableError(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue cannot be resynced without the cache"
+            ) from e
+        if not acquired:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue was resynced in the last "
+                f"{PICKUP_POINT_RESYNC_GUARD_SECONDS} s"
+            )
+        cls._resync_within_deadline(
+            carrier, provider_code, location, country_code=country_code
+        )
+        return carrier.deliverable_pickup_point(
+            location, country_code=country_code
+        )
+
+    @staticmethod
+    def _resync_within_deadline(
+        carrier: ShippingCarrierInterface,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> None:
+        """Run the carrier's resync, waiting at most
+        ``PICKUP_POINT_RESYNC_TIMEOUT_SECONDS`` for it.
+
+        The sync runs in a daemon thread of its own, on the request's
+        store schema (the pattern of ``agent.outbox``'s event call),
+        because a carrier client has no deadline for a whole sync
+        (each call retries within its own timeout, so a sync can take
+        minutes) and the order call has callers that wait seconds. Past
+        the deadline the order is refused; the thread finishes the sync,
+        so the next order finds the point. A failure is logged and
+        refused alike.
+        """
+        import threading
+
+        from django.db import connection
+        from django_tenants.utils import schema_context
+
+        schema = connection.schema_name
+        failure: list[BaseException] = []
+
+        def resync() -> None:
+            # A thread of its own outlives a request that stops waiting:
+            # it sets its store's schema, logs what goes wrong (nobody may
+            # read its result), and closes the connection it opened.
+            try:
+                with schema_context(schema):
+                    carrier.refresh_pickup_points(country_code=country_code)
+            except Exception as error:
+                logger.exception(
+                    "Resync of the %s catalogue for pickup point %s failed",
+                    provider_code,
+                    dict(location),
+                )
+                failure.append(error)
+            finally:
+                connection.close()
+
+        # The guard (``pickup_point_address``) is taken before this thread
+        # starts, so requests that stop waiting never run two syncs.
+        worker = threading.Thread(
+            target=resync, name="pickup-point-resync", daemon=True
+        )
+        worker.start()
+        worker.join(settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
+        if worker.is_alive():
+            logger.warning(
+                "Resync of the %s catalogue for pickup point %s did not "
+                "finish within %s s; the order is refused and the sync "
+                "goes on",
+                provider_code,
+                dict(location),
+                settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS,
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue resync passed its deadline"
+            )
+        if failure:
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue could not be resynced"
+            ) from failure[0]
 
     @classmethod
     def adapter_for(cls, provider_code: str):
@@ -233,6 +447,60 @@ class ShippingService:
             if (rule := adapter.canceled_shipment_q()) is not None
         ]
         return reduce(operator.or_, rules) if rules else None
+
+    @classmethod
+    def moves_by_carrier(cls, order: Order) -> bool:
+        """Whether a carrier takes the order's parcel: its provider keeps a
+        shipment of its own (a voucher, a locker parcel). The merchant's
+        own ``flat_rate`` delivery keeps none."""
+        adapter = cls.adapter_for_order(order)
+        return (
+            adapter is not None
+            and adapter.shipment_for_order(order) is not None
+        )
+
+    @classmethod
+    def carrier_holds_the_parcel(cls, order: Order) -> bool:
+        """Whether the order's carrier has accepted its parcel (a voucher or
+        parcel at the carrier, ``holds_the_parcel``). A tracking number
+        typed on the order, or a shipment row written at checkout, is not
+        that."""
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return False
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return False
+        # As stored: the order may hold the row cached from before the
+        # carrier path saved the voucher or parcel on its own (locked)
+        # copy and then recorded the tracking number on the order.
+        return adapter.holds_the_parcel(
+            type(shipment)._default_manager.get(pk=shipment.pk)
+        )
+
+    @classmethod
+    def delivery_address(cls, order: Order) -> PostalAddress | None:
+        """Where the order's carrier takes the parcel, or ``None`` when the
+        order does not move through a carrier (no provider, or one with no
+        shipment of its own, like the merchant's ``flat_rate`` delivery).
+
+        The pickup point's address for a locker or station order
+        (:meth:`ShippingCarrierInterface.pickup_point_address`), the
+        buyer's shipping address otherwise. Raises ``ValueError`` when the
+        pickup point's address is not known.
+        """
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return None
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return None
+        return adapter.pickup_point_address(shipment) or PostalAddress(
+            street=order.street,
+            street_number=order.street_number,
+            postal_code=order.zipcode,
+            city=order.city,
+        )
 
     @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:

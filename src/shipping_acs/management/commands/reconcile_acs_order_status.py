@@ -1,7 +1,7 @@
 """Replay the order-status transition for shipments the poll can't revisit.
 
 ``poll_acs_tracking`` only dispatches for NON-terminal shipments
-(``shipping_acs/tasks.py``: it excludes PENDING_CREATION, DELIVERED,
+(``src/shipping_acs/tasks.py``: it excludes PENDING_CREATION, DELIVERED,
 RETURNED, CANCELED and LOST). That is correct — a delivered parcel has
 nothing left to report — but it means the order status is applied exactly
 once, at the moment the shipment reaches its terminal state. If that

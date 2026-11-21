@@ -114,7 +114,7 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
     ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
     with the plan flag inside ``TenantConfigSerializer``, and so is every
     feature switch in ``TenantConfig.features`` and every preference in
-    ``TenantConfig.preferences`` (``tenant/features.py``)
+    ``TenantConfig.preferences`` (``src/tenant/features.py``)
     — without this bump a merchant toggle would sit behind the resolve
     cache for the full TTL. Setting rows live in the TENANT schema, so
     the current connection schema identifies whose generation to bump.

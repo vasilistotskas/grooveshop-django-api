@@ -17,6 +17,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 
@@ -159,7 +160,7 @@ class TestRefundOrderConcurrencyGuard:
             "order.payments.payment.get_payment_provider"
         ) as mock_provider:
             with pytest.raises(PaymentError):
-                OrderService.refund_order(order, reason="dup")
+                RefundService.refund_order(order, reason="dup")
 
             # The locked ledger blocked it: no second provider refund.
             mock_provider.assert_not_called()
@@ -178,7 +179,7 @@ class TestRefundOrderConcurrencyGuard:
             "order.payments.payment.get_payment_provider"
         ) as mock_provider:
             with pytest.raises(PaymentError, match=r"\(20\.00\)"):
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, amount=Money("30.00", "EUR"), reason="dup"
                 )
 

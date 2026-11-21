@@ -17,12 +17,9 @@ from rest_framework.test import APIClient
 
 from cart.agent_token import mint_cart_token
 from cart.models import Cart
-from core.api.throttling import (
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-)
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.throttles import PaymentAttemptAnonThrottle, PaymentAttemptThrottle
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from tests.utils.fake_stripe import fake_stripe

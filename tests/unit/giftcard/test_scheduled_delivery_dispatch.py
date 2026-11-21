@@ -12,7 +12,7 @@ never delivered and never retried (``delivered_at`` stayed NULL, so the
 same rows failed again every day).
 
 Immediate delivery is skipped for scheduled cards
-(``giftcard/services.py``), making this sweep their only delivery path.
+(``src/giftcard/services.py``), making this sweep their only delivery path.
 
 The suite runs with multi-tenancy disabled (``tests/conftest.py``), so
 the schema rebinding itself cannot be exercised here — assert the

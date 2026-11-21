@@ -134,7 +134,7 @@ class LoyaltyViewSet(BaseModelViewSet):
     # history or redemption. IsAuthenticated covers the rest: the
     # queryset filters by request.user and lives in the tenant schema,
     # so an authenticated caller here is by construction a customer of
-    # THIS store (see tenant/membership.py).
+    # THIS store (see src/tenant/membership.py).
     permission_classes = [*feature_gates("loyalty"), IsAuthenticated]
     serializers_config = serializers_config
 

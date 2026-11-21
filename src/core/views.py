@@ -8,7 +8,7 @@ from allauth.mfa.adapter import DefaultMFAAdapter, get_adapter
 from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import translation
 from django.views import View
@@ -17,6 +17,16 @@ from django.views.i18n import set_language as django_set_language
 from core.utils.files import sanitize_filename
 
 logger = logging.getLogger(__name__)
+
+
+def device_flow_not_offered(request, *args, **kwargs):
+    """The OAuth device flow's routes, on every issuer.
+
+    No client may register its grant (``agent.oidc.CLIENT_GRANT_TYPES``),
+    and its pages sign people in through allauth's account login, which
+    knows neither the staff lockouts nor the superuser's second factor.
+    """
+    raise Http404
 
 
 def set_language(request):
@@ -156,7 +166,7 @@ def upload_image(request):
     # Windows.
     saved_path = storage.save(f"uploads/tinymce/{sanitized_name}", file_obj)
 
-    # MEDIA_URL is absolute in every environment (settings/storage.py), so the
+    # MEDIA_URL is absolute in every environment (settings.storage), so the
     # storage URL is the editor's image location as is.
     return JsonResponse(
         {

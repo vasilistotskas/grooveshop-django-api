@@ -35,7 +35,7 @@ CELERY_TASK_TIME_LIMIT = 1800
 #
 # Nothing in this codebase reads a task's return value: there is no
 # AsyncResult, no .get(), no chord and no group. The one chain()
-# (core/tasks.py) links an immutable .si() signature, which celery
+# (src/tenant/tasks.py) links an immutable .si() signature, which celery
 # dispatches from ``task_request.chain`` before it ever touches the
 # backend (celery/app/trace.py). So every stored success was write
 # amplification nobody consumed — 2,937 keys a day in production,

@@ -9,7 +9,24 @@ from os import getenv
 from redis.backoff import NoBackoff
 from redis.retry import Retry
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
+
+
+def stopped_default_cache(default: dict) -> dict:
+    """``CACHES["default"]`` (given as ``default``) pointed at a port
+    nothing listens on, for ``override_settings(CACHES=...)``: the whole
+    request then meets the outage, every caller of the default cache
+    alike, as a real Redis outage does."""
+    return {
+        **default,
+        "BACKEND": "core.cache_backend.CustomCache",
+        "LOCATION": "redis://127.0.0.1:1/0",
+        "OPTIONS": {
+            "retry": Retry(NoBackoff(), 0),
+            "socket_connect_timeout": 0.2,
+            "health_check_interval": 0,
+        },
+    }
 
 
 def stopped_cache() -> CustomCache:

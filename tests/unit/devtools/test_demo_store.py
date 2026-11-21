@@ -1,6 +1,6 @@
 """Contract tests for the demo-store dataset.
 
-``devtools/demo_store.py`` is a large hand-authored dataset applied to
+``src/devtools/demo_store.py`` is a large hand-authored dataset applied to
 non-production tenants by ``manage.py seed_demo_store``. Nothing else
 type-checks it: a review pointing at a product slug that was renamed,
 or a wholesale net price above retail, fails silently at runtime and
@@ -428,6 +428,23 @@ class TestRicherCatalogueSeed:
         )
         assert rates == {STANDARD_VAT_RATE}
 
+    def test_a_deleted_demo_product_comes_back_with_the_next_seed(
+        self, seeded, monkeypatch
+    ):
+        """The dataset is code: a product staff deleted (a soft delete) is
+        restored by the next run, or the offers that target it stop the
+        seed at the promotions step."""
+        from product.models import Product
+
+        slug = demo_store.PRODUCTS[0].slug
+        Product.objects.filter(slug=slug).delete()
+
+        demo_store.seed_products()
+
+        product = Product.objects.get(slug=slug)
+        assert product.is_deleted is False
+        assert product.deleted_at is None
+
     def test_a_store_without_the_standard_row_is_not_seeded(
         self, demo_tenant, monkeypatch
     ):
@@ -435,7 +452,7 @@ class TestRicherCatalogueSeed:
         from vat.models import Vat
 
         monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
-        Product.objects.filter(slug__startswith="demo-").delete()
+        Product.objects.filter(slug__startswith="demo-").hard_delete()
         Vat.objects.filter(value=24).delete()
 
         with pytest.raises(Vat.DoesNotExist):

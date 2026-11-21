@@ -23,7 +23,7 @@ from order.tasks import (
 )
 from pay_way.factories import PayWayFactory
 from tests.utils.dispatch import assert_published_once
-from tests.utils.mydata import issuable, mydata_enabled
+from tests.utils.mydata import issuable, mydata_enabled, registered
 
 
 def _sell_something(order):
@@ -72,7 +72,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -109,7 +109,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string", return_value="content")
+    @patch("emails.render.render_template", return_value="content")
     def test_confirmation_send_failure_schedules_a_retry(
         self, mock_render, mock_email, mock_cache
     ):
@@ -134,7 +134,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string", return_value="content")
+    @patch("emails.render.render_template", return_value="content")
     def test_confirmation_send_gives_up_after_its_retries(
         self, mock_render, mock_email, mock_cache
     ):
@@ -301,7 +301,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         ``send_order_confirmation_email``) must surface the active
         tenant's ``logo_light_url`` as ``SITE_LOGO_URL`` — previously no
         live send included that key, so the template's per-tenant logo
-        branch was dead code (see ``core/utils/email_context.py``).
+        branch was dead code (see ``src/core/utils/email_context.py``).
         """
         order = _quiet_order(
             email="logo-tenant@example.com",
@@ -341,7 +341,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertIn("logo-dark.svg", html_body)
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -377,7 +377,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -457,7 +457,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -566,7 +566,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -735,7 +735,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         _sell_something(self.order)
         with mydata_enabled(auto_submit=False):
-            generate_invoice(issuable(self.order))
+            registered(generate_invoice(issuable(self.order)))
 
         # Clear any emails the order_created signal already sent so we
         # only assert on the invoice email below.
@@ -815,7 +815,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         )
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -885,7 +885,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         return_value=["merchant@store.test"],
     )
     @patch("emails.sender.from_address", return_value="orders@store.test")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
     )

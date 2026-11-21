@@ -17,14 +17,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    SearchThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from search.models import SearchQuery
 from search.params import VALID_LANGUAGE_CODES
 from search.serializers import TrendingSearchResponseSerializer
+from search.throttles import SearchThrottle
 from tenant.permissions import IsCatalogueEnabled
 
 _TRENDING_CACHE_TTL_SECONDS = 300  # 5 minutes
@@ -34,7 +31,7 @@ _TRENDING_MAX_LIMIT = 20
 _TRENDING_WINDOW_HOURS = 24
 
 
-# The `ty: ignore` below is explained in `search/views/blog.py`.
+# The `ty: ignore` below is explained in `src/search/views/blog.py`.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     operation_id="listTrendingSearches",
     tags=["Search"],

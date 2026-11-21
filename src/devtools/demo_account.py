@@ -17,7 +17,7 @@ Because the credentials are public, the account is shared and hostile
 input is expected:
 
   - the credential mutations that could cost everyone the login are
-    refused server-side (`core/demo_account.py`);
+    refused server-side (`src/core/demo_account.py`);
   - everything a visitor CAN change — orders, cart, reviews, comments,
     addresses, favourites, points, the gift card's balance — is wiped
     and rebuilt by `reset_demo_account`, which the nightly task runs.
@@ -36,7 +36,7 @@ What each account gets:
     publishes — there is no third credential.
 
 Orders are written with `bulk_create` and backdated, never through
-`OrderService` or `save()` (see `devtools/demo_orders.py`). A seeded order
+`OrderService` or `save()` (see `src/devtools/demo_orders.py`). A seeded order
 must not send a confirmation email, must not move stock, and must not
 enter the state machine — it is a fixture, not a sale. The same goes for
 everything that hangs off one: the carrier rows are written directly and
@@ -116,7 +116,7 @@ class OrderRow:
     #: EUR, as a string so the dataset never carries a float.
     shipping_price: str = "3.50"
     customer_notes: str = ""
-    #: A coupon code from ``devtools/demo_promotions.py``; the order
+    #: A coupon code from ``src/devtools/demo_promotions.py``; the order
     #: carries its discount and its redemption row.
     promotion_code: str = ""
     #: Spends ``GIFT_CARD_SPENT`` of the demo gift card.
@@ -169,7 +169,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
 #: two Greek addresses it always had.
 WHOLESALE_ADDRESSES: tuple[AddressRow, ...] = ADDRESSES[:2]
 
-#: Favourites are product slugs from ``devtools/demo_catalogue.py``. A
+#: Favourites are product slugs from ``src/devtools/demo_catalogue.py``. A
 #: slug that no longer exists is skipped rather than failing the seed —
 #: the catalogue is edited far more often than this list.
 FAVOURITE_SLUGS: tuple[str, ...] = (
@@ -182,7 +182,7 @@ FAVOURITE_SLUGS: tuple[str, ...] = (
 )
 
 #: Where the parcels go. The lockers are named, never written to
-#: ``BoxNowLocker`` (see ``devtools/demo_shipments.py``).
+#: ``BoxNowLocker`` (see ``src/devtools/demo_shipments.py``).
 _ACS_STATION = "ACS Θεσσαλονίκη — Κέντρο"
 _ACS_STATION_ATHENS = "ACS Αθήνα — Κέντρο"
 _LOCKER_THESSALONIKI = ShipmentRow(
@@ -1433,7 +1433,7 @@ def reset_demo_account() -> dict[str, int]:
     from devtools.demo_store import _current_tenant_is_demo
 
     # The wipe below deletes customer orders. The fanout only ever sends
-    # ``is_demo`` schemas here (``tenant/tasks.py``), but a reset that
+    # ``is_demo`` schemas here (``src/tenant/tasks.py``), but a reset that
     # ran against a real merchant — a hand-run task, a wrong schema —
     # would delete that merchant's guest checkouts, so the store is
     # checked again at the point of deletion.
@@ -1512,7 +1512,7 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
     The stock goes back with a queryset ``update()`` plus the INCREMENT
     ``StockLog`` row ``StockManager.increment_stock`` would write — not
     through ``increment_stock`` itself. That method saves the product,
-    and the product's history signal (``product/signals.py``) turns a
+    and the product's history signal (``src/product/signals.py``) turns a
     0 → positive stock into ``product_back_in_stock``, which emails every
     restock subscriber and pushes a live notification to favouriters;
     the save also queues a recommendation recompute. A reset that must

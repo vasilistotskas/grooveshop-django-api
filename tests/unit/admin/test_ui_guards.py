@@ -2,7 +2,7 @@
 
 The 2026-07 admin overhaul replaced every hand-rolled Tailwind pill,
 emoji badge and inline style with unfold-native ``@display`` columns
-(see ``admin/displays.py``). These guards keep it that way: a new
+(see ``src/admin/displays.py``). These guards keep it that way: a new
 admin column must use the shared vocabulary, not reintroduce ad-hoc
 markup that drifts from the theme and breaks dark mode.
 """
@@ -23,7 +23,7 @@ ADMIN_FILES = (
         for p in SRC_DIR.glob("*/admin.py")
         if ".venv" not in p.parts
         and "node_modules" not in p.parts
-        # ``settings/admin.py`` is the Unfold and TinyMCE configuration,
+        # ``src/settings/admin.py`` is the Unfold and TinyMCE configuration,
         # not an app's admin: its colours and styles are settings.
         and p.parent.name != "settings"
     )

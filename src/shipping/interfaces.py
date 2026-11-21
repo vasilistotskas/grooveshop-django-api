@@ -20,11 +20,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
+
+from django.utils.translation import gettext_lazy as _
 
 from shipping.exceptions import ShippingProviderNotFoundError
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from decimal import Decimal
 
     from django.db.models import Q
@@ -33,6 +37,42 @@ if TYPE_CHECKING:
     from pay_way.enum.settlement import PaySettlement
     from shipping.enum import ShippingKind
     from shipping.models import ShippingRate
+
+
+@dataclass(frozen=True)
+class PostalAddress:
+    """A place goods are loaded at or delivered to, as AADE's
+    ``AddressType`` holds one: the street and its number are optional,
+    the postcode and the city are not."""
+
+    street: str
+    street_number: str
+    postal_code: str
+    city: str
+
+
+# The refusals of a pickup point at checkout, one text each for every
+# carrier: the serializer's field errors and the carriers'
+# ``validate_order_payload`` say the same.
+PICKUP_POINT_UNAVAILABLE = _(
+    "This pickup point is not available. Choose another one."
+)
+PICKUP_POINT_IN_ANOTHER_COUNTRY = _(
+    "This pickup point is not in the delivery country. Choose another one."
+)
+
+
+class PickupPointInAnotherCountry(ValueError):
+    """The pickup point is in another country than the order's: no order
+    is sent there under the order's country (``deliverable_pickup_point``).
+    A resync cannot change that, so none runs."""
+
+
+class PickupPointUnknown(ValueError):
+    """The carrier's catalogue does not hold the address of the pickup
+    point a shipment goes to, or not of that exact point. Its daily sync
+    may add it, so a receipt that names it is tried again
+    (``order.tasks.retry_receipts_with_mydata``)."""
 
 
 class ShippingCarrierInterface(ABC):
@@ -53,6 +93,13 @@ class ShippingCarrierInterface(ABC):
     # carrier doesn't add any per-order payload (e.g. flat home-delivery
     # carriers without locker selection).
     payload_keys: ClassVar[tuple[str, ...]] = ()
+
+    # The ``payload_keys`` that name the pickup point the shopper chose
+    # (a locker, a station). The checkout quote takes them as order
+    # creation does, and the cart digest covers them
+    # (``order.checkout.quote.ShippingChoice``), so an order goes to the
+    # pickup point it was quoted for.
+    location_keys: ClassVar[tuple[str, ...]] = ()
 
     @abstractmethod
     def create_shipment(
@@ -126,6 +173,111 @@ class ShippingCarrierInterface(ABC):
     @abstractmethod
     def shipment_for_order(self, order: Order) -> Any | None:
         """Return the provider's shipment row attached to ``order`` or None."""
+
+    @abstractmethod
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """Whether the carrier has accepted the parcel of *shipment*: its
+        voucher or parcel exists at the carrier, not only the local row a
+        checkout writes before asking for one. What a receipt with
+        movement indication waits for (``order.accounting.invoicing.
+        receipt_issuable``)."""
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress | None:
+        """The address of the pickup point (a locker, a station) the parcel
+        goes to, or ``None`` when it goes to the buyer's own address.
+
+        The receipt's delivery address (``order.accounting.movement``).
+        Raises ``ValueError`` when the parcel goes to a pickup point whose
+        address is not known.
+        """
+        return None
+
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
+        """Remove the recipient's data from this carrier's records of the
+        given orders, for GDPR erasure (``order.privacy``): the copies of
+        the order's name, address, phone and notes it keeps on rows of its
+        own, which survive the order's anonymisation. *buyer_values* are
+        each order's email, name, phone and typed cancel reason, to redact
+        from free text staff wrote (empty when the order was erased
+        earlier). Returns a tally of the rows touched, by kind.
+
+        Default: nothing to remove, for a carrier that keeps no records of
+        its own (the flat rate).
+        """
+        return {}
+
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders this carrier wrote a record of since *since*, read
+        from the rows written since then: what the daily sweep of erased
+        orders clears again (``order.privacy.erase_late_carrier_data``),
+        so data that arrives after an erasure, the parcel's last event
+        included, does not stay.
+
+        Default: none, for a carrier that keeps no records of its own.
+        """
+        return set()
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What this carrier reported about the recipient of each of the
+        given orders and :meth:`erase_recipient_data` clears, for a data
+        export (``user.services.gdpr``), by order id. The copies of the
+        order's own data it keeps are not repeated: the export lists the
+        order.
+
+        Default: nothing, for a carrier that keeps no records of its own.
+        """
+        return {}
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The address of the pickup point ``location`` names (this
+        carrier's ``location_keys``), from its catalogue now.
+
+        A pickup-point order is delivered there, so checkout stores it as
+        the order's delivery address (``OrderCreateFromCartSerializer``).
+        Raises ``PickupPointUnknown`` when the catalogue does not hold it;
+        a carrier with no pickup points holds none.
+        """
+        raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
+
+    def pickup_point_errors(
+        self, field: str, location: Mapping[str, str], *, country_code: str
+    ) -> dict[str, list[str]]:
+        """``validate_order_payload``'s errors for the point *location*
+        names: :meth:`deliverable_pickup_point`'s rule, as field errors."""
+        try:
+            self.deliverable_pickup_point(location, country_code=country_code)
+        except PickupPointInAnotherCountry:
+            return {field: [str(PICKUP_POINT_IN_ANOTHER_COUNTRY)]}
+        except PickupPointUnknown:
+            return {field: [str(PICKUP_POINT_UNAVAILABLE)]}
+        return {}
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names when an order
+        for *country_code* can be sent there now: the catalogue holds it,
+        it is active (a sync marks a point the carrier withdrew inactive
+        and keeps its row), and it is in that country.
+
+        The order-time rule; :meth:`address_of_pickup_point` stays the
+        receipt's, which must still name a point withdrawn after the order.
+        Raises ``PickupPointUnknown`` for a point missing or withdrawn (a
+        resync may bring it back) and ``PickupPointInAnotherCountry``.
+        """
+        raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
+
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """Fetch the carrier's catalogue of pickup points again, now,
+        through the path its scheduled sync takes, for checkout to find
+        a point the last sync did not hold (``ShippingService.
+        pickup_point_address``). A carrier with no pickup points has none
+        to fetch."""
+        return
 
     @abstractmethod
     def serialize_shipment(

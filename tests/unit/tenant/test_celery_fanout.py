@@ -89,7 +89,8 @@ class TestSuspendedStores:
     ``include_suspended`` job ever reached a suspended store (#753).
     """
 
-    #: The jobs a suspended store still gets: the retention sweeps, the work
+    #: The jobs a suspended store still gets: the retention sweeps, the
+    #: erasure of carrier data that reached an erased order late, the work
     #: a customer's money or parcel waits on, and the agent outbox sweep,
     #: whose attempts hold a suspended store's events.
     INCLUDE_SUSPENDED = {
@@ -107,12 +108,14 @@ class TestSuspendedStores:
         "order.tasks.finish_pending_shipment_cancels",
         "order.tasks.purge_expired_pending_payment_fees",
         "order.tasks.reconcile_pending_refunds",
+        "order.tasks.retry_receipts_with_mydata",
         "product.tasks.purge_unconfirmed_guest_alerts",
         "recommendation.tasks.purge_expired_recommendation_events",
         "shipping_acs.tasks.purge_expired_acs_api_calls",
         "shipping_acs.tasks.purge_expired_acs_tracking_events",
         "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
         "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        "user.tasks.erase_late_carrier_data",
         "user.tasks.purge_unconfirmed_guest_subscriptions",
     }
 
@@ -401,7 +404,7 @@ class TestBeatScheduleTenantCoverage:
         # reached through their own fanout entry.
         "emails.tasks.purge_expired_email_logs",
         # Billing terms + dunning bookkeeping are public-schema Tenant
-        # rows; the cycle never enters a tenant schema (tenant/billing.py).
+        # rows; the cycle never enters a tenant schema (src/tenant/billing.py).
         "tenant.tasks.process_tenant_billing",
         # TenantArchive rows live in the public schema BECAUSE the
         # schemas they describe have been dropped — there is no tenant

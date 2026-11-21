@@ -312,10 +312,22 @@ msgstr[0] "%(count)s order · %(share)s"
 msgstr[1] "%(count)s orders · %(share)s"
 
 #, python-format
+msgid "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgid_plural "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+msgstr[0] "%(count)s parcel left before myDATA registered its receipt, because myDATA did not answer. The receipt is sent again automatically, with AADE's loss-of-connection indication, until it is registered."
+msgstr[1] "%(count)s parcels left before myDATA registered their receipts, because myDATA did not answer. The receipts are sent again automatically, with AADE's loss-of-connection indication, until they are registered."
+
+#, python-format
 msgid "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgid_plural "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[0] "%(count)s product selected: %(active_count)s active, %(inactive_count)s inactive."
 msgstr[1] "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
+
+#, python-format
+msgid "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgid_plural "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
+msgstr[0] "%(count)s receipt of an order canceled before its parcel left is still waiting to be canceled in myDATA. It is canceled automatically once myDATA answers; if myDATA refused the receipt or the store's credentials, the order's notes say what to do."
+msgstr[1] "%(count)s receipts of orders canceled before their parcels left are still waiting to be canceled in myDATA. They are canceled automatically once myDATA answers; if myDATA refused a receipt or the store's credentials, its order's notes say what to do."
 
 #, python-format
 msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
@@ -858,8 +870,14 @@ msgstr "A note is required."
 msgid "A password was set on your account"
 msgstr "A password was set on your account"
 
+msgid "A payment for this order was received and is being confirmed. Do not pay again."
+msgstr "A payment for this order was received and is being confirmed. Do not pay again."
+
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "A payment intent is required — the applied discounts do not cover the order total."
+
+msgid "A pickup-point order is delivered to its point's address, which can't be changed."
+msgstr "A pickup-point order is delivered to its point's address, which can't be changed."
 
 msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 msgstr "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
@@ -880,6 +898,9 @@ msgstr "A publish can be scheduled at most %(days)s days ahead."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
+
+msgid "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
+msgstr "A receipt for a courier or locker order must carry the movement of goods and be issued before the courier collects the parcel. Until the dispatch point is set, receipts are issued when the order ships, without it. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street)."
 
 msgid "A refund by lines is worth what its lines are worth: do not give an amount with them."
 msgstr "A refund by lines is worth what its lines are worth: do not give an amount with them."
@@ -1473,6 +1494,9 @@ msgstr "Actor email"
 msgid "Add synonyms, products or content for these."
 msgstr "Add synonyms, products or content for these."
 
+msgid "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+msgstr "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+
 msgid "Add tracking information to an existing order"
 msgstr "Add tracking information to an existing order"
 
@@ -1756,6 +1780,9 @@ msgstr "An error occurred while processing your request."
 
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
+
+msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
+msgstr "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
@@ -2723,6 +2750,9 @@ msgstr "Cancel"
 msgid "Cancel ACS voucher"
 msgstr "Cancel ACS voucher"
 
+msgid "Cancel Held For Staff At"
+msgstr "Cancel Held For Staff At"
+
 msgid "Cancel Requested At"
 msgstr "Cancel Requested At"
 
@@ -3232,6 +3262,9 @@ msgstr "Choose a new password for %(store)s"
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
 
+msgid "Choose a pickup point."
+msgstr "Choose a pickup point."
+
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
@@ -3257,11 +3290,11 @@ msgctxt "legal details alert"
 msgid "City"
 msgstr "City"
 
-msgid "City name"
-msgstr "City name"
-
 msgid "City name for nearest-locker lookup"
 msgstr "City name for nearest-locker lookup"
+
+msgid "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
+msgstr "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
 
 msgid "Claim"
 msgstr "Claim"
@@ -3792,9 +3825,6 @@ msgstr "Create a feedback submission"
 msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
 msgstr "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
 
-msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
-msgstr "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
-
 msgid "Create a hosted checkout session for an order"
 msgstr "Create a hosted checkout session for an order"
 
@@ -4250,6 +4280,9 @@ msgstr "Delivery flag"
 
 msgid "Delivery kind"
 msgstr "Delivery kind"
+
+msgid "Delivery place"
+msgstr "Delivery place"
 
 msgid "Delivery products"
 msgstr "Delivery products"
@@ -4826,6 +4859,9 @@ msgstr "Enter the code from your authenticator app for %(account)s, or one of yo
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 
+msgid "Enter the company's address: a pickup point is not one."
+msgstr "Enter the company's address: a pickup point is not one."
+
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 
@@ -4917,6 +4953,9 @@ msgstr "Events"
 msgid "Events received"
 msgstr "Events received"
 
+msgid "Every country, in one list"
+msgstr "Every country, in one list"
+
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 
@@ -4925,6 +4964,9 @@ msgstr "Every delivery the store offers to the request's country, priced as an o
 
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
+
+msgid "Every gift card linked to my account, in one list"
+msgstr "Every gift card linked to my account, in one list"
 
 msgid "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
 msgstr "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
@@ -6990,8 +7032,15 @@ msgstr "Good news! Your order #%(order_id)s has been shipped and is on its way t
 msgid "Goods"
 msgstr "Goods"
 
+#, python-format
+msgid "Goods and charges at %(rate)s%% VAT"
+msgstr "Goods and charges at %(rate)s%% VAT"
+
 msgid "Goods claimed"
 msgstr "Goods claimed"
+
+msgid "Goods moved"
+msgstr "Goods moved"
 
 msgid "Goods not yet settled"
 msgstr "Goods not yet settled"
@@ -7412,6 +7461,9 @@ msgstr "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` 
 
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 country code."
+
+msgid "ISO 3166-1 alpha-2 country of the locker."
+msgstr "ISO 3166-1 alpha-2 country of the locker."
 
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
@@ -8268,6 +8320,9 @@ msgstr "Live key counts are unavailable — the cache backend did not answer. Th
 msgid "Live promotion"
 msgstr "Live promotion"
 
+msgid "Loading place"
+msgstr "Loading place"
+
 msgid "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 msgstr "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 
@@ -8751,8 +8806,8 @@ msgstr "Meta Pixel ID"
 msgid "Meta Pixel ID must contain digits only (e.g. '123456789012345')."
 msgstr "Meta Pixel ID must contain digits only (e.g. '123456789012345')."
 
-msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
-msgstr "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
+msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). A ``client_ip_address`` sent here is ignored: the server sets it from the verified edge address. Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
+msgstr "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). A ``client_ip_address`` sent here is ignored: the server sets it from the verified edge address. Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
 
 msgid "Meta fbtrace_id"
 msgstr "Meta fbtrace_id"
@@ -8853,6 +8908,12 @@ msgstr "Most posts to return, from 1 to {max} (the default)."
 
 msgid "Moved at"
 msgstr "Moved at"
+
+msgid "Movement"
+msgstr "Movement"
+
+msgid "Movement of goods"
+msgstr "Movement of goods"
 
 msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 msgstr "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
@@ -9670,6 +9731,9 @@ msgstr "Open full stock history chart"
 msgid "Open the credit documents"
 msgstr "Open the credit documents"
 
+msgid "Open the dispatch point settings"
+msgstr "Open the dispatch point settings"
+
 msgid "Open the email log"
 msgstr "Open the email log"
 
@@ -10324,6 +10388,9 @@ msgstr "Parcel & COD"
 msgid "Parcel ID"
 msgstr "Parcel ID"
 
+msgid "Parcel Left Unregistered At"
+msgstr "Parcel Left Unregistered At"
+
 msgid "Parcel State"
 msgstr "Parcel State"
 
@@ -10353,6 +10420,9 @@ msgstr "Parcel sender"
 
 msgid "Parcel_COD_Amount from ACS."
 msgstr "Parcel_COD_Amount from ACS."
+
+msgid "Parcels that left while myDATA was unreachable"
+msgstr "Parcels that left while myDATA was unreachable"
 
 msgid "Parent"
 msgstr "Parent"
@@ -10778,6 +10848,9 @@ msgstr "Permanently destroyed %(count)d tenant(s): %(names)s"
 msgid "Permissions"
 msgstr "Permissions"
 
+msgid "Personal data erased at"
+msgstr "Personal data erased at"
+
 msgid "Phone"
 msgstr "Phone"
 
@@ -11063,8 +11136,8 @@ msgstr "Postal code of the event location"
 msgid "Postal code of the locker"
 msgstr "Postal code of the locker"
 
-msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
-msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
+msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
+msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
 
 msgid "Posts"
 msgstr "Posts"
@@ -11556,6 +11629,9 @@ msgstr "Purged %(d)s Django + %(n)s Nuxt keys across %(s)s surface(s)."
 msgid "Purged At"
 msgstr "Purged At"
 
+msgid "Purpose of movement"
+msgstr "Purpose of movement"
+
 msgid "Put the returned units back in stock"
 msgstr "Put the returned units back in stock"
 
@@ -11574,6 +11650,9 @@ msgstr "QR code for the authenticator app"
 
 msgid "Qty"
 msgstr "Qty"
+
+msgid "Quantities are in pieces."
+msgstr "Quantities are in pieces."
 
 msgid "Quantity"
 msgstr "Quantity"
@@ -11765,6 +11844,9 @@ msgstr "Receipt {document_number} for your order #{order_id}"
 
 msgid "Receipts"
 msgstr "Receipts"
+
+msgid "Receipts of canceled orders not canceled in myDATA"
+msgstr "Receipts of canceled orders not canceled in myDATA"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Receipts rejected by myDATA"
@@ -12686,6 +12768,10 @@ msgstr "SVG files containing script elements are not allowed for security reason
 msgid "SVG files with javascript: or data: URLs are not allowed for security reasons."
 msgstr "SVG files with javascript: or data: URLs are not allowed for security reasons."
 
+msgctxt "purpose of movement"
+msgid "Sale"
+msgstr "Sale"
+
 msgid "Sales"
 msgstr "Sales"
 
@@ -12940,6 +13026,9 @@ msgstr "Select a region that belongs to the selected country."
 
 msgid "Select a valid country."
 msgstr "Select a valid country."
+
+msgid "Select a valid region."
+msgstr "Select a valid region."
 
 msgid "Select action"
 msgstr "Select action"
@@ -13234,6 +13323,9 @@ msgstr "Set the Google Ads conversion ID first; a label cannot be sent without i
 #, python-format
 msgid "Set the VAT percentage rate (0.0% - 100.0%)"
 msgstr "Set the VAT percentage rate (0.0% - 100.0%)"
+
+msgid "Set the dispatch point for courier receipts"
+msgstr "Set the dispatch point for courier receipts"
 
 msgid "Set this address as the user's main address."
 msgstr "Set this address as the user's main address."
@@ -13751,6 +13843,9 @@ msgstr "Standard property"
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 
+msgid "Start of movement"
+msgstr "Start of movement"
+
 msgid "Started At"
 msgstr "Started At"
 
@@ -13956,17 +14051,14 @@ msgstr "Street"
 msgid "Street Number"
 msgstr "Street Number"
 
-msgid "Street name"
-msgstr "Street name"
-
 msgid "Street name and number"
 msgstr "Street name and number"
 
-msgid "Street number"
-msgstr "Street number"
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
+msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
 
-msgid "Street, street number, and city are required."
-msgstr "Street, street number, and city are required."
+msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
+msgstr "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 
 msgid "Stripe"
 msgstr "Stripe"
@@ -14555,6 +14647,9 @@ msgstr "The VAT on the invoice, kept for your accountant."
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 msgstr "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 
+msgid "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+msgstr "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+
 msgid "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 msgstr "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 
@@ -14804,6 +14899,9 @@ msgstr "The last voucher request for order #%(order)s may have reached ACS witho
 msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
 msgstr "The last voucher request whose answer was lost, as ACS or the network reported it."
 
+msgid "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+msgstr "The latest moment a send of this document may still register at AADE: each send moves it to its own start plus the window the store's settings gave it then, never back. Until it passes a send with no answer is in flight, and a lookup that finds nothing decides nothing."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -14838,6 +14936,9 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 msgid "The link search is not valid."
 msgstr "The link search is not valid."
 
+msgid "The locker's BOX NOW id, exactly."
+msgstr "The locker's BOX NOW id, exactly."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 
@@ -14846,6 +14947,9 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "The money beyond the receipt and the goods short of it are acknowledged."
+
+msgid "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
+msgstr "The movement indication the receipt was sent to myDATA with: dispatch date, loading and delivery address, and the goods that move with their quantities. Empty for a receipt without one (an order that does not move through a carrier)."
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
@@ -14873,6 +14977,9 @@ msgstr "The order total is below this wholesale tier's minimum of {minimum}."
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 msgstr "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 
+msgid "The order's hosted payment link (Stripe or Viva Wallet). While a link of the order can still be paid it is returned again, with its own expiry, and successUrl and cancelUrl are those it was opened with; only when none can be paid is a new one opened. 409 payment_in_progress: a payment was made and is being confirmed, so no link is opened; read the order again after Retry-After. 503 payment_provider_unavailable: the provider cannot say whether a link is still payable; try again after Retry-After."
+msgstr "The order's hosted payment link (Stripe or Viva Wallet). While a link of the order can still be paid it is returned again, with its own expiry, and successUrl and cancelUrl are those it was opened with; only when none can be paid is a new one opened. 409 payment_in_progress: a payment was made and is being confirmed, so no link is opened; read the order again after Retry-After. 503 payment_provider_unavailable: the provider cannot say whether a link is still payable; try again after Retry-After."
+
 msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 msgstr "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 
@@ -14898,6 +15005,9 @@ msgstr "The payment method is free once the products, after discounts and exclud
 
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
+
+msgid "The payment provider cannot be reached right now. Try again in a moment."
+msgstr "The payment provider cannot be reached right now. Try again in a moment."
 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "The payment provider cannot be reached to check this reference."
@@ -14925,6 +15035,9 @@ msgstr "The payment provider's result for the failed call."
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "The payment this share is refunded against; none for gift cards and points."
+
+msgid "The pickup point cannot be checked right now. Try again in a moment."
+msgstr "The pickup point cannot be checked right now. Try again in a moment."
 
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
@@ -15104,9 +15217,6 @@ msgstr "The same value as ``reason``."
 msgid "The scheduled database backup failed with this error:"
 msgstr "The scheduled database backup failed with this error:"
 
-msgid "The selected locker is not in the delivery country."
-msgstr "The selected locker is not in the delivery country."
-
 msgid "The selected payment method cannot be paid with a card on this page."
 msgstr "The selected payment method cannot be paid with a card on this page."
 
@@ -15204,8 +15314,8 @@ msgstr "The time to pay for this order has run out. Place a new order from your 
 msgid "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 msgstr "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 
-msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
-msgstr "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``. The order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgstr "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``. The order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
 
 msgid "The type must look like name@version."
 msgstr "The type must look like name@version."
@@ -15239,6 +15349,9 @@ msgstr "The voucher request that has the turn: the shipment and the request's ow
 
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
+
+msgid "The whole country list as one array, filtered and ordered as the paginated list is: for a picker that needs every row."
+msgstr "The whole country list as one array, filtered and ordered as the paginated list is: for a picker that needs every row."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "The wholesale pricing tier this business gets"
@@ -15490,6 +15603,12 @@ msgstr "This payout is tied to a shipment; there is nothing to reconcile."
 
 msgid "This person is already on the team."
 msgstr "This person is already on the team."
+
+msgid "This pickup point is not available. Choose another one."
+msgstr "This pickup point is not available. Choose another one."
+
+msgid "This pickup point is not in the delivery country. Choose another one."
+msgstr "This pickup point is not in the delivery country. Choose another one."
 
 msgid "This product is already in the user's favorites."
 msgstr "This product is already in the user's favorites."
@@ -16922,6 +17041,9 @@ msgstr "What the store sells. Selects the recommendation preset the store starts
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 
+msgid "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+msgstr "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+
 msgid "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 msgstr "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 
@@ -16970,6 +17092,12 @@ msgstr "When staff recorded that this payout was accounted for. A payout matchin
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 
+msgid "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+msgstr "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+
+msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+msgstr "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
+
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "When the current confirmation link was issued. The link expires a week later."
 
@@ -16979,14 +17107,26 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
+msgid "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+msgstr "When the earliest send AADE has not decided began: it may hold the document from then on. Kept through later errors, cleared when AADE answers a send (registered, or 228) or a lookup finds the document or finds nothing."
+
 msgid "When the export can no longer be downloaded."
 msgstr "When the export can no longer be downloaded."
+
+msgid "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
+msgstr "When the latest send to AADE began. A send with no answer on record still runs until this is older than the retry delay, whatever else touched the document since."
 
 msgid "When the money moved; empty while it is in flight."
 msgstr "When the money moved; empty while it is in flight."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
+
+msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+msgstr "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+
+msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
+msgstr "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
 
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
@@ -17432,6 +17572,9 @@ msgstr "Your business account has been approved"
 msgid "Your business's legal details are missing"
 msgstr "Your business's legal details are missing"
 
+msgid "Your cart has changed since its total was shown. Review your order and place it again."
+msgstr "Your cart has changed since its total was shown. Review your order and place it again."
+
 msgid "Your data and preferences are still safely stored"
 msgstr "Your data and preferences are still safely stored"
 
@@ -17788,8 +17931,8 @@ msgstr "``invalid_coupon`` only."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 
-msgid "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
-msgstr "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
+msgid "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
+msgstr "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
@@ -17901,6 +18044,12 @@ msgstr "myDATA MARK"
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
 
+msgid "myDATA Send Deadline"
+msgstr "myDATA Send Deadline"
+
+msgid "myDATA Sent At"
+msgstr "myDATA Sent At"
+
 msgid "myDATA Serial Number (aa)"
 msgstr "myDATA Serial Number (aa)"
 
@@ -17915,6 +18064,9 @@ msgstr "myDATA Submitted At"
 
 msgid "myDATA UID"
 msgstr "myDATA UID"
+
+msgid "myDATA Unanswered Since"
+msgstr "myDATA Unanswered Since"
 
 msgid "myDATA has no valid environment"
 msgstr "myDATA has no valid environment"
@@ -18075,8 +18227,17 @@ msgid "…and {count} more lines with errors."
 msgstr "…and {count} more lines with errors."
 
 #, python-format
+#~ msgid "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgid_plural "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+#~ msgstr[0] "%(count)s receipt was issued under AADE's loss-of-connection procedure and is not registered yet. Its parcel ships as usual; it is sent again automatically once myDATA answers."
+#~ msgstr[1] "%(count)s receipts were issued under AADE's loss-of-connection procedure and are not registered yet. Their parcels ship as usual; they are sent again automatically once myDATA answers."
+
+#, python-format
 #~ msgid "%(slot)s navigation"
 #~ msgstr "%(slot)s navigation"
+
+#~ msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
+#~ msgstr "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
 
 #~ msgid "A document has more than one version."
 #~ msgstr "A document has more than one version."
@@ -18197,6 +18358,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Cancel the BoxNow shipment for an order"
 
+#~ msgid "City name"
+#~ msgstr "City name"
+
 #~ msgid "Click the button below to retry your payment with a different card or method."
 #~ msgstr "Click the button below to retry your payment with a different card or method."
 
@@ -18230,6 +18394,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Contact Panel"
 #~ msgstr "Contact Panel"
+
+#~ msgid "Courier receipts cannot be sent: no dispatch point"
+#~ msgstr "Courier receipts cannot be sent: no dispatch point"
+
+#~ msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
+#~ msgstr "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Critical Stock (1-5)"
@@ -18397,6 +18567,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Is Visible"
 #~ msgstr "Is Visible"
+
+#~ msgid "Issued Without Connection At"
+#~ msgstr "Issued Without Connection At"
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"
@@ -18741,6 +18914,15 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 #~ msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 
+#~ msgid "Street name"
+#~ msgstr "Street name"
+
+#~ msgid "Street number"
+#~ msgstr "Street number"
+
+#~ msgid "Street, street number, and city are required."
+#~ msgstr "Street, street number, and city are required."
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
@@ -18771,6 +18953,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgstr ""
 #~ "Thank you for using %(site_name)s!\n"
 #~ "%(site_domain)s"
+
+#~ msgid "The selected locker is not in the delivery country."
+#~ msgstr "The selected locker is not in the delivery country."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

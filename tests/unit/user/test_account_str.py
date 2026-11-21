@@ -1,7 +1,7 @@
 """A user renders as the person, not the generated handle.
 
 Usernames here are generated (``{Adjective}{Noun}#{hash}``, see
-``core/generators.py``), so ``str(user)`` returning one showed staff
+``src/user/generators.py``), so ``str(user)`` returning one showed staff
 ``Paok1441`` on the Blog Author admin page for an account plainly
 holding "Webside Admin". Every admin surface that renders a user
 through a relation — a ``user`` form field, autocomplete results, FK

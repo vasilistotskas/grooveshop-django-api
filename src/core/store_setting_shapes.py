@@ -8,7 +8,7 @@ a hand-written parser in the storefront, joined by nothing but a comment.
 Each shape is now a serializer. That one class is
 
 * the validator: ``extra_settings`` calls ``is_valid_structured`` when an
-  admin saves the row (``tenant/validators.py``);
+  admin saves the row (``src/tenant/validators.py``);
 * the schema: ``GET /settings/public`` serves the typed value through the
   same class (``PublicSettingsSerializer``), so ``schema.yml`` describes
   it and the storefront generates its parser instead of writing one;

@@ -1,11 +1,11 @@
 """The store-admin agent surface: ``/api/v1/agent/staff/*``.
 
 Read-only views behind the staff MCP server (``/mcp/admin``). Each view
-names one scope (``agent/staff.py``), and ``HasStaffScope`` requires both
+names one scope (``src/agent/staff.py``), and ``HasStaffScope`` requires both
 the scope on the token and the permission behind it on the caller's role.
 The figures come from the modules the admin's own pages use
-(``order/reporting/turnover.py``, ``order/reporting/profit.py``), so an AI app and the admin
-can never disagree.
+(``order.reporting.turnover``, ``order.reporting.profit``), so an AI app and
+the admin can never disagree.
 """
 
 from __future__ import annotations
@@ -55,9 +55,9 @@ from agent.staff_serializers import (
     StaffReviewSerializer,
     StaffSalesReportSerializer,
 )
+from agent.throttles import StaffAgentThrottle
 from contact.models import Contact
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import StaffAgentThrottle
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from order.reporting import profit, turnover

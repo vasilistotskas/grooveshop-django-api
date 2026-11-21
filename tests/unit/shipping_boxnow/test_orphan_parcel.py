@@ -1332,6 +1332,24 @@ class TestTheSweepSettlesUncertainCreations:
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
         assert shipment.parcel_id == "9219709201"
 
+    def test_a_parcel_taken_over_by_the_settle_gets_its_receipt(
+        self, http, django_capture_on_commit_callbacks
+    ):
+        """A parcel the settle takes over is a live shipment like a created
+        one: the order's first tracking number issues its receipt (#747)."""
+        shipment = _settled(_paid_order())
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+
+        with (
+            patch("order.signals.handlers.receipt_issuable", return_value=True),
+            patch("order.signals.handlers.issue_receipt_for_pickup") as issue,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "taken_over"
+        issue.assert_called_once_with(shipment.order_id)
+
     def test_a_canceled_order_with_nothing_listed_cancels_locally(self, http):
         shipment = _settled(_canceled_order())
         http.answer(_LOOKUP, _lookup())

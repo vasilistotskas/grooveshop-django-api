@@ -580,7 +580,7 @@ class GiftCardService:
         *amount* of it, or everything not back yet when ``amount`` is
         ``None`` (a cancel). Returns what was credited.
 
-        An order is refunded onto its cards in parts (``OrderService.
+        An order is refunded onto its cards in parts (``RefundService.
         refund_order`` pays the provider first, then what the order paid
         with gift cards), so a card can be credited more than once for one
         order. What a card is owed is what it gave (REDEEM) less what has

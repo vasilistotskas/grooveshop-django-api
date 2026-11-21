@@ -25,6 +25,24 @@ Rules both carriers share:
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **The receipt follows the voucher, never the other way round.** Every
+  path that makes a voucher or parcel live records it with
+  `Order.add_tracking_info`, and recording it issues the receipt with
+  movement indication (`issue_receipt_for_pickup`), also over a number
+  staff typed before the carrier held the parcel, the voucher's own number
+  included, for a
+  store whose receipts the platform issues and that has set its dispatch
+  point ([§7.4](fiscal-movement-receipts.md)), dated the day the voucher is
+  created.
+  Only a voucher or parcel the carrier holds counts
+  (`ShippingCarrierInterface.holds_the_parcel`, asked through
+  `ShippingService.carrier_holds_the_parcel`): a tracking number staff type
+  on an order whose carrier holds none issues nothing.
+  Nothing in shipping waits for myDATA: a receipt AADE does not answer for
+  is sent again, and once its parcel leaves unregistered, with AADE's
+  loss-of-connection indication. A voucher made again after the receipt
+  was issued (a new locker or address, or days later) is flagged to staff
+  when the parcel leaves.
 - **One HTTP retry rule.** Both clients build their `requests` session
   with `carrier_session` (`src/shipping/carrier_http.py`), whose
   `CARRIER_RETRY` sends a request again only when it never connected
@@ -97,9 +115,8 @@ accepting Cyprus orders at the Greek flat rate.
   cart's create-payment-intent and `POST /cart/quote` price through that
   one function ([§3.0](creation.md)), so they agree for the same pricing
   inputs. The inputs can change between two requests (a price, a
-  promotion, a rate), and then the later total differs: a client that
-  must know sends the quote's `expectedTotal` with the order, which is
-  then created only at that total. The cart response
+  promotion, a rate), and then the later total differs: every order is
+  created with the quote's `expectedTotal`, and only at that total. The cart response
   reports it as `freeThresholdValue`, and `/shipping/options` takes it as
   `orderValueAmount`; a client shows "X more for free" from that number,
   never from `totalPrice`. (Before, the fee compared items + shipping and
@@ -180,7 +197,7 @@ accepting Cyprus orders at the Greek flat rate.
   checkout preselects (the cart knows no address; the payload echoes
   `countryCode`); a promotion holds in every country. The cheapest route
   wins, a promotion on a tie; a units teaser ("2 more items") costs what
-  the engine's own simulation adds (`PromotionEngine.teaser_cost`).
+  the engine's own simulation adds (`promotion.engine.teasers.teaser_cost`).
   `free` once checkout charges 0, else exactly one of `remainingAmount`
   and `remainingQuantity`; `threshold` is the value a meter fills to.
   `null` when the cart has no route at all. `promotionNearMiss` entries
@@ -204,8 +221,10 @@ accepting Cyprus orders at the Greek flat rate.
   own `price`, `freeShippingThreshold`, `deliveryDaysMin`/`Max` and
   `maxWeightGrams` (null when unset) and no cart input. Anonymous, cached
   by `@cache_methods` (`ShippingPolicyView`); the `shipping` cache surface
-  purges it and declares `ShippingRate`, `ShippingProvider` and
-  `shipping_acs.AcsStation` (the locker gate) as `invalidated_by`. A
+  purges it and declares `ShippingRate`, `ShippingProvider`,
+  `shipping_acs.AcsStation` (the locker gate) and
+  `shipping_boxnow.BoxNowLocker` (the locker list) as `invalidated_by`;
+  the catalogue syncs mark it for the rows they deactivate. A
   carrier's credentials live on the `Tenant` row, which no surface watches,
   so connecting or removing one shows after the TTL or a manual purge of
   the `shipping` surface.

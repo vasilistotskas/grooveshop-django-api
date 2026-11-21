@@ -10,12 +10,14 @@ preview, the quote, the intent amount and the order cannot disagree.
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from django.utils.crypto import salted_hmac
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
@@ -26,18 +28,24 @@ from order.exceptions import (
     ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
+from promotion.engine.benefits import gift_pairs
+from promotion.engine.evaluation import PromotionEngine
+from promotion.engine.teasers import teaser_cost
 from promotion.enum import BenefitType
-from promotion.services import PromotionEngine
 from shipping.enum import FreeShippingSource, ShippingRefusal
 
 if TYPE_CHECKING:
     from cart.models import Cart
     from giftcard.services import RedemptionPlan
     from pay_way.models import PayWay
-    from promotion.services import CartDiscountResult
+    from promotion.engine.results import CartDiscountResult
     from shipping.services import ShippingCharge
 
 logger = logging.getLogger(__name__)
+
+# The HMAC key salt of ``OrderQuoteService.cart_digest``: its own, so the
+# digest is no other HMAC the ``SECRET_KEY`` signs.
+CART_DIGEST_SALT = "order.checkout.quote.cart_digest"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +84,45 @@ class ShippingChoice:
     provider_code: str | None
     country_id: str | None
     region_id: str | None = None
+    # The pickup point, as ``(key, value)`` pairs of the carrier's
+    # ``location_keys``: what the cart digest covers, never priced.
+    location: tuple[tuple[str, str], ...] = ()
+
+    @classmethod
+    def of(cls, data: Mapping[str, Any]) -> ShippingChoice:
+        """The delivery a request body (snake_case, validated) chose.
+
+        The quote and order creation build it here from the same field
+        names, so they read one delivery. The pickup point is the
+        carrier's own ``location_keys``: a key of another carrier names
+        nothing this order is sent to. A pickup-point delivery has no
+        region: it goes to the point, and the order keeps none of the
+        buyer's address (``_deliver_to_pickup_point``), so the quote, the
+        digest and the order read the same delivery.
+        """
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import get_provider, is_registered
+
+        kind = data.get("shipping_kind") or None
+        provider_code = data.get("shipping_provider_code") or None
+        keys = (
+            get_provider(provider_code).location_keys
+            if provider_code and is_registered(provider_code)
+            else ()
+        )
+        return cls(
+            kind=kind,
+            provider_code=provider_code,
+            country_id=data.get("country_id") or None,
+            region_id=(
+                None
+                if kind == ShippingKind.PICKUP_POINT
+                else data.get("region_id") or None
+            ),
+            location=tuple(
+                (key, str(data[key])) for key in keys if data.get(key)
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +201,7 @@ class CheckoutQuote:
     gift_cards: RedemptionPlan | None
     grand_total: Money | None
     amount_due: Money | None
+    cart_digest: str | None
 
     @property
     def currency(self) -> str:
@@ -310,6 +358,18 @@ class OrderQuoteService:
             currency,
         )
 
+        # Once a delivery is chosen: what the order is made of. The pay
+        # way is not part of it; its fee is in ``expected_total``.
+        cart_digest = (
+            cls.cart_digest(
+                cart,
+                promotion,
+                shipping=shipping,
+                weight_grams=weight_grams,
+            )
+            if shipping is not None
+            else None
+        )
         grand_total = amount_due = gift_cards = None
         if shipping_charge is not None and payment_fee is not None:
             grand_total = Money(
@@ -339,7 +399,85 @@ class OrderQuoteService:
             gift_cards=gift_cards,
             grand_total=grand_total,
             amount_due=amount_due,
+            cart_digest=cart_digest,
         )
+
+    @staticmethod
+    def cart_digest(
+        cart: Cart,
+        promotion: CartDiscountResult,
+        *,
+        shipping: ShippingChoice,
+        weight_grams: int,
+    ) -> str:
+        """What an order of ``cart`` is made of, as one opaque value.
+
+        Each line (product, quantity, unit price as priced, the promotion
+        money it carries), the promotions that apply with their codes,
+        amounts and gifts, the delivery (kind, the carrier that takes it,
+        as :meth:`_carrier` resolves one a home delivery does not name,
+        country, region, pickup point). Two quotes of the same order give
+        the same digest, and an order whose contents changed since its
+        quote gives another even when its total did not (a line swapped
+        for one at the same price). It is a check of contents: it holds no
+        pay way (an agent may name it only at completion), no shipping
+        charge, fee, loyalty or gift-card amount; ``expectedTotal`` holds
+        what is paid and for what.
+
+        An HMAC over a canonical form, keyed by the ``SECRET_KEY``: it
+        reveals nothing of the cart, and no client can compute it.
+        """
+        line_discounts = promotion.line_discounts
+        lines = sorted(
+            [
+                item.product_id,
+                item.quantity,
+                str(item.final_price.amount),
+                str(line_discounts.get(item.pk, Decimal(0))),
+            ]
+            for item in cart.items.all()
+        )
+        promotions = sorted(
+            [
+                entry.promotion.id,
+                entry.code.id if entry.code else 0,
+                str(entry.amount.amount),
+            ]
+            for entry in promotion.applied
+        ) + sorted(
+            [promo.id, code.id if code else 0]
+            for promo, code in promotion.non_monetary
+        )
+        gifts = sorted(
+            [gift.promotion.id, gift.product.id, gift.quantity]
+            for gift in promotion.gift_items
+        )
+        kind, carrier = OrderQuoteService._carrier(
+            shipping.kind,
+            shipping.provider_code,
+            shipping.country_id,
+            weight_grams,
+        )
+        delivery = [
+            kind,
+            carrier or "",
+            shipping.country_id or "",
+            shipping.region_id or "",
+            sorted(shipping.location),
+        ]
+        canonical = json.dumps(
+            {
+                "lines": lines,
+                "promotions": promotions,
+                "gifts": gifts,
+                "delivery": delivery,
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return salted_hmac(
+            CART_DIGEST_SALT, canonical, algorithm="sha256"
+        ).hexdigest()
 
     @staticmethod
     def _parcel(cart: Cart, promotion: CartDiscountResult):
@@ -351,7 +489,7 @@ class OrderQuoteService:
 
         parcel_items = (
             *((item.product, item.quantity) for item in cart.items.all()),
-            *PromotionEngine.gift_pairs(promotion),
+            *gift_pairs(promotion),
         )
         return parcel_items, compute_total_weight_grams(parcel_items)
 
@@ -555,7 +693,7 @@ class OrderQuoteService:
         holds in every country. Of the routes left, the one that costs
         the shopper least wins, a promotion on a tie since it does not
         depend on the carrier; a units teaser costs what the engine's
-        own simulation adds (``PromotionEngine.teaser_cost``).
+        own simulation adds (``promotion.engine.teasers.teaser_cost``).
 
         A threshold's distance is measured on :meth:`threshold_value`,
         the products after discounts, as checkout judges it; a
@@ -579,7 +717,7 @@ class OrderQuoteService:
         cart_items = list(cart.items.all())
         pairs = [
             (item.product, item.quantity) for item in cart_items
-        ] + PromotionEngine.gift_pairs(promotion_result)
+        ] + gift_pairs(promotion_result)
         value = cls.threshold_value(
             cart.total_price, promotion_result.discount_total
         ).amount
@@ -633,7 +771,7 @@ class OrderQuoteService:
                     )
                 )
                 continue
-            cost = PromotionEngine.teaser_cost(entry, cart_items)
+            cost = teaser_cost(entry, cart_items)
             if cost is None:
                 continue
             routes.append(

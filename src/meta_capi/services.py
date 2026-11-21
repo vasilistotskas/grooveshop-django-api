@@ -121,7 +121,7 @@ def is_capi_enabled() -> bool:
     Also requires both a Meta Pixel ID and a Meta CAPI access token to
     be configured on the active tenant (``Tenant.meta_pixel_id`` /
     ``Tenant.meta_capi_access_token`` — tenant-only, no platform/env
-    fallback; see ``tenant/credentials.py``). Flipping the toggle alone
+    fallback; see ``src/tenant/credentials.py``). Flipping the toggle alone
     without those would otherwise produce a flood of FAILED log rows from
     the Celery dispatcher (config errors are non-retryable). Treating
     missing config as "disabled" keeps the audit table clean and lets ops
@@ -390,9 +390,12 @@ def build_purchase_event(order: Order) -> tuple[Event, str]:
 
 
 def build_initiate_checkout_event(order: Order) -> tuple[Event, str]:
-    import uuid as uuid_lib
-
-    event_id = _event_id_for(order, "initiate_checkout") or uuid_lib.uuid4().hex
+    # An order starts one checkout: with no browser-minted id, the order's
+    # number keeps every copy of the dispatch one event (see Purchase).
+    event_id = (
+        _event_id_for(order, "initiate_checkout")
+        or f"initiate-checkout-{order.pk}"
+    )
     event = _new_event(
         name=StandardEvent.INITIATE_CHECKOUT,
         event_id=event_id,
@@ -404,13 +407,18 @@ def build_initiate_checkout_event(order: Order) -> tuple[Event, str]:
 
 
 def build_refund_event(
-    order: Order, amount: Decimal | None
+    order: Order, amount: Decimal | None, *, refund_id: int
 ) -> tuple[Event, str]:
-    import uuid as uuid_lib
+    """Build the Refund event of one refund of ``order``: the ledger's
+    REFUND row ``refund_id``.
 
-    # Refunds don't dedup against a browser leg (no user interaction),
-    # so a fresh UUID is fine.
-    event_id = uuid_lib.uuid4().hex
+    The row is the refund, so its number is the event's id: every copy of
+    the task that sends it (a retry, a message delivered again, the sweep's
+    copy of a publish) sends the same event, and a second refund of the
+    order is another. A browser never sends a Refund, so nothing else has
+    to match it.
+    """
+    event_id = f"refund-{refund_id}"
     # "Refund" isn't a Meta standard event — passed as a custom
     # string so call sites still see it as a known constant.
     event = _new_event(
@@ -441,7 +449,6 @@ def build_complete_registration_event(
     fbc: str | None = None,
     client_ip_address: str | None = None,
     client_user_agent: str | None = None,
-    event_id: str | None = None,
     event_source_url: str | None = None,
 ) -> tuple[Event, str]:
     """Build CompleteRegistration for an account that just signed up.
@@ -450,8 +457,6 @@ def build_complete_registration_event(
     pull from — the allauth signal handler is responsible for
     reading the request cookies/headers and passing them in.
     """
-    import uuid as uuid_lib
-
     from facebook_business.adobjects.serverside.user_data import UserData
 
     user_data = UserData(
@@ -462,7 +467,10 @@ def build_complete_registration_event(
         fbp=fbp or None,
         fbc=fbc or None,
     )
-    eid = event_id or uuid_lib.uuid4().hex
+    # An account registers once, so its number is the event's id: every copy
+    # of the task sends the same event. The storefront's browser leg mints
+    # its own id and is not deduplicated against this one.
+    eid = f"complete-registration-{user.pk}"
     event = _new_event(
         name=StandardEvent.COMPLETE_REGISTRATION,
         event_id=eid,

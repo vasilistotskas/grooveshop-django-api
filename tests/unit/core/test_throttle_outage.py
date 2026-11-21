@@ -14,7 +14,6 @@ blip. Every throttle is ours, keyed on the proven visitor.
 from __future__ import annotations
 
 import ast
-import inspect
 import logging
 from pathlib import Path
 
@@ -24,13 +23,17 @@ from django.test import Client, override_settings
 from django.urls import path
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
-from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
-from core import caches as core_caches
+from cart.throttles import CouponApplyThrottle
+from core import cache_backend
 from core.api import throttling
-from core.caches import STRICT_NAMESPACE
+from core.cache_backend import STRICT_NAMESPACE
+from giftcard.throttles import GiftCardCheckThrottle
+from order.throttles import PaymentAttemptThrottle
+from search.throttles import SearchThrottle
 from tests.utils.redis import private_cache, stopped_cache
+from tests.utils.throttles import project_throttle_classes
 
 #: The classification this module locks in. Changing a scope's policy
 #: must be a deliberate edit here too.
@@ -55,6 +58,8 @@ FAIL_CLOSED = {
 }
 FAIL_OPEN = {
     "UserOrIpRateThrottle",
+    "GatewayUserRateThrottle",
+    "UserIdRateThrottle",
     "UserBudgetThrottle",
     "AnonIpRateThrottle",
     "GatewayAnonThrottle",
@@ -71,7 +76,7 @@ FAIL_OPEN = {
     "ViewCountThrottle",
     "RecommendationEventThrottle",
     "EmailUnsubscribeThrottle",
-    # Authenticated staff reads (agent/staff_views.py): no secret, oracle
+    # Authenticated staff reads (src/agent/staff_views.py): no secret, oracle
     # or money behind it, and a store's team keeps working through a blip.
     "StaffAgentThrottle",
 }
@@ -84,7 +89,7 @@ def _fresh_bursts(monkeypatch):
         monkeypatch.setattr(
             throttling,
             name,
-            core_caches.BurstLogger(
+            cache_backend.BurstLogger(
                 original._message,
                 level=original._level,
                 target=original._logger,
@@ -105,13 +110,8 @@ def _throttle(cls, monkeypatch, cache, rate="3/minute"):
 
 
 class TestClassification:
-    def test_every_throttle_here_declares_its_outage_policy(self):
-        defined = {
-            name: cls
-            for name, cls in inspect.getmembers(throttling, inspect.isclass)
-            if issubclass(cls, SimpleRateThrottle)
-            and cls.__module__ == throttling.__name__
-        }
+    def test_every_throttle_declares_its_outage_policy(self):
+        defined = project_throttle_classes()
         assert set(defined) == FAIL_CLOSED | FAIL_OPEN
         for name, cls in defined.items():
             assert issubclass(cls, throttling.ResilientThrottleMixin), name
@@ -125,12 +125,12 @@ class TestRedisDown:
         self, monkeypatch, caplog
     ):
         throttle = _throttle(
-            throttling.GiftCardCheckThrottle, monkeypatch, stopped_cache()
+            GiftCardCheckThrottle, monkeypatch, stopped_cache()
         )
 
         with (
             caplog.at_level(logging.ERROR, logger="core.api.throttling"),
-            pytest.raises(core_caches.REDIS_UNAVAILABLE),
+            pytest.raises(cache_backend.REDIS_UNAVAILABLE),
         ):
             throttle.allow_request(_request(), view=None)
 
@@ -140,9 +140,7 @@ class TestRedisDown:
         )
 
     def test_a_general_scope_allows_and_warns(self, monkeypatch, caplog):
-        throttle = _throttle(
-            throttling.SearchThrottle, monkeypatch, stopped_cache()
-        )
+        throttle = _throttle(SearchThrottle, monkeypatch, stopped_cache())
 
         with caplog.at_level(logging.WARNING, logger="core.api.throttling"):
             assert throttle.allow_request(_request(), view=None) is True
@@ -164,21 +162,19 @@ class TestRedisDown:
         assert throttle.allow_request(_request(), view=None) is True
 
     def test_the_throttle_key_really_raises_in_the_cache(self):
-        with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+        with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
             stopped_cache().get(
-                throttling.GiftCardCheckThrottle.cache_format
+                GiftCardCheckThrottle.cache_format
                 % {"scope": "gift_card_check", "ident": "1"},
                 [],
             )
 
     def test_a_denial_is_logged_once_per_burst(self, monkeypatch, caplog):
-        throttle = _throttle(
-            throttling.CouponApplyThrottle, monkeypatch, stopped_cache()
-        )
+        throttle = _throttle(CouponApplyThrottle, monkeypatch, stopped_cache())
 
         with caplog.at_level(logging.ERROR, logger="core.api.throttling"):
             for _ in range(5):
-                with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+                with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
                     throttle.allow_request(_request(), view=None)
 
         assert sum("DENIED" in r.getMessage() for r in caplog.records) == 1
@@ -195,16 +191,14 @@ class TestRedisDown:
         view = type("View", (), {"throttle_scope": "staff_login"})()
 
         throttle = throttling.StaffLoginThrottle()
-        with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+        with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
             throttle.allow_request(_request(), view)
 
     @override_settings(ROOT_URLCONF=__name__)
     def test_a_view_answers_a_coded_503(self, monkeypatch):
+        monkeypatch.setattr(GiftCardCheckThrottle, "cache", stopped_cache())
         monkeypatch.setattr(
-            throttling.GiftCardCheckThrottle, "cache", stopped_cache()
-        )
-        monkeypatch.setattr(
-            throttling.GiftCardCheckThrottle, "rate", "6/minute", raising=False
+            GiftCardCheckThrottle, "rate", "6/minute", raising=False
         )
 
         response = Client().get("/throttled", REMOTE_ADDR="203.0.113.7")
@@ -219,7 +213,7 @@ class TestIdentity:
         "throttle_class",
         [
             throttling.StaffLoginThrottle,
-            throttling.PaymentAttemptThrottle,
+            PaymentAttemptThrottle,
             throttling.AnonIpRateThrottle,
             throttling.UserBudgetThrottle,
         ],
@@ -282,7 +276,7 @@ def _names_drf_throttling(node: ast.AST) -> bool:
 class TestRedisUp:
     def test_a_security_scope_throttles_normally(self, monkeypatch):
         cache = private_cache()
-        throttle_cls = throttling.GiftCardCheckThrottle
+        throttle_cls = GiftCardCheckThrottle
         monkeypatch.setattr(throttle_cls, "cache", cache)
         monkeypatch.setattr(throttle_cls, "rate", "2/minute", raising=False)
         request = _request()
@@ -298,7 +292,7 @@ class TestRedisUp:
 
     def test_a_general_scope_throttles_normally(self, monkeypatch):
         cache = private_cache()
-        throttle_cls = throttling.SearchThrottle
+        throttle_cls = SearchThrottle
         monkeypatch.setattr(throttle_cls, "cache", cache)
         monkeypatch.setattr(throttle_cls, "rate", "1/minute", raising=False)
         request = _request()
@@ -314,7 +308,7 @@ class TestRedisUp:
 class _GiftCardCheckView(APIView):
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [throttling.GiftCardCheckThrottle]
+    throttle_classes = [GiftCardCheckThrottle]
 
     def get(self, request):
         return Response({"ok": True})

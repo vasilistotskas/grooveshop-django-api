@@ -11,6 +11,8 @@ from rest_framework import serializers
 from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
+from core.validators import address as address_rules
+from order.serializers.quote import PickupPointSerializer
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
@@ -175,7 +177,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # promotion fields all read from it.
         cache = self.context.setdefault("_promotion_results", {})
         if obj.pk not in cache:
-            from promotion.services import PromotionEngine
+            from promotion.engine.evaluation import PromotionEngine
 
             cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
         return cache[obj.pk]
@@ -185,7 +187,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # With promotions off no code applies and the cart lists none, so
         # nothing dead is shown that the shopper could not remove; the
         # codes wait on the cart until the store turns promotions back on.
-        from promotion.services import PromotionEngine
+        from promotion.engine.evaluation import PromotionEngine
 
         return PromotionEngine.is_enabled()
 
@@ -412,7 +414,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     )
     def get_applied_promotions(self, obj: Cart) -> list[dict]:
         # The engine already knows this — ``CartDiscountResult.applied``
-        # is what ``PromotionEngine.record`` writes onto the order as
+        # is what ``record_redemptions`` writes onto the order as
         # ``metadata["promotions"]``. Serializing it here is what lets
         # the cart explain a discount instead of showing one opaque
         # number, and what lets the coupon row show ITS OWN amount: a
@@ -851,18 +853,30 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         # Normalise empty string → not present so the view's
         # downstream None-check stays clean.
         attrs["shipping_provider_code"] = code or None
+        # The region order creation would refuse is refused here too, as
+        # a field error. A pickup delivery is priced without one
+        # (``ShippingChoice.of``), so it is not read.
+        if kind != "pickup_point" and (
+            errors := address_rules.region_errors(
+                attrs.get("country_id"), attrs.get("region_id")
+            )
+        ):
+            raise serializers.ValidationError(errors, code="region_invalid")
         return attrs
 
 
-class CartQuoteRequestSerializer(CartCreatePaymentIntentRequestSerializer):
+class CartQuoteRequestSerializer(
+    PickupPointSerializer, CartCreatePaymentIntentRequestSerializer
+):
     """Request body for ``POST /api/v1/cart/quote``.
 
     The choices of the payment-intent body, each optional: a quote may
     be asked before the shopper has chosen a delivery or a pay way, and
     the rows that depend on a missing choice come back null. A delivery
     is priced once both ``shipping_kind`` and ``country_id`` are given.
-    Send what the order-create body will carry, the email included, so
-    the quote is the total that order is created at.
+    Send what the order-create body will carry, the email and the pickup
+    point included, so the quote is the total that order is created at
+    and its ``cartDigest`` the cart that order is made of.
     """
 
     pay_way_id = serializers.IntegerField(

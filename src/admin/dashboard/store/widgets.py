@@ -2,7 +2,7 @@
 
 Each class is an Unfold component rendered by a partial under
 ``core/templates/admin/dashboard/``; the layout is
-``core/templates/admin/index.html``. Cached data comes from
+``src/core/templates/admin/index.html``. Cached data comes from
 ``admin.dashboard.store.queries``; everything below runs per request, in
 the viewer's language.
 
@@ -863,19 +863,15 @@ class StoreAlerts(DashboardWidget):
         """Scheduled publishes that failed and that nobody has
         acknowledged yet, for whoever may publish. Acknowledging in the
         list takes the alert away."""
-        from builder.models import (
-            BuilderScheduledPublish,
-            ScheduleStatus,
-            document_label,
-        )
+        from builder.models import BuilderScheduledPublish, document_label
         from builder.services import PUBLISH_PERMISSION
 
         if not self.request.user.has_perm(PUBLISH_PERMISSION):
             return []
         failed = list(
-            BuilderScheduledPublish.objects.filter(
-                status=ScheduleStatus.FAILED, acknowledged_at__isnull=True
-            ).order_by("-scheduled_for")[:5]
+            BuilderScheduledPublish.objects.failed_unacknowledged().order_by(
+                "-scheduled_for"
+            )[:5]
         )
         if not failed:
             return []
@@ -1129,11 +1125,7 @@ class StoreAlerts(DashboardWidget):
         from order.accounting.credit_allocation import describe_blockers
         from order.models import Order
 
-        waiting = list(
-            Order.objects.filter(metadata__receipt_deferred=True).order_by(
-                "-pk"
-            )[:5]
-        )
+        waiting = list(Order.objects.receipt_deferred().order_by("-pk")[:5])
         if not waiting:
             return []
         return [
@@ -1210,19 +1202,26 @@ class StoreAlerts(DashboardWidget):
         ]
 
     def _mydata(self) -> list[dict[str, Any]]:
-        from order.accounting.mydata.config import load_config
+        from order.accounting.movement import loading_address
+        from order.accounting.mydata.config import (
+            CREDENTIALS,
+            MyDataRequirement,
+            load_config,
+        )
+        from order.models.invoice import Invoice
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.
         if not store_features(self.request).live(RETAIL_DOCUMENTS):
             return []
         config = load_config()
+        unmet = config.unmet()
         alerts = []
         settings_link = (
             self.changelist_url("extra_settings.Setting", "q=MYDATA_"),
             _("Open the myDATA settings"),
         )
-        if config.environment is None:
+        if MyDataRequirement.ENVIRONMENT in unmet:
             alerts.append(
                 _alert(
                     "danger",
@@ -1238,7 +1237,7 @@ class StoreAlerts(DashboardWidget):
         # The ERP channel is only for a business exempt from the fiscal
         # device (ΦΗΜ); a store that takes real orders and has not recorded
         # the ground issues nothing. Sandbox test documents need none.
-        elif not (config.fhm_exemption_ground or config.issues_to_sandbox_only):
+        elif MyDataRequirement.FHM_EXEMPTION_GROUND in unmet:
             alerts.append(
                 _alert(
                     "danger",
@@ -1255,14 +1254,7 @@ class StoreAlerts(DashboardWidget):
                     link=settings_link,
                 )
             )
-        missing = [
-            field
-            for field, value in (
-                ("mydata_user_id", config.user_id),
-                ("mydata_subscription_key", config.subscription_key),
-            )
-            if not value
-        ]
+        missing = [str(field) for field in CREDENTIALS if field in unmet]
         if missing:
             alerts.append(
                 _alert(
@@ -1274,6 +1266,88 @@ class StoreAlerts(DashboardWidget):
                     link=(
                         self.changelist_url("tenant.Tenant"),
                         _("Fix in settings"),
+                    ),
+                )
+            )
+        waiting = Invoice.objects.transmission_failed().count()
+        if waiting:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cloud_sync",
+                    _("Parcels that left while myDATA was unreachable"),
+                    ngettext(
+                        "%(count)s parcel left before myDATA registered its "
+                        "receipt, because myDATA did not answer. The receipt "
+                        "is sent again automatically, with AADE's "
+                        "loss-of-connection indication, until it is "
+                        "registered.",
+                        "%(count)s parcels left before myDATA registered "
+                        "their receipts, because myDATA did not answer. The "
+                        "receipts are sent again automatically, with AADE's "
+                        "loss-of-connection indication, until they are "
+                        "registered.",
+                        waiting,
+                    )
+                    % {"count": waiting},
+                )
+            )
+        # Set aside when their orders were canceled before the parcel left,
+        # and settled within minutes; one still here waits for myDATA to
+        # answer (sent and canceled automatically), or for staff: myDATA
+        # refused the receipt or the store's credentials (its order's notes
+        # say so).
+        held = Invoice.objects.cancel_overdue().count()
+        if held:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "cancel_schedule_send",
+                    _("Receipts of canceled orders not canceled in myDATA"),
+                    ngettext(
+                        "%(count)s receipt of an order canceled before its "
+                        "parcel left is still waiting to be canceled in "
+                        "myDATA. It is canceled automatically once myDATA "
+                        "answers; if myDATA refused the receipt or the "
+                        "store's credentials, the order's notes say what "
+                        "to do.",
+                        "%(count)s receipts of orders canceled before their "
+                        "parcels left are still waiting to be canceled in "
+                        "myDATA. They are canceled automatically once "
+                        "myDATA answers; if myDATA refused a receipt or the "
+                        "store's credentials, its order's notes say what "
+                        "to do.",
+                        held,
+                    )
+                    % {"count": held},
+                )
+            )
+        # Only a store whose parcels a carrier integration takes owes a
+        # movement receipt (``order.accounting.movement``).
+        carrier_apps = {"shipping_acs", "shipping_boxnow"}
+        uses_a_carrier = bool(
+            carrier_apps - store_features(self.request).inactive_carrier_apps()
+        )
+        if uses_a_carrier and loading_address() is None:
+            alerts.append(
+                _alert(
+                    "warning",
+                    "local_shipping",
+                    _("Set the dispatch point for courier receipts"),
+                    _(
+                        "A receipt for a courier or locker order must carry "
+                        "the movement of goods and be issued before the "
+                        "courier collects the parcel. Until the dispatch "
+                        "point is set, receipts are issued when the order "
+                        "ships, without it. Fill in "
+                        "MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY "
+                        "(and the street)."
+                    ),
+                    link=(
+                        self.changelist_url(
+                            "extra_settings.Setting", "q=MYDATA_LOADING_"
+                        ),
+                        _("Open the dispatch point settings"),
                     ),
                 )
             )

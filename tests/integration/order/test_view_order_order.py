@@ -26,6 +26,7 @@ from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 from tests.utils import TestURLFixerMixin
+from tests.utils.checkout import quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -200,7 +201,11 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
                 PaymentStatus.COMPLETED,
                 {"status": "succeeded"},
             )
-            response = self.client.post(self.list_url, payload, format="json")
+            response = self.client.post(
+                self.list_url,
+                quoted_body(self.client, payload),
+                format="json",
+            )
 
         self.assertEqual(
             response.status_code,
@@ -228,7 +233,13 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        for field in ("pay_way_id", "email", "phone", "first_name"):
+        for field in (
+            "pay_way_id",
+            "email",
+            "phone",
+            "first_name",
+            "expected_total",
+        ):
             self.assertIn(field, response.data)
 
     # -- update -----------------------------------------------------------

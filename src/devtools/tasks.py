@@ -7,7 +7,7 @@ point of giving them the account — but the next prospect should meet the
 showroom, not the last visitor's mess.
 
 Only tenants flagged ``is_demo`` are touched. The fan-out that picks
-them lives in ``tenant/tasks.py`` with every other one — a beat entry
+them lives in ``src/tenant/tasks.py`` with every other one — a beat entry
 has to dispatch a ``tenant.tasks.fanout_*`` wrapper, which
 ``tests/unit/tenant/test_celery_fanout.py`` enforces, because a beat
 entry pointed straight at a tenant-scoped task fires once in the
@@ -22,7 +22,7 @@ from typing import Any
 from django_tenants.utils import schema_context
 
 from core import celery_app
-from core.tasks import MonitoredTask
+from core.monitored_task import MonitoredTask
 
 logger = logging.getLogger(__name__)
 

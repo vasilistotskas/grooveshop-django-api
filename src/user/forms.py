@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from unfold.forms import UserCreationForm
 
-from core.generators import UserNameGenerator
+from user.generators import UserNameGenerator
 from user.models import UserAccount
 
 
@@ -14,7 +14,7 @@ class UserAccountCreationForm(UserCreationForm):
 
     ``UserAccountManager.create_user`` has always generated a handle
     from the email when none is supplied
-    (``user/managers/account.py``), but the admin's add view builds a
+    (``src/user/managers/account.py``), but the admin's add view builds a
     plain ModelForm and posts whatever is in the field — so the manager
     is bypassed and a blank field reaches the database as NULL.
 

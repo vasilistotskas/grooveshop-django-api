@@ -86,7 +86,7 @@ class Command(BaseCommand):
     def _provision(self, tenant: Tenant, options) -> None:
         """Render ``provisioning.provision_stripe`` to stdout.
 
-        The logic itself lives in ``tenant/provisioning.py`` so the admin
+        The logic itself lives in ``src/tenant/provisioning.py`` so the admin
         action and this command cannot drift.
         """
         from tenant.provisioning import provision_stripe

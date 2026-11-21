@@ -1,4 +1,4 @@
-"""STORE_GEO_LAT / STORE_GEO_LNG validators (tenant/validators.py).
+"""STORE_GEO_LAT / STORE_GEO_LNG validators (src/tenant/validators.py).
 
 The pair is published as the store's location (the map's pin and the
 LocalBusiness structured data). The storefront reads it with the same rule

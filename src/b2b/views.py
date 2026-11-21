@@ -17,8 +17,9 @@ from b2b.serializers import (
     BusinessProfileWriteSerializer,
 )
 from b2b.services import B2BPricingService, B2BService
+from b2b.throttles import B2BProfileSubmitThrottle
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import B2BProfileSubmitThrottle, UserBudgetThrottle
+from core.api.throttling import UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,

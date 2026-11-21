@@ -82,12 +82,15 @@ class MyDataClient:
         self,
         *,
         entity_vat_number: str,
-        date_from: date,
-        date_to: date,
+        after_mark: int = 0,
+        date_from: date | None = None,
+        date_to: date | None = None,
         next_partition_key: str | None = None,
         next_row_key: str | None = None,
     ) -> bytes:
-        """GET ``/RequestTransmittedDocs`` for documents in a date window.
+        """GET ``/RequestTransmittedDocs``: our documents, and the
+        cancellations of them, whose MARK is greater than *after_mark*,
+        optionally in an issue-date window.
 
         Per AADE myDATA API Documentation v1.0.10 (prod URL extracted
         from the PDF's hyperlinks):
@@ -123,11 +126,13 @@ class MyDataClient:
         so we just prepend the method path.
         """
         params: dict[str, str] = {
-            "mark": "0",
+            "mark": str(after_mark),
             "entityVatNumber": entity_vat_number,
-            "dateFrom": date_from.strftime("%d/%m/%Y"),
-            "dateTo": date_to.strftime("%d/%m/%Y"),
         }
+        if date_from is not None:
+            params["dateFrom"] = date_from.strftime("%d/%m/%Y")
+        if date_to is not None:
+            params["dateTo"] = date_to.strftime("%d/%m/%Y")
         if next_partition_key:
             params["nextPartitionKey"] = next_partition_key
         if next_row_key:
@@ -135,11 +140,12 @@ class MyDataClient:
 
         url = f"{self._config.base_url}/RequestTransmittedDocs"
         logger.info(
-            "myDATA RequestTransmittedDocs entityVat=%s dateFrom=%s "
+            "myDATA RequestTransmittedDocs entityVat=%s mark>%s dateFrom=%s "
             "dateTo=%s env=%s",
             entity_vat_number,
-            date_from.isoformat(),
-            date_to.isoformat(),
+            after_mark,
+            date_from,
+            date_to,
             self._config.environment,
         )
         try:

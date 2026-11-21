@@ -123,7 +123,7 @@ class GrooveShopCelery(Celery):
 def create_celery_app():
     tasker = GrooveShopCelery("core")
 
-    # Every Celery option lives in settings/celery.py under the CELERY_
+    # Every Celery option lives in src/settings/celery.py under the CELERY_
     # namespace.
     #
     # A ``conf.update()`` here does NOT win, whatever the call order: a key
@@ -132,7 +132,7 @@ def create_celery_app():
     # This block used to carry a comment claiming the opposite, and with it
     # ``task_ignore_result=False``, ``task_soft_time_limit=300`` and
     # ``task_time_limit=600`` — none of which were ever in effect (the real
-    # values are True, 1500 and 1800). Add options to settings/celery.py and
+    # values are True, 1500 and 1800). Add options to src/settings/celery.py and
     # resolve ``celery_app.conf[...]`` to check one, never infer from here.
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
 
@@ -150,7 +150,7 @@ def create_celery_app():
     # A signal that never fires raises nothing, which is why this held
     # for so long — and why the comment below claiming the overlay fixed
     # "Order Received - #38 shipped in English" described something that
-    # was not happening. ``meili/apps.py`` documents the identical trap
+    # was not happening. ``src/meili/apps.py`` documents the identical trap
     # for its own closures.
     @worker_process_init.connect(weak=False)
     def init_worker_process(**kwargs):

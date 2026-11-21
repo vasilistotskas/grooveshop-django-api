@@ -40,6 +40,7 @@ from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.models import Invoice, Order, OrderHistory, RetailCredit
+from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
 from order.tasks import (
     send_admin_new_order_email,
@@ -366,6 +367,7 @@ class TestCustomerOrderEmails:
             order=order,
             invoice_number="INV-2026-000001",
             issue_date=date(2026, 3, 15),
+            mydata_status=MyDataStatus.CONFIRMED,
             mydata_mark=400000000000001,
         )
         invoice.document_file.save("receipt.pdf", ContentFile(b"%PDF-1.4"))

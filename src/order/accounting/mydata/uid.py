@@ -39,7 +39,12 @@ def build_uid(
     deviation_type: str = "",
     receiver_vat: str = "",
 ) -> str:
-    """Return the 40-char SHA-1 hex digest of the AADE identity tuple.
+    """Return the 40-char SHA-1 digest of the AADE identity tuple, as AADE
+    computes it: the fields joined by ``-``, in upper-case hex. The
+    documentation names the fields, not how they are joined; the form was
+    read off AADE's own ``invoiceUid`` (sandbox, 2026-11-20), and a uid
+    built any other way never matches what ``RequestTransmittedDocs``
+    lists, so no MARK could ever be looked up by it.
 
     ISO-8859-7 encoding is what the AADE spec calls out — our content
     is ASCII today (VAT numbers, dates, integers, Latin-alphabet
@@ -54,9 +59,10 @@ def build_uid(
         invoice_type,
         series,
         str(aa),
-        deviation_type,
     ]
+    if deviation_type:
+        parts.append(deviation_type)
     if receiver_vat:
         parts.append(receiver_vat)
-    payload = "".join(parts).encode("iso-8859-7", errors="replace")
-    return hashlib.sha1(payload, usedforsecurity=False).hexdigest()
+    payload = "-".join(parts).encode("iso-8859-7", errors="replace")
+    return hashlib.sha1(payload, usedforsecurity=False).hexdigest().upper()

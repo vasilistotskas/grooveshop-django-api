@@ -11,7 +11,7 @@ them for a package that cannot be absent.
 The rule is anchored on `pyproject.toml`'s `[project].dependencies`,
 because that is exactly the set the production image installs (`uv sync
 --no-dev`). A guard around a *dev* dependency is legitimate and is not
-flagged: `devtools/utils/profiler.py` guards `psutil` on purpose, since
+flagged: `src/devtools/utils/profiler.py` guards `psutil` on purpose, since
 the profiler is dev-only tooling that must not break a prod import.
 """
 

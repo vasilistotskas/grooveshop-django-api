@@ -2,7 +2,7 @@
 
 ``/api/v1/agent/staff/*`` on a store host serves the staff MCP server
 (``/mcp/admin``, through the agent gateway). It accepts one credential: an
-access token from the PLATFORM's issuer (``agent/staff.py``), bound to
+access token from the PLATFORM's issuer (``src/agent/staff.py``), bound to
 this store's staff MCP server, whose holder is staff of this store now.
 """
 

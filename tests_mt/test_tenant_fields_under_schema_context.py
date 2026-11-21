@@ -1,7 +1,7 @@
 """A real tenant schema, entered with ``schema_context``, reads its row.
 
 ``schema_context(name)`` binds a bare django-tenants ``FakeTenant`` with
-only ``schema_name``. The order commit hooks (``order/signals/handlers.py``)
+only ``schema_name``. The order commit hooks (``src/order/signals/handlers.py``)
 re-enter their schema that way, so before ``bound_tenant`` every
 ``tenant.credentials`` helper read an empty value there: on production
 (2026-10-13) shipping an order on a store with myDATA configured never

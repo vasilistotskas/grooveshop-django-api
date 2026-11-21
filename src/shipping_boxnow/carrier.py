@@ -15,12 +15,20 @@ from django.db.models import Q
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping.interfaces import (
+    PickupPointInAnotherCountry,
+    PickupPointUnknown,
+    PostalAddress,
+    ShippingCarrierInterface,
+    register_provider,
+)
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from order.models.order import Order
     from shipping_boxnow.models import BoxNowShipment
 
@@ -33,6 +41,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
     # Carrier-specific request-body keys popped before Order.create().
     payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
+    location_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -79,6 +88,163 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
     def shipment_for_order(self, order: Order):
         return getattr(order, "boxnow_shipment", None)
+
+    def holds_the_parcel(self, shipment: Any) -> bool:
+        """BOX NOW holds a parcel for the shipment (created, or taken over
+        after a P410)."""
+        return shipment.has_parcel
+
+    def pickup_point_address(self, shipment: Any) -> PostalAddress:
+        """The address of the shipment's locker
+        (:meth:`address_of_pickup_point`)."""
+        return self.address_of_pickup_point(
+            {"boxnow_locker_id": shipment.locker_external_id}
+        )
+
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """The daily ``sync_boxnow_lockers`` run, now: BOX NOW lists its
+        destinations whole, with no lookup of one by id."""
+        from shipping_boxnow.services import BoxNowService
+
+        BoxNowService.sync_lockers()
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The locker's address as BOX NOW lists it. Its destinations carry
+        no city field: the city is ``addressLine2`` (BOX NOW API manual
+        v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
+        "ΑΘΗΝΑ"``). Read from the catalogue now, so a locker a later sync
+        added is found (``PickupPointUnknown`` until then)."""
+        return self._address(self._locker(location), location)
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        locker = self._locker(location)
+        if locker is not None and not locker.is_active:
+            raise PickupPointUnknown(
+                f"BOX NOW locker {locker.external_id} is withdrawn."
+            )
+        address = self._address(locker, location)
+        if (locker.country_code or "").upper() != country_code.upper():
+            raise PickupPointInAnotherCountry(
+                f"BOX NOW locker {locker.external_id} is in "
+                f"{locker.country_code}, not {country_code}."
+            )
+        return address
+
+    @staticmethod
+    def _locker(location: Mapping[str, str]):
+        from shipping_boxnow.models import BoxNowLocker
+
+        external_id = location.get("boxnow_locker_id") or ""
+        return BoxNowLocker.objects.filter(external_id=external_id).first()
+
+    @staticmethod
+    def _address(locker, location: Mapping[str, str]) -> PostalAddress:
+        if locker is None or not (locker.postal_code and locker.address_line_2):
+            raise PickupPointUnknown(
+                "The address of BOX NOW locker "
+                f"{location.get('boxnow_locker_id') or ''} is not known."
+            )
+        return PostalAddress(
+            street=locker.address_line_1,
+            street_number="",
+            postal_code=locker.postal_code,
+            city=locker.address_line_2,
+        )
+
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
+        """The BOX NOW records of the orders, cleared of the recipient:
+        each shipment's ``metadata`` at ``BoxNowShipment.PERSONAL_METADATA``
+        (the rest stays), and each parcel event's text and the raw body's
+        ``BoxNowParcelEvent.PERSONAL_RAW`` (the customer BOX NOW names, its
+        text); the events stay. Nothing here is free text staff wrote, so
+        *buyer_values* is not read. Run again for orders already erased, it
+        clears the events that arrived since."""
+        from core.utils.json_paths import drop_paths
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        scrubbed = 0
+        for shipment in BoxNowShipment.objects.filter(order_id__in=order_ids):
+            metadata = shipment.metadata or {}
+            if drop_paths(metadata, BoxNowShipment.PERSONAL_METADATA):
+                BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                    metadata=metadata
+                )
+                scrubbed += 1
+
+        events = 0
+        for event in BoxNowParcelEvent.objects.filter(
+            shipment__order_id__in=order_ids
+        ):
+            raw = (
+                event.raw_payload if isinstance(event.raw_payload, dict) else {}
+            )
+            dropped = drop_paths(raw, BoxNowParcelEvent.PERSONAL_RAW)
+            if event.additional_information or dropped:
+                event.additional_information = ""
+                event.raw_payload = raw
+                event.save(
+                    update_fields=["additional_information", "raw_payload"]
+                )
+                events += 1
+
+        return {
+            "carrier_pii_scrubbed": scrubbed,
+            "carrier_events_scrubbed": events,
+        }
+
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders BOX NOW wrote a record of since *since*: a shipment
+        row or a parcel event, read from the rows written since then."""
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        return set(
+            BoxNowShipment.objects.filter(updated_at__gte=since).values_list(
+                "order_id", flat=True
+            )
+        ) | set(
+            BoxNowParcelEvent.objects.filter(
+                created_at__gte=since, shipment__isnull=False
+            ).values_list("shipment__order_id", flat=True)
+        )
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What BOX NOW reported about each order's recipient, for a data
+        export: each parcel event's text and the raw body's
+        ``BoxNowParcelEvent.PERSONAL_RAW`` (the customer it names), what
+        :meth:`erase_recipient_data` clears."""
+        from core.utils.json_paths import pick_paths
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        data: dict[int, dict] = {}
+        for order_id, text, raw in (
+            BoxNowParcelEvent.objects.filter(shipment__order_id__in=order_ids)
+            .order_by("event_time")
+            .values_list(
+                "shipment__order_id", "additional_information", "raw_payload"
+            )
+        ):
+            entry = data.setdefault(order_id, {})
+            # A polled event keeps its text in the raw body only.
+            polled = pick_paths(raw, (("event", "additionalInformation"),))
+            text = text or polled.get("event", {}).get(
+                "additionalInformation", ""
+            )
+            if text:
+                entry.setdefault("boxnow_event_texts", []).append(text)
+            customer = pick_paths(raw, (("data", "customer"),))
+            if customer:
+                entry.setdefault("boxnow_customers", []).append(
+                    customer["data"]["customer"]
+                )
+        return {order_id: entry for order_id, entry in data.items() if entry}
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
@@ -155,15 +321,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         payload: dict[str, Any],
     ) -> dict[str, list[str]]:
-        """Locker required for a locker order, and it must be in the
-        delivery country.
-
-        A locker absent from the local ``BoxNowLocker`` cache is
-        ACCEPTED with a warning rather than rejected: the daily sync
-        task lags behind BoxNow's own catalogue, so a locker that
-        genuinely exists can be momentarily unknown to us — rejecting
-        it would block a real order over our own stale cache, not a
-        bad selection.
+        """Locker required for a locker order, and deliverable: held by
+        the catalogue, active and in the delivery country
+        (``deliverable_pickup_point``). Order creation refuses it first,
+        field-coded and after one resync of the catalogue
+        (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
         """
         from django.utils.translation import gettext_lazy as _
 
@@ -183,33 +345,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
                 ]
             }
 
-        from shipping_boxnow.models import BoxNowLocker
-
-        locker = BoxNowLocker.objects.filter(external_id=locker_id).first()
-        if locker is None:
-            logger.warning(
-                "BoxNow locker %s not found in the local cache — "
-                "accepting anyway (daily sync lags BoxNow's own catalogue)",
-                locker_id,
-                extra={"boxnow_locker_external_id": locker_id},
-            )
-            return {}
-
-        order_country = (payload.get("country_id") or "").upper()
-        if (
-            order_country
-            and locker.country_code
-            and locker.country_code.upper() != order_country
-        ):
-            return {
-                "boxnow_locker_id": [
-                    str(
-                        _("The selected locker is not in the delivery country.")
-                    )
-                ]
-            }
-
-        return {}
+        return self.pickup_point_errors(
+            "boxnow_locker_id",
+            {"boxnow_locker_id": str(locker_id)},
+            country_code=payload.get("country_id") or "",
+        )
 
     def assert_parcel_fits(
         self,

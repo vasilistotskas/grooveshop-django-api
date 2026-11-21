@@ -1,6 +1,6 @@
 import contextlib
 import smtplib
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from celery.exceptions import Retry
@@ -235,6 +235,7 @@ class TestContactSignals(TestCase):
             # stamped at registration, because the commit hook fires
             # after the request's schema context can unwind.
             mock_dispatch.assert_called_once_with(
+                task_id=ANY,
                 args=[contact.id],
                 headers={"_schema_name": connection.schema_name},
             )

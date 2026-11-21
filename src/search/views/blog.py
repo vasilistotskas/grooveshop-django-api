@@ -16,11 +16,7 @@ from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    SearchThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from search.analytics import record_engine_time
 from search.params import (
     get_max_search_limit,
@@ -32,6 +28,7 @@ from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
     BlogPostTranslationSerializer,
 )
+from search.throttles import SearchThrottle
 from tenant.permissions import IsBlogEnabled
 
 
@@ -117,7 +114,7 @@ def blog_post_meili_search(request):
     )
 
     # Greeklish queries match the indexed ``*_greeklish`` shadow fields
-    # directly (see search/transliteration.py) — no query rewriting.
+    # directly (see src/search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
 
     search_qs = BlogPostTranslation.meilisearch.paginate(

@@ -1,6 +1,6 @@
 """HTTP error mapping, token lifecycle and request shaping of BoxNowClient.
 
-Covers ``shipping_boxnow/client.py`` paths ``test_client.py`` leaves open:
+Covers ``src/shipping_boxnow/client.py`` paths ``test_client.py`` leaves open:
 auth-endpoint failures, token TTL, 401-after-refresh and 403 handling,
 error-envelope parsing (``errorCode`` / ``error`` / non-JSON), transport
 errors, ``_json`` fallbacks, and the query/body shaping of the location,

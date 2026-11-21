@@ -1,6 +1,6 @@
 """Branch coverage for the Meilisearch Celery tasks (client mocked).
 
-Covers ``meili/tasks.py``: ``index_document_task`` (missing instance,
+Covers ``src/meili/tasks.py``: ``index_document_task`` (missing instance,
 successful add, failed Meilisearch task, swallowed removal failure),
 ``delete_document_task`` (success, document-not-found, failure) and
 ``reindex_model_task`` (clear-first, batching, filtering, partial failure).

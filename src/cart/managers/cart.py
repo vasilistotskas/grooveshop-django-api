@@ -170,5 +170,6 @@ class CartManager(OptimizedManager):
     # cart with items — after 30 days, and was wired to no scheduled task
     # (a foot-gun inviting a future engineer to schedule it). Removed:
     # cart cleanup is owned by the guest-only Celery tasks in
-    # ``core/tasks.py`` (``cleanup_abandoned_carts`` / ``cleanup_old_guest_carts``),
-    # which never touch authenticated users' carts.
+    # ``cart.tasks`` (``cleanup_abandoned_carts`` /
+    # ``cleanup_old_guest_carts``), which never touch authenticated
+    # users' carts.

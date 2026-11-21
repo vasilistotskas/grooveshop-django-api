@@ -23,16 +23,18 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
+from core.cache.invalidation import mark_surface_stale
+from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.locks import lock_with_order
-from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
+from shipping.services import DELIVERY_NOTES_MAX_LEN, CourierNotes
 from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
 from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
@@ -80,7 +82,7 @@ _COD_PAYMENT_METHOD = "acs_cod"
 
 # State-transition tables (string literals to avoid importing
 # order.enum.status at module import time and risking a circular
-# import chain since order/services.py imports shipping providers).
+# import chain since src/order/services.py imports shipping providers).
 
 _SHIPPED_STATES: frozenset[AcsShipmentState] = frozenset(
     {
@@ -125,7 +127,7 @@ _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
 # DB without re-running the payload builder. Strictly operational —
 # recipient PII (name/address/phone/email) is intentionally excluded
 # because shipment.metadata is not cleared by GDPR anonymisation
-# (see user/services/gdpr.py) and we don't want a shadow PII copy.
+# (see src/user/services/gdpr.py) and we don't want a shadow PII copy.
 _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Pickup_Date",
     "Sender",
@@ -146,6 +148,30 @@ _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Language",
     "Delivery_Notes",
 )
+
+
+def _floor_label(order: Order) -> str:
+    """The order's floor as the courier reads it: the choice's Greek label
+    ("2ος όροφος"), the text the checkout shows, or "" without one.
+
+    It rides in ``Delivery_Notes`` (free text by ACS's manual, p. 7). The
+    manual's ``Recipient_Floor`` gives no format or allowed values (p. 6),
+    so the field is not sent until an ACS stage voucher shows how a value
+    lands; the floor then moves there and out of the notes.
+    """
+    if not order.floor:
+        return ""
+    if order.floor not in FloorChoicesEnum.values:
+        # The column's choices are not a database constraint: a value
+        # outside them must not keep the voucher from being issued.
+        logger.warning(
+            "Order %s has a floor outside the choices: %r",
+            order.id,
+            order.floor,
+        )
+        return ""
+    with translation.override("el"):
+        return str(FloorChoicesEnum(order.floor).label)
 
 
 def _recipient_name(order: Order) -> str:
@@ -191,9 +217,30 @@ def _stale_claim_message(age: float) -> str:
     )
 
 
-def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
-    """Return a PII-scrubbed copy of the create-voucher params."""
-    return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+def _audit_envelope(params: dict[str, Any], order: Order) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the create-voucher params, built
+    with them (``create_voucher_for_order``) from the same order.
+
+    ``Delivery_Notes`` is recorded as the customer's note the voucher
+    carried (:attr:`CourierNotes.customer_part`), without the floor and
+    the address line 2 that ride ahead of it: those are the recipient's
+    address, which this copy does not hold.
+    """
+    envelope = {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+    if "Delivery_Notes" in envelope:
+        envelope["Delivery_Notes"] = _delivery_notes(order).customer_part
+    return envelope
+
+
+def _delivery_notes(order: Order) -> CourierNotes:
+    """The voucher's ``Delivery_Notes``: the floor, the address line 2
+    and the customer's note. The floor and the address line come first:
+    ACS's ``Recipient_Address`` is the street alone, so they ride here."""
+    return CourierNotes(
+        floor=_floor_label(order),
+        address_line_2=order.address_line_2,
+        customer_notes=order.customer_notes,
+    )
 
 
 def _kg_from_grams(weight_grams: int | None) -> str:
@@ -585,6 +632,7 @@ class AcsService:
         # ----- Phase 2: API call (no DB lock held) -----
         try:
             params = cls._build_create_voucher_params(order, shipment, client)
+            audit_request = _audit_envelope(params, order)
         except Exception as exc:
             # Nothing was sent. Refused locally (an invalid postcode) or
             # failed building the request: record it where the admin
@@ -775,10 +823,10 @@ class AcsService:
                 # attempt so ops looking at the row don't mistake an old
                 # error for the current state. Mirrors BoxNow's success
                 # path which already nulls ``last_error`` (see
-                # shipping_boxnow/services.py).
+                # src/shipping_boxnow/services.py).
                 metadata.pop("last_error", None)
                 metadata["create_response"] = result
-                metadata["create_request"] = _audit_envelope(params)
+                metadata["create_request"] = audit_request
                 metadata["multipart_vouchers"] = children
 
                 # The answer came after another worker found this claim
@@ -797,6 +845,8 @@ class AcsService:
                 shipment.voucher_request_unknown_at = None
                 shipment.voucher_request_held_at = None
                 shipment.metadata = metadata
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
                 shipment.save(
                     update_fields=[
                         "voucher_no",
@@ -804,6 +854,7 @@ class AcsService:
                         "voucher_request_unknown_at",
                         "voucher_request_held_at",
                         "metadata",
+                        "updated_at",
                     ]
                 )
                 cls._settle_unrecognised_vouchers(
@@ -832,7 +883,7 @@ class AcsService:
         sent_notes = params.get("Delivery_Notes", "") or ""
         raw_notes_len = len(order.customer_notes or "")
         # ``notes_truncated`` derives from the post-sanitize length —
-        # ``sanitize_delivery_notes`` collapses whitespace runs before
+        # ``CourierNotes`` collapses whitespace runs before
         # truncating, so a raw note of 600 spaces sanitises to "" and
         # was NOT truncated even though raw_len > MAX. The sanitiser
         # caps at exactly MAX, so sent_len == MAX is the truncation
@@ -983,7 +1034,9 @@ class AcsService:
                     "response": getattr(exc, "raw", None),
                 }
                 fresh.metadata = metadata
-                fresh.save(update_fields=["metadata"])
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
+                fresh.save(update_fields=["metadata", "updated_at"])
         except Exception:
             logger.warning(
                 "Failed to persist last_error for shipment=%s",
@@ -1453,7 +1506,7 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            "Delivery_Notes": sanitize_delivery_notes(order.customer_notes),
+            "Delivery_Notes": _delivery_notes(order).sent,
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:
@@ -1638,11 +1691,14 @@ class AcsService:
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment.cancel_requested_at = timezone.now()
             shipment.metadata = metadata
+            # ``updated_at`` too: the erasure sweep reads a write to the
+            # row by it (``AcsCarrier.orders_written_since``).
             shipment.save(
                 update_fields=[
                     "shipment_state",
                     "cancel_requested_at",
                     "metadata",
+                    "updated_at",
                 ]
             )
 
@@ -3344,6 +3400,10 @@ class AcsService:
                 .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
+            if deactivated:
+                # ``update`` sends no ``post_save``: the cached station
+                # list would keep serving the withdrawn stations.
+                mark_surface_stale("shipping")
 
         return {"upserted": upserted, "deactivated": deactivated}
 
@@ -3980,7 +4040,7 @@ class AcsService:
         Fires ``order_paid`` so the standard signal chain (Meta CAPI
         Purchase dispatch) runs — ``mark_as_paid`` only persists
         ``payment_status``; the post_save handler in
-        ``order/signals/handlers.py`` only emits ``order_paid`` on a
+        ``src/order/signals/handlers.py`` only emits ``order_paid`` on a
         PENDING → PROCESSING status transition with ``is_paid=True``,
         and COD orders are already at PROCESSING by the time we reach
         here (status was advanced at voucher-mint time). After the

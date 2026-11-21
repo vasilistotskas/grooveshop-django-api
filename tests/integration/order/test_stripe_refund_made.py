@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 import stripe
@@ -26,6 +26,7 @@ from order.models import OrderHistory
 from order.models.refund_attempt import RefundAttemptStatus
 from order.payments.payment import REFUND_ATTEMPT_METADATA_KEY
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_charge_refunded,
@@ -339,7 +340,7 @@ class TestRefundWebhook:
                 True,
                 {"refund_id": "re_in_app_1", "amount": "15.00"},
             )
-            OrderService.refund_order(order, amount=Money("15.00", "EUR"))
+            RefundService.refund_order(order, amount=Money("15.00", "EUR"))
         assert len(refunded_signals) == 1
 
         _deliver("re_in_app_1", "pi_in_app_1", 1500)
@@ -360,7 +361,7 @@ class TestRefundWebhook:
                 True,
                 {"refund_id": "re_mixed_in_app", "amount": "5.00"},
             )
-            OrderService.refund_order(order, amount=Money("5.00", "EUR"))
+            RefundService.refund_order(order, amount=Money("5.00", "EUR"))
         _deliver("re_mixed_in_app", "pi_mixed_1", 500)
 
         assert [r.amount.amount for r in _refunds(order)] == [
@@ -404,7 +405,7 @@ class TestRefundWebhook:
         assert mock_email.call_count == 1
         [refund] = _refunds(order)
         mock_email.assert_called_with(
-            args=[refund.pk], headers={"_schema_name": "public"}
+            task_id=ANY, args=[refund.pk], headers={"_schema_name": "public"}
         )
 
     def test_charge_refunded_books_no_order_refund(self):
@@ -439,7 +440,7 @@ class TestAWebhookRefundIsKeyedLikeEveryOtherPath:
 
         order = _order("pi_keyed_1", amount_due=Money("50.00", "EUR"))
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-            OrderService.refund_order(order, amount=Money("20.00", "EUR"))
+            RefundService.refund_order(order, amount=Money("20.00", "EUR"))
         [attempt] = order.refund_attempts.all()
         assert attempt.status == RefundAttemptStatus.PENDING
 

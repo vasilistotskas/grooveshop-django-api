@@ -103,7 +103,7 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
         knox 5.1.0 walks ``auth_token.user.auth_token_set``: the reverse
         accessor of the tenant-only ``knox.AuthToken``, which
         ``PlatformStaffToken`` gives up for ``platform_staff_tokens``
-        (``tenant/models.py``). Inherited, it queried ``knox_authtoken``
+        (``src/tenant/models.py``). Inherited, it queried ``knox_authtoken``
         inside the public-schema block below, where that table does not
         exist, and every staff token request answered 500. Same contract
         as knox's: delete the user's other expired staff tokens, delete

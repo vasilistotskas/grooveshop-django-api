@@ -45,7 +45,7 @@ refunded, payment by payment) and:
 - records each refund the provider accepted as it goes, and signals it, so a
   failure on the second payment keeps (and has announced) the first; the shares
   after a refused one are released (`DECLINED`), they were never called;
-- returns a `RefundResult` (`src/order/services.py`): `refunded` (the money
+- returns a `RefundResult` (`src/order/refunds/service.py`): `refunded` (the money
   that actually moved, a `Money`), `refund_ids`, and `declined` (the provider's
   answer for the share it did not make, `None` when every share was). Never a
   yes/no: a refund declined part-way reports what DID move, so no caller tells
@@ -76,9 +76,12 @@ webhook books the refund and settles the attempt. Cash shares are not attempts
 to resume: their `repayment_reference` is their key. A different amount is its
 own refund under its own key. **What each outcome does to the attempt**: a
 refusal (`success` false without `outcome_unknown`: Stripe 4xx,
-`Success: false` from Viva) marks it `DECLINED` and frees its amount; an
-**unknown outcome** (`outcome_unknown` in the answer: a timeout, a dropped
-connection, a 5xx, or Viva accepting without a `TransactionId`, which cannot be
+`Success: false` from Viva, or a request never sent: a Viva store without the
+Merchant ID and API Key, which `VivaWalletPaymentProvider.has_basic_credentials`
+checks before sending, or a connection that timed out before it was made) marks
+it `DECLINED` and frees its amount; an **unknown outcome** (`outcome_unknown` in
+the answer, only for a request that may have reached the provider: a read
+timeout, a dropped connection, a 5xx, or Viva accepting without a `TransactionId`, which cannot be
 booked under an id the 1797 would not repeat) keeps it `PENDING`, because the
 refund may have been made, writes a staff note saying so, and lets the webhook,
 a retry or the reconciliation below settle it. It keeps holding its amount
@@ -98,7 +101,7 @@ stay under the 24 hours Stripe remembers a key) is *overdue*
 attempt is never sent again: a retry of its amount is refused (Stripe may have
 forgotten the key, so a resend could refund twice). Three things resolve it,
 all through the ledger paths a refund made in one go takes
-(`OrderService.book_share` settles, a `DECLINED` status frees):
+(`RefundService.book_share` settles, a `DECLINED` status frees):
 
 - the provider's webhook (`record_refund`);
 - the beat task `order.tasks.reconcile_pending_refunds`
@@ -173,7 +176,7 @@ REFUNDED, once, with the last refund**: the loyalty points
 once per order). Gift-card value does not go through `order_refunded`: there is
 no receiver for it. `refund_order` credits the cards itself, in parts, with the
 value of a refund beyond the provider's money (`GiftCardService.credit_refund`,
-called from `OrderService._return_stored_value`; [§7.2](refunds.md)). When the
+called from `RefundService._return_stored_value`; [§7.2](refunds.md)). When the
 order used gift cards and points, the excess is split between them in
 proportion to what each has not yet got back
 (`PaymentLedger.split_stored_value`): the cards get their share, not the whole

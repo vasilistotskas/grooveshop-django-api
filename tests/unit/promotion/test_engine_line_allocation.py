@@ -13,9 +13,9 @@ from decimal import Decimal
 
 import pytest
 
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 
 pytestmark = pytest.mark.django_db
 

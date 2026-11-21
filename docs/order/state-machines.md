@@ -105,7 +105,7 @@ No explicit table — flips are direct assignments. Common paths:
 | `PENDING → COMPLETED` | `Order.mark_as_paid()` (called by Stripe + Viva success handlers, COD reconcile) |
 | `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`); a poll that reads the payment failed or canceled (`OrderService._apply_polled_payment_status`, [§4.1](payments.md)) |
 | `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. (continues under the table) |
-| `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Every refund path writes a `PaymentTransaction` REFUND row and `PaymentLedger.record_refund` derives the status from the ledger's sums in that one place ([§7.3](payment-ledger.md)): `OrderService.refund_order` (the in-app refund, the staff "Refund" action, a cancel), `handle_stripe_refund_made` ([§4.2](payments.md)) and the Viva reversal webhook (`_handle_reversal_created`, event 1797, [§4.3](payments.md)). (continues under the table) |
+| `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Every refund path writes a `PaymentTransaction` REFUND row and `PaymentLedger.record_refund` derives the status from the ledger's sums in that one place ([§7.3](payment-ledger.md)): `RefundService.refund_order` (the in-app refund, the staff "Refund" action, a cancel), `handle_stripe_refund_made` ([§4.2](payments.md)) and the Viva reversal webhook (`_handle_reversal_created`, event 1797, [§4.3](payments.md)). (continues under the table) |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `src/order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). (continues under the table) |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
 | `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. (continues under the table) |
@@ -148,9 +148,11 @@ the order stays CANCELED and nothing ships. Idempotent per payment id. A
 REFUNDED / PARTIALLY_REFUNDED canceled order still ignores a stale success.
 
 `Order.clean()` refuses a COMPLETED payment with `amount_due` 0.00
-unless deductions cover the whole total (`Order._payment_consistency_errors`)
-— the admin form edits both fields. It is not a `CheckConstraint`: the
-total is a sum over the order's lines.
+unless deductions cover the whole total (`Order._payment_consistency_errors`).
+The error is the whole order's (`NON_FIELD_ERRORS`): the admin shows both
+fields read-only, and a form error on a field with no input makes the save
+a 500. It is not a `CheckConstraint`: the total is a sum over the order's
+lines.
 
 ### 2.3 The follow-up flag (`src/order/lifecycle/follow_up.py`)
 

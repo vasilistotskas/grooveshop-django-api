@@ -26,11 +26,14 @@ that is neither is refused (the store is not ready), never guessed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
+from enum import StrEnum
 from typing import Literal
 
 from django.conf import settings
 
 from core.store_settings import store_setting
+from order.accounting.movement import xml_character
 from tenant.credentials import mydata_credentials
 from tenant.membership import is_demo_store
 
@@ -41,6 +44,44 @@ _BASE_URLS: dict[Environment, str] = {
     "dev": "https://mydataapidev.aade.gr",
     "prod": "https://mydatapi.aade.gr/myDATA",
 }
+
+#: The longest ``series`` AADE takes (``InvoiceHeaderType``, the XSD's
+#: ``maxLength``); a document's series is its prefix and ``-<year>``.
+SERIES_MAX_LENGTH = 50
+SERIES_PREFIX_MAX_LENGTH = SERIES_MAX_LENGTH - len("-YYYY")
+
+
+def validate_series_prefix_setting(value: object) -> bool:
+    """Validator for ``MYDATA_INVOICE_SERIES_PREFIX`` and
+    ``MYDATA_CREDIT_SERIES_PREFIX``: text whose series fits AADE's, and
+    that AADE reads exactly as it was hashed. The uid is the hash of the
+    series as given, while the payload leaves out what XML cannot carry and
+    a parser reads a carriage return as a line feed (XML 1.0 §2.11): such
+    a character, or any line break or tab, would give a uid AADE never
+    lists for the series it received."""
+    return (
+        isinstance(value, str)
+        and len(value) <= SERIES_PREFIX_MAX_LENGTH
+        and all(
+            xml_character(character) and character not in "\t\n\r"
+            for character in value
+        )
+    )
+
+
+class MyDataRequirement(StrEnum):
+    """One condition of :meth:`MyDataConfig.is_ready`; a credential is
+    named by its ``Tenant`` field."""
+
+    ENABLED = "enabled"
+    ENVIRONMENT = "environment"
+    FHM_EXEMPTION_GROUND = "fhm_exemption_ground"
+    USER_ID = "mydata_user_id"
+    SUBSCRIPTION_KEY = "mydata_subscription_key"
+
+
+#: The store's own myDATA credentials, in the order they are listed.
+CREDENTIALS = (MyDataRequirement.USER_ID, MyDataRequirement.SUBSCRIPTION_KEY)
 
 
 @dataclass(frozen=True)
@@ -81,19 +122,44 @@ class MyDataConfig:
         relies on, so no ΦΗΜ exemption is needed for them."""
         return self.environment == "dev" and not self.takes_real_orders
 
+    def unmet(self) -> list[MyDataRequirement]:
+        """The conditions of :meth:`is_ready` this store does not meet, in
+        order: myDATA enabled, a known environment, the legal ground of its
+        ΦΗΜ exemption recorded (or only issuing to the sandbox), and its
+        credentials populated. The store dashboard tells the merchant
+        which ones are missing from this same list."""
+        checks = (
+            (MyDataRequirement.ENABLED, self.enabled),
+            (MyDataRequirement.ENVIRONMENT, self.environment is not None),
+            (
+                MyDataRequirement.FHM_EXEMPTION_GROUND,
+                self.fhm_exemption_ground or self.issues_to_sandbox_only,
+            ),
+            (MyDataRequirement.USER_ID, self.user_id),
+            (MyDataRequirement.SUBSCRIPTION_KEY, self.subscription_key),
+        )
+        return [requirement for requirement, met in checks if not met]
+
     def is_ready(self) -> bool:
         """True when the platform issues this store's retail documents:
-        myDATA is enabled with a known environment, the store has
-        recorded the legal ground of its ΦΗΜ exemption (or only issues to
-        the sandbox), and its credentials are populated. The call sites
-        should no-op rather than raise when False — the store then issues
-        its documents outside the platform."""
-        return bool(
-            self.enabled
-            and self.environment is not None
-            and (self.fhm_exemption_ground or self.issues_to_sandbox_only)
-            and self.user_id
-            and self.subscription_key
+        every condition of :meth:`unmet` holds. The call sites should no-op
+        rather than raise when False — the store then issues its documents
+        outside the platform."""
+        return not self.unmet()
+
+    @property
+    def send_window(self) -> timedelta:
+        """How long after it began a send to AADE may still register: the
+        one rule for whether a send has ended. :class:`MyDataClient` gives
+        up after ``request_timeout_seconds`` to connect and as long again
+        for AADE's answer to start, and ``MYDATA_RETRY_AFTER_MINUTES``
+        past that is the margin in which nothing is concluded of it (AADE
+        may finish a request whose client gave up, and its worker may still
+        be recording the answer). Within it a send with no answer on record
+        is in flight, and a lookup that finds nothing does not decide it."""
+        return timedelta(
+            seconds=2 * self.request_timeout_seconds,
+            minutes=settings.MYDATA_RETRY_AFTER_MINUTES,
         )
 
     def issues_automatically(self) -> bool:

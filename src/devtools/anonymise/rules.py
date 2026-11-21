@@ -182,6 +182,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "last_name": Kind.LAST_NAME,
             "phone": Kind.PHONE,
             "notes": Kind.FREE_TEXT,
+            "address_line_2": Kind.BLANK,
             **_ADDRESS,
         },
     ),
@@ -224,6 +225,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "last_name": Kind.LAST_NAME,
             "phone": Kind.PHONE,
             "place": Kind.PLACE,
+            "address_line_2": Kind.BLANK,
             "customer_notes": Kind.FREE_TEXT,
             "billing_vat_id": Kind.VAT_ID,
             "billing_company_name": Kind.COMPANY,
@@ -244,6 +246,10 @@ REGISTRY: dict[str, Scrub | Delete] = {
         order_fk="order",
         fields={
             "buyer_snapshot": Kind.JSON,
+            # A receipt with movement names the buyer, by name and address,
+            # to AADE (its counterpart, which AADE requires of a movement
+            # document), and a home delivery's address.
+            "movement": Kind.JSON,
             "mydata_error_message": Kind.TEXT,
         },
     ),

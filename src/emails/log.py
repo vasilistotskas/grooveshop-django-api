@@ -11,41 +11,44 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Generator
+from contextlib import ExitStack, contextmanager
 from typing import Any
 
 import requests
-from celery import current_task
-from django.db import Error, transaction
+from django.db import Error, InterfaceError, OperationalError, transaction
 from django.utils import timezone
 
+from core.db.locks import LockWaitRanOut, held_across_calls
 from emails import optout
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
 from emails.status import NOT_SENT, Status
+from tenant.celery import dispatch_key
 
 logger = logging.getLogger(__name__)
 
-_DELIVERY_NAMESPACE = uuid.uuid5(
-    uuid.NAMESPACE_URL, "grooveshop:email-delivery"
-)
+_DELIVERY_NAMESPACE = "email-delivery"
+#: The advisory lock of one delivery. Advisory locks are per database, which
+#: every schema shares; a delivery id is unique across them.
+_LOCK_KEY = "emails.delivery:{delivery}"
 
 
-def delivery_id(type_key: str, recipient_hash: str, subject: str) -> uuid.UUID:
+def delivery_id(
+    type_key: str, recipient_hash: str, subject: str
+) -> uuid.UUID | None:
     """The identity of one delivery: the row's uuid and the provider's
     idempotency key.
 
-    Inside a Celery task it is derived from the task id, which every
-    ``retry()`` keeps, plus the type, the recipient and the subject, so the
-    retry of a send whose response was lost is the same delivery and reuses
-    its row and key. Outside a task (a synchronous send) it is fresh.
+    Inside a Celery task it is derived from the task id, plus the type, the
+    recipient and the subject (``tenant.celery.dispatch_key``). Every copy of
+    a task carries the same id: its retries, a message delivered again, and
+    the sweep's copy of a publish that also went out
+    (``tenant.celery.dispatch_on_commit`` picks the id). Each copy's send is
+    therefore the same delivery and reuses its row and key. None outside a
+    task: a synchronous send is a delivery of its own, under a fresh uuid.
     """
-    task_id = getattr(getattr(current_task, "request", None), "id", None)
-    if not task_id:
-        return uuid.uuid4()
-    return uuid.uuid5(
-        _DELIVERY_NAMESPACE,
-        f"{task_id}|{type_key}|{recipient_hash}|{subject}",
-    )
+    return dispatch_key(_DELIVERY_NAMESPACE, type_key, recipient_hash, subject)
 
 
 def validate_retention_days_setting(value: object) -> bool:
@@ -93,21 +96,31 @@ def record_skip(
     )
 
 
-def start(
+@contextmanager
+def delivering(
     type_key: str,
     recipient: Recipient,
     subject: str,
     *,
     test_by: Any = None,
-) -> EmailLog:
-    """The row of a message about to be sent. The retry of a task finds the
-    row its earlier attempt wrote (same delivery id): one the provider has is
-    returned as it is, so the caller does not send it again, any other goes
-    back to ``QUEUED``. When the row cannot be written the message is sent
-    anyway and the row stays unsaved."""
+) -> Generator[EmailLog]:
+    """The row of a message about to be sent, held until the block ends.
+
+    Another copy of the task (``delivery_id``) finds the row the earlier one
+    wrote: one the provider has is yielded as it is, so the caller does not
+    send it again; any other goes back to ``QUEUED``. When the row cannot be
+    written the message is sent anyway and the row stays unsaved.
+
+    The copies can run at the same time: the sweep's copy of a publish and
+    the message that publish wrote are delivered together once the broker
+    takes messages again. So the row is read and the message sent under a
+    lock on the delivery (``_one_copy_at_a_time``), and the copy that waits
+    finds the row sent.
+    """
     fields = _recipient_fields(recipient)
+    delivery = delivery_id(type_key, fields["recipient_hash"], subject)
     entry = EmailLog(
-        uuid=delivery_id(type_key, fields["recipient_hash"], subject),
+        uuid=delivery or uuid.uuid4(),
         type_key=type_key,
         status=Status.QUEUED,
         subject=subject,
@@ -116,6 +129,11 @@ def start(
     )
     if test_by is not None:
         entry.triggered_by_staff = test_by
+    with _one_copy_at_a_time(delivery):
+        yield _claim(entry)
+
+
+def _claim(entry: EmailLog) -> EmailLog:
     try:
         earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
     except Error:
@@ -128,6 +146,43 @@ def start(
         earlier.error = ""
         _write(earlier, update_fields=["status", "error", "updated_at"])
     return earlier
+
+
+@contextmanager
+def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
+    """Hold the advisory lock of *delivery* for the block
+    (``core.db.locks.held_across_calls``), for as long as the transport
+    takes.
+
+    Only a send inside a task can have another copy; a synchronous send's id
+    is fresh and takes no lock. A worker that dies takes its session and the
+    lock with it, and the copy that waits sends.
+
+    A wait that runs out (``statement_timeout``, or ``lock_timeout`` where a
+    session sets one) raises ``core.db.locks.LockWaitRanOut``, an
+    ``OperationalError``, which every mail task retries: the copy ahead is
+    still sending. A database that cannot be
+    reached (any other ``OperationalError`` or ``InterfaceError``) does not
+    stop the send, as it does not for the row (``_write``): an alert about
+    that database must go out. Any other database error is a bug and is
+    raised: sending without the lock would let two copies send.
+    """
+    if delivery is None:
+        yield
+        return
+    key = _LOCK_KEY.format(delivery=delivery)
+    with ExitStack() as held:
+        try:
+            held.enter_context(held_across_calls(key))
+        except (OperationalError, InterfaceError) as error:
+            if isinstance(error, LockWaitRanOut):
+                raise
+            logger.exception(
+                "Email delivery %s is sent without its lock",
+                key,
+                extra={"email_log": key},
+            )
+        yield
 
 
 def mark_sent(

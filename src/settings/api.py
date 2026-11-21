@@ -7,7 +7,7 @@ from settings.env import DEBUG
 # Rest Framework
 REST_FRAMEWORK = {
     # Every error gains ``code`` (and ``fields`` for validation); see
-    # core/api/exception_handler.py.
+    # src/core/api/exception_handler.py.
     "EXCEPTION_HANDLER": "core.api.exception_handler.exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.api.tokens.BoundedTokenAuthentication",
@@ -31,7 +31,7 @@ REST_FRAMEWORK = {
         # Tenant scoping is NOT enforced here. Customers live in their
         # tenant's own schema, so an authenticated request on this host
         # is by construction a customer of THIS store — see
-        # tenant/membership.py. The previous default additionally
+        # src/tenant/membership.py. The previous default additionally
         # required a UserTenantMembership, which no shopper can hold
         # (public-schema table, FK to the public user table), so every
         # authenticated write was refused.
@@ -53,7 +53,7 @@ REST_FRAMEWORK = {
         "user": None if DEBUG else "150000/day",
         # Per-endpoint scopes. Applied via throttle_classes on specific views
         # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
-        # in core.api.throttling) — the global anon/user throttles continue to
+        # in each app's ``throttles`` module) — the global anon/user throttles continue to
         # apply on top.
         "contact": None if DEBUG else "5/minute",
         "feedback": None if DEBUG else "5/minute",
@@ -155,7 +155,7 @@ REST_FRAMEWORK = {
 }
 
 # How long a cart remembers the gift-card codes it has already tried
-# (``core.api.throttling.GiftCardCodeThrottle``): within it, sending one
+# (``giftcard.throttles.GiftCardCodeThrottle``): within it, sending one
 # of them again is use, not a new guess. About the length of a checkout.
 GIFT_CARD_CODES_SEEN_TTL_SECONDS = int(
     getenv("GIFT_CARD_CODES_SEEN_TTL_SECONDS", "1800")

@@ -12,6 +12,13 @@ class OrderSignalHandlersTestCase(TestCase):
         self.order.id = 1
         self.order.status = OrderStatus.PENDING
         self.order._original_status = None
+        # An order without tracking, before and after the save: a Mock would
+        # answer each of these with a distinct truthy Mock, which reads as
+        # tracking recorded and sends the shipment-dispatched signal too.
+        self.order.tracking_number = ""
+        self.order.shipping_carrier = ""
+        self.order._original_tracking_number = ""
+        self.order._original_shipping_carrier = ""
 
         self.sender = MagicMock()
 

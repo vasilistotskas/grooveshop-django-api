@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+from django.apps import apps
+from django.core.exceptions import ImproperlyConfigured
+from django.utils.module_loading import module_has_submodule
 from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface, register_surface
 
-#: Where Nitro keeps its cached page renders (``_nuxt_routes``).
+#: Where Nitro keeps its cached page renders (``nuxt_routes``).
 NUXT_ROUTE_PREFIX = "cache:nitro:routes:"
 
 #: Every page the storefront has cached for a store, and its settings read.
@@ -19,21 +24,21 @@ SITEMAP_SEO_SURFACE = "sitemap_seo"
 SALE_UPDATE_FIELDS = frozenset({"stock", "updated_at"})
 
 
-def _nuxt(*names: str) -> tuple[str, ...]:
+def nuxt_handlers(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.
 
     Nitro stores cached event handlers under
     ``cache:nitro:handlers:<name>:<key>``. The name must be complete:
     the purge endpoint resolves a trailing-``*`` pattern with unstorage's
     ``getKeys()``, which treats its argument as a key PATH and only
-    matches on ``:`` segment boundaries. Use ``_nuxt_matching`` to sweep a
-    family by name fragment.
+    matches on ``:`` segment boundaries. Use ``nuxt_handlers_matching``
+    to sweep a family by name fragment.
     """
 
     return tuple(f"cache:nitro:handlers:{name}*" for name in names)
 
 
-def _nuxt_matching(*fragments: str) -> tuple[str, ...]:
+def nuxt_handlers_matching(*fragments: str) -> tuple[str, ...]:
     """Build handler patterns that match a NAME FRAGMENT.
 
     ``getKeys("nitro:handlers:Blog")`` returns nothing, because the key's
@@ -51,7 +56,7 @@ def _nuxt_matching(*fragments: str) -> tuple[str, ...]:
     return tuple(f"cache:nitro:handlers:*{fragment}*" for fragment in fragments)
 
 
-def _nuxt_routes(*paths: str) -> tuple[str, ...]:
+def nuxt_routes(*paths: str) -> tuple[str, ...]:
     """Build Nuxt patterns for CACHED SSR PAGES (Nitro route rules).
 
     Nitro keys a cached route as
@@ -65,11 +70,11 @@ def _nuxt_routes(*paths: str) -> tuple[str, ...]:
     starts with ``blog``.
 
     The pattern is ``_:*<path>*`` rather than ``_:<path>*`` for the same
-    segment-boundary reason as ``_nuxt_matching``: the key's segment is
+    segment-boundary reason as ``nuxt_handlers_matching``: the key's segment is
     the full ``blogpost42mnhmhr.<hash>``, so only a leading ``*`` gets the
     regex post-filter applied over the ``nitro:routes:_:`` prefix.
 
-    This differs from ``_nuxt`` above, which targets cached API handlers
+    This differs from ``nuxt_handlers`` above, which targets cached API handlers
     (``cache:nitro:handlers:``). Purging a handler drops the JSON the page
     is built from; purging a route drops the rendered HTML. A merchant
     edit needs BOTH, or the storefront keeps serving the old page from
@@ -90,7 +95,7 @@ def _escaped_pathname(path: str) -> str:
     live keyspace as
     ``cache:nitro:routes:_:index.<hash>:host.<hash>:xdeviceclass.<hash>.json``.
 
-    Without this branch, ``_nuxt_routes("/")`` returned
+    Without this branch, ``nuxt_routes("/")`` returned
     ``routes:_:**``, which matches EVERY cached page render — so a
     caller wanting to drop the homepage silently dropped the whole
     site's SSR cache instead.
@@ -100,11 +105,11 @@ def _escaped_pathname(path: str) -> str:
     return "".join(ch for ch in path if ch.isalnum())[:16]
 
 
-def _nuxt_functions(*names: str) -> tuple[str, ...]:
+def nuxt_functions(*names: str) -> tuple[str, ...]:
     """Build Nuxt patterns for cached FUNCTIONS (``defineCachedFunction``).
 
     Stored as ``cache:nitro:functions:<name>:<args>``. Distinct from both
-    ``_nuxt`` (cached event handlers) and ``_nuxt_routes`` (cached page
+    ``nuxt_handlers`` (cached event handlers) and ``nuxt_routes`` (cached page
     renders) — the sitemap and RSS feeds build their data through cached
     functions, so neither of the other two prefixes ever matched them.
     """
@@ -112,645 +117,154 @@ def _nuxt_functions(*names: str) -> tuple[str, ...]:
     return tuple(f"cache:nitro:functions:{name}*" for name in names)
 
 
-def register_default_surfaces() -> None:
-    """Register the surfaces shipped by ``core``.
+#: The surfaces no single app owns: the settings, every storefront page,
+#: and the sitemap and feeds.
+CORE_SURFACES = (
+    CacheSurface(
+        code="settings",
+        label=_("Site settings"),
+        description=_(
+            "django-extra-settings cache (extra_settings_*) and the"
+            " admin dashboard summary. Touches the Nuxt"
+            " /api/settings proxy and the published seller identity."
+        ),
+        django_patterns=(
+            # django-extra-settings' own cache: cache.py builds its
+            # key as f"extra_settings_{name}", so this matches one
+            # key per Setting row (92 on a provisioned tenant).
+            "*extra_settings_*",
+            "*admin:dashboard*",
+            # NOTE: a "*SettingsViewSet_*" pattern used to sit here
+            # and matched nothing — there is no such class. The
+            # settings API is two plain @api_view functions
+            # (core.api.settings_api.list_settings / get_setting_by_key)
+            # with no cache_page or cache_methods, so it has no
+            # Django response cache to purge. Do not re-add it:
+            # a pattern that matches nothing makes the purge report
+            # success while stale content keeps being served.
+        ),
+        # ``tenantLegalIdentity`` is the storefront's published seller
+        # identity, and it is built from the INVOICE_SELLER_* rows in
+        # extra_settings — so editing them here has to invalidate it.
+        # Without this entry the footer keeps serving the previous
+        # identity for the route's 30-minute maxAge, which for a
+        # merchant who just corrected their GEMI number or address
+        # means the wrong legal identity stays published.
+        #
+        # ``settingsPublic`` is the storefront's ONE settings read
+        # (server/api/settings/public.get.ts, tenant-cached for a
+        # minute). ``nuxt_handlers`` needs the EXACT handler name — the
+        # ``"settings"`` that used to sit here matched no handler
+        # (the route was ``settingsGet``), so purging this surface
+        # never reached the storefront's settings cache.
+        nuxt_patterns=nuxt_handlers("settingsPublic", "tenantLegalIdentity"),
+        # Every store setting lives in an ``extra_settings.Setting``
+        # row: a save from the admin, a shell or a migration has to
+        # purge the caches above, or the storefront keeps the old
+        # settings and seller identity for the routes' lifetime.
+        invalidated_by=("extra_settings.Setting",),
+        invalidates_tenant_config=True,
+        related=("pay_way", "shipping", "loyalty"),
+        icon="tune",
+        group="config",
+    ),
+    CacheSurface(
+        code=STORE_PAGES_SURFACE,
+        label=_("Storefront pages"),
+        description=_(
+            "Every page the storefront has rendered and cached for"
+            " this store, and its settings read. Purges itself when a"
+            " store feature is switched on or off, because the"
+            " navigation, footer and product cards of every page show"
+            " what the store offers."
+        ),
+        django_patterns=(),
+        # The settings read first, so a page rendered between the
+        # two deletions already reads the new switch. Then every
+        # rendered page: one pattern for the whole route family,
+        # which the purge endpoint narrows to this store's keys
+        # (``host``). Purging route keys also queues the edge purge.
+        nuxt_patterns=nuxt_handlers("settingsPublic")
+        + (f"{NUXT_ROUTE_PREFIX}_:*",),
+        invalidates_tenant_config=True,
+        icon="web",
+        group="content",
+    ),
+    CacheSurface(
+        code=SITEMAP_SEO_SURFACE,
+        label=_("Sitemap & SEO"),
+        description=_(
+            "XML sitemap, RSS, llms.txt and the OG image cache."
+            " Purged when a post, product, category or content page"
+            " changes or goes live."
+        ),
+        django_patterns=(),
+        # These are cached FUNCTIONS, not routes: the sitemap source
+        # and the RSS feed build their data through
+        # ``defineCachedFunction`` (``sitemap:blog-posts``,
+        # ``rss:feed``, ``rss:blog-posts``, ...), so the previous
+        # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
+        # matched no key in Redis and this surface's Nuxt half was a
+        # no-op. Verified against the live keyspace.
+        #
+        # The sitemap ITSELF is a route-rule cache (``/sitemap.xml``,
+        # keyed per host): @nuxtjs/sitemap's own cache lived in each
+        # pod's memory, where no purge reached it, so the storefront
+        # turned it off and caches the response in Redis instead.
+        #
+        # Every read the feeds make is a function named ``rss:<what>``
+        # (the storefront's ``server/utils/rssFeed.ts``), so ``rss``
+        # purges the feed and the posts and categories it was built
+        # from.
+        nuxt_patterns=nuxt_functions("sitemap", "rss")
+        + nuxt_routes("/sitemap.xml")
+        + nuxt_handlers("nuxt-ai-ready"),
+        # What the sitemap and the feeds list. A row that goes live at
+        # its publish date is reported by ``core.publication``.
+        invalidated_by=(
+            "blog.BlogPost",
+            "blog.BlogPostTranslation",
+            "blog.BlogCategory",
+            "blog.BlogCategoryTranslation",
+            "product.Product",
+            "product.ProductTranslation",
+            "product.ProductCategory",
+            "product.ProductCategoryTranslation",
+            "page_config.ContentPage",
+            "page_config.ContentPageTranslation",
+        ),
+        # Each order's stock decrement, as on the products surface.
+        ignored_update_fields=SALE_UPDATE_FIELDS,
+        icon="map",
+        group="content",
+    ),
+)
 
-    Each app may register its own surfaces in ``AppConfig.ready()``;
-    this function exists so the core surfaces are colocated and easy
-    to audit in one place.
+
+def register_default_surfaces() -> None:
+    """Register core's surfaces, then every app's.
+
+    An app declares its surfaces as ``SURFACES`` in its own
+    ``cache_surfaces`` module; this collects them, so the whole set is
+    registered before ``connect_surface_invalidation`` reads it and can be
+    registered again after a test empties the registry. Two modules
+    declaring the same code stop the boot: the registry would keep the
+    later one alone, and wire its ``invalidated_by`` in silence.
     """
 
-    register_surface(
-        CacheSurface(
-            code="pay_way",
-            label=_("Payment methods"),
-            description=_(
-                "Payment-method list and detail responses, plus the"
-                " checkout sidebar that displays them. Purge after"
-                " enabling/disabling a PayWay or changing its cost."
-            ),
-            django_patterns=("*PayWayViewSet_*",),
-            nuxt_patterns=_nuxt("PayWayViewSet"),
-            # Operator-driven and rare, so purging on write is cheap —
-            # and necessary: the checkout renders the admin-authored
-            # description and instructions, which used to stay stale for
-            # hours after an edit. ``PayWayTranslation`` is listed
-            # separately because parler keeps each language in its own
-            # row, and editing the Greek copy touches only that row.
-            invalidated_by=(
-                "pay_way.PayWay",
-                "pay_way.PayWayTranslation",
-            ),
-            # ``/api/v1/shipping/options`` embeds each option's eligible
-            # pay-ways (id + name), which the checkout renders as badges
-            # on the delivery step. A PayWay edit makes that payload
-            # stale too, and it is cached under the ``shipping`` surface
-            # rather than this one.
-            related=("shipping",),
-            icon="payments",
-            group="commerce",
-        )
-    )
+    sources = [(__name__, CORE_SURFACES)]
+    for app_config in apps.get_app_configs():
+        if module_has_submodule(app_config.module, "cache_surfaces"):
+            module = import_module(f"{app_config.name}.cache_surfaces")
+            sources.append((module.__name__, module.SURFACES))
 
-    register_surface(
-        CacheSurface(
-            code="recommendations",
-            label=_("Product recommendations"),
-            description=_(
-                "Suggested-product responses and the cached tenant facts"
-                " the strategies consult. Purges itself when a product,"
-                " a curated relation or a slot's configuration changes,"
-                " so a merchant's edit shows on the next request."
-            ),
-            # No ``*ViewSet_*`` pattern: the read endpoint is a function
-            # view that is deliberately NOT ``cache_page``d (every
-            # response mints its own impression id). What lives in
-            # Django's cache is the per-tenant context under ``recs:``.
-            django_patterns=("*recs:*",),
-            nuxt_patterns=_nuxt("productRecommendations"),
-            # Every OPERATOR write that changes what a strategy would
-            # answer. ``RecommendationCandidate`` is deliberately absent:
-            # its rows are rebuilt by queryset delete + bulk_create, and
-            # a post_delete receiver would make Django instantiate and
-            # signal every row — one purge per product across a nightly
-            # full pass. A per-product rebuild is already covered by the
-            # Product/ProductRelation write that triggered it; the full
-            # pass purges once, explicitly, when it finishes
-            # (``recommendation.tasks.recompute_all_candidates``).
-            invalidated_by=(
-                "product.Product",
-                "product.ProductCategory",
-                "product.ProductRelation",
-                "recommendation.RecommendationSlot",
-            ),
-            # The engine reads stock live (its guard drops sold-out
-            # products), so only the storefront's hydrated strips can show
-            # an old stock figure ("only 2 left"), bounded by their TTL like
-            # the listing's cards. A sale does not purge them; a product
-            # that sells out or comes back does.
-            ignored_update_fields=SALE_UPDATE_FIELDS,
-            icon="recommend",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="shipping",
-            label=_("Shipping options"),
-            description=_(
-                "Shipping option matrix, locker pickers and the ACS"
-                " station map. Purge after toggling a provider, editing"
-                " a price, or after a station/locker sync."
-            ),
-            django_patterns=(
-                "*BoxNowLockerViewSet_*",
-                "*AcsStationViewSet_*",
-                "*ShippingPolicyView_*",
-            ),
-            nuxt_patterns=_nuxt(
-                "shipping.options",
-                "shipping.lockers",
-                "shipping.acs.nearest",
-                "shipping.acs.stations",
-                "shipping.freeShippingInfo",
-                "shipping.policy",
-            ),
-            # A rate's price, threshold, weight cap or active flag
-            # changes what ``/shipping/options`` and
-            # ``/shipping/free-shipping-info`` return; a provider's
-            # active/capability flags do too. ``/shipping/policy`` is
-            # cached here and also depends on the per-kind gate, which
-            # for ACS lockers is the synced ``AcsStation`` rows.
-            invalidated_by=(
-                "shipping.ShippingRate",
-                "shipping.ShippingProvider",
-                "shipping_acs.AcsStation",
-            ),
-            icon="local_shipping",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="products",
-            label=_("Products"),
-            description=_(
-                "Product list/detail, images, attributes, related"
-                " products, and the search endpoint."
-            ),
-            # Django ViewSet class names (used by ``cache_methods``):
-            # ``AttributeViewSet`` and ``AttributeValueViewSet`` are
-            # NOT prefixed with ``Product`` even though their Nuxt
-            # handler names are. ``ProductImageViewSet`` is singular
-            # in Django, plural (``ProductImagesViewSet``) in the Nuxt
-            # /products/[id]/images route. Both are listed below.
-            django_patterns=(
-                "*ProductImageViewSet_*",
-                "*ProductCategoryImageViewSet_*",
-                "*AttributeViewSet_*",
-                "*AttributeValueViewSet_*",
-                "*BrandViewSet_*",
-            ),
-            nuxt_patterns=_nuxt(
-                "ProductViewSet",
-                "ProductDetailViewSet",
-                "ProductImageViewSet",
-                "ProductImagesViewSet",
-                "ProductImageDetail",
-                "ProductReviewsViewSet",
-                # Keyed by tenant + product id; every spell is written by
-                # ``product.pricing.service`` through a Product save (a
-                # ``post_save`` on ``product.Product``) or
-                # ``sync_product_prices`` (``mark_surface_stale``).
-                "product-price-history",
-                "ProductTagsViewSet",
-                "ProductAttributeViewSet",
-                "ProductAttributeValueViewSet",
-                "SearchProductViewSet",
-            )
-            + _nuxt_functions("builderDataProduct", "builderDataSlug")
-            # The rendered pages too, not just the JSON behind them:
-            # /products and /products/** are SWR-cached (300s), so
-            # without this a price edit stayed visible for the whole TTL.
-            + _nuxt_routes("/products"),
-            related=("categories", "tags"),
-            # The catalog feeds embed product rows (and the
-            # category names used for g:product_type), and the
-            # gateway caches them for FEED_FRESH_TTL in its own
-            # Redis. Without this a price change took up to six
-            # hours to reach Google, Meta and TikTok.
-            invalidates_gateway_feeds=True,
-            invalidated_by=(
-                "product.Product",
-                "product.ProductTranslation",
-                "product.ProductImage",
-                "product.ProductImageTranslation",
-                "product.ProductHighlight",
-                "product.ProductHighlightTranslation",
-                "product.Attribute",
-                "product.AttributeTranslation",
-                "product.AttributeValue",
-                "product.AttributeValueTranslation",
-                "product.ProductAttribute",
-                "product.Brand",
-                "product.ProductVariantGroup",
-                "product.ProductVariantGroupTranslation",
-                # Moderation shows or hides a review on the product page;
-                # a rate edit moves the average. A customer's new review
-                # is pending, so it costs one batched purge, no more.
-                "product.ProductReview",
-                "product.ProductReviewTranslation",
-            ),
-            # Each order's stock decrement; the product pages show stock,
-            # but checkout re-validates it and the page TTL bounds it. A
-            # sale that sells the product out is not ignored
-            # (``product.availability``): the listing puts sold-out
-            # products last and the builder's lists read this surface's data.
-            ignored_update_fields=SALE_UPDATE_FIELDS,
-            icon="inventory_2",
-            group="catalog",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="categories",
-            label=_("Categories"),
-            description=_(
-                "Category trees, listing pages and the category map"
-                " used for the navbar."
-            ),
-            django_patterns=("*ProductCategoryViewSet_*",),
-            nuxt_patterns=_nuxt(
-                "ProductCategoryViewSet",
-                "ProductCategoryAll",
-                "ProductCategoryDetail",
-            )
-            + _nuxt_functions("builderDataCategory", "builderDataSlug")
-            # Category pages live under /products/category/**, which the
-            # same escaped-path prefix covers.
-            + _nuxt_routes("/products"),
-            # The catalog feeds embed product rows (and the
-            # category names used for g:product_type), and the
-            # gateway caches them for FEED_FRESH_TTL in its own
-            # Redis. Without this a price change took up to six
-            # hours to reach Google, Meta and TikTok.
-            invalidates_gateway_feeds=True,
-            invalidated_by=(
-                "product.ProductCategory",
-                "product.ProductCategoryTranslation",
-                "product.ProductCategoryImage",
-                "product.ProductCategoryImageTranslation",
-            ),
-            icon="category",
-            group="catalog",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="blog",
-            label=_("Blog"),
-            description=_(
-                "Blog post list/detail, related posts, comments,"
-                " categories, tags, and authors."
-            ),
-            django_patterns=(
-                "*BlogPostViewSet_*",
-                "*BlogCategoryViewSet_*",
-                "*BlogTagViewSet_*",
-                "*BlogAuthorViewSet_*",
-            ),
-            # ``cache:nitro:handlers:Blog*`` prefix-matches every Nuxt
-            # blog handler (BlogPostViewSet, BlogPostDetailViewSet,
-            # BlogPostComments, BlogCategoryViewSet, BlogCategoryDetail,
-            # BlogCategoryPostsViewSet, BlogTagViewSet, BlogTagDetail,
-            # BlogAuthorViewSet, BlogAuthorDetail, BlogCommentViewSet).
-            # ``_nuxt_matching("Blog")``, not ``_nuxt("Blog")``: the
-            # latter matched zero keys (see the helper docstrings).
-            # ``_nuxt_routes("/blog")`` adds the rendered pages —
-            # /blog, /blog/categories, /blog/category/**, /blog/post/**
-            # are SWR-cached (600s).
-            nuxt_patterns=_nuxt_matching("Blog")
-            + _nuxt_functions(
-                "builderDataBlogPost",
-                "builderDataBlogCategory",
-                "builderDataSlug",
-            )
-            + _nuxt_routes("/blog"),
-            invalidated_by=(
-                "blog.BlogPost",
-                "blog.BlogPostTranslation",
-                "blog.BlogCategory",
-                "blog.BlogCategoryTranslation",
-                "blog.BlogAuthor",
-                "blog.BlogAuthorTranslation",
-                "blog.BlogTag",
-                "blog.BlogTagTranslation",
-                # Approving or hiding a comment is a moderator edit.
-                "blog.BlogComment",
-                "blog.BlogCommentTranslation",
-            ),
-            icon="article",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="regions_countries",
-            label=_("Regions & Countries"),
-            description=_(
-                "Country and region pickers used during checkout"
-                " address selection."
-            ),
-            django_patterns=("*RegionViewSet_*", "*CountryViewSet_*"),
-            nuxt_patterns=_nuxt("RegionViewSet", "CountryViewSet"),
-            # ``?shippable=true`` is answered from active ShippingRate
-            # rows (``ShippingService.shippable_country_codes``), so
-            # adding/disabling a rate changes this surface's own
-            # ``CountryViewSet`` response, not just ``shipping``.
-            invalidated_by=("shipping.ShippingRate",),
-            icon="public",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="loyalty",
-            label=_("Loyalty"),
-            description=_(
-                "Loyalty settings, tiers, and summaries surfaced on"
-                " the storefront. Backend Loyalty ViewSets are not"
-                " ``@cache_methods``-decorated so this purge only hits"
-                " the Nuxt SSR cache."
-            ),
-            # Django side: Loyalty ViewSets are not ``cache_methods``-
-            # decorated. Pattern intentionally omitted.
-            django_patterns=(),
-            nuxt_patterns=_nuxt(
-                "loyalty-settings",
-                "LoyaltySummaryAnon",
-            )
-            # The cached programme page renders these settings.
-            + _nuxt_routes("/loyalty-program"),
-            icon="loyalty",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="page_config",
-            label=_("Content pages"),
-            description=_(
-                "The content pages (policies, FAQ, info pages) and the"
-                " RENDERED pages that show or link them. Purge after"
-                " editing a content page."
-            ),
-            # NOTHING in page_config is ``@cache_methods``-decorated:
-            # ContentPageViewSet — despite being a BaseModelViewSet —
-            # carries no decorator (checked against page_config/views.py,
-            # which does not import cache_methods at all). A
-            # ``*ContentPageViewSet_*`` pattern
-            # here would match zero keys and report success, which is
-            # the exact failure test_surface_patterns.py exists to
-            # prevent. So the Django half is empty by fact, not by
-            # oversight, and this surface purges Nuxt only.
-            django_patterns=(),
-            # Two halves, and BOTH are needed: purging the handler drops
-            # the JSON, purging the route drops the HTML already built
-            # from it. Without the route half an edit sits behind
-            # Nitro's SSR cache for the rest of its TTL.
-            #
-            # Every cached page of the store, not a list of paths: the
-            # footers and the checkout's legal strip link content pages
-            # from every page, and a custom ContentPage's path is
-            # whatever the merchant typed. A fixed list left those stale
-            # for up to 600 s. The purge endpoint narrows the one pattern
-            # to this store's keys (``host``), as for ``store_pages``, and
-            # a route-prefix pattern queues the edge purge.
-            # These are ``defineCachedEventHandler`` NAMES from the Nuxt
-            # repo, not guesses — verified against the ``name:`` field of
-            # server/api/content-pages/*.get.ts. A name that matches no
-            # handler purges nothing and reports success (an operator's
-            # menu edit stayed invisible that way, staging 2026-09-01).
-            # Pages and menus are the page builder's: its own surface.
-            nuxt_patterns=_nuxt(
-                "ContentPageViewSet",
-                "ContentPageDetailViewSet",
-            )
-            + _nuxt_functions("builderDataTargets")
-            + (f"{NUXT_ROUTE_PREFIX}_:*",),
-            invalidated_by=(
-                "page_config.ContentPage",
-                "page_config.ContentPageTranslation",
-            ),
-            icon="dashboard_customize",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="store_texts",
-            label=_("Storefront texts"),
-            description=_(
-                "The wording a store replaced in its storefront, and every"
-                " page rendered with it. Purges itself when a text is saved,"
-                " reset or restored in the text editor."
-            ),
-            # The overrides endpoint is keyed by the store's cache
-            # generation (``texts.views``), which the save bumps, so
-            # Django has nothing to purge. The storefront's own copy is
-            # the handler below; the rendered pages carry the wording on
-            # every route, so the whole route family goes, as for
-            # ``store_pages``. The name is the storefront's
-            # ``defineCachedEventHandler`` name for
-            # ``server/api/texts/[locale].get.ts``.
-            django_patterns=(),
-            nuxt_patterns=_nuxt("textOverrides") + (f"{NUXT_ROUTE_PREFIX}_:*",),
-            invalidates_tenant_config=True,
-            invalidated_by=("texts.TextOverride",),
-            icon="translate",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="builder_documents",
-            label=_("Pages showing changed records"),
-            description=_(
-                "The rendered pages of the page builder that show a product,"
-                " category, blog post or promotion that changed. Purges"
-                " itself when one is saved or deleted."
-            ),
-            # No pattern: the storefront maps each document to its routes
-            # (``builder.data_purge``).
-            purges_builder_documents=True,
-            icon="web",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="builder",
-            label=_("Page builder"),
-            description=_(
-                "The pages, theme and sections a store published with the"
-                " page builder, and every page rendered with them. Purges"
-                " itself when a release is published or rolled back; saving"
-                " a draft purges nothing."
-            ),
-            # The public read is keyed by the release number
-            # (``builder.published``), which a new release moves, so
-            # Django has nothing to purge. The storefront's copy and the
-            # rendered pages go, and the release moves the store's cache
-            # generation (``tenant.signals``) so the storefront re-keys
-            # every cached page of the store at once, as for
-            # ``store_texts``.
-            django_patterns=(),
-            # ``builderPageDocument`` is the cached function that replaces
-            # the ``builderPage`` handler; both are purged until the
-            # storefront has dropped the handler.
-            nuxt_patterns=_nuxt("builderPage", "builderChrome")
-            + _nuxt_functions(
-                "builderPageDocument", "builderDataTargets", "builderDataMedia"
-            )
-            + (f"{NUXT_ROUTE_PREFIX}_:*",),
-            invalidates_tenant_config=True,
-            invalidated_by=("builder.BuilderRelease",),
-            icon="web",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="promotions",
-            label=_("Promotions"),
-            description=_(
-                "The public offers listing and the per-product offer"
-                " panel. An offer is a commercial commitment with an"
-                " end date, so a stale entry advertises a discount the"
-                " cart will refuse — purge after editing a promotion,"
-                " its codes, its scope or its schedule."
-            ),
-            # Both promotion views are plain APIViews with no
-            # ``@cache_methods`` decorator, so there is no Django-side
-            # response cache to purge — only the Nuxt handlers and the
-            # rendered pages.
-            django_patterns=(),
-            # ``/products`` is here, not only in the ``products``
-            # surface: the product page now RENDERS the offers that
-            # apply to it, so a promotion edit that changes which
-            # products it targets leaves every product page's SSR
-            # cache advertising the old scope. Promotions are edited
-            # rarely; a stale offer panel would survive the whole
-            # SWR window.
-            nuxt_patterns=_nuxt("PublicPromotionList", "ProductPromotionList")
-            + _nuxt_functions("builderDataPromotion", "builderDataProduct")
-            + _nuxt_routes("/offers", "/products"),
-            invalidated_by=(
-                "promotion.Promotion",
-                "promotion.PromotionTranslation",
-                # The listing prints one of the promotion's codes.
-                "promotion.PromotionCode",
-            ),
-            icon="local_offer",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="tags",
-            label=_("Tags"),
-            description=_(
-                "Generic Tag list/detail and the M2M-through"
-                " TaggedItem cache. Tags are shared by Products and"
-                " Blog posts so this surface lives outside both."
-            ),
-            django_patterns=("*TagViewSet_*", "*TaggedItemViewSet_*"),
-            nuxt_patterns=(),
-            invalidated_by=(
-                "tag.Tag",
-                "tag.TagTranslation",
-                "tag.TaggedItem",
-            ),
-            icon="sell",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="settings",
-            label=_("Site settings"),
-            description=_(
-                "django-extra-settings cache (extra_settings_*) and the"
-                " admin dashboard summary. Touches the Nuxt"
-                " /api/settings proxy and the published seller identity."
-            ),
-            django_patterns=(
-                # django-extra-settings' own cache: cache.py builds its
-                # key as f"extra_settings_{name}", so this matches one
-                # key per Setting row (92 on a provisioned tenant).
-                "*extra_settings_*",
-                "*admin:dashboard*",
-                # NOTE: a "*SettingsViewSet_*" pattern used to sit here
-                # and matched nothing — there is no such class. The
-                # settings API is two plain @api_view functions
-                # (core.api.views.list_settings / get_setting_by_key)
-                # with no cache_page or cache_methods, so it has no
-                # Django response cache to purge. Do not re-add it:
-                # a pattern that matches nothing makes the purge report
-                # success while stale content keeps being served.
-            ),
-            # ``tenantLegalIdentity`` is the storefront's published seller
-            # identity, and it is built from the INVOICE_SELLER_* rows in
-            # extra_settings — so editing them here has to invalidate it.
-            # Without this entry the footer keeps serving the previous
-            # identity for the route's 30-minute maxAge, which for a
-            # merchant who just corrected their GEMI number or address
-            # means the wrong legal identity stays published.
-            #
-            # ``settingsPublic`` is the storefront's ONE settings read
-            # (server/api/settings/public.get.ts, tenant-cached for a
-            # minute). ``_nuxt`` needs the EXACT handler name — the
-            # ``"settings"`` that used to sit here matched no handler
-            # (the route was ``settingsGet``), so purging this surface
-            # never reached the storefront's settings cache.
-            nuxt_patterns=_nuxt("settingsPublic", "tenantLegalIdentity"),
-            # Every store setting lives in an ``extra_settings.Setting``
-            # row: a save from the admin, a shell or a migration has to
-            # purge the caches above, or the storefront keeps the old
-            # settings and seller identity for the routes' lifetime.
-            invalidated_by=("extra_settings.Setting",),
-            invalidates_tenant_config=True,
-            related=("pay_way", "shipping", "loyalty"),
-            icon="tune",
-            group="config",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code=STORE_PAGES_SURFACE,
-            label=_("Storefront pages"),
-            description=_(
-                "Every page the storefront has rendered and cached for"
-                " this store, and its settings read. Purges itself when a"
-                " store feature is switched on or off, because the"
-                " navigation, footer and product cards of every page show"
-                " what the store offers."
-            ),
-            django_patterns=(),
-            # The settings read first, so a page rendered between the
-            # two deletions already reads the new switch. Then every
-            # rendered page: one pattern for the whole route family,
-            # which the purge endpoint narrows to this store's keys
-            # (``host``). Purging route keys also queues the edge purge.
-            nuxt_patterns=_nuxt("settingsPublic")
-            + (f"{NUXT_ROUTE_PREFIX}_:*",),
-            invalidates_tenant_config=True,
-            icon="web",
-            group="content",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code=SITEMAP_SEO_SURFACE,
-            label=_("Sitemap & SEO"),
-            description=_(
-                "XML sitemap, RSS, llms.txt and the OG image cache."
-                " Purged when a post, product, category or content page"
-                " changes or goes live."
-            ),
-            django_patterns=(),
-            # These are cached FUNCTIONS, not routes: the sitemap source
-            # and the RSS feed build their data through
-            # ``defineCachedFunction`` (``sitemap:blog-posts``,
-            # ``rss:feed``, ``rss:blog-posts``, ...), so the previous
-            # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
-            # matched no key in Redis and this surface's Nuxt half was a
-            # no-op. Verified against the live keyspace.
-            #
-            # The sitemap ITSELF is a route-rule cache (``/sitemap.xml``,
-            # keyed per host): @nuxtjs/sitemap's own cache lived in each
-            # pod's memory, where no purge reached it, so the storefront
-            # turned it off and caches the response in Redis instead.
-            #
-            # Every read the feeds make is a function named ``rss:<what>``
-            # (the storefront's ``server/utils/rssFeed.ts``), so ``rss``
-            # purges the feed and the posts and categories it was built
-            # from.
-            nuxt_patterns=_nuxt_functions("sitemap", "rss")
-            + _nuxt_routes("/sitemap.xml")
-            + _nuxt("nuxt-ai-ready"),
-            # What the sitemap and the feeds list. A row that goes live at
-            # its publish date is reported by ``core.publication``.
-            invalidated_by=(
-                "blog.BlogPost",
-                "blog.BlogPostTranslation",
-                "blog.BlogCategory",
-                "blog.BlogCategoryTranslation",
-                "product.Product",
-                "product.ProductTranslation",
-                "product.ProductCategory",
-                "product.ProductCategoryTranslation",
-                "page_config.ContentPage",
-                "page_config.ContentPageTranslation",
-            ),
-            # Each order's stock decrement, as on the products surface.
-            ignored_update_fields=SALE_UPDATE_FIELDS,
-            icon="map",
-            group="content",
-        )
-    )
+    declared_by: dict[str, str] = {}
+    for origin, surfaces in sources:
+        for surface in surfaces:
+            if surface.code in declared_by:
+                raise ImproperlyConfigured(
+                    f"Cache surface {surface.code!r} is declared by both "
+                    f"{declared_by[surface.code]} and {origin}"
+                )
+            declared_by[surface.code] = origin
+            register_surface(surface)

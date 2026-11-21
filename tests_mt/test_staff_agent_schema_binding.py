@@ -2,7 +2,7 @@
 
 The staff issuer keeps its clients and tokens in the PUBLIC schema and a
 store's own issuer keeps its customers' in the store's schema
-(``agent/staff.py``). The main suite cannot see that difference: it runs
+(``src/agent/staff.py``). The main suite cannot see that difference: it runs
 every app's tables in ``public``. So the claims that matter most are
 proven here:
 
@@ -649,14 +649,11 @@ def test_a_resource_the_issuer_refuses_is_invalid_target_not_a_500(
     assert token.json()["error_description"]
 
 
-@pytest.mark.parametrize(
-    "path", ["/identity/o/api/token", "/identity/o/api/device/code"]
-)
 def test_a_store_issuer_answers_a_malformed_resource_with_invalid_target(
-    mt_tenant, path
+    mt_tenant,
 ):
     response = TenantClient(mt_tenant).post(
-        path,
+        "/identity/o/api/token",
         {
             "grant_type": "authorization_code",
             "client_id": "unknown",
@@ -709,3 +706,13 @@ def test_a_store_issuer_refuses_another_stores_resource(mt_tenant, mt_tenant_b):
     assert response.status_code == 400, response.content
     assert response.json()["error"] == "invalid_target"
     assert "this store" in response.json()["error_description"]
+
+
+def test_a_store_issuer_does_not_serve_the_device_flow(mt_tenant):
+    client = TenantClient(mt_tenant)
+
+    assert client.get("/identity/o/device", secure=True).status_code == 404
+    assert (
+        client.post("/identity/o/api/device/code", {}, secure=True).status_code
+        == 404
+    )

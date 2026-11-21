@@ -31,6 +31,7 @@ from region.factories import RegionFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowLockerFactory
 from shipping_boxnow.models import BoxNowShipment
+from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -95,7 +96,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.product = ProductFactory(
             active=True, stock=20, num_images=0, num_reviews=0
         )
-        self.locker = BoxNowLockerFactory(external_id="4")
+        self.locker = BoxNowLockerFactory(
+            external_id="4", country_code=self.country.alpha_2
+        )
 
         self.cart = CartFactory(user=self.user)
         CartItemFactory(cart=self.cart, product=self.product, quantity=1)
@@ -135,6 +138,17 @@ class TestOrderCreateWithBoxNow(APITestCase):
             payload["boxnow_locker_id"] = locker_id
         return payload
 
+    def _create(self, payload, *, expected_total=None):
+        """Place the order at ``expected_total``, or else at its quote's."""
+        headers = {"HTTP_X_CART_ID": str(self.cart.uuid)}
+        if expected_total is None:
+            payload = quoted_body(self.client, payload, **headers)
+        else:
+            payload = {**payload, "expected_total": expected_total}
+        return self.client.post(
+            self.create_url, payload, format="json", **headers
+        )
+
     def _mock_payment_success(self, mock_get_payment_provider):
         provider = MagicMock()
         provider.get_payment_status.return_value = (
@@ -151,7 +165,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         so this class binds it manually instead.
 
         ``BoxNowCarrier.is_kind_enabled()`` gates on tenant credentials
-        (``shipping_boxnow/services.py::is_configured``) — since
+        (``src/shipping_boxnow/services.py::is_configured``) — since
         ``OrderQuoteService.shipping_cost`` now resolves the rate through
         the real carrier adapter, a BoxNow pickup_point order needs one
         bound, same as the live checkout flow does.
@@ -191,11 +205,8 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
+        response = self._create(
             self._build_payload(pay_way_id=self.online_pay_way.id),
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_201_CREATED, (
@@ -240,11 +251,8 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
+        response = self._create(
             self._build_payload(pay_way_id=self.pay_on_the_go_pay_way.id),
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_201_CREATED, (
@@ -296,11 +304,10 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
+        response = self._create(
             self._build_payload(pay_way_id=courier_cod.id),
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
+            # The quote refuses this delivery too: no total to send.
+            expected_total=UNQUOTED,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST, (
@@ -328,13 +335,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
+        response = self._create(
             self._build_payload(
                 pay_way_id=self.online_pay_way.id, include_locker_id=False
             ),
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
+            # The quote refuses this delivery too: no total to send.
+            expected_total=UNQUOTED,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -368,11 +374,10 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
+        response = self._create(
             self._build_payload(pay_way_id=self.online_pay_way.id),
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
+            # The quote refuses this delivery too: no total to send.
+            expected_total=UNQUOTED,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -388,7 +393,13 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.product.save()
 
     def _place_order(
-        self, mock_validate_address, mock_validate_cart, mock_pp, **extra
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_pp,
+        *,
+        expected_total=None,
+        **extra,
     ):
         self._bind_boxnow_tenant()
         mock_validate_cart.return_value = {
@@ -399,14 +410,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         mock_validate_address.return_value = None
         self._mock_payment_success(mock_pp)
         self.client.force_authenticate(user=self.user)
-        return self.client.post(
-            self.create_url,
+        return self._create(
             {
                 **self._build_payload(pay_way_id=self.online_pay_way.id),
                 **extra,
             },
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
+            expected_total=expected_total,
         )
 
     @patch("order.payments.payment.get_payment_provider")
@@ -487,7 +496,11 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self._measure_product(80, 50, 40)
 
         response = self._place_order(
-            mock_validate_address, mock_validate_cart, mock_get_payment_provider
+            mock_validate_address,
+            mock_validate_cart,
+            mock_get_payment_provider,
+            # The quote refuses a parcel no compartment holds too.
+            expected_total=UNQUOTED,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST, (

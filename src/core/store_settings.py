@@ -82,7 +82,7 @@ def store_settings(names: Iterable[str]) -> dict[str, Any]:
 # The store VALUES a storefront renders: figures, texts, hours, contact
 # details. A store switch is never here: a feature is served in
 # ``TenantConfig.features`` and a preference in ``TenantConfig.preferences``
-# (``tenant/features.py``), Django's one answer for each, and a switch
+# (``src/tenant/features.py``), Django's one answer for each, and a switch
 # published here too would be a second answer a client could read instead.
 # ``tests/integration/core/test_settings_public_api.py`` refuses one.
 PUBLIC_SETTING_KEYS = frozenset(

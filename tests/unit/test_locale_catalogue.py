@@ -82,7 +82,7 @@ def test_the_catalogue_is_in_canonical_form(catalogue):
     then touch different lines and merge cleanly.
 
     Fix it with ``uv run python manage.py makemessages -l el -l en``,
-    which writes this form (``core/utils/po_catalogue.py``)."""
+    which writes this form (``src/core/utils/po_catalogue.py``)."""
     assert catalogue.read_text(encoding="utf-8") == canonical_text(catalogue)
 
 

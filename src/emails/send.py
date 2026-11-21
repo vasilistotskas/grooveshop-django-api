@@ -158,40 +158,41 @@ def deliver_to(
             rendered = replace(
                 rendered, subject=f"{gettext('[Test]')} {rendered.subject}"
             )
-    entry = log.start(
+    with log.delivering(
         email_type.key, recipient, rendered.subject, test_by=test_by
-    )
-    if entry.status not in NOT_SENT:
-        # An earlier attempt of this task already sent it (a retry after a
-        # later recipient failed): never send it twice.
-        return Delivery(
-            email_type.key,
-            Status.SENT,
-            recipient=recipient,
-            subject=rendered.subject,
+    ) as entry:
+        if entry.status not in NOT_SENT:
+            # Another copy of this task already sent it (a retry after a
+            # later recipient failed, a message delivered twice): never send
+            # it twice.
+            return Delivery(
+                email_type.key,
+                Status.SENT,
+                recipient=recipient,
+                subject=rendered.subject,
+            )
+        try:
+            receipt = transport.deliver(
+                rendered,
+                from_email=sender.from_address(),
+                to=[recipient.address],
+                reply_to=sender.reply_to(email_type, obj),
+                headers=build_headers(email_type, recipient),
+                attachments=attachments,
+                message_ref=entry.uuid,
+            )
+        except Exception as error:
+            log.mark_failed(entry, error)
+            logger.warning(
+                "Email %s failed",
+                email_type.key,
+                extra={"email_type": email_type.key},
+                exc_info=True,
+            )
+            raise
+        log.mark_sent(
+            entry, provider=receipt.provider, message_id=receipt.message_id
         )
-    try:
-        receipt = transport.deliver(
-            rendered,
-            from_email=sender.from_address(),
-            to=[recipient.address],
-            reply_to=sender.reply_to(email_type, obj),
-            headers=build_headers(email_type, recipient),
-            attachments=attachments,
-            message_ref=entry.uuid,
-        )
-    except Exception as error:
-        log.mark_failed(entry, error)
-        logger.warning(
-            "Email %s failed",
-            email_type.key,
-            extra={"email_type": email_type.key},
-            exc_info=True,
-        )
-        raise
-    log.mark_sent(
-        entry, provider=receipt.provider, message_id=receipt.message_id
-    )
     logger.info(
         "Email %s sent",
         email_type.key,

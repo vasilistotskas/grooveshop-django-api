@@ -35,7 +35,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     """
     Middleware to track search queries and results.
 
-    Tracks the three query routes of ``search/urls.py`` and only their
+    Tracks the three query routes of ``src/search/urls.py`` and only their
     HTTP 200 responses. Trending, analytics and click are routes of the
     same app but not searches.
 
@@ -63,7 +63,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
         return response
 
-    # The query routes of ``search/urls.py`` and the content type each
+    # The query routes of ``src/search/urls.py`` and the content type each
     # one records.
     _QUERY_ROUTES = {
         "search-product": "product",

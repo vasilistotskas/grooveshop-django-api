@@ -1,5 +1,5 @@
 """Shopper-facing gift-card endpoints (``GiftCardViewSet``,
-``giftcard/views.py``): balance check, purchase, purchase-status poll and
+``src/giftcard/views.py``): balance check, purchase, purchase-status poll and
 "my gift cards".
 
 The merchant toggle (``GIFT_CARDS_ENABLED`` extra-setting) is patched
@@ -128,6 +128,14 @@ class TestCheck:
 
         assert response.status_code == 404
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST",
+        "/api/v1/giftcard/check",
+        400,
+        at=("$.code", "$.detail", "$.reason"),
+        issue=684,
+    )
     def test_missing_code_is_a_field_error(self):
         with _gift_cards():
             response = _client().post(CHECK_URL, {}, format="json")
@@ -258,6 +266,14 @@ class TestPurchaseRefusals:
         provider.process_payment.assert_not_called()
         assert not GiftCardPurchase.objects.exists()
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST",
+        "/api/v1/giftcard/purchase",
+        400,
+        at=("$.detail", "$.reason"),
+        issue=684,
+    )
     def test_unregistered_payment_provider_is_a_field_error(self):
         with _gift_cards():
             response = _client().post(
@@ -272,6 +288,14 @@ class TestPurchaseRefusals:
         assert "payment_provider" in response.data
         assert not GiftCardPurchase.objects.exists()
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST",
+        "/api/v1/giftcard/purchase",
+        400,
+        at=("$.detail", "$.reason"),
+        issue=684,
+    )
     def test_missing_recipient_email_is_a_field_error(self):
         body = _purchase_body(buyer_email="b@example.com")
         del body["recipient_email"]
@@ -491,6 +515,15 @@ class TestMine:
 
         assert response.status_code == 404
 
+    # An admin-issued card has no recipient (``""``), which the read-only
+    # ``recipientEmail`` declares as an email (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/giftcard/mine",
+        200,
+        at="$.results[*].recipientEmail",
+        issue=684,
+    )
     def test_lists_only_my_cards_newest_first(self):
         user = UserAccountFactory()
         older = GiftCardFactory(code="GC-MINE-0000-OLDR", issued_to=user)
@@ -518,6 +551,11 @@ class TestMine:
 
         assert response.status_code == 404
 
+    # The bare array is not what the operation documents (its paginated
+    # envelope): the whole list moves to a route of its own (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/giftcard/mine", 200, at="$", issue=684
+    )
     def test_pagination_false_returns_every_card_as_a_list(self):
         """The account summary reads every card in one request
         (``GiftCardViewSet.unpaginated_actions``)."""

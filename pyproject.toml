@@ -1,5 +1,5 @@
 [project]
-version = "3.255.3"
+version = "3.263.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -275,6 +275,7 @@ timeout_func_only = true
 # See docs/testing.md before allowing another host.
 addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db --disable-socket --allow-hosts=127.0.0.1,localhost,::1,db,redis,rabbitmq,meilisearch"
 markers = [
+    "known_schema_drift(method, path, status, at, issue): a body of this operation and status may break its schema at the paths at names while the issue is open; the test fails once none does (tests/response_contract.py).",
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
 ]
 
@@ -520,6 +521,7 @@ include = [
     "src/core/fields/**",
     "src/core/forms/**",
     "src/core/filters/**",
+    "src/core/measurement.py",
     "src/core/utils/**",
     "src/asgi/**",
     "src/admin/**",
@@ -660,16 +662,11 @@ ignore_imports = [
     "core.admin -> admin.platform_site",
     "core.api.serializers -> product.models",
     "core.api.throttling -> cart.agent_token",
-    "core.api.views -> contact.attachments",
+    "core.api.settings_api -> contact.attachments",
     "core.cache.service -> builder.data_purge",
-    "core.emails -> emails.declare",
-    "core.emails -> emails.types",
-    "core.generators -> user.models.account",
     "core.management.commands.reset_staff_mfa -> admin.staff_mfa",
     "core.management.commands.reset_staff_mfa -> user.models",
     "core.middleware.idempotency -> cart.agent_token",
-    "core.tasks -> cart.models",
-    "core.tasks -> emails.send",
     "core.templatetags.store_brand -> admin.branding",
     "core.urls -> emails.webhooks",
     "core.urls -> order.views.viva_webhook",
@@ -755,8 +752,6 @@ ignore_imports = [
     "order.serializers.order -> shipping_boxnow.serializers.shipment",
     "order.views.order -> shipping_acs.exceptions",
     "order.views.order -> shipping_boxnow.exceptions",
-    "user.services.gdpr -> shipping_acs.models",
-    "user.services.gdpr -> shipping_boxnow.models.shipment",
 ]
 allow_indirect_imports = true
 
@@ -824,7 +819,7 @@ allow_indirect_imports = true
 # models, which reach every app and so every subpackage, so the layers
 # contract above cannot hold it without one ignored chain per module: this
 # contract checks its direct imports. The one ignored edge is the ledger
-# booking a refund's allocation (#658), removed by #569.
+# booking a refund's allocation (#658), removed by #658's refund booking.
 [[tool.importlinter.contracts]]
 name = "order payments import neither accounting, refunds, reporting nor checkout"
 type = "forbidden"
@@ -837,5 +832,64 @@ forbidden_modules = [
 ]
 ignore_imports = [
     "order.payments.payment_ledger -> order.accounting.credit_allocation",
+]
+allow_indirect_imports = true
+
+# Inside `promotion` (#585). The engine is one module per seam
+# (`promotion/engine/__init__.py` lists them), and the services that call
+# it (coupons, the checkout coupon picker, the product page's offers) sit
+# above it. The services contract holds for indirect chains too. The
+# engine's seams import the product and order models, which reach back
+# into the engine through `promotion.offers` and `product.pricing`, so a
+# layers contract over the seams would need those app cycles ignored:
+# these contracts check the seams' direct imports, as the order ones do.
+[[tool.importlinter.contracts]]
+name = "promotion services over the engine"
+type = "layers"
+containers = ["promotion"]
+layers = [
+    "views",
+    "coupon_picker | coupons | product_offers",
+    "engine",
+]
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: bxgy, scope and results import no seam above them"
+type = "forbidden"
+source_modules = [
+    "promotion.engine.bxgy",
+    "promotion.engine.results",
+    "promotion.engine.scope",
+]
+forbidden_modules = [
+    "promotion.engine.benefits",
+    "promotion.engine.eligibility",
+    "promotion.engine.evaluation",
+    "promotion.engine.redemptions",
+    "promotion.engine.stacking",
+    "promotion.engine.teasers",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: no seam imports evaluation"
+type = "forbidden"
+source_modules = [
+    "promotion.engine.benefits",
+    "promotion.engine.eligibility",
+    "promotion.engine.redemptions",
+    "promotion.engine.stacking",
+    "promotion.engine.teasers",
+]
+forbidden_modules = ["promotion.engine.evaluation"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: results imports no other seam"
+type = "forbidden"
+source_modules = ["promotion.engine.results"]
+forbidden_modules = [
+    "promotion.engine.bxgy",
+    "promotion.engine.scope",
 ]
 allow_indirect_imports = true

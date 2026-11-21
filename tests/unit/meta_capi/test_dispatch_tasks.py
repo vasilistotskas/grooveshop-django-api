@@ -1,6 +1,6 @@
 """Dispatch, audit and retry behaviour of the Meta CAPI Celery tasks.
 
-Covers ``meta_capi/tasks.py``: every ``dispatch_*`` task's gates (kill
+Covers ``src/meta_capi/tasks.py``: every ``dispatch_*`` task's gates (kill
 switch, missing row, consent), ``_dispatch``'s SENT short-circuit and its
 FAILED/SENT audit rows for transient, permanent and config errors, and the
 ``schedule_*`` helpers. ``MetaCapiClient`` — the facade over the Graph API
@@ -19,7 +19,6 @@ from extra_settings.models import Setting
 from facebook_business.adobjects.adspixel import AdsPixel
 from facebook_business.exceptions import FacebookRequestError
 
-from meta_capi.client import MetaCapiResponse
 from meta_capi.exceptions import (
     MetaCapiConfigError,
     MetaCapiError,
@@ -35,7 +34,8 @@ from meta_capi.tasks import (
     schedule_purchase,
     schedule_refund,
 )
-from order.factories.order import OrderFactory
+from order.factories.payment_transaction import RefundTransactionFactory
+from tests.unit.meta_capi.conftest import capi_order as _order
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -47,13 +47,6 @@ _CONSENTED_META = {
         "client_ip_address": "203.0.113.9",
     }
 }
-
-
-def _order(**kwargs):
-    # Faker's phone numbers can carry an extension ("...x305"), which the
-    # Facebook SDK's normaliser rejects; a fixed E.164 number keeps the
-    # payload, and so the run, deterministic.
-    return OrderFactory(**{"phone": "+302101234567", **kwargs})
 
 
 def _set_kill_switch(enabled: bool) -> None:
@@ -74,16 +67,6 @@ def capi_enabled(bind_tenant):
         )
     )
     _set_kill_switch(True)
-
-
-@pytest.fixture
-def meta_send():
-    with patch("meta_capi.tasks.MetaCapiClient") as client_cls:
-        send = client_cls.return_value.send
-        send.return_value = MetaCapiResponse(
-            events_received=1, fbtrace_id="trace-abc", messages=[]
-        )
-        yield send
 
 
 def _sent_event(send):
@@ -261,13 +244,17 @@ class TestInitiateCheckoutDispatch:
 
 
 class TestRefundDispatch:
-    def test_explicit_amount_is_reported(self, capi_enabled, meta_send):
+    def test_explicit_amount_is_reported_under_its_ledger_row(
+        self, capi_enabled, meta_send
+    ):
         order = _order(metadata=_CONSENTED_META, num_order_items=1)
+        refund = RefundTransactionFactory(order=order)
 
-        dispatch_refund_event.run(order.id, "12.50")
+        dispatch_refund_event.run(order.id, "12.50", refund_id=refund.pk)
 
         event = _sent_event(meta_send)
         assert event.event_name == "Refund"
+        assert event.event_id == f"refund-{refund.pk}"
         assert event.custom_data.value == 12.5
         assert event.custom_data.order_id == str(order.id)
         row = MetaCapiEventLog.objects.get(event_id=event.event_id)
@@ -279,8 +266,9 @@ class TestRefundDispatch:
     ):
         order = _order(metadata=_CONSENTED_META, num_order_items=1)
         order.refresh_from_db()
+        refund = RefundTransactionFactory(order=order)
 
-        dispatch_refund_event.run(order.id)
+        dispatch_refund_event.run(order.id, refund_id=refund.pk)
 
         event = _sent_event(meta_send)
         assert event.custom_data.value == float(order.amount_due.amount)
@@ -288,14 +276,15 @@ class TestRefundDispatch:
 
     def test_refund_without_consent_is_not_sent(self, capi_enabled, meta_send):
         order = _order(metadata={}, num_order_items=1)
+        refund = RefundTransactionFactory(order=order)
 
-        dispatch_refund_event.run(order.id, "5.00")
+        dispatch_refund_event.run(order.id, "5.00", refund_id=refund.pk)
 
         meta_send.assert_not_called()
 
 
 class TestCompleteRegistrationDispatch:
-    def test_sends_with_supplied_event_id_and_no_order(
+    def test_sends_under_the_account_and_no_order(
         self, capi_enabled, meta_send
     ):
         user = UserAccountFactory()
@@ -303,14 +292,14 @@ class TestCompleteRegistrationDispatch:
         dispatch_complete_registration_event.run(
             user.id,
             fbp="fb.1.123",
-            event_id="evt-reg-1",
             event_source_url="https://shop.example/register",
         )
 
         event = _sent_event(meta_send)
         assert event.event_name == "CompleteRegistration"
+        assert event.event_id == f"complete-registration-{user.pk}"
         assert event.event_source_url == "https://shop.example/register"
-        row = MetaCapiEventLog.objects.get(event_id="evt-reg-1")
+        row = MetaCapiEventLog.objects.get(event_id=event.event_id)
         assert row.user_id == user.id
         assert row.order_id is None
         assert row.status == MetaCapiEventStatus.SENT
@@ -329,12 +318,12 @@ class TestCompleteRegistrationDispatch:
 class TestScheduleHelpers:
     def test_schedule_refund_passes_the_amount_as_a_string(self):
         with patch("meta_capi.tasks.dispatch_on_commit") as dispatch:
-            schedule_refund(5, Decimal("12.50"))
-            schedule_refund(6, None)
+            schedule_refund(5, 50, Decimal("12.50"))
+            schedule_refund(6, 60, None)
 
         assert [c.args for c in dispatch.call_args_list] == [
-            (dispatch_refund_event, [5, "12.50"]),
-            (dispatch_refund_event, [6, None]),
+            (dispatch_refund_event, [5, "12.50"], {"refund_id": 50}),
+            (dispatch_refund_event, [6, None], {"refund_id": 60}),
         ]
 
     def test_schedule_purchase_and_initiate_checkout_target_their_tasks(

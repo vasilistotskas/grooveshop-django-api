@@ -39,6 +39,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
 
@@ -195,12 +196,14 @@ class TestCheckoutLocksProductsInPkOrder:
         ) as get_provider:
             get_provider.return_value = provider
             return OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address=self.shipping_address,
-                payment_intent_id="pi_lock_order",
-                pay_way=pay_way,
-                user=None,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=cart,
+                    shipping_address=self.shipping_address,
+                    payment_intent_id="pi_lock_order",
+                    pay_way=pay_way,
+                    user=None,
+                )
             )
 
     def _order_first(self, cart):
@@ -209,11 +212,13 @@ class TestCheckoutLocksProductsInPkOrder:
             settlement=PaySettlement.COURIER_CASH,
         )
         return OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=self.shipping_address,
-            pay_way=pay_way,
-            user=None,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=self.shipping_address,
+                pay_way=pay_way,
+                user=None,
+            )
         )
 
     @pytest.mark.parametrize("lines_added_in", ["ascending", "descending"])

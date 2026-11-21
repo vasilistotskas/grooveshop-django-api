@@ -15,7 +15,7 @@ suite assert that shape verbatim.
 from __future__ import annotations
 
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 from django.db import connection, transaction
 from django.test import TestCase
@@ -33,7 +33,9 @@ class DispatchOnCommitTests(TestCase):
         # No `kwargs=` key. Tests across the suite assert exactly this,
         # and an empty dict would not be the same call.
         task.apply_async.assert_called_once_with(
-            args=[42], headers={"_schema_name": connection.schema_name}
+            task_id=ANY,
+            args=[42],
+            headers={"_schema_name": connection.schema_name},
         )
 
     def test_kwargs_only_call_omits_args(self):
@@ -43,6 +45,7 @@ class DispatchOnCommitTests(TestCase):
             dispatch_on_commit(task, kwargs={"product_id": 7})
 
         task.apply_async.assert_called_once_with(
+            task_id=ANY,
             kwargs={"product_id": 7},
             headers={"_schema_name": connection.schema_name},
         )
@@ -79,7 +82,7 @@ class DispatchOnCommitTests(TestCase):
             callback()
 
         task.apply_async.assert_called_once_with(
-            args=[1], headers={"_schema_name": "tenant_under_test"}
+            task_id=ANY, args=[1], headers={"_schema_name": "tenant_under_test"}
         )
 
     def test_explicit_schema_name_wins(self):
@@ -89,7 +92,7 @@ class DispatchOnCommitTests(TestCase):
             dispatch_on_commit(task, [1], schema_name="pinned")
 
         task.apply_async.assert_called_once_with(
-            args=[1], headers={"_schema_name": "pinned"}
+            task_id=ANY, args=[1], headers={"_schema_name": "pinned"}
         )
 
     def test_caller_headers_are_kept_and_the_schema_added(self):
@@ -99,6 +102,7 @@ class DispatchOnCommitTests(TestCase):
             dispatch_on_commit(task, [1], headers={"x-trace": "abc"})
 
         task.apply_async.assert_called_once_with(
+            task_id=ANY,
             args=[1],
             headers={
                 "x-trace": "abc",
@@ -113,10 +117,34 @@ class DispatchOnCommitTests(TestCase):
             dispatch_on_commit(task, [1], countdown=30)
 
         task.apply_async.assert_called_once_with(
+            task_id=ANY,
             args=[1],
             headers={"_schema_name": connection.schema_name},
             countdown=30,
         )
+
+    def test_each_dispatch_is_published_with_a_task_id_of_its_own(self):
+        """The id is the dispatch's identity: every copy of it (a message
+        delivered again, the sweep's copy of a failed publish, a retry)
+        carries it, and a task that keys its effect on it does it once."""
+        task = Mock()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dispatch_on_commit(task, [1])
+            dispatch_on_commit(task, [1])
+
+        first, second = (
+            call.kwargs["task_id"] for call in task.apply_async.call_args_list
+        )
+        assert first and second and first != second
+
+    def test_a_task_id_the_caller_chose_is_kept(self):
+        task = Mock()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dispatch_on_commit(task, [1], task_id="chosen")
+
+        assert task.apply_async.call_args.kwargs["task_id"] == "chosen"
 
     def test_on_commit_is_reached_through_the_module(self):
         """The suite monkeypatches ``transaction.on_commit``.
@@ -139,7 +167,7 @@ class DispatchOnCommitTests(TestCase):
 
 
 def test_helper_is_importable_without_touching_models():
-    """`tenant/celery.py` must stay model-free at import.
+    """`src/tenant/celery.py` must stay model-free at import.
 
     It is imported by signal modules that load during app registry
     population; a model import at module level would make that ordering

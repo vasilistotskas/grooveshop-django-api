@@ -13,7 +13,14 @@ from djstripe.models import Event
 from agent.outbox import record_order_changed
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
-from order.accounting.invoicing import receipt_issuable
+from order.accounting.invoicing import (
+    PRE_SHIPMENT_STATUSES,
+    receipt_issuable,
+)
+from order.accounting.movement import (
+    flag_a_movement_the_receipt_does_not_cover,
+    parcel_left_unregistered,
+)
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.communications.notifications import (
     notify_order_created_live,
@@ -30,6 +37,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.history import OrderHistory
+from order.models.invoice import Invoice, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
@@ -52,6 +60,7 @@ from order.signals import (
     order_delivered,
     order_paid,
     order_refunded,
+    order_shipment_cancel_answered,
     order_shipment_dispatched,
     order_shipped,
     order_status_changed,
@@ -61,13 +70,17 @@ from order.signals import (
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
+    issue_receipt_for_pickup,
     send_admin_new_order_email,
     send_dispute_notification_email,
+    send_invoice_email,
+    send_invoice_to_mydata,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
     send_refund_confirmation_email,
     send_shipping_notification_email,
+    settle_canceled_receipt,
 )
 from pay_way.enum.settlement import PaySettlement
 from tenant.celery import dispatch_on_commit
@@ -135,34 +148,32 @@ def handle_order_post_save(
 
         transaction.on_commit(send_status_changed_signal)
 
-    # Detect the null → set transition on tracking info. We treat an
-    # empty string the same as None because the field is declared with
-    # ``blank=True`` and Django serializers happily round-trip "" as
-    # "no value". Fire on commit to avoid a race where the Celery task
-    # reads a not-yet-visible row.
-    #
-    # Additionally require the *value* to have actually changed between
-    # original and current — protects against the clear-then-reset case
-    # where an admin blanks the tracking, saves (post_save refreshes
-    # the ``_original_*`` snapshot to ""), then re-enters the same
-    # tracking number. Without the equality check the signal would
-    # fire a second time and the shopper would get a duplicate
-    # "Tracking available" notification.
-    # Fires only on the transition INTO having tracking: at least one
-    # field was empty before and both are set now. That already rules out
-    # a re-save with identical values — if the old value equalled the new
-    # non-empty one, the old one was non-empty too, which the "not both
-    # set before" term excludes. An extra equality check read as a second
-    # safeguard but could never change the outcome.
+    # Fires, both fields set, whenever the order's tracking becomes a value
+    # it did not have (set for the first time, or replaced: a carrier's
+    # voucher recorded over a number staff typed before the carrier held
+    # the parcel), and whenever ``Order.add_tracking_info`` records it,
+    # unchanged values included (the voucher number staff typed, which the
+    # carrier then records). Any other save with the same values fires
+    # nothing. Every receiver is safe to run again: the tracking email is
+    # sent once (``shipping_notification_email_sent``), and the receipt is
+    # issued once (``issue_receipt_when_the_shipment_is_live``: an order's
+    # receipt is never issued twice). Fire on commit to avoid a race where
+    # the Celery task reads a not-yet-visible row.
     tracking_dispatched = (
-        hasattr(instance, "_original_tracking_number")
-        and hasattr(instance, "_original_shipping_carrier")
-        and not (
-            instance._original_tracking_number
-            and instance._original_shipping_carrier
-        )
-        and bool(instance.tracking_number)
+        bool(instance.tracking_number)
         and bool(instance.shipping_carrier)
+        and (
+            getattr(instance, "_tracking_recorded", False)
+            or (
+                hasattr(instance, "_original_tracking_number")
+                and hasattr(instance, "_original_shipping_carrier")
+                and (
+                    instance._original_tracking_number,
+                    instance._original_shipping_carrier,
+                )
+                != (instance.tracking_number, instance.shipping_carrier)
+            )
+        )
     )
     if tracking_dispatched:
 
@@ -363,7 +374,7 @@ def handle_order_status_changed(
     # filters internally for statuses we actually want to surface in the
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
-    # one place (``order/communications/notifications.py::_ORDER_STATUS_COPY``).
+    # one place (``order.communications.notifications._ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
         dispatch_on_commit(
             notify_order_status_changed_live, [order.id, new_status]
@@ -543,10 +554,92 @@ def handle_order_shipped(
     # Email is sent by handle_order_status_changed via
     # send_order_status_update_email (uses the shipped template)
 
-    # The retail receipt is issued when the shipment starts (ΕΛΠ art.
-    # 13(a)). Idempotent: ``generate_order_invoice`` issues it once.
-    if receipt_issuable(order) and load_mydata_config().issues_automatically():
+    # A receipt with movement that AADE has not answered for goes on as a
+    # document whose movement started during a loss of connection: stamped
+    # before anything sends it again, and sent at once. Otherwise the
+    # retail receipt is issued when the shipment starts (ΕΛΠ art. 13(a)).
+    # Idempotent: ``generate_order_invoice`` issues it once, so an order a
+    # carrier took, whose receipt was issued when its voucher or parcel was
+    # created (``issue_receipt_for_pickup``), gets nothing more.
+    if parcel_left_unregistered(order.id):
+        dispatch_on_commit(send_invoice_to_mydata, [order.id])
+    elif (
+        receipt_issuable(order) and load_mydata_config().issues_automatically()
+    ):
         dispatch_on_commit(generate_order_invoice, [order.id])
+    flag_a_movement_the_receipt_does_not_cover(order)
+    # A receipt with movement indication registered before the pickup
+    # reaches the customer now that the parcel left
+    # (``Invoice.awaits_the_parcel``). SHIPPED is committed, so this reads
+    # after it; ``send_invoice_to_mydata`` reads the order after it stores
+    # the MARK, so whichever comes second sends it. The email task sends
+    # it once, and only while it ``is_deliverable`` (one staff canceled as
+    # issued in error is not).
+    if (
+        Invoice.objects.filter(
+            order_id=order.id,
+            mydata_mark__isnull=False,
+            mydata_status=MyDataStatus.CONFIRMED,
+        )
+        .exclude(movement={})
+        .exists()
+    ):
+        dispatch_on_commit(send_invoice_email, [order.id])
+
+
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.issue_receipt_when_the_shipment_is_live",
+)
+def issue_receipt_when_the_shipment_is_live(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """A carrier's voucher or parcel was recorded on the order: its
+    receipt, with movement indication, is issued now, before the pickup.
+
+    Every path that makes a shipment live records it through
+    ``Order.add_tracking_info`` (an ACS voucher minted or adopted, a BOX NOW
+    parcel created, taken over or settled), which sends this signal each
+    time the tracking changes, a voucher recorded over a number staff typed
+    included, so none of them can skip the receipt.
+    """
+    if order.status in PRE_SHIPMENT_STATUSES and receipt_issuable(order):
+        issue_receipt_for_pickup(order.id)
+
+
+@receiver(
+    order_shipment_cancel_answered,
+    dispatch_uid="order.settle_receipt_once_the_courier_answered",
+)
+def settle_receipt_once_the_courier_answered(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """The courier answered the shipment cancel of a canceled order: its
+    receipt set aside for cancel is settled now (``settle_canceled_receipt``)."""
+    if Invoice.objects.filter(
+        order_id=order.id, cancel_requested_at__isnull=False
+    ).exists():
+        dispatch_on_commit(settle_canceled_receipt, [order.id])
+
+
+@receiver(order_canceled, dispatch_uid="order.settle_receipt_of_canceled_order")
+def settle_receipt_of_canceled_order(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """A carrier order canceled before its parcel left: the cancel set its
+    receipt aside under the order's lock
+    (``invoicing.hold_receipt_for_cancel``), and now that it committed the
+    receipt is settled (``settle_canceled_receipt``; again by the
+    ``retry_receipts_with_mydata`` sweep while the courier has not
+    answered)."""
+    if (
+        Invoice.objects.filter(
+            order_id=order.id, cancel_requested_at__isnull=False
+        )
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .exists()
+    ):
+        dispatch_on_commit(settle_canceled_receipt, [order.id])
 
 
 @receiver(order_delivered, dispatch_uid="order.handle_order_delivered")
@@ -1899,8 +1992,11 @@ def handle_stripe_checkout_expired(sender, **kwargs):
 
             if not order.metadata:
                 order.metadata = {}
-            order.metadata["stripe_checkout_expired"] = True
-            order.metadata["stripe_checkout_session_id"] = session_id
+            # The recorded session is the order's live one: an expired
+            # session is never written over it. A session that lost a
+            # concurrent request, or one that expired before the current
+            # one was opened, would otherwise make the next request mint
+            # a second payable session (#643).
             order.metadata[f"webhook_processed_{event_id}"] = True
             order.save(update_fields=["metadata"])
 

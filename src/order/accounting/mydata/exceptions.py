@@ -12,6 +12,7 @@ MyDataTransportError           yes (network, 5xx, 429)
 MyDataAuthError                no (rotate creds)
 MyDataValidationError          no (fix master data)
 MyDataDuplicateError           no (recover via query)
+MyDataSendInFlight             no (the sweep, once it ended)
 =============================  =========================
 """
 
@@ -30,10 +31,30 @@ class MyDataError(Exception):
         super().__init__(self.message)
 
 
-class MyDataTransportError(MyDataError):
+class MyDataTransportError(MyDataError, ConnectionError):
     """Transient transport-level failure — network error, timeout,
     5xx, or 429 rate-limit. The Celery task retries these with
-    exponential backoff using the same ``uid`` (AADE dedupes)."""
+    exponential backoff using the same ``uid`` (AADE dedupes).
+
+    A ``ConnectionError``: AADE could not be reached or answered, so a
+    task's ``autoretry_for`` names it through ``core.retry``'s transient
+    network set, like any other service that did not answer."""
+
+
+class MyDataNotListedError(MyDataTransportError):
+    """AADE answered ``RequestTransmittedDocs`` and does not list the
+    document: nothing about it can be concluded from the listing. Still a
+    transport error to every caller that only retries; the settle of a
+    canceled order's receipt tells it apart after a 301 to its cancel
+    (``order.tasks.settle_canceled_receipt``)."""
+
+
+class MyDataSendInFlight(MyDataError):
+    """A send of the document may still be running (no answer on record,
+    before its deadline, ``movement.send_in_flight``), so nothing is sent
+    over it. Not retried by the task: retries would end inside the
+    deadline. ``order.tasks.retry_receipts_with_mydata`` takes the document
+    up once the deadline passed and no answer came."""
 
 
 class MyDataAuthError(MyDataError):

@@ -1,6 +1,6 @@
 """Whether a save moved a product between available and sold out.
 
-Every sale saves ``stock`` alone (``order/inventory/stock.py``), so a save of
+Every sale saves ``stock`` alone (``order.inventory.stock``), so a save of
 ``stock`` and ``updated_at`` is bookkeeping: the cached pages and the page
 builder's lists are not purged for it. The one such save that changes what
 they show is the one that sells a product out or brings it back, because the

@@ -29,9 +29,14 @@ the linked section or the originating commit's message.
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | [§3.4](creation-records.md) |
 | A cart records its first touch (`CartAttribution`) only through `CartAttributionService.capture`, called before the line is written: an empty cart takes it, a cart holding lines keeps it, a merge keeps the earlier; both order creation paths copy it to `OrderAttribution.cart_source*` because the cart is deleted with its lines | [§3.4](creation-records.md) |
 | An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`src/order/accounting/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | [§3.5](creation-records.md) |
+| A MARK is final: every write of a myDATA send (`service.submit_document`: the intent, a refusal, an unanswered send) re-reads the document's row under its lock and leaves one that holds a MARK as it is, so overlapping senders (retry chain, sweep, SHIPPED, staff) can never demote it to SUBMITTED or REJECTED | [§7.4](fiscal-mydata.md) (#760) |
+| A courier order's receipt is set aside for its cancel (`hold_receipt_for_cancel`) inside `_cancel_order_locked`, under the order lock and before the save that asks for credits; credits are created under the same lock, and the receipt email checks `Invoice.is_deliverable` when it runs | [§7.1](cancel.md), [§7.4](fiscal-movement-receipts.md) (#760) |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `src/devtools/demo_account.py: _restore_gift_card` |
 | The checkout total is computed once, by `OrderQuoteService.quote`: `POST /cart/quote`, the payment-intent amount and both creation paths (`lock=True`) read it. An order is built from the quote's rows and refused (`OrderService._require_quoted_total`) when its own sum is not the quote's `amount_due` | [§3.0](creation.md) (#635) |
-| An order created with `expectedTotal` exists only at that total: compared exactly (minor units and currency) with the quote computed under the cart lock, else 409 `code: total_changed` with the quote and nothing created. Its `error.type` stays `invalid_order_data` until the storefront in production lists `total_changed` | [§3.0](creation.md) (#635) |
+| An order exists only at the `expectedTotal` its creation request carried (required on `POST /api/v1/order`): compared exactly (minor units and currency) with the quote computed under the cart lock, else 409 `code: total_changed` with the quote and nothing created. Its `error.type` stays `invalid_order_data` until the storefront in production lists `total_changed` | [§3.0](creation.md) (#635) |
+| An order created with `expectedCartDigest` is made of exactly what that quote priced: the lines, the promotions and the delivery with its pickup point, not the pay way (`OrderQuoteService.cart_digest`), compared under the cart lock before the total, else 409 `code: cart_changed` with the quote and nothing created. It is a check of contents: it holds the line prices and their promotion money, not the shipping charge, the fee or the loyalty and gift-card amounts, which `expectedTotal` holds. The quote and order creation take the same pickup-point fields and build the delivery with `ShippingChoice.of` | [§3.0](creation.md) (#755) |
+| A pickup-point order's delivery address is its point's, from the carrier's catalogue (`address_of_pickup_point`), never the buyer's: the receipt, the ACS voucher and the order page read that one snapshot. Only a deliverable point is accepted: in the catalogue, active and in the order's country; a missing or withdrawn one is looked for once by a guarded, deadline-bounded resync, run after every cheaper check, then refused. The order keeps none of the buyer's region, floor, location type or address line 2, and its owner cannot write one over the point's (`Order.SHIPPING_ADDRESS_FIELDS`) | [§3.3](creation-address.md) (#642) |
+| An order has at most one payment link a buyer can pay: `create_checkout_session` returns the order's live link again, refuses with 409 `payment_in_progress` while a paid link waits for its webhook and 503 `payment_provider_unavailable` when the provider cannot say, and mints only when none can be paid; a hosted session and a PaymentIntent are never open together | [§4](payments.md) (#643) |
 | A pay way is accepted exactly when the quote lists it for the delivery: `OrderQuoteService.offered_pay_ways` is the one rule behind the quote's `payWays`, the selection of a quote or a payment intent, and `OrderViewSet._validate_pay_way_for_order` on both creation paths | [§3.0](creation.md) (#635) |
 | "Free above X" means one value for shipping and for the pay-way fee: the products after discounts, excluding shipping and fees (`OrderQuoteService.threshold_value`), passed by every caller of `shipping_cost` and `calculate_payment_method_fee` | [§5.0](shipping.md) |
 | A payment is bound to what it was made for: every PaymentIntent carries server-set `purpose` / `subject` / `tenant_schema` metadata, payment-first order creation refuses an intent that is not `cart` + this cart + this tenant (or that a gift-card purchase holds), and the polled status path settles only through `handle_payment_succeeded` | [§3.1](creation.md), [§4.1](payments.md) |
@@ -90,10 +95,11 @@ These invariants need more than a table row. Each ends with its anchor.
   - Anchor: commits `61dd09854` (2026-04-29, the amount) and `ffe1718e4`
     (2026-04-30, the weight)
 - The default cache fails open on a Redis outage (reads miss, writes no-op —
-  `src/core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
+  `src/core/cache_backend.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
   the IdP's single-use codes and WebSocket tickets. The checkout, payment,
-  coupon and gift-card throttles (`src/core/api/throttling.py`,
+  coupon and gift-card throttles (`src/order/throttles.py`,
+  `src/cart/throttles.py`, `src/giftcard/throttles.py`,
   `fail_closed = True`) therefore REFUSE with 503 `temporarily_unavailable`
   during an outage (`src/core/middleware/strict_cache.py`; never a 429: the
   caller sent nothing too often), while
@@ -143,7 +149,12 @@ These invariants need more than a table row. Each ends with its anchor.
   the remainder
   - Anchor: [§7.2](refunds.md), [§7.3](payment-ledger.md)
 - The platform issues retail myDATA documents only: an 11.1 receipt when a
-  RECEIPT order ships (`order_shipped`, exactly once) and an 11.4 credit per
+  RECEIPT order ships (`order_shipped`), or, for a courier or locker order of
+  a store with its dispatch point set, with movement indication before the
+  pickup, once the carrier holds its voucher or parcel and the order awaits
+  no online payment (cash on delivery included: it is not awaiting one)
+  (`order_shipment_dispatched`, `receipt_issuable`,
+  [§7.4](fiscal-mydata.md)); exactly once either way. An 11.4 credit per
   ledger REFUND row of an order whose receipt has a MARK, plus one settlement
   credit when the order closes without a sale. `document_type=INVOICE` orders
   submit nothing: invoices are issued by hand in timologio (AADE decision

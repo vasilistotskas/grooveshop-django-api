@@ -8,10 +8,10 @@ import pytest
 from django.utils import timezone
 from djmoney.money import Money
 
+from promotion.coupons import CouponError, CouponService
 from promotion.enum import CouponRejectionReason
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
-from promotion.services import CouponError, CouponService
 
 pytestmark = pytest.mark.django_db
 

@@ -36,7 +36,7 @@ load_dotenv_file()
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 # The deployment this is: ``production``, ``staging``, ``dev`` or ``ci``.
 # ``SYSTEM_ENV`` names it (the admin's environment badge and tab prefix,
-# admin/environment.py); PRODUCTION_PROFILE is the hardening a real
+# src/admin/environment.py); PRODUCTION_PROFILE is the hardening a real
 # deployment needs — required secrets, TLS to the database, JSON logs.
 # Staging runs the production profile on purpose, so a release rehearses
 # exactly what production will run, and still says it is staging.

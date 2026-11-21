@@ -1,6 +1,6 @@
 """Tenant resolution, signed-data parsing and dispatch in the BoxNow webhook.
 
-Covers ``shipping_boxnow/views/webhook.py``: ``_resolve_tenant_for_parcel``
+Covers ``src/shipping_boxnow/views/webhook.py``: ``_resolve_tenant_for_parcel``
 skipping inactive and suspended tenants, the 400 for signed ``data`` that
 does not parse, the 500 when the Celery broker refuses the task, and the
 schema header + content fingerprint on a successful dispatch.

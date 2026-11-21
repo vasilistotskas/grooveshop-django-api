@@ -1,24 +1,22 @@
 import logging
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 
 from core import celery_app
+from core.db.locks import held_across_calls
+from core.monitored_task import MonitoredTask
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     SEARCH_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
 )
-from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 from emails.send import Status, send_email, was_sent
 from product.emails import ALERTS_GATE, LowStock, PriceDrop
 from product.enum.stock import RESTOCK_STATES, StockState
-
-if TYPE_CHECKING:
-    from product.models.alert import ProductAlert
 
 logger = logging.getLogger(__name__)
 
@@ -300,36 +298,54 @@ def check_low_stock_products() -> dict:
     return {"alerted": len(product_ids), "ids": product_ids}
 
 
-def _notify_alerts(alerts, *, type_key: str, wrap=lambda alert: alert):
-    """Send the email of *type_key* for each alert; returns the alerts that
-    were handled and how many were sent, or ``None`` when the type is off.
+def _notify_alerts(
+    alerts, *, type_key: str, wrap=lambda alert: alert
+) -> int | None:
+    """Send the email of *type_key* for each alert still armed; returns how
+    many were sent, or ``None`` when the type is off.
 
     An alert is single-shot: it is handled, sent or not, so a retry loop
-    never hammers a broken address. A type that is off (its feature closed,
-    or the store switched it off) handles nothing: the alerts stay armed
-    for when it is back on.
+    never hammers a broken address. Two runs can meet (two stock or price
+    updates, each its own dispatch), so each alert is read, mailed and
+    marked (``is_active`` off, ``notified_at`` set) under an advisory lock
+    on it (``core.db.locks.held_across_calls``): the run that waits finds it
+    marked. A mark set before the send would lose the mail with a worker
+    that dies mid-send; the lock goes with that worker's session, and the
+    copy delivered again sends the alert (under the same delivery id, so a
+    mail that did leave is not sent twice). A type that is off (its feature
+    closed, or the store switched it off) handles nothing and leaves every
+    alert armed.
     """
-    handled: list[ProductAlert] = []
+    from product.models.alert import ProductAlert
+
     sent = 0
     for alert in alerts:
-        try:
-            deliveries = send_email(type_key, wrap(alert))
-        except Exception:
-            logger.exception(
-                "Failed to send product alert %s (alert %s)",
-                type_key,
-                alert.pk,
-            )
-            handled.append(alert)
-            continue
-        if deliveries[0].status in (
-            Status.SKIPPED_FEATURE_OFF,
-            Status.SKIPPED_SWITCHED_OFF,
+        with held_across_calls(
+            f"product.alert:{connection.schema_name}:{alert.pk}"
         ):
-            return None
-        handled.append(alert)
-        sent += was_sent(deliveries)
-    return handled, sent
+            armed = ProductAlert.objects.filter(
+                pk=alert.pk, is_active=True, notified_at__isnull=True
+            )
+            if not armed.exists():
+                continue
+            try:
+                deliveries = send_email(type_key, wrap(alert))
+            except Exception:
+                logger.exception(
+                    "Failed to send product alert %s (alert %s)",
+                    type_key,
+                    alert.pk,
+                )
+                armed.update(is_active=False, notified_at=timezone.now())
+                continue
+            if deliveries[0].status in (
+                Status.SKIPPED_FEATURE_OFF,
+                Status.SKIPPED_SWITCHED_OFF,
+            ):
+                return None
+            armed.update(is_active=False, notified_at=timezone.now())
+            sent += was_sent(deliveries)
+    return sent
 
 
 def _with_product(alerts, product):
@@ -366,23 +382,11 @@ def send_product_alert_restock(product_id: int) -> dict:
         notified_at__isnull=True,
     ).select_related("user")
 
-    now = timezone.now()
-    outcome = _notify_alerts(
+    sent = _notify_alerts(
         _with_product(alerts, product), type_key="product.restock_alert"
     )
-    if outcome is None:
+    if sent is None:
         return {"status": "skipped", "reason": "switched_off"}
-    _handled, sent = outcome
-
-    # Single-shot: deactivate every alert we processed, even failures —
-    # a retry loop would otherwise hammer broken addresses.
-    ProductAlert.objects.filter(
-        product_id=product_id,
-        kind=ProductAlertKind.RESTOCK,
-        is_active=True,
-        notified_at__isnull=True,
-    ).update(is_active=False, notified_at=now)
-
     return {"status": "success", "product_id": product_id, "sent": sent}
 
 
@@ -415,21 +419,13 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         target_price_currency=getattr(settings, "DEFAULT_CURRENCY", "EUR"),
     ).select_related("user")
 
-    now = timezone.now()
-    outcome = _notify_alerts(
+    sent = _notify_alerts(
         _with_product(alerts, product),
         type_key="product.price_drop_alert",
         wrap=lambda alert: PriceDrop(alert=alert, new_price=new_price),
     )
-    if outcome is None:
+    if sent is None:
         return {"status": "skipped", "reason": "switched_off"}
-    handled, sent = outcome
-
-    if handled:
-        ProductAlert.objects.filter(id__in=[a.id for a in handled]).update(
-            is_active=False, notified_at=now
-        )
-
     return {"status": "success", "product_id": product_id, "sent": sent}
 
 

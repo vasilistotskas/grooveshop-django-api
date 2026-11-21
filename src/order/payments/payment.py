@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar, cast
+from zoneinfo import ZoneInfo
 
 import moneyed
 import stripe
@@ -19,7 +20,10 @@ from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
 from order.enum.status import PaymentStatus
-from order.exceptions import PaymentStatusUnavailableError
+from order.exceptions import (
+    PaymentInProgressError,
+    PaymentStatusUnavailableError,
+)
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 
 if TYPE_CHECKING:
@@ -44,6 +48,56 @@ class ProviderRefund:
     refund_id: str
     amount: Money
     made: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LiveCheckoutSession:
+    """A hosted payment session of an order that can still be paid: the
+    link a new request for one gets back (``live_checkout_session``)."""
+
+    session_id: str
+    checkout_url: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class OpenPayment:
+    """What an order records as its payment, read before a provider call
+    opens a new one: the state, the client-confirmed payment
+    (``payment_id``) and the hosted session (``recorded_checkout_session``).
+
+    Every write of a newly opened payment, a hosted session
+    (``create_checkout_session``) or a client-confirmed intent
+    (``PayWayService.process_payment``), goes through :meth:`lock_unchanged`,
+    so an order has one payable instrument: a request that finds another
+    opened, paid or canceled since it read the order records nothing (#643).
+    """
+
+    status: str
+    payment_status: str
+    payment_id: str
+    checkout_session: str | None
+
+    @classmethod
+    def of(cls, order: Order, provider: PaymentProvider) -> OpenPayment:
+        return cls(
+            status=order.status,
+            payment_status=order.payment_status,
+            payment_id=order.payment_id or "",
+            checkout_session=provider.recorded_checkout_session(
+                order.metadata or {}
+            ),
+        )
+
+    def lock_unchanged(self, order: Order, provider: PaymentProvider):
+        """The order's row, locked, if nothing of this changed since it
+        was read; ``None`` when another payment was recorded, or the order
+        was paid or canceled, meanwhile. Call inside ``transaction.atomic``.
+        """
+        from order.models.order import Order as OrderModel
+
+        locked = OrderModel.objects.select_for_update().get(pk=order.pk)
+        return locked if OpenPayment.of(locked, provider) == self else None
 
 
 class PaymentProvider(ABC):
@@ -141,6 +195,30 @@ class PaymentProvider(ABC):
         may pay on any of them — so the shape belongs to the PSP rather
         than to a branch in the checkout-session view.
         """
+        return
+
+    def recorded_checkout_session(self, metadata: dict[str, Any]) -> str | None:
+        """The session reference ``record_checkout_session`` stored last,
+        or ``None``: what a concurrent request compares to learn whether
+        another one opened a session meanwhile."""
+        return None
+
+    def live_checkout_session(self, order: Order) -> LiveCheckoutSession | None:
+        """The order's hosted session that can still be paid, if any.
+
+        Asking for a payment link is idempotent: while one is payable it
+        is the answer, so an order never has two links a buyer could pay
+        (#643). ``None`` when every session the order had has expired,
+        been canceled, or it had none. Raises ``PaymentInProgressError``
+        when a session was paid and the order does not know it yet, and
+        ``PaymentStatusUnavailableError`` when the provider cannot say:
+        a link is then never minted blind.
+        """
+        return None
+
+    def discard_checkout_session(self, session_id: str) -> None:
+        """End a session nobody was given: the one a request opened while
+        a concurrent request recorded its own first. Default nothing."""
         return
 
     def close_payment(self, order: Order) -> bool:
@@ -244,7 +322,7 @@ class StripePaymentProvider(PaymentProvider):
     a cross-tenant race under ASGI/threads. Webhook verification is
     dj-stripe's job: its UUID-routed webhook view verifies against the
     per-schema ``WebhookEndpoint`` row secret (see
-    ``tenant/management/commands/bootstrap_stripe.py``).
+    ``src/tenant/management/commands/bootstrap_stripe.py``).
     """
 
     code: ClassVar[str] = "stripe"
@@ -286,6 +364,64 @@ class StripePaymentProvider(PaymentProvider):
     ) -> None:
         """One live session at a time; a new one replaces the last."""
         metadata["stripe_checkout_session_id"] = session_id
+
+    def recorded_checkout_session(self, metadata: dict[str, Any]) -> str | None:
+        return metadata.get("stripe_checkout_session_id") or None
+
+    def live_checkout_session(self, order: Order) -> LiveCheckoutSession | None:
+        """The order's Checkout Session while it is ``open``. A
+        ``complete`` one was paid (or its payment is being processed)
+        while the order is still unpaid: its webhook has not landed. An
+        ``expired`` one can no longer be completed."""
+        session_id = self.recorded_checkout_session(order.metadata or {})
+        if not session_id:
+            return None
+        try:
+            session = stripe.checkout.Session.retrieve(
+                session_id, api_key=self.api_key, expand=["payment_intent"]
+            )
+        except stripe.StripeError as e:
+            logger.warning("Checkout Session %s could not be read", session_id)
+            raise PaymentStatusUnavailableError(session_id) from e
+        if session.status == "complete":
+            if self._session_payment_may_land(session):
+                raise PaymentInProgressError(
+                    f"Checkout Session {session_id} of order {order.id} is "
+                    "paid or being paid and the order is unpaid"
+                )
+            # A delayed method (SEPA Debit) that failed leaves the session
+            # ``complete`` for ever: it can no longer be paid.
+            return None
+        if session.status != "open":
+            return None
+        return LiveCheckoutSession(
+            session_id=session.id,
+            checkout_url=session.url,
+            expires_at=datetime.fromtimestamp(session.expires_at, tz=UTC),
+        )
+
+    #: A PaymentIntent in these states may still take the money, or has.
+    INTENT_MAY_LAND: ClassVar[frozenset[str]] = frozenset(
+        {"processing", "requires_capture", "requires_action", "succeeded"}
+    )
+
+    @classmethod
+    def _session_payment_may_land(cls, session: Any) -> bool:
+        """Whether a ``complete`` session was paid or is being paid:
+        ``payment_status`` "paid" or "no_payment_required", or an
+        "unpaid" one whose PaymentIntent is still in flight. One whose
+        intent failed (``requires_payment_method``, ``canceled``) is gone."""
+        if session.payment_status in {"paid", "no_payment_required"}:
+            return True
+        intent = session.payment_intent
+        status = getattr(intent, "status", None) if intent else None
+        return status is None or status in cls.INTENT_MAY_LAND
+
+    def discard_checkout_session(self, session_id: str) -> None:
+        """Expire it: "After it expires, a customer can't complete a
+        Checkout Session" (https://docs.stripe.com/api/checkout/sessions/expire).
+        """
+        stripe.checkout.Session.expire(session_id, api_key=self.api_key)
 
     def __init__(self):
         from tenant.credentials import stripe_credentials
@@ -768,23 +904,26 @@ class StripePaymentProvider(PaymentProvider):
         hours and, asked again with the same parameters, returns it instead
         of refunding twice. That is what makes a retry after a timeout safe.
         Reusing a key with different parameters is an error on Stripe's side.
+
+        The request is built before the ``try``: only an error from the call
+        itself, or after it, may follow a refund Stripe made.
         """
+        from django.db import connection as _connection
+
+        tenant_schema = getattr(_connection, "schema_name", "public")
+        minor_units = round(amount.amount * amount.currency.sub_unit)
+        logger.info(
+            "Processing Stripe refund",
+            extra={
+                "payment_id": payment_id,
+                "amount": str(amount.amount),
+                "idempotency_key": idempotency_key,
+            },
+        )
         try:
-            logger.info(
-                "Processing Stripe refund",
-                extra={
-                    "payment_id": payment_id,
-                    "amount": str(amount.amount),
-                    "idempotency_key": idempotency_key,
-                },
-            )
-
-            from django.db import connection as _connection
-
-            tenant_schema = getattr(_connection, "schema_name", "public")
             stripe_refund = stripe.Refund.create(
                 payment_intent=payment_id,
-                amount=round(amount.amount * amount.currency.sub_unit),
+                amount=minor_units,
                 # Echo the tenant back on the refund for finance
                 # reconciliation, and the attempt, so a refund whose answer
                 # was lost is found by it (``find_refunds``).
@@ -1082,6 +1221,21 @@ VIVA_DISPUTE_OPEN_STATUS_IDS: frozenset[str] = frozenset({"M", "MA", "MI"})
 VIVA_DISPUTE_LOST_STATUS_ID = "ML"
 #: ``MW``: "Dispute Won".
 VIVA_DISPUTE_WON_STATUS_ID = "MW"
+# Why a Viva refund was refused before anything was sent (the order's
+# history shows it to staff).
+VIVA_REFUND_NEEDS_BASIC_PAIR = (
+    "Not sent: this store's Viva Wallet Merchant ID and API Key are "
+    "missing. Add them to the store's Viva Wallet settings, then refund "
+    "again."
+)
+
+
+def order_viva_codes_in_order(order) -> list[str]:
+    """The order's Viva orderCodes, oldest first, as they were issued."""
+    metadata = order.metadata or {}
+    return [
+        str(code) for code in (metadata.get("viva_order_codes") or []) if code
+    ]
 
 
 def order_viva_codes(order) -> set[str]:
@@ -1095,10 +1249,7 @@ def order_viva_codes(order) -> set[str]:
     """
     # Exactly what the resolver matches, nothing more: ``payment_id``
     # holds a TransactionId once an order is paid, never an orderCode.
-    metadata = order.metadata or {}
-    return {
-        str(code) for code in (metadata.get("viva_order_codes") or []) if code
-    }
+    return set(order_viva_codes_in_order(order))
 
 
 class VivaWalletPaymentProvider(PaymentProvider):
@@ -1119,6 +1270,15 @@ class VivaWalletPaymentProvider(PaymentProvider):
     #: lifetime this can ask for
     #: (https://developer.viva.com/apis-for-payments/payment-api).
     MAX_PAYMENT_TIMEOUT: ClassVar[timedelta] = timedelta(seconds=65534)
+    #: Retrieve order's ``StateId``: "0 (Pending) 1 (Expired) 2 (Canceled)
+    #: 3 (Paid)" (payment-api.yaml).
+    STATE_PENDING: ClassVar[int] = 0
+    STATE_PAID: ClassVar[int] = 3
+    STATES: ClassVar[frozenset[int]] = frozenset({0, 1, 2, 3})
+    #: The zone Viva's offset-less ``ExpirationDate`` is written in.
+    TIME_ZONE: ClassVar[ZoneInfo] = ZoneInfo("Europe/Athens")
+    #: A read made while a shopper waits for their payment link.
+    READ_TIMEOUT_SECONDS: ClassVar[int] = 15
     # Hosted redirect only. ``process_payment`` below delegates straight
     # to ``create_checkout_session`` — there is no intent to confirm, so
     # an order using Viva is created BEFORE any money moves.
@@ -1129,8 +1289,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
     def is_configured_for_tenant(cls) -> bool:
         from tenant.credentials import viva_wallet_credentials
 
-        creds = viva_wallet_credentials()
-        return bool(creds["client_id"] and creds["client_secret"])
+        return not cls._missing_credentials(viva_wallet_credentials())
+
+    @staticmethod
+    def _missing_credentials(creds) -> list[str]:
+        """The credentials a Viva store lacks. Every one is needed: the
+        OAuth pair mints payment orders, the Basic pair (Merchant ID, API
+        Key) reads them (Retrieve order) and refunds."""
+        present = {
+            "merchant_id": creds["merchant_id"],
+            "api_key": creds["api_key"],
+            "client_id": creds["client_id"],
+            "client_secret": creds["client_secret"],
+        }
+        return [name for name, value in present.items() if not value]
 
     def record_checkout_session(
         self, metadata: dict[str, Any], session_id: str
@@ -1148,6 +1320,137 @@ class VivaWalletPaymentProvider(PaymentProvider):
             codes.append(session_id)
         metadata["viva_order_codes"] = codes
 
+    def recorded_checkout_session(self, metadata: dict[str, Any]) -> str | None:
+        codes = metadata.get("viva_order_codes") or []
+        return str(codes[-1]) if codes else None
+
+    def live_checkout_session(self, order: Order) -> LiveCheckoutSession | None:
+        """The newest of the order's payment orders Viva still reads as
+        Pending, from ``GET /api/orders/{orderCode}`` (Retrieve order):
+        ``StateId`` 0 Pending, 1 Expired, 2 Canceled, 3 Paid.
+
+        Every code is read, because a payment on any of them is the
+        order's (``viva_order_code_q``): one that reads Paid while the
+        order is unpaid means the webhook has not landed. Viva forgets a
+        payment order some time after it ends and answers 404; that
+        means "gone" only once the order's hold and the grace window
+        have ended (``payment_hold.hold_ended``: the latest any of its
+        codes could have been payable). A 404 for a code that could
+        still be payable is an answer Viva cannot give, so it is
+        "unreadable", never "gone".
+        """
+        from order.payments import payment_hold
+
+        live: LiveCheckoutSession | None = None
+        for code in reversed(list(order_viva_codes_in_order(order))):
+            state = self._payment_order(code)
+            if state is None:
+                if payment_hold.hold_ended(order):
+                    continue
+                logger.warning(
+                    "Viva does not know payment order %s, still in its hold",
+                    code,
+                )
+                raise PaymentStatusUnavailableError(code)
+            state_id = state.get("StateId")
+            if state_id not in self.STATES:
+                # An answer that names no known state says nothing about
+                # whether the link can still be paid: never minted past.
+                logger.warning(
+                    "Viva answered payment order %s with no known StateId",
+                    code,
+                )
+                raise PaymentStatusUnavailableError(code)
+            if state_id == self.STATE_PAID:
+                raise PaymentInProgressError(
+                    f"Viva payment order {code} of order {order.id} is paid "
+                    "and the order is unpaid"
+                )
+            if state_id == self.STATE_PENDING and live is None:
+                expires_at = self._expiration(state)
+                if expires_at > timezone.now():
+                    live = LiveCheckoutSession(
+                        session_id=code,
+                        checkout_url=self._checkout_link(code),
+                        expires_at=expires_at,
+                    )
+        return live
+
+    def _payment_order(self, code: str) -> dict[str, Any] | None:
+        """Viva's Retrieve order for *code*, ``None`` when Viva answers
+        404 ("Specified order code does not exist or is invalid").
+
+        A store without the Merchant ID and API Key cannot read it: the
+        order is unreadable (``PaymentStatusUnavailableError``, a 503), as
+        when Viva cannot be reached, and nothing is sent. Checkout offers
+        Viva only with all four values, but an order placed earlier can
+        ask after the store lost them."""
+        import requests
+
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva payment order %s not read: the store has no Viva "
+                "Merchant ID and API Key",
+                code,
+            )
+            raise PaymentStatusUnavailableError(code)
+        try:
+            response = requests.get(
+                f"{self.transactions_url}/api/orders/{code}",
+                headers={"Authorization": self._get_basic_auth_header()},
+                timeout=self.READ_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as e:
+            logger.warning("Viva could not be reached for %s", code)
+            raise PaymentStatusUnavailableError(code) from e
+        if response.status_code == 404:
+            return None
+        try:
+            response.raise_for_status()
+            body = response.json()
+        except (requests.HTTPError, ValueError) as e:
+            logger.warning(
+                "Viva answered %s for payment order %s",
+                response.status_code,
+                code,
+            )
+            raise PaymentStatusUnavailableError(code) from e
+        if not isinstance(body, dict):
+            # A list, ``null`` or a scalar is no payment order: unreadable,
+            # never "gone" (a 404 is the only "gone").
+            logger.warning(
+                "Viva answered payment order %s with no object", code
+            )
+            raise PaymentStatusUnavailableError(code)
+        return body
+
+    def _expiration(self, state: dict[str, Any]) -> datetime:
+        """``ExpirationDate`` as an aware instant. Viva writes it without
+        an offset, in Greek local time (read on demo 2026-11-21: a code
+        created with our 22:36:55+02:00 expiry reads
+        ``2026-11-20T22:36:55.457``)."""
+        try:
+            # ``fold=1``: an ambiguous wall time (the hour repeated when
+            # summer time ends) is the later of its two instants, so a code
+            # that is still payable is never taken for expired early; the
+            # other way, the worst is returning a link about to expire.
+            # As UTC: an aware time in the repeated hour compares unequal
+            # to every other zone's (PEP 495), so it is not passed on.
+            return (
+                datetime.fromisoformat(state["ExpirationDate"])
+                .replace(tzinfo=self.TIME_ZONE, fold=1)
+                .astimezone(UTC)
+            )
+        except (KeyError, TypeError, ValueError) as e:
+            code = str(state.get("OrderCode", ""))
+            logger.warning(
+                "Viva's ExpirationDate of %s could not be read", code
+            )
+            raise PaymentStatusUnavailableError(code) from e
+
+    def _checkout_link(self, code: str) -> str:
+        return f"{self.checkout_url}/web/checkout?ref={code}"
+
     def __init__(self):
         from tenant.credentials import viva_wallet_credentials
 
@@ -1162,12 +1465,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.source_code = creds["source_code"] or "Default"
         self.live_mode = creds["live_mode"]
 
+        # Each call is gated by what it needs. The offer needs all four
+        # (``is_configured_for_tenant``); the OAuth pair is what every
+        # payment-order and webhook call uses, so it is required here; the
+        # Basic pair is checked where it is used (``_get_basic_auth_header``),
+        # so a store with only the OAuth pair still settles its webhooks.
         if not (self.client_id and self.client_secret):
-            # No tenant OAuth2 credentials: Viva Wallet is unavailable
-            # for this tenant. Fail loudly — the pay-way availability
-            # gate (``PayWayService.is_provider_configured``) should
-            # have hidden the provider and order-create should have
-            # rejected it before this constructor ever runs.
+            # The pay-way availability gate
+            # (``PayWayService.is_provider_configured``) should have hidden
+            # the provider and order-create should have rejected it before
+            # this constructor ever runs.
             raise ImproperlyConfigured(
                 "Viva Wallet is not configured for this tenant: no "
                 "viva_wallet_client_id/viva_wallet_client_secret set on "
@@ -1230,9 +1537,28 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
         return access_token
 
+    @property
+    def has_basic_credentials(self) -> bool:
+        """Whether the store holds the Merchant ID and API Key, which
+        Retrieve order and the transaction calls (refunds, their lookup)
+        need. Every one of those calls checks it before sending and fails
+        the way it fails when Viva cannot be read: Retrieve order is
+        unreadable (503), a refund is refused, a refund lookup finds
+        nothing to say. None sends empty credentials or reads as a lost
+        answer."""
+        return bool(self.merchant_id and self.api_key)
+
     def _get_basic_auth_header(self) -> str:
+        """Basic auth with the Merchant ID and API Key: Retrieve order and
+        the transaction calls. A store without them cannot make those calls,
+        and is told so, rather than sending empty credentials."""
         from base64 import b64encode
 
+        if not self.has_basic_credentials:
+            raise ImproperlyConfigured(
+                "Viva Wallet's Basic credentials are not set for this "
+                "tenant: viva_wallet_merchant_id and viva_wallet_api_key."
+            )
         credentials = b64encode(
             f"{self.merchant_id}:{self.api_key}".encode()
         ).decode()
@@ -1328,7 +1654,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             data = response.json()
 
             order_code = data["orderCode"]
-            checkout_url = f"{self.checkout_url}/web/checkout?ref={order_code}"
+            checkout_url = self._checkout_link(str(order_code))
 
             logger.info(
                 "Viva Wallet payment order created",
@@ -1405,25 +1731,30 @@ class VivaWalletPaymentProvider(PaymentProvider):
         above what is left on the payment, which is what stops a repeated
         call from refunding twice, and the ledger's unique constraint on
         the refund transaction id stops it being recorded twice.
+
+        Only a request that may have reached Viva has an unknown outcome.
+        One that was never sent (the store has no Merchant ID and API Key,
+        or no connection was made) is a refusal: nothing can have moved.
         """
         import requests
 
-        try:
-            logger.info(
-                "Processing Viva Wallet refund",
-                extra={
-                    "payment_id": payment_id,
-                    "amount": str(amount.amount),
-                },
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva Wallet refund not sent: no Merchant ID and API Key",
+                extra={"payment_id": payment_id},
             )
+            return False, {"error": VIVA_REFUND_NEEDS_BASIC_PAIR}
+        authorization = self._get_basic_auth_header()
 
-            refund_amount = amount.amount
-
+        refund_amount = amount.amount
+        logger.info(
+            "Processing Viva Wallet refund",
+            extra={"payment_id": payment_id, "amount": str(refund_amount)},
+        )
+        try:
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
-                headers={
-                    "Authorization": self._get_basic_auth_header(),
-                },
+                headers={"Authorization": authorization},
                 params={"amount": round(refund_amount * 100)},
                 timeout=30,
             )
@@ -1470,6 +1801,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
             return True, refund_data
 
+        except requests.ConnectTimeout:
+            # No connection was made, so the request never left.
+            logger.warning(
+                "Viva Wallet refund not sent: the connection timed out",
+                extra={"payment_id": payment_id},
+            )
+            return False, {
+                "error": "Not sent: Viva Wallet could not be reached.",
+                "viva_error": True,
+            }
         except requests.HTTPError as e:
             error_body = ""
             if e.response is not None:
@@ -1525,12 +1866,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
         """
         import requests
 
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva Wallet refund lookup not sent: no Merchant ID and "
+                "API Key",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        authorization = self._get_basic_auth_header()
         found: dict[str, ProviderRefund] = {}
         try:
             for order_code in sorted(order_viva_codes(order)):
                 response = requests.get(
                     f"{self.transactions_url}/api/transactions/",
-                    headers={"Authorization": self._get_basic_auth_header()},
+                    headers={"Authorization": authorization},
                     params={"ordercode": order_code},
                     timeout=30,
                 )

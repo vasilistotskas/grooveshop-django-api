@@ -187,8 +187,13 @@ def order_vat_lines(
     """Every taxable line of ``order``: goods, then shipping, then the fee.
 
     A zero-gross line (a free gift, a fully discounted line) is left out:
-    myDATA rejects zero-amount lines and a breakdown row of zeros says
-    nothing. ``items`` lets a caller pass rows it already fetched.
+    these are the lines with value, and a breakdown row of zeros says
+    nothing. A line of no value is within myDATA's field limits (REST API
+    v2.0.2, §5.4: ``netValue`` and ``vatAmount`` have a minimum of 0), and
+    a receipt with movement declares such a good on one
+    (``mydata.builder._receipt_lines``); AADE accepting a whole 11.1 that
+    carries one is not verified yet (no sandbox run). ``items`` lets a
+    caller pass rows it already fetched.
     """
     rows = list(order.items.all()) if items is None else list(items)
     gross_by_pk = discounted_line_gross(order, rows)

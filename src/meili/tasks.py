@@ -11,7 +11,12 @@ from typing import Any
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
+from django.core import management
+from django.utils import timezone
 
+from core import celery_app
+from core.exceptions import ManagementCommandFailed
+from core.monitored_task import MonitoredTask
 from core.retry import SEARCH_TRANSIENT_ERRORS
 from meili.exceptions import MeiliTaskFailed
 from tenant.celery import TenantTask
@@ -467,3 +472,35 @@ def _get_document_pk(instance) -> str:
     return instance._meta.get_field(
         instance._meilisearch["primary_key"]
     ).value_to_string(instance)
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    name="core.tasks.sync_meilisearch_indexes",
+    max_retries=3,
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
+    retry_backoff=True,
+)
+def sync_meilisearch_indexes():
+    """
+    Sync all Meilisearch indexes by calling the management command.
+    Scheduled to run daily at 2 AM.
+    """
+    logger.info("Starting Meilisearch index synchronization")
+
+    try:
+        management.call_command("meilisearch_sync_all_indexes")
+        logger.info("Meilisearch index synchronization completed successfully")
+        return {
+            "status": "success",
+            "result_message": "All Meilisearch indexes synchronized successfully",
+            "timestamp": timezone.now().isoformat(),
+        }
+    except SystemExit as e:
+        raise ManagementCommandFailed("meilisearch sync", e.code) from e
+    except management.CommandError as e:
+        logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
+        raise
+    except Exception:
+        logger.exception("Unexpected error in sync_meilisearch_indexes")
+        raise

@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
@@ -29,6 +29,8 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import quoted_body
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.usefixtures("checkout_legal_documents")
@@ -45,30 +47,36 @@ class TestOrderCreateErrorCodes(APITestCase):
             active=True,
         )
         self.country = CountryFactory()
+        # Delivered at a rate, so the order the shopper places is quoted.
+        enable_rate(self.country)
         self.region = RegionFactory(country=self.country)
         self.url = reverse("order-list")
         self.client.force_authenticate(user=self.user)
 
     def _post(self, cart, language="en"):
+        headers = {
+            "HTTP_X_CART_ID": str(cart.uuid),
+            "HTTP_X_LANGUAGE": language,
+        }
+        body = {
+            "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "email": "alice@example.com",
+            "street": "Baker St",
+            "street_number": "221B",
+            "city": "Thessaloniki",
+            "zipcode": "54621",
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
+            "phone": "+306911111111",
+        }
         return self.client.post(
             self.url,
-            {
-                "pay_way_id": self.pay_way.id,
-                "terms_accepted": True,
-                "first_name": "Alice",
-                "last_name": "Smith",
-                "email": "alice@example.com",
-                "street": "Baker St",
-                "street_number": "221B",
-                "city": "Thessaloniki",
-                "zipcode": "54621",
-                "country_id": self.country.alpha_2,
-                "region_id": self.region.alpha,
-                "phone": "+306911111111",
-            },
+            quoted_body(self.client, body, **headers),
             format="json",
-            HTTP_X_CART_ID=str(cart.uuid),
-            HTTP_X_LANGUAGE=language,
+            **headers,
         )
 
     def _cart(self, **product):
@@ -125,3 +133,31 @@ class TestOrderCreateErrorCodes(APITestCase):
 
         assert isinstance(error, InvalidOrderDataError)
         assert "Cart validation failed" in str(error)
+
+
+@pytest.mark.django_db
+def test_a_cache_outage_during_creation_is_the_coded_503():
+    """A cache-held bound that fails closed raises ``REDIS_UNAVAILABLE``;
+    the view's catch-all must leave it to ``StrictCacheUnavailableMiddleware``
+    (a 503 ``temporarily_unavailable``), never answer it as a 500."""
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
+    from order.views.order import OrderViewSet
+
+    cart = CartFactory()
+    CartItemFactory(cart=cart)
+    with patch.object(
+        OrderViewSet,
+        "_validate_and_create",
+        side_effect=RedisConnectionError("down"),
+    ):
+        response = APIClient().post(
+            reverse("order-list"),
+            {},
+            format="json",
+            HTTP_X_CART_ID=str(cart.uuid),
+        )
+
+    assert response.status_code == 503, response.content
+    assert response.json()["code"] == STRICT_CACHE_UNAVAILABLE_CODE

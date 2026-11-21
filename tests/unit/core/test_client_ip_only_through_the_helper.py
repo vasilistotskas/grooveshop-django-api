@@ -2,7 +2,7 @@
 
 ``REMOTE_ADDR`` is the proxy's address, ``X-Forwarded-For`` and
 ``X-Real-IP`` are chosen by whoever sends the request, and which of them
-may be believed is the one decision ``core/client_ip.py`` makes
+may be believed is the one decision ``src/core/client_ip.py`` makes
 (``edge_client_ip``, ``client_ip_or_peer``). A second reader re-decides it,
 usually wrongly: keying a throttle on the proxy shares one budget between
 all callers, trusting a header lets a caller mint its own.

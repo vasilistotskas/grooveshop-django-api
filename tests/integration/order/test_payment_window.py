@@ -731,6 +731,9 @@ class TestTheCheckoutSessionReturnsTheLinkExpiry:
             },
         )
         provider.checkout_session_params.return_value = {}
+        # No link of the order is payable yet, so one is opened (#643).
+        provider.live_checkout_session.return_value = None
+        provider.recorded_checkout_session.return_value = None
         provider.min_hosted_session = timedelta(0)
         client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
         client.force_authenticate(user=user)

@@ -285,7 +285,9 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         # frozen branch and hands the totals to the template.
         from order.accounting.invoicing import _persist_invoice_row
 
-        _regenerated, _breakdown, totals = _persist_invoice_row(order, invoice)
+        _regenerated, _breakdown, totals = _persist_invoice_row(
+            order, invoice, issuing=False
+        )
 
         for key in (
             "subtotal",
@@ -337,7 +339,9 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         invoice.mydata_mark = 400001234567890
         invoice.save(update_fields=["mydata_mark"])
 
-        invoice, breakdown, totals = _persist_invoice_row(order, invoice)
+        invoice, breakdown, totals = _persist_invoice_row(
+            order, invoice, issuing=False
+        )
         html = render_to_string(
             "invoices/invoice.html",
             _build_context(order, invoice, breakdown, totals),
@@ -371,7 +375,9 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
 
         order = self._make_order()
         invoice = generate_invoice(order)
-        invoice, breakdown, totals = _persist_invoice_row(order, invoice)
+        invoice, breakdown, totals = _persist_invoice_row(
+            order, invoice, issuing=False
+        )
 
         def render(seller: dict[str, str]) -> str:
             invoice.seller_snapshot = seller

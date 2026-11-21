@@ -14,6 +14,7 @@ from core.validators import address as address_rules
 from country.models import Country
 from order.accounting.invoicing import specimen_available
 from order.checkout.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
+from order.checkout.quote import ShippingChoice
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
@@ -33,12 +34,22 @@ from order.serializers.item import (
 from order.serializers.quote import (
     CheckoutQuoteSerializer,
     ExpectedTotalSerializer,
+    PickupPointSerializer,
 )
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from region.models import Region
 from shipping.enum import ShippingKind
+from shipping.interfaces import (
+    PICKUP_POINT_IN_ANOTHER_COUNTRY,
+    PICKUP_POINT_UNAVAILABLE,
+    PickupPointInAnotherCountry,
+    PickupPointUnknown,
+    get_provider,
+    is_registered,
+)
+from shipping.services import ShippingService
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
@@ -285,6 +296,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "status_display",
@@ -370,6 +382,11 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             # alongside an unchanged pay way would survive.
             "pay_way_key",
         )
+        # Always present, and empty on a pickup order whose point's street
+        # line names no number (``_deliver_to_pickup_point``).
+        extra_kwargs = {
+            "street_number": {"required": True, "allow_blank": True},
+        }
 
 
 class OrderDetailSerializer(OrderSerializer):
@@ -1048,7 +1065,7 @@ class OrderDetailSerializer(OrderSerializer):
         )
 
 
-class OrderCreateFromCartSerializer(serializers.Serializer):
+class OrderCreateFromCartSerializer(PickupPointSerializer):
     """
     Serializer for creating orders from cart (dual-flow payment architecture).
 
@@ -1092,25 +1109,61 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     email = serializers.EmailField(
         required=True, help_text=_("Customer email address")
     )
+    # The buyer's own address: required for a home delivery. A
+    # pickup-point order is delivered to the point, whose address
+    # replaces it (``_deliver_to_pickup_point``).
     street = serializers.CharField(
-        max_length=255, required=True, help_text=_("Street name")
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Street name, or the whole street line with its number after "
+            "the name (Ermou 12) when streetNumber is not sent. Required "
+            "for a home delivery; a pickup-point order takes the point's "
+            "address instead."
+        ),
     )
-    # Required: the courier voucher cannot be issued without one, and
-    # the service layer already rejected a blank value — the field
-    # declaration said otherwise.
+    # The courier voucher needs a number: without this field it is split
+    # from ``street`` (``address_rules.split_street_line``), and a line
+    # with none is refused, so the order always stores both.
     street_number = serializers.CharField(
-        max_length=50, required=True, help_text=_("Street number")
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Street number. Optional: without it, street must end in the "
+            "number, which is split from it; a street with no number is "
+            "refused with code street_number_missing on street."
+        ),
+    )
+    address_line_2 = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "What the street line does not hold: a flat, a floor, a "
+            "building. Optional free text, printed under the street and "
+            "given to the courier."
+        ),
     )
     city = serializers.CharField(
-        max_length=100, required=True, help_text=_("City name")
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "City name. Required for a home delivery; a pickup-point order "
+            "takes the point's city instead."
+        ),
     )
     zipcode = serializers.CharField(
         max_length=20,
-        required=True,
+        required=False,
+        allow_blank=True,
         help_text=_(
             "Postal/ZIP code. Must match the country's "
             "``postal_code_pattern``; stored normalised (trimmed, "
-            "upper-case, single spaces)."
+            "upper-case, single spaces). Required for a home delivery; a "
+            "pickup-point order takes the point's postcode instead."
         ),
     )
     country_id = serializers.CharField(
@@ -1250,14 +1303,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
 
-    # BoxNow locker fields (required when carrier=boxnow + kind=pickup_point)
-    boxnow_locker_id = serializers.CharField(
-        max_length=64,
-        required=False,
-        allow_blank=True,
-        help_text=_("BoxNow APM locker ID from the widget"),
-    )
-
     # Shipping abstraction: ``(shipping_provider_code, shipping_kind)``
     # is the single source of truth for carrier dispatch. Validated
     # against the in-memory carrier registry; the dynamic home-delivery
@@ -1278,20 +1323,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         help_text=_("Generic fulfilment kind, independent of provider."),
     )
     # ACS-specific fields, only honoured when shipping_provider_code='acs'.
-    acs_station_external_id = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_(
-            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
-        ),
-    )
-    acs_station_branch = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_("ACS_Station_Branch_Destination value."),
-    )
+    # Its pickup point is on ``PickupPointSerializer``.
     acs_charge_type = serializers.ChoiceField(
         choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
         required=False,
@@ -1334,17 +1366,28 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     )
 
     # ---------- The total the buyer was shown ----------
-    # Optional for now: a client that sends it gets the order only at
-    # that total (``OrderTotalChangedError``, 409 ``total_changed``).
+    # Required: the order is created only at the total the buyer saw
+    # (``OrderTotalChangedError``, 409 ``total_changed``).
     expected_total = ExpectedTotalSerializer(
-        required=False,
         write_only=True,
         help_text=_(
             "The total the buyer was shown: ``expectedTotal`` of "
-            "``POST /cart/quote``, or the client's own amount due in minor "
-            "units. When sent, the order is created only if it is exactly "
-            "the amount due computed now; otherwise the answer is 409 "
-            "``total_changed`` with the new quote and nothing is created."
+            "``POST /cart/quote``. The order is created only if it is "
+            "exactly the amount due computed now; otherwise the answer is "
+            "409 ``total_changed`` with the new quote and nothing is "
+            "created."
+        ),
+    )
+    expected_cart_digest = serializers.CharField(
+        required=False,
+        write_only=True,
+        max_length=64,
+        help_text=_(
+            "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was "
+            "shown. When sent, the order is created only if it is made of "
+            "exactly what that quote priced (lines, promotions, delivery, "
+            "pickup point); otherwise the answer is 409 "
+            "``cart_changed`` with the new quote and nothing is created."
         ),
     )
 
@@ -1362,12 +1405,12 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         write_only=True,
         help_text=_(
             "Meta Pixel context: keys ``fbp``, ``fbc``, "
-            "``client_user_agent``, ``client_ip_address``, "
-            "``event_ids`` (dict of {purchase, initiate_checkout, "
-            "add_payment_info}), ``consent`` (dict with ``ads`` "
-            "boolean). Empty dict / null when the customer declined "
-            "marketing cookies; the CAPI dispatcher then skips the "
-            "send."
+            "``client_user_agent``, ``event_ids`` (dict of {purchase, "
+            "initiate_checkout, add_payment_info}), ``consent`` (dict "
+            "with ``ads`` boolean). A ``client_ip_address`` sent here is "
+            "ignored: the server sets it from the verified edge address. "
+            "Empty dict / null when the customer declined marketing "
+            "cookies; the CAPI dispatcher then skips the send."
         ),
     )
 
@@ -1484,8 +1527,16 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         3. ``(shipping_provider_code='boxnow', shipping_kind='pickup_point')``
            ⇒ ``boxnow_locker_id`` required and ``pay_way`` must be an
            online-payment method (BoxNow rejects COD at lockers).
-        4. The delivery address passes ``core.validators.address`` for
-           its country, and the postcode is stored normalised.
+        4. A home delivery's address is required and passes
+           ``core.validators.address`` for its country, and the postcode
+           is stored normalised. A street sent without ``street_number``
+           is one line, split by ``split_street_line``; the errors of its
+           number are the line's.
+        5. A pickup-point order is delivered to the point: its address,
+           from the carrier's catalogue, is the order's delivery address,
+           and the buyer's own is neither required nor kept. It is
+           resolved last, after every cheaper check, because a point the
+           catalogue misses starts a resync of it.
         """
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
@@ -1493,19 +1544,10 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 {"country_id": _("Select a valid country.")},
                 code="country_invalid",
             )
-        region = None
-        if attrs.get("region_id"):
-            region = Region.objects.filter(alpha=attrs["region_id"]).first()
-        errors = address_rules.address_errors(
-            country=country,
-            street=attrs["street"],
-            street_number=attrs["street_number"],
-            zipcode=attrs["zipcode"],
-            region=region,
-        )
-        if errors:
-            raise serializers.ValidationError(errors)
-        attrs["zipcode"] = address_rules.normalize_postcode(attrs["zipcode"])
+        self._validate_carrier(attrs)
+        pickup = attrs.get("shipping_kind") == ShippingKind.PICKUP_POINT
+        if not pickup:
+            self._validate_home_address(attrs, country)
 
         document_type = attrs.get("document_type", "RECEIPT")
         billing_vat_id = attrs.get("billing_vat_id", "")
@@ -1542,6 +1584,18 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             # address instead of relying on read-time fallbacks. A
             # PARTIAL explicit address is rejected — the invoice would
             # otherwise mix the billing street with the shipping city.
+            if not (attrs.get("billing_street") or "").strip() and pickup:
+                # The delivery address is the pickup point's, never the
+                # company's: an invoice to a locker names it explicitly.
+                raise serializers.ValidationError(
+                    {
+                        "billing_street": _(
+                            "Enter the company's address: a pickup point "
+                            "is not one."
+                        )
+                    },
+                    code="required",
+                )
             if not (attrs.get("billing_street") or "").strip():
                 attrs["billing_street"] = attrs.get("street") or ""
                 attrs["billing_street_number"] = (
@@ -1576,6 +1630,21 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             attrs["billing_city"] = ""
             attrs["billing_zipcode"] = ""
 
+        # NOTE: pay-way active + carrier-compatibility is enforced in the
+        # view (``_validate_pay_way_for_order``) where the PayWay row is
+        # resolved from the DB — keeping this cross-field validator free
+        # of DB pay-way lookups.
+
+        # Last: resolving the point can resync a carrier's catalogue, so
+        # every cheaper refusal of the body has run before it.
+        if pickup:
+            self._deliver_to_pickup_point(attrs)
+
+        return attrs
+
+    def _validate_carrier(self, attrs) -> None:
+        """The carrier of the delivery: named for a pickup point, active,
+        and a BoxNow locker named."""
         provider_code = attrs.get("shipping_provider_code")
         shipping_kind = attrs.get("shipping_kind")
 
@@ -1635,12 +1704,127 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 code="locker_required",
             )
 
-        # NOTE: pay-way active + carrier-compatibility is enforced in the
-        # view (``_validate_pay_way_for_order``) where the PayWay row is
-        # resolved from the DB — keeping this cross-field validator free
-        # of DB pay-way lookups.
+    def _validate_home_address(self, attrs, country: Country) -> None:
+        """The buyer's address a home delivery goes to (rule 4)."""
+        missing = {
+            field: [self.fields[field].error_messages["required"]]
+            for field in ("street", "city", "zipcode")
+            if not (attrs.get(field) or "").strip()
+        }
+        if missing:
+            raise serializers.ValidationError(missing, code="required")
+        if errors := address_rules.region_errors(
+            attrs["country_id"], attrs.get("region_id")
+        ):
+            raise serializers.ValidationError(errors, code="region_invalid")
+        region = None
+        if attrs.get("region_id"):
+            region = Region.objects.filter(alpha=attrs["region_id"]).first()
+        one_line = not (attrs.get("street_number") or "").strip()
+        if one_line:
+            split = address_rules.split_street_line(attrs["street"])
+            if split is None:
+                raise serializers.ValidationError(
+                    {"street": [address_rules.street_number_missing()]},
+                    code="street_number_missing",
+                )
+            street, number = split
+            # Fields are validated before ``validate``: the number split
+            # from the line gets the checks of the field it replaces.
+            try:
+                self.fields["street_number"].run_validation(number)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(
+                    {"street": e.detail}, code="street_number_invalid"
+                ) from None
+            attrs["street"], attrs["street_number"] = street, number
+        errors = address_rules.address_errors(
+            country=country,
+            street=attrs["street"],
+            street_number=attrs["street_number"],
+            zipcode=attrs["zipcode"],
+            region=region,
+        )
+        if one_line and "street_number" in errors:
+            # The caller sent no number field: its error is the line's.
+            errors.setdefault("street", []).extend(errors.pop("street_number"))
+        if "region" in errors:
+            # The rule names the model field; this body's is ``region_id``.
+            errors["region_id"] = errors.pop("region")
+        if errors:
+            raise serializers.ValidationError(errors)
+        attrs["zipcode"] = address_rules.normalize_postcode(attrs["zipcode"])
 
-        return attrs
+    def _deliver_to_pickup_point(self, attrs) -> None:
+        """Make the pickup point's address the order's delivery address
+        (rule 5).
+
+        The one snapshot the receipt, the courier voucher and the order
+        page read; the buyer's own address is not needed to deliver to a
+        locker or a station, so it is not kept either. The point is the
+        chosen carrier's own ``location_keys`` (``ShippingChoice.of``),
+        its address the carrier's catalogue now, resynced once when it
+        misses (``ShippingService.pickup_point_address``): a point neither
+        holds is refused, as no address could be stored for it.
+        """
+        code = attrs["shipping_provider_code"]
+        if not is_registered(code):
+            raise serializers.ValidationError(
+                {
+                    "shipping_provider_code": _(
+                        "The selected shipping provider is currently "
+                        "unavailable."
+                    )
+                },
+                code="shipping_provider_unavailable",
+            )
+        carrier = get_provider(code)
+        location = dict(ShippingChoice.of(attrs).location)
+        field = (
+            carrier.location_keys[0]
+            if carrier.location_keys
+            else "shipping_provider_code"
+        )
+        if not location:
+            raise serializers.ValidationError(
+                {field: [_("Choose a pickup point.")]},
+                code="pickup_point_required",
+            )
+        try:
+            address = ShippingService.pickup_point_address(
+                code, location, country_code=attrs["country_id"]
+            )
+        except PickupPointInAnotherCountry:
+            raise serializers.ValidationError(
+                {field: [PICKUP_POINT_IN_ANOTHER_COUNTRY]},
+                code="pickup_point_in_another_country",
+            ) from None
+        except PickupPointUnknown:
+            raise serializers.ValidationError(
+                {field: [PICKUP_POINT_UNAVAILABLE]},
+                code="pickup_point_unknown",
+            ) from None
+        street, number = address.street, address.street_number
+        if not number:
+            # Catalogues list the number in the street line ("Ιπποκράτους
+            # 33"): split it as a buyer's line is, for the courier's two
+            # voucher fields; a line that does not split stays whole.
+            street, number = address_rules.split_street_line(street) or (
+                street,
+                "",
+            )
+        attrs["street"] = street
+        attrs["street_number"] = number
+        attrs["city"] = address.city
+        attrs["zipcode"] = address_rules.normalize_postcode(address.postal_code)
+        # Nothing else of the buyer's address is the point's: no region
+        # (``ShippingChoice.of`` prices a pickup delivery without one), no
+        # floor, no location type, no address line 2 (it would print under
+        # the point's street and reach the courier's notes).
+        attrs["region_id"] = None
+        attrs["floor"] = ""
+        attrs["location_type"] = ""
+        attrs["address_line_2"] = ""
 
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
@@ -1685,8 +1869,19 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         Judged only when the payload changes the address, so editing an
         old order's notes does not demand a fix to an address that
         predates the rules. The country and region are not editable at
-        all: see ``PRICED_ADDRESS_FIELDS``.
+        all: see ``PRICED_ADDRESS_FIELDS``. Nor is any delivery-address
+        field of a pickup-point order (``Order.SHIPPING_ADDRESS_FIELDS``):
+        its address is its point's, from the carrier's catalogue
+        (``OrderCreateFromCartSerializer._deliver_to_pickup_point``), and a
+        street, a floor or a line 2 written over it would reach the
+        courier's voucher; a change of point is staff work. A pickup
+        point's street line may name no number, so only an order delivered
+        to the buyer needs one.
         """
+        pickup = (
+            self.instance is not None
+            and self.instance.shipping_kind == ShippingKind.PICKUP_POINT
+        )
         locked = {
             field: [
                 _(
@@ -1694,13 +1889,37 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                     "shipping cost and VAT were priced for it."
                 )
             ]
-            for field in self.PRICED_ADDRESS_FIELDS
-            if self.instance is not None
-            and field in attrs
-            and attrs[field] != getattr(self.instance, field)
+            for field in self._changed(attrs, self.PRICED_ADDRESS_FIELDS)
         }
+        if pickup:
+            locked.update(
+                {
+                    field: [
+                        _(
+                            "A pickup-point order is delivered to its "
+                            "point's address, which can't be changed."
+                        )
+                    ]
+                    for field in self._changed(
+                        attrs, Order.SHIPPING_ADDRESS_FIELDS
+                    )
+                }
+            )
         if locked:
             raise serializers.ValidationError(locked, code="order_field_locked")
+        if (
+            not pickup
+            and "street_number" in attrs
+            and not attrs["street_number"].strip()
+        ):
+            raise serializers.ValidationError(
+                {
+                    "street_number": [
+                        self.fields["street_number"].error_messages["blank"]
+                    ]
+                },
+                code="blank",
+            )
         errors = address_rules.address_update_errors(attrs, self.instance)
         if errors:
             raise serializers.ValidationError(errors)
@@ -1713,6 +1932,16 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     #: order costs. The rest of the address stays editable: it reprices
     #: nothing.
     PRICED_ADDRESS_FIELDS = ("country", "region")
+
+    def _changed(self, attrs, fields) -> list[str]:
+        """The ``fields`` this payload sets to a value the order lacks."""
+        if self.instance is None:
+            return []
+        return [
+            field
+            for field in fields
+            if field in attrs and attrs[field] != getattr(self.instance, field)
+        ]
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a
@@ -1741,6 +1970,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "first_name",
@@ -1793,7 +2023,11 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         extra_kwargs = {
             "user": {
                 "help_text": _("User ID. Leave empty for guest orders."),
-            }
+            },
+            # Blank on a pickup order whose point's street line names no
+            # number, which a PUT echoes back; ``validate`` requires one
+            # for an order delivered to the buyer.
+            "street_number": {"required": True, "allow_blank": True},
         }
 
 
@@ -2074,9 +2308,10 @@ class OrderCreateErrorDetailSerializer(serializers.Serializer):
     quote = CheckoutQuoteSerializer(
         required=False,
         help_text=_(
-            "``total_changed`` only: what checkout charges for the cart "
-            "now. Show its total and send its ``expectedTotal`` to order "
-            "at it."
+            "``total_changed`` and ``cart_changed`` only: what checkout "
+            "charges for the cart now. Show it and send its "
+            "``expectedTotal``, and its ``cartDigest`` as "
+            "``expectedCartDigest``, to order at it."
         ),
     )
 
@@ -2087,9 +2322,10 @@ class OrderCreateErrorSerializer(serializers.Serializer):
     409 is ``legal_document_unavailable`` (a checkout legal text the
     store cannot show in the order's language) or ``total_changed``
     (the request's ``expectedTotal`` is not the amount due computed
-    now). Tell ``total_changed`` by ``code`` and the status: its
-    ``error.type`` is ``invalid_order_data`` until every client lists
-    the new value.
+    now) or ``cart_changed`` (its ``expectedCartDigest`` is not the
+    cart digest computed now). Tell those two by ``code`` and the
+    status: their ``error.type`` is ``invalid_order_data`` until every
+    client lists the new values.
 
     A refusal the order service understands carries ``error.type``; a
     malformed payload is DRF's field-error map instead (``{field:

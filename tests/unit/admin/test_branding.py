@@ -1,6 +1,6 @@
 """A store's admin wears that store's marks and never another store's.
 
-``admin/branding.py`` follows the rule outbound email follows: the
+``src/admin/branding.py`` follows the rule outbound email follows: the
 tenant's own asset, the platform's bundled assets only for the platform
 storefront, nothing otherwise (Unfold then draws ``SITE_SYMBOL``).
 Before, ``UNFOLD["SITE_LOGO"]`` pointed at the bundled SVGs for every

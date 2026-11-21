@@ -1007,7 +1007,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "MYDATA_AUTO_SUBMIT",
         "type": "bool",
         "value": False,
-        "description": "If true, the platform issues its retail documents by itself: the receipt when an order ships, a credit document when money goes back. Otherwise they are issued only through the order's admin actions.",
+        "description": "If true, the platform issues its retail documents by itself: the receipt when an order ships, or, for a courier or locker order once the dispatch point (MYDATA_LOADING_*) is set, when its voucher or parcel is created, before the pickup; and a credit document when money goes back. Otherwise they are issued only through the order's admin actions.",
     },
     {
         "name": "MYDATA_ENVIRONMENT",
@@ -1018,14 +1018,16 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "MYDATA_INVOICE_SERIES_PREFIX",
         "type": "string",
+        "validator": "order.setting_validators.validate_series_prefix_setting",
         "value": "GRVP",
-        "description": "Prefix for the AADE series code. Combined with the issuer VAT + year to form e.g. 'GRVP-2026'.",
+        "description": "Prefix for the AADE series code. Combined with the year to form e.g. 'GRVP-2026'. At most 45 characters, so the series fits AADE's 50.",
     },
     {
         "name": "MYDATA_CREDIT_SERIES_PREFIX",
         "type": "string",
+        "validator": "order.setting_validators.validate_series_prefix_setting",
         "value": "GRVC",
-        "description": "Prefix for the AADE series code of the retail credit documents (11.4), which are a gapless series of their own. Combined with the year to form e.g. 'GRVC-2026'.",
+        "description": "Prefix for the AADE series code of the retail credit documents (11.4), which are a gapless series of their own. Combined with the year to form e.g. 'GRVC-2026'. At most 45 characters, so the series fits AADE's 50.",
     },
     {
         "name": "MYDATA_ISSUER_BRANCH",
@@ -1038,6 +1040,61 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "int",
         "value": 30,
         "description": "HTTP request timeout in seconds. AADE endpoints are sometimes slow under load — 30s is the usual sweet spot.",
+    },
+    # The dispatch point (Τόπος Φόρτωσης) a courier or locker order's
+    # receipt declares as its loading address: the receipt with movement
+    # indication (Α.1123/2024 Annex ΙΙ §7.3, order.accounting.movement).
+    {
+        "name": "MYDATA_LOADING_STREET",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "Street of the place the store's parcels leave from (Τόπος "
+            "Φόρτωσης). A courier or locker order's receipt is issued with "
+            "movement indication and names it as the loading address and "
+            "as the store's address, which AADE requires with its number. "
+            "Up to 150 characters."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_NUMBER",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "Street number of the place the store's parcels leave from. "
+            "AADE requires it of the store's address on a receipt with "
+            "movement indication."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_POSTAL_CODE",
+        "type": "string",
+        "value": "",
+        "validator": (
+            "order.setting_validators.validate_loading_postal_code_setting"
+        ),
+        "description": (
+            "Postcode of the place the store's parcels leave from (a Greek "
+            "postcode). With the street, number and city it turns on the "
+            "receipt with movement indication for courier and locker "
+            "orders, issued when the voucher is created; until all four "
+            "are set those receipts are issued when the order ships, "
+            "without it."
+        ),
+    },
+    {
+        "name": "MYDATA_LOADING_CITY",
+        "type": "string",
+        "value": "",
+        "validator": "order.setting_validators.validate_loading_text_setting",
+        "description": (
+            "City of the place the store's parcels leave from, up to 150 "
+            "characters. With the street, number and postcode it turns on "
+            "the receipt with movement indication for courier and locker "
+            "orders."
+        ),
     },
     {
         "name": "ANNOUNCEMENT_BAR",

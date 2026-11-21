@@ -47,6 +47,8 @@ _KEY_KINDS: tuple[tuple[tuple[str, ...], Kind], ...] = (
     (("useragent",), Kind.BLANK),
     (("ipaddress", "clientip", "remoteip"), Kind.IP),
     (("zip", "postal", "postcode"), Kind.ZIPCODE),
+    # Before "street": a street number alone is not a street line.
+    (("streetnumber", "streetno", "housenumber"), Kind.STREET_NUMBER),
     (("street", "address", "addr"), Kind.STREET_LINE),
     (("city", "town"), Kind.CITY),
     (("vat", "afm", "taxid", "taxnumber"), Kind.VAT_ID),
@@ -117,6 +119,8 @@ def _fake_for(kind: Kind, subject: Any) -> str:
             return place.zipcode
         case Kind.STREET_LINE:
             return f"{place.street} {place.street_number}"
+        case Kind.STREET_NUMBER:
+            return place.street_number
         case Kind.CITY:
             return place.city
         case Kind.VAT_ID:

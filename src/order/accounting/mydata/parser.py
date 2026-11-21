@@ -15,13 +15,16 @@ Status codes per the spec: ``Success``, ``ValidationError``,
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal, cast, get_args
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, ParseError
 
 # AADE's answers come over the network, and a response wraps a second XML
 # document in an element's text; defusedxml refuses entity declarations
 # and external references in both, as for every other untrusted XML here.
 from defusedxml.ElementTree import fromstring
+
+from order.accounting.mydata.exceptions import MyDataTransportError
 
 StatusCode = Literal[
     "Success", "ValidationError", "TechnicalError", "XMLSyntaxError"
@@ -105,6 +108,27 @@ class ResponseDoc:
         return self.rows[0]
 
 
+def _document_root(xml_bytes: bytes) -> Element:
+    """The root of an answer of AADE's, unwrapped from the DataContract
+    ``<string>`` envelope its dev endpoint sometimes adds (the inner XML,
+    entity-escaped as text; ElementTree resolves the entities on parse).
+
+    An answer that is not XML at all (an empty or cut-off body behind an
+    HTTP 200, a gateway's HTML page) says nothing of what became of the
+    request: it raises ``MyDataTransportError``, like an answer that never
+    came, so the caller records the send as unanswered and retries it
+    instead of failing with a ``ParseError`` that no handler expects."""
+    try:
+        root = fromstring(xml_bytes)
+        if _local(root.tag) == "string" and root.text:
+            root = fromstring(root.text.encode("utf-8"))
+    except ParseError as exc:
+        raise MyDataTransportError(
+            f"AADE answered with no readable document: {exc}"
+        ) from exc
+    return root
+
+
 def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
     """Parse the ``ResponseDoc`` XML returned by any AADE submission.
 
@@ -115,12 +139,7 @@ def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
     form before parsing. The bare and namespaced ``ResponseDoc``
     forms both work via the namespace-stripping in ``_local``.
     """
-    root = fromstring(xml_bytes)
-    if _local(root.tag) == "string" and root.text:
-        # Re-parse the inner (previously escaped) XML. ``root.text``
-        # already contains the unescaped string because ElementTree
-        # resolves entities on parse.
-        root = fromstring(root.text.encode("utf-8"))
+    root = _document_root(xml_bytes)
     rows = [_parse_row(el) for el in _iter_children(root, "response")]
     return ResponseDoc(rows=rows)
 
@@ -191,9 +210,10 @@ class TransmittedDoc:
     AADE's ``RequestTransmittedDocs`` returns a ``RequestedDoc`` whose
     ``<invoicesDoc>`` wraps ``<invoice>`` children (``AadeBookInvoiceType``).
     Each invoice carries ``<uid>`` (the submitter-generated SHA-1 we sent)
-    and ``<mark>`` (the AADE-assigned Registration Number). Only those two
-    fields are extracted — they're all MARK recovery needs; the rest of
-    the invoice (issuer, lines, totals) is present but ignored.
+    and ``<mark>`` (the AADE-assigned Registration Number), which MARK
+    recovery matches on, and what recovery keeps of the registered
+    document: its ``<qrCodeUrl>`` and its header's ``<dispatchDate>``. The
+    rest of the invoice (issuer, lines, totals) is present but ignored.
 
     Element names validated against the AADE myDATA invoice schema
     (``AadeBookInvoiceType``: ``uid`` + ``mark`` as direct children of
@@ -202,6 +222,16 @@ class TransmittedDoc:
 
     uid: str
     invoice_mark: int | None
+    #: ``cancelledByMark``: the MARK of the cancellation of this
+    #: document, filled by AADE (``AadeBookInvoiceType``, v2.0.2).
+    cancelled_by_mark: int | None = None
+    #: ``qrCodeUrl``: AADE's verification URL of the document, the
+    #: listing's name for what a ``SendInvoices`` answer calls ``qrUrl``;
+    #: empty when AADE lists none.
+    qr_code_url: str = ""
+    #: ``invoiceHeader/dispatchDate``: the movement's start as AADE
+    #: registered it, ``None`` for a document without movement.
+    dispatch_date: date | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +248,10 @@ class RequestedDocResult:
     docs: list[TransmittedDoc]
     next_partition_key: str | None = None
     next_row_key: str | None = None
+    #: ``cancelledInvoicesDoc``: the MARK of each cancelled document
+    #: mapped to the MARK of its cancellation (``CancelledInvoiceType``:
+    #: ``invoiceMark``, ``cancellationMark``).
+    cancellations: dict[int, int] = field(default_factory=dict)
 
 
 def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
@@ -248,9 +282,15 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
     Namespaces are stripped via ``_local`` so the default ``xmlns`` AADE
     sets does not affect element matching.
     """
-    root = fromstring(xml_bytes)
-    if _local(root.tag) == "string" and root.text:
-        root = fromstring(root.text.encode("utf-8"))
+    root = _document_root(xml_bytes)
+    if _local(root.tag) != "RequestedDoc":
+        # An XML answer that is not AADE's (a gateway's page, an error
+        # envelope) lists nothing, which must not read as "AADE holds no
+        # such document" (``service.MarkLookup.ABSENT``).
+        raise MyDataTransportError(
+            f"AADE answered with a {_local(root.tag)!r} document, not a "
+            "RequestedDoc."
+        )
 
     docs: list[TransmittedDoc] = []
     for invoices_doc_el in _iter_children(root, "invoicesDoc"):
@@ -259,8 +299,25 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
                 TransmittedDoc(
                     uid=_text(invoice_el, "uid") or "",
                     invoice_mark=_int_or_none(_text(invoice_el, "mark")),
+                    cancelled_by_mark=_int_or_none(
+                        _text(invoice_el, "cancelledByMark")
+                    ),
+                    qr_code_url=_text(invoice_el, "qrCodeUrl") or "",
+                    dispatch_date=_dispatch_date(invoice_el),
                 )
             )
+
+    cancellations: dict[int, int] = {}
+    for cancelled_doc_el in _iter_children(root, "cancelledInvoicesDoc"):
+        for cancelled_el in _iter_children(
+            cancelled_doc_el, "cancelledInvoice"
+        ):
+            invoice_mark = _int_or_none(_text(cancelled_el, "invoiceMark"))
+            cancellation_mark = _int_or_none(
+                _text(cancelled_el, "cancellationMark")
+            )
+            if invoice_mark is not None and cancellation_mark is not None:
+                cancellations[invoice_mark] = cancellation_mark
 
     # nextPartitionKey / nextRowKey live INSIDE the <continuationToken>
     # wrapper, not as direct children of <RequestedDoc>.
@@ -275,7 +332,22 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
         docs=docs,
         next_partition_key=next_partition_key,
         next_row_key=next_row_key,
+        cancellations=cancellations,
     )
+
+
+def _dispatch_date(invoice_el: Element) -> date | None:
+    """The ``dispatchDate`` of an ``<invoice>``'s header, or ``None`` when
+    it has none or AADE's value is not an ``xs:date``."""
+    for header_el in _iter_children(invoice_el, "invoiceHeader"):
+        value = _text(header_el, "dispatchDate")
+        if not value:
+            return None
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _int_or_none(value: str | None) -> int | None:

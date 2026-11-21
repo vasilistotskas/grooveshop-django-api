@@ -91,6 +91,23 @@ BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+
+# The longest checkout waits for a carrier's catalogue to be resynced when
+# an order names a pickup point the catalogue does not hold yet
+# (``ShippingService.pickup_point_address``). A full sync can take minutes
+# (a carrier client's own retries and timeouts), and the agent gateway
+# waits 10 s (its UPSTREAM_TIMEOUT) for the whole order call, so the order
+# is refused with ``pickup_point_unknown`` well inside that; the sync goes
+# on and the next order finds the point.
+PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = int(
+    getenv("PICKUP_POINT_RESYNC_TIMEOUT_SECONDS", "5")
+)
+# The Retry-After of the 503 ``pickup_point_check_unavailable``: the
+# pickup point could not be checked because the cache holding the resync
+# guard (Redis) is down, which is ours to fix, not the shopper's choice.
+PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS = int(
+    getenv("PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS", "30")
+)
 # Seconds after a parcel creation whose outcome is uncertain (a timeout, a
 # 5xx: the request may have reached BoxNow) during which an empty lookup by
 # ``orderNumber`` does not prove that no parcel exists: BoxNow may still be
@@ -198,6 +215,15 @@ ACS_API_CALL_POLL_RETENTION_DAYS = int(
 CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
     getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
 )
+# The daily sweep of erased orders (``order.privacy.erase_late_carrier_data``)
+# clears the carrier records of an order erased, or written about by a
+# carrier, within this many days: a parcel still moving when its buyer is
+# erased goes on being tracked, delivered and paid out, and each of those
+# writes the recipient's details again. Longer than any gap between two
+# daily runs, so no write is missed while the scheduler is down a few days.
+ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS = int(
+    getenv("ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS", "7")
+)
 # A BoxNow webhook event whose signed time is older than this is ignored.
 # The ``BoxNowParcelEvent`` rows are the replay guard, so the window must
 # end before the sweep above can delete a row an event could still meet.
@@ -251,6 +277,11 @@ META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
 META_CAPI_PARTNER_AGENT = getenv(
     "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
 )
+# Seconds the connect and each read of a CAPI request may take. The event's
+# lock is held across the request (``meta_capi.tasks._dispatch``), and a copy
+# waiting on it gives up at the session's ``statement_timeout`` (30 s), so a
+# request must end well before that.
+META_CAPI_TIMEOUT_SECONDS = float(getenv("META_CAPI_TIMEOUT_SECONDS", "10"))
 
 # ---------- Agent gateway (grooveshop-agent-gateway) ----------
 # Cluster-internal base URL of the agent gateway service. Empty (the

@@ -136,7 +136,7 @@ def tenant_plan_allows(flag: str) -> bool:
     are platform-controlled and describe what a store has PAID for. The
     matching ``extra_settings`` toggles are merchant-controlled and
     describe whether the store currently WANTS it on. Both must hold —
-    see the contract in ``tenant/permissions.py``.
+    see the contract in ``src/tenant/permissions.py``.
 
     That contract used to be enforced only by the DRF permission
     classes on each feature's own endpoints, which the order-create

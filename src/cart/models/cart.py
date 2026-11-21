@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Literal, cast
+from typing import cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -138,7 +138,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_items(self) -> int | Literal[0]:
+    def total_items(self) -> int:
         """
         Return the total quantity of all items in the cart.
 

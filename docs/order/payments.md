@@ -37,6 +37,74 @@ accounts:
   hides credential-less providers from the shopper pay-way list AND
   refuses checkout-session/SPT creation for them.
 
+**One payable link per order (#643).** Asking for a payment link
+(`OrderViewSet.create_checkout_session`, every caller: the storefront's
+payment view and "pay now", the agent gateway) is idempotent. The provider
+is asked first, with no row locked (`PaymentProvider.live_checkout_session`):
+
+- a link that can still be paid is returned again with its own expiry, and
+  nothing is minted (`successUrl`/`cancelUrl` are the ones it was opened
+  with);
+- a link that was paid while the order is still unpaid (its webhook has not
+  landed) answers **409 `payment_in_progress`** with `Retry-After: 10`; no
+  link is minted, so the buyer cannot pay twice;
+- only when none can be paid is a new one minted, and only then does the
+  provider's minimum session lifetime apply (`payment_window_expired` when
+  less of the window is left); a refused request closes nothing;
+- a provider that cannot say answers **503 `payment_provider_unavailable`**
+  with `Retry-After: 30`: a link is never minted blind.
+
+Viva is read with Retrieve order (`GET /api/orders/{orderCode}`, Basic auth)
+for every code in `metadata.viva_order_codes`: `StateId` 0 Pending is
+returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone; an
+answer with no known `StateId` is "unreadable". Viva is offered only to a
+store holding all four credentials (`is_configured_for_tenant`): the OAuth
+pair mints payment orders and reads transactions, the Basic pair (Merchant
+ID, API Key) reads payment orders and refunds. Each call is gated by what it
+needs: the provider builds with the OAuth pair, so a store holding only it
+still settles its webhooks. Every Basic-auth call checks
+`has_basic_credentials` before sending and fails the way it fails when Viva
+cannot be read: Retrieve order is unreadable (503, an order placed before the
+store lost the pair), a refund is refused, a refund lookup has nothing to say.
+None sends empty credentials. A Retrieve order answer that is not a
+JSON object is "unreadable" too.
+`ExpirationDate` carries no offset and is Greek local time
+(`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated
+when summer time ends is read as its later instant (`fold=1`), so a payable
+code is never taken for expired early. Viva forgets a code
+some time after it ends and answers 404 (codes from two months before
+answered 404 on demo, 2026-11-21); a 404 is "gone" only once the order's
+hold and the grace window have ended (`payment_hold.hold_ended`), else it is
+"unreadable". Stripe is read from the Checkout Session's `status`: `open` is
+returned, `expired` is gone, and `complete` is in progress only while its
+payment may land (`payment_status` paid, or its PaymentIntent processing,
+requiring capture or action, or succeeded); a delayed method (SEPA Debit)
+whose intent failed leaves the session `complete` for ever, and it is gone.
+`checkout.session.expired` never writes over the recorded session: a late
+event for an older session, or for one that lost a concurrent request, would
+make the next request mint a second payable one. A hosted session and a PaymentIntent are never
+payable together: an open intent is closed (`close_payment`) before a session
+opens, and an open session is expired before `PayWayService.process_payment`
+mints an intent; one that may still be paid refuses the other.
+
+One payable instrument per order is enforced where every newly opened
+payment is written: `OpenPayment.lock_unchanged` (`src/order/payments/
+payment.py`), under the order's row lock, for a hosted session
+(`create_checkout_session`) and for a client-confirmed intent
+(`PayWayService._record_opened_payment`). Each request reads `OpenPayment`
+(status, payment status, `payment_id`, the recorded session) before its
+provider call; when anything of it changed meanwhile, it records nothing.
+Two concurrent link requests: the second records nothing of its own, leaves
+the hold alone and answers with the first one's link. A link request that
+loses to an intent opened meanwhile (another tab's retry), or an intent that
+loses to a session, answers 409 `order_changed_during_payment`; a lost
+Stripe session is expired, a lost intent's client secret is never
+returned. Reusing a live session closes an open intent first, as minting
+does. Its own
+link reached nobody; a Stripe one is expired (`discard_checkout_session`),
+a Viva one is left, as Viva's cancel is not documented well enough to build
+on.
+
 ### 4.1 Stripe online (`payment_intent.succeeded`)
 
 Webhook handler:
@@ -259,7 +327,7 @@ order by the dispute's `payment_intent` and are guarded by the
   became a dispute): clears `metadata["disputed"]` and leaves a NOTE. No row.
 - **A refund is refused while a dispute is open.** Stripe: "you can't issue a
   refund on a disputed charge until your customer's card issuer decides in your
-  favor" (docs.stripe.com/disputes/withdrawing). `OrderService.refund_order`
+  favor" (docs.stripe.com/disputes/withdrawing). `RefundService.refund_order`
   raises `PaymentError` when `PaymentLedger.dispute_open` holds (flagged, no
   CHARGEBACK row for that dispute id yet). An inquiry (`dispute_status`
   `warning_*`) is not refused: Stripe lets the merchant refund one to resolve

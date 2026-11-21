@@ -14,6 +14,7 @@ from order.models.stock_log import StockLog
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from tests.utils.shipping import enable_rate
@@ -131,12 +132,14 @@ class TestTransactionFailuresRollbackCompletely:
                 pytest.raises(expected_exception, match="Order save failed"),
             ):
                 OrderService.create_order_from_cart(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=cart,
-                    shipping_address=self.shipping_address,
-                    payment_intent_id=payment_intent_id,
-                    pay_way=self.pay_way,
-                    user=self.user,
+                    **priced(
+                        legal_acceptance=checkout_acceptance(),
+                        cart=cart,
+                        shipping_address=self.shipping_address,
+                        payment_intent_id=payment_intent_id,
+                        pay_way=self.pay_way,
+                        user=self.user,
+                    )
                 )
 
         elif failure_point == "order_item_save":
@@ -151,12 +154,14 @@ class TestTransactionFailuresRollbackCompletely:
                 ),
             ):
                 OrderService.create_order_from_cart(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=cart,
-                    shipping_address=self.shipping_address,
-                    payment_intent_id=payment_intent_id,
-                    pay_way=self.pay_way,
-                    user=self.user,
+                    **priced(
+                        legal_acceptance=checkout_acceptance(),
+                        cart=cart,
+                        shipping_address=self.shipping_address,
+                        payment_intent_id=payment_intent_id,
+                        pay_way=self.pay_way,
+                        user=self.user,
+                    )
                 )
 
         elif failure_point == "stock_log_save":
@@ -169,12 +174,14 @@ class TestTransactionFailuresRollbackCompletely:
                 pytest.raises(expected_exception, match="StockLog save failed"),
             ):
                 OrderService.create_order_from_cart(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=cart,
-                    shipping_address=self.shipping_address,
-                    payment_intent_id=payment_intent_id,
-                    pay_way=self.pay_way,
-                    user=self.user,
+                    **priced(
+                        legal_acceptance=checkout_acceptance(),
+                        cart=cart,
+                        shipping_address=self.shipping_address,
+                        payment_intent_id=payment_intent_id,
+                        pay_way=self.pay_way,
+                        user=self.user,
+                    )
                 )
 
         # Verify complete rollback - no partial changes persisted
@@ -552,12 +559,14 @@ class TestTransactionFailuresRollbackCompletely:
                     Exception, match="OrderItem save failed on 3rd item"
                 ):
                     OrderService.create_order_from_cart(
-                        legal_acceptance=checkout_acceptance(),
-                        cart=cart,
-                        shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
-                        pay_way=self.pay_way,
-                        user=self.user,
+                        **priced(
+                            legal_acceptance=checkout_acceptance(),
+                            cart=cart,
+                            shipping_address=self.shipping_address,
+                            payment_intent_id=payment_intent_id,
+                            pay_way=self.pay_way,
+                            user=self.user,
+                        )
                     )
 
         # Verify complete rollback for ALL products

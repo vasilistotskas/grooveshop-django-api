@@ -20,6 +20,7 @@ Exception Hierarchy:
     │   ├── ShippingRefusedError
     │   └── ShippingPriceUnresolvedError
     ├── OrderTotalChangedError
+    ├── OrderCartChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -371,6 +372,23 @@ class OrderTotalChangedError(OrderServiceError):
         super().__init__("the order total is not the total the client expected")
 
 
+class OrderCartChangedError(OrderServiceError):
+    """Raised when the order would be made of something other than what
+    the client says it showed the buyer: the quote's ``cart_digest`` is
+    not the one the request carried (``expectedCartDigest``).
+
+    Nothing was created. The API answers it 409 with the quote the order
+    would have been created at, as for ``OrderTotalChangedError``.
+
+    Attributes:
+        quote (CheckoutQuote): What checkout charges for the cart now.
+    """
+
+    def __init__(self, quote):
+        self.quote = quote
+        super().__init__("the cart is not the cart the client was quoted")
+
+
 class InvalidCouponError(OrderServiceError):
     """
     Raised when a coupon attached to the cart is refused at order
@@ -597,6 +615,15 @@ class PaymentNotFoundError(PaymentError):
         """
         self.payment_id = payment_id
         super().__init__(f"Payment intent with ID {payment_id} not found")
+
+
+class PaymentInProgressError(PaymentError):
+    """Raised when a hosted payment session of an order has been paid
+    and the order does not know it yet: the provider's webhook has not
+    landed. No new payment link may be opened: the buyer would pay
+    twice. The client asks again a little later
+    (``create_checkout_session``'s 409 ``payment_in_progress``).
+    """
 
 
 class PaymentStatusUnavailableError(PaymentError):

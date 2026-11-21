@@ -14,6 +14,8 @@ import pytest
 from django.utils import timezone
 from djmoney.money import Money
 
+from promotion.engine.evaluation import PromotionEngine
+from promotion.engine.redemptions import record_redemptions
 from promotion.enum import (
     BenefitType,
     CouponRejectionReason,
@@ -22,7 +24,6 @@ from promotion.enum import (
 )
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode, PromotionRedemption
-from promotion.services import PromotionEngine
 
 pytestmark = pytest.mark.django_db
 
@@ -502,7 +503,7 @@ class TestRecord:
         result = PromotionEngine.evaluate(cart)
 
         order = OrderFactory()
-        total = PromotionEngine.record(order, result)
+        total = record_redemptions(order, result)
 
         assert total.amount == Decimal("10.00")
         redemption = PromotionRedemption.objects.get(order=order)

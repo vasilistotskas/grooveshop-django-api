@@ -35,7 +35,7 @@ def _start_of_local_day(day: date) -> datetime:
     return timezone.make_aware(datetime.combine(day, time.min))
 
 
-# The `ty: ignore` below is explained in `search/views/blog.py`.
+# The `ty: ignore` below is explained in `src/search/views/blog.py`.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get search analytics metrics"),
     description=_(

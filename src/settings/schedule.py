@@ -200,6 +200,12 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
+        "erase-late-carrier-data": {
+            # Fanout: clears the carrier data that reached an order after
+            # its buyer's GDPR erasure (ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS).
+            "task": "tenant.tasks.fanout_erase_late_carrier_data",
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+        },
         "purge-expired-recommendation-events": {
             # Fanout: RecommendationEvent is per-tenant. Deletes events
             # older than RECOMMENDATION_EVENT_RETENTION_DAYS.
@@ -283,6 +289,15 @@ def get_celery_beat_schedule():
             # opens nothing and is removed (``builder.preview_links``).
             "task": "tenant.tasks.fanout_purge_expired_builder_preview_links",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+        },
+        "retry-receipts-with-mydata": {
+            # Fanout: a receipt issued while myDATA could not be reached
+            # (AADE's loss-of-connection procedure) is sent again, and one
+            # of an order canceled before its parcel left is canceled
+            # there; shipping never waits for either, this finds them by
+            # state.
+            "task": "tenant.tasks.fanout_retry_receipts_with_mydata",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
         },
         "rescan-pending-contact-attachments": {
             # Fanout: an attachment whose scan was queued by a worker that

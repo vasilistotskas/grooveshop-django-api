@@ -1,7 +1,7 @@
 """Unit tests for ``BoxNowCarrier.is_kind_enabled`` credential gating.
 
 BoxNow credentials are tenant-only (no settings fallback — see
-``tenant/credentials.py:box_now_credentials()``), so an unconfigured
+``src/tenant/credentials.py:box_now_credentials()``), so an unconfigured
 tenant must see BoxNow as entirely unavailable, not just missing a
 per-kind feature flag (BoxNow has no such flag; it only ever serves
 ``pickup_point``).

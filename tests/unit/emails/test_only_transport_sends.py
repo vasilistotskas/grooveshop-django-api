@@ -1,4 +1,4 @@
-"""Nothing sends mail but ``emails/transport.py``.
+"""Nothing sends mail but ``src/emails/transport.py``.
 
 Every email is an email type sent through ``emails.send.send_email``, which
 decides whether to send (gates, the store's switch, recipients, opt-out),

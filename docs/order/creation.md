@@ -37,7 +37,7 @@ caller:
   The callers that pass both read `quote.charges()`.
 - **`lock=True` is order creation.** The candidate `Promotion` rows, the
   customer's row (when points are redeemed) and the gift cards are locked
-  until commit, so what was quoted is what `PromotionEngine.record`,
+  until commit, so what was quoted is what `promotion.engine.redemptions.record_redemptions`,
   `LoyaltyService.redeem_points` and `GiftCardService.record_plan` write.
   A refused attached coupon raises `InvalidCouponError`; without the lock
   it is reported on the quote (`blocking_coupon`).
@@ -81,9 +81,10 @@ caller:
   own sum is not the quote's `amount_due`: a charge added to one and not
   the other, or a cart line changed between the quote and the line lock,
   fails the creation instead of producing an order no payment matches.
-- **The expected total.** `POST /api/v1/order` takes an optional
+- **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
-  (cents). Both creation paths compare it, exactly, with the quote computed
+  (cents), as the quote returned it. An order is never created at a total
+  the client did not send. Both creation paths compare it, exactly, with the quote computed
   under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the
@@ -101,14 +102,46 @@ caller:
     may send it. Until then clients branch on `code` and the 409
     (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
     `code` already.
-  - **Optional for now.** The storefront and the gateway start sending it,
-    then a later release requires it (#635).
+  - **Required since #635's third release**, once the storefront
+    (v3.345.3) and the gateway (v1.49.0) in production sent it on every
+    order. Nothing creates an order without the total check.
+- **The cart digest.** A quote with a delivery chosen also returns
+  `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
+  `SECRET_KEY`, over a canonical form of what the order would be made of:
+  each line (product, quantity, unit price as priced, the promotion money
+  it carries), the promotions that apply with their codes, amounts and
+  gifts, the delivery (kind as `delivery_kind` reads it, the carrier that
+  takes it, as `_carrier` resolves one a home delivery does not name,
+  country, region, the pickup point). It is a check of contents: it holds
+  no pay way (a UCP checkout may name its payment method only when it
+  completes) and no shipping charge, fee, loyalty or gift-card amount;
+  `expectedTotal` holds what is paid, the pay way's fee included. It is stable while those do not change and reveals
+  nothing of the cart. `POST /api/v1/order` takes an optional
+  `expectedCartDigest`; both creation paths compare it under the cart
+  lock, before the total, and a difference creates nothing and answers
+  **409** `{detail, error: {type, quote}, code: "cart_changed"}`. It
+  catches what the total cannot: a line swapped for one at the same
+  price, quantities that trade off, another locker at the same rate.
+  - **The quote takes what the order takes.** The pickup point
+    (`boxnowLockerId`, `acsStationExternalId`, `acsStationBranch`,
+    `order.serializers.quote.PickupPointSerializer`) is a field of both
+    bodies, and both build the delivery with `ShippingChoice.of`, which
+    keeps only the chosen carrier's `location_keys`
+    (`shipping.interfaces.ShippingCarrierInterface`). Every order-creation
+    field is placed as digested, priced or not priced in
+    `tests/integration/order/test_cart_digest.py`, so a field added to one
+    body and not the other fails there.
+  - **A code, not an enum value.** As `total_changed`, `cart_changed` is
+    sent under `error.type` `invalid_order_data`
+    (`order.enum.create_error.CART_CHANGED_CODE`), and only to a request
+    carrying `expectedCartDigest`. Optional until the storefront and the
+    gateway send it; a later release requires it (#755).
 - **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
   body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation
   prices a missing kind as home delivery; a quote does not assume one).
-  Besides the rows it returns `expectedTotal`, to send back with the
-  order, and the priced lists: `shippingOptions` (every delivery the store
+  Besides the rows it returns `expectedTotal` and `cartDigest`, to send
+  back with the order, and the priced lists: `shippingOptions` (every delivery the store
   offers to the country, `ShippingService.available_options` priced with
   the region and a free-shipping promotion, each with `waivedBy`; null
   without a country) and `payWays` (every pay way a shopper is offered
@@ -145,7 +178,7 @@ caller:
   - **Guessing a gift-card code is budgeted, using one is not.** The
     quote, the payment intent and order creation each say what a card
     settles (or that the code is no card), so each could be used to guess
-    codes. `core.api.throttling.gift_card_code_throttles`, the one helper
+    codes. `giftcard.throttles.gift_card_code_throttles`, the one helper
     the three views add to their throttles, gives a request that carries
     `giftCardCodes` a `GiftCardCodeThrottle`:
     - only a code **new to the cart** counts. The cart keeps the codes it
@@ -435,60 +468,3 @@ caller:
   only sees the order after the create transaction commits.
 - For **online (Viva)**: skips the immediate dispatch — Viva's
   webhook handler does it after payment confirms.
-
-### 3.3 Delivery-address rules (`src/core/validators/address.py`)
-
-Every address write is checked against the order's country row before
-an order or saved address exists, so a courier never receives an
-address it cannot place (prod order #316: street "1", street number
-"70300", a non-numeric postcode, rejected by `ACS_Create_Voucher`).
-
-- **Postcode**: normalised (trimmed, upper-case, whitespace collapsed to
-  one space) and full-matched (ASCII) against
-  `Country.postal_code_pattern`. The pattern and `postal_code_example`
-  are Google's Address Data Service `zip` / first `zipex`, seeded by
-  `src/country/migrations/0011_country_postal_code_format.py` and editable
-  in the Country admin. A blank pattern means only "required".
-- **Street** must contain a letter; **street number** must not itself
-  match the country's postcode pattern (4+ characters).
-- **Region**: required exactly when the country has any (`Country.
-  has_regions`, an `Exists(Region…)` annotation `for_list()`/
-  `for_detail()` add — never a prefetch, so the storefront's country
-  picker can decide whether to show the region field per country
-  without an extra query); when given, it must belong to the selected
-  country. `src/country/migrations/0012_seed_iso_countries.py` seeds the
-  full ISO 3166-1 list, most of which have no seeded regions at all —
-  a region could no longer be unconditionally required at the
-  serializer-field level (`UserAddressWriteSerializer.region` and
-  `OrderCreateFromCartSerializer.region_id` are both optional; this
-  validator is what actually enforces it, per-country).
-- Applied in `OrderCreateFromCartSerializer.validate` (always; an
-  unknown `country_id` is a field error), `OrderWriteSerializer` and
-  `UserAddressWriteSerializer` (`address_update_errors`), and
-  `Order.clean()` / `UserAddress.clean()` (`model_address_errors`, the
-  admin). The last three judge the address only when the write changes
-  `country`, `region`, `street`, `street_number` or `zipcode`, so an
-  unrelated edit of an old record is not blocked by an address that
-  predates the rules.
-- Carrier code calls `normalize_postcode(value)` and
-  `postcode_matches(country, value)`.
-- The storefront applies the same rules inline from the same country row
-  (`shared/utils/postalCode.ts`); only the normalisation and the two
-  street rules are mirrored in code, and they must stay in lockstep.
-- **Countries and regions are public, shared rows; what uses them is not.**
-  `country` and `region` are in `SHARED_APPS` only (their tables exist
-  once, in `public`; a store's `search_path` falls through to them), and
-  `tenant.role_scopes.REFERENCE_DATA_APP_LABELS` gives stores `view` on
-  them and nothing else. Orders, saved addresses, shipping rates and
-  pay-way exclusions are in each store's own schema. So deleting one is
-  refused when ANY store's rows point at it
-  (`src/tenant/reference_guard.py`): the admin lists the stores on its
-  confirmation page (`tenant.deletion.PublicReferenceDataDeletionMixin`)
-  and a `pre_delete` receiver in `src/tenant/signals.py` refuses every other
-  path. A country is also refused when a store uses one of its regions,
-  because the regions go with it. Soft-deleted orders count (the foreign
-  key is still there); simple-history rows do not. Deleting a row nobody
-  uses works from the platform admin. Both ends of a store's use are
-  found from the models' own reverse relations, hidden ones included, so
-  a new model with a foreign key to `Country` is covered without a list
-  to update.

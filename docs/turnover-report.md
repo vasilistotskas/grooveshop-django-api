@@ -28,18 +28,31 @@ method alike. `Order.save` stamps it the first time the order is in a status of
 event, a script): it is the one save they all share. A later status never moves
 it.
 
-Why dispatch and not payment or placement. The platform's retail receipt is
-issued when the parcel ships (`order.accounting.invoicing.receipt_issuable`,
-`docs/order/fiscal-mydata.md` section 7.4), and a Greek store keeps accrual
-books
-(ν.4308/2014): a sale belongs to the period of its receipt, not to the day a
-courier pays a cash-on-delivery order out, nor to the day an online payment
-cleared before the parcel left. The earlier rule (placed, and collected)
+Why dispatch and not payment or placement. A Greek store keeps accrual books
+(ν.4308/2014): a sale is earned when the goods go, not on the day a courier
+pays a cash-on-delivery order out, nor on the day an online payment cleared
+before the parcel left. The earlier rule (placed, and collected)
 restated past months: on the production store 143 of 182 cash-on-delivery
 collections landed in a later month than the order, up to 27 days later. The
 rule was chosen by the owner on 2026-10-30; the statute's own wording of the tax
 point was not checked against the law text when it was written, so confirm it
 with the store's accountant before relying on the page for a filing.
+
+Why dispatch and not the receipt's date. Most receipts are issued when the
+parcel ships (`order.accounting.invoicing.receipt_issuable`), but a courier or
+locker order's receipt carries the movement and is issued when its voucher is
+created, up to five days before the pickup (`src/order/accounting/movement.py`,
+`docs/order/fiscal-movement-receipts.md`, section 7.4). Until the parcel
+leaves, that sale can still be undone: an order canceled before the pickup is no sale here, and in
+myDATA its receipt is either canceled (`CancelInvoice`, a document never used)
+or, when the courier could not stop the parcel or AADE refused the cancel,
+stands with a credit document that reverses it in full; either way myDATA nets
+to nothing for that order. Counting the sale from
+the receipt's date would put it in a month before it was certain and take it
+out again after that month closed. So when a voucher is created in the last
+days of a month and the parcel leaves in the next, myDATA holds the receipt in
+the earlier month and this report counts the sale in the later one; read the
+two months together to reconcile them.
 
 - An order that never shipped is not a sale: a pending one is not yet, a
   canceled one (paid and refunded, or unpaid) never is.

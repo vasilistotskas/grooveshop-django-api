@@ -33,7 +33,7 @@ urlpatterns = [
         AgentFavouritesView.as_view(),
         name="agent-favourites",
     ),
-    # The store-admin surface behind /mcp/admin (agent/staff_views.py).
+    # The store-admin surface behind /mcp/admin (src/agent/staff_views.py).
     path("agent/staff/me", StaffAgentMeView.as_view(), name="agent-staff-me"),
     path(
         "agent/staff/orders",

@@ -31,8 +31,8 @@ class BuildUidTestCase(SimpleTestCase):
     def test_returns_40_char_hex(self):
         uid = build_uid(**self._baseline_kwargs())
         self.assertEqual(len(uid), 40)
-        # SHA-1 outputs lowercase hex.
-        self.assertTrue(all(c in "0123456789abcdef" for c in uid))
+        # AADE's own uids are upper-case hex.
+        self.assertTrue(all(c in "0123456789ABCDEF" for c in uid))
 
     def test_deterministic_across_calls(self):
         """Same inputs MUST produce the same uid — the basis of the
@@ -66,21 +66,23 @@ class BuildUidTestCase(SimpleTestCase):
         uid_with = build_uid(**{**kw, "receiver_vat": "987654321"})
         self.assertNotEqual(uid_without, uid_with)
 
-    def test_matches_manual_iso_8859_7_sha1(self):
-        """Pin the exact hash so a refactor that changes the
-        encoding or join order fails loudly rather than silently
-        breaking AADE dedupe on the next deploy."""
-        kw = self._baseline_kwargs()
-        expected_payload = (
-            kw["issuer_vat"]
-            + kw["issue_date"].isoformat()
-            + str(kw["branch"])
-            + kw["invoice_type"]
-            + kw["series"]
-            + str(kw["aa"])
-            + ""  # empty deviation_type
-        ).encode("iso-8859-7")
-        expected = hashlib.sha1(
-            expected_payload, usedforsecurity=False
-        ).hexdigest()
-        self.assertEqual(build_uid(**kw), expected)
+    def test_matches_the_uid_aade_computes(self):
+        """Pin the exact hash so a refactor that changes the encoding or
+        join fails loudly. AADE joins the fields with ``-`` and answers in
+        upper-case hex: the form was read off the ``invoiceUid`` its
+        sandbox returned for a receipt (2026-11-20). The concatenation
+        without separators this replaced never matched what AADE lists,
+        so no MARK could be looked up by its uid."""
+        self.assertEqual(
+            build_uid(**self._baseline_kwargs()),
+            hashlib.sha1(
+                b"123456789-2026-04-22-0-11.1-GRVP-2026-1",
+                usedforsecurity=False,
+            )
+            .hexdigest()
+            .upper(),
+        )
+        self.assertEqual(
+            build_uid(**self._baseline_kwargs()),
+            "391805A15D31A1DC5C63140D6ABED1229BF89885",
+        )

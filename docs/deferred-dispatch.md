@@ -17,7 +17,7 @@ never reaches the caller:
 2. it is kept as a `tenant.DeferredDispatch` row in `public` (the task name,
    `args`, `kwargs`, headers including the schema, and the options), so it is
    not lost. If even the row cannot be written, the log line says what the work
-   was, with its secrets masked (`core.tasks.safe_task_arguments`, the same mask
+   was, with its secrets masked (`core.monitored_task.safe_task_arguments`, the same mask
    as a failed task's);
 3. `tenant.tasks.redispatch_deferred_tasks` (beat, every minute) publishes the
    rows again and deletes each once its task is out. A row that fails again
@@ -190,6 +190,48 @@ sweep replays.
 The read timeout is set on Linux only, where every deployment runs: py-amqp packs
 the value as a POSIX `timeval`, which Windows reads as milliseconds, so a Windows
 host has no read bound (the hold and the refusal still apply).
+
+## One dispatch, one task id
+
+`dispatch_on_commit` gives each call a task id of its own and publishes with
+it (`task_id`, unless the caller chose one). The row a failed publish keeps
+holds it in its options, so the sweep's copy goes out under the same id as the
+message the failed publish may have written; a message delivered again after a
+worker was lost (`task_acks_late`) and every `retry()` keep it too. A task can
+therefore tell another copy of its dispatch from new work by its own id,
+and an effect keyed on it happens once however many copies run.
+`tenant.celery.dispatch_key(namespace, *parts)` makes that key: the task id
+and what tells the task's effects apart (a recipient, a subject), or `None`
+outside a task.
+
+- **E-mail**: every send goes through `send_email`, whose delivery id is
+  derived from the task id (`emails.log.delivery_id`); a second copy finds
+  the delivery sent, and copies that run at the same moment send under an
+  advisory lock on it (`docs/emails/delivery.md`).
+- **Meta Conversions API**: each event's id is fixed before the task can run
+  again (the order's or the account's number, a Refund's ledger row,
+  `src/meta_capi/services.py`), and `MetaCapiEventLog` is checked and the
+  event sent under an advisory lock on that id. A copy whose wait for the
+  lock runs out (`core.db.locks.LockWaitRanOut`) retries, and finds the event
+  sent; the request to Meta is bounded by `META_CAPI_TIMEOUT_SECONDS`.
+
+A task whose effect is a state of a row needs no id, and its state also covers
+two dispatches of it from different paths. When the effect is the row's own
+state, the task claims it (a compare-and-set, a unique row). When the state
+records a call to another service (a mail), the task reads the row, calls and
+marks it under an advisory lock on the row (`core.db.locks.held_across_calls`)
+instead: a mark set before the call would lose the call with a worker that
+dies mid-call, and the lock goes with that worker's session, so the run after
+it calls again. A dispatch made inside a task (a chain's next link) is a
+dispatch of its own, with an id of its own.
+
+- **A product alert** (`product.tasks._notify_alerts`) is read, mailed and
+  marked (`is_active` off, `notified_at` set) under a lock on the alert, so a
+  second run (another stock or price update) waits and finds it marked. A type
+  that is switched off leaves every alert armed.
+- **A gift card's delivery** (`giftcard.tasks.deliver_gift_card_email`), queued
+  by the purchase, the admin's resend and the daily sweep, reads
+  `delivered_at` and sends under a lock on the card.
 
 ## One sweep at a time
 

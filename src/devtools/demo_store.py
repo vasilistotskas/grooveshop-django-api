@@ -1103,6 +1103,10 @@ def seed_products() -> dict[str, int]:
         product.discount_percent = Decimal(row.discount)
         product.stock = row.stock
         product.active = True
+        # The dataset is code: a demo product staff deleted comes back with
+        # the rest, or the offers that target it stop the seed.
+        product.is_deleted = False
+        product.deleted_at = None
         product.vat = vat
         # A `Weight`, not a dict: the field is a MeasurementField and
         # hands the raw value to a FloatField. Never zero, either — a
@@ -1244,7 +1248,7 @@ def seed_tags() -> dict[str, int]:
 
 
 def seed_reviews() -> dict[str, int]:
-    """The demo store's reviews — see ``devtools/demo_reviews.py``.
+    """The demo store's reviews — see ``src/devtools/demo_reviews.py``.
 
     Dozens of dedicated reviewer accounts with COMPLETED orders for what
     they review, so the reviews count as verified purchases.
@@ -1671,7 +1675,7 @@ def seed_demo_account() -> dict[str, int]:
 
 
 def seed_blog() -> dict[str, int]:
-    """The demo blog — see ``devtools/demo_blog.py`` for the dataset.
+    """The demo blog — see ``src/devtools/demo_blog.py`` for the dataset.
 
     ``_translate`` and ``ensure_asset`` are handed over rather than
     imported there, so that module stays a dataset plus one function
@@ -1748,7 +1752,7 @@ def seed_price_history() -> dict[str, int]:
 
 
 def seed_promotions() -> dict[str, int]:
-    """The demo store's offers — see ``devtools/demo_promotions.py``.
+    """The demo store's offers — see ``src/devtools/demo_promotions.py``.
 
     ``_translate`` is handed over rather than imported there for the
     same reason as the blog: that module stays a dataset plus one

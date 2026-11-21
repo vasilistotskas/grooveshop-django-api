@@ -67,7 +67,7 @@ class CeleryConfigTestCase(TestCase):
         # container — production logged "Timed out waiting for UP
         # message" twice in six hours. Asserting the RESOLVED value
         # rather than the setting's existence is the point: a later
-        # conf.update() in core/celery.py would be silently inert, which
+        # conf.update() in src/core/celery.py would be silently inert, which
         # is exactly how task_ignore_result once ended up not applying.
         self.assertEqual(
             conf["worker_proc_alive_timeout"],

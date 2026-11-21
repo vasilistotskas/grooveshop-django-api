@@ -55,16 +55,18 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from order.accounting import credit_allocation
+from order.accounting.movement import ReceiptMovement, movement_receipts_on
 from order.accounting.mydata.config import load_config as load_mydata_config
 from order.accounting.taxation import breakdown_by_rate, order_vat_lines
 from order.checkout.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
-from order.models.invoice import Invoice, InvoiceCounter
+from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.order import Order
 from order.models.retail_credit import RetailCredit
 from order.storefront_links import order_page_url
 from pay_way.enum.pay_way import PayWayEnum
+from shipping.services import ShippingService
 from tenant.membership import is_demo_store
 
 logger = logging.getLogger(__name__)
@@ -92,14 +94,85 @@ RECEIPT_ISSUING_STATUSES = frozenset(
     }
 )
 
+#: Statuses in which an order's carrier shipment is created: a parcel that
+#: moves through a carrier gets its receipt here, before the carrier takes
+#: it (``order.tasks.issue_receipt_for_pickup``).
+PRE_SHIPMENT_STATUSES = frozenset({OrderStatus.PENDING, OrderStatus.PROCESSING})
+
 
 def receipt_issuable(order: Order) -> bool:
     """True when the platform issues this order's retail receipt now: a
     receipt order (an invoice order never gets one) whose goods have
-    shipped."""
+    shipped, or whose parcel waits for its carrier: a courier or locker
+    sale's receipt is issued with movement indication before the movement
+    starts (``order.accounting.movement``), once nothing is owed online,
+    the store has set its dispatch point (``movement_receipts_on``) and the
+    carrier has accepted the parcel
+    (``ShippingService.carrier_holds_the_parcel``: ACS's voucher, BOX NOW's
+    parcel). Neither a shipment row (ACS's is written at checkout, before
+    the voucher is asked for) nor a tracking number typed on the order is
+    that."""
+    if order.document_type != OrderDocumentTypeEnum.RECEIPT.value:
+        return False
+    if order.status in RECEIPT_ISSUING_STATUSES:
+        return True
     return (
-        order.document_type == OrderDocumentTypeEnum.RECEIPT.value
-        and order.status in RECEIPT_ISSUING_STATUSES
+        order.status in PRE_SHIPMENT_STATUSES
+        and not order.awaits_online_payment
+        and movement_receipts_on(order)
+        and ShippingService.carrier_holds_the_parcel(order)
+    )
+
+
+def hold_receipt_for_cancel(order: Order) -> bool:
+    """Set aside the receipt of an order canceled before its parcel left:
+    it is to be canceled in myDATA, not credited.
+
+    The receipt of a carrier order is issued when its voucher or parcel is
+    created and is not handed to the customer before the parcel leaves
+    (``Invoice.awaits_the_parcel``), so the sale and the movement it
+    documents never happened and the document was never used: the case
+    ``CancelInvoice`` is lawful for (Α.1138/2020 annex, «μη χρήση»). Only
+    where the platform issues the store's receipts. Credits wait while it
+    is set (``credit_documents.create_pending_credits``), and
+    ``order.tasks.settle_canceled_receipt`` decides once the courier
+    answered the cancel: canceled in myDATA, or released to the credit
+    path when the courier may hold the parcel. Returns whether a receipt
+    was set aside.
+
+    Called by the one path that cancels an order
+    (``OrderService._cancel_order_locked``), in its transaction and under
+    its lock on the order row, the lock every credit is created under: no
+    credit can be created between the cancel and the hold. The receipt's
+    email reads the hold when it runs (``Invoice.is_deliverable``).
+
+    Set aside: a receipt not handed to the customer, that is one with
+    movement indication, or one AADE has not registered (never sent, or
+    refused: it is canceled once staff correct it and it is registered).
+    Never one already canceled, nor one with a credit document (money
+    returned before the pickup): that one was used, and the rest of it
+    goes the credit path like any other refund.
+    """
+    if (
+        order.shipped_at is not None
+        or not ShippingService.moves_by_carrier(order)
+        or not load_mydata_config().is_ready()
+    ):
+        return False
+    now = timezone.now()
+    return bool(
+        Invoice.objects.filter(
+            order_id=order.pk, cancel_requested_at__isnull=True
+        )
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        # A plain receipt AADE registered was emailed at its MARK: used.
+        .exclude(movement={}, mydata_mark__isnull=False)
+        .exclude(
+            pk__in=RetailCredit.objects.filter(order_id=order.pk).values(
+                "invoice_id"
+            )
+        )
+        .update(cancel_requested_at=now, updated_at=now)
     )
 
 
@@ -148,19 +221,25 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the document is frozen).
+    until the document is frozen); the credit documents render the
+    snapshot taken with the receipt they credit.
 
-    ΕΛΠ art. 12(4) has the seller keep the customer's name and address for
-    every credit document above EUR 50: the credit documents render this
-    snapshot, taken with the receipt they credit.
+    A retail document needs no buyer address: Law 4308/2014 art. 12 par. 2
+    names only the seller's, and the former par. 4 rule (the customer's
+    name and address above EUR 50) was deleted by Law 5222/2025 art. 238
+    par. 2. The address shown is the order's delivery address, which for
+    a pickup-point order is the point's (#642).
     """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
         "email": order.email,
         "phone": str(order.phone) if order.phone else "",
         "address_line_1": f"{order.street} {order.street_number}".strip(),
-        "address_line_2": order.place or "",
+        "address_line_2": order.address_line_2,
         "city": order.city,
+        # A district or area (Τοποθεσία), printed with the city: never the
+        # address's second line, which is ``address_line_2``.
+        "place": order.place,
         "postal_code": order.zipcode,
         "country": (order.country.name if order.country_id else "")
         if hasattr(order, "country")
@@ -184,7 +263,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
-    Gift-card amounts are payment, never allocated (order/checkout/discounts.py).
+    Gift-card amounts are payment, never allocated (order.checkout.discounts).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
     allocation = _returned_before_receipt(order)
@@ -440,6 +519,11 @@ def _build_context(
     A *specimen* carries no QR at all: it is registered nowhere, so there
     is nothing a scan could verify.
     """
+    movement = (
+        ReceiptMovement.from_json(invoice.movement)
+        if invoice.movement
+        else None
+    )
     qr_target_url = ""
     if not specimen:
         qr_target_url = invoice.mydata_qr_url or _verification_url(
@@ -465,7 +549,31 @@ def _build_context(
         # see the legal registration number next to the invoice number.
         "mydata_mark": invoice.mydata_mark,
         "specimen": specimen,
+        # What the receipt was sent to myDATA with as its movement
+        # indication, printed with the parcel's addresses and dispatch.
+        "movement": movement,
+        # The goods it declares moving, at the quantities it declares (the
+        # units bought less those refunded), apart from the sale's lines.
+        "movement_goods": _movement_goods(order, movement),
     }
+
+
+def _movement_goods(
+    order: Order, movement: ReceiptMovement | None
+) -> list[dict[str, Any]]:
+    """The goods *movement* declares, each named by its order line."""
+    if movement is None:
+        return []
+    names = {
+        item.pk: item.product_name
+        for item in order.items.filter(
+            pk__in=[good.item for good in movement.goods]
+        )
+    }
+    return [
+        {"name": names.get(good.item, ""), "quantity": good.quantity}
+        for good in movement.goods
+    ]
 
 
 def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
@@ -483,7 +591,7 @@ def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
 
 @transaction.atomic
 def _persist_invoice_row(
-    order: Order, existing: Invoice | None
+    order: Order, existing: Invoice | None, *, issuing: bool
 ) -> tuple[Invoice, list[dict[str, Any]], dict[str, Any]]:
     """Allocate the number and persist the Invoice row (no PDF).
 
@@ -499,8 +607,16 @@ def _persist_invoice_row(
     and the row's creation must be one step: a refund inserted but not yet
     committed when the ledger is read is invisible to the netting, yet it
     predates the row, and no credit would ever cover it.
+
+    *issuing* (a call that issues, not a re-render) re-judges
+    :func:`receipt_issuable` on the locked row: the caller's order was
+    read before the lock, and a cancel that committed since must find
+    either no receipt (refused here) or one it sets aside
+    (:func:`hold_receipt_for_cancel`, under the same lock).
     """
-    Order.objects.select_for_update().get(pk=order.pk)
+    locked = Order.objects.select_for_update().get(pk=order.pk)
+    if issuing:
+        _refuse_unless_issuable(locked)
     if existing is None:
         # The receipt nets what was returned before it, at the rates each
         # refund was allocated at: decide the sources nobody allocated yet
@@ -530,13 +646,6 @@ def _persist_invoice_row(
         invoice = existing
         invoice_number = existing.invoice_number
         issue_date = existing.issue_date
-        # Delete the stale PDF so the regenerated one lands at the
-        # same storage key. Django's default ``get_available_name``
-        # appends a suffix to avoid overwrites, which would leave
-        # the pre-MARK PDF as an orphan (plus cost an extra S3
-        # object per regeneration in prod).
-        if invoice.document_file:
-            invoice.document_file.delete(save=False)
     else:
         issue_date = timezone.localdate()
         invoice_number = InvoiceCounter.allocate(issue_date.year)
@@ -590,10 +699,53 @@ def _persist_invoice_row(
     invoice.discount = totals["discount"]
     invoice.total = totals["total"]
     invoice.currency = currency
-    # Save so ``invoice.pk`` exists when the upload_to callable builds
-    # the file path during the (post-commit) render step.
-    invoice.save()
+    if existing is None:
+        # Save so ``invoice.pk`` exists when the upload_to callable builds
+        # the file path during the (post-commit) render step.
+        invoice.save()
+    else:
+        # Only what rendering owns: *existing* was read before the order
+        # lock, and the rest of the row (its registration, a cancel's hold
+        # set since) belongs to the paths that write it.
+        invoice.save(
+            update_fields=[
+                "seller_snapshot",
+                "buyer_snapshot",
+                "vat_breakdown",
+                "subtotal",
+                "subtotal_currency",
+                "total_vat",
+                "total_vat_currency",
+                "shipping",
+                "shipping_currency",
+                "payment_fee",
+                "payment_fee_currency",
+                "discount",
+                "discount_currency",
+                "total",
+                "total_currency",
+                "currency",
+                "updated_at",
+            ]
+        )
     return invoice, vat_breakdown, totals
+
+
+def _refuse_unless_issuable(order: Order) -> None:
+    """Refuse an order :func:`receipt_issuable` rejects."""
+    if not receipt_issuable(order):
+        raise ReceiptNotIssuable(
+            _(
+                "A retail receipt is issued for a receipt order once it "
+                "has shipped. Order #%(order_id)s is %(doc)s, status "
+                "%(status)s."
+            )
+            % {
+                "order_id": order.id,
+                "doc": order.get_document_type_display(),
+                "status": order.get_status_display(),
+            }
+        )
 
 
 def _refuse_if_fully_refunded(order: Order, existing: Invoice | None) -> None:
@@ -658,19 +810,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             )
         _refuse_if_fully_refunded(order, existing)
     else:
-        if not receipt_issuable(order):
-            raise ReceiptNotIssuable(
-                _(
-                    "A retail receipt is issued for a receipt order once it "
-                    "has shipped. Order #%(order_id)s is %(doc)s, status "
-                    "%(status)s."
-                )
-                % {
-                    "order_id": order.id,
-                    "doc": order.get_document_type_display(),
-                    "status": order.get_status_display(),
-                }
-            )
+        _refuse_unless_issuable(order)
         _refuse_if_fully_refunded(order, existing)
         if not load_mydata_config().is_ready():
             raise ReceiptNotIssuable(
@@ -688,7 +828,9 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             )
             return existing
 
-    invoice, vat_breakdown, totals = _persist_invoice_row(order, existing)
+    invoice, vat_breakdown, totals = _persist_invoice_row(
+        order, existing, issuing=not force
+    )
 
     # Render under the buyer's preferred language so e.g. a German
     # shopper gets a German-labelled invoice even though the seller
@@ -699,17 +841,75 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
             _build_context(order, invoice, vat_breakdown, totals)
         )
 
-    filename = f"{invoice.invoice_number}.pdf"
-    invoice.document_file.save(filename, ContentFile(pdf_bytes), save=False)
-    invoice.save(update_fields=["document_file"])
-
+    stored = _store_pdf(invoice, pdf_bytes)
+    if stored is None:
+        logger.info(
+            "Receipt %s of order %s changed while it rendered (registered, "
+            "or regenerated again); the newer one renders it",
+            invoice.invoice_number,
+            order.id,
+        )
+        return Invoice.objects.get(pk=invoice.pk)
     logger.info(
         "Generated invoice %s for order %s (%s bytes)",
         invoice.invoice_number,
         order.id,
         len(pdf_bytes),
     )
-    return invoice
+    return stored
+
+
+def _rendered_from(invoice: Invoice) -> tuple[Any, ...]:
+    """What of the row a receipt PDF prints and a later write can change:
+    AADE's MARK, the seller and buyer snapshots a regeneration takes again,
+    and the movement block (the figures are frozen once the row exists)."""
+    return (
+        invoice.mydata_mark,
+        invoice.seller_snapshot,
+        invoice.buyer_snapshot,
+        invoice.movement,
+    )
+
+
+def _store_pdf(invoice: Invoice, pdf_bytes: bytes) -> Invoice | None:
+    """Store the PDF just rendered for *invoice* in place of the one the
+    row holds, and return the row; ``None``, storing nothing, when the row
+    no longer holds what the PDF was rendered from (:func:`_rendered_from`):
+    AADE's registration landed while it rendered (which clears the PDF it
+    found and renders its own, ``mydata.service._persist_success``), or a
+    later regeneration saved newer snapshots and renders those.
+
+    The old file is removed only now that its replacement is rendered, so
+    a render that fails leaves the row and its file as they were. It is
+    removed first so the new one lands at the same storage key (Django's
+    ``get_available_name`` would add a suffix and orphan the old one), and
+    the row stops naming it in a commit of its own before it goes: a write
+    of the new file that fails leaves a row with no PDF, which
+    ``send_invoice_to_mydata`` and the receipt email see and render again,
+    never a row naming a file that is gone."""
+    rendered = _rendered_from(invoice)
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if _rendered_from(locked) != rendered:
+            return None
+        stale = locked.document_file.name
+        if stale:
+            locked.document_file = ""
+            locked.save(update_fields=["document_file"])
+    if stale:
+        locked.document_file.storage.delete(stale)
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if _rendered_from(locked) != rendered:
+            return None
+        if locked.document_file:
+            # Another render of the same row stored its PDF meanwhile.
+            return locked
+        locked.document_file.save(
+            f"{locked.invoice_number}.pdf", ContentFile(pdf_bytes), save=False
+        )
+        locked.save(update_fields=["document_file"])
+    return locked
 
 
 def render_specimen_pdf(order: Order) -> bytes:

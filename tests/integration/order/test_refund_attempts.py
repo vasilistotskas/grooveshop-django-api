@@ -1,4 +1,4 @@
-"""``OrderService.refund_order`` claims, calls and records (H1).
+"""``RefundService.refund_order`` claims, calls and records (H1).
 
 A connection idle in a transaction is killed after ten seconds
 (``idle_in_transaction_session_timeout``), so the provider must be called
@@ -26,6 +26,7 @@ from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -94,7 +95,7 @@ class TestNoTransactionIsOpenWhileTheProviderAnswers:
         order = _order()
 
         with _TransactionWatchingStripe() as stripe_api:
-            result = OrderService.refund_order(order, amount=_eur("30.00"))
+            result = RefundService.refund_order(order, amount=_eur("30.00"))
 
         assert result.complete is True
         assert stripe_api.in_transaction == [False]
@@ -139,12 +140,12 @@ class TestTheAttemptHoldsItsAmountBack:
                 PaymentLedger, "record_refund", side_effect=RuntimeError("db")
             ):
                 with pytest.raises(RuntimeError):
-                    OrderService.refund_order(order, amount=_eur("80.00"))
+                    RefundService.refund_order(order, amount=_eur("80.00"))
 
         # 80 is on its way out: only 20 is left to claim.
         assert PaymentLedger.refundable(order) == Decimal("20.00")
         with FakeStripeRefunds() as stripe_api, pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
         assert stripe_api.calls == []
 
     def test_an_old_attempt_still_holds_its_amount(self):
@@ -164,7 +165,7 @@ class TestTheAttemptHoldsItsAmountBack:
         order = _order()
 
         with FakeStripeRefunds(fail_with=stripe.InvalidRequestError("no", "x")):
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is False
         [attempt] = order.refund_attempts.all()
@@ -177,7 +178,7 @@ class TestTheAttemptHoldsItsAmountBack:
         order = _order()
 
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is False
         assert result.declined["outcome_unknown"] is True
@@ -200,7 +201,7 @@ class TestTheAttemptHoldsItsAmountBack:
         )
 
         with FakeStripeRefunds(fail_with=stripe.InvalidRequestError("no", "x")):
-            result = OrderService.refund_order(order)
+            result = RefundService.refund_order(order)
 
         assert result.complete is False
         assert {a.status for a in order.refund_attempts.all()} == {
@@ -217,8 +218,8 @@ class TestARepeatReusesTheAttempt:
                 PaymentLedger, "record_refund", side_effect=RuntimeError("db")
             ):
                 with pytest.raises(RuntimeError):
-                    OrderService.refund_order(order, amount=_eur("40.00"))
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+                    RefundService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is True
         assert order.refund_attempts.count() == 1
@@ -235,8 +236,8 @@ class TestARepeatReusesTheAttempt:
                 PaymentLedger, "record_refund", side_effect=RuntimeError("db")
             ):
                 with pytest.raises(RuntimeError):
-                    OrderService.refund_order(order)
-            result = OrderService.refund_order(order)
+                    RefundService.refund_order(order)
+            result = RefundService.refund_order(order)
 
         assert result.refunded == _eur("100.00")
         assert len(stripe_api.created) == 1
@@ -254,7 +255,7 @@ class TestARepeatReusesTheAttempt:
             ),
         ):
             with pytest.raises(RuntimeError):
-                OrderService.refund_order(order, amount=_eur("40.00"))
+                RefundService.refund_order(order, amount=_eur("40.00"))
 
         def cancels() -> int:
             return sum(1 for r in api.sent if r.method == "DELETE")
@@ -262,7 +263,7 @@ class TestARepeatReusesTheAttempt:
         assert cancels() == 1
 
         with api, pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert "result is not known yet" in str(excinfo.value)
         assert cancels() == 1
@@ -289,7 +290,7 @@ class TestTheWebhookBeatsTheRecord:
                 return refund
 
         with _Stripe():
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is True
         assert result.refunded == _eur("40.00")
@@ -325,7 +326,7 @@ class TestWhatTheProviderAnswers:
         body = {**CANCEL_SUCCESS, "TransactionId": None}
 
         with FakeVivaApi(captured=100.0, cancel=(200, body)):
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is False
         assert result.declined["outcome_unknown"] is True
@@ -341,7 +342,7 @@ class TestWhatTheProviderAnswers:
             "order.payments.payment.get_payment_provider",
             side_effect=ImproperlyConfigured("no key"),
         ):
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is False
         assert result.paid_something is False
@@ -362,3 +363,92 @@ class TestWhatTheProviderAnswers:
 
         assert success is False
         assert response["outcome_unknown"] is True
+
+
+def _oauth_only():
+    """A store whose Viva settings hold the OAuth pair alone: it was paid
+    through it while the offer needed only that pair."""
+    from tests.utils.viva import CREDENTIALS
+
+    return mock.patch(
+        "tenant.credentials.viva_wallet_credentials",
+        return_value={**CREDENTIALS, "merchant_id": "", "api_key": ""},
+    )
+
+
+class TestOnlyARequestThatMayHaveReachedVivaIsUnknown:
+    """A refund that was never sent is a refusal: it frees what its
+    attempt held at once and tells staff why (the stand-in review of
+    3cc73abb7). Only a request that may have reached Viva is unknown."""
+
+    def test_a_store_without_the_basic_pair_is_refused_before_sending(self):
+        order = _viva_order()
+        api = FakeVivaApi(captured=100.0)
+
+        with api, _oauth_only():
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
+
+        assert not any(r.method == "DELETE" for r in api.sent)
+        assert result.complete is False
+        assert not result.declined.get("outcome_unknown")
+        assert order.refund_attempts.get().status == (
+            RefundAttemptStatus.DECLINED
+        )
+        assert PaymentLedger.refundable(order) == Decimal("100.00")
+        [note] = [
+            row.new_value["note"]
+            for row in OrderHistory.objects.filter(
+                order=order, change_type="NOTE"
+            )
+            if row.new_value["note"].startswith("Refund via ")
+        ]
+        assert "was not processed" in note
+        assert "Merchant ID and API Key are missing" in note
+
+    def test_a_connection_never_made_is_a_refusal(self):
+        import requests
+
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        with (
+            FakeVivaApi(captured=100.0),
+            mock.patch("requests.delete", side_effect=requests.ConnectTimeout),
+        ):
+            success, response = VivaWalletPaymentProvider().refund_payment(
+                VIVA_PAYMENT, _eur("40.00"), idempotency_key="unused"
+            )
+
+        assert success is False
+        assert not response.get("outcome_unknown")
+
+    def test_an_answer_that_never_came_stays_unknown(self):
+        import requests
+
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        with (
+            FakeVivaApi(captured=100.0),
+            mock.patch("requests.delete", side_effect=requests.ReadTimeout),
+        ):
+            success, response = VivaWalletPaymentProvider().refund_payment(
+                VIVA_PAYMENT, _eur("40.00"), idempotency_key="unused"
+            )
+
+        assert success is False
+        assert response["outcome_unknown"] is True
+
+    def test_the_refund_lookup_without_the_basic_pair_sends_nothing(self):
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        order = _viva_order()
+        order.metadata = {"viva_order_codes": ["1111"]}
+        order.save(update_fields=["metadata"])
+        api = FakeVivaApi(captured=100.0)
+
+        with api, _oauth_only():
+            found = VivaWalletPaymentProvider().find_refunds(
+                order, VIVA_PAYMENT, _eur("40.00"), idempotency_key=""
+            )
+
+        assert found is None
+        assert not any("/api/transactions/" in r.url for r in api.sent)

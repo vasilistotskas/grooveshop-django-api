@@ -33,19 +33,17 @@ from cart.serializers.cart import (
     ReserveStockResponseSerializer,
 )
 from cart.services import CartService
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
+from cart.throttles import (
     CartAgentTokenThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CartQuoteAnonThrottle,
     CartQuoteThrottle,
     CouponApplyThrottle,
-    UserBudgetThrottle,
-    gift_card_code_throttles,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
 from core.utils.serializers import (
@@ -53,6 +51,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from giftcard.throttles import gift_card_code_throttles
 from order.checkout.quote import (
     CheckoutQuote,
     OrderQuoteService,
@@ -528,7 +527,7 @@ class CartViewSet(BaseModelViewSet):
     @action(detail=False, methods=["post"], url_path="coupon")
     def apply_coupon(self, request, *args, **kwargs):
         """Attach a coupon code to the cart and return the updated cart."""
-        from promotion.services import CouponError, CouponService
+        from promotion.coupons import CouponError, CouponService
 
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -561,7 +560,7 @@ class CartViewSet(BaseModelViewSet):
     @action(detail=False, methods=["delete"], url_path="coupon")
     def remove_coupon(self, request, *args, **kwargs):
         """Detach the applied coupon code from the cart."""
-        from promotion.services import CouponService
+        from promotion.coupons import CouponService
 
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -590,7 +589,7 @@ class CartViewSet(BaseModelViewSet):
         A read, so it neither creates a cart nor 404s without one: a
         shopper with no cart yet simply has no coupons to judge.
         """
-        from promotion.services import CouponPickerService
+        from promotion.coupon_picker import CouponPickerService
 
         cart = self.cart_service.get_existing_cart()
         owner = self.cart_service.owner
@@ -1062,12 +1061,7 @@ class CartViewSet(BaseModelViewSet):
         # A delivery is priced once it is chosen: a kind and a country.
         shipping = None
         if data.get("shipping_kind") and country_id:
-            shipping = ShippingChoice(
-                kind=data["shipping_kind"],
-                provider_code=data.get("shipping_provider_code"),
-                country_id=country_id,
-                region_id=region_id,
-            )
+            shipping = ShippingChoice.of(data)
         pay_way = None
         if data.get("pay_way_id"):
             pay_way = self._offered_pay_way(data["pay_way_id"], shipping)
@@ -1188,24 +1182,9 @@ class CartViewSet(BaseModelViewSet):
         )
         request_serializer.is_valid(raise_exception=True)
         pay_way_id = request_serializer.validated_data["pay_way_id"]
-        # ``shipping_provider_code`` is normalised to None by the
-        # serializer's validate() when omitted (home_delivery is
-        # provider-agnostic in the frontend); pass it through so the
-        # order-create verification gets the same None and both calc
-        # paths agree on the generic-fallback shipping price.
-        shipping_provider_code = request_serializer.validated_data.get(
-            "shipping_provider_code"
-        )
-        shipping_kind = request_serializer.validated_data["shipping_kind"]
-        country_id = request_serializer.validated_data.get("country_id") or None
-        region_id = request_serializer.validated_data.get("region_id") or None
-
-        shipping = ShippingChoice(
-            kind=shipping_kind,
-            provider_code=shipping_provider_code,
-            country_id=country_id,
-            region_id=region_id,
-        )
+        # The delivery as order creation reads it from the same body
+        # (``ShippingChoice.of``), so both price the same shipping.
+        shipping = ShippingChoice.of(request_serializer.validated_data)
         pay_way = self._offered_pay_way(pay_way_id, shipping)
         if isinstance(pay_way, Response):
             return pay_way

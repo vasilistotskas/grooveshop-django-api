@@ -29,7 +29,6 @@ from djmoney.money import Money
 from b2b.factories import BusinessProfileFactory
 from b2b.tasks import send_business_profile_status_email
 from cart.factories.cart import CartFactory
-from core.tasks import send_inactive_user_notifications
 from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
@@ -63,15 +62,15 @@ from shipping_boxnow.factories import (
 )
 from shipping_boxnow.tasks import boxnow_send_arrival_notification
 from tests.utils.emails import open_email_gates  # noqa: F401
-from tests.utils.mydata import issuable, mydata_enabled
+from tests.utils.mydata import issuable, mydata_enabled, registered
 from user.adapter import UserAccountAdapter
 from user.factories.account import UserAccountFactory
 from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import UserSubscription
-from user.tasks import export_user_data_task
-from user.utils.subscription import send_subscription_confirmation
+from user.services.subscription_mail import send_subscription_confirmation
+from user.tasks import export_user_data_task, send_inactive_user_notifications
 
 BASE = "https://shop.example"
 
@@ -433,7 +432,7 @@ class TestMoreOrderEmails:
                 return_value=b"%PDF-1.4",
             ),
         ):
-            generate_invoice(issuable(order))
+            registered(generate_invoice(issuable(order)))
         mail.outbox = []
 
         with mydata_enabled(auto_submit=False):

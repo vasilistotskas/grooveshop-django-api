@@ -19,7 +19,7 @@ fake = Faker()
 # ISO 3166-1's own "user-assigned" alpha-2/alpha-3 ranges: reserved
 # indefinitely, never allocated to a real country by the standard, so
 # a value drawn from here can never collide with
-# ``country/migrations/0012_seed_iso_countries.py``'s full ISO seed —
+# ``src/country/migrations/0012_seed_iso_countries.py``'s full ISO seed —
 # real Faker country codes exist in `unique_model_fields`' DB-conflict
 # retry loop, but only ~195 of them, all now pre-seeded, so every
 # attempt failed and exhausted it. Same reserved-range trick

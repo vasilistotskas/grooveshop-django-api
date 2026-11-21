@@ -16,11 +16,10 @@ from unittest import mock
 import pytest
 from django.conf import settings
 from django.test import Client, override_settings
-from redis.backoff import NoBackoff
-from redis.retry import Retry
 from rest_framework.test import APIClient
 
-from core.caches import STRICT_CACHE_UNAVAILABLE_MESSAGE
+from core.cache_backend import STRICT_CACHE_UNAVAILABLE_MESSAGE
+from tests.utils.redis import stopped_default_cache
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -31,16 +30,7 @@ CODE = "temporarily_unavailable"
 
 @pytest.fixture
 def redis_down():
-    stopped = {
-        **settings.CACHES["default"],
-        "BACKEND": "core.caches.CustomCache",
-        "LOCATION": "redis://127.0.0.1:1/0",
-        "OPTIONS": {
-            "retry": Retry(NoBackoff(), 0),
-            "socket_connect_timeout": 0.2,
-            "health_check_interval": 0,
-        },
-    }
+    stopped = stopped_default_cache(settings.CACHES["default"])
     with override_settings(CACHES={"default": stopped}):
         yield
 

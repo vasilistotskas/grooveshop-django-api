@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 from django.conf import settings as django_settings
 from extra_settings.models import Setting
 
-from order.accounting.mydata.config import load_config
+from order.accounting.mydata.config import (
+    MyDataConfig,
+    MyDataRequirement,
+    load_config,
+)
 from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
@@ -243,3 +249,94 @@ def test_the_exemption_ground_is_a_store_setting_that_ships_blank():
     ground = defaults["MYDATA_FHM_EXEMPTION_GROUND"]
     assert ground["type"] == "string"
     assert ground["value"] == ""
+
+
+@pytest.mark.parametrize(
+    ("value", "accepted"),
+    [
+        ("GRVP", True),
+        ("x" * 45, True),
+        ("x" * 46, False),
+        ("GRVP\x01", False),
+        ("GR\rVP", False),
+        ("GR\nVP", False),
+        ("GR\tVP", False),
+        (5, False),
+    ],
+)
+def test_a_series_prefix_is_what_the_uid_and_aade_see_alike(value, accepted):
+    """The uid hashes the series as given and the payload leaves out what
+    XML cannot carry, so a prefix holding such a character, or one too long
+    for AADE's series, is refused where it is saved."""
+    from order.setting_validators import validate_series_prefix_setting
+
+    assert validate_series_prefix_setting(value) is accepted
+
+
+@pytest.mark.parametrize(
+    "name", ["MYDATA_INVOICE_SERIES_PREFIX", "MYDATA_CREDIT_SERIES_PREFIX"]
+)
+def test_both_series_prefixes_are_validated_where_they_are_saved(name):
+    from order.setting_validators import validate_series_prefix_setting
+
+    defaults = {
+        item["name"]: item for item in django_settings.EXTRA_SETTINGS_DEFAULTS
+    }
+    assert defaults[name]["validator"] == (
+        "order.setting_validators.validate_series_prefix_setting"
+    )
+    assert validate_series_prefix_setting(defaults[name]["value"])
+
+
+@pytest.mark.parametrize(
+    (
+        "enabled",
+        "environment",
+        "ground",
+        "takes_real_orders",
+        "user_id",
+        "subscription_key",
+    ),
+    list(
+        itertools.product(
+            (True, False),
+            ("prod", "dev", None),
+            ("ΠΟΛ.1002/2014", ""),
+            (True, False),
+            ("user", ""),
+            ("key", ""),
+        )
+    ),
+)
+def test_a_store_is_ready_exactly_when_nothing_is_unmet(
+    enabled, environment, ground, takes_real_orders, user_id, subscription_key
+):
+    """The dashboard lists ``unmet()``; issuing is gated on ``is_ready()``.
+    They read one rule, so the dashboard shows no gap exactly when the
+    store issues, over every combination of the conditions."""
+    config = MyDataConfig(
+        enabled=enabled,
+        fhm_exemption_ground=ground,
+        takes_real_orders=takes_real_orders,
+        auto_submit=True,
+        environment=environment,
+        user_id=user_id,
+        subscription_key=subscription_key,
+        invoice_series_prefix="A",
+        credit_series_prefix="C",
+        issuer_branch=0,
+        request_timeout_seconds=10,
+    )
+    expected = bool(
+        enabled
+        and environment is not None
+        and (ground or (environment == "dev" and not takes_real_orders))
+        and user_id
+        and subscription_key
+    )
+    assert config.is_ready() is expected
+    assert (config.unmet() == []) is expected
+    assert (MyDataRequirement.USER_ID in config.unmet()) is (not user_id)
+    assert (MyDataRequirement.ENVIRONMENT in config.unmet()) is (
+        environment is None
+    )

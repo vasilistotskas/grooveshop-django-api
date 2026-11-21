@@ -18,6 +18,7 @@ Callers:
 from __future__ import annotations
 
 import re
+import unicodedata
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -37,6 +38,91 @@ _WHITESPACE_RUN = re.compile(r"\s+")
 # is a postcode typed into the wrong field (prod order #316: "70300").
 # Four, not five: Cyprus postcodes are four digits.
 _MIN_POSTCODE_LOOKALIKE_LENGTH = 4
+
+# One street line that ends in its number, the way Greek and Cypriot
+# addresses are written: "Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12",
+# "Ermou 12-14", "Ermou 12/3". The number is ASCII digits (the postcode
+# guard reads ASCII alone, like the storefront), at most one letter after
+# them, and an optional second number after a dash or a slash.
+_LETTER = r"[^\W\d_]"
+_HOUSE_NUMBER = rf"[0-9]+{_LETTER}?(?:[-/][0-9]+{_LETTER}?)?"
+_STREET_LINE = re.compile(rf"(?P<street>.+?)[ ,]+(?P<number>{_HOUSE_NUMBER})")
+# A range or a slash written with spaces is one number: "12 - 14".
+_SPACED_RANGE = re.compile(r"(?<=[0-9])\s*([-/])\s*(?=[0-9])")
+# Dashes keyboards and phones type for "-" in a range ("12–14").
+_DASHES = str.maketrans(
+    {"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"}
+)
+# A street holds a number only as the day of a date that names it ("28ης
+# Οκτωβρίου", "28η Οκτωβρίου", "28 Οκτωβρίου", "Οδός 1ης Μαΐου"): a day
+# 1 to 31, optionally with a Greek ordinal ending, then a month in the
+# genitive. Any other number in it ("Ερμού 12, όροφος 3", "Ερμού 12ος 3",
+# "12 Main St") means the line cannot be split without guessing which
+# number is the house's.
+_DAY = re.compile(r"(?:[1-9]|[12][0-9]|3[01])[α-ω]*")
+MONTHS_GENITIVE = (
+    "ιανουαριου",
+    "φεβρουαριου",
+    "μαρτιου",
+    "απριλιου",
+    "μαιου",
+    "ιουνιου",
+    "ιουλιου",
+    "αυγουστου",
+    "σεπτεμβριου",
+    "οκτωβριου",
+    "νοεμβριου",
+    "δεκεμβριου",
+)
+# Words that name a floor or a flat, not the street: a number after one is
+# the floor's or the flat's, never the house's ("Ερμού, όροφος 3"), so a
+# street holding one is never split. Compared without accents, case or a
+# final dot.
+UNIT_MARKERS = (
+    "οροφος",
+    "οροφ",
+    "ορ",
+    "ισογειο",
+    "διαμερισμα",
+    "διαμ",
+    "ημιοροφος",
+    "floor",
+    "fl",
+    "apt",
+    "apartment",
+    "unit",
+    "suite",
+    "flat",
+)
+# Words that only say "number" before the house number ("Ερμού αρ. 12",
+# "Ermou No 12"): dropped from the street, whose number they announce.
+NUMBER_MARKERS = ("αρ", "αριθ", "αριθμος", "νο", "no", "nr")
+
+
+def _folded(word: str) -> str:
+    """*word* compared as the marker and month lists are written: no
+    accents or diaeresis, case-folded, no final dot."""
+    decomposed = unicodedata.normalize("NFD", word)
+    bare = "".join(c for c in decomposed if unicodedata.category(c) != "Mn")
+    return bare.casefold().rstrip(".")
+
+
+# The lists as ``_folded`` compares them (its casefold turns a final "ς"
+# into "σ", so the lists are folded the same way, once).
+_UNIT_MARKERS = frozenset(map(_folded, UNIT_MARKERS))
+_NUMBER_MARKERS = frozenset(map(_folded, NUMBER_MARKERS))
+_MONTHS_GENITIVE = frozenset(map(_folded, MONTHS_GENITIVE))
+
+
+def _normalised_line(line: str) -> str:
+    """*line* in the one form it is split in: NFC (a decomposed accent is
+    one letter, as the database stores it), every Unicode space a plain
+    space and runs of them one, typographic dashes "-", and a range
+    written with spaces one number."""
+    text = unicodedata.normalize("NFC", line).translate(_DASHES)
+    text = "".join(" " if c.isspace() else c for c in text)
+    text = _WHITESPACE_RUN.sub(" ", text).strip()
+    return _SPACED_RANGE.sub(r"\1", text)
 
 
 def normalize_postcode(value: str) -> str:
@@ -79,6 +165,89 @@ def _coded(code: str, message: StrOrPromise) -> ErrorDetail:
     DRF reads ``ErrorDetail.code`` where Django just sees a ``str``.
     """
     return ErrorDetail(str(message), code)
+
+
+def split_street_line(line: str) -> tuple[str, str] | None:
+    """The street and its number from one line whose number follows the
+    street, or ``None`` when it cannot be split without guessing. The one
+    place Django splits a street line: a caller that sends one line
+    instead of a street and a number gets the same two columns the courier
+    voucher reads.
+
+    A wrong number sends the parcel elsewhere, which is worse than asking
+    for the number again (``street_number_missing``), so the rules are
+    explicit:
+
+    1. The line is normalised first (``_normalised_line``).
+    2. It ends in the house number (``_STREET_LINE``); a number written
+       first ("12 Main St") is never read.
+    3. A comma in the street is allowed only directly before the number
+       ("Ερμού, 12"); one anywhere else ("Ερμού 12, όροφος 3",
+       "Εγνατίας 12, 546 22") refuses the line.
+    4. A floor or flat word (``UNIT_MARKERS``) in the street refuses it:
+       the number after it is not the house's ("Ερμού, όροφος 3").
+    5. A word that only says "number" before it (``NUMBER_MARKERS``) is
+       dropped from the street ("Ερμού αρ. 12" -> "Ερμού", "12").
+    6. The street holds no number but the day of a date that names it:
+       a day 1 to 31, with or without a Greek ordinal ending, followed by
+       a month in the genitive (``MONTHS_GENITIVE``): "28 Οκτωβρίου 15",
+       "28η Οκτωβρίου 15", "25ης Μαρτίου 3", "Οδός 1ης Μαΐου 3".
+    7. The street ends in a letter, or in an abbreviation's dot after one
+       ("Main St. 12").
+
+    The street is returned in its normalised form.
+    """
+    match = _STREET_LINE.fullmatch(_normalised_line(line))
+    if match is None:
+        return None
+    street = match["street"].rstrip(" ,")
+    if "," in street:
+        return None
+    words = street.split()
+    folded = [_folded(word) for word in words]
+    if any(word in _UNIT_MARKERS for word in folded):
+        return None
+    while folded and folded[-1] in _NUMBER_MARKERS:
+        words.pop()
+        folded.pop()
+    if not _only_date_numbers(words, folded):
+        return None
+    street = " ".join(words)
+    last = street.rstrip(".")[-1:] if street else ""
+    if not last.isalpha():
+        return None
+    number = match["number"]
+    # ``[^\W\d_]`` also admits a character that is alphanumeric without
+    # being a digit, such as a superscript "²": the suffix must be a letter.
+    if not all(char.isalpha() for char in number if char not in "0123456789-/"):
+        return None
+    return street, number
+
+
+def _only_date_numbers(words: list[str], folded: list[str]) -> bool:
+    """Every word holding a digit is a day followed by a month."""
+    for index, word in enumerate(words):
+        if not any(char.isdigit() for char in word):
+            continue
+        is_day = _DAY.fullmatch(folded[index]) is not None
+        next_is_month = (
+            index + 1 < len(folded) and folded[index + 1] in _MONTHS_GENITIVE
+        )
+        if not (is_day and next_is_month):
+            return False
+    return True
+
+
+def street_number_missing() -> ErrorDetail:
+    """The error of a street line sent without a street number when no
+    number can be split from it (``split_street_line``)."""
+    return _coded(
+        "street_number_missing",
+        _(
+            "Add the street number after the street name, for example "
+            "Ermou 12, or enter it in the street number field."
+        ),
+    )
 
 
 def postcode_error(country: Country) -> StrOrPromise:
@@ -169,6 +338,35 @@ def address_errors(
         ]
 
     return errors
+
+
+def region_errors(
+    country_code: str | None, region_code: str | None
+) -> dict[str, list[StrOrPromise]]:
+    """The error of a ``region_id`` a request body sent, keyed by that
+    field: none sent, or one that exists and belongs to the country, is
+    no error. The request-side check the order and the quote share, so an
+    unknown region is a field error, never a foreign key the database
+    refuses."""
+    from region.models import Region
+
+    if not region_code:
+        return {}
+    region = Region.objects.filter(alpha=region_code).first()
+    if region is None:
+        return {
+            "region_id": [_coded("region_invalid", _("Select a valid region."))]
+        }
+    if country_code and region.country_id != country_code.upper():
+        return {
+            "region_id": [
+                _coded(
+                    "region_country_mismatch",
+                    _("Select a region that belongs to the selected country."),
+                )
+            ]
+        }
+    return {}
 
 
 ADDRESS_FIELDS = ("country", "region", "street", "street_number", "zipcode")

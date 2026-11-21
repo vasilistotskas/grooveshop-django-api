@@ -129,7 +129,8 @@ transaction (a transaction open across the send would be ended by
 `idle_in_transaction_session_timeout`), so a worker that dies takes it along
 and the waiting copy sends instead. Inside a transaction (a task applied
 eagerly) it is the transaction's and ends with it. A send outside a task has a
-fresh id and takes no lock. A wait longer than `statement_timeout` raises
+fresh id and takes no lock. A wait that runs out (`statement_timeout`, or a
+`lock_timeout` a session sets) raises
 `OperationalError`, which the mail tasks retry; a database that cannot be
 reached at all does not stop the send, as for the row below.
 `tests/integration/emails/test_delivery_copies_at_once.py` runs two copies on

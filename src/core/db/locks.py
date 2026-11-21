@@ -26,9 +26,10 @@ def held_across_calls(key: str) -> Generator[None]:
     """Hold an exclusive advisory lock on *key* for the block.
 
     Another holder makes this wait, for at most the connection's
-    ``statement_timeout``: a longer wait raises ``OperationalError``.
-    Advisory locks are per database, which every schema shares, so *key*
-    names what it guards in a way no other store's key can repeat.
+    ``lock_timeout`` or ``statement_timeout``: a longer wait raises
+    ``OperationalError``. Advisory locks are per database, which every
+    schema shares, so *key* names what it guards in a way no other store's
+    key can repeat.
 
     Inside a transaction (a task applied eagerly, or called within one) the
     lock is the transaction's and ends with it, so it is never left on a

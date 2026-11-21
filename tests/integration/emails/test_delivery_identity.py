@@ -13,7 +13,7 @@ from unittest import mock
 import pytest
 from django.core import mail
 from django.db import OperationalError
-from psycopg.errors import QueryCanceled
+from psycopg.errors import LockNotAvailable, QueryCanceled
 
 from core import celery_app
 from emails.models import EmailLog
@@ -155,14 +155,15 @@ class TestTheDeliveryLock:
         assert len(mail.outbox) == 1
         assert "sent without its lock" in caplog.text
 
+    @pytest.mark.parametrize("cause", [QueryCanceled, LockNotAvailable])
     def test_a_wait_that_runs_out_is_raised_for_the_retry(
-        self, catalogue, retrying_task
+        self, catalogue, retrying_task, cause
     ):
-        """``statement_timeout`` ended the wait: the copy ahead is still
-        sending, so this one must not send too."""
+        """``statement_timeout`` or ``lock_timeout`` ended the wait: the copy
+        ahead is still sending, so this one must not send too."""
         catalogue(probe())
-        waited_out = OperationalError("canceling statement due to timeout")
-        waited_out.__cause__ = QueryCanceled()
+        waited_out = OperationalError("the wait for the lock ran out")
+        waited_out.__cause__ = cause()
         held = mock.MagicMock(in_atomic_block=False)
         held.cursor.return_value.__enter__.return_value.execute.side_effect = (
             waited_out

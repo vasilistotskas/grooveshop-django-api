@@ -4,15 +4,11 @@ The message a publish wrote before it failed and the sweep's copy of that
 publish are delivered together once the broker takes messages again, so two
 workers can run the same task, with the same id, at the same moment. Each
 copy runs here on its own thread and database connection, as two workers
-would, and the transport holds the first copy mid-send.
+would (``tests.utils.concurrency``), and the transport holds the first copy
+mid-send.
 """
 
 from __future__ import annotations
-
-import threading
-import time
-from collections.abc import Callable
-from unittest import mock
 
 import pytest
 from django.core import mail
@@ -22,7 +18,8 @@ from core import celery_app
 from emails.models import EmailLog
 from emails.send import Status, send_email
 from emails.types import Audience, Owner
-from tests.utils.emails import probe, probe_object
+from tests.utils.concurrency import in_thread, wait_for_a_blocked_backend
+from tests.utils.emails import HeldTransport, probe, probe_object
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -49,84 +46,28 @@ def _outbox():
     mail.outbox.clear()
 
 
-class HeldTransport:
-    """The SMTP send, held at its start until ``release`` is set."""
-
-    def __init__(self) -> None:
-        self.calls: list[int] = []
-        self.sending = threading.Event()
-        self.release = threading.Event()
-        self.real = mail.EmailMultiAlternatives.send
-
-    def patched(self):
-        """The send as the class attribute it replaces: a function, which
-        the message binds to as ``self``."""
-
-        def send(message, *args, **kwargs):
-            return self.send(message, *args, **kwargs)
-
-        return mock.patch("emails.transport.EmailMultiAlternatives.send", send)
-
-    def send(self, message, *args, **kwargs):
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_backend_pid()")
-            (pid,) = cursor.fetchone()
-        self.calls.append(pid)
-        self.sending.set()
-        assert self.release.wait(WAIT)
-        return self.real(message, *args, **kwargs)
-
-
-def run_copy(task, errors: list[BaseException]) -> threading.Thread:
-    def run() -> None:
-        try:
-            task.apply(task_id=DISPATCH, throw=True)
-        except BaseException as error:
-            errors.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=run)
-    thread.start()
-    return thread
-
-
-def waiting_for_a_lock() -> int:
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
-            "AND NOT granted AND database = "
-            "(SELECT oid FROM pg_database WHERE datname = current_database())"
-        )
-        (waiting,) = cursor.fetchone()
-    return waiting
-
-
-def eventually(condition: Callable[[], bool]) -> None:
-    deadline = time.monotonic() + WAIT
-    while not condition():
-        assert time.monotonic() < deadline, "the condition never held"
-        time.sleep(0.05)
+def copy_of(task, failures: list[BaseException]):
+    return in_thread(lambda: task.apply(task_id=DISPATCH, throw=True), failures)
 
 
 def test_a_copy_that_starts_while_another_sends_waits_and_sends_nothing(
     sending_task,
 ):
-    transport = HeldTransport()
-    errors: list[BaseException] = []
+    transport = HeldTransport(WAIT)
+    failures: list[BaseException] = []
 
     with transport.patched():
-        first = run_copy(sending_task, errors)
+        first = copy_of(sending_task, failures)
         assert transport.sending.wait(WAIT)
-        second = run_copy(sending_task, errors)
-        eventually(lambda: waiting_for_a_lock() == 1)
+        second = copy_of(sending_task, failures)
+        wait_for_a_blocked_backend(WAIT)
         assert len(transport.calls) == 1
 
         transport.release.set()
-        first.join(WAIT)
-        second.join(WAIT)
+        first.finish(WAIT)
+        second.finish(WAIT)
 
-    assert not errors, errors
+    assert not failures, failures
     assert len(transport.calls) == 1
     assert len(mail.outbox) == 1
     [row] = EmailLog.objects.all()
@@ -136,24 +77,23 @@ def test_a_copy_that_starts_while_another_sends_waits_and_sends_nothing(
 def test_a_copy_waiting_on_a_worker_that_died_sends_it(sending_task):
     """The lock is the session's, so it ends with the worker that held it,
     and the copy that waited sends what the dead one may never have."""
-    transport = HeldTransport()
-    errors: list[BaseException] = []
+    transport = HeldTransport(WAIT)
+    failures: list[BaseException] = []
 
     with transport.patched():
-        first = run_copy(sending_task, errors)
+        first = copy_of(sending_task, failures)
         assert transport.sending.wait(WAIT)
-        second = run_copy(sending_task, errors)
-        eventually(lambda: waiting_for_a_lock() == 1)
+        second = copy_of(sending_task, failures)
+        wait_for_a_blocked_backend(WAIT)
 
         [dead] = transport.calls
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_terminate_backend(%s)", [dead])
-        eventually(lambda: len(transport.calls) == 2)
-
         transport.release.set()
-        first.join(WAIT)
-        second.join(WAIT)
+        first.finish(WAIT)
+        second.finish(WAIT)
 
-    assert not errors, errors
+    assert not failures, failures
+    assert len(transport.calls) == 2
     [row] = EmailLog.objects.all()
     assert row.status == Status.SENT

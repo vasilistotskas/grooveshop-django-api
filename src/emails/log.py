@@ -18,7 +18,7 @@ from typing import Any
 import requests
 from django.db import Error, transaction
 from django.utils import timezone
-from psycopg.errors import QueryCanceled
+from psycopg.errors import LockNotAvailable, QueryCanceled
 
 from core.db.locks import held_across_calls
 from emails import optout
@@ -159,8 +159,9 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
     is fresh and takes no lock. A worker that dies takes its session and the
     lock with it, and the copy that waits sends.
 
-    A wait longer than ``statement_timeout`` raises ``OperationalError``,
-    which every mail task retries: the copy ahead is still sending. A
+    A wait that runs out (``statement_timeout``, or ``lock_timeout`` where a
+    session sets one) raises ``OperationalError``, which every mail task
+    retries: the copy ahead is still sending. A
     database that cannot be reached does not stop the send, as it does not
     for the row (``_write``): an alert about that database must go out.
     """
@@ -172,7 +173,7 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
         try:
             held.enter_context(held_across_calls(key))
         except Error as error:
-            if isinstance(error.__cause__, QueryCanceled):
+            if isinstance(error.__cause__, QueryCanceled | LockNotAvailable):
                 raise
             logger.exception(
                 "Email delivery %s is sent without its lock",

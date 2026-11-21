@@ -10,12 +10,15 @@ the probe templates (``tests/templates/emails_test/``) loadable.
 from __future__ import annotations
 
 import copy
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from django.core import mail
+from django.db import connection
 
 from emails.gates import CarrierGate, FeatureGate, ScheduleGate, StoreSwitchGate
 from emails.recipients import Recipient
@@ -109,3 +112,37 @@ def open_email_gates():
         patch.object(ScheduleGate, "is_open", return_value=True),
     ):
         yield
+
+
+class HeldTransport:
+    """The SMTP send, held at its start until ``release`` is set, for tests
+    that run two sends on two connections (``tests.utils.concurrency``).
+
+    ``calls`` holds the backend pid of each send's session, so a test can
+    end the session of a send that is held, as a worker that dies would.
+    """
+
+    def __init__(self, wait: float) -> None:
+        self.calls: list[int] = []
+        self.sending = threading.Event()
+        self.release = threading.Event()
+        self.wait = wait
+        self.real = mail.EmailMultiAlternatives.send
+
+    def patched(self):
+        """The send as the class attribute it replaces: a function, which
+        the message binds to as ``self``."""
+
+        def send(message, *args, **kwargs):
+            return self.send(message, *args, **kwargs)
+
+        return patch("emails.transport.EmailMultiAlternatives.send", send)
+
+    def send(self, message, *args, **kwargs):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_backend_pid()")
+            (pid,) = cursor.fetchone()
+        self.calls.append(pid)
+        self.sending.set()
+        assert self.release.wait(self.wait)
+        return self.real(message, *args, **kwargs)

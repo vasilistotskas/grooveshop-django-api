@@ -98,6 +98,13 @@ class BoxNowCarrier(ShippingCarrierInterface):
             {"boxnow_locker_id": shipment.locker_external_id}
         )
 
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """The daily ``sync_boxnow_lockers`` run, now: BOX NOW lists its
+        destinations whole, with no lookup of one by id."""
+        from shipping_boxnow.services import BoxNowService
+
+        BoxNowService.sync_lockers()
+
     def address_of_pickup_point(
         self, location: Mapping[str, str]
     ) -> PostalAddress:

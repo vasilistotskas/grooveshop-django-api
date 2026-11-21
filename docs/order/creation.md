@@ -508,10 +508,18 @@ address it cannot place (prod order #316: street "1", street number
   address, its number split from the street line by `split_street_line`
   where it splits. That one snapshot is what the receipt, the ACS voucher
   and the order page read. Name, email and phone stay required; the
-  region rule does not apply. A point the catalogue does not hold is a 400
-  `pickup_point_unknown` on the carrier's location field (`boxnowLockerId`,
-  `acsStationExternalId`), no point at all `pickup_point_required`: no
-  address could be stored for it. An invoice to a pickup point names the
+  region rule does not apply. A point the catalogue does not hold yet (BOX
+  NOW's widget is live data, the catalogue syncs daily at 02:00) is looked
+  for once more: `ShippingService.pickup_point_address` resyncs that
+  carrier's catalogue through its scheduled sync's own path
+  (`refresh_pickup_points`: `sync_lockers`, `sync_stations` for the order's
+  country), before any transaction or lock. At most one resync per store and
+  carrier runs in `PICKUP_POINT_RESYNC_GUARD_SECONDS` (600 s); inside it a
+  miss is refused at once. A point the resync does not hold either, or a
+  resync that fails (logged), is a 400 `pickup_point_unknown` on the
+  carrier's location field (`boxnowLockerId`, `acsStationExternalId`); no
+  point at all is `pickup_point_required`. The buyer's address is never
+  used instead. An invoice to a pickup point names the
   company's address (`billingStreet`), since "same as delivery" would copy
   the point's. A retail receipt needs no buyer address (Law 4308/2014 art.
   12 par. 2; the former EUR 50 rule was deleted by Law 5222/2025 art. 238

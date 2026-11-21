@@ -185,6 +185,14 @@ class ShippingCarrierInterface(ABC):
         """
         raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
 
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """Fetch the carrier's catalogue of pickup points again, now,
+        through the path its scheduled sync takes, for checkout to find
+        a point the last sync did not hold (``ShippingService.
+        pickup_point_address``). A carrier with no pickup points has none
+        to fetch."""
+        return
+
     @abstractmethod
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

@@ -28,6 +28,7 @@ from shipping.exceptions import (
     ShippingWeightExceededError,
 )
 from shipping.interfaces import (
+    PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     get_provider,
@@ -40,6 +41,15 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+# How long after one checkout resynced a carrier's catalogue for an
+# unknown pickup point another miss refuses at once instead of syncing
+# again: a full catalogue fetch takes seconds, so a bad or malicious id
+# must not be able to start one per request. Per store and carrier (the
+# cache key is tenant-scoped). Ten minutes: a point BOX NOW's widget
+# shows after the 02:00 sync is found by the first resync, and the next
+# chance comes soon enough for a real point added in between.
+PICKUP_POINT_RESYNC_GUARD_SECONDS = 600
 
 
 # Defensive cap on free-text notes that ride along to the courier
@@ -89,6 +99,56 @@ class ShippingService:
     # ------------------------------------------------------------------
     # Lookup
     # ------------------------------------------------------------------
+
+    @classmethod
+    def pickup_point_address(
+        cls,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names, from the
+        carrier's catalogue, resyncing it once when the point is missing.
+
+        The storefront picks a BOX NOW locker in BOX NOW's own widget
+        (live data) while the catalogue syncs daily, so a new locker can
+        be missing for up to a day; an ACS station can be missing through
+        the gateway or a stale cache. On a miss the catalogue is fetched
+        again through the scheduled sync's own path
+        (``refresh_pickup_points``), before any transaction or lock, and
+        read once more. At most one resync per store and carrier runs in
+        ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
+        at once. A resync that fails (the carrier is down) is logged and
+        refused. Raises ``PickupPointUnknown``; never answers with any
+        other address.
+        """
+        from django.core.cache import cache
+
+        carrier = get_provider(provider_code)
+        try:
+            return carrier.address_of_pickup_point(location)
+        except PickupPointUnknown:
+            pass
+        guard = f"shipping:pickup-point-resync:{provider_code}"
+        if not cache.add(guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS):
+            raise PickupPointUnknown(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue was resynced in the last "
+                f"{PICKUP_POINT_RESYNC_GUARD_SECONDS} s"
+            )
+        try:
+            carrier.refresh_pickup_points(country_code=country_code)
+        except Exception as e:
+            logger.exception(
+                "Resync of the %s catalogue for pickup point %s failed",
+                provider_code,
+                dict(location),
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue could not be resynced"
+            ) from e
+        return carrier.address_of_pickup_point(location)
 
     @classmethod
     def adapter_for(cls, provider_code: str):

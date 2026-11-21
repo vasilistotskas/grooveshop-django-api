@@ -11,7 +11,8 @@ order page read. Name, email and phone stay required.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+import logging
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
@@ -23,8 +24,10 @@ from pay_way.factories import PayWayFactory
 from region.factories import RegionFactory
 from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsStationFactory
+from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import _checkout
+from tests.utils.redis import private_cache
 from tests.utils.shipping import enable_rate
 
 pytestmark = [
@@ -262,3 +265,145 @@ def test_an_invoice_to_a_locker_names_the_company_address(locker_checkout):
 
         assert not serializer.is_valid()
     assert "billing_street" in serializer.errors
+
+
+def _destination(external_id: str, country: str) -> dict:
+    """A destination as BOX NOW's ``/api/v1/destinations`` lists it."""
+    return {
+        "id": external_id,
+        "locationType": "apm",
+        "name": f"Locker {external_id}",
+        "title": external_id,
+        "lat": "37.9750",
+        "lng": "23.7350",
+        "addressLine1": "Ermou 40",
+        "addressLine2": "Athens",
+        "postalCode": "105 63",
+        "country": country,
+    }
+
+
+@pytest.fixture
+def resync(locker_checkout):
+    """BOX NOW's client mocked at its boundary, and a cache of the test's
+    own for the resync guard."""
+    client = MagicMock()
+    client.return_value.partner_id = "1"
+    client.return_value.list_destinations.return_value = [
+        _destination("4", locker_checkout.country.alpha_2)
+    ]
+    with (
+        patch("shipping_boxnow.services.BoxNowClient", client),
+        patch("django.core.cache.cache", private_cache()),
+    ):
+        yield client.return_value.list_destinations
+
+
+class TestALockerTheCatalogueDoesNotHoldYet:
+    """A locker BOX NOW's widget shows before the daily sync holds it."""
+
+    def test_is_found_by_a_resync_and_ordered_at_its_address(
+        self, locker_checkout, resync
+    ):
+        resync.return_value.append(
+            _destination("77", locker_checkout.country.alpha_2)
+        )
+
+        response = _post_locker_order(locker_checkout, boxnow_locker_id="77")
+
+        assert response.status_code == 201, response.content
+        resync.assert_called_once()
+        order = Order.objects.get()
+        assert (order.street, order.street_number, order.city) == (
+            "Ermou",
+            "40",
+            "Athens",
+        )
+
+    def test_is_refused_when_the_resync_does_not_hold_it_either(
+        self, locker_checkout, resync
+    ):
+        response = _post_locker_order(locker_checkout, boxnow_locker_id="77")
+
+        assert response.status_code == 400, response.content
+        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        resync.assert_called_once()
+        assert not Order.objects.exists()
+
+    def test_a_second_miss_inside_the_guard_syncs_nothing(
+        self, locker_checkout, resync
+    ):
+        first = _post_locker_order(locker_checkout, boxnow_locker_id="77")
+        second = _post_locker_order(locker_checkout, boxnow_locker_id="78")
+
+        assert first.status_code == second.status_code == 400
+        resync.assert_called_once()
+
+    def test_a_carrier_that_fails_the_resync_is_refused_and_logged(
+        self, locker_checkout, resync, caplog
+    ):
+        resync.side_effect = BoxNowAPIError(503, message="down")
+
+        with caplog.at_level(logging.ERROR, logger="shipping.services"):
+            response = _post_locker_order(
+                locker_checkout, boxnow_locker_id="77"
+            )
+
+        assert response.status_code == 400, response.content
+        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        assert "Resync of the boxnow catalogue" in caplog.text
+        assert not Order.objects.exists()
+
+    def test_a_known_locker_asks_the_carrier_nothing(
+        self, locker_checkout, resync
+    ):
+        response = _post_locker_order(locker_checkout)
+
+        assert response.status_code == 201, response.content
+        resync.assert_not_called()
+
+
+class TestAStationTheCatalogueDoesNotHoldYet:
+    def test_is_found_by_a_resync_of_its_country(self):
+        ShippingProvider.objects.filter(code="acs").update(is_active=True)
+        country = _checkout().country
+        client = MagicMock()
+        # ``Acs_Stations`` rows as ACS lists them, for every kind asked.
+        client.return_value.stations.return_value = [
+            {
+                "ACS_SHOP_STATION_ID_EN": "ATH77",
+                "ACS_SHOP_BRANCH_ID": "3",
+                "ACS_SHOP_STATION_DESCR": "Smartpoint Ιπποκράτους",
+                "ACS_SHOP_ADDRESS": "Ιπποκράτους 33",
+                "ACS_SHOP_AREA_DESCR": "Αθήνα",
+                "ACS_SHOP_ZIPCODE": "10680",
+            }
+        ]
+        with (
+            patch("shipping_acs.services.AcsClient", client),
+            patch("django.core.cache.cache", private_cache()),
+        ):
+            serializer = _serializer(
+                country=country,
+                shipping_kind="pickup_point",
+                shipping_provider_code="acs",
+                acs_station_external_id="ATH77",
+                acs_station_branch="3",
+            )
+
+            assert serializer.is_valid(), serializer.errors
+        client.return_value.stations.assert_called()
+        assert {
+            call.kwargs["country"]
+            for call in client.return_value.stations.call_args_list
+        } == {country.alpha_2}
+        data = serializer.validated_data
+        assert (data["street"], data["street_number"], data["city"]) == (
+            "Ιπποκράτους",
+            "33",
+            "Αθήνα",
+        )

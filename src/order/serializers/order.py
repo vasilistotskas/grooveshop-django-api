@@ -46,6 +46,7 @@ from shipping.interfaces import (
     get_provider,
     is_registered,
 )
+from shipping.services import ShippingService
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
@@ -1723,8 +1724,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         page read; the buyer's own address is not needed to deliver to a
         locker or a station, so it is not kept either. The point is the
         chosen carrier's own ``location_keys`` (``ShippingChoice.of``),
-        its address the carrier's catalogue now: a point the catalogue
-        does not hold is refused, as no address could be stored for it.
+        its address the carrier's catalogue now, resynced once when it
+        misses (``ShippingService.pickup_point_address``): a point neither
+        holds is refused, as no address could be stored for it.
         """
         code = attrs["shipping_provider_code"]
         if not is_registered(code):
@@ -1750,7 +1752,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
                 code="pickup_point_required",
             )
         try:
-            address = carrier.address_of_pickup_point(location)
+            address = ShippingService.pickup_point_address(
+                code, location, country_code=attrs["country_id"]
+            )
         except PickupPointUnknown:
             raise serializers.ValidationError(
                 {

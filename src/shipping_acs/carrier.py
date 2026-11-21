@@ -103,6 +103,13 @@ class AcsCarrier(ShippingCarrierInterface):
             }
         )
 
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """``sync_acs_stations`` for the order's country, now: ACS lists
+        its stations per country and kind, with no lookup of one by id."""
+        from shipping_acs.services import AcsService
+
+        AcsService.sync_stations(country=country_code)
+
     def address_of_pickup_point(
         self, location: Mapping[str, str]
     ) -> PostalAddress:

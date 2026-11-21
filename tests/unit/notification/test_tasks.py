@@ -166,7 +166,7 @@ def test_a_send_that_answers_reaches_the_user_group(row):
 
 @pytest.mark.django_db
 @pytest.mark.timeout(30)
-def test_a_second_copy_of_the_push_pushes_nothing(row):
+def test_a_second_copy_of_the_push_pushes_nothing(row, caplog):
     """The storefront toasts every frame: a retry, a message delivered
     again or the sweep's copy of a publish must not push the row twice."""
     layer = CountingLayer()
@@ -179,10 +179,14 @@ def test_a_second_copy_of_the_push_pushes_nothing(row):
     assert layer.group_sends == 1
     row.refresh_from_db()
     assert row.pushed_at is not None
+    assert "already pushed" in caplog.text
+    assert "is gone" not in caplog.text
 
 
 @pytest.mark.django_db
-def test_a_row_that_is_gone_is_not_pushed(row):
+def test_a_row_that_is_gone_is_not_pushed_and_says_so(row, caplog):
+    """Not logged as a copy: a row missing from the schema the task looks
+    in can be a routing bug."""
     layer = CountingLayer()
     data = push_of(row)
     row.delete()
@@ -191,6 +195,9 @@ def test_a_row_that_is_gone_is_not_pushed(row):
         send_notification_task.apply(args=[data])
 
     assert layer.group_sends == 0
+    [record] = [r for r in caplog.records if "is gone" in r.getMessage()]
+    assert record.levelname == "WARNING"
+    assert "already pushed" not in caplog.text
 
 
 def test_the_task_has_its_own_time_limits():

@@ -11,8 +11,6 @@ delivery.
 
 from __future__ import annotations
 
-import json
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import IntegrityError, transaction
@@ -53,6 +51,7 @@ def create_user_notification(
     priority: str = NotificationPriorityEnum.NORMAL,
     notification_type: str = "",
     link: str = "",
+    distinct_by: object = None,
 ) -> NotificationUser | None:
     """Create a notification for a single user with multi-locale content.
 
@@ -79,28 +78,28 @@ def create_user_notification(
     this is the one write path every task goes through.
 
     Inside a task the notification is written once per dispatch: its
-    ``dispatch_key`` is made of the task id, the user and everything the
-    notification says (``tenant.celery.dispatch_key``), and is unique, so
-    one task can still write two different notifications to one user (two
-    likes of a comment). Another copy of the task (a retry, a message
-    delivered again, the sweep's copy of a publish) gets back the row the
-    first one wrote, and the live push that follows a new row is not
-    queued again. A copy that runs at the same moment waits on the unique
-    index for the first to commit.
+    ``dispatch_key`` is made of the task id, the user, the
+    ``notification_type``, the ``link`` and ``distinct_by``
+    (``tenant.celery.dispatch_key``), and is unique. That is what the
+    notification is about, not its words, so a copy that renders it
+    differently (a product renamed, a catalogue changed between the copies)
+    is still the same notification. Another copy of the task (a retry, a
+    message delivered again, the sweep's copy of a publish) gets back the
+    row the first one wrote, or ``None`` when the user has removed it since,
+    and the live push that follows a new row is not queued again. A copy
+    that runs at the same moment waits on the unique index for the first to
+    commit.
+
+    ``distinct_by`` tells apart the notifications one task writes to one
+    user with the same type and link (the liker of a comment): without it
+    the second of them is taken for a copy of the first and not written.
     """
     if refuses_customer(user):
         return None
     if link:
         validate_storefront_path(link)
     key = dispatch_key(
-        _DISPATCH_NAMESPACE,
-        user.pk,
-        kind,
-        category,
-        priority,
-        notification_type,
-        link,
-        json.dumps(translations, sort_keys=True, ensure_ascii=False),
+        _DISPATCH_NAMESPACE, user.pk, notification_type, link, distinct_by
     )
     try:
         with transaction.atomic():
@@ -115,9 +114,9 @@ def create_user_notification(
     except IntegrityError:
         if key is None:
             raise
-        return NotificationUser.objects.get(
+        return NotificationUser.objects.filter(
             user=user, notification__dispatch_key=key
-        )
+        ).first()
 
     supported = supported_notification_languages()
     # Fallback chain used when a locale has no entry in the caller's

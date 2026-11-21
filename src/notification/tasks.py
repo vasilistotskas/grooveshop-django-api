@@ -52,10 +52,17 @@ def send_notification_task(self, data: dict, *args, **kwargs):
         pk=row_id, pushed_at__isnull=True
     )
     if not unpushed.update(pushed_at=timezone.now()):
-        logger.info(
-            "send_notification_task: notification %s was already pushed",
-            row_id,
-        )
+        if NotificationUser.objects.filter(pk=row_id).exists():
+            logger.info(
+                "send_notification_task: notification %s was already pushed",
+                row_id,
+            )
+        else:
+            # Removed by its user since, or looked for in the wrong store's
+            # schema: the second would be a routing bug.
+            logger.warning(
+                "send_notification_task: notification %s is gone", row_id
+            )
         return
 
     # The group is named after the schema active on this worker

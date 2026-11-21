@@ -240,10 +240,13 @@ IS sent for guests since it goes to `order.email`).
 **Once per dispatch.** Each of these tasks can run more than once (a retry, a
 message delivered again, the sweep's copy of a publish, see
 `docs/deferred-dispatch.md`). `create_user_notification` writes the
-notification with a `dispatch_key` made of the task id, the user and
-everything the notification says, unique among `Notification` rows, so a
-second copy gets the first copy's row back and writes nothing; one task can
-still write two different notifications to one user. The push that a new row
+notification with a `dispatch_key` made of the task id, the user, the type,
+the link and `distinct_by`, unique among `Notification` rows, so a second
+copy gets the first copy's row back (or nothing, when the user has removed
+it since) and writes nothing, even when it words the notification
+differently. One task can write several notifications of one type and link
+to one user when the caller tells them apart with `distinct_by` (the liker
+of a comment, `blog.tasks.notify_comment_liked_task`). The push that a new row
 queues (`notification.tasks.send_notification_task`) claims the row first
 (`NotificationUser.pushed_at`, a compare-and-set) and gives the claim back
 when the push fails, so the storefront gets one toast per row. A worker that

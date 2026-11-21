@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-# The default backend is core.caches.CustomCache (see CACHES) —
+# The default backend is core.cache_backend.CustomCache (see CACHES) —
 # the proxy delegates its raw-key helpers (keys/delete_raw_keys/
 # clear_by_prefixes) to it.
 from django.core.cache import cache as cache_instance

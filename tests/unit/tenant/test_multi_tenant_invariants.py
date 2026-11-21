@@ -180,7 +180,7 @@ class TestEmailHelperCallSites:
         "src/b2b/tasks.py",
         "src/contact/tasks.py",
         "src/user/tasks.py",
-        "src/user/utils/subscription.py",
+        "src/user/services/subscription_mail.py",
     )
 
     def test_outbound_email_paths_use_tenant_helpers(self) -> None:

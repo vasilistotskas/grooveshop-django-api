@@ -42,7 +42,7 @@ from core.api.permissions import (
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
-from core.caches import REDIS_UNAVAILABLE
+from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (

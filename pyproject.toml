@@ -1,5 +1,5 @@
 [project]
-version = "3.262.1"
+version = "3.262.2"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -521,6 +521,7 @@ include = [
     "src/core/fields/**",
     "src/core/forms/**",
     "src/core/filters/**",
+    "src/core/measurement.py",
     "src/core/utils/**",
     "src/asgi/**",
     "src/admin/**",

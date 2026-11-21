@@ -96,7 +96,7 @@ def send_subscription_confirmation_email_task(
     and guest (newsletter form) rows alike.
     """
     from user.models.subscription import UserSubscription
-    from user.utils.subscription import send_subscription_confirmation
+    from user.services.subscription_mail import send_subscription_confirmation
 
     try:
         subscription = UserSubscription.objects.select_related(
@@ -233,7 +233,7 @@ def send_newsletter_already_subscribed_email_task(
     starts over with a fresh confirmation link.
     """
     from user.models.subscription import UserSubscription
-    from user.utils.subscription import send_already_subscribed_notice
+    from user.services.subscription_mail import send_already_subscribed_notice
 
     try:
         subscription = UserSubscription.objects.select_related(

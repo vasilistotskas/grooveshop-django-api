@@ -28,9 +28,10 @@ from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
+from region.factories import RegionFactory
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import (
@@ -39,6 +40,7 @@ from tests.integration.order.test_checkout_quote import (
     _address,
     _checkout,
     _choices,
+    _money,
     _post_intent,
     _post_order,
     _product,
@@ -363,6 +365,43 @@ class TestThePickupPoint:
         assert elsewhere.json()["code"] == CART_CHANGED_CODE
         assert quoted.status_code == 201, quoted.content
 
+    def test_a_region_sent_with_a_pickup_order_does_not_change_it(
+        self, locker_checkout
+    ):
+        """A pickup order keeps no region (``_deliver_to_pickup_point``),
+        so neither the quote nor the digest reads one: a client that sends
+        the buyer's region (an island one, the region a home delivery could
+        be priced by) pays what the same order without it pays."""
+        checkout = locker_checkout
+        region = RegionFactory(country=checkout.country, alpha="ION")
+        with_region = {
+            **checkout.choices,
+            "boxnow_locker_id": "4",
+            "region_id": region.alpha,
+        }
+        quote = _quote(checkout, **with_region)
+        bare = _quote(
+            checkout,
+            **{k: v for k, v in with_region.items() if k != "region_id"},
+        )
+
+        response = _post_order(
+            checkout,
+            shipping_kind="pickup_point",
+            shipping_provider_code="boxnow",
+            boxnow_locker_id="4",
+            region_id=region.alpha,
+            **_guards(quote),
+        )
+
+        assert quote["expectedTotal"] == bare["expectedTotal"]
+        assert quote["shipping"]["price"] == bare["shipping"]["price"]
+        assert quote["cartDigest"] == bare["cartDigest"]
+        assert response.status_code == 201, response.content
+        order = Order.objects.get()
+        assert order.region_id is None
+        assert order.shipping_price.amount == _money(bare["shipping"]["price"])
+
 
 class TestTheShippingChoice:
     def test_a_carrier_reads_its_own_pickup_point(self):
@@ -505,6 +544,7 @@ NOT_PRICED = {
     "floor",
     "location_type",
     "customer_notes",
+    "address_line_2",
     # The receipt or invoice the order is documented with.
     "document_type",
     "billing_vat_id",

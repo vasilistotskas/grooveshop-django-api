@@ -2,8 +2,8 @@ import logging
 
 from builder import preview_links, scheduling
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_DB_ERRORS, TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 

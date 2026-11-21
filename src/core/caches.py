@@ -30,8 +30,8 @@ BURST_INTERVAL_SECONDS = 60.0
 
 #: Namespace for a key whose reads and writes must NEVER fail open. Code
 #: that needs "Redis down means stop" rather than "Redis down means
-#: miss" puts its keys under it (``core.api.throttling`` does, for every
-#: throttle it defines).
+#: miss" puts its keys under it (``core.api.throttling.ResilientThrottleMixin``
+#: does, for every throttle built on it).
 STRICT_NAMESPACE = "strict:"
 
 #: Every key the fail-open layer must leave raising. A miss on these is
@@ -66,7 +66,7 @@ STRICT_NAMESPACE = "strict:"
 #: **Every security control fails closed, and says so.** A control is a
 #: key whose loss lifts a bound or a guarantee: allauth's limits, TOTP
 #: replay protection and IdP codes, ``core.middleware.allauth_ratelimit``,
-#: the security scopes of ``core.api.throttling`` (``fail_closed = True``),
+#: the security scopes of the throttles (``fail_closed = True``),
 #: the single-use tickets, the staff sign-in counters
 #: (``tenant.staff_login_limits``, ``admin.staff_mfa``) and the staff
 #: password-reset budget (``admin.password_reset``). One rule for all:
@@ -295,7 +295,7 @@ class CustomCache(RedisCache):
     # (``rest_framework/throttling.py``), so a throttle on its default
     # key ALLOWS every request during an outage. That is right for the
     # general ``anon``/``user`` budgets and wrong for the security
-    # scopes, which is why every throttle in ``core.api.throttling``
+    # scopes, which is why every throttle built on ``core.api.throttling``
     # keys under ``strict:`` and decides per class whether an outage
     # denies or allows (``ResilientThrottleMixin.fail_closed``).
     #

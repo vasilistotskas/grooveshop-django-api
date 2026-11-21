@@ -112,7 +112,12 @@ def create_user_notification(
                 dispatch_key=key,
             )
     except IntegrityError:
-        if key is None:
+        # A copy of this dispatch only when a row holds its key; any other
+        # violation is the real failure and is raised as it is.
+        if (
+            key is None
+            or not Notification.objects.filter(dispatch_key=key).exists()
+        ):
             raise
         return NotificationUser.objects.filter(
             user=user, notification__dispatch_key=key

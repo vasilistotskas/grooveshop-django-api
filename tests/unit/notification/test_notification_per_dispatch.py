@@ -13,6 +13,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from django.db import IntegrityError
 
 from core import celery_app
 from notification.enum import NotificationTypeEnum
@@ -130,3 +131,18 @@ def test_outside_a_task_every_call_writes_a_notification():
 
     assert NotificationUser.objects.filter(user=user).count() == 2
     assert not Notification.objects.filter(dispatch_key__isnull=False).exists()
+
+
+def test_another_integrity_error_is_raised_as_it_is():
+    """Only a row holding the key makes a failed insert a copy: any other
+    violation is the real failure, never a missing row or a silent None."""
+    user = UserAccountFactory()
+
+    with (
+        patch(
+            "notification.services.Notification.objects.create",
+            side_effect=IntegrityError("another constraint"),
+        ),
+        pytest.raises(IntegrityError, match="another constraint"),
+    ):
+        run(user, ONE, "one-dispatch")

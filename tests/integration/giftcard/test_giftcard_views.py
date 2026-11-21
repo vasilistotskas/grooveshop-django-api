@@ -130,7 +130,11 @@ class TestCheck:
 
     # Its 400 body is documented as the view's own only, not the validation error it is (#684).
     @pytest.mark.known_schema_drift(
-        "POST", "/api/v1/giftcard/check", 400, issue=684
+        "POST",
+        "/api/v1/giftcard/check",
+        400,
+        at=("$.code", "$.detail", "$.reason"),
+        issue=684,
     )
     def test_missing_code_is_a_field_error(self):
         with _gift_cards():
@@ -264,7 +268,11 @@ class TestPurchaseRefusals:
 
     # Its 400 body is documented as the view's own only, not the validation error it is (#684).
     @pytest.mark.known_schema_drift(
-        "POST", "/api/v1/giftcard/purchase", 400, issue=684
+        "POST",
+        "/api/v1/giftcard/purchase",
+        400,
+        at=("$.detail", "$.reason"),
+        issue=684,
     )
     def test_unregistered_payment_provider_is_a_field_error(self):
         with _gift_cards():
@@ -282,7 +290,11 @@ class TestPurchaseRefusals:
 
     # Its 400 body is documented as the view's own only, not the validation error it is (#684).
     @pytest.mark.known_schema_drift(
-        "POST", "/api/v1/giftcard/purchase", 400, issue=684
+        "POST",
+        "/api/v1/giftcard/purchase",
+        400,
+        at=("$.detail", "$.reason"),
+        issue=684,
     )
     def test_missing_recipient_email_is_a_field_error(self):
         body = _purchase_body(buyer_email="b@example.com")
@@ -506,7 +518,11 @@ class TestMine:
     # An admin-issued card has no recipient (``""``), which the read-only
     # ``recipientEmail`` declares as an email (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/giftcard/mine", 200, issue=684
+        "GET",
+        "/api/v1/giftcard/mine",
+        200,
+        at="$.results[*].recipientEmail",
+        issue=684,
     )
     def test_lists_only_my_cards_newest_first(self):
         user = UserAccountFactory()
@@ -538,7 +554,7 @@ class TestMine:
     # The bare array is not what the operation documents (its paginated
     # envelope): the whole list moves to a route of its own (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/giftcard/mine", 200, issue=684
+        "GET", "/api/v1/giftcard/mine", 200, at="$", issue=684
     )
     def test_pagination_false_returns_every_card_as_a_list(self):
         """The account summary reads every card in one request

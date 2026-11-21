@@ -23,9 +23,12 @@ document ``manage.py spectacular`` writes (``tests.utils.openapi``):
   counts; ``-v`` lists them by operation, so the gap stays visible.
   Under ``STRICT_PREFIXES`` an undocumented status fails as well.
 - **A known drift**: ``@pytest.mark.known_schema_drift(method, path,
-  status, issue=N)`` on a test lets a body of that operation and status
-  fail, while its issue is open. A test so marked that receives no such
-  failing body fails: the drift is gone, take the marker off.
+  status, at=..., issue=N)`` on a test lets a body of that operation and
+  status fail at the places ``at`` names (``"$.results[*].description"``;
+  a missing property is named by its own path, ``"$.reason"``), while its
+  issue is open. A failure anywhere else still fails. A test so marked
+  that passes without receiving such a failing body fails: the drift is
+  gone, take the marker off.
 """
 
 from __future__ import annotations
@@ -74,6 +77,15 @@ class Tally:
         }
 
 
+@dataclass(frozen=True)
+class Drift:
+    """One ``known_schema_drift`` marker: where a body may fail, and the
+    issue that fixes it."""
+
+    at: frozenset[str]
+    issue: int
+
+
 @dataclass
 class KnownDrifts:
     """The running test, and which of its ``known_schema_drift`` markers a
@@ -85,17 +97,38 @@ class KnownDrifts:
     met: set[tuple[str, str, int]] = field(default_factory=set)
 
     @property
-    def allowed(self) -> dict[tuple[str, str, int], int]:
+    def allowed(self) -> dict[tuple[str, str, int], Drift]:
         if self.node is None:
             return {}
-        return {
-            (
-                marker.args[0].upper(),
-                marker.args[1],
-                int(marker.args[2]),
-            ): marker.kwargs["issue"]
-            for marker in self.node.iter_markers("known_schema_drift")
-        }
+        allowed = {}
+        for marker in self.node.iter_markers("known_schema_drift"):
+            method, path, status = marker.args
+            at = marker.kwargs["at"]
+            allowed[method.upper(), path, int(status)] = Drift(
+                at=frozenset((at,) if isinstance(at, str) else at),
+                issue=marker.kwargs["issue"],
+            )
+        return allowed
+
+
+_INDEX = re.compile(r"\[\d+\]")
+
+
+def failing_paths(errors) -> frozenset[str]:
+    """Where each error is, items as ``[*]``; a missing property is named
+    by the path it would have (``$.reason``)."""
+    paths = set()
+    for error in errors:
+        where = _INDEX.sub("[*]", error.json_path)
+        if error.validator == "required" and isinstance(error.instance, dict):
+            paths.update(
+                f"{where}.{name}"
+                for name in error.validator_value
+                if name not in error.instance
+            )
+        else:
+            paths.add(where)
+    return frozenset(paths)
 
 
 TALLY = Tally()
@@ -106,7 +139,13 @@ DRIFTS = KnownDrifts()
 def _templates() -> tuple[tuple[re.Pattern[str], str, int], ...]:
     return tuple(
         (
-            re.compile("^" + _PARAMETER.sub("[^/]+", template) + "$"),
+            re.compile(
+                "^"
+                + "[^/]+".join(
+                    re.escape(literal) for literal in _PARAMETER.split(template)
+                )
+                + "$"
+            ),
             template,
             template.count("{"),
         )
@@ -169,21 +208,30 @@ def check(method: str, path: str, response) -> None:
         TALLY.not_judged[f"{method} {template} {status}: no JSON body"] += 1
         return
     TALLY.validated += 1
-    error = best_match(
+    errors = list(
         judge(openapi_document())
         .validator(schema)
         .iter_errors(json.loads(response.content))
     )
-    if error is None:
+    if not errors:
         return
     key = (method, template, status)
-    if key in DRIFTS.allowed:
+    paths = failing_paths(errors)
+    drift = DRIFTS.allowed.get(key)
+    if drift is not None and paths <= drift.at:
         DRIFTS.met.add(key)
         return
-    raise AssertionError(
+    error = best_match(errors)
+    message = (
         f"{method} {template} answered {status} with a body its schema "
         f"rejects, at {error.json_path}: {error.message}"
     )
+    if drift is not None:
+        message += (
+            f" (it fails at {', '.join(sorted(paths))}; the marker allows "
+            f"{', '.join(sorted(drift.at))})"
+        )
+    raise AssertionError(message)
 
 
 _original_request = Client.request
@@ -218,23 +266,47 @@ def known_schema_drifts(request):
     fail a marker whose drift no longer shows."""
     DRIFTS.node, DRIFTS.met = request.node, set()
     yield
-    gone = unmet_drifts()
+    report = drift_gone_report()
     DRIFTS.node, DRIFTS.met = None, set()
-    if gone:
-        pytest.fail(
-            "No body broke the schema for "
-            + ", ".join(gone)
-            + ": the drift is gone, remove its known_schema_drift marker"
-        )
+    if report:
+        pytest.fail(report)
+
+
+def drift_gone_report() -> str | None:
+    """The failure for markers no failing body met, or ``None``. A test
+    whose own call failed may have stopped before the drifting request,
+    so its markers are not judged."""
+    gone = unmet_drifts()
+    if not gone or (
+        DRIFTS.node is not None and DRIFTS.node.stash.get(CALL_FAILED, False)
+    ):
+        return None
+    return (
+        "No body broke the schema for "
+        + ", ".join(gone)
+        + ": the drift is gone, remove its known_schema_drift marker"
+    )
 
 
 def unmet_drifts() -> list[str]:
     """The current test's markers that no failing body has met."""
     allowed = DRIFTS.allowed
     return [
-        f"{method} {path} {status} (issue {allowed[method, path, status]})"
+        f"{method} {path} {status} (issue {allowed[method, path, status].issue})"
         for method, path, status in sorted(set(allowed) - DRIFTS.met)
     ]
+
+
+#: Whether the test's own call failed, for ``known_schema_drifts``.
+CALL_FAILED = pytest.StashKey[bool]()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    report = yield
+    if report.when == "call":
+        item.stash[CALL_FAILED] = report.failed
+    return report
 
 
 def pytest_sessionfinish(session):

@@ -9,7 +9,11 @@ from tag.factories.tagged_item import TaggedProductFactory
 # Every test lists tagged products, whose contentObject is declared as a
 # loose object with a string price, not the Product it is (#684).
 pytestmark = pytest.mark.known_schema_drift(
-    "GET", "/api/v1/tagged-item", 200, issue=684
+    "GET",
+    "/api/v1/tagged-item",
+    200,
+    at="$.results[*].contentObject.price",
+    issue=684,
 )
 
 

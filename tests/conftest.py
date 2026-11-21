@@ -18,6 +18,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from tests.db_lifecycle import django_db_keepdb  # noqa: F401
 from tests.response_contract import (  # noqa: F401
     known_schema_drifts,
+    pytest_runtest_makereport,
     pytest_sessionfinish,
     pytest_terminal_summary,
     pytest_testnodedown,

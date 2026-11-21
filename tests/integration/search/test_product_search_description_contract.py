@@ -22,7 +22,13 @@ from tests.utils.meilisearch import LiveSearchIndex, unique_marker
 
 @requires_meilisearch
 @pytest.mark.django_db
-@pytest.mark.known_schema_drift("GET", "/api/v1/search/product", 200, issue=684)
+@pytest.mark.known_schema_drift(
+    "GET",
+    "/api/v1/search/product",
+    200,
+    at="$.results[*].description",
+    issue=684,
+)
 def test_a_product_without_a_description_is_found():
     marker = unique_marker()
 

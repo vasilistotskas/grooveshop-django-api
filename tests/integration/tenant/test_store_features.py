@@ -319,7 +319,11 @@ def test_the_catalogue_switch_refuses_what_needs_the_catalogue(
         # documents as its own body only (#684).
         request.applymarker(
             pytest.mark.known_schema_drift(
-                "POST", "/api/v1/giftcard/check", 400, issue=684
+                "POST",
+                "/api/v1/giftcard/check",
+                400,
+                at=("$.code", "$.detail", "$.reason"),
+                issue=684,
             )
         )
     switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": on})

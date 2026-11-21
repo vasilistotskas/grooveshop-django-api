@@ -53,7 +53,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
     )
     def test_list(self):
         url = self.get_tagged_item_list_url()
@@ -89,7 +93,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item/{id}", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item/{id}",
+        200,
+        at="$.contentObject.price",
+        issue=684,
     )
     def test_retrieve_valid(self):
         url = self.get_tagged_item_detail_url(self.tagged_item.id)
@@ -117,7 +125,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "POST", "/api/v1/tagged-item", 201, issue=684
+        "POST",
+        "/api/v1/tagged-item",
+        201,
+        at="$.contentObject.price",
+        issue=684,
     )
     def test_create_valid(self):
         new_product = ProductFactory()
@@ -196,7 +208,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "PUT", "/api/v1/tagged-item/{id}", 200, issue=684
+        "PUT",
+        "/api/v1/tagged-item/{id}",
+        200,
+        at="$.contentObject.price",
+        issue=684,
     )
     def test_update_valid(self):
         new_tag = TagFactory(active=True)
@@ -245,7 +261,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
     )
     def test_filtering_by_tag(self):
         url = self.get_tagged_item_list_url()
@@ -257,7 +277,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
     )
     def test_filtering_by_content_type(self):
         url = self.get_tagged_item_list_url()
@@ -269,7 +293,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
     )
     def test_filtering_by_object_id(self):
         url = self.get_tagged_item_list_url()
@@ -288,7 +316,11 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     # contentObject is declared as a loose object with a string price, not the Product it is (#684).
     @pytest.mark.known_schema_drift(
-        "GET", "/api/v1/tagged-item", 200, issue=684
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
     )
     def test_ordering_functionality(self):
         url = self.get_tagged_item_list_url()

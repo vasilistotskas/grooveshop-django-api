@@ -3,6 +3,98 @@
 
 
 
+## v3.262.4 (2026-11-21)
+
+### Bug fixes
+
+* fix(user): erasure reaches every copy of a subject's data (#774) ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(user): erasure reaches every copy of a subject's data
+
+- One definition of an order's personal data on the model:
+  Order.PERSONAL_FIELDS (contact, address, the customer's note, the
+  invoice's counterparty in BILLING_FIELDS) and Order.PERSONAL_METADATA
+  (the Conversions API browser identity, a typed cancel reason). The
+  export lists it, order.privacy erases it.
+- Every order of the subject, soft-deleted ones included.
+- Each carrier clears its own records through the carrier interface
+  (erase_recipient_data, recipient_data, orders_in_motion): shipment
+  metadata at PERSONAL_METADATA (cancel reasons included), the ACS call
+  history found by the orders and their voucher numbers (never a name or
+  a phone), checkpoint notes, the COD receiver (the POD voucher stays),
+  BOX NOW event text. user.services.gdpr no longer imports the carrier
+  apps.
+- The buyer's email, name, phone and cancel reason are redacted where the
+  order's own records copied them: history notes, the stock log, refund
+  attempts and ledger rows.
+- Billing fields stay only with an invoice issued in timologio.
+- Orders are stamped personal_data_erased_at; a daily task clears the
+  carrier data that arrives later, while a parcel is in motion and for
+  ERASURE_CARRIER_FOLLOW_UP_DAYS after the erasure.
+- The export lists what the carriers reported about the recipient.
+- The erasure test cancels orders through the real flow and searches
+  every text and JSON column of every table for the subject's values. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(shipping_acs): erasure skips a shipment's missing voucher number
+
+A shipment not yet minted has no voucher (None), which reached the voucher
+search's regex and aborted the whole erasure. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(user): erasure reaches BOX NOW's customer, owed invoices, late carrier writes and earlier erasures
+
+- BoxNowParcelEvent.PERSONAL_RAW: the webhook's data.customer (name,
+  email, phone) is cleared with the event text.
+- Billing fields stay when an invoice is issued or owed (an INVOICE order
+  not canceled), not only once its MARK is recorded.
+- The daily sweep re-erases an erased order whenever a carrier wrote a
+  record of it within ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS
+  (orders_written_since), so the event that settles a parcel is cleared
+  too; it replaces the in-motion and 90-day window rule.
+- order.0115 finishes orders the earlier erasure left: their browser
+  identity, cancel reason and its copies, email addresses in their
+  history, the billing rule, and the stamp the sweep then reads.
+- ACS: every voucher an order had (re-minted, orphaned, adopted) finds its
+  calls; staff notes on the money are redacted (core.utils.redaction).
+- Guest orders placed with a verified address of the account are the
+  subject's (_subject_orders), as other guest records are. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(user): earlier erasures are finished by the daily sweep, not a data migration
+
+finish_earlier_erasures, run first by erase_late_carrier_data, finds the
+orders the earlier erasure left through the email's trigram index, redacts
+their copies with the shared helper (email addresses included), clears
+and stamps them; the same run then clears their carrier records. It also
+covers an order erased the old way during a deploy's window, and nothing
+heavy runs before the new code. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(user): erasure reaches guest orders' side records, finishes earlier erasures in transactions, and sweeps from recent writes
+
+- A guest order's promotion redemption and Conversions API logs carry no
+  user; erasure finds them by the order.
+- finish_earlier_erasures works in batches, one transaction each, with
+  the carriers' erase first and the stamp last: a batch that fails stays
+  unstamped and is tried again.
+- The sweep clears the billing fields of an erased order that no longer
+  needs them (an owed invoice whose order was canceled since).
+- orders_written_since reads the rows written since the lookback (each
+  table's timestamp index) instead of every erased order; a voucher maps
+  back to its order through every place it is kept.
+- The ACS writers of personal shipment metadata bump updated_at.
+- BOX NOW's export lists the customer block erasure clears. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
+* fix(user): a failing earlier-erasure batch no longer holds back the sweep
+
+- finish_earlier_erasures runs last in the daily sweep, in batches of 50
+  paged by id: a batch that fails is rolled back, logged and left for the
+  next day while the next one runs.
+- ACS: a call with an order or voucher column is found by it; only one
+  with neither is searched for the vouchers. A voucher maps back to its
+  order through the indexed column first, the metadata lists only for what
+  is left, one "any of" test each.
+- The mint's save bumps updated_at, as the other writers of personal
+  shipment metadata do.
+- BOX NOW's export lists a polled event's text, kept in its raw body. ([`df777ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df777ce152a87cdb48de6bd78b770cb23484a43b))
+
 ## v3.262.3 (2026-11-21)
 
 ### Refactoring

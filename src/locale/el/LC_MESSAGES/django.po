@@ -4967,6 +4967,9 @@ msgstr "Συμβάντα"
 msgid "Events received"
 msgstr "Συμβάντα που παραλήφθηκαν"
 
+msgid "Every country, in one list"
+msgstr "Όλες οι χώρες, σε μία λίστα"
+
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Κάθε κουπόνι που μπορεί να προσφερθεί στον αγοραστή — οι κωδικοί που το κατάστημα προβάλλει δημόσια, καθώς και τα προσωπικά κουπόνια που έχουν αντιστοιχιστεί στον συνδεδεμένο πελάτη — το καθένα αξιολογημένο εκ των προτέρων έναντι του καλαθιού όπως είναι τώρα. Το ``eligible`` αντιστοιχεί ακριβώς σε ό,τι θα έκανε η εφαρμογή του κωδικού, ώστε μια απενεργοποιημένη γραμμή και μια άρνηση κατά την εφαρμογή να μη διαφωνούν ποτέ· το ``reason`` φέρει το λεξιλόγιο εκπτώσεων ACP και το ``discountAmount`` το ποσό που θα αφαιρούσε ο κωδικός αυτή τη στιγμή. Κενό όταν το κατάστημα έχει απενεργοποιημένες τις προσφορές."
 
@@ -4975,6 +4978,9 @@ msgstr "Κάθε τρόπος παράδοσης που προσφέρει το 
 
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Όλα τα email που στέλνει το κατάστημά σας. Κλείστε ένα και το κατάστημα σταματά να το στέλνει, μόνο εκείνο. Τα email που χρειάζεται ο πελάτης ή ο νόμος, όπως η επιβεβαίωση παραγγελίας ή η επαναφορά κωδικού, δεν μπορούν να κλείσουν."
+
+msgid "Every gift card linked to my account, in one list"
+msgstr "Όλες οι δωροκάρτες που είναι συνδεδεμένες με τον λογαριασμό μου, σε μία λίστα"
 
 msgid "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
 msgstr "Κάθε newsletter που στέλνουμε έχει στο κάτω μέρος έναν σύνδεσμο απεγγραφής, αν ποτέ θελήσετε να σταματήσετε να το λαμβάνετε."
@@ -15366,6 +15372,9 @@ msgstr "Το αίτημα voucher που έχει σειρά: η αποστολ�
 
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "Η ημερομηνία παραλαβής του voucher: η εκτέλεση λίστας παραλαβής που το ανέφερε πρώτη, ή η ημερομηνία που έφερε το αίτημα voucher του."
+
+msgid "The whole country list as one array, filtered and ordered as the paginated list is: for a picker that needs every row."
+msgstr "Ολόκληρη η λίστα χωρών σε έναν πίνακα, φιλτραρισμένη και ταξινομημένη όπως η σελιδοποιημένη λίστα: για έναν επιλογέα που χρειάζεται κάθε γραμμή."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει αυτή η επιχείρηση"

@@ -85,11 +85,10 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
         """Name the scopes this issuer offers, which allauth's list omits."""
         super().populate_server_metadata(data)
         data["grant_types_supported"] = sorted(CLIENT_GRANT_TYPES)
-        # No client may register the device grant (``CLIENT_GRANT_TYPES``),
-        # and the platform's issuer does not serve its routes.
-        data.pop("device_authorization_endpoint", None)
         if on_platform_issuer():
             data["scopes_supported"] = list(STAFF_CLIENT_SCOPES)
+            # The device flow's routes are not served on this issuer.
+            data.pop("device_authorization_endpoint", None)
             return
         data["scopes_supported"] = list(LINKING_SCOPES)
 

@@ -263,7 +263,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
-    Gift-card amounts are payment, never allocated (order/checkout/discounts.py).
+    Gift-card amounts are payment, never allocated (order.checkout.discounts).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
     allocation = _returned_before_receipt(order)

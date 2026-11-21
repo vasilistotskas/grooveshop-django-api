@@ -121,7 +121,7 @@ def is_capi_enabled() -> bool:
     Also requires both a Meta Pixel ID and a Meta CAPI access token to
     be configured on the active tenant (``Tenant.meta_pixel_id`` /
     ``Tenant.meta_capi_access_token`` — tenant-only, no platform/env
-    fallback; see ``tenant/credentials.py``). Flipping the toggle alone
+    fallback; see ``src/tenant/credentials.py``). Flipping the toggle alone
     without those would otherwise produce a flood of FAILED log rows from
     the Celery dispatcher (config errors are non-retryable). Treating
     missing config as "disabled" keeps the audit table clean and lets ops

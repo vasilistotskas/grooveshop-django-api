@@ -1,6 +1,6 @@
 """Post-row tenant provisioning — the ONE path for both entry points.
 
-Creating a ``Tenant`` row (``tenant/models.py``) only builds the
+Creating a ``Tenant`` row (``src/tenant/models.py``) only builds the
 Postgres schema (``auto_create_schema=True``). Everything a store
 needs to actually be usable happens here, and lives here ONCE so
 ``tenant_create`` (the CLI path) and ``TenantAdmin`` (the "New Store"
@@ -385,7 +385,7 @@ def _activate_default_carrier(tenant: Tenant) -> bool:
     turn it off the moment it has a real carrier. Pricing lives on
     ``ShippingRate`` rows, not here: a brand-new tenant schema runs its
     full migration history at creation, including
-    ``shipping/migrations/0011_convert_legacy_pricing_to_rates.py``,
+    ``src/shipping/migrations/0011_convert_legacy_pricing_to_rates.py``,
     which already gives ``flat_rate`` a GR/home_delivery rate at the
     frozen historical default (no ``extra_settings`` rows exist yet at
     that point, so it falls back to 3.00 / 50.00) — this function only
@@ -489,7 +489,7 @@ def _create_meili_indexes(tenant: Tenant) -> bool:
             # It still guarantees the primary key: the method calls
             # ``create_index(index_name, primary_key)`` first, precisely
             # so a settings call cannot auto-create a pk-less index
-            # (see meili/models.py::update_meili_settings).
+            # (see src/meili/models.py::update_meili_settings).
             model.update_meili_settings()
             logger.info(
                 "Created Meilisearch index with settings: %s", index_name

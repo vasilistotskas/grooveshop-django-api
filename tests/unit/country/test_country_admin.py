@@ -24,7 +24,7 @@ class CountryStatusFilterTestCase(TestCase):
         self.factory = RequestFactory()
         self.request = self.factory.get("/admin/country/country/")
 
-        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # ``src/country/migrations/0012_seed_iso_countries.py`` seeds every
         # real ISO country now — ``get_or_create`` so a real code like
         # "US"/"GB" returns the already-seeded row instead of an
         # IntegrityError.

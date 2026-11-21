@@ -5,7 +5,7 @@ to settings.X." for an X that had never existed — or, in the Viva Wallet
 and ACS cases, for one that was deliberately REMOVED when per-tenant
 credentials landed, precisely so money could never route through
 platform-wide env vars the merchant had not configured for their own
-store. `tenant/credentials.py` says so in as many words: "Tenant-only —
+store. `src/tenant/credentials.py` says so in as many words: "Tenant-only —
 NO platform-wide fallback."
 
 That made the admin form actively misleading on the fields where being

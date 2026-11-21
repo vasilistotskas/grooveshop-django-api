@@ -1,4 +1,4 @@
-"""Payload building and gating in ``meta_capi/services.py``.
+"""Payload building and gating in ``src/meta_capi/services.py``.
 
 Covers ``is_capi_enabled`` (returns a real bool), consent / event-id
 extraction from ``Order.metadata`` (malformed shapes fail closed), user-data

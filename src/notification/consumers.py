@@ -110,7 +110,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """
         Handler for group messages of type ``force.logout``.
 
-        Broadcast by ``user/signals.py`` after Knox tokens are revoked
+        Broadcast by ``src/user/signals.py`` after Knox tokens are revoked
         (password change, email change).  Closes the WebSocket with code
         4003 so connected clients know they must re-authenticate.
         """

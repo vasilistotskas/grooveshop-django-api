@@ -5,7 +5,7 @@ so an ORM-only command cannot tell them apart. Only ``tenant_context``
 puts the real ``Tenant`` row on ``connection.tenant`` — ``schema_context``
 installs a ``FakeTenant`` carrying nothing but a schema name — and every
 per-tenant credential is read off exactly that attribute
-(``tenant/credentials.py:_get_tenant_field``).
+(``src/tenant/credentials.py:_get_tenant_field``).
 
 That difference is invisible until a command needs a credential.
 ``reconcile_acs_cod`` shipped this way and was unusable in production:

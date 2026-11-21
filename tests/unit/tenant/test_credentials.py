@@ -1,4 +1,4 @@
-"""Unit tests for tenant/credentials.py helpers.
+"""Unit tests for src/tenant/credentials.py helpers.
 
 Two contracts are covered here:
 

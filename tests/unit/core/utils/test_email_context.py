@@ -2,10 +2,10 @@
 
 Every Celery email task routes its render context through this single
 function so the ``SITE_LOGO_URL`` branch in
-``core/templates/emails/base/email_base.html`` actually receives a
+``src/core/templates/emails/base/email_base.html`` actually receives a
 value — previously no live send included that key at all, so a
 tenant's configured ``logo_light_url`` never reached its outbound
-mail (see the module docstring on ``core/utils/email_context.py`` for
+mail (see the module docstring on ``src/core/utils/email_context.py`` for
 the full defect writeup).
 """
 

@@ -100,7 +100,7 @@ def recompute_all_candidates() -> dict[str, int]:
 
     # One purge for the whole pass. The cache surface deliberately does
     # NOT list RecommendationCandidate in ``invalidated_by`` — see
-    # core/cache/surfaces.py — because per-row signals from the
+    # src/core/cache/surfaces.py — because per-row signals from the
     # delete + bulk_create above would purge once per product.
     from core.cache.service import CacheService
 

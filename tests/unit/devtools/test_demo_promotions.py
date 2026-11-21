@@ -1,6 +1,6 @@
 """Contract tests for the demo store's offers.
 
-``devtools/demo_promotions.py`` is hand-authored data applied to
+``src/devtools/demo_promotions.py`` is hand-authored data applied to
 non-production tenants by ``manage.py seed_demo_store``. Nothing else
 type-checks it, and a promotion is the kind of row that fails QUIETLY: a
 card renders on ``/offers`` and the cart then refuses the code, or the

@@ -1,6 +1,6 @@
 """Which responses ``IdempotencyMiddleware`` caches, and how it replays them.
 
-Covers ``core/middleware/idempotency.py``: ``_cacheable_outcome`` (redirect,
+Covers ``src/core/middleware/idempotency.py``: ``_cacheable_outcome`` (redirect,
 oversized, non-JSON, undecodable and list bodies, preserved headers), the
 replay path in ``process_view`` and the over-long key guard.
 """

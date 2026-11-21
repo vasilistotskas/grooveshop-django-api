@@ -180,7 +180,7 @@ CACHE_PURGE_LOG_RETENTION_DAYS = int(
     getenv("CACHE_PURGE_LOG_RETENTION_DAYS", "90")
 )
 
-# Tenant billing dunning (tenant/billing.py). WARN_DAYS before the
+# Tenant billing dunning (src/tenant/billing.py). WARN_DAYS before the
 # term end the owner gets an expiry warning; GRACE_DAYS after it the
 # store is suspended — but only once AUTO_SUSPEND is switched on
 # (rollout default is notify-only: warnings and expired notices flow,
@@ -229,7 +229,7 @@ TENANT_INVOICE_RETENTION_YEARS = int(
 )
 
 # --------------------------------------------------------------------------
-# Contact-attachment malware scanning (contact/scanners.py)
+# Contact-attachment malware scanning (src/contact/scanners.py)
 # --------------------------------------------------------------------------
 # Which engine the CLUSTER runs, not what a store wants: a tenant cannot
 # conjure a ClamAV deployment by ticking a box, so this is env, not an
@@ -333,7 +333,7 @@ RECOMMENDATION_CO_PURCHASE_MIN_ORDERS = int(
 RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT = int(
     getenv("RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT", "5")
 )
-# Nightly weight learning (``recommendation/learning.py``): the trailing
+# Nightly weight learning (``src/recommendation/learning.py``): the trailing
 # window of events read, the impressions a strategy needs on a surface
 # before its weight moves, and the lowest weight learning may set.
 RECOMMENDATION_LEARNING_WINDOW_DAYS = int(
@@ -372,7 +372,7 @@ PENDING_PAYMENT_FEE_RETENTION_DAYS = int(
     getenv("PENDING_PAYMENT_FEE_RETENTION_DAYS", "90")
 )
 
-# ---------- Store-admin tools over MCP (agent/staff.py) --------------------
+# ---------- Store-admin tools over MCP (agent.staff) --------------------
 # The host a store's staff connect an AI app on: the staff issuer of the
 # public schema, served alone through ``agent.urls_connect``
 # (``tenant.middleware.PlatformTenantMainMiddleware``) and outside the

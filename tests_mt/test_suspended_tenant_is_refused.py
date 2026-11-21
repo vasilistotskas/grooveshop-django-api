@@ -1,7 +1,7 @@
 """A suspended store must stop serving, not just stop resolving.
 
 `suspend_tenant` sets `is_active=False`, and five consumers honour it:
-`tenant/views.py` resolve 404s, the internal domains feed skips it, the
+`src/tenant/views.py` resolve 404s, the internal domains feed skips it, the
 WebSocket middleware closes 4004, the Celery fanout skips it, and the
 Viva webhook refuses it. The one path never covered was the one that
 serves the store — the tenant HTTP request.

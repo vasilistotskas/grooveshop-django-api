@@ -1,6 +1,6 @@
 """Behaviour of the ``IndexMixin`` base shared by every indexed model.
 
-Covers ``meili/models.py``: tenant-prefixed index names, geo settings,
+Covers ``src/meili/models.py``: tenant-prefixed index names, geo settings,
 ``update_meili_settings`` (index creation order, task failure, flush),
 ``meili_serialize`` / ``_serialize_value`` edge cases, ``meili_geo``'s
 guard and the ``meilisearch`` descriptor. Exercised through

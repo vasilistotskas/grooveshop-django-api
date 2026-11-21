@@ -75,7 +75,7 @@ class CacheSurface:
     # A save whose ``update_fields`` fall entirely inside this set does NOT
     # invalidate the surface. For bookkeeping writes that are frequent and
     # not what the cached pages are for: the stock decrement every order
-    # makes (``order/inventory/stock.py``) would otherwise empty a store's
+    # makes (``src/order/inventory/stock.py``) would otherwise empty a store's
     # product cache on each sale. A full ``save()`` still invalidates, and so
     # does a save a model's app registers as significant
     # (``core.cache.invalidation.register_significant_save``): a product

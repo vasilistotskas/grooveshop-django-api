@@ -1,6 +1,6 @@
 """The agent surface accepts OIDC access tokens and nothing else.
 
-Covers ``agent/views.py`` (``AgentAPIView`` / ``AgentTokenAuthentication``):
+Covers ``src/agent/views.py`` (``AgentAPIView`` / ``AgentTokenAuthentication``):
 a valid Knox token, an OIDC refresh token, a query-string access token and
 an inactive user's token must all be refused with the 401 challenge the
 agent gateway relies on.

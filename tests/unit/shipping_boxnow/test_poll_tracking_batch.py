@@ -1,6 +1,6 @@
 """Single-flight lock and candidate selection of ``poll_boxnow_tracking_batch``.
 
-Covers ``shipping_boxnow/tasks.py``: the batch dispatcher skips without
+Covers ``src/shipping_boxnow/tasks.py``: the batch dispatcher skips without
 touching another worker's lock, releases its own lock after success and
 after a failed dispatch, skips unconfigured tenants before locking, and
 fans out only non-terminal, stale shipments with a parcel id, oldest poll

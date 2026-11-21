@@ -4,10 +4,10 @@ of Rosetta's own staff/superuser gate.
 
 ``core.models.Translation`` is a SHARED (public-schema-only) model —
 every Rosetta edit patches the ONE global gettext overlay that ships
-to every tenant (see ``core/rosetta_storage.py``: ``apply_db_overlay``
+to every tenant (see ``src/core/rosetta_storage.py``: ``apply_db_overlay``
 mutates the process-wide catalog, and the version tick that propagates
 it now lives under the schema-independent ``"global:"`` cache key —
-see ``tenant/cache.py``). Without this check, django-tenants resolves
+see ``src/tenant/cache.py``). Without this check, django-tenants resolves
 ``/rosetta/...`` on ANY tenant host (Rosetta has no schema awareness
 of its own), so a tenant-schema superuser — a tenant's own staff,
 scoped to THAT tenant's Django admin — could reach the editor on their

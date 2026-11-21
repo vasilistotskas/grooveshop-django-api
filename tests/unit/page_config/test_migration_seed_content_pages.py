@@ -1,4 +1,4 @@
-"""Exercises page_config/migrations/0007_seed_content_pages.py directly.
+"""Exercises src/page_config/migrations/0007_seed_content_pages.py directly.
 
 Data migrations aren't covered by the normal model/view test path, so
 this loads the module (numeric-prefixed, hence importlib rather than a

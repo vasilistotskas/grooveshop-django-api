@@ -1,6 +1,6 @@
 """The pytest run writes no log file.
 
-``tests/settings.py`` pins ``DEBUG`` on, which makes ``settings/logging.py``
+``tests/settings.py`` pins ``DEBUG`` on, which makes ``src/settings/logging.py``
 add a ``RotatingFileHandler`` every xdist worker would open. On Windows the
 rotation of that shared file fails in one worker while the others hold it
 open, and ``logging`` prints the error to stderr.

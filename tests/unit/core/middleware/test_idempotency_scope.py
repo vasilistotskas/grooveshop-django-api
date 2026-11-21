@@ -1,5 +1,5 @@
 """Whose ``Idempotency-Key`` a request carries: the shopper's, never the
-connection's (``core/middleware/idempotency.py``).
+connection's (``src/core/middleware/idempotency.py``).
 
 A key used to belong to the session user, else the session, else the
 client address. A Bearer token is resolved by DRF inside the view, so a

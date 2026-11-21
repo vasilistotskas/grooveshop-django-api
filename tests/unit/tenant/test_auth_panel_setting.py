@@ -1,4 +1,4 @@
-"""AUTH_PANEL extra_setting validator (tenant/validators.py).
+"""AUTH_PANEL extra_setting validator (src/tenant/validators.py).
 
 The photo and line beside the sign-in pages. extra_settings validators
 return a boolean — Setting.validate() wraps a falsy result in its

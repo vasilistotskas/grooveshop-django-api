@@ -1,6 +1,6 @@
 """``TenantConfig.features``: each optional feature's effective state.
 
-One table (``tenant/features.py``) names the plan flag and the store
+One table (``src/tenant/features.py``) names the plan flag and the store
 settings of every feature, with the permission classes that answer 404 for
 it, so the answer a client reads off ``/tenant/resolve`` is the one the API
 serves by.

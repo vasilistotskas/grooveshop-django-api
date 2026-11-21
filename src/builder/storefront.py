@@ -134,7 +134,7 @@ def _rich_text_pointers(
     """Pointers (``*`` for a list's elements) of the settings whose schema
     says ``contentMediaType: text/html``: those are rich text, held to the
     sanitiser policy. Only inline schemas are walked, as the catalogue's
-    are (``builder/pointers.py``)."""
+    are (``src/builder/pointers.py``)."""
     if not isinstance(schema, dict):
         return
     if schema.get("contentMediaType") == "text/html":

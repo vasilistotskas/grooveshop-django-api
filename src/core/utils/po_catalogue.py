@@ -7,7 +7,7 @@ line numbers change with every edit of the code), and the header's
 ``POT-Creation-Date`` is pinned. Two PRs that add different messages then
 touch different places in the file, and git merges them.
 
-``manage.py makemessages`` (``core/management/commands/makemessages.py``)
+``manage.py makemessages`` (``src/core/management/commands/makemessages.py``)
 writes this form, and ``tests/unit/test_locale_catalogue.py`` fails on a
 catalogue that is not in it.
 """

@@ -66,7 +66,7 @@ class Command(BaseCommand):
             )
 
         # ``validate_reserved_schema_name`` carves out
-        # ``get_public_schema_name()`` (see tenant/validators.py) so the
+        # ``get_public_schema_name()`` (see src/tenant/validators.py) so the
         # ONE legitimate public-tenant row — created exclusively by
         # ``bootstrap_platform`` — can pass full_clean()/ModelForm
         # validation later. This command is for ordinary tenants only,
@@ -154,7 +154,7 @@ class Command(BaseCommand):
             )
 
             # ``ensure_api_domain`` derives + creates the ``api.<domain>``
-            # row (see tenant/provisioning.py for why it is not optional).
+            # row (see src/tenant/provisioning.py for why it is not optional).
             # Listing it in --extra-domains as well is harmless: the
             # get_or_create below is then a no-op for that row.
             from tenant.provisioning import (
@@ -164,7 +164,7 @@ class Command(BaseCommand):
 
             ensure_api_domain(tenant)
             # The public-schema Site row that per-tenant SocialApp
-            # credentials key on — see tenant/provisioning.py::ensure_site.
+            # credentials key on — see src/tenant/provisioning.py::ensure_site.
             ensure_site(tenant)
 
             for extra in options["extra_domains"]:

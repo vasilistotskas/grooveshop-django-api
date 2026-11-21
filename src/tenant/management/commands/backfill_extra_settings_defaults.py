@@ -3,7 +3,7 @@
 Iterates every store, suspended ones included, and calls
 ``Setting.set_defaults_from_settings()`` inside each tenant's schema
 context.  This backfills any entries added to ``EXTRA_SETTINGS_DEFAULTS``
-in settings/store_settings.py that are not yet present in existing tenant
+in src/settings/store_settings.py that are not yet present in existing tenant
 databases. A suspended store is backfilled too: this brings its data up
 to date with the code and starts no work, so a store suspended through a
 few deploys has every setting when it is reactivated.
@@ -17,7 +17,7 @@ Safe to re-run:``set_defaults_from_settings`` is idempotent — it only
 creates missing rows and leaves existing values untouched.
 
 It also brings every existing row's description and validator in line
-with settings/store_settings.py
+with src/settings/store_settings.py
 (``tenant.settings_metadata.sync_setting_metadata``, which ``migrate``
 runs too), never its value.
 """
@@ -38,7 +38,7 @@ class Command(TenantCommandMixin, BaseCommand):
     """Backfill EXTRA_SETTINGS_DEFAULTS entries across every store.
 
     Useful after adding new rows to EXTRA_SETTINGS_DEFAULTS in
-    settings/store_settings.py: running this command propagates the
+    src/settings/store_settings.py: running this command propagates the
     defaults into every tenant that was created before the new entry was
     added, without touching existing values.
     """

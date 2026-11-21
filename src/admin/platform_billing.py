@@ -28,7 +28,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 from unfold.views import UnfoldSiteViewMixin
 
-# Classification lives in tenant/billing.py — the same ``billing_state``
+# Classification lives in src/tenant/billing.py — the same ``billing_state``
 # the daily dunning task acts on, so this page can never disagree with
 # what the automation will do.
 from tenant.billing import billing_config, billing_state

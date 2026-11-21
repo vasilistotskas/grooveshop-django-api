@@ -43,7 +43,7 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
             phone_code=33,
             num_regions=0,
         )
-        # ``country/migrations/0012_seed_iso_countries.py`` seeds a real
+        # ``src/country/migrations/0012_seed_iso_countries.py`` seeds a real
         # CY row on a fresh database — the tests below use CY's own ISO data
         # (alpha_3 "CYP", iso_cc 196) to exercise CREATE, so they need
         # CY absent, not a duplicate 400.
@@ -192,7 +192,7 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         # confirmed on a fresh database, in isolation, with a separate
         # connection reading the row back afterward. Every other test
         # in this class, and the wider suite's per-country ISO seed
-        # (country/migrations/0012_seed_iso_countries.py), depends on
+        # (src/country/migrations/0012_seed_iso_countries.py), depends on
         # GR surviving — deleting a disposable row here instead of GR
         # is the minimal fix for the blast radius that dependency now
         # has, whatever the root cause of the rollback gap turns out

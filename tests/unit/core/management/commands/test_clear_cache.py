@@ -74,7 +74,7 @@ class TestClearCacheCommand:
         )
         output = out.getvalue()
         # The gateway feed count is a third target — see
-        # core/cache/gateway.py for why it cannot be a key pattern.
+        # src/core/cache/gateway.py for why it cannot be a key pattern.
         assert "Purged 6 Django + 0 Nuxt + 0 feed keys" in output
         assert "pay_way" in output
         assert "orders" in output

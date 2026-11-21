@@ -30,7 +30,7 @@ class TestRegionStatusFilter(TestCase):
 
         self.model_admin = MockModelAdmin()
 
-        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # ``src/country/migrations/0012_seed_iso_countries.py`` seeds every
         # real ISO country now — ``get_or_create`` so this returns the
         # already-seeded US row (with the same alpha_3/iso_cc this test
         # would otherwise have created) instead of an IntegrityError.
@@ -195,7 +195,7 @@ class TestRegionAdmin(TestCase):
         self.site = AdminSite()
         self.admin = RegionAdmin(Region, self.site)
 
-        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # ``src/country/migrations/0012_seed_iso_countries.py`` seeds every
         # real ISO country now — ``get_or_create`` so this returns the
         # already-seeded US row (with the same alpha_3/iso_cc this test
         # would otherwise have created) instead of an IntegrityError.

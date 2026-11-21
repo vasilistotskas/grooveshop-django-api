@@ -72,7 +72,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -109,7 +109,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string", return_value="content")
+    @patch("emails.render.render_template", return_value="content")
     def test_confirmation_send_failure_schedules_a_retry(
         self, mock_render, mock_email, mock_cache
     ):
@@ -134,7 +134,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string", return_value="content")
+    @patch("emails.render.render_template", return_value="content")
     def test_confirmation_send_gives_up_after_its_retries(
         self, mock_render, mock_email, mock_cache
     ):
@@ -341,7 +341,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertIn("logo-dark.svg", html_body)
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -377,7 +377,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -457,7 +457,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -566,7 +566,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -815,7 +815,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         )
 
     @patch("emails.transport.EmailMultiAlternatives")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -885,7 +885,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         return_value=["merchant@store.test"],
     )
     @patch("emails.sender.from_address", return_value="orders@store.test")
-    @patch("emails.render.render_to_string")
+    @patch("emails.render.render_template")
     @override_settings(
         SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
     )

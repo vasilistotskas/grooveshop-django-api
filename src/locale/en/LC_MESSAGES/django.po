@@ -17002,6 +17002,9 @@ msgstr "What the store sells. Selects the recommendation preset the store starts
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 
+msgid "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+msgstr "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+
 msgid "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 msgstr "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 

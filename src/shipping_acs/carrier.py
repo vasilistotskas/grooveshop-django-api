@@ -762,7 +762,7 @@ class AcsCarrier(ShippingCarrierInterface):
         # station codes. Empty/missing values return
         # ``Άγνωστο κατάστημα παραλαβής``. The merchant pickup branch
         # is parsed from the billing code (or via metadata override —
-        # see ``shipping_acs/config.py::station_origin``). When we
+        # see ``src/shipping_acs/config.py::station_origin``). When we
         # don't have a destination yet (sidebar quote pre-address)
         # we use origin for both — ACS prices intra-region same as
         # the merchant's home region (~+0.20€ delta to inter-region),

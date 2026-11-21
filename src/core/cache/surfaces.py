@@ -18,7 +18,7 @@ STORE_PAGES_SURFACE = "store_pages"
 #: The sitemap, RSS, llms.txt and OG image caches.
 SITEMAP_SEO_SURFACE = "sitemap_seo"
 
-#: The fields a sale saves (``order/inventory/stock.py``). A save of
+#: The fields a sale saves (``src/order/inventory/stock.py``). A save of
 #: nothing else is bookkeeping for the surfaces that name this set, except a
 #: product that sells out or comes back (``product.availability``).
 SALE_UPDATE_FIELDS = frozenset({"stock", "updated_at"})

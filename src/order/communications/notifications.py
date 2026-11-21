@@ -1,12 +1,12 @@
 """Live (in-app + WebSocket) notification dispatch tasks for orders.
 
-Kept in a dedicated module so the email tasks in ``order/tasks.py`` and
+Kept in a dedicated module so the email tasks in ``src/order/tasks.py`` and
 the live-notification tasks don't read as one concern. The two worlds
 share no code today — email tasks render templates and touch
 ``EmailMultiAlternatives``; live-notification tasks call
 ``notification.services.create_user_notification`` which transparently
 writes a Notification + NotificationUser row and the post_save signal
-in ``notification/signals.py`` fans out via ``send_notification_task``
+in ``src/notification/signals.py`` fans out via ``send_notification_task``
 to the per-user WebSocket group.
 
 Idempotency note: the underlying notification helper is not idempotent

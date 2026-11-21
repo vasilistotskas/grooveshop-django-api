@@ -783,7 +783,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # reported ``updated_at`` equal to its ``created_at``.
         #
         # That is not cosmetic. ``updated_at`` is a documented API filter
-        # (order/filters.py exposes gte/lte/date), so "orders changed
+        # (src/order/filters.py exposes gte/lte/date), so "orders changed
         # since X" silently omitted every status change. Worse,
         # ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
         # bucket with ``updated_at__lt=now - GRACE``, intending a retry
@@ -792,7 +792,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # cancellable on the very next run, with no grace at all.
         #
         # Fixed here rather than at ~35 call sites so it cannot be missed
-        # again — order/inventory/stock.py and the shipping services already
+        # again — src/order/inventory/stock.py and the shipping services already
         # pass "updated_at" by hand, which is the convention Order's own saves
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing

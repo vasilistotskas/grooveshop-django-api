@@ -18,6 +18,7 @@ from drf_spectacular.views import (
 
 import core.filters.camel_case_filters
 import core.filters.camel_case_ordering  # noqa
+from agent.oidc import device_flow_not_offered
 from core.api.health_api import health_check, health_live
 from core.api.settings_api import (
     get_public_settings,
@@ -89,6 +90,9 @@ _customer_identity_root_patterns = [
 # served by the staff connect host alone (``agent.urls_connect``), never
 # the platform host.
 _customer_identity_storefront_patterns = [
+    # Ahead of allauth's include: the device flow is not offered.
+    path("identity/o/device", device_flow_not_offered),
+    path("identity/o/api/device/code", device_flow_not_offered),
     path("", include("allauth.idp.urls")),
     # RFC 8414 alias: plain-OAuth clients look for
     # /.well-known/oauth-authorization-server; serve the same metadata

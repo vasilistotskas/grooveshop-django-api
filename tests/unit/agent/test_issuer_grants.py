@@ -9,13 +9,18 @@ from unittest.mock import patch
 
 from allauth.idp.oidc.models import Client, Token
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, override_settings
-from django.urls import reverse
+from django.http import Http404
+from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import resolve, reverse
 from django.utils import timezone
 from rest_framework import status
 
 from agent.checks import CIMD_ENABLED, client_metadata_documents_stay_off
-from agent.oidc import CLIENT_GRANT_TYPES, AgentOIDCAdapter
+from agent.oidc import (
+    CLIENT_GRANT_TYPES,
+    AgentOIDCAdapter,
+    device_flow_not_offered,
+)
 from agent.staff import STAFF_CLIENT_SCOPES
 from tests.unit.agent.test_agent_api import AgentAPITestCase
 
@@ -137,3 +142,25 @@ class ClientMetadataDocumentsTestCase(SimpleTestCase):
         errors = client_metadata_documents_stay_off(None)
 
         self.assertEqual([error.id for error in errors], [CIMD_ENABLED])
+
+
+class DeviceFlowRoutesTestCase(SimpleTestCase):
+    def test_a_store_host_does_not_serve_them(self) -> None:
+        for path in ("/identity/o/device", "/identity/o/api/device/code"):
+            with self.subTest(path):
+                self.assertIs(
+                    resolve(path, urlconf="core.urls").func,
+                    device_flow_not_offered,
+                )
+
+    def test_the_connect_host_does_not_serve_them(self) -> None:
+        for path in ("/identity/o/device", "/identity/o/api/device/code"):
+            with self.subTest(path):
+                self.assertIs(
+                    resolve(path, urlconf="agent.urls_connect").func,
+                    device_flow_not_offered,
+                )
+
+    def test_the_view_is_a_404(self) -> None:
+        with self.assertRaises(Http404):
+            device_flow_not_offered(RequestFactory().get("/"))

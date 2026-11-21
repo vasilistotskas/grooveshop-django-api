@@ -85,6 +85,7 @@ from order.exceptions import (
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
+    PaymentInProgressError,
     PaymentNotFoundError,
     PaymentStatusUnavailableError,
     PaymentVerificationError,
@@ -97,6 +98,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
 from order.payments.payment import (
+    OpenPayment,
     get_payment_provider,
     provider_supports,
     registered_provider_codes,
@@ -141,6 +143,12 @@ from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 
 logger = logging.getLogger(__name__)
+
+# When a client asks again after ``payment_in_progress``: the provider's
+# webhook settles a paid order within seconds.
+PAYMENT_IN_PROGRESS_RETRY_AFTER_SECONDS = 10
+# When a client asks again after ``payment_provider_unavailable``.
+PAYMENT_PROVIDER_UNAVAILABLE_RETRY_AFTER_SECONDS = 30
 
 
 class RefundOutstanding(APIException):
@@ -264,12 +272,23 @@ serializers_config: SerializersConfig = {
     "create_checkout_session": ActionConfig(
         request=CreateCheckoutSessionRequestSerializer,
         response=CreateCheckoutSessionResponseSerializer,
-        responses={400: PaymentProviderErrorSerializer},
+        responses={
+            400: PaymentProviderErrorSerializer,
+            409: ErrorResponseSerializer,
+            503: ErrorResponseSerializer,
+        },
         operation_id="createOrderCheckoutSession",
         summary=_("Create a hosted checkout session for an order"),
         description=_(
-            "Create a hosted checkout session (Stripe or Viva Wallet). "
-            "The customer will be redirected to the provider's checkout page to complete payment."
+            "The order's hosted payment link (Stripe or Viva Wallet). "
+            "While a link of the order can still be paid it is returned "
+            "again, with its own expiry, and successUrl and cancelUrl are "
+            "those it was opened with; only when none can be paid is a new "
+            "one opened. 409 payment_in_progress: a payment was made and "
+            "is being confirmed, so no link is opened; read the order "
+            "again after Retry-After. 503 payment_provider_unavailable: "
+            "the provider cannot say whether a link is still payable; try "
+            "again after Retry-After."
         ),
         parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
@@ -690,6 +709,119 @@ class OrderViewSet(BaseModelViewSet):
             {"detail": detail, "code": "order_not_payable"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    @staticmethod
+    def _close_open_intent(order, provider) -> bool:
+        """End the order's open client-confirmed payment before a hosted
+        link opens, so the two are never payable together; ``False``
+        when it may still land. An order with none has nothing open."""
+        if not (order.payment_id and provider.supports_payment_intent):
+            return True
+        try:
+            return provider.close_payment(order)
+        except Exception as e:
+            logger.exception(
+                "Could not close the open payment of order %s", order.id
+            )
+            raise PaymentStatusUnavailableError(order.payment_id) from e
+
+    def _checkout_session_answer(self, order, provider, live) -> Response:
+        """The answer of ``create_checkout_session`` for a session that is
+        still payable: its own link and its own expiry."""
+        amount = order.calculate_order_total_amount()
+        response_serializer = self.get_response_serializer()(
+            data={
+                "session_id": live.session_id,
+                "checkout_url": live.checkout_url,
+                "status": "open",
+                "amount": str(amount.amount),
+                "currency": str(amount.currency),
+                "provider": provider.code,
+                "expires_at": live.expires_at,
+            }
+        )
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.validated_data)
+
+    def _concurrent_session_answer(
+        self, order, provider, session_id: str, observed: OpenPayment
+    ) -> Response:
+        """End the session this request opened, which nobody was given,
+        and answer with the one a concurrent request recorded. When what
+        changed meanwhile is not a session (an intent was opened, the
+        order was paid or canceled), no link is the answer."""
+        order.refresh_from_db()
+        try:
+            provider.discard_checkout_session(session_id)
+        except Exception:
+            logger.exception(
+                "Checkout session %s of order %s lost a concurrent request "
+                "and could not be ended",
+                session_id,
+                order.id,
+            )
+        current = OpenPayment.of(order, provider)
+        if (
+            current.payment_id != observed.payment_id
+            or current.status != observed.status
+            or current.payment_status != observed.payment_status
+        ):
+            return self._order_changed_during_payment(order)
+        try:
+            live = provider.live_checkout_session(order)
+        except PaymentInProgressError:
+            return self._payment_in_progress()
+        except Exception:
+            logger.exception(
+                "Checkout session %s of order %s lost a concurrent "
+                "request, and the recorded session could not be read",
+                session_id,
+                order.id,
+            )
+            return self._payment_provider_unavailable()
+        if live is None:
+            return self._payment_provider_unavailable()
+        return self._checkout_session_answer(order, provider, live)
+
+    @staticmethod
+    def _payment_in_progress() -> Response:
+        """409: a payment of this order was made and is being confirmed.
+
+        No link is opened: the buyer would pay twice. The client reads
+        the order again after ``Retry-After`` seconds; the provider's
+        webhook settles it.
+        """
+        response = Response(
+            {
+                "detail": _(
+                    "A payment for this order was received and is being "
+                    "confirmed. Do not pay again."
+                ),
+                "code": "payment_in_progress",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+        response["Retry-After"] = str(PAYMENT_IN_PROGRESS_RETRY_AFTER_SECONDS)
+        return response
+
+    @staticmethod
+    def _payment_provider_unavailable() -> Response:
+        """503: the provider cannot say whether the order's link is still
+        payable, so no new one is minted. Try again later."""
+        response = Response(
+            {
+                "detail": _(
+                    "The payment provider cannot be reached right now. "
+                    "Try again in a moment."
+                ),
+                "code": "payment_provider_unavailable",
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+        response["Retry-After"] = str(
+            PAYMENT_PROVIDER_UNAVAILABLE_RETRY_AFTER_SECONDS
+        )
+        return response
 
     @staticmethod
     def _payment_window_expired() -> Response:
@@ -1895,11 +2027,6 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
-        # A hosted link the provider cannot open for what is left of the
-        # window is refused, never stretched past it.
-        if payment_hold.window_closed(order, provider.min_hosted_session):
-            return self._payment_window_expired()
-
         # Charge what the customer actually owes — line items + extras
         # minus any loyalty redemption. Reading order.total_price here
         # billed the UNDISCOUNTED figure while the shopper's points had
@@ -1907,6 +2034,35 @@ class OrderViewSet(BaseModelViewSet):
         # Stripe also receives shipping_price separately for a proper
         # line-item breakdown on the checkout page.
         amount = order.calculate_order_total_amount()
+
+        # Asking for a link is idempotent (#643): while one is payable it
+        # is the answer, and a paid one whose webhook has not landed is
+        # never followed by a second link. The provider is read with no
+        # row locked; a link is never minted blind.
+        # A live session is the answer, whatever is left of the window.
+        # Only a new one needs the provider's minimum lifetime, and only
+        # a request that opens one, or reuses one, closes an open
+        # client-confirmed intent: the two are never payable together,
+        # and a refused request closes nothing.
+        observed = OpenPayment.of(order, provider)
+        try:
+            live = provider.live_checkout_session(order)
+            if live is None and payment_hold.window_closed(
+                order, provider.min_hosted_session
+            ):
+                # A hosted link the provider cannot open for what is left
+                # of the window is refused, never stretched past it.
+                return self._payment_window_expired()
+            if not self._close_open_intent(order, provider):
+                raise PaymentInProgressError(
+                    f"the open payment of order {order.id} may still land"
+                )
+        except PaymentInProgressError:
+            return self._payment_in_progress()
+        except PaymentStatusUnavailableError:
+            return self._payment_provider_unavailable()
+        if live is not None:
+            return self._checkout_session_answer(order, provider, live)
 
         # Provider-specific extras come from the provider, not from a
         # branch here that every future PSP would have to find.
@@ -1940,18 +2096,31 @@ class OrderViewSet(BaseModelViewSet):
         # session, and both the webhook and the return endpoint resolve
         # the order by whichever code was actually paid, from the one
         # list (see viva_order_code_q).
+        #
+        # Compare and set: when a concurrent request recorded a session
+        # after this one read the order, that session is the answer. This
+        # one's link reached nobody, so nobody can pay it: it is not
+        # recorded, the hold does not move, and it is ended where the
+        # provider can end one (a Stripe session; Viva documents its
+        # cancel too thinly to build on).
+        session_id = str(checkout_response["session_id"])
         with transaction.atomic():
-            locked = Order.objects.select_for_update().get(pk=order.pk)
-            metadata = locked.metadata or {}
-            provider.record_checkout_session(
-                metadata, str(checkout_response["session_id"])
+            locked = observed.lock_unchanged(order, provider)
+            if locked is not None:
+                metadata = locked.metadata or {}
+                provider.record_checkout_session(metadata, session_id)
+                locked.metadata = metadata
+                # The expiry the provider applied: the stock is held
+                # until exactly then, and not past it.
+                locked.payment_hold_expires_at = checkout_response["expires_at"]
+                locked.save(
+                    update_fields=["metadata", "payment_hold_expires_at"]
+                )
+                order = locked
+        if locked is None:
+            return self._concurrent_session_answer(
+                order, provider, session_id, observed
             )
-            locked.metadata = metadata
-            # The expiry the provider applied: the stock is held until
-            # exactly then, and not past it.
-            locked.payment_hold_expires_at = checkout_response["expires_at"]
-            locked.save(update_fields=["metadata", "payment_hold_expires_at"])
-            order = locked
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=checkout_response)

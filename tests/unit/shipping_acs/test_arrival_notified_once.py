@@ -20,7 +20,7 @@ customer on every re-entry:
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from django.db import connection
@@ -101,7 +101,7 @@ def test_the_first_arrival_still_notifies(shipment, monkeypatch):
         AcsService.poll_shipment_tracking(shipment)
 
     notify.assert_called_once_with(
-        args=[shipment.id], headers={"_schema_name": SCHEMA}
+        task_id=ANY, args=[shipment.id], headers={"_schema_name": SCHEMA}
     )
 
 

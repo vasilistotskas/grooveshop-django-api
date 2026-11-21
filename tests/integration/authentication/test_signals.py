@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from allauth.socialaccount.models import SocialAccount, SocialLogin
 from django.db import connection
@@ -26,6 +26,7 @@ class PopulateProfileTest(TestCase):
         # signup runs inside an atomic block, so the commit hook fires
         # after that block's schema context can unwind.
         mock_task.apply_async.assert_called_once_with(
+            task_id=ANY,
             kwargs={
                 "user_id": self.user.pk,
                 "picture_url": (
@@ -41,6 +42,7 @@ class PopulateProfileTest(TestCase):
         self.sociallogin.account.provider = "google"
         populate_profile(self.sociallogin, self.user)
         mock_task.apply_async.assert_called_once_with(
+            task_id=ANY,
             kwargs={
                 "user_id": self.user.pk,
                 "picture_url": "http://example.com",

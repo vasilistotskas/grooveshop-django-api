@@ -7,7 +7,7 @@ Requirements: 3.6, 11.4
 """
 
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from django.db import OperationalError
@@ -119,7 +119,7 @@ class TestSignalHandlerExceptionIsolation:
             # Dispatched via apply_async with the tenant schema stamped
             # (tests run in the public schema).
             mock_task.apply_async.assert_called_once_with(
-                args=[order.id], headers={"_schema_name": "public"}
+                task_id=ANY, args=[order.id], headers={"_schema_name": "public"}
             )
 
     def test_canceled_handler_calls_delay_on_commit(self):
@@ -144,7 +144,7 @@ class TestSignalHandlerExceptionIsolation:
             # Dispatched via apply_async with the tenant schema stamped
             # (tests run in the public schema).
             mock_task.apply_async.assert_called_once_with(
-                args=[order.id], headers={"_schema_name": "public"}
+                task_id=ANY, args=[order.id], headers={"_schema_name": "public"}
             )
 
     def test_partially_refunded_handler_reverses_nothing(self):
@@ -195,7 +195,7 @@ class TestSignalHandlerExceptionIsolation:
             # Dispatched via apply_async with the tenant schema stamped
             # (tests run in the public schema).
             mock_task.apply_async.assert_called_once_with(
-                args=[order.id], headers={"_schema_name": "public"}
+                task_id=ANY, args=[order.id], headers={"_schema_name": "public"}
             )
 
     def test_completed_handler_does_not_raise_on_task_error(self):

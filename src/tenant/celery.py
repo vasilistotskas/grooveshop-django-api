@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
 
 import psycopg
-from celery import Task
+from celery import Task, current_task
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import OperationalError, connection, transaction
@@ -403,11 +404,20 @@ def dispatch_on_commit(
     raises reaches the caller and drops the commit's later hooks, like any
     hook that raises, so it should do no more than record.
 
+    One call is one dispatch with one task id, chosen here and passed as
+    ``task_id``. A publish that wrote its message before it failed is
+    delivered as well as the row the sweep publishes again, and a worker
+    lost under ``acks_late`` has the message delivered again; every retry
+    keeps the id too. A task that keys its effect on its own id
+    (``emails.log.delivery_id``) therefore does it once however many of
+    those copies run (docs/deferred-dispatch.md).
+
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
     """
     schema = schema_name or getattr(connection, "schema_name", "public")
     headers = {**(options.pop("headers", None) or {}), "_schema_name": schema}
+    options.setdefault("task_id", str(uuid.uuid4()))
 
     call: dict[str, Any] = {}
     if args is not None:
@@ -435,6 +445,25 @@ def dispatch_on_commit(
                 then()
 
     transaction.on_commit(publish)
+
+
+def dispatch_key(namespace: str, *parts: object) -> uuid.UUID | None:
+    """The key of one effect of the dispatch the running task serves, or
+    None outside a task.
+
+    Every copy of a dispatch runs under its task id (``dispatch_on_commit``),
+    so a key made of that id and of what tells the task's effects apart
+    (*parts*: a recipient, a subject) is the same in every copy, and a row
+    unique on it is written once. *namespace* keeps two kinds of effect
+    apart. Outside a task there is no copy to tell apart.
+    """
+    task_id = getattr(getattr(current_task, "request", None), "id", None)
+    if not task_id:
+        return None
+    return uuid.uuid5(
+        uuid.uuid5(uuid.NAMESPACE_URL, f"grooveshop:{namespace}"),
+        "|".join(str(part) for part in (task_id, *parts)),
+    )
 
 
 #: Characters kept of the error a deferred dispatch records.

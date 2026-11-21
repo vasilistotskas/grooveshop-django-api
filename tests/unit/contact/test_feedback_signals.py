@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from django.core import mail
@@ -116,6 +116,7 @@ class TestFeedbackSignals(TestCase):
             # tenant schema is stamped at registration, not when the
             # commit hook fires.
             mock_dispatch.assert_called_once_with(
+                task_id=ANY,
                 args=[feedback.id],
                 headers={"_schema_name": connection.schema_name},
             )

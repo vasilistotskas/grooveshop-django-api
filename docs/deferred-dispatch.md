@@ -191,6 +191,28 @@ The read timeout is set on Linux only, where every deployment runs: py-amqp pack
 the value as a POSIX `timeval`, which Windows reads as milliseconds, so a Windows
 host has no read bound (the hold and the refusal still apply).
 
+## One dispatch, one task id
+
+`dispatch_on_commit` gives each call a task id of its own and publishes with
+it (`task_id`, unless the caller chose one). The row a failed publish keeps
+holds it in its options, so the sweep's copy goes out under the same id as the
+message the failed publish may have written; a message delivered again after a
+worker was lost (`task_acks_late`) and every `retry()` keep it too. A task can
+therefore tell another copy of its dispatch from new work by its own id,
+and an effect keyed on it happens once however many copies run.
+`tenant.celery.dispatch_key(namespace, *parts)` makes that key: the task id
+and what tells the task's effects apart (a recipient, a subject), or `None`
+outside a task.
+
+- **E-mail**: every send goes through `send_email`, whose delivery id is
+  derived from the task id (`emails.log.delivery_id`); a second copy finds
+  the delivery sent, and copies that run at the same moment send under an
+  advisory lock on it (`docs/emails/delivery.md`).
+
+A task whose effect is a state of a row needs no id: it claims the state (a
+compare-and-set, a unique row). A dispatch made inside a task (a chain's next
+link) is a dispatch of its own, with an id of its own.
+
 ## One sweep at a time
 
 One sweep runs at a time, and it publishes outside any transaction. A publish to

@@ -11,41 +11,44 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 import requests
-from celery import current_task
-from django.db import Error, transaction
+from django.db import Error, connection, transaction
 from django.utils import timezone
+from psycopg.errors import QueryCanceled
 
 from emails import optout
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
 from emails.status import NOT_SENT, Status
+from tenant.celery import dispatch_key
 
 logger = logging.getLogger(__name__)
 
-_DELIVERY_NAMESPACE = uuid.uuid5(
-    uuid.NAMESPACE_URL, "grooveshop:email-delivery"
-)
+_DELIVERY_NAMESPACE = "email-delivery"
+#: The advisory lock of one delivery. Advisory locks are per database, which
+#: every schema shares; a delivery id is unique across them.
+_LOCK_KEY = "emails.delivery:{delivery}"
 
 
-def delivery_id(type_key: str, recipient_hash: str, subject: str) -> uuid.UUID:
+def delivery_id(
+    type_key: str, recipient_hash: str, subject: str
+) -> uuid.UUID | None:
     """The identity of one delivery: the row's uuid and the provider's
     idempotency key.
 
-    Inside a Celery task it is derived from the task id, which every
-    ``retry()`` keeps, plus the type, the recipient and the subject, so the
-    retry of a send whose response was lost is the same delivery and reuses
-    its row and key. Outside a task (a synchronous send) it is fresh.
+    Inside a Celery task it is derived from the task id, plus the type, the
+    recipient and the subject (``tenant.celery.dispatch_key``). Every copy of
+    a task carries the same id: its retries, a message delivered again, and
+    the sweep's copy of a publish that also went out
+    (``tenant.celery.dispatch_on_commit`` picks the id). Each copy's send is
+    therefore the same delivery and reuses its row and key. None outside a
+    task: a synchronous send is a delivery of its own, under a fresh uuid.
     """
-    task_id = getattr(getattr(current_task, "request", None), "id", None)
-    if not task_id:
-        return uuid.uuid4()
-    return uuid.uuid5(
-        _DELIVERY_NAMESPACE,
-        f"{task_id}|{type_key}|{recipient_hash}|{subject}",
-    )
+    return dispatch_key(_DELIVERY_NAMESPACE, type_key, recipient_hash, subject)
 
 
 def validate_retention_days_setting(value: object) -> bool:
@@ -93,21 +96,31 @@ def record_skip(
     )
 
 
-def start(
+@contextmanager
+def delivering(
     type_key: str,
     recipient: Recipient,
     subject: str,
     *,
     test_by: Any = None,
-) -> EmailLog:
-    """The row of a message about to be sent. The retry of a task finds the
-    row its earlier attempt wrote (same delivery id): one the provider has is
-    returned as it is, so the caller does not send it again, any other goes
-    back to ``QUEUED``. When the row cannot be written the message is sent
-    anyway and the row stays unsaved."""
+) -> Generator[EmailLog]:
+    """The row of a message about to be sent, held until the block ends.
+
+    Another copy of the task (``delivery_id``) finds the row the earlier one
+    wrote: one the provider has is yielded as it is, so the caller does not
+    send it again; any other goes back to ``QUEUED``. When the row cannot be
+    written the message is sent anyway and the row stays unsaved.
+
+    The copies can run at the same time: the sweep's copy of a publish and
+    the message that publish wrote are delivered together once the broker
+    takes messages again. So the row is read and the message sent under a
+    lock on the delivery (``_one_copy_at_a_time``), and the copy that waits
+    finds the row sent.
+    """
     fields = _recipient_fields(recipient)
+    delivery = delivery_id(type_key, fields["recipient_hash"], subject)
     entry = EmailLog(
-        uuid=delivery_id(type_key, fields["recipient_hash"], subject),
+        uuid=delivery or uuid.uuid4(),
         type_key=type_key,
         status=Status.QUEUED,
         subject=subject,
@@ -116,6 +129,11 @@ def start(
     )
     if test_by is not None:
         entry.triggered_by_staff = test_by
+    with _one_copy_at_a_time(delivery):
+        yield _claim(entry)
+
+
+def _claim(entry: EmailLog) -> EmailLog:
     try:
         earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
     except Error:
@@ -128,6 +146,71 @@ def start(
         earlier.error = ""
         _write(earlier, update_fields=["status", "error", "updated_at"])
     return earlier
+
+
+@contextmanager
+def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
+    """Hold an advisory lock on *delivery* for the block.
+
+    Only a send inside a task can have another copy; a synchronous send's id
+    is fresh and takes no lock. The lock is held on the connection's session,
+    outside any transaction, for as long as the transport takes: a
+    transaction open across the send would be ended by
+    ``idle_in_transaction_session_timeout``. Inside a transaction (a task
+    applied eagerly, or called within one) it is the transaction's and ends
+    with it, so it is never left on a pooled connection. A worker that dies
+    takes its session and the lock with it, and the copy that waits sends.
+
+    A wait longer than ``statement_timeout`` raises ``OperationalError``,
+    which every mail task retries: the copy ahead is still sending. A
+    database that cannot be reached does not stop the send, as it does not
+    for the row (``_write``): an alert about that database must go out.
+    """
+    if delivery is None:
+        yield
+        return
+    key = _LOCK_KEY.format(delivery=delivery)
+    if connection.in_atomic_block:
+        _lock("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", key)
+        yield
+        return
+    held = _lock("SELECT pg_advisory_lock(hashtextextended(%s, 0))", key)
+    try:
+        yield
+    finally:
+        if held:
+            _unlock(key)
+
+
+def _lock(statement: str, key: str) -> bool:
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(statement, [key])
+    except Error as error:
+        if isinstance(error.__cause__, QueryCanceled):
+            raise
+        logger.exception(
+            "Email delivery %s is sent without its lock",
+            key,
+            extra={"email_log": key},
+        )
+        return False
+    return True
+
+
+def _unlock(key: str) -> None:
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [key]
+            )
+    except Error:
+        # The session broke during the send, and the lock went with it.
+        logger.warning(
+            "Email delivery %s: the session holding its lock broke",
+            key,
+            extra={"email_log": key},
+        )
 
 
 def mark_sent(

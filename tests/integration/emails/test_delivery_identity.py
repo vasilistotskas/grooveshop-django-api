@@ -12,6 +12,8 @@ from unittest import mock
 
 import pytest
 from django.core import mail
+from django.db import OperationalError
+from psycopg.errors import QueryCanceled
 
 from core import celery_app
 from emails.models import EmailLog
@@ -108,6 +110,71 @@ class TestRetry:
         ]
         assert EmailLog.objects.filter(status=Status.SENT).count() == 2
         assert EmailLog.objects.count() == 2
+
+
+class TestCopiesOfOneDispatch:
+    """``dispatch_on_commit`` gives each dispatch its task id, and every copy
+    of it carries that id: the message a failed publish wrote and the
+    sweep's copy of it, a message delivered again after a worker was lost."""
+
+    def test_a_second_copy_sends_nothing(self, catalogue, retrying_task):
+        catalogue(probe())
+
+        retrying_task.apply(task_id="one-dispatch")
+        retrying_task.apply(task_id="one-dispatch")
+
+        [row] = EmailLog.objects.all()
+        assert row.status == Status.SENT
+        assert len(mail.outbox) == 1
+
+    def test_another_dispatch_of_the_task_is_another_delivery(
+        self, catalogue, retrying_task
+    ):
+        catalogue(probe())
+
+        retrying_task.apply(task_id="one-dispatch")
+        retrying_task.apply(task_id="another-dispatch")
+
+        assert EmailLog.objects.filter(status=Status.SENT).count() == 2
+        assert len(mail.outbox) == 2
+
+
+class TestTheDeliveryLock:
+    def test_a_database_out_of_reach_does_not_stop_the_send(
+        self, catalogue, retrying_task, caplog
+    ):
+        """An alert about a failing database must still go out, as it does
+        when the row cannot be written."""
+        catalogue(probe())
+        unreachable = mock.MagicMock(in_atomic_block=False)
+        unreachable.cursor.side_effect = OperationalError("unreachable")
+
+        with mock.patch("emails.log.connection", unreachable):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert len(mail.outbox) == 1
+        assert "sent without its lock" in caplog.text
+
+    def test_a_wait_that_runs_out_is_raised_for_the_retry(
+        self, catalogue, retrying_task
+    ):
+        """``statement_timeout`` ended the wait: the copy ahead is still
+        sending, so this one must not send too."""
+        catalogue(probe())
+        waited_out = OperationalError("canceling statement due to timeout")
+        waited_out.__cause__ = QueryCanceled()
+        held = mock.MagicMock(in_atomic_block=False)
+        held.cursor.return_value.__enter__.return_value.execute.side_effect = (
+            waited_out
+        )
+
+        with (
+            mock.patch("emails.log.connection", held),
+            pytest.raises(OperationalError),
+        ):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert mail.outbox == []
 
 
 class TestIdentity:

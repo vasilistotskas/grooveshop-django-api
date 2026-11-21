@@ -664,7 +664,6 @@ ignore_imports = [
     "core.cache.service -> builder.data_purge",
     "core.emails -> emails.declare",
     "core.emails -> emails.types",
-    "core.generators -> user.models.account",
     "core.management.commands.reset_staff_mfa -> admin.staff_mfa",
     "core.management.commands.reset_staff_mfa -> user.models",
     "core.middleware.idempotency -> cart.agent_token",

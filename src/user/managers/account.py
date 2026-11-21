@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import BaseUserManager
 
-from core.generators import UserNameGenerator
+from user.generators import UserNameGenerator
 
 if TYPE_CHECKING:
     from user.models import UserAccount

@@ -22,8 +22,8 @@ from unittest import mock
 
 from django.test import TestCase
 
-from core.generators import UserNameGenerator
 from user.forms import UserAccountCreationForm
+from user.generators import UserNameGenerator
 from user.models import UserAccount
 from user.validators import ExtendedUnicodeUsernameValidator
 

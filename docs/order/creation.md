@@ -102,8 +102,9 @@ caller:
     may send it. Until then clients branch on `code` and the 409
     (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
     `code` already.
-  - **Optional for now.** The storefront and the gateway start sending it,
-    then a later release requires it (#635).
+  - **Required since #635's third release**, once the storefront
+    (v3.345.3) and the gateway (v1.49.0) in production sent it on every
+    order. Nothing creates an order without the total check.
 - **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
   body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation

@@ -23,6 +23,7 @@ from django.db.models import Q
 
 from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
 from recommendation.models import RecommendationEvent
+from tenant.celery import dispatch_key
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +52,17 @@ def record_events(
     user_id: int | None = None,
     cart_uuid: str | None = None,
 ) -> int:
-    """Insert one row per item; return how many were written.
+    """Insert one row per item; return how many were asked for.
 
     Validates the enums again here rather than trusting the caller:
     the task payload crosses a broker, and a row with an unknown kind
     would poison the nightly aggregation with nothing to say why.
     ``attach`` is never accepted from here — it is derived from orders.
+
+    Each row carries the key of the task copy that writes it
+    (``tenant.celery.dispatch_key``): another copy of the task (a retry, a
+    message delivered again, the sweep's copy of a publish) makes the same
+    keys, and the unique constraint on them leaves its rows out.
     """
     if (
         kind not in _KINDS
@@ -80,6 +86,13 @@ def record_events(
             session_key=session_key or "",
             user_id=user_id,
             cart_uuid=_as_uuid(cart_uuid),
+            dispatch_key=dispatch_key(
+                "recommendation-event",
+                kind,
+                impression_id,
+                item["product_id"],
+                item.get("position"),
+            ),
         )
         for item in items
         if item.get("strategy") in _STRATEGIES and item.get("product_id")

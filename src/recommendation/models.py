@@ -311,6 +311,14 @@ class RecommendationEvent(models.Model):
         blank=True,
         default="",
     )
+    # The task copy that wrote this row (``events.record_events``): every copy
+    # of a task carries the same key per item, so a second copy inserts
+    # nothing. Two beacons are two tasks, so two rows, even for one
+    # impression id (a cached strip shows one id to many viewers). Empty for
+    # ``attach`` rows, whose own constraint below makes them once per order.
+    dispatch_key = models.UUIDField(
+        _("Dispatch key"), null=True, blank=True, editable=False
+    )
     created_at = models.DateTimeField(_("Created at"), auto_now_add=True)
 
     class Meta(TypedModelMeta):
@@ -324,6 +332,12 @@ class RecommendationEvent(models.Model):
                 fields=["order", "product", "impression_id"],
                 condition=Q(kind="attach"),
                 name="rec_event_attach_unique",
+            ),
+            # One row per item per task copy (``dispatch_key``).
+            models.UniqueConstraint(
+                fields=["dispatch_key"],
+                condition=Q(dispatch_key__isnull=False),
+                name="rec_event_dispatch_key_unique",
             ),
         ]
         indexes = [

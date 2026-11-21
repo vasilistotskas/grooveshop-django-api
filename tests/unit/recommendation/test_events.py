@@ -11,6 +11,7 @@ from product.factories.product import ProductFactory
 from recommendation.enum import EventKind, StrategyCode, Surface
 from recommendation.events import record_events
 from recommendation.models import RecommendationEvent
+from recommendation.tasks import record_recommendation_event
 
 pytestmark = pytest.mark.django_db
 
@@ -122,3 +123,46 @@ def test_items_with_an_unknown_strategy_are_dropped_individually():
     assert list(
         RecommendationEvent.objects.values_list("product_id", flat=True)
     ) == [a.id]
+
+
+def _record(impression: uuid.UUID, products, *, task_id: str) -> None:
+    record_recommendation_event.apply(
+        kwargs={
+            "kind": EventKind.IMPRESSION,
+            "surface": Surface.ORDER_EMAIL,
+            "impression_id": str(impression),
+            "items": _items(*products),
+        },
+        task_id=task_id,
+        throw=True,
+    )
+
+
+def test_a_second_copy_of_the_task_writes_nothing():
+    """The order confirmation's strip is recorded through
+    ``dispatch_on_commit``: a retry, a message delivered again or the
+    sweep's copy of a publish runs the task again under its id."""
+    a, b = ProductFactory(num_images=0), ProductFactory(num_images=0)
+    impression = uuid.uuid4()
+
+    _record(impression, [a, b], task_id="one-dispatch")
+    _record(impression, [a, b], task_id="one-dispatch")
+
+    rows = RecommendationEvent.objects.filter(impression_id=impression)
+    assert rows.count() == 2
+    assert all(row.dispatch_key is not None for row in rows)
+
+
+def test_two_beacons_for_one_impression_are_two_sets_of_rows():
+    """A cached strip shows one impression id to every viewer, and each
+    view's beacon is a task of its own: they are separate impressions."""
+    product = ProductFactory(num_images=0)
+    impression = uuid.uuid4()
+
+    _record(impression, [product], task_id="one-view")
+    _record(impression, [product], task_id="another-view")
+
+    assert (
+        RecommendationEvent.objects.filter(impression_id=impression).count()
+        == 2
+    )

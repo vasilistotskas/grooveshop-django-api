@@ -88,7 +88,9 @@ nothing is built or sent, whoever asks: `generate_invoice` refuses to issue
 refused (`has_retail_documents_permission`), the order's Receipt card says the
 store issues the receipt outside the platform, and the dashboard shows a danger
 alert when the switch is on but the ground is blank (outside the sandbox
-exception), or when the environment is invalid. "Regenerate receipt" only
+exception), or when the environment is invalid. Both read
+`MyDataConfig.unmet()`, the list of conditions not met, which `is_ready()` is
+true exactly when empty, so the dashboard and the issuing gate cannot disagree. "Regenerate receipt" only
 re-renders a receipt that exists; it never creates one. The customer sees a
 receipt (`hasInvoice`, `/order/{id}/invoice`, `/invoice/download`; a guest with
 the order's `?uuid=` too) only once AADE registered it

@@ -198,7 +198,15 @@ def _checked_request(self, **request):
 
 @pytest.fixture(scope="session", autouse=True)
 def responses_match_the_schema():
-    """Judge every test client response for the whole session."""
+    """Judge every test client response for the whole session.
+
+    The document is built here, before any test runs, and not on the
+    first response: a test that overrides ``ROOT_URLCONF`` (the platform
+    admin's ``tenant.urls_public``) would otherwise build it from that URL
+    conf, and every later test would be judged against a document missing
+    the store's operations.
+    """
+    openapi_document()
     Client.request = _checked_request
     yield
     Client.request = _original_request

@@ -19,7 +19,7 @@ from typing import Any
 
 from allauth.headless.constants import Flow
 
-from core.caches import STRICT_CACHE_UNAVAILABLE_CODE
+from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
 
 Document = dict[str, Any]
 

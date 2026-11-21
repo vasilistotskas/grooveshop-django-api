@@ -3,7 +3,7 @@ from os import getenv
 
 from django.test import TestCase
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 
 class CustomCacheTestCase(TestCase):

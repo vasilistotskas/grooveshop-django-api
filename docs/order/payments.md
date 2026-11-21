@@ -48,13 +48,18 @@ is asked first, with no row locked (`PaymentProvider.live_checkout_session`):
 - a link that was paid while the order is still unpaid (its webhook has not
   landed) answers **409 `payment_in_progress`** with `Retry-After: 10`; no
   link is minted, so the buyer cannot pay twice;
-- only when none can be paid is a new one minted;
+- only when none can be paid is a new one minted, and only then does the
+  provider's minimum session lifetime apply (`payment_window_expired` when
+  less of the window is left); a refused request closes nothing;
 - a provider that cannot say answers **503 `payment_provider_unavailable`**
   with `Retry-After: 30`: a link is never minted blind.
 
 Viva is read with Retrieve order (`GET /api/orders/{orderCode}`, Basic auth)
 for every code in `metadata.viva_order_codes`: `StateId` 0 Pending is
-returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone.
+returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone; an
+answer with no known `StateId` is "unreadable". Viva is offered only to a
+store holding all four credentials: the OAuth pair mints payment orders and
+the Basic pair (Merchant ID, API Key) reads and refunds them.
 `ExpirationDate` carries no offset and is Greek local time
 (`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated
 when summer time ends is read as its later instant (`fold=1`), so a payable

@@ -2027,11 +2027,6 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
-        # A hosted link the provider cannot open for what is left of the
-        # window is refused, never stretched past it.
-        if payment_hold.window_closed(order, provider.min_hosted_session):
-            return self._payment_window_expired()
-
         # Charge what the customer actually owes — line items + extras
         # minus any loyalty redemption. Reading order.total_price here
         # billed the UNDISCOUNTED figure while the shopper's points had
@@ -2044,15 +2039,24 @@ class OrderViewSet(BaseModelViewSet):
         # is the answer, and a paid one whose webhook has not landed is
         # never followed by a second link. The provider is read with no
         # row locked; a link is never minted blind.
-        # An open client-confirmed intent is closed first, whether the
-        # session is reused or minted: the two are never payable together.
+        # A live session is the answer, whatever is left of the window.
+        # Only a new one needs the provider's minimum lifetime, and only
+        # a request that opens one, or reuses one, closes an open
+        # client-confirmed intent: the two are never payable together,
+        # and a refused request closes nothing.
         observed = OpenPayment.of(order, provider)
         try:
+            live = provider.live_checkout_session(order)
+            if live is None and payment_hold.window_closed(
+                order, provider.min_hosted_session
+            ):
+                # A hosted link the provider cannot open for what is left
+                # of the window is refused, never stretched past it.
+                return self._payment_window_expired()
             if not self._close_open_intent(order, provider):
                 raise PaymentInProgressError(
                     f"the open payment of order {order.id} may still land"
                 )
-            live = provider.live_checkout_session(order)
         except PaymentInProgressError:
             return self._payment_in_progress()
         except PaymentStatusUnavailableError:

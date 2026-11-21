@@ -751,3 +751,82 @@ class TestStripeAfterThisReview:
         assert response.status_code == 200, response.data
         assert response.data["session_id"] == "cs_1"
         close.assert_called_once()
+
+
+class TestAfterCodeRabbitsReview:
+    @pytest.mark.parametrize(
+        "body", [{}, {"StateId": 9, "ExpirationDate": "2027-01-15T12:00:00"}]
+    )
+    def test_a_viva_answer_with_no_known_state_mints_nothing(self, body):
+        order, client = _order("viva_wallet")
+        _with_codes(
+            order, "1111", hold_expires=timezone.now() + timedelta(minutes=5)
+        )
+        answer = Mock(status_code=200)
+        answer.json.return_value = body
+        answer.raise_for_status.return_value = None
+
+        with _states({"1111": answer}), patch("requests.post") as post:
+            response = _ask(order, client)
+
+        assert response.status_code == 503, response.data
+        post.assert_not_called()
+
+    def test_a_live_session_is_reused_inside_the_minimum_lifetime(self):
+        """Stripe opens no session shorter than 31 minutes, but an open one
+        is the answer however little of the window is left."""
+        order, client = _order("stripe")
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(minutes=45)
+        )
+        order.refresh_from_db()
+        expires = timezone.now() + timedelta(minutes=10)
+        _with_session(order, "cs_1", expires)
+
+        with (
+            patch.object(
+                stripe.checkout.Session,
+                "retrieve",
+                return_value=_stripe_session("cs_1", "open", expires),
+            ),
+            patch.object(stripe.checkout.Session, "create") as create,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 200, response.data
+        assert response.data["session_id"] == "cs_1"
+        create.assert_not_called()
+
+    def test_a_refused_request_closes_no_open_intent(self):
+        order, client = _order("stripe", payment_id="pi_1")
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(minutes=45)
+        )
+
+        with patch(
+            "order.payments.payment.StripePaymentProvider.close_payment"
+        ) as close:
+            response = _ask(order, client)
+
+        assert response.status_code == 400, response.data
+        assert response.data["code"] == "payment_window_expired"
+        close.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "missing", ["merchant_id", "api_key", "client_id", "client_secret"]
+    )
+    def test_viva_needs_all_four_credentials(self, missing):
+        creds = {
+            "merchant_id": "m",
+            "api_key": "k",
+            "client_id": "c",
+            "client_secret": "s",
+            "source_code": "Default",
+            "live_mode": False,
+        }
+        creds[missing] = ""
+
+        with patch(
+            "tenant.credentials.viva_wallet_credentials", return_value=creds
+        ):
+            assert not VivaWalletPaymentProvider.is_configured_for_tenant()

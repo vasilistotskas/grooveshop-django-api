@@ -1264,6 +1264,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
     #: 3 (Paid)" (payment-api.yaml).
     STATE_PENDING: ClassVar[int] = 0
     STATE_PAID: ClassVar[int] = 3
+    STATES: ClassVar[frozenset[int]] = frozenset({0, 1, 2, 3})
     #: The zone Viva's offset-less ``ExpirationDate`` is written in.
     TIME_ZONE: ClassVar[ZoneInfo] = ZoneInfo("Europe/Athens")
     #: A read made while a shopper waits for their payment link.
@@ -1278,8 +1279,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
     def is_configured_for_tenant(cls) -> bool:
         from tenant.credentials import viva_wallet_credentials
 
-        creds = viva_wallet_credentials()
-        return bool(creds["client_id"] and creds["client_secret"])
+        return not cls._missing_credentials(viva_wallet_credentials())
+
+    @staticmethod
+    def _missing_credentials(creds) -> list[str]:
+        """The credentials a Viva store lacks. Every one is needed: the
+        OAuth pair mints payment orders, the Basic pair (Merchant ID, API
+        Key) reads them (Retrieve order) and refunds."""
+        present = {
+            "merchant_id": creds["merchant_id"],
+            "api_key": creds["api_key"],
+            "client_id": creds["client_id"],
+            "client_secret": creds["client_secret"],
+        }
+        return [name for name, value in present.items() if not value]
 
     def record_checkout_session(
         self, metadata: dict[str, Any], session_id: str
@@ -1330,6 +1343,14 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 )
                 raise PaymentStatusUnavailableError(code)
             state_id = state.get("StateId")
+            if state_id not in self.STATES:
+                # An answer that names no known state says nothing about
+                # whether the link can still be paid: never minted past.
+                logger.warning(
+                    "Viva answered payment order %s with no known StateId",
+                    code,
+                )
+                raise PaymentStatusUnavailableError(code)
             if state_id == self.STATE_PAID:
                 raise PaymentInProgressError(
                     f"Viva payment order {code} of order {order.id} is paid "
@@ -1413,16 +1434,17 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.source_code = creds["source_code"] or "Default"
         self.live_mode = creds["live_mode"]
 
-        if not (self.client_id and self.client_secret):
-            # No tenant OAuth2 credentials: Viva Wallet is unavailable
-            # for this tenant. Fail loudly — the pay-way availability
-            # gate (``PayWayService.is_provider_configured``) should
-            # have hidden the provider and order-create should have
-            # rejected it before this constructor ever runs.
+        missing = self._missing_credentials(creds)
+        if missing:
+            # Viva Wallet is unavailable for this tenant. Fail loudly —
+            # the pay-way availability gate
+            # (``PayWayService.is_provider_configured``) should have hidden
+            # the provider and order-create should have rejected it before
+            # this constructor ever runs.
             raise ImproperlyConfigured(
                 "Viva Wallet is not configured for this tenant: no "
-                "viva_wallet_client_id/viva_wallet_client_secret set on "
-                "the Tenant."
+                + ", ".join(f"viva_wallet_{name}" for name in missing)
+                + " set on the Tenant."
             )
 
         if self.live_mode:

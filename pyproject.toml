@@ -275,6 +275,7 @@ timeout_func_only = true
 # See docs/testing.md before allowing another host.
 addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db --disable-socket --allow-hosts=127.0.0.1,localhost,::1,db,redis,rabbitmq,meilisearch"
 markers = [
+    "known_schema_drift(method, path, status, issue): a body of this operation and status may break its schema while the issue is open; the test fails once none does (tests/response_contract.py).",
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
 ]
 

@@ -16,6 +16,13 @@ from pytest_django.fixtures import validate_django_db
 from redis.exceptions import ConnectionError as RedisConnectionError
 
 from tests.db_lifecycle import django_db_keepdb  # noqa: F401
+from tests.response_contract import (  # noqa: F401
+    known_schema_drifts,
+    pytest_sessionfinish,
+    pytest_terminal_summary,
+    pytest_testnodedown,
+    responses_match_the_schema,
+)
 
 # The logger Django reports a failed robust ``on_commit`` callback to.
 _on_commit_logger = logging.getLogger("django.db.backends.base")
@@ -837,17 +844,12 @@ def provision_meilisearch_indexes(attempts: int = 3) -> None:
 
 @pytest.fixture(scope="session")
 def openapi_schema() -> dict:
-    """The OpenAPI document ``manage.py spectacular`` writes, built once.
+    """The OpenAPI document ``manage.py spectacular`` writes, built once per
+    worker (``tests.utils.openapi.openapi_document``). Read it, never
+    mutate it."""
+    from tests.utils.openapi import openapi_document
 
-    The command is this same call plus rendering
-    (``drf_spectacular/management/commands/spectacular.py``), and one
-    generation takes seconds — it used to run once per test. Shared by
-    every test in the session: read it, never mutate it.
-    """
-    from drf_spectacular.settings import spectacular_settings
-
-    generator = spectacular_settings.DEFAULT_GENERATOR_CLASS()
-    return generator.get_schema(request=None, public=True)
+    return openapi_document()
 
 
 @pytest.fixture(scope="session")
@@ -929,16 +931,8 @@ def trust_intent_binding():
         yield
 
 
-@pytest.fixture(scope="session")
-def generated_schema():
-    """The OpenAPI document the code generates, built once per worker."""
-    from drf_spectacular.generators import SchemaGenerator
-
-    return SchemaGenerator().get_schema(request=None, public=True)
-
-
 @pytest.fixture
-def documented(generated_schema):
+def documented(openapi_schema):
     """Check a real response body against what its operation documents.
 
     ``documented(response, "/api/v1/product/{id}", "get")`` validates the
@@ -951,8 +945,8 @@ def documented(generated_schema):
 
     def check(response, path, method):
         declared = response_schema(
-            generated_schema, path, method, str(response.status_code)
+            openapi_schema, path, method, str(response.status_code)
         )
-        validate_against(generated_schema, declared, response.json())
+        validate_against(openapi_schema, declared, response.json())
 
     return check

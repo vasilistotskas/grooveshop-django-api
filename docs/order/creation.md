@@ -81,9 +81,10 @@ caller:
   own sum is not the quote's `amount_due`: a charge added to one and not
   the other, or a cart line changed between the quote and the line lock,
   fails the creation instead of producing an order no payment matches.
-- **The expected total.** `POST /api/v1/order` takes an optional
+- **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
-  (cents). Both creation paths compare it, exactly, with the quote computed
+  (cents), as the quote returned it. An order is never created at a total
+  the client did not send. Both creation paths compare it, exactly, with the quote computed
   under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the
@@ -101,8 +102,9 @@ caller:
     may send it. Until then clients branch on `code` and the 409
     (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
     `code` already.
-  - **Optional for now.** The storefront and the gateway start sending it,
-    then a later release requires it (#635).
+  - **Required since #635's third release**, once the storefront
+    (v3.345.3) and the gateway (v1.49.0) in production sent it on every
+    order. Nothing creates an order without the total check.
 - **The cart digest.** A quote with a delivery and a pay way also returns
   `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
   `SECRET_KEY`, over a canonical form of what the order would be made of:
@@ -483,22 +485,36 @@ address it cannot place (prod order #316: street "1", street number
   match the country's postcode pattern (4+ characters).
 - **One street line** (#641). Order creation takes `street` without
   `streetNumber` (or with it blank) as one line whose number follows the
-  street, the Greek and Cypriot form: `split_street_line` cuts the
-  trailing number ("Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12", "12-14",
-  "12/3"; a number in the street's name stays in it: "28ης Οκτωβρίου 15")
-  and the order stores both columns, so the ACS voucher, invoices and
-  myDATA read them as before. A range written with spaces ("12 - 14") is
-  one number. A wrong split is worse than a 400, so the split is taken
-  only when what is left is plainly a street name: it ends in a letter
-  and holds no number but an ordinal of its own name. A number written
-  first ("12 Main St", "28 Οκτωβρίου"), text after the number ("Ερμού
-  12, όροφος 3", "Εγνατίας 12, 546 22") and digits other than 0-9 are
-  refused. A line it cannot split is a 400 with
-  `fields.street` code `street_number_missing`, and the errors of a split
-  number (`street_number_is_postcode`) are reported on `street`: the
-  caller sent no number field. A sent `streetNumber` is used as sent.
-  The agent gateway sends the UCP and ACP destination's single street
-  line this way.
+  street, the Greek and Cypriot form, and `split_street_line` splits it,
+  so the order stores both columns the ACS voucher, invoices and myDATA
+  read. A wrong number sends the parcel elsewhere, which is worse than
+  asking for it again, so the rules are explicit:
+  1. The line is normalised: NFC, every Unicode space a plain space,
+     typographic dashes `-`, a range written with spaces one number
+     ("12 - 14" -> "12-14").
+  2. It ends in the house number: ASCII digits, at most one letter, an
+     optional second number after `-` or `/`. A number written first
+     ("12 Main St") is never read.
+  3. A comma is allowed only directly before the number ("Ερμού, 12");
+     elsewhere ("Ερμού 12, όροφος 3", "Εγνατίας 12, 546 22") the line is
+     refused.
+  4. A floor or flat word (`UNIT_MARKERS`: όροφος, οροφ., ορ., ισόγειο,
+     διαμέρισμα, διαμ., ημιόροφος, floor, fl., apt, apartment, unit, suite,
+     flat; compared without accents or case) refuses the line: the number
+     after it is not the house's ("Ερμού, όροφος 3").
+  5. A word that only says "number" (`NUMBER_MARKERS`: αρ., αριθμός, Νο,
+     No, nr) is dropped from the street ("Ερμού αρ. 12" -> "Ερμού", "12").
+  6. The street holds no number but the day of a date that names it: 1 to
+     31, with or without a Greek ordinal ending, before a month in the
+     genitive ("28 Οκτωβρίου 15", "28η Οκτωβρίου 15", "Οδός 1ης Μαΐου 3").
+  7. The street ends in a letter, or an abbreviation's dot after one
+     ("Main St. 12").
+
+  A line it cannot split is a 400 with `fields.street` code
+  `street_number_missing`, and the errors of a split number
+  (`street_number_is_postcode`) are reported on `street`: the caller sent
+  no number field. A sent `streetNumber` is used as sent. The agent
+  gateway sends the UCP and ACP destination's single street line this way.
 - **A pickup-point order is delivered to the point** (#642). For
   `shippingKind=pickup_point` the buyer's `street`, `streetNumber`, `city`
   and `zipcode` are not required and not kept: `OrderCreateFromCartSerializer.

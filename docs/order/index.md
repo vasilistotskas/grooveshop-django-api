@@ -39,6 +39,7 @@ outgrows the limit is split on a subject, and this table gains a row.
 
 Last refresh: 2026-11-21 (the quote's `cartDigest`: an order created
 with `expectedCartDigest` is made of what was quoted, [§3.0](creation.md);
+`expectedTotal` is required on order creation, [§3.0](creation.md);
 order creation takes one street line and splits its number,
 [§3.3](creation.md); a pickup-point order is delivered to the point's
 address and needs none of the buyer's, [§3.3](creation.md); before that

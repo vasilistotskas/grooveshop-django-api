@@ -128,6 +128,15 @@ pull request must show all of this:
 `until` then names the consumer release regenerated from the corrected
 document.
 
+**A request field every live consumer already sends becomes required.**
+The storefront's document is generated from this schema, so it declares
+the field optional until Django requires it, and no order of releases
+satisfies the check. The pull request must show, with file and line, that
+the storefront and the gateway live in production and in staging send the
+field on every request to the route (#635 release 3 did it for
+`expectedTotal`). `until` names the storefront's next release, which
+regenerates from this document.
+
 A break that only exists because a consumer requires something Django does not
 provide yet is never accepted: split the change. The two differ in time. "Not
 yet" is something Django will send once its side lands, so the change is split

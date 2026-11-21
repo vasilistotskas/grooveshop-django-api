@@ -18,6 +18,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -74,12 +75,15 @@ class CheckoutAPITestCase(APITestCase):
             CartItemFactory(cart=cart, product=product, quantity=quantity)
         return cart
 
-    def _post(self, data, cart):
+    def _post(self, data, cart, *, expected_total=None):
+        """Place the order at ``expected_total``, or else at its quote's."""
+        headers = {"HTTP_X_CART_ID": str(cart.uuid)}
+        if expected_total is None:
+            data = quoted_body(self.client, data, **headers)
+        else:
+            data = {**data, "expected_total": expected_total}
         return self.client.post(
-            self.checkout_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(cart.uuid),
+            self.checkout_url, data, format="json", **headers
         )
 
     def test_guest_checkout_creates_an_unowned_order(self):
@@ -130,7 +134,11 @@ class CheckoutAPITestCase(APITestCase):
     def test_invalid_email_is_a_field_error(self):
         cart = self._cart()
 
-        response = self._post(self._checkout_data(email="invalid-email"), cart)
+        response = self._post(
+            self._checkout_data(email="invalid-email"),
+            cart,
+            expected_total=UNQUOTED,
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)

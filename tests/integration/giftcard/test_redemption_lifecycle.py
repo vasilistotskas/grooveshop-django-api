@@ -23,6 +23,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -86,12 +87,14 @@ def checkout():
 
 def _create_order(checkout, codes):
     return OrderService.create_order_from_cart_offline(
-        legal_acceptance=checkout_acceptance(),
-        cart=checkout["cart"],
-        shipping_address=checkout["shipping_address"],
-        pay_way=checkout["pay_way"],
-        user=checkout["user"],
-        gift_card_codes=codes,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=checkout["cart"],
+            shipping_address=checkout["shipping_address"],
+            pay_way=checkout["pay_way"],
+            user=checkout["user"],
+            gift_card_codes=codes,
+        )
     )
 
 
@@ -144,12 +147,14 @@ class TestSplitPayment:
 
         with pytest.raises(InvalidGiftCardError) as excinfo:
             OrderService.create_order_from_cart_offline(
-                legal_acceptance=checkout_acceptance(),
-                cart=checkout["cart"],
-                shipping_address=checkout["shipping_address"],
-                pay_way=online,
-                user=checkout["user"],
-                gift_card_codes=[card.code],
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=checkout["cart"],
+                    shipping_address=checkout["shipping_address"],
+                    pay_way=online,
+                    user=checkout["user"],
+                    gift_card_codes=[card.code],
+                )
             )
 
         assert excinfo.value.reason == "gift_card_insufficient"

@@ -27,6 +27,7 @@ from shipping_acs.factories import AcsStationFactory
 from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import _checkout
+from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.redis import private_cache
 from tests.utils.shipping import enable_rate
 
@@ -75,8 +76,11 @@ def locker_checkout():
 
 
 def _post_locker_order(checkout, **body):
-    return checkout.client.post(
-        reverse("order-list"),
+    """Quote the locker order, then place it at the quote's total, as a
+    client does."""
+    headers = {"HTTP_X_CART_ID": str(checkout.cart.uuid)}
+    order = quoted_body(
+        checkout.client,
         {
             **BUYER,
             "country_id": checkout.country.alpha_2,
@@ -87,8 +91,10 @@ def _post_locker_order(checkout, **body):
             "boxnow_locker_id": "4",
             **body,
         },
-        format="json",
-        HTTP_X_CART_ID=str(checkout.cart.uuid),
+        **headers,
+    )
+    return checkout.client.post(
+        reverse("order-list"), order, format="json", **headers
     )
 
 
@@ -150,7 +156,8 @@ def _serializer(**body) -> OrderCreateFromCartSerializer:
             "country_id": country.alpha_2,
             "pay_way_id": 1,
             "terms_accepted": True,
-            "expected_total": {"amount": 0, "currency": "EUR"},
+            # The serializer checks the shape alone; no quote is compared.
+            "expected_total": UNQUOTED,
             **body,
         }
     )

@@ -24,6 +24,7 @@ from order.serializers.order import (
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import UNQUOTED
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
@@ -49,6 +50,8 @@ def _create_payload(**overrides):
     data = {
         "pay_way_id": pay_way.id,
         "terms_accepted": True,
+        # The serializer checks the shape alone; no quote is compared here.
+        "expected_total": UNQUOTED,
         "first_name": "Jane",
         "last_name": "Doe",
         "email": "jane@example.com",
@@ -113,6 +116,22 @@ class TestCheckoutSerializer:
         assert serializer.is_valid(), serializer.errors
         assert serializer.validated_data["street"] == "Εγνατίας"
         assert serializer.validated_data["street_number"] == "12Α"
+
+    @pytest.mark.parametrize(("length", "valid"), [(50, True), (51, False)])
+    def test_a_split_number_has_the_fields_length_limit(
+        self, greece, length, valid
+    ):
+        payload = _create_payload(street="Εγνατίας " + "1" * length)
+        payload.pop("street_number")
+
+        serializer = OrderCreateFromCartSerializer(data=payload)
+
+        assert serializer.is_valid() is valid, serializer.errors
+        if valid:
+            assert serializer.validated_data["street_number"] == "1" * length
+        else:
+            assert set(serializer.errors) == {"street"}
+            assert serializer.errors["street"][0].code == "max_length"
 
     def test_a_sent_number_is_kept_as_sent(self, greece):
         serializer = OrderCreateFromCartSerializer(

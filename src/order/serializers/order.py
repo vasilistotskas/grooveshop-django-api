@@ -1347,17 +1347,16 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
     )
 
     # ---------- The total the buyer was shown ----------
-    # Optional for now: a client that sends it gets the order only at
-    # that total (``OrderTotalChangedError``, 409 ``total_changed``).
+    # Required: the order is created only at the total the buyer saw
+    # (``OrderTotalChangedError``, 409 ``total_changed``).
     expected_total = ExpectedTotalSerializer(
-        required=False,
         write_only=True,
         help_text=_(
             "The total the buyer was shown: ``expectedTotal`` of "
-            "``POST /cart/quote``, or the client's own amount due in minor "
-            "units. When sent, the order is created only if it is exactly "
-            "the amount due computed now; otherwise the answer is 409 "
-            "``total_changed`` with the new quote and nothing is created."
+            "``POST /cart/quote``. The order is created only if it is "
+            "exactly the amount due computed now; otherwise the answer is "
+            "409 ``total_changed`` with the new quote and nothing is "
+            "created."
         ),
     )
     expected_cart_digest = serializers.CharField(
@@ -1701,7 +1700,16 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
                     {"street": [address_rules.street_number_missing()]},
                     code="street_number_missing",
                 )
-            attrs["street"], attrs["street_number"] = split
+            street, number = split
+            # Fields are validated before ``validate``: the number split
+            # from the line gets the checks of the field it replaces.
+            try:
+                self.fields["street_number"].run_validation(number)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(
+                    {"street": e.detail}, code="street_number_invalid"
+                ) from None
+            attrs["street"], attrs["street_number"] = street, number
         errors = address_rules.address_errors(
             country=country,
             street=attrs["street"],

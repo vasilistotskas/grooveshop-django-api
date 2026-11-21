@@ -52,6 +52,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from region.factories import RegionFactory
 from shipping.models import ShippingProvider
+from tests.utils.checkout import UNQUOTED, priced, quoted_body
 from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
@@ -114,12 +115,14 @@ class _Cart:
     def order(self, checkout: UUID | None, *, pay_way=None) -> Order:
         """Place an agent order the order-first way (Viva unless told)."""
         return OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=self.cart,
-            shipping_address=self.address(),
-            pay_way=pay_way or _viva(),
-            attribution=AGENT,
-            agent_checkout=checkout,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=self.cart,
+                shipping_address=self.address(),
+                pay_way=pay_way or _viva(),
+                attribution=AGENT,
+                agent_checkout=checkout,
+            )
         )
 
     def pay_first(
@@ -135,13 +138,15 @@ class _Cart:
             "order.payments.payment.get_payment_provider", return_value=provider
         ):
             return OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=self.cart,
-                shipping_address=self.address(),
-                payment_intent_id=payment_intent_id,
-                pay_way=PayWayFactory.create_online_payment("stripe"),
-                attribution=AGENT,
-                agent_checkout=checkout,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=self.cart,
+                    shipping_address=self.address(),
+                    payment_intent_id=payment_intent_id,
+                    pay_way=PayWayFactory.create_online_payment("stripe"),
+                    attribution=AGENT,
+                    agent_checkout=checkout,
+                )
             )
 
     def stock(self) -> int:
@@ -279,35 +284,54 @@ class TestThroughTheEndpoint:
             self.region = RegionFactory(country=self.checkout.country)
             self.viva = _viva()
             self.cod = _cod()
+            # The total the gateway showed for each checkout: it sends the
+            # same one with every repeat of that checkout's order.
+            self.shown: dict = {}
             yield
 
     def _post(
-        self, pay_way, checkout, *, secret=GATEWAY_SECRET, cart=None, **body
+        self,
+        pay_way,
+        checkout,
+        *,
+        secret=GATEWAY_SECRET,
+        cart=None,
+        expected_total=None,
+        **body,
     ):
         address = self.checkout.address()
+        headers = {
+            "HTTP_X_CART_ID": str((cart or self.checkout.cart).uuid),
+            "HTTP_X_INTERNAL_GATEWAY": secret,
+            "HTTP_X_LANGUAGE": "en",
+        }
+        request = {
+            "payWayId": pay_way.id,
+            "termsAccepted": True,
+            "firstName": address["first_name"],
+            "lastName": address["last_name"],
+            "email": address["email"],
+            "street": address["street"],
+            "streetNumber": address["street_number"],
+            "city": address["city"],
+            "zipcode": address["zipcode"],
+            "countryId": address["country_id"],
+            "regionId": self.region.alpha,
+            "phone": address["phone"],
+            "attribution": {"agentProtocol": "ucp"},
+            "agentCheckout": str(checkout),
+            **body,
+        }
+        if expected_total is None:
+            if checkout not in self.shown:
+                quoted = quoted_body(APIClient(), request, **headers)
+                self.shown[checkout] = quoted["expectedTotal"]
+            expected_total = self.shown[checkout]
         return APIClient().post(
             reverse("order-list"),
-            {
-                "payWayId": pay_way.id,
-                "termsAccepted": True,
-                "firstName": address["first_name"],
-                "lastName": address["last_name"],
-                "email": address["email"],
-                "street": address["street"],
-                "streetNumber": address["street_number"],
-                "city": address["city"],
-                "zipcode": address["zipcode"],
-                "countryId": address["country_id"],
-                "regionId": self.region.alpha,
-                "phone": address["phone"],
-                "attribution": {"agentProtocol": "ucp"},
-                "agentCheckout": str(checkout),
-                **body,
-            },
+            {**request, "expectedTotal": expected_total},
             format="json",
-            HTTP_X_CART_ID=str((cart or self.checkout.cart).uuid),
-            HTTP_X_INTERNAL_GATEWAY=secret,
-            HTTP_X_LANGUAGE="en",
+            **headers,
         )
 
     @pytest.mark.parametrize("pay_way", ["viva", "cod"])
@@ -358,7 +382,14 @@ class TestThroughTheEndpoint:
         ShippingProvider.objects.filter(code="flat_rate").update(
             is_active=False
         )
-        refused = self._post(self.cod, uuid4(), cart=other.cart, **carrier)
+        # The quote refuses the switched-off carrier as well.
+        refused = self._post(
+            self.cod,
+            uuid4(),
+            cart=other.cart,
+            expected_total=UNQUOTED,
+            **carrier,
+        )
         assert refused.status_code == status.HTTP_400_BAD_REQUEST
         assert refused.json()["code"] == "shipping_provider_unavailable"
 
@@ -469,25 +500,30 @@ class TestThroughTheEndpoint:
         assert not Order.objects.exists()
 
     def test_an_order_without_a_checkout_shows_none(self):
-        response = APIClient().post(
+        client = APIClient()
+        headers = {
+            "HTTP_X_CART_ID": str(self.checkout.cart.uuid),
+            "HTTP_X_LANGUAGE": "en",
+        }
+        body = {
+            "payWayId": self.cod.id,
+            "termsAccepted": True,
+            "firstName": "Maria",
+            "lastName": "Papadopoulou",
+            "email": "maria@example.com",
+            "street": "Ermou",
+            "streetNumber": "1",
+            "city": "Athens",
+            "zipcode": "10563",
+            "countryId": self.checkout.country.alpha_2,
+            "regionId": self.region.alpha,
+            "phone": "+306900000000",
+        }
+        response = client.post(
             reverse("order-list"),
-            {
-                "payWayId": self.cod.id,
-                "termsAccepted": True,
-                "firstName": "Maria",
-                "lastName": "Papadopoulou",
-                "email": "maria@example.com",
-                "street": "Ermou",
-                "streetNumber": "1",
-                "city": "Athens",
-                "zipcode": "10563",
-                "countryId": self.checkout.country.alpha_2,
-                "regionId": self.region.alpha,
-                "phone": "+306900000000",
-            },
+            quoted_body(client, body, **headers),
             format="json",
-            HTTP_X_CART_ID=str(self.checkout.cart.uuid),
-            HTTP_X_LANGUAGE="en",
+            **headers,
         )
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
@@ -516,12 +552,14 @@ class TestTwoCallsOfOneCheckoutRacing:
         placed, failures = race(
             lambda: (
                 OrderService.create_order_from_cart_offline(
-                    legal_acceptance=acceptance,
-                    cart=cart.cart,
-                    shipping_address=cart.address(),
-                    pay_way=pay_way,
-                    attribution=AGENT,
-                    agent_checkout=checkout,
+                    **priced(
+                        legal_acceptance=acceptance,
+                        cart=cart.cart,
+                        shipping_address=cart.address(),
+                        pay_way=pay_way,
+                        attribution=AGENT,
+                        agent_checkout=checkout,
+                    )
                 ).pk
             )
         )
@@ -554,6 +592,16 @@ class TestTwoCallsOfOneCheckoutRacing:
             "attribution": {"agentProtocol": "ucp"},
             "agentCheckout": str(checkout),
         }
+        with patch(
+            "pay_way.services.PayWayService.is_provider_configured",
+            return_value=True,
+        ):
+            body = quoted_body(
+                APIClient(),
+                body,
+                HTTP_X_CART_ID=str(cart.cart.uuid),
+                HTTP_X_INTERNAL_GATEWAY=GATEWAY_SECRET,
+            )
 
         def post():
             response = APIClient().post(

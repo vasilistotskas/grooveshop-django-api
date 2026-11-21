@@ -43070,11 +43070,9 @@ components:
           - $ref: '#/components/schemas/ExpectedTotalRequest'
           writeOnly: true
           description: 'Το σύνολο που είδε ο αγοραστής: το ``expectedTotal`` του ``POST
-            /cart/quote``, ή το οφειλόμενο ποσό που υπολόγισε ο ίδιος ο client, σε
-            υποδιαιρέσεις του νομίσματος. Όταν αποστέλλεται, η παραγγελία δημιουργείται
-            μόνο αν είναι ακριβώς το οφειλόμενο ποσό που υπολογίζεται τώρα· διαφορετικά
-            η απάντηση είναι 409 ``total_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται
-            τίποτα.'
+            /cart/quote``. Η παραγγελία δημιουργείται μόνο αν είναι ακριβώς το οφειλόμενο
+            ποσό που υπολογίζεται τώρα· διαφορετικά η απάντηση είναι 409 ``total_changed``
+            με τη νέα κοστολόγηση και δεν δημιουργείται τίποτα.'
         expectedCartDigest:
           type: string
           writeOnly: true
@@ -43115,6 +43113,7 @@ components:
       required:
       - countryId
       - email
+      - expectedTotal
       - firstName
       - lastName
       - payWayId

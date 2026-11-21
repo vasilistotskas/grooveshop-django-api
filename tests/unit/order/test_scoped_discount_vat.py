@@ -35,6 +35,7 @@ from product.factories import ProductCategoryFactory, ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
 from promotion.services import PromotionEngine
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.mydata import issuable, mydata_enabled
 from tests.utils.shipping import enable_rate
@@ -115,28 +116,30 @@ def _checkout(cart, *, user=None, points=None):
     country = CountryFactory()
     enable_rate(country, price=SHIPPING, free_shipping_threshold=None)
     return OrderService.create_order_from_cart_offline(
-        legal_acceptance=checkout_acceptance(),
-        cart=cart,
-        shipping_address={
-            "first_name": "Maria",
-            "last_name": "Papadopoulou",
-            "email": "maria@example.com",
-            "street": "Ermou",
-            "street_number": "1",
-            "city": "Athens",
-            "zipcode": "10563",
-            "country_id": country.alpha_2,
-            "phone": "+306900000000",
-            "shipping_kind": "home_delivery",
-        },
-        pay_way=PayWayFactory(
-            settlement=PaySettlement.COURIER_CASH,
-            active=True,
-            cost=Money(D(0), "EUR"),
-            free_threshold=Money(D(0), "EUR"),
-        ),
-        user=user,
-        loyalty_points_to_redeem=points,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address={
+                "first_name": "Maria",
+                "last_name": "Papadopoulou",
+                "email": "maria@example.com",
+                "street": "Ermou",
+                "street_number": "1",
+                "city": "Athens",
+                "zipcode": "10563",
+                "country_id": country.alpha_2,
+                "phone": "+306900000000",
+                "shipping_kind": "home_delivery",
+            },
+            pay_way=PayWayFactory(
+                settlement=PaySettlement.COURIER_CASH,
+                active=True,
+                cost=Money(D(0), "EUR"),
+                free_threshold=Money(D(0), "EUR"),
+            ),
+            user=user,
+            loyalty_points_to_redeem=points,
+        )
     )
 
 
@@ -518,23 +521,25 @@ class TestPaymentFirstPath:
                 {"payment_id": "pi_scoped", "status": "succeeded"},
             )
             order = OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=_cart((food, 1), (other, 1), user=user),
-                shipping_address={
-                    "first_name": "Maria",
-                    "last_name": "Papadopoulou",
-                    "email": "maria@example.com",
-                    "street": "Ermou",
-                    "street_number": "1",
-                    "city": "Athens",
-                    "zipcode": "10563",
-                    "country_id": country.alpha_2,
-                    "phone": "+306900000000",
-                    "shipping_kind": "home_delivery",
-                },
-                payment_intent_id="pi_scoped",
-                pay_way=PayWayFactory(provider_code="stripe"),
-                user=user,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=_cart((food, 1), (other, 1), user=user),
+                    shipping_address={
+                        "first_name": "Maria",
+                        "last_name": "Papadopoulou",
+                        "email": "maria@example.com",
+                        "street": "Ermou",
+                        "street_number": "1",
+                        "city": "Athens",
+                        "zipcode": "10563",
+                        "country_id": country.alpha_2,
+                        "phone": "+306900000000",
+                        "shipping_kind": "home_delivery",
+                    },
+                    payment_intent_id="pi_scoped",
+                    pay_way=PayWayFactory(provider_code="stripe"),
+                    user=user,
+                )
             )
 
         assert _allocation(order) == {food.pk: D("56.50"), other.pk: D(0)}

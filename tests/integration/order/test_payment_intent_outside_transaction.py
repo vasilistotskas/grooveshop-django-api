@@ -34,6 +34,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from product.models.product import Product
+from tests.utils.checkout import priced, quoted_total
 from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
 
@@ -81,14 +82,17 @@ class TestIntentIsReadOutsideTheTransaction:
         CartItem.objects.create(cart=cart, product=self.product, quantity=2)
         return cart
 
-    def _create(self, payment_intent_id, *, cart=None):
+    def _create(self, payment_intent_id, *, cart=None, **expected):
         return OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart or self.cart,
-            shipping_address=self.shipping_address,
-            payment_intent_id=payment_intent_id,
-            pay_way=self.pay_way,
-            user=None,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart or self.cart,
+                shipping_address=self.shipping_address,
+                payment_intent_id=payment_intent_id,
+                pay_way=self.pay_way,
+                user=None,
+                **expected,
+            )
         )
 
     @staticmethod
@@ -175,9 +179,16 @@ class TestIntentIsReadOutsideTheTransaction:
 
         mock_get_provider.return_value = self._provider(read)
         stock_before = Product.objects.get(pk=self.product.pk).stock
+        # The buyer's total agrees with the server's (it was quoted at the
+        # new price), so only the intent's amount is stale: the comparison
+        # under the lock with the provider's figure is what refuses it.
+        cart = self._cart()
+        Product.objects.filter(pk=self.product.pk).update(price=_eur("60.00"))
+        shown = quoted_total(cart, self.shipping_address, pay_way=self.pay_way)
+        Product.objects.filter(pk=self.product.pk).update(price=_eur("50.00"))
 
         with pytest.raises(PaymentAmountMismatchError):
-            self._create("pi_stale", cart=self._cart())
+            self._create("pi_stale", cart=cart, expected_total=shown)
 
         assert not Order.objects.filter(payment_id="pi_stale").exists()
         assert Product.objects.get(pk=self.product.pk).stock == stock_before, (

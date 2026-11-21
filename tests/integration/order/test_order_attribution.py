@@ -29,6 +29,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -86,27 +87,31 @@ class TestOrderAttributionOnCreate(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def _post(self, pay_way, *, user_agent="", gateway_secret="", **extra):
+        headers = {
+            "HTTP_X_CART_ID": str(self.cart.uuid),
+            "HTTP_USER_AGENT": user_agent,
+            "HTTP_X_INTERNAL_GATEWAY": gateway_secret,
+        }
+        body = {
+            "payWayId": pay_way.id,
+            "termsAccepted": True,
+            "firstName": "Maria",
+            "lastName": "Papadopoulou",
+            "email": "maria@example.com",
+            "street": "Ermou",
+            "streetNumber": "1",
+            "city": "Athens",
+            "zipcode": "10563",
+            "countryId": self.country.alpha_2,
+            "regionId": self.region.alpha,
+            "phone": "+306900000000",
+            **extra,
+        }
         return self.client.post(
             self.url,
-            {
-                "payWayId": pay_way.id,
-                "termsAccepted": True,
-                "firstName": "Maria",
-                "lastName": "Papadopoulou",
-                "email": "maria@example.com",
-                "street": "Ermou",
-                "streetNumber": "1",
-                "city": "Athens",
-                "zipcode": "10563",
-                "countryId": self.country.alpha_2,
-                "regionId": self.region.alpha,
-                "phone": "+306900000000",
-                **extra,
-            },
+            quoted_body(self.client, body, **headers),
             format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-            HTTP_USER_AGENT=user_agent,
-            HTTP_X_INTERNAL_GATEWAY=gateway_secret,
+            **headers,
         )
 
     def _cod(self):

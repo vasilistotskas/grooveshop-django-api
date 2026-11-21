@@ -21,7 +21,8 @@
 
 <div class="email-card" style="border-left: 4px solid #2563eb;">
     <h3>{% trans "Complete your payment" %}</h3>
-    <p>{% trans "Nothing was charged. Your order is registered unpaid — contact us to complete the payment." %}</p>
+    <p>{% trans "Nothing was charged. Your order is registered unpaid." %}</p>
+    <p>{% if not order_url %}{% trans "Contact us to complete the payment." %}{% elif order.payment_hold_expires_at %}{% blocktrans with deadline=order.payment_hold_expires_at|date:"SHORT_DATETIME_FORMAT" %}You can complete the payment from your order page until {{ deadline }}.{% endblocktrans %}{% else %}{% trans "You can complete the payment from your order page." %}{% endif %}</p>
     {% if order_url %}
     <p>
         <a href="{{ order_url }}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: bold;">

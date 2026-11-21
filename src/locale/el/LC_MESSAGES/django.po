@@ -3631,6 +3631,9 @@ msgstr "Μήνυμα από τη φόρμα επικοινωνίας"
 msgid "Contact us"
 msgstr "Επικοινωνήστε μαζί μας"
 
+msgid "Contact us to complete the payment."
+msgstr "Επικοινωνήστε μαζί μας για να ολοκληρώσετε την πληρωμή."
+
 msgid "Contacts"
 msgstr "Επικοινωνίες"
 
@@ -9486,8 +9489,8 @@ msgstr "Δεν διατηρήθηκε τίποτα"
 msgid "Nothing to issue"
 msgstr "Τίποτα προς έκδοση"
 
-msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
-msgstr "Δεν έγινε καμία χρέωση. Η παραγγελία σας καταχωρήθηκε απλήρωτη — επικοινωνήστε μαζί μας για να ολοκληρώσετε την πληρωμή."
+msgid "Nothing was charged. Your order is registered unpaid."
+msgstr "Δεν έγινε καμία χρέωση. Η παραγγελία σας έχει καταχωρηθεί ως απλήρωτη."
 
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Δεν αποθηκεύτηκε τίποτα. Διορθώστε τα κείμενα που επισημαίνονται."
@@ -13032,6 +13035,9 @@ msgstr "Επιλέξτε έγκυρη χώρα."
 
 msgid "Select a valid region."
 msgstr "Επιλέξτε έγκυρη περιοχή."
+
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
 
 msgid "Select all"
 msgstr "Επιλογή όλων"
@@ -17417,6 +17423,13 @@ msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάπ
 
 msgid "You are signed in"
 msgstr "Έχετε συνδεθεί"
+
+#, python-format
+msgid "You can complete the payment from your order page until %(deadline)s."
+msgstr "Μπορείτε να ολοκληρώσετε την πληρωμή από τη σελίδα της παραγγελίας σας έως %(deadline)s."
+
+msgid "You can complete the payment from your order page."
+msgstr "Μπορείτε να ολοκληρώσετε την πληρωμή από τη σελίδα της παραγγελίας σας."
 
 msgid "You can only delete your own account."
 msgstr "Μπορείτε να διαγράψετε μόνο τον δικό σας λογαριασμό."

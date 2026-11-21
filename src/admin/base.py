@@ -37,7 +37,11 @@ from unfold.mixins import FormFieldModelAdminMixin
 from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.filters import RelatedDropdownFilter
-from admin.mixins import FeatureGatedModelAdmin, WithheldOnTenantHostModelAdmin
+from admin.mixins import (
+    ActionLocationModelAdmin,
+    FeatureGatedModelAdmin,
+    WithheldOnTenantHostModelAdmin,
+)
 from core.json_schema import schema_validator
 
 
@@ -65,7 +69,10 @@ def unfold_filter_for(field: models.Field) -> type:
 
 
 class BaseModelAdmin(
-    FeatureGatedModelAdmin, WithheldOnTenantHostModelAdmin, ModelAdmin
+    ActionLocationModelAdmin,
+    FeatureGatedModelAdmin,
+    WithheldOnTenantHostModelAdmin,
+    ModelAdmin,
 ):
     """Project-wide defaults for unfold ModelAdmin.
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from django.contrib.admin.options import ActionLocation
 from django.forms.models import _get_foreign_key
+from django.utils.translation import gettext as _
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from admin.features import (
     PLACEMENTS,
@@ -11,6 +14,28 @@ from admin.features import (
     Placement,
     store_features,
 )
+
+
+class ActionLocationModelAdmin(UnfoldModelAdmin):
+    """Keeps Django's ``action_location`` through Unfold's action choices.
+
+    Replaces ``unfold.admin.ModelAdmin.get_action_choices``, which has
+    Django 5.x's signature: it drops ``action_location`` and so triggers
+    ``RemovedInDjango2028Warning`` on every changelist. This calls the
+    method Unfold overrides, with Unfold's blank "Select action" choice.
+    Delete it once Unfold accepts ``action_location``. It must precede
+    Unfold's ``ModelAdmin`` in the bases.
+    """
+
+    def get_action_choices(
+        self,
+        request,
+        default_choices=None,
+        action_location=ActionLocation.CHANGE_LIST,
+    ):
+        return super(UnfoldModelAdmin, self).get_action_choices(
+            request, [("", _("Select action"))], action_location
+        )
 
 
 class AdminFooterMixin:

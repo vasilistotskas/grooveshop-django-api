@@ -1496,10 +1496,10 @@ class OrderViewSet(BaseModelViewSet):
         # Step 1: Get cart from request
         cart, user = self._get_cart_and_user(request)
 
-        # Step 2: Validate cart is ready for checkout
-        validation_result = OrderService.validate_cart_for_checkout(cart)
-        if not validation_result.get("valid", False):
-            raise CartNotReadyError.from_validation(validation_result)
+        # The cart is validated by the service, under its row lock, and
+        # after a repeat of the same checkout resumed the cart's unpaid
+        # order (#694): that order holds the cart's stock, the last units
+        # included, so a check here would refuse the repeat it resumes.
 
         # Step 3: Build and validate shipping address from validated data
         shipping_address = self._build_shipping_address_from_validated(

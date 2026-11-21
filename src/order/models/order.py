@@ -163,11 +163,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     #: The paths inside ``metadata`` that hold the buyer's own data: the
     #: browser identity the Conversions API reads (IP address, user agent,
-    #: Meta's browser and click ids) and the reason typed when cancelling.
-    #: Exported and erased with ``PERSONAL_FIELDS``.
+    #: Meta's browser and click ids), the reason typed when cancelling, and
+    #: the checkout's fingerprint, an HMAC of the address among the rest
+    #: (``order.checkout.resume``). Exported and erased with
+    #: ``PERSONAL_FIELDS``.
     PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
         ("meta",),
         ("cancellation", "reason"),
+        ("checkout_fingerprint",),
     )
 
     id = models.BigAutoField(primary_key=True)

@@ -23,11 +23,22 @@ def throttle_modules() -> list:
 
 
 def project_throttle_classes() -> dict[str, type[SimpleRateThrottle]]:
-    """Each throttle class by name, from the module that defines it."""
-    return {
-        name: cls
-        for module in throttle_modules()
-        for name, cls in inspect.getmembers(module, inspect.isclass)
-        if issubclass(cls, SimpleRateThrottle)
-        and cls.__module__ == module.__name__
-    }
+    """Each throttle class by name, from the module that defines it.
+
+    Two modules defining one name fail here: the second would hide the
+    first from every check that reads this map.
+    """
+    found: dict[str, type[SimpleRateThrottle]] = {}
+    for module in throttle_modules():
+        for name, cls in inspect.getmembers(module, inspect.isclass):
+            if not issubclass(cls, SimpleRateThrottle):
+                continue
+            if cls.__module__ != module.__name__:
+                continue
+            if name in found:
+                raise AssertionError(
+                    f"Throttle {name} is defined in both "
+                    f"{found[name].__module__} and {module.__name__}"
+                )
+            found[name] = cls
+    return found

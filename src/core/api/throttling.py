@@ -109,7 +109,7 @@ class ResilientThrottleMixin:
     def take(self, request, view) -> bool:
         """The budget check itself, which the outage policy above wraps:
         DRF's. A budget that must count requests arriving together
-        overrides it (``GiftCardCheckThrottle``)."""
+        overrides it (``giftcard.throttles.GiftCardCheckThrottle``)."""
         return super().allow_request(request, view)  # type: ignore[misc]
 
 
@@ -178,7 +178,7 @@ class GatewayIdentMixin(ResilientThrottleMixin):
     address where the route names no order (the gift-card purchase).
 
     The rule lives here, once, for both halves of a pair
-    (``GatewayAnonThrottle`` and the ``UserRateThrottle`` beside it),
+    (``GatewayAnonThrottle`` and ``GatewayUserRateThrottle``),
     for ``GiftCardCodeThrottle`` and for ``CouponApplyThrottle``.
     """
 

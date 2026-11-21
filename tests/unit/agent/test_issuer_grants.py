@@ -16,12 +16,9 @@ from django.utils import timezone
 from rest_framework import status
 
 from agent.checks import CIMD_ENABLED, client_metadata_documents_stay_off
-from agent.oidc import (
-    CLIENT_GRANT_TYPES,
-    AgentOIDCAdapter,
-    device_flow_not_offered,
-)
+from agent.oidc import CLIENT_GRANT_TYPES, AgentOIDCAdapter
 from agent.staff import STAFF_CLIENT_SCOPES
+from core.views import device_flow_not_offered
 from tests.unit.agent.test_agent_api import AgentAPITestCase
 
 

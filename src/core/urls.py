@@ -18,7 +18,6 @@ from drf_spectacular.views import (
 
 import core.filters.camel_case_filters
 import core.filters.camel_case_ordering  # noqa
-from agent.oidc import device_flow_not_offered
 from core.api.health_api import health_check, health_live
 from core.api.settings_api import (
     get_public_settings,
@@ -29,6 +28,7 @@ from core.rosetta_views import DBBackedTranslationFormView
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
+    device_flow_not_offered,
     robots_txt,
     set_language,
     upload_image,

@@ -4,7 +4,6 @@ from allauth.idp.oidc.adapter import DefaultOIDCAdapter
 from allauth.idp.oidc.internal.resources import is_resources_subset
 from allauth.idp.oidc.models import Client
 from django.core.exceptions import ValidationError
-from django.http import Http404
 from django.utils.translation import gettext_lazy as _
 
 from agent.staff import (
@@ -42,14 +41,6 @@ LINKING_SCOPES = (
 CLIENT_GRANT_TYPES: frozenset[str] = frozenset(
     {Client.GrantType.AUTHORIZATION_CODE, Client.GrantType.REFRESH_TOKEN}
 )
-
-
-def device_flow_not_offered(request, *args, **kwargs):
-    """The device flow's routes, on both issuers: no client may register its
-    grant (``CLIENT_GRANT_TYPES``), and its pages sign people in through
-    allauth's account login, which knows neither the staff lockouts nor the
-    superuser's second factor."""
-    raise Http404
 
 
 # Where a store's MCP server lives on its own domain, routed to the agent

@@ -14,12 +14,12 @@ from allauth.idp.oidc import views as oidc_views
 from django.contrib.auth.views import LogoutView
 from django.urls import include, path, reverse_lazy
 
-from agent.oidc import device_flow_not_offered
 from agent.staff_connect import (
     LOGIN_URL_NAME,
     StaffAuthorizationView,
     StaffConnectLoginView,
 )
+from core.views import device_flow_not_offered
 
 urlpatterns = [
     # Ahead of allauth's include, so these answer the same paths.

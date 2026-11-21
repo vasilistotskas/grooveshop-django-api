@@ -475,9 +475,9 @@ The strip posts the impression from its own `onMounted`, which under
 `hydrate-on-visible` fires when it scrolls into view — "shown", not
 "served" — with no `impressionId`: `recommendation_event` mints one, records
 the impression with that request's own session, cart and customer, and
-answers with it. The `impressionId` in the suggestions body is shared by
-every viewer of a cached copy and is not the showing's. The strip sends
-the minted id on its clicks through
+answers with it; an impression that brings an id of its own is refused
+(`400 impression_id_minted`), and the suggestions body names none. The strip
+sends the minted id on its clicks through
 `server/api/analytics/recommendation-event.post.ts`,
 carrying the cart's identity headers so an `attach` can later be
 correlated against the same basket. The click also remembers the

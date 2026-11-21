@@ -1781,6 +1781,9 @@ msgstr "An error occurred while processing your request."
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
 
+msgid "An impression's id is minted when it is recorded."
+msgstr "An impression's id is minted when it is recorded."
+
 msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 msgstr "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 
@@ -13372,9 +13375,6 @@ msgstr "Shared by (staff)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 
-msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-
 msgid "Shared text"
 msgstr "Shared text"
 
@@ -15217,8 +15217,8 @@ msgstr "The shipment whose voucher request returned this voucher after another o
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
 
-msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
-msgstr "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgid "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
+msgstr "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
@@ -18834,6 +18834,9 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Setting '%(key)s' not found"
+
+#~ msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+#~ msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
 
 #~ msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
 #~ msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."

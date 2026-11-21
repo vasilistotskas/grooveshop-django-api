@@ -1786,6 +1786,9 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επεξεργα
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορά του προϊόντος στο απόθεμα. Δοκιμάστε ξανά αργότερα."
 
+msgid "An impression's id is minted when it is recorded."
+msgstr "Το αναγνωριστικό μιας προβολής δημιουργείται όταν αυτή καταγράφεται."
+
 msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 msgstr "Ένα αδιαφανές αποτύπωμα του τι θα περιέχει η παραγγελία: οι γραμμές, οι προωθητικές ενέργειες και η αποστολή με το σημείο παραλαβής της, όχι ο τρόπος πληρωμής. Null μέχρι να επιλεγεί αποστολή. Στείλτε το πίσω ως ``expectedCartDigest`` κατά τη δημιουργία της παραγγελίας: η παραγγελία δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό."
 
@@ -13378,9 +13381,6 @@ msgstr "Κοινοποιήθηκε από (προσωπικό)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Κοινό σε όλα τα μερίδια μιας επιστροφής ανά γραμμή, ώστε η επανάληψή της να τα βρίσκει μαζί."
 
-msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
-
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
 
@@ -15219,8 +15219,8 @@ msgstr "Η αποστολή της οποίας το αίτημα voucher επέ
 msgid "The shipping of this order was already refunded."
 msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
 
-msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
-msgstr "Το αναγνωριστικό της εμφάνισης. Μην το στέλνετε σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που καταγράφηκε για αυτή την εμφάνιση, το οποίο φέρουν στη συνέχεια τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί. Ένα κλικ πρέπει να το φέρει."
+msgid "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
+msgstr "Το αναγνωριστικό της εμφάνισης, που φέρει ένα κλικ. Μια προβολή δεν έχει: η απόκρισή της αναφέρει το αναγνωριστικό που δημιουργήθηκε για αυτή την εμφάνιση, το οποίο φέρουν τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
@@ -19468,6 +19468,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"
 #~ msgstr "Όνομα κλειδιού ρύθμισης (π.χ. CHECKOUT_SHIPPING_PRICE)"
+
+#~ msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+#~ msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
 
 #~ msgid "Shipment Summary"
 #~ msgstr "Σύνοψη Αποστολής"

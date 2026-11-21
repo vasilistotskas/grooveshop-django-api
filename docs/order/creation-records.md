@@ -8,7 +8,7 @@ and says which file holds each § number used here.
 Every order created by either checkout path gets exactly one
 `OrderAttribution` row (`src/order/models/attribution.py`, one-to-one,
 `related_name="attribution"`), written by `OrderAttributionService.record`
-(`src/order/services.py`) right after `Order.objects.create` inside the
+(`src/order/checkout/attribution_service.py`) right after `Order.objects.create` inside the
 creation transaction. A checkout order with no signal at all gets a
 `direct` row, so for checkout orders **no row** means placed before the
 table existed (`0059_orderattribution`, no backfill), never "direct".

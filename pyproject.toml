@@ -772,9 +772,13 @@ protected_modules = ["order.signals.handlers"]
 allowed_importers = ["order.apps"]
 
 [[tool.importlinter.contracts]]
-name = "order.services imports neither the tasks nor the refund reconciliation"
+name = "order's services import neither the tasks nor the refund reconciliation"
 type = "forbidden"
-source_modules = ["order.services"]
+source_modules = [
+    "order.lifecycle.service",
+    "order.refunds.service",
+    "order.services",
+]
 forbidden_modules = ["order.refunds.refund_reconciliation", "order.tasks"]
 allow_indirect_imports = true
 

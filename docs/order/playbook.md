@@ -33,7 +33,7 @@ and says which file holds each § number used here.
 ### 9.2 Adding a new order status
 
 1. Add the value to `OrderStatus` in `src/order/enum/status.py`.
-2. Update the transition table in `OrderLifecycleService.update_order_status`. A status
+2. Update the transition table, `ALLOWED_TRANSITIONS` in `src/order/lifecycle/service.py`. A status
    that has to do more than change the label (as CANCELED does) gets its own
    service method instead of a row.
 3. Add a Greek translation in `src/locale/el/LC_MESSAGES/django.po`, run

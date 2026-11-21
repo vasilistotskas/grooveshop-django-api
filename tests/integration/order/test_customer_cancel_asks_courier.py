@@ -508,7 +508,7 @@ class TestTheOrderMovesOnWhileTheCourierAnswers:
 
         with (
             FakeVivaApi() as viva,
-            caplog.at_level(logging.ERROR, logger="order.services"),
+            caplog.at_level(logging.ERROR, logger="order.lifecycle.service"),
         ):
             response = _cancel(_owner_client(order), order)
 

@@ -1,5 +1,6 @@
 """Refusal and failure branches of ``RefundService.refund_order`` and the
-refund leg of ``OrderLifecycleService.cancel_order`` (``src/order/services.py``).
+refund leg of ``OrderLifecycleService.cancel_order``
+(``src/order/refunds/service.py``, ``src/order/lifecycle/service.py``).
 
 The happy paths are covered in ``test_service_order.py`` and
 ``test_partial_refunds.py``; this module pins what happens when a refund

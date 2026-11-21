@@ -334,6 +334,17 @@ class ShippingRefusedError(InvalidOrderDataError):
         )
 
 
+class PickupPointTooSmallError(InvalidOrderDataError):
+    """Raised when the chosen pickup point has no compartment for the
+    cart's parcel. Answered by order creation as the field error
+    ``pickup_point_too_small`` on the carrier's location field."""
+
+    def __init__(self, field: str, message: str):
+        self.field = field
+        self.message = message
+        super().__init__(message, field_errors={field: [message]})
+
+
 class ShippingPriceUnresolvedError(InvalidOrderDataError):
     """Raised by the locked quote of order creation when the carrier's
     live price for the delivery was not resolved before the locks were

@@ -91,7 +91,7 @@ class TestTheLockerSync:
         written, so this sync's one write is the deactivating
         ``update``, which sends no signal."""
         codes, reset = purged
-        BoxNowLockerFactory(external_id="old-1")
+        BoxNowLockerFactory(external_id="old-1", consecutive_absent_syncs=2)
         reset()
 
         result = _sync_lockers([_destination("kept-1", country="")])

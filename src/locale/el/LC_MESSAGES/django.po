@@ -2052,6 +2052,9 @@ msgstr "Οι αυτόματες προσφορές εφαρμόζονται σε
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Αυτόματες προσφορές στις οποίες λείπει ακριβώς μία ελάχιστη προϋπόθεση (ποσό, τεμάχια ή προϊόν-ανταμοιβή) — 'πρόσθεσε X ακόμα για να την ξεκλειδώσεις'"
 
+msgid "Availability probability"
+msgstr "Πιθανότητα διαθεσιμότητας"
+
 msgid "Available Locales"
 msgstr "Διαθέσιμες Γλώσσες"
 
@@ -2096,6 +2099,9 @@ msgstr "Μεταφορέας BOX NOW"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "Δέμα BOX NOW στο locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "Η εκτίμηση της BOX NOW, από 0 έως 1, ότι το locker έχει ελεύθερη θυρίδα. Κενό σημαίνει άγνωστη."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "Οι προσφορές BXGY απαιτούν τόσο ποσότητα αγοράς όσο και ποσότητα λήψης."
@@ -3470,6 +3476,9 @@ msgstr "Σύγκριση με"
 msgid "Compartment Size"
 msgstr "Μέγεθος θυρίδας"
 
+msgid "Compartment sizes"
+msgstr "Μεγέθη θυρίδων"
+
 msgid "Complete"
 msgstr "Πλήρες"
 
@@ -3569,6 +3578,9 @@ msgstr "Επιβεβαιώθηκε χειροκίνητα"
 
 msgid "Connection or timeout"
 msgstr "Σύνδεση ή χρονικό όριο"
+
+msgid "Consecutive absent syncs"
+msgstr "Συνεχόμενοι συγχρονισμοί χωρίς το locker"
 
 msgid "Consent"
 msgstr "Συγκατάθεση"
@@ -9695,6 +9707,9 @@ msgstr "Μόνο για προϊόντα που μπορούν να πουληθ
 msgid "Only images of this store can be imported, not other sites."
 msgstr "Εισάγονται μόνο εικόνες αυτού του καταστήματος, όχι άλλων ιστότοπων."
 
+msgid "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches."
+msgstr "Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2 μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ."
+
 msgid "Only one active newsletter topic can be the default."
 msgstr "Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
 
@@ -10474,6 +10489,9 @@ msgstr "Συνεργαζόμενο κατάστημα (2)"
 
 msgid "Partner shop (3)"
 msgstr "Συνεργαζόμενο κατάστημα (3)"
+
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Συνεχόμενοι συγχρονισμοί με τον συνεργάτη που δεν επέστρεψαν το locker. Αποσύρεται όταν φτάσει τη ρύθμιση BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
 
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Ο κωδικός πρόσβασης έγινε δεκτός. Επιβεβαιώστε ότι είστε εσείς με έναν κωδικό."
@@ -14723,6 +14741,12 @@ msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης το�
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
 
+msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3 μεγάλο). Κενό όταν δεν είναι γνωστά: το locker τότε δεν ταιριάζει σε καμία παραγγελία."
+
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker, από τον δημόσιο κατάλογο lockers της BOX NOW. Κενό σημαίνει άγνωστα: ποτέ ότι δέχεται κάθε μέγεθος."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."
 
@@ -14931,6 +14955,9 @@ msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από �
 
 msgid "The link search is not valid."
 msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη."
+
+msgid "The locker compartment size the cart packs into (1 small, 2 medium, 3 large) on a BOX NOW pickup option; null elsewhere and when the cart fits none. Pass it as ``compartmentSize`` to list the lockers that take this cart."
+msgstr "Το μέγεθος θυρίδας locker στο οποίο χωράει το καλάθι (1 μικρό, 2 μεσαίο, 3 μεγάλο) σε μια επιλογή παραλαβής BOX NOW· null αλλού και όταν το καλάθι δεν χωράει σε κανένα. Στείλτε το ως ``compartmentSize`` για να δείτε τα lockers που δέχονται αυτό το καλάθι."
 
 msgid "The locker's BOX NOW id, exactly."
 msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
@@ -15515,6 +15542,9 @@ msgstr "Αυτός ο σύνδεσμος δεν ισχύει πια: χρησι�
 msgid "This list does not take that filter."
 msgstr "Αυτή η λίστα δεν δέχεται αυτό το φίλτρο."
 
+msgid "This locker has no compartment for your order's size. Choose another one."
+msgstr "Αυτό το locker δεν έχει θυρίδα για το μέγεθος της παραγγελίας σας. Διαλέξτε άλλο."
+
 msgid "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
 msgstr "Αυτό μοιάζει με ταχυδρομικό κώδικα. Εισαγάγετε εδώ τον αριθμό οδού και τον ταχυδρομικό κώδικα στο αντίστοιχο πεδίο."
 
@@ -15988,6 +16018,9 @@ msgstr "True αν η δέσμευση μετατράπηκε σε πραγματ
 
 msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr "True αν έχει σταλεί email στον πελάτη για αυτή την εγκαταλελειμμένη δέσμευση"
+
+msgid "True when BOX NOW rates the chance of a free compartment below BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
+msgstr "Αληθές όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· ψευδές όταν δεν είναι γνωστή."
 
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True όταν το ``weight_grams`` του αιτήματος ξεπερνά το ``max_weight_grams``. Η επιλογή επιστρέφεται κανονικά αντί να κρύβεται — το κατάστημα τη δείχνει απενεργοποιημένη με την αιτία, ώστε ένα βαρύ καλάθι να μη βλέπει ποτέ μια επιλογή λιγότερη χωρίς εξήγηση."

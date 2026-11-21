@@ -133,6 +133,52 @@ BOXNOW_RETRY_AFTER_MAX_SECONDS = int(
     getenv("BOXNOW_RETRY_AFTER_MAX_SECONDS", "900")
 )
 
+# BOX NOW's public locker catalogue: the file its own map widget reads
+# (https://map.boxnow.gr/config.js names the base and environment). It is
+# the only source of a locker's compartment sizes and availability: the
+# partner API's destinations carry neither, and its ``requiredSize``
+# filter returns the same lockers for every size (measured on production,
+# 2026-11-21). BOX NOW documents neither the file nor its shape; it is the
+# widget's internals, so the sync validates it strictly and keeps what it
+# holds when the shape changes (``shipping_boxnow.catalogue``).
+BOXNOW_LOCKER_CATALOGUE_URL = getenv(
+    "BOXNOW_LOCKER_CATALOGUE_URL",
+    "https://globallockersprod.z28.web.core.windows.net"
+    "/PROD/{country}/lockers/all.json",
+)
+# The catalogue's country path segment, by ISO 3166-1 alpha-2 code (the
+# widget's ``codeToCountry.js``). A country not listed has no catalogue.
+BOXNOW_LOCKER_CATALOGUE_COUNTRIES = {
+    "GR": "greece",
+    "CY": "cyprus",
+    "BG": "bulgaria",
+    "HR": "croatia",
+    "SI": "slovenia",
+}
+BOXNOW_LOCKER_CATALOGUE_MAX_BYTES = int(
+    getenv("BOXNOW_LOCKER_CATALOGUE_MAX_BYTES", str(8 * 1024 * 1024))
+)
+# A locker whose catalogue ``probability`` is below this is shown with the
+# "limited availability" marker. Source: BOX NOW's widget, which marks a
+# locker available from 0.87 (its ``acceptLocker.js``).
+BOXNOW_LIMITED_AVAILABILITY_BELOW = float(
+    getenv("BOXNOW_LIMITED_AVAILABILITY_BELOW", "0.87")
+)
+# The partner list churns about 3% a day (62 rows left and 48 joined in
+# 14 hours, production 2026-11-21), so one absence withdraws nothing. A
+# locker is deactivated after this many daily syncs in a row without it:
+# about 48 hours at the daily 02:00 sync (``sync-boxnow-lockers``). Derive
+# it again when that cadence changes.
+BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION = int(
+    getenv("BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION", "3")
+)
+# A partner list smaller than this fraction of the active lockers is an
+# error response, not a withdrawal of the rest: the sync logs it and
+# touches nothing, counters included.
+BOXNOW_LOCKER_SYNC_MIN_FRACTION = float(
+    getenv("BOXNOW_LOCKER_SYNC_MIN_FRACTION", "0.5")
+)
+
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing
 # code, station origin) lives ONLY on the ``Tenant`` model (see

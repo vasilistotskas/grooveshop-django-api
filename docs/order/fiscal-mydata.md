@@ -242,7 +242,7 @@ is the one reconciliation (under the order row lock, idempotent) and the
 registered yet. It is dispatched by:
 
 - `handle_order_refunded`: every refund path ends in
-  `PaymentLedger.record_refund` and signals `order_refunded` once per REFUND
+  `RefundService.book_refund` and signals `order_refunded` once per REFUND
   row (in-app refund, the staff "Refund" action, `cancel_order`, Stripe
   `refund.created`, Viva reversal 1797), so each refund gets one document,
   `RetailCredit.refund` being one-to-one;

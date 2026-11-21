@@ -818,8 +818,9 @@ allow_indirect_imports = true
 # (#658: accounting -> payments). Every payments module imports the order
 # models, which reach every app and so every subpackage, so the layers
 # contract above cannot hold it without one ignored chain per module: this
-# contract checks its direct imports. The one ignored edge is the ledger
-# booking a refund's allocation (#658), removed by #658's refund booking.
+# contract checks its direct imports. A refund is booked above both, by
+# ``order.refunds.service.RefundService`` (#658), so the ledger imports
+# none of them.
 [[tool.importlinter.contracts]]
 name = "order payments import neither accounting, refunds, reporting nor checkout"
 type = "forbidden"
@@ -829,9 +830,6 @@ forbidden_modules = [
     "order.checkout",
     "order.refunds",
     "order.reporting",
-]
-ignore_imports = [
-    "order.payments.payment_ledger -> order.accounting.credit_allocation",
 ]
 allow_indirect_imports = true
 

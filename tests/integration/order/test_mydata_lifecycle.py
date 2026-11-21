@@ -884,14 +884,13 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         assert aade.credits == []
 
     def test_a_refund_that_failed_does_not_reduce_it(self):
-        from order.payments.payment_ledger import PaymentLedger
 
         order = _order(lines=(("24", "100.00"),))
         charge = order.payment_transactions.get()
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
 

@@ -52,6 +52,7 @@ from order.payments.payment_ledger import (
     PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -1276,7 +1277,7 @@ def handle_stripe_refund_made(sender, **kwargs):
                 if key
                 else None
             )
-            refund_row, created = PaymentLedger.record_refund(
+            refund_row, created = RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=refunded,
@@ -1379,7 +1380,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
 
             previous_payment_status = order.payment_status
             try:
-                _row, created = PaymentLedger.record_refund_reversal(
+                _row, created = RefundService.book_refund_reversal(
                     order,
                     charge=charge,
                     amount=failed,

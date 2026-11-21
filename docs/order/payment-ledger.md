@@ -38,7 +38,10 @@ from `AcsService._mark_cod_order_paid_if_pending` and
 `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in
 the same atomic step as the payment status, [§4.4](payments.md));
 `RefundService.refund_order`, `handle_stripe_refund_made`,
-`_handle_reversal_created` (REFUND, through `record_refund`);
+`_handle_reversal_created` (REFUND, booked by `RefundService.book_refund`,
+which writes the row through `record_refund` and then settles the attempt it
+fulfils, decides the order's allocation and re-derives the overcharge flag:
+the ledger itself imports no allocation code);
 `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The
 Viva handlers (`_handle_account_transaction_event`, and
 `_handle_reversal_created` for a refund-claim type) book it through the same

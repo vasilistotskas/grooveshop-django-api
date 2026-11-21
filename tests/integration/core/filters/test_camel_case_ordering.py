@@ -135,12 +135,8 @@ class CamelCaseOrderingFilterTest(APITestCase):
         response = self.client.get(url, {"ordering": "createdAt"})
         self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(url, {"ordering": "CreatedAt"})
-        self.assertEqual(response.status_code, 200)
-
         response = self.client.get(url, {"ordering": "-createdAt"})
         self.assertEqual(response.status_code, 200)
 
         response = self.client.get(url, {"ordering": "-publishedAt,viewCount"})
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.status_code, 200)

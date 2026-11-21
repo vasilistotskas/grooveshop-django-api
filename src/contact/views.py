@@ -14,14 +14,13 @@ from contact.serializers import (
     ContactWriteSerializer,
     FeedbackWriteSerializer,
 )
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
+from contact.throttles import (
     ContactAttachmentThrottle,
     ContactCreateThrottle,
     FeedbackCreateThrottle,
-    UserBudgetThrottle,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from tenant.permissions import IsContactAttachmentsEnabled, IsFeedbackEnabled
 
 logger = logging.getLogger(__name__)

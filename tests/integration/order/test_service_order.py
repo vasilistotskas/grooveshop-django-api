@@ -58,7 +58,7 @@ class OrderServiceTestCase(TestCase):
         order.items.create(product=product, price=_eur("50.00"), quantity=3)
         # Take the stock the way checkout does. A raw ``product.stock = 7``
         # is indistinguishable from an admin editing the product: it logs
-        # against no order (product/signals.py), and cancelling an order
+        # against no order (src/product/signals.py), and cancelling an order
         # must not hand back stock some other actor removed.
         StockManager.decrement_stock(
             product_id=product.id,

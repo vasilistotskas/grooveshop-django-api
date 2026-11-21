@@ -279,6 +279,17 @@ class ScheduleStatus(models.TextChoices):
     FAILED = "failed", _("Failed")
 
 
+class BuilderScheduledPublishQuerySet(
+    models.QuerySet["BuilderScheduledPublish"]
+):
+    def failed_unacknowledged(self):
+        """Schedules that failed and that nobody has acknowledged yet: what
+        the store dashboard alerts on until someone has seen them."""
+        return self.filter(
+            status=ScheduleStatus.FAILED, acknowledged_at__isnull=True
+        )
+
+
 class BuilderScheduledPublish(TimeStampMixinModel):
     """A publish waiting for its time.
 
@@ -341,6 +352,8 @@ class BuilderScheduledPublish(TimeStampMixinModel):
         _("Acknowledged by (staff)"), null=True, blank=True
     )
     acknowledged_by_staff = StaffActor()
+
+    objects = BuilderScheduledPublishQuerySet.as_manager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Scheduled publish")

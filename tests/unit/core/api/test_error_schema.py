@@ -10,11 +10,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.api.schema import publish_error_schemas
-from core.api.throttling import ProductAlertCreateThrottle
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from product.factories.product import ProductFactory
 from product.models.alert import ProductAlertKind
+from product.throttles import ProductAlertCreateThrottle
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 

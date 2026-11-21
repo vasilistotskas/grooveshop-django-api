@@ -21,6 +21,7 @@ provides:
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -312,6 +313,31 @@ class MyDataRegistration(models.Model):
         return bool(self.mydata_mark) and bool(self.mydata_qr_url)
 
 
+class InvoiceQuerySet(models.QuerySet["Invoice"]):
+    def transmission_failed(self):
+        """Receipts whose parcel left while myDATA did not answer: the send
+        failed in transit and AADE has registered no MARK yet. They are sent
+        again, with AADE's loss-of-connection indication, until registered;
+        a refused or canceled receipt waits for nothing."""
+        return self.filter(
+            transmission_failed_at__isnull=False, mydata_mark__isnull=True
+        ).exclude(
+            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
+        )
+
+    def cancel_overdue(self):
+        """Receipts of orders canceled before their parcel left whose
+        cancellation in myDATA is still not done
+        ``MYDATA_RETRY_AFTER_MINUTES`` after it was asked for. One waits for
+        myDATA to answer, or for staff (myDATA refused the receipt or the
+        store's credentials, and its order's notes say so)."""
+        return self.filter(
+            cancel_requested_at__isnull=False,
+            cancel_requested_at__lte=timezone.now()
+            - timedelta(minutes=settings.MYDATA_RETRY_AFTER_MINUTES),
+        ).exclude(mydata_status=MyDataStatus.CANCELED)
+
+
 class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
     """The order's retail receipt (myDATA 11.1), linked 1:1 to an Order.
 
@@ -480,6 +506,8 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         max_length=10,
         default=settings.DEFAULT_CURRENCY,
     )
+
+    objects = InvoiceQuerySet.as_manager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Receipt")

@@ -22,7 +22,6 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.throttling import NewsletterSubscribeThrottle
 from user.factories.account import UserAccountFactory
 from user.models.subscription import (
     CONFIRMATION_TTL,
@@ -30,6 +29,7 @@ from user.models.subscription import (
     UserSubscription,
 )
 from user.serializers.subscription import SubscriptionTopicWriteSerializer
+from user.throttles import NewsletterSubscribeThrottle
 
 pytestmark = pytest.mark.django_db
 

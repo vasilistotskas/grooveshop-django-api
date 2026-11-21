@@ -650,7 +650,7 @@ def register_default_surfaces() -> None:
                 # NOTE: a "*SettingsViewSet_*" pattern used to sit here
                 # and matched nothing — there is no such class. The
                 # settings API is two plain @api_view functions
-                # (core.api.views.list_settings / get_setting_by_key)
+                # (core.api.settings_api.list_settings / get_setting_by_key)
                 # with no cache_page or cache_methods, so it has no
                 # Django response cache to purge. Do not re-add it:
                 # a pattern that matches nothing makes the purge report

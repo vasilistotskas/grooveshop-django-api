@@ -366,7 +366,7 @@ def _queued_search_syncs_do_not_run(monkeypatch):
     """
     from unittest.mock import MagicMock
 
-    from core.tasks import sync_meilisearch_indexes
+    from meili.tasks import sync_meilisearch_indexes
 
     monkeypatch.setattr(sync_meilisearch_indexes, "apply_async", MagicMock())
 

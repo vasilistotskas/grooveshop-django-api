@@ -56,8 +56,10 @@ where the serializer nests:
   by the four order actions that call the payment provider.
 - `tests/unit/core/api/test_error_schema.py` checks real 400, 401, 403, 404,
   409 and 429 bodies against what their operation documents (the `documented`
-  fixture in `tests/conftest.py`), and every error body any test receives is
-  judged against its operation by `tests/response_contract.py`. No operation documents a 405 or 415; the
+  fixture in `tests/conftest.py`), and `tests/response_contract.py` judges
+  every JSON error body a test receives whose operation documents that status
+  with a JSON schema; an undocumented status, a 405 and a body that is not
+  JSON are counted, not judged. No operation documents a 405 or 415; the
   handler sends the same `{detail, code}` for them.
 
 ## Raising one

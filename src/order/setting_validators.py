@@ -1,6 +1,6 @@
 """The validators of ``order``'s store settings, at a permanent address.
 
-``settings/store_settings.py`` names each store setting's validator by a
+``src/settings/store_settings.py`` names each store setting's validator by a
 dotted path, and ``tenant.settings_metadata.sync_setting_metadata`` writes
 that path into every store's ``extra_settings.Setting`` row on each
 ``migrate``. The release still serving during a deploy reads those rows

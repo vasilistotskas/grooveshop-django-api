@@ -40,7 +40,7 @@ def get_or_create_user():
 def get_or_create_country():
     """Prefer the seeded GR row; a random pick used to be harmless
     when GR was the only real candidate, but the CY seed migration
-    (``country/migrations/0012_seed_iso_countries.py``) made it a genuine,
+    (``src/country/migrations/0012_seed_iso_countries.py``) made it a genuine,
     always-present alternative with a STRICT 4-digit postal format —
     which this factory's generic ``zipcode`` (a locale-agnostic Faker
     postcode) does not reliably satisfy. A test that cares which
@@ -61,7 +61,7 @@ def get_or_create_region():
     """Prefer a GR region, matching ``get_or_create_country``'s
     deterministic GR default above — ``region`` is picked
     independently of ``country`` here, and since the CY region seed
-    migration (``region/migrations/0010_seed_cyprus_regions.py``)
+    migration (``src/region/migrations/0010_seed_cyprus_regions.py``)
     added real CY-* rows, a purely random pick could hand a GR order a
     Cypriot region, which ``Order.clean()``'s region-belongs-to-
     country check now rejects.

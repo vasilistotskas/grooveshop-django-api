@@ -3219,7 +3219,7 @@ class OrderService:
                 "message": "Payment refunded successfully",
             }
         # ``declined["error"]`` carries raw provider exception text (see
-        # order/payments/payment.py) — log it, never return it (CodeQL
+        # src/order/payments/payment.py) — log it, never return it (CodeQL
         # py/stack-trace-exposure).
         logger.error(
             "Refund failed for canceled order %s: %s",

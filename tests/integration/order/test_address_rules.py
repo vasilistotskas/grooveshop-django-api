@@ -31,9 +31,8 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 @pytest.fixture
 def greece():
-    """Greece with its seeded Google format, created here rather than
-    read from the migration seed: ``tests/integration/country/conftest.py``
-    deletes the seeded row for the rest of its worker's session."""
+    """Greece with its Google format set here, so these tests do not
+    depend on what the migration seed holds for it."""
     country = CountryFactory(alpha_2="GR", alpha_3="GRC")
     country.postal_code_pattern = r"\d{3} ?\d{2}"
     country.postal_code_example = "151 24"

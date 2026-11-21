@@ -65,7 +65,7 @@ class OrderItemViewSet(BaseModelViewSet):
     serializers_config = serializers_config
     # Reads: the queryset is user-scoped and schema-isolated, so an
     # authenticated caller is by construction a customer of THIS store.
-    # Tenancy is not an extra permission here (see tenant/membership.py).
+    # Tenancy is not an extra permission here (see src/tenant/membership.py).
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [

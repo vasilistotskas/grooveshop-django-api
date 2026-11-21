@@ -8,7 +8,7 @@ from django.http import HttpResponse, JsonResponse
 
 from tests import response_contract
 from tests.response_contract import (
-    CALL_FAILED,
+    CALL_PASSED,
     DRIFTS,
     Tally,
     check,
@@ -150,6 +150,7 @@ def test_a_marker_applied_in_the_test_counts(request, tally):
 def test_a_marker_whose_drift_is_gone_is_reported(request):
     key = ("GET", HEALTH, 200)
     request.applymarker(pytest.mark.known_schema_drift(*key, at="$", issue=1))
+    request.node.stash[CALL_PASSED] = True
 
     assert unmet_drifts() == [f"GET {HEALTH} 200 (issue 1)"]
     assert drift_gone_report() == (
@@ -160,16 +161,25 @@ def test_a_marker_whose_drift_is_gone_is_reported(request):
     DRIFTS.met.add(key)
 
 
-def test_a_test_that_failed_is_not_told_its_drift_is_gone(request):
+@pytest.mark.parametrize("call", ["failed", "skipped"])
+def test_a_test_whose_call_did_not_pass_is_not_told_its_drift_is_gone(
+    request, call
+):
     request.applymarker(
         pytest.mark.known_schema_drift("GET", HEALTH, 200, at="$", issue=1)
     )
-    request.node.stash[CALL_FAILED] = True
+    # A skipped call leaves no report, so nothing is stashed.
+    if call == "failed":
+        request.node.stash[CALL_PASSED] = False
 
     assert drift_gone_report() is None
 
-    request.node.stash[CALL_FAILED] = False
     DRIFTS.met.add(("GET", HEALTH, 200))
+
+
+def test_a_builder_path_no_operation_fits_fails(tally):
+    with pytest.raises(AssertionError, match="no operation of the schema"):
+        check("GET", "/api/v1/builder/nothing/here/at/all", HttpResponse())
 
 
 @pytest.mark.parametrize(
@@ -187,6 +197,12 @@ def test_a_test_that_failed_is_not_told_its_drift_is_gone(request):
         ("/media/a.png", "uri", False),
         ("http://[bad", "uri", False),
         ("http://example.gr:70000/", "uri", False),
+        ("http://[::1]/", "uri", True),
+        ("http://[fe80::1%25eth0]/", "uri", False),
+        ("file:///x", "uri", True),
+        ("file://a b/x", "uri", False),
+        ("git://a b/x", "uri", False),
+        ("git://a:99999/", "uri", False),
         ("2026-11-21T10:00:00Z", "date-time", True),
         ("2026-11-21T10:00", "date-time", False),
         ("2026-11-21", "date", True),

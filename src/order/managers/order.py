@@ -95,6 +95,13 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         refunding the excess, and the filter behind it."""
         return self.filter(overcharged_at__isnull=False)
 
+    def receipt_deferred(self) -> Self:
+        """Shipped orders whose receipt waits for a refund claim to resolve
+        (``order.accounting.invoicing.ReceiptDeferred`` marks them): the
+        store dashboard's alert and the admin's "Receipt waiting for a
+        refund" filter."""
+        return self.filter(metadata__receipt_deferred=True)
+
     def awaiting_chargeback_decision(self) -> Self:
         """Orders with a lost dispute whose goods staff have not yet said
         came back or stayed (``ChargebackDecision``): the worklist the

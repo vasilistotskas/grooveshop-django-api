@@ -23,7 +23,6 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from cart.factories.cart import CartFactory
-from core.tasks import send_inactive_user_notifications
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from order.models.stock_reservation import StockReservation
@@ -32,6 +31,7 @@ from product.factories.product import ProductFactory
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 from user.models.account import UserAccount
+from user.tasks import send_inactive_user_notifications
 
 pytestmark = [
     pytest.mark.django_db,

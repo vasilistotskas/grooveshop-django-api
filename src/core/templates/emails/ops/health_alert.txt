@@ -2,7 +2,7 @@
 
 {% trans "These system components failed their health checks:" %}
 
-{% for error in errors %}{{ error|safe }}
+{% for error in errors %}{{ error }}
 {% endfor %}
 {% trans "The run is recorded as a failure. Fix the component, then check the next scheduled run." %}
 

@@ -252,3 +252,25 @@ def test_a_bundle_that_will_not_delete_aborts_the_whole_erasure(
 
     assert User.objects.filter(pk=subject.pk).exists()
     assert bundle.exists()
+
+
+def test_a_retained_order_keeps_no_address_of_the_subject(subject):
+    """Every field in ``Order.SHIPPING_ADDRESS_FIELDS`` is blanked (or set
+    to the placeholder) on the order erasure keeps, ``address_line_2``
+    included (#641)."""
+    from order.factories.order import OrderFactory
+    from order.models.order import Order
+
+    order = OrderFactory(
+        user=subject,
+        address_line_2="Διαμ. 3, 2ος όροφος",
+        place="Κολωνάκι",
+        floor="SECOND_FLOOR",
+        location_type="HOME",
+    )
+
+    anonymise_and_delete_user(subject)
+
+    order.refresh_from_db()
+    for field in Order.SHIPPING_ADDRESS_FIELDS:
+        assert getattr(order, field) in {"", "[deleted]"}, field

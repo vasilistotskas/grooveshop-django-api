@@ -28,7 +28,8 @@
     <h3>Διεύθυνση παράδοσης</h3>
     <p>
         {{ order.first_name }} {{ order.last_name }}<br>
-        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.street }} {{ order.street_number }}<br>{% if order.address_line_2 %}
+        {{ order.address_line_2 }}<br>{% endif %}
         {{ order.city }}, {{ order.zipcode }}
     </p>
 </div>

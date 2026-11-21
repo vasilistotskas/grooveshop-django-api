@@ -21,13 +21,9 @@ from cart.serializers.item import (
     CartItemUpdateSerializer,
 )
 from cart.services import CartService
+from cart.throttles import CartMutationAnonThrottle, CartMutationThrottle
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    CartMutationAnonThrottle,
-    CartMutationThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,

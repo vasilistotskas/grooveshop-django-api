@@ -109,6 +109,20 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return Country.objects.all()
 
     @property
+    def has_regions(self) -> bool:
+        """Whether any ``Region`` row belongs to this country: the
+        ``with_has_regions`` annotation when the row was read with it (a
+        list or a detail), else one ``EXISTS`` (a row just created)."""
+        if "has_regions" in self.__dict__:
+            return self.__dict__["has_regions"]
+        return self.regions.exists()
+
+    @has_regions.setter
+    def has_regions(self, value: bool) -> None:
+        """Let the queryset's annotation set the value."""
+        self.__dict__["has_regions"] = value
+
+    @property
     def main_image_path(self) -> str:
         from core.utils.image_paths import image_to_media_path
 

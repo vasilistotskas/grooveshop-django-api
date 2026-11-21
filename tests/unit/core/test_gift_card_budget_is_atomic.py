@@ -14,7 +14,7 @@ import threading
 import pytest
 from rest_framework.test import APIRequestFactory
 
-from core.api.throttling import GiftCardCheckThrottle, GiftCardCodeThrottle
+from giftcard.throttles import GiftCardCheckThrottle, GiftCardCodeThrottle
 from tests.utils.redis import private_cache
 
 LIMIT = 6

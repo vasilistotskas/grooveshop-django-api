@@ -1,10 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
@@ -120,6 +120,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         final order (audit trail, stock-discrepancy debugging).
     """
 
+    #: The delivery address fields that are the buyer's own: what GDPR
+    #: erasure blanks and a data export lists (``user.services.gdpr``). A
+    #: new address field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_address_field.py``
+    #: fails for one that is scrubbed by the staging anonymiser but neither
+    #: listed here nor kept on purpose.
+    SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
+
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
@@ -171,10 +188,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     first_name = models.CharField(_("First Name"), max_length=255)
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
-    street_number = models.CharField(_("Street Number"), max_length=255)
+    street_number = models.CharField(
+        _("Street Number"), max_length=255, blank=True
+    )
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
+    # What the street line does not hold: a flat, a floor, a building
+    # (UCP's ``extended_address``). Free text, separate from the notes; the
+    # ACS voucher carries it in ``Delivery_Notes``, as ACS's
+    # ``Recipient_Address`` is the street alone.
+    address_line_2 = models.CharField(
+        _("Address line 2"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     phone = PhoneNumberField(_("Phone Number"))
     customer_notes = models.TextField(
         _("Customer Notes"), blank=True, default=""
@@ -816,17 +846,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         if not self.zipcode:
             errors["zipcode"] = [_("Zipcode is required.")]
 
-        required_address_fields = ["street", "street_number", "city"]
-        missing_fields = [
-            field
-            for field in required_address_fields
-            if not getattr(self, field)
-        ]
-
-        if missing_fields:
-            errors["address"] = [
-                _("Street, street number, and city are required.")
-            ]
+        # Each under its own field, so a form shows it on that input (a key
+        # that is no field makes ``ModelForm.add_error`` raise: a 500 in the
+        # admin). A pickup point's street line may name no number
+        # (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
+        required_address_fields = ["street", "city"]
+        if self.shipping_kind != ShippingKind.PICKUP_POINT:
+            required_address_fields.append("street_number")
+        for field in required_address_fields:
+            if not getattr(self, field):
+                errors[field] = [
+                    self._meta.get_field(field).error_messages["blank"]
+                ]
 
         if not errors:
             # Postcode format + street/number mix-ups, only for an
@@ -845,10 +876,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         when deductions — promotion, loyalty redemption, gift card —
         cover the whole total (see ``is_paid``); ``calculate_order_total_
         amount`` is exactly that remainder. Anything else is a payment
-        booked on an order whose amount due was never set: the admin
-        form, which edits both fields, is the path this guards (the demo
+        booked on an order whose amount due was never set (the demo
         fixtures that produced eight such rows no longer go through
-        ``save`` at all).
+        ``save`` at all). Model validation refuses to save such a row,
+        whatever the save changes; the admin shows both fields read-only
+        (``OrderAdmin.readonly_fields``), so the error is the order's, not
+        a field's.
 
         Not a ``CheckConstraint``: the total is a sum over the order's
         lines, which a row constraint cannot see. An unsaved order has
@@ -860,8 +893,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             return {}
         if self.calculate_order_total_amount().amount == 0:
             return {}
+        # Not under ``amount_due``: a form error on a read-only field has no
+        # input to land on (``ModelForm.add_error`` raises: a 500).
         return {
-            "amount_due": [
+            NON_FIELD_ERRORS: [
                 _(
                     "A completed payment needs an amount due, unless "
                     "discounts, loyalty points or gift cards cover the "
@@ -951,7 +986,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def full_address(self) -> str:
-        return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
+        """The delivery address on one line: the street and its number, the
+        address line 2 when there is one, then the postcode and the city
+        ("Ερμού 12, 3ος όροφος, 10563 Αθήνα")."""
+        street = f"{self.street} {self.street_number}".strip()
+        place = f"{self.zipcode} {self.city}".strip()
+        return ", ".join(
+            part for part in (street, self.address_line_2, place) if part
+        )
 
     @property
     def customer_full_name(self) -> str:

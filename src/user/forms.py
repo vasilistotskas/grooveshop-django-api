@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from unfold.forms import UserCreationForm
 
-from core.generators import UserNameGenerator
+from user.generators import UserNameGenerator
 from user.models import UserAccount
 
 

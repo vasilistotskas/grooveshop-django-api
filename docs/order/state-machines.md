@@ -148,9 +148,11 @@ the order stays CANCELED and nothing ships. Idempotent per payment id. A
 REFUNDED / PARTIALLY_REFUNDED canceled order still ignores a stale success.
 
 `Order.clean()` refuses a COMPLETED payment with `amount_due` 0.00
-unless deductions cover the whole total (`Order._payment_consistency_errors`)
-— the admin form edits both fields. It is not a `CheckConstraint`: the
-total is a sum over the order's lines.
+unless deductions cover the whole total (`Order._payment_consistency_errors`).
+The error is the whole order's (`NON_FIELD_ERRORS`): the admin shows both
+fields read-only, and a form error on a field with no input makes the save
+a 500. It is not a `CheckConstraint`: the total is a sum over the order's
+lines.
 
 ### 2.3 The follow-up flag (`src/order/lifecycle/follow_up.py`)
 

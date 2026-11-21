@@ -1,6 +1,6 @@
 """A validator path stored as data must always resolve.
 
-``settings/store_settings.py`` names each store setting's validator by a
+``src/settings/store_settings.py`` names each store setting's validator by a
 dotted path, and ``tenant.settings_metadata.sync_setting_metadata`` writes
 it into every store's ``extra_settings.Setting`` row on each migrate. A
 path that no longer imports turns an admin save of that setting into a

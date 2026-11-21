@@ -19,7 +19,7 @@ import pytest
 
 from core.celery import celery_app
 from core.logging import JsonFormatter
-from core.tasks import MonitoredTask
+from core.monitored_task import MonitoredTask
 
 pytestmark = pytest.mark.django_db
 
@@ -36,11 +36,11 @@ def _fails(token=None):
 
 
 def _task_records(caplog) -> list[logging.LogRecord]:
-    return [r for r in caplog.records if r.name == "core.tasks"]
+    return [r for r in caplog.records if r.name == "core.monitored_task"]
 
 
 def test_a_failed_task_logs_one_error_record_carrying_the_traceback(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.tasks"):
+    with caplog.at_level(logging.DEBUG, logger="core.monitored_task"):
         result = _fails.apply(kwargs={"token": "hunter2"}, throw=False)
 
     assert result.failed()
@@ -53,7 +53,7 @@ def test_a_failed_task_logs_one_error_record_carrying_the_traceback(caplog):
 
 
 def test_the_traceback_reaches_the_json_line_as_the_real_exception(caplog):
-    with caplog.at_level(logging.INFO, logger="core.tasks"):
+    with caplog.at_level(logging.INFO, logger="core.monitored_task"):
         _fails.apply(kwargs={"token": "hunter2"}, throw=False)
 
     (record,) = _task_records(caplog)
@@ -68,7 +68,7 @@ def test_the_traceback_reaches_the_json_line_as_the_real_exception(caplog):
 
 
 def test_the_masked_kwargs_stay_masked(caplog):
-    with caplog.at_level(logging.INFO, logger="core.tasks"):
+    with caplog.at_level(logging.INFO, logger="core.monitored_task"):
         _fails.apply(kwargs={"token": "hunter2"}, throw=False)
 
     (record,) = _task_records(caplog)

@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 from django.conf import settings as django_settings
 from extra_settings.models import Setting
 
-from order.accounting.mydata.config import load_config
+from order.accounting.mydata.config import (
+    MyDataConfig,
+    MyDataRequirement,
+    load_config,
+)
 from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
@@ -280,3 +286,57 @@ def test_both_series_prefixes_are_validated_where_they_are_saved(name):
         "order.setting_validators.validate_series_prefix_setting"
     )
     assert validate_series_prefix_setting(defaults[name]["value"])
+
+
+@pytest.mark.parametrize(
+    (
+        "enabled",
+        "environment",
+        "ground",
+        "takes_real_orders",
+        "user_id",
+        "subscription_key",
+    ),
+    list(
+        itertools.product(
+            (True, False),
+            ("prod", "dev", None),
+            ("ΠΟΛ.1002/2014", ""),
+            (True, False),
+            ("user", ""),
+            ("key", ""),
+        )
+    ),
+)
+def test_a_store_is_ready_exactly_when_nothing_is_unmet(
+    enabled, environment, ground, takes_real_orders, user_id, subscription_key
+):
+    """The dashboard lists ``unmet()``; issuing is gated on ``is_ready()``.
+    They read one rule, so the dashboard shows no gap exactly when the
+    store issues, over every combination of the conditions."""
+    config = MyDataConfig(
+        enabled=enabled,
+        fhm_exemption_ground=ground,
+        takes_real_orders=takes_real_orders,
+        auto_submit=True,
+        environment=environment,
+        user_id=user_id,
+        subscription_key=subscription_key,
+        invoice_series_prefix="A",
+        credit_series_prefix="C",
+        issuer_branch=0,
+        request_timeout_seconds=10,
+    )
+    expected = bool(
+        enabled
+        and environment is not None
+        and (ground or (environment == "dev" and not takes_real_orders))
+        and user_id
+        and subscription_key
+    )
+    assert config.is_ready() is expected
+    assert (config.unmet() == []) is expected
+    assert (MyDataRequirement.USER_ID in config.unmet()) is (not user_id)
+    assert (MyDataRequirement.ENVIRONMENT in config.unmet()) is (
+        environment is None
+    )

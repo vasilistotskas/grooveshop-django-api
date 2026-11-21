@@ -402,7 +402,9 @@ analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 
 Meta Conversions API: `MetaCapiEventLog`, the receivers on order and
 registration events (`src/meta_capi/signals.py`) and the tasks that post
-the events (`src/meta_capi/tasks.py`). It has no doc in this repository;
+the events (`src/meta_capi/tasks.py`), each event once: its id is fixed
+before a task can run again (`src/meta_capi/services.py`) and the check and
+the send hold an advisory lock on it. It has no doc in this repository;
 the cross-service view is
 `grooveshop-docs/src/dev/flows/analytics-and-consent.md`.
 

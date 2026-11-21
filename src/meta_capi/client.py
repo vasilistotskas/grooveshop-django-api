@@ -68,8 +68,12 @@ def _get_api(access_token: str, api_version: str) -> Any:
         )
 
         # Direct construction — NOT FacebookAdsApi.init(), which would
-        # also stamp this token onto the process-global default.
-        session = FacebookSession(access_token=access_token)
+        # also stamp this token onto the process-global default. The SDK's
+        # default timeout is none at all.
+        session = FacebookSession(
+            access_token=access_token,
+            timeout=settings.META_CAPI_TIMEOUT_SECONDS,
+        )
         api = FacebookAdsApi(session, api_version=api_version)
         _api_cache[cache_key] = api
         return api

@@ -14,12 +14,12 @@ import pytest
 from django.core import mail
 from django.db import OperationalError, connection
 
-from core import celery_app
 from emails.models import EmailLog
-from emails.send import Status, send_email
+from emails.send import Status
 from emails.types import Audience, Owner
 from tests.utils.concurrency import in_thread, wait_for_a_blocked_backend
-from tests.utils.emails import HeldTransport, probe, probe_object
+from tests.utils.email_tasks import send_once
+from tests.utils.emails import HeldTransport, probe
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -32,13 +32,7 @@ def sending_task(catalogue):
     """A task that sends one platform mail: a platform type needs no store
     bound on the thread that runs it."""
     catalogue(probe(owner=Owner.PLATFORM, audience=Audience.PLATFORM_OPERATOR))
-
-    @celery_app.task(bind=True, name="tests.delivery_copies")
-    def task(self):
-        send_email("probe.notice", probe_object())
-
-    yield task
-    celery_app.tasks.pop("tests.delivery_copies", None)
+    return send_once
 
 
 @pytest.fixture(autouse=True)

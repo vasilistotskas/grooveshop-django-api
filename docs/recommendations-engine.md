@@ -466,15 +466,18 @@ while it revalidates — the `recommendations` cache surface purges it);
 the cart fetches through `server/api/recommendations.get.ts` —
 `surface=cart` with the basket's product ids as `seeds`, or no seed for
 an empty cart — cached for five minutes under the same handler name so
-the same purge reaches it. The strip is server-rendered, so its answer
-is also in the page, which the edge caches. **The read endpoint writes
-no event, and its body names no impression**: one body reaches every
-viewer of the page while it is cached, so an id in it would be one
-viewer's showing shared by all of them. The strip mints an
-`impressionId` for each showing (`useRecommendationTracking`) and posts
-the impression under it from its own `onMounted`, which under
+the same purge reaches it. The strip is server-rendered into pages Nitro
+and the edge cache too (`/products/**`). **The read endpoint writes no
+event**, and while a body is cached every viewer gets the same one.
+
+**An impression is one showing, and its id is minted by the beacon.**
+The strip posts the impression from its own `onMounted`, which under
 `hydrate-on-visible` fires when it scrolls into view — "shown", not
-"served" — and sends the same id on that showing's clicks through
+"served" — with no `impressionId`: `recommendation_event` mints one, records
+the impression with that request's own session, cart and customer, and
+answers with it. The `impressionId` in the suggestions body is shared by
+every viewer of a cached copy and is not the showing's. The strip sends
+the minted id on its clicks through
 `server/api/analytics/recommendation-event.post.ts`,
 carrying the cart's identity headers so an `attach` can later be
 correlated against the same basket. The click also remembers the

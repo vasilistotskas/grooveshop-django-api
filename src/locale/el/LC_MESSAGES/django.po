@@ -795,6 +795,9 @@ msgstr "Η ανάλυση δείχνει τις πωλήσεις πριν από
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "Η ανάλυση δείχνει μόνο τα προϊόντα, πριν τις επιστροφές, με τις μεγαλύτερες ομάδες πρώτες. Το κέρδος και το περιθώριο αφορούν τις πωλήσεις που έχουν τιμή κόστους. Οι προμήθειες πληρωμών και τα έξοδα ανήκουν στο κατάστημα, όχι σε ένα προϊόν ή μια παραγγελία. Η εξαγωγή απαριθμεί κάθε ομάδα, περίοδο προς περίοδο."
 
+msgid "A click carries the impression id of its showing."
+msgstr "Ένα κλικ φέρει το αναγνωριστικό προβολής της εμφάνισής του."
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι πιστότητας ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
 
@@ -5207,8 +5210,8 @@ msgstr "Λειτουργία feedback"
 msgid "Feedback received"
 msgstr "Ελήφθη feedback"
 
-msgid "Feeds the learning loop. Pass the impression_id the client minted for this showing of the strip. Attach events are written server-side when an order completes and cannot be posted here."
-msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Περάστε το impression_id που δημιούργησε ο client για αυτή την εμφάνιση της λωρίδας. Τα συμβάντα προσθήκης καταγράφονται στον server όταν ολοκληρώνεται μια παραγγελία και δεν μπορούν να υποβληθούν εδώ."
+msgid "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
+msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Μη στέλνετε impression_id σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που δημιουργήθηκε για αυτή την εμφάνιση, και τα κλικ της το φέρουν. Τα συμβάντα προσθήκης καταγράφονται στον server όταν ολοκληρώνεται μια παραγγελία και δεν μπορούν να υποβληθούν εδώ."
 
 msgid "Fees"
 msgstr "Χρεώσεις"
@@ -11444,8 +11447,8 @@ msgstr "Τα προϊόντα αυτών των κατηγοριών (συμπε
 msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 msgstr "Υποσύνολο προϊόντων, μετά τις εκπτώσεις και χωρίς τα μεταφορικά, από το οποίο ο συνδυασμός αποστέλλεται δωρεάν. Null όταν δεν γίνεται ποτέ δωρεάν."
 
-msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Mint an impression_id each time the strip is shown, report the impression event under it, and send it on that strip's click events."
-msgstr "Προϊόντα προς εμφάνιση δίπλα στο προϊόν ή στα προϊόντα αναφοράς σε μια συγκεκριμένη επιφάνεια (σελίδα προϊόντος, καλάθι, εξαντλημένο προϊόν, άδειο καλάθι). Κάθε στοιχείο περιέχει τη στρατηγική που το παρήγαγε και, για συνδέσεις που επιμελήθηκε ο έμπορος, τον τύπο σχέσης. Μια κενή λίστα σημαίνει ότι το κατάστημα δεν έχει τίποτα αξιόλογο να δείξει εδώ — μην εμφανίσετε τίποτα. Δημιουργήστε ένα impression_id κάθε φορά που εμφανίζεται η λωρίδα, αναφέρετε με αυτό το συμβάν προβολής και στείλτε το στα συμβάντα κλικ της ίδιας λωρίδας."
+msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
+msgstr "Προϊόντα προς εμφάνιση δίπλα στο προϊόν ή στα προϊόντα αναφοράς σε μια συγκεκριμένη επιφάνεια (σελίδα προϊόντος, καλάθι, εξαντλημένο προϊόν, άδειο καλάθι). Κάθε στοιχείο περιέχει τη στρατηγική που το παρήγαγε και, για συνδέσεις που επιμελήθηκε ο έμπορος, τον τύπο σχέσης. Μια κενή λίστα σημαίνει ότι το κατάστημα δεν έχει τίποτα αξιόλογο να δείξει εδώ — μην εμφανίσετε τίποτα. Αναφέρετε ένα συμβάν προβολής μόλις εμφανιστεί η λωρίδα, χωρίς impression_id: η απόκρισή του αναφέρει το αναγνωριστικό της εμφάνισης, που φέρουν τα συμβάντα κλικ της λωρίδας."
 
 msgid "Profile"
 msgstr "Προφίλ"
@@ -13375,6 +13378,9 @@ msgstr "Κοινοποιήθηκε από (προσωπικό)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Κοινό σε όλα τα μερίδια μιας επιστροφής ανά γραμμή, ώστε η επανάληψή της να τα βρίσκει μαζί."
 
+msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
+
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
 
@@ -14828,6 +14834,9 @@ msgstr "Το δώρο αυτού του κωδικού δεν είναι δια�
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρωσε ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά."
 
+msgid "The id of the showing the event was recorded under."
+msgstr "Το αναγνωριστικό της εμφάνισης με το οποίο καταγράφηκε το συμβάν."
+
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "Το αναγνωριστικό που επέστρεψε ο πάροχος. Κενό μέσω SMTP, που δεν επιστρέφει κάποιο."
 
@@ -15210,8 +15219,8 @@ msgstr "Η αποστολή της οποίας το αίτημα voucher επέ
 msgid "The shipping of this order was already refunded."
 msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
 
-msgid "The showing's own id, minted by the client each time it shows a strip; sent on the impression and on every click of it."
-msgstr "Το αναγνωριστικό αυτής της εμφάνισης, που δημιουργεί ο client κάθε φορά που εμφανίζει μια λωρίδα· αποστέλλεται με την προβολή και με κάθε κλικ σε αυτή."
+msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgstr "Το αναγνωριστικό της εμφάνισης. Μην το στέλνετε σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που καταγράφηκε για αυτή την εμφάνιση, το οποίο φέρουν στη συνέχεια τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί. Ένα κλικ πρέπει να το φέρει."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."

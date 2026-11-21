@@ -790,6 +790,9 @@ msgstr "A breakdown shows sales before returns, biggest first. For a product or 
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 
+msgid "A click carries the impression id of its showing."
+msgstr "A click carries the impression id of its showing."
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
@@ -5202,8 +5205,8 @@ msgstr "Feedback feature"
 msgid "Feedback received"
 msgstr "Feedback received"
 
-msgid "Feeds the learning loop. Pass the impression_id the client minted for this showing of the strip. Attach events are written server-side when an order completes and cannot be posted here."
-msgstr "Feeds the learning loop. Pass the impression_id the client minted for this showing of the strip. Attach events are written server-side when an order completes and cannot be posted here."
+msgid "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
+msgstr "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
 
 msgid "Fees"
 msgstr "Fees"
@@ -11437,8 +11440,8 @@ msgstr "Products in these categories (subcategories included) are never counted 
 msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 msgstr "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 
-msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Mint an impression_id each time the strip is shown, report the impression event under it, and send it on that strip's click events."
-msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Mint an impression_id each time the strip is shown, report the impression event under it, and send it on that strip's click events."
+msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
+msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
 
 msgid "Profile"
 msgstr "Profile"
@@ -13369,6 +13372,9 @@ msgstr "Shared by (staff)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 
+msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+
 msgid "Shared text"
 msgstr "Shared text"
 
@@ -14826,6 +14832,9 @@ msgstr "The gift for this code is not available right now"
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 
+msgid "The id of the showing the event was recorded under."
+msgstr "The id of the showing the event was recorded under."
+
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
 
@@ -15208,8 +15217,8 @@ msgstr "The shipment whose voucher request returned this voucher after another o
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
 
-msgid "The showing's own id, minted by the client each time it shows a strip; sent on the impression and on every click of it."
-msgstr "The showing's own id, minted by the client each time it shows a strip; sent on the impression and on every click of it."
+msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgstr "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."

@@ -1,12 +1,11 @@
 """Write the feedback loop's rows.
 
-One ``impression`` row per item shown, one ``click`` per item clicked in
-a showing — both reported by the storefront — and one ``attach`` per order
-line whose product had been shown under an impression to the same cart or
-the same signed-in customer inside the attribution windows. All three
-share ``impression_id``, the showing's id: the storefront mints one each
-time it shows a strip (the suggestions body is cached and shared, so it
-cannot carry one), and the order confirmation one per email.
+One ``impression`` row per item shown, one ``click`` per click — both
+reported by the storefront — and one ``attach`` per order line whose
+product had been shown under an impression to the same cart or the same
+signed-in customer inside the attribution windows. All three share
+``impression_id``, minted by the API per response and echoed by the
+client.
 
 Called from Celery tasks so no write sits on a page's or a checkout's
 critical path; primitives in, count out.
@@ -24,15 +23,13 @@ from django.db.models import Q
 
 from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
 from recommendation.models import RecommendationEvent
+from tenant.celery import dispatch_key
 
 logger = logging.getLogger(__name__)
 
 _KINDS = frozenset(EventKind.values)
 _SURFACES = frozenset(Surface.values)
 _STRATEGIES = frozenset(StrategyCode.values)
-_EVENT_NAMESPACE = uuid.uuid5(
-    uuid.NAMESPACE_URL, "grooveshop:recommendation-event"
-)
 
 
 def _as_uuid(value: Any) -> uuid.UUID | None:
@@ -62,12 +59,10 @@ def record_events(
     would poison the nightly aggregation with nothing to say why.
     ``attach`` is never accepted from here — it is derived from orders.
 
-    Each row's ``event_key`` is the event itself: the kind, the showing
-    (``impression_id``, which the client mints for each showing of a strip
-    and the order confirmation for each email) and the item. A beacon sent
-    twice for one showing, and another copy of the task (a retry, a message
-    delivered again, the sweep's copy of a publish), make the same keys, and
-    the unique constraint on them leaves their rows out.
+    Each row's ``event_key`` is the key of the task copy that writes it
+    (``tenant.celery.dispatch_key``): another copy of the task (a retry, a
+    message delivered again, the sweep's copy of a publish) makes the same
+    keys, and the unique constraint on them leaves its rows out.
     """
     if (
         kind not in _KINDS
@@ -91,10 +86,12 @@ def record_events(
             session_key=session_key or "",
             user_id=user_id,
             cart_uuid=_as_uuid(cart_uuid),
-            event_key=uuid.uuid5(
-                _EVENT_NAMESPACE,
-                f"{kind}|{impression_id}|{item['product_id']}|"
-                f"{item.get('position')}",
+            event_key=dispatch_key(
+                "recommendation-event",
+                kind,
+                impression_id,
+                item["product_id"],
+                item.get("position"),
             ),
         )
         for item in items

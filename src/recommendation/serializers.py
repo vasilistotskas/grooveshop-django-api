@@ -104,6 +104,12 @@ class RecommendationItemSerializer(serializers.Serializer):
 class RecommendationResponseSerializer(serializers.Serializer):
     surface = serializers.ChoiceField(choices=Surface.choices)
     items = RecommendationItemSerializer(many=True, read_only=True)
+    impression_id = serializers.UUIDField(
+        help_text=_(
+            "Shared by every viewer of a cached copy of this body. Leave it "
+            "out of the impression event and use the id its response names."
+        )
+    )
 
 
 class RecommendationEventItemSerializer(serializers.Serializer):
@@ -114,10 +120,13 @@ class RecommendationEventItemSerializer(serializers.Serializer):
 
 class RecommendationEventRequestSerializer(serializers.Serializer):
     impression_id = serializers.UUIDField(
+        required=False,
         help_text=_(
-            "The showing's own id, minted by the client each time it shows "
-            "a strip; sent on the impression and on every click of it."
-        )
+            "The showing's id. Leave it out of an impression: the response "
+            "names the id recorded for that showing, which its clicks and "
+            "the add to cart that follows one then carry. A click must "
+            "carry it."
+        ),
     )
     surface = serializers.ChoiceField(choices=Surface.choices)
     # ``attach`` is written server-side by order completion only.
@@ -129,6 +138,18 @@ class RecommendationEventRequestSerializer(serializers.Serializer):
     )
     seed_id = serializers.IntegerField(min_value=1, required=False)
     items = RecommendationEventItemSerializer(many=True)
+
+    def validate(self, attrs):
+        if attrs["kind"] == EventKind.CLICK and "impression_id" not in attrs:
+            raise serializers.ValidationError(
+                {
+                    "impression_id": _(
+                        "A click carries the impression id of its showing."
+                    )
+                },
+                code="impression_id_required",
+            )
+        return attrs
 
     def validate_items(self, value):
         if not value:
@@ -145,3 +166,6 @@ class RecommendationEventRequestSerializer(serializers.Serializer):
 
 class RecommendationEventResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
+    impression_id = serializers.UUIDField(
+        help_text=_("The id of the showing the event was recorded under.")
+    )

@@ -28,6 +28,7 @@ from core.rosetta_views import DBBackedTranslationFormView
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
+    device_flow_not_offered,
     robots_txt,
     set_language,
     upload_image,
@@ -89,6 +90,9 @@ _customer_identity_root_patterns = [
 # served by the staff connect host alone (``agent.urls_connect``), never
 # the platform host.
 _customer_identity_storefront_patterns = [
+    # Ahead of allauth's include: the device flow is not offered.
+    path("identity/o/device", device_flow_not_offered),
+    path("identity/o/api/device/code", device_flow_not_offered),
     path("", include("allauth.idp.urls")),
     # RFC 8414 alias: plain-OAuth clients look for
     # /.well-known/oauth-authorization-server; serve the same metadata

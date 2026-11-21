@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from agent.staff import (
-    STAFF_CLIENT_GRANT_TYPES,
     STAFF_CLIENT_SCOPES,
     STAFF_SCOPE_DISPLAY,
     on_platform_issuer,
@@ -32,6 +31,17 @@ LINKING_SCOPES = (
     SCOPE_LOYALTY_READ,
     SCOPE_FAVOURITES_READ,
 )
+
+# Grant types a client of either issuer may register: identity linking
+# is a person consenting (authorization code + PKCE) and the refresh of
+# that grant. The device flow is left out of the platform's issuer: its
+# verification page signs people in through allauth's account login, which
+# knows neither the staff lockouts nor the superuser's second factor.
+# Client credentials names no person, and nothing here is for a machine.
+CLIENT_GRANT_TYPES: frozenset[str] = frozenset(
+    {Client.GrantType.AUTHORIZATION_CODE, Client.GrantType.REFRESH_TOKEN}
+)
+
 
 # Where a store's MCP server lives on its own domain, routed to the agent
 # gateway.
@@ -75,9 +85,9 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
     ) -> None:
         """Name the scopes this issuer offers, which allauth's list omits."""
         super().populate_server_metadata(data)
+        data["grant_types_supported"] = sorted(CLIENT_GRANT_TYPES)
         if on_platform_issuer():
             data["scopes_supported"] = list(STAFF_CLIENT_SCOPES)
-            data["grant_types_supported"] = sorted(STAFF_CLIENT_GRANT_TYPES)
             # The device flow's routes are not served on this issuer.
             data.pop("device_authorization_endpoint", None)
             return
@@ -86,7 +96,10 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
     def validate_client_registration(
         self, *, client: Client, client_metadata: dict[str, Any], **kwargs: Any
     ) -> None:
-        """Register a client that names no scopes for what linking offers.
+        """Register a client for the grants and scopes this issuer offers.
+
+        Only ``CLIENT_GRANT_TYPES``, whatever the client asks for. A client
+        that names no scopes gets what linking offers.
 
         Registration may omit ``scope`` (RFC 7591), and allauth then stores
         ``openid`` alone, so the client's later request for the commerce
@@ -97,6 +110,11 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
         super().validate_client_registration(
             client=client, client_metadata=client_metadata, **kwargs
         )
+        if not set(client.get_grant_types()) <= CLIENT_GRANT_TYPES:
+            raise ValidationError(
+                "Only the authorization code and refresh token grants "
+                "are offered here."
+            )
         if on_platform_issuer():
             self._register_staff_client(client)
             return
@@ -105,17 +123,12 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
 
     @staticmethod
     def _register_staff_client(client: Client) -> None:
-        """Hold a staff client to the staff scopes and the code flow.
+        """Hold a staff client to the staff scopes.
 
         A client may ask for none of the scopes (registration may omit
         ``scope``) or for others: it gets every staff scope, since the
         consent page and the person's role decide what a token holds.
         """
-        grant_types = set(client.get_grant_types())
-        if not grant_types <= STAFF_CLIENT_GRANT_TYPES:
-            raise ValidationError(
-                "Only the authorization code flow is offered here."
-            )
         client.set_scopes(list(STAFF_CLIENT_SCOPES))
 
     def validate_resource_uris(self, *, uris: list[str], **kwargs: Any) -> None:

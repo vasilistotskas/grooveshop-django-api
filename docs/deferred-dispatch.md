@@ -210,8 +210,20 @@ outside a task.
   advisory lock on it (`docs/emails/delivery.md`).
 
 A task whose effect is a state of a row needs no id: it claims the state (a
-compare-and-set, a unique row). A dispatch made inside a task (a chain's next
-link) is a dispatch of its own, with an id of its own.
+compare-and-set, a unique row), which also covers two dispatches of it from
+different paths. A dispatch made inside a task (a chain's next link) is a
+dispatch of its own, with an id of its own.
+
+- **A product alert** (`product.tasks._notify_alerts`) is claimed before its
+  mail: `is_active` off and `notified_at` set by an update on the row still
+  armed, so a second run (another stock or price update) skips every alert the
+  first one took. An alert claimed to find its type switched off is armed again.
+- **A gift card's delivery** (`giftcard.tasks.deliver_gift_card_email`), queued
+  by the purchase, the admin's resend and the daily sweep, reads
+  `delivered_at` and sends under an advisory lock on the card
+  (`core.db.locks.held_across_calls`). A claim set before the send would lose
+  the card's mail with a worker that dies mid-send; the lock goes with that
+  worker's session, and the run after it sends the card.
 
 ## One sweep at a time
 

@@ -301,17 +301,29 @@ def check_low_stock_products() -> dict:
 
 
 def _notify_alerts(alerts, *, type_key: str, wrap=lambda alert: alert):
-    """Send the email of *type_key* for each alert; returns the alerts that
-    were handled and how many were sent, or ``None`` when the type is off.
+    """Send the email of *type_key* for each alert this run claims; returns
+    the alerts it handled and how many were sent, or ``None`` when the type
+    is off.
 
     An alert is single-shot: it is handled, sent or not, so a retry loop
-    never hammers a broken address. A type that is off (its feature closed,
-    or the store switched it off) handles nothing: the alerts stay armed
-    for when it is back on.
+    never hammers a broken address. Each one is claimed before its mail
+    (``is_active`` off and ``notified_at`` set, a compare-and-set on the row
+    still armed), so a second run at the same moment (two stock updates, a
+    copy of the task) skips every alert the first one took. A type that is
+    off (its feature closed, or the store switched it off) handles nothing:
+    the alert claimed to find that out is armed again, and so are the rest.
     """
+    from product.models.alert import ProductAlert
+
     handled: list[ProductAlert] = []
     sent = 0
     for alert in alerts:
+        claimed_at = timezone.now()
+        armed = ProductAlert.objects.filter(
+            pk=alert.pk, is_active=True, notified_at__isnull=True
+        )
+        if not armed.update(is_active=False, notified_at=claimed_at):
+            continue
         try:
             deliveries = send_email(type_key, wrap(alert))
         except Exception:
@@ -326,6 +338,9 @@ def _notify_alerts(alerts, *, type_key: str, wrap=lambda alert: alert):
             Status.SKIPPED_FEATURE_OFF,
             Status.SKIPPED_SWITCHED_OFF,
         ):
+            ProductAlert.objects.filter(
+                pk=alert.pk, notified_at=claimed_at
+            ).update(is_active=True, notified_at=None)
             return None
         handled.append(alert)
         sent += was_sent(deliveries)
@@ -366,23 +381,12 @@ def send_product_alert_restock(product_id: int) -> dict:
         notified_at__isnull=True,
     ).select_related("user")
 
-    now = timezone.now()
     outcome = _notify_alerts(
         _with_product(alerts, product), type_key="product.restock_alert"
     )
     if outcome is None:
         return {"status": "skipped", "reason": "switched_off"}
     _handled, sent = outcome
-
-    # Single-shot: deactivate every alert we processed, even failures —
-    # a retry loop would otherwise hammer broken addresses.
-    ProductAlert.objects.filter(
-        product_id=product_id,
-        kind=ProductAlertKind.RESTOCK,
-        is_active=True,
-        notified_at__isnull=True,
-    ).update(is_active=False, notified_at=now)
-
     return {"status": "success", "product_id": product_id, "sent": sent}
 
 
@@ -415,7 +419,6 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         target_price_currency=getattr(settings, "DEFAULT_CURRENCY", "EUR"),
     ).select_related("user")
 
-    now = timezone.now()
     outcome = _notify_alerts(
         _with_product(alerts, product),
         type_key="product.price_drop_alert",
@@ -423,13 +426,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
     )
     if outcome is None:
         return {"status": "skipped", "reason": "switched_off"}
-    handled, sent = outcome
-
-    if handled:
-        ProductAlert.objects.filter(id__in=[a.id for a in handled]).update(
-            is_active=False, notified_at=now
-        )
-
+    _handled, sent = outcome
     return {"status": "success", "product_id": product_id, "sent": sent}
 
 

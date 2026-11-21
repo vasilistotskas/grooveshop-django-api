@@ -599,6 +599,15 @@ class PaymentNotFoundError(PaymentError):
         super().__init__(f"Payment intent with ID {payment_id} not found")
 
 
+class PaymentInProgressError(PaymentError):
+    """Raised when a hosted payment session of an order has been paid
+    and the order does not know it yet: the provider's webhook has not
+    landed. No new payment link may be opened: the buyer would pay
+    twice. The client asks again a little later
+    (``create_checkout_session``'s 409 ``payment_in_progress``).
+    """
+
+
 class PaymentStatusUnavailableError(PaymentError):
     """
     Raised when a payment provider could not be asked where a payment

@@ -875,6 +875,9 @@ msgstr "Η σημείωση είναι υποχρεωτική."
 msgid "A password was set on your account"
 msgstr "Ορίστηκε κωδικός πρόσβασης στον λογαριασμό σας"
 
+msgid "A payment for this order was received and is being confirmed. Do not pay again."
+msgstr "Μια πληρωμή για αυτή την παραγγελία ελήφθη και επιβεβαιώνεται. Μην πληρώσετε ξανά."
+
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "Απαιτείται payment intent — οι εφαρμοσμένες εκπτώσεις δεν καλύπτουν το σύνολο της παραγγελίας."
 
@@ -3810,9 +3813,6 @@ msgstr "Δημιουργία υποβολής feedback"
 
 msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
 msgstr "Δημιουργία νέου Stripe PaymentIntent για παραγγελία της οποίας η προηγούμενη πληρωμή απέτυχε ή δεν ολοκληρώθηκε ποτέ, ώστε ο πελάτης να μπορεί να δοκιμάσει ξανά χωρίς να ξεκινήσει νέα παραγγελία."
-
-msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
-msgstr "Δημιουργία φιλοξενούμενης συνεδρίας ολοκλήρωσης αγοράς (Stripe ή Viva Wallet). Ο πελάτης θα ανακατευθυνθεί στη σελίδα πληρωμής του παρόχου για να ολοκληρώσει την πληρωμή."
 
 msgid "Create a hosted checkout session for an order"
 msgstr "Δημιουργία φιλοξενούμενης συνεδρίας ολοκλήρωσης αγοράς για παραγγελία"
@@ -14940,6 +14940,9 @@ msgstr "Το σύνολο της παραγγελίας είναι κάτω απ
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 msgstr "Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες και προσωπικό του καταστήματος."
 
+msgid "The order's hosted payment link (Stripe or Viva Wallet). While a link of the order can still be paid it is returned again, with its own expiry, and successUrl and cancelUrl are those it was opened with; only when none can be paid is a new one opened. 409 payment_in_progress: a payment was made and is being confirmed, so no link is opened; read the order again after Retry-After. 503 payment_provider_unavailable: the provider cannot say whether a link is still payable; try again after Retry-After."
+msgstr "Ο φιλοξενούμενος σύνδεσμος πληρωμής της παραγγελίας (Stripe ή Viva Wallet). Όσο ένας σύνδεσμος της παραγγελίας μπορεί ακόμη να πληρωθεί, επιστρέφεται ξανά, με τη δική του λήξη, και τα successUrl και cancelUrl είναι αυτά με τα οποία άνοιξε· μόνο όταν κανένας δεν μπορεί να πληρωθεί ανοίγει νέος. 409 payment_in_progress: έγινε πληρωμή και επιβεβαιώνεται, οπότε δεν ανοίγει σύνδεσμος· διαβάστε ξανά την παραγγελία μετά το Retry-After. 503 payment_provider_unavailable: ο πάροχος δεν μπορεί να πει αν ένας σύνδεσμος πληρώνεται ακόμη· δοκιμάστε ξανά μετά το Retry-After."
+
 msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 msgstr "Οι σελίδες, το θέμα και οι ενότητες που δημοσίευσε ένα κατάστημα με τον δημιουργό σελίδων, και κάθε σελίδα που εμφανίζεται με αυτά. Καθαρίζει μόνη της όταν δημοσιεύεται ή επαναφέρεται μια έκδοση· η αποθήκευση πρόχειρου δεν καθαρίζει τίποτα."
 
@@ -14965,6 +14968,9 @@ msgstr "Η μέθοδος πληρωμής είναι δωρεάν όταν τα
 
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακόμη, επομένως δεν υπάρχει κάτι προς επιστροφή."
+
+msgid "The payment provider cannot be reached right now. Try again in a moment."
+msgstr "Δεν είναι δυνατή η επικοινωνία με τον πάροχο πληρωμών αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο."
 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "Ο πάροχος πληρωμών δεν είναι προσβάσιμος για να ελεγχθεί αυτός ο κωδικός."
@@ -18527,6 +18533,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Courier receipts cannot be sent: no dispatch point"
 #~ msgstr "Οι αποδείξεις courier δεν μπορούν να σταλούν: δεν έχει οριστεί τόπος φόρτωσης"
+
+#~ msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
+#~ msgstr "Δημιουργία φιλοξενούμενης συνεδρίας ολοκλήρωσης αγοράς (Stripe ή Viva Wallet). Ο πελάτης θα ανακατευθυνθεί στη σελίδα πληρωμής του παρόχου για να ολοκληρώσει την πληρωμή."
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Κρίσιμο απόθεμα (1-5)"

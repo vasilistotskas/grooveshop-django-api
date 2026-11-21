@@ -37,6 +37,43 @@ accounts:
   hides credential-less providers from the shopper pay-way list AND
   refuses checkout-session/SPT creation for them.
 
+**One payable link per order (#643).** Asking for a payment link
+(`OrderViewSet.create_checkout_session`, every caller: the storefront's
+payment view and "pay now", the agent gateway) is idempotent. The provider
+is asked first, with no row locked (`PaymentProvider.live_checkout_session`):
+
+- a link that can still be paid is returned again with its own expiry, and
+  nothing is minted (`successUrl`/`cancelUrl` are the ones it was opened
+  with);
+- a link that was paid while the order is still unpaid (its webhook has not
+  landed) answers **409 `payment_in_progress`** with `Retry-After: 10`; no
+  link is minted, so the buyer cannot pay twice;
+- only when none can be paid is a new one minted;
+- a provider that cannot say answers **503 `payment_provider_unavailable`**
+  with `Retry-After: 30`: a link is never minted blind.
+
+Viva is read with Retrieve order (`GET /api/orders/{orderCode}`, Basic auth)
+for every code in `metadata.viva_order_codes`: `StateId` 0 Pending is
+returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone.
+`ExpirationDate` carries no offset and is Greek local time
+(`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens). Viva forgets a code
+some time after it ends and answers 404 (codes from two months before
+answered 404 on demo, 2026-11-21); a 404 is "gone" only once the order's
+hold and the grace window have ended (`payment_hold.hold_ended`), else it is
+"unreadable". Stripe is read from the Checkout Session's `status` (`open`,
+`complete`, `expired`). A hosted session and a PaymentIntent are never
+payable together: an open intent is closed (`close_payment`) before a session
+opens, and an open session is expired before `PayWayService.process_payment`
+mints an intent; one that may still be paid refuses the other.
+
+Two concurrent requests that both find no live link both mint; under the
+order's row lock the second compares the reference it read
+(`recorded_checkout_session`) with the one stored, records nothing of its
+own, leaves the hold alone and answers with the first one's link. Its own
+link reached nobody; a Stripe one is expired (`discard_checkout_session`),
+a Viva one is left, as Viva's cancel is not documented well enough to build
+on.
+
 ### 4.1 Stripe online (`payment_intent.succeeded`)
 
 Webhook handler:

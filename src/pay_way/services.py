@@ -9,7 +9,10 @@ from django.utils.translation import gettext_lazy as _
 from order.enum.status import (
     PaymentStatus,
 )
-from order.exceptions import OrderChangedDuringPaymentError
+from order.exceptions import (
+    OrderChangedDuringPaymentError,
+    PaymentInProgressError,
+)
 from order.models import Order
 from order.payments import payment_hold
 from order.payments.payment import get_payment_provider
@@ -348,6 +351,29 @@ class PayWayService:
                 return False, {
                     "error": _("The previous payment is still in progress."),
                     "code": "previous_payment_in_progress",
+                }
+
+        # The reverse holds too: an open hosted session of the order is
+        # ended before an intent replaces it, so the two are never
+        # payable together (#643). One that was paid stays the payment.
+        if provider.supports_hosted_checkout:
+            try:
+                live = provider.live_checkout_session(order)
+                if live is not None:
+                    provider.discard_checkout_session(live.session_id)
+            except PaymentInProgressError:
+                return False, {
+                    "error": _("The previous payment is still in progress."),
+                    "code": "previous_payment_in_progress",
+                }
+            except Exception:
+                logger.exception(
+                    "Could not close the open checkout session of order %s",
+                    order.id,
+                )
+                return False, {
+                    "error": _("The previous payment could not be closed."),
+                    "code": "previous_payment_not_closed",
                 }
 
         hold_expires_at = payment_hold.deadline(order)

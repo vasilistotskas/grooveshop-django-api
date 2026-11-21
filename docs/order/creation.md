@@ -541,7 +541,8 @@ address it cannot place (prod order #316: street "1", street number
   outside any transaction or lock, and only where the store delivers that
   kind in that country (`active_rate`). At most one resync per store and
   carrier runs in `PICKUP_POINT_RESYNC_GUARD_SECONDS` (600 s); inside it a
-  miss is refused at once. The request waits for it at most
+  miss is refused at once, and so is one while the cache holding the guard
+  is down (`REDIS_UNAVAILABLE`, logged): no resync runs without it. The request waits for it at most
   `PICKUP_POINT_RESYNC_TIMEOUT_SECONDS` (5 s, under the agent gateway's 10
   s): the sync runs on a daemon thread of its own, which sets the store's
   schema, logs its own failure and closes its own connection; the guard is

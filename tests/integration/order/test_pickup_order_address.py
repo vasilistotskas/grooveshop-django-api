@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import reverse
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
@@ -349,12 +350,25 @@ def resync(locker_checkout):
         patch("django.core.cache.cache", private_cache()),
     ):
         yield client.return_value.list_destinations
+        _join_resync_threads()
+
+
+def _join_resync_threads() -> None:
+    """Wait for every resync thread the test started, while its mocks
+    and database are still there: one left running past its test makes
+    its queries after the teardown and logs their refusal into the next
+    test on the worker."""
+    for thread in threading.enumerate():
+        if thread.name == RESYNC_THREAD:
+            thread.join(10)
+            assert not thread.is_alive(), "a resync thread outlived its test"
 
 
 # The resync runs on a thread with a connection of its own
 # (``ShippingService._resync_within_deadline``), which sees only committed
 # rows: these tests run outside the test's transaction.
 RESYNC = pytest.mark.django_db(transaction=True)
+RESYNC_THREAD = "pickup-point-resync"
 
 
 @RESYNC
@@ -562,7 +576,7 @@ class TestALockerTheCatalogueDoesNotHoldYet:
             raise BoxNowAPIError(503, message="down")
 
         def recording_close(wrapper):
-            if threading.current_thread().name == "pickup-point-resync":
+            if threading.current_thread().name == RESYNC_THREAD:
                 closed.set()
             return close(wrapper)
 
@@ -582,7 +596,7 @@ class TestALockerTheCatalogueDoesNotHoldYet:
             caplog.text
         )
         (logged,) = [r for r in caplog.records if r.levelno == logging.ERROR]
-        assert logged.threadName == "pickup-point-resync"
+        assert logged.threadName == RESYNC_THREAD
         assert isinstance(logged.exc_info[1], BoxNowAPIError)
 
     def test_a_carrier_that_fails_the_resync_is_refused_and_logged(
@@ -600,6 +614,31 @@ class TestALockerTheCatalogueDoesNotHoldYet:
             "pickup_point_unknown"
         )
         assert "Resync of the boxnow catalogue" in caplog.text
+        assert not Order.objects.exists()
+
+    def test_a_cache_outage_refuses_without_a_resync(
+        self, locker_checkout, resync, caplog
+    ):
+        """``CustomCache.add`` raises while Redis is down; without its
+        guard no resync runs, and the order is the field error, never a
+        500."""
+        with (
+            patch(
+                "django.core.cache.cache.add",
+                side_effect=RedisConnectionError("down"),
+            ),
+            caplog.at_level(logging.WARNING, logger="shipping.services"),
+        ):
+            response = _post_locker_order(
+                locker_checkout, boxnow_locker_id="77"
+            )
+
+        assert response.status_code == 400, response.content
+        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        resync.assert_not_called()
+        assert "the cache holding its guard is unavailable" in caplog.text
         assert not Order.objects.exists()
 
     def test_a_known_locker_asks_the_carrier_nothing(

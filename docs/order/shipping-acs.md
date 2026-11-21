@@ -13,7 +13,10 @@ and says which file holds each § number used here.
   lookups of one station: `externalId` (the area code several Smartpoints
   share) and `branch` (with it, one station; empty matches the station
   without a branch). The agent gateway resolves a UCP pickup destination
-  with the exact pair.
+  with the exact pair. The list is cached (`cache_methods`) under the
+  `shipping` cache surface, which every station write purges: a saved row
+  through `invalidated_by`, a sync's deactivating `update` through
+  `mark_surface_stale`, the order-time resync included.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout`: the row lock used to be held

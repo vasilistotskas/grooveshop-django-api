@@ -21,6 +21,7 @@ from django.conf import settings
 from django.db.models import Q
 from djmoney.money import Money
 
+from core.caches import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
     ShippingParcelTooLargeError,
@@ -151,7 +152,25 @@ class ShippingService:
                 f"{country_code}"
             ) from e
         guard = f"shipping:pickup-point-resync:{provider_code}"
-        if not cache.add(guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS):
+        try:
+            acquired = cache.add(
+                guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS
+            )
+        except REDIS_UNAVAILABLE as e:
+            # ``CustomCache.add`` raises while Redis is down: without the
+            # guard nothing bounds the resyncs, so none runs.
+            logger.warning(
+                "No resync of the %s catalogue for pickup point %s: the "
+                "cache holding its guard is unavailable",
+                provider_code,
+                dict(location),
+                exc_info=True,
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue cannot be resynced without the cache"
+            ) from e
+        if not acquired:
             raise PickupPointUnknown(
                 f"{provider_code} pickup point {dict(location)} is unknown "
                 "and its catalogue was resynced in the last "

@@ -10,7 +10,10 @@ and says which file holds each § number used here.
   `src/shipping_boxnow/views/locker.py`, `BoxNowLockerFilter`) serves
   active rows only and takes the exact filters `externalId` (the locker's
   BOX NOW id) and `countryCode`, with which the agent gateway resolves a
-  UCP pickup destination.
+  UCP pickup destination. The list is cached (`cache_methods`) under the
+  `shipping` cache surface, which every locker write purges: a saved row
+  through `invalidated_by`, a sync's deactivating `update` through
+  `mark_surface_stale`, the order-time resync included.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
   have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,

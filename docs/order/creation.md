@@ -81,9 +81,10 @@ caller:
   own sum is not the quote's `amount_due`: a charge added to one and not
   the other, or a cart line changed between the quote and the line lock,
   fails the creation instead of producing an order no payment matches.
-- **The expected total.** `POST /api/v1/order` takes an optional
+- **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
-  (cents). Both creation paths compare it, exactly, with the quote computed
+  (cents), as the quote returned it. An order is never created at a total
+  the client did not send. Both creation paths compare it, exactly, with the quote computed
   under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the

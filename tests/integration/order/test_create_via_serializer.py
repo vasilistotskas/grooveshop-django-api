@@ -26,6 +26,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -74,6 +75,8 @@ class TestOrderCreateSerializerValidation(APITestCase):
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
             "phone": "+306900000000",
+            # Validated as a shape here; nothing is priced.
+            "expected_total": {"amount": 1000, "currency": "EUR"},
         }
         data.update(overrides)
         return data
@@ -94,6 +97,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
             # (``self.region``), so one is required now.
             "region_id": self.region.alpha,
             "phone": "+306900000001",
+            "expected_total": {"amount": 1000, "currency": "EUR"},
         }
         data.update(overrides)
         return data
@@ -264,6 +268,15 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         CartItemFactory(cart=self.cart, product=self.product, quantity=1)
         self.create_url = reverse("order-list")
 
+    def _create(self, data, *, expected_total=None, **headers):
+        """Place the order at ``expected_total``, or else at its quote's."""
+        headers.setdefault("HTTP_X_CART_ID", str(self.cart.uuid))
+        if expected_total is None:
+            data = quoted_body(self.client, data, **headers)
+        else:
+            data = {**data, "expected_total": expected_total}
+        return self.client.post(self.create_url, data, format="json", **headers)
+
     def _base_address(self):
         return {
             "first_name": "Alice",
@@ -309,12 +322,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         }
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
@@ -342,12 +350,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         }
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
@@ -381,14 +384,12 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             with self.subTest(language=language):
                 cart = CartFactory(user=self.user)
                 CartItemFactory(cart=cart, product=self.product, quantity=1)
-                response = self.client.post(
-                    self.create_url,
+                response = self._create(
                     {
                         **self._base_address(),
                         "pay_way_id": pay_way.id,
                         "terms_accepted": True,
                     },
-                    format="json",
                     HTTP_X_CART_ID=str(cart.uuid),
                     HTTP_X_LANGUAGE=language,
                 )
@@ -420,12 +421,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         }
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data, expected_total=UNQUOTED)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
@@ -456,12 +452,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         }
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data, expected_total=UNQUOTED)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
@@ -500,12 +491,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             "boxnow_locker_id": "123",
         }
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data, expected_total=UNQUOTED)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
@@ -519,12 +505,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         }
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._create(data, expected_total=UNQUOTED)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
@@ -557,12 +538,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             ),
         ):
             self.client.force_authenticate(user=self.user)
-            response = self.client.post(
-                self.create_url,
-                data,
-                format="json",
-                HTTP_X_CART_ID=str(self.cart.uuid),
-            )
+            response = self._create(data)
 
         # 201 means the payload was accepted and routed correctly
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

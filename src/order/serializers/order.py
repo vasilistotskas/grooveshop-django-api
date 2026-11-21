@@ -1334,17 +1334,16 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     )
 
     # ---------- The total the buyer was shown ----------
-    # Optional for now: a client that sends it gets the order only at
-    # that total (``OrderTotalChangedError``, 409 ``total_changed``).
+    # Required: the order is created only at the total the buyer saw
+    # (``OrderTotalChangedError``, 409 ``total_changed``).
     expected_total = ExpectedTotalSerializer(
-        required=False,
         write_only=True,
         help_text=_(
             "The total the buyer was shown: ``expectedTotal`` of "
-            "``POST /cart/quote``, or the client's own amount due in minor "
-            "units. When sent, the order is created only if it is exactly "
-            "the amount due computed now; otherwise the answer is 409 "
-            "``total_changed`` with the new quote and nothing is created."
+            "``POST /cart/quote``. The order is created only if it is "
+            "exactly the amount due computed now; otherwise the answer is "
+            "409 ``total_changed`` with the new quote and nothing is "
+            "created."
         ),
     )
 

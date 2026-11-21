@@ -845,6 +845,8 @@ class AcsService:
                 shipment.voucher_request_unknown_at = None
                 shipment.voucher_request_held_at = None
                 shipment.metadata = metadata
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
                 shipment.save(
                     update_fields=[
                         "voucher_no",
@@ -852,6 +854,7 @@ class AcsService:
                         "voucher_request_unknown_at",
                         "voucher_request_held_at",
                         "metadata",
+                        "updated_at",
                     ]
                 )
                 cls._settle_unrecognised_vouchers(

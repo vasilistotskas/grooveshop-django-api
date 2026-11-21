@@ -93,7 +93,8 @@ when a carrier wrote a record of it within `ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS`
 
 - a tracking checkpoint;
 - a COD payout, matched by its shipment or by its voucher alone;
-- an ACS call naming the order or any voucher it had;
+- an ACS call naming the order or any voucher it had (a call with neither
+  column, a COD or pickup-list answer, is searched for the voucher);
 - a BOX NOW event or shipment row;
 - an ACS shipment row whose personal metadata a writer changed (those
   writers bump `updated_at`).
@@ -110,17 +111,19 @@ canceled since.
 
 ## Orders erased before this
 
-The same daily sweep first finishes the orders an earlier erasure left
-(`order.privacy.finish_earlier_erasures`): those with the old placeholder
-email (`deleted-<hex>@deleted.invalid`) and no stamp. It finds them through
-the email's trigram index (`order_email_search_ix`).
+The same daily sweep, as its last step, finishes the orders an earlier
+erasure left (`order.privacy.finish_earlier_erasures`): those with the old
+placeholder email (`deleted-<hex>@deleted.invalid`) and no stamp. It finds
+them through the email's trigram index (`order_email_search_ix`).
 
-- It works in batches, each one transaction: their carrier records are
+- It works in batches of 50, each one transaction: their carrier records are
   cleared, the cancel reason's copies and every email address in their
   history are redacted (the buyer's own address is gone), their
   `PERSONAL_METADATA` is dropped and the billing rule applied, and the stamp
   comes last.
-- A batch that fails stays unstamped and is tried again the next day.
+- A batch that fails is rolled back, logged and left for the next day. The
+  next batch still runs (the batches page by id), and the rest of the sweep
+  has already run.
 
 The step is idempotent, and it also covers an order erased the old way during
 a deploy's window. Run the sweep once by hand right after the deploy that

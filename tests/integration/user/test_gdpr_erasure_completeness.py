@@ -815,24 +815,56 @@ def test_a_canceled_owed_invoice_loses_its_billing_at_the_sweep(subject):
 def test_finishing_an_earlier_erasure_stamps_only_what_it_cleared(
     subject, monkeypatch
 ):
-    """The stamp comes last, in the same transaction as the carriers'
-    erase: a batch that fails stays unstamped and is tried again."""
-    from order.factories import OrderFactory
-    from order.privacy import finish_earlier_erasures
+    """Each batch is one transaction with the stamp last: a batch that fails
+    is rolled back (its carrier records and history stay as they were, to
+    be cleared with it next time) and left unstamped, and the next batch
+    still runs."""
+    from django.db import OperationalError
 
-    order = OrderFactory(
-        user=None, email="deleted-0123456789ab@deleted.invalid"
+    from order import privacy
+    from order.factories import OrderFactory
+    from order.models.history import OrderHistory
+    from shipping_acs.factories import (
+        AcsShipmentFactory,
+        AcsTrackingEventFactory,
     )
 
-    def fail(*args, **kwargs):
-        raise RuntimeError("statement timeout")
+    def old_way(voucher):
+        order = OrderFactory(
+            user=None, email=f"deleted-{voucher}@deleted.invalid"
+        )
+        event = AcsTrackingEventFactory(
+            shipment=AcsShipmentFactory(order=order, voucher_no=voucher),
+            notes="Παρέλαβε η αγοράστρια",
+        )
+        note = OrderHistory.log_note(order=order, note="sent to a@example.gr")
+        return order, event, note
 
-    monkeypatch.setattr("order.privacy.erase_carrier_data", fail)
-    with pytest.raises(RuntimeError):
-        finish_earlier_erasures()
+    failing, failing_event, failing_note = old_way("7400000020")
+    later, later_event, _ = old_way("7400000021")
 
-    order.refresh_from_db()
-    assert order.personal_data_erased_at is None
+    stamp = privacy._clear_and_stamp
+
+    def stamp_or_fail(order_ids):
+        if failing.id in order_ids:
+            raise OperationalError("canceling statement due to timeout")
+        stamp(order_ids)
+
+    monkeypatch.setattr(privacy, "_FINISH_BATCH", 1)
+    monkeypatch.setattr(privacy, "_clear_and_stamp", stamp_or_fail)
+
+    assert privacy.finish_earlier_erasures() == (1, 1)
+
+    failing.refresh_from_db()
+    failing_event.refresh_from_db()
+    failing_note.refresh_from_db()
+    assert failing.personal_data_erased_at is None
+    assert failing_event.notes == "Παρέλαβε η αγοράστρια"
+    assert "a@example.gr" in str(failing_note.new_value)
+    later.refresh_from_db()
+    later_event.refresh_from_db()
+    assert later.personal_data_erased_at is not None
+    assert later_event.notes == ""
 
 
 def test_a_namesake_keeps_their_acs_calls(subject):
@@ -907,6 +939,8 @@ def test_an_order_erased_the_old_way_is_finished_by_the_next_sweep(subject):
     the cancel reason, the reason's copies, the email addresses in its
     history, and its carrier records, in the same run. A stamped order is
     not matched again."""
+    from datetime import timedelta
+
     from order.factories import OrderFactory
     from order.inventory.stock import StockManager
     from order.models.history import OrderHistory
@@ -943,9 +977,16 @@ def test_an_order_erased_the_old_way_is_finished_by_the_next_sweep(subject):
         order_id=order.id,
         reason=f"Order {order.id} canceled: {reason}",
     )
+    shipment = AcsShipmentFactory(order=order, voucher_no="7400000010")
     event = AcsTrackingEventFactory(
-        shipment=AcsShipmentFactory(order=order, voucher_no="7400000010"),
-        notes="Παρέλαβε η αγοράστρια",
+        shipment=shipment, notes="Παρέλαβε η αγοράστρια"
+    )
+    # Written long ago: only the finish step's own carrier erase reads them,
+    # not the sweep of recent writes.
+    long_ago = timezone.now() - timedelta(days=400)
+    type(shipment).objects.filter(pk=shipment.pk).update(updated_at=long_ago)
+    type(event).objects.filter(pk=event.pk).update(
+        created_at=long_ago, updated_at=long_ago
     )
     done = OrderFactory(
         user=None,

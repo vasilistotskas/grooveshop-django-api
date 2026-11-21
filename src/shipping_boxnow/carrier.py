@@ -232,6 +232,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
             )
         ):
             entry = data.setdefault(order_id, {})
+            # A polled event keeps its text in the raw body only.
+            polled = pick_paths(raw, (("event", "additionalInformation"),))
+            text = text or polled.get("event", {}).get(
+                "additionalInformation", ""
+            )
             if text:
                 entry.setdefault("boxnow_event_texts", []).append(text)
             customer = pick_paths(raw, (("data", "customer"),))

@@ -10,16 +10,20 @@ Soft-deleted orders are the subject's too, so every query here reads
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.db.models import Q
 from django.utils import timezone
 
 from core.utils.json_paths import drop_paths, pick_paths
 from core.utils.redaction import redact, redaction_texts
 from shipping.interfaces import registered_providers
+
+logger = logging.getLogger(__name__)
 
 PLACEHOLDER_NAME = "[deleted]"
 
@@ -142,16 +146,18 @@ def erase_carrier_data(
     return counts
 
 
-# Orders finished per transaction by :func:`finish_earlier_erasures`.
-_FINISH_BATCH = 200
+# Orders finished per transaction by :func:`finish_earlier_erasures`: small,
+# as the carriers' erase of a batch searches their call history for every
+# voucher of it.
+_FINISH_BATCH = 50
 
 
 def erase_late_carrier_data() -> dict[str, int]:
-    """The daily sweep of erased orders: finish the orders an earlier
-    erasure left (:func:`finish_earlier_erasures`), clear the carrier data
-    that arrived after an erasure, and clear the billing fields of an order
-    that stopped needing them (:func:`keeps_billing`: an owed invoice whose
-    order was canceled since).
+    """The daily sweep of erased orders: clear the carrier data that
+    arrived after an erasure, clear the billing fields of an order that
+    stopped needing them (:func:`keeps_billing`: an owed invoice whose
+    order was canceled since), and last, finish the orders an earlier
+    erasure left (:func:`finish_earlier_erasures`).
 
     A parcel still moving when its buyer is erased goes on being tracked,
     delivered and paid out: each poll, webhook and COD answer writes the
@@ -165,7 +171,6 @@ def erase_late_carrier_data() -> dict[str, int]:
     """
     from order.models.order import Order
 
-    finished = finish_earlier_erasures()
     since = timezone.now() - timedelta(
         days=settings.ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS
     )
@@ -178,7 +183,6 @@ def erase_late_carrier_data() -> dict[str, int]:
         .values_list("id", flat=True)
     )
     counts = erase_carrier_data(swept, buyer_values={})
-    counts["earlier_erasures_finished"] = finished
     counts["billing_cleared"] = (
         Order.objects.all_with_deleted()
         .filter(personal_data_erased_at__isnull=False)
@@ -186,10 +190,15 @@ def erase_late_carrier_data() -> dict[str, int]:
         .exclude(**dict.fromkeys(Order.BILLING_FIELDS, ""))
         .update(**dict.fromkeys(Order.BILLING_FIELDS, ""))
     )
+    # Last: a batch of it that fails cannot keep the sweep above from
+    # running.
+    finished, failed = finish_earlier_erasures()
+    counts["earlier_erasures_finished"] = finished
+    counts["earlier_erasures_failed"] = failed
     return counts
 
 
-def finish_earlier_erasures() -> int:
+def finish_earlier_erasures() -> tuple[int, int]:
     """Finish the orders an erasure from before this module left: it
     blanked the order's columns, with the placeholder email
     (``deleted-<hex>@deleted.invalid``), and kept every copy (the browser
@@ -200,9 +209,11 @@ def finish_earlier_erasures() -> int:
     the copies redacted by what is left on the order (the cancel reason)
     and the history by every email address it names, as the buyer's is
     gone; the stamp comes last (:func:`_clear_and_stamp`), so a stamped
-    order is always one whose carrier records were cleared, and a batch
-    that fails is tried again the next day. Idempotent: a stamped order is
-    never matched again. Found through the email's trigram index
+    order is always one whose carrier records were cleared. A batch that
+    fails is rolled back, logged and left for the next day, and the next
+    batch runs: the batches page by id, so one that keeps failing cannot
+    hold the others back. Returns the orders finished and those whose
+    batch failed. Idempotent: a stamped order is never matched again. Found through the email's trigram index
     (``order_email_search_ix``). A soft-deleted order that erasure skipped
     was unlinked from its account with its data and cannot be told apart
     from a guest's."""
@@ -220,14 +231,28 @@ def finish_earlier_erasures() -> int:
         )
         .order_by("id")
     )
-    finished = 0
-    while batch := list(pending.values_list("id", flat=True)[:_FINISH_BATCH]):
-        with transaction.atomic():
-            erase_carrier_data(batch, buyer_values={})
-            _erase_copies(_buyer_values(batch), emails=True)
-            _clear_and_stamp(batch)
+    finished = failed = last_id = 0
+    while batch := list(
+        pending.filter(id__gt=last_id).values_list("id", flat=True)[
+            :_FINISH_BATCH
+        ]
+    ):
+        last_id = batch[-1]
+        try:
+            with transaction.atomic():
+                erase_carrier_data(batch, buyer_values={})
+                _erase_copies(_buyer_values(batch), emails=True)
+                _clear_and_stamp(batch)
+        except DatabaseError:
+            logger.exception(
+                "Finishing an earlier erasure failed for orders %s..%s",
+                batch[0],
+                last_id,
+            )
+            failed += len(batch)
+            continue
         finished += len(batch)
-    return finished
+    return finished, failed
 
 
 def _buyer_values(order_ids: list[int]) -> dict[int, list[str]]:

@@ -224,20 +224,30 @@ class AcsCarrier(ShippingCarrierInterface):
         # A voucher number is the order's own, exact and unique; a name or
         # a phone is not (two customers can share one), so the content is
         # searched for the vouchers alone, as whole numbers.
-        named = Q(order_id__in=order_ids) | Q(voucher_no__in=vouchers)
-        for voucher in vouchers:
-            token = rf"(^|[^0-9]){re.escape(voucher)}([^0-9]|$)"
-            named |= Q(request_text__regex=token)
-            named |= Q(response_text__regex=token)
-        calls = (
-            AcsApiCall.objects.annotate(
-                request_text=Cast("request_params", TextField()),
-                response_text=Cast("response", TextField()),
+        # A call with an order or voucher column is found by it (indexed);
+        # only one with neither (a COD or pickup-list answer) is searched.
+        by_column = AcsApiCall.objects.filter(
+            Q(order_id__in=order_ids) | Q(voucher_no__in=vouchers)
+        ).values_list("pk", flat=True)
+        by_content: list[int] = []
+        if vouchers:
+            content = Q()
+            for voucher in vouchers:
+                token = rf"(^|[^0-9]){re.escape(voucher)}([^0-9]|$)"
+                content |= Q(request_text__regex=token)
+                content |= Q(response_text__regex=token)
+            by_content = list(
+                AcsApiCall.objects.filter(order_id__isnull=True, voucher_no="")
+                .annotate(
+                    request_text=Cast("request_params", TextField()),
+                    response_text=Cast("response", TextField()),
+                )
+                .filter(content)
+                .values_list("pk", flat=True)
             )
-            .filter(named)
-            .values_list("pk", flat=True)
-        )
-        deleted = AcsApiCall.objects.filter(pk__in=list(calls)).delete()[0]
+        deleted = AcsApiCall.objects.filter(
+            pk__in=[*by_column, *by_content]
+        ).delete()[0]
 
         events = 0
         for event in AcsTrackingEvent.objects.filter(
@@ -321,16 +331,20 @@ class AcsCarrier(ShippingCarrierInterface):
             )
         )
         vouchers: set[str] = set()
-        for order_id, voucher in AcsCodPayout.objects.filter(
-            updated_at__gte=since
-        ).values_list("shipment__order_id", "voucher_no"):
+        for order_id, voucher in (
+            AcsCodPayout.objects.filter(updated_at__gte=since)
+            .values_list("shipment__order_id", "voucher_no")
+            .distinct()
+        ):
             if order_id:
                 written.add(order_id)
             elif voucher:
                 vouchers.add(voucher)
-        for order_id, voucher in AcsApiCall.objects.filter(
-            created_at__gte=since
-        ).values_list("order_id", "voucher_no"):
+        for order_id, voucher in (
+            AcsApiCall.objects.filter(created_at__gte=since)
+            .values_list("order_id", "voucher_no")
+            .distinct()
+        ):
             if order_id:
                 written.add(order_id)
             elif voucher:
@@ -907,22 +921,35 @@ def _order_vouchers(order_ids: list[int]) -> dict[int, set[str]]:
 
 def _orders_of_vouchers(vouchers: set[str]) -> set[int]:
     """The orders any of *vouchers* belongs to, by every place
-    :func:`_order_vouchers` reads a voucher from."""
+    :func:`_order_vouchers` reads a voucher from: the live voucher column
+    first (indexed), and only the vouchers it does not hold (children,
+    replaced, orphaned, adopted, usually none) are looked up in the
+    metadata, with one "any of" test per list."""
     from django.db.models import Q
 
     from shipping_acs.models import AcsShipment
 
     if not vouchers:
         return set()
-    match = Q(voucher_no__in=vouchers)
-    for voucher in vouchers:
-        for key in (
-            "multipart_vouchers",
-            "previous_vouchers",
-            "orphan_vouchers",
-        ):
-            match |= Q(**{f"metadata__{key}__contains": [voucher]})
-        match |= Q(metadata__adopted_voucher__voucher_no=voucher)
-    return set(
-        AcsShipment.objects.filter(match).values_list("order_id", flat=True)
-    )
+    orders: set[int] = set()
+    live: set[str] = set()
+    for order_id, voucher in (
+        AcsShipment.objects.filter(voucher_no__in=vouchers)
+        .values_list("order_id", "voucher_no")
+        .distinct()
+    ):
+        orders.add(order_id)
+        live.add(voucher)
+    rest = sorted(vouchers - live)
+    if rest:
+        orders |= set(
+            AcsShipment.objects.filter(
+                Q(metadata__multipart_vouchers__has_any_keys=rest)
+                | Q(metadata__previous_vouchers__has_any_keys=rest)
+                | Q(metadata__orphan_vouchers__has_any_keys=rest)
+                | Q(metadata__adopted_voucher__voucher_no__in=rest)
+            )
+            .values_list("order_id", flat=True)
+            .distinct()
+        )
+    return orders

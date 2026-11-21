@@ -22,7 +22,6 @@ from django.utils import translation
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.throttling import OrderSpecimenThrottle
 from order.accounting.invoicing import (
     SpecimenNotAvailable,
     _build_context,
@@ -34,6 +33,7 @@ from order.accounting.invoicing import (
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.invoice import Invoice, InvoiceCounter
+from order.throttles import OrderSpecimenThrottle
 from tests.utils.mydata import issuable
 from user.factories.account import UserAccountFactory
 

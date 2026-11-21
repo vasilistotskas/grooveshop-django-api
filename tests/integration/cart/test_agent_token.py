@@ -36,7 +36,7 @@ from cart.agent_token import (
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart
 from cart.services import CartService
-from core.api.throttling import CartAgentTokenThrottle
+from cart.throttles import CartAgentTokenThrottle
 from product.factories import ProductFactory
 from tests.utils.boxnow import nearest_locker
 from tests.utils.staff import (

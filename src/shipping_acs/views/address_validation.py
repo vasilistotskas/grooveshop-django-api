@@ -27,10 +27,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.throttling import AcsAddressValidationThrottle
 from shipping.api_errors import CarrierUnavailable
 from shipping.exceptions import CarrierUnavailableError
 from shipping_acs.exceptions import AcsAPIError, AcsConfigError
+from shipping_acs.throttles import AcsAddressValidationThrottle
 
 logger = logging.getLogger(__name__)
 

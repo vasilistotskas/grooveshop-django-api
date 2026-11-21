@@ -1,5 +1,5 @@
 """Payment history rows record ``PaymentStatus`` values, not lowercase
-literals (``order/signals/handlers.py``).
+literals (``src/order/signals/handlers.py``).
 
 ``Order.payment_status`` stores the upper-case enum value, so a history
 row written as ``"completed"`` / ``"failed"`` matched no status and read
@@ -109,7 +109,7 @@ def test_payment_failed_history_uses_enum_values():
 
 
 class TestVivaWebhookHistory:
-    """``order/views/viva_webhook.py`` writes the same rows for Viva."""
+    """``src/order/views/viva_webhook.py`` writes the same rows for Viva."""
 
     @staticmethod
     def _history(order):

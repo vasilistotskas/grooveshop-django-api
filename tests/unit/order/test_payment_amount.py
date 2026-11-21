@@ -223,8 +223,8 @@ class PaymentMethodFeeTestCase(TestCase):
 class TestOrderQuoteServiceShippingCost:
     """``OrderQuoteService.shipping_cost`` — pricing now comes from a
     ``ShippingRate`` row, not a global Setting pair; ``ShippingService``
-    itself (gate, quote order, weight cap) is covered by ``tests/unit/
-    shipping/test_shipping_service_rates.py``. These tests pin what
+    itself (gate, quote order, weight cap) is covered by
+    ``tests/unit/shipping/test_shipping_service_rates.py``. These tests pin what
     THIS wrapper adds: home-delivery auto-resolution, the ``free``
     override, and translating ``shipping.exceptions`` into
     ``InvalidOrderDataError`` so every caller gets one error shape.

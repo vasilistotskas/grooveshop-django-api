@@ -355,7 +355,9 @@ the engine (`src/recommendation/engine.py`) and its strategies
 
 ### `notification/`
 
-`Notification` and `NotificationUser`, the Channels consumer
+`Notification` and `NotificationUser`, written once per dispatch by
+`src/notification/services.py` (`dispatch_key`) and pushed once
+(`pushed_at`, `src/notification/tasks.py`), the Channels consumer
 (`src/notification/consumers.py`), the per-user group names and the
 send to them, bounded by `NOTIFICATION_PUSH_TIMEOUT_SECONDS`
 (`src/notification/groups.py`), and the single-use WebSocket ticket

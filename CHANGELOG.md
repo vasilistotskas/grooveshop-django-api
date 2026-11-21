@@ -3,6 +3,661 @@
 
 
 
+## v3.263.1 (2026-11-21)
+
+### Bug fixes
+
+* fix(notification): a notification task notifies once per dispatch (#785) ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(emails): a mail task queued after a commit mails once per dispatch
+
+A task queued through dispatch_on_commit can run more than once: the
+message a publish wrote before it failed and the sweep's copy of that
+publish, a message delivered again after a worker was lost, a retry. The
+sweep's copy went out under a new task id, so every mail task that the
+audit in #719 listed sent its mail twice.
+
+- dispatch_on_commit publishes each call with a task id of its own,
+  which the kept DeferredDispatch row holds in its options, so the
+  sweep's copy goes out under the same id as the message.
+- tenant.celery.dispatch_key(namespace, *parts) derives an effect's key
+  from the running task's id. emails.log.delivery_id is built on it and
+  gives the same ids as before.
+- emails.log.delivering reads the delivery's row and the transport sends
+  under a session-level advisory lock on the delivery id. Two copies that
+  run at the same moment (the sweep's copy and the message are delivered
+  together) send once, and a copy waiting on a worker that died sends in
+  its place. A send outside a task takes no lock. A database that cannot
+  be reached does not stop the send.
+
+Tests run every mail task on #720's list twice under one id and once
+under another, and run two copies on two connections at once.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(emails): a lock wait that lock_timeout ends is a wait that ran out
+
+A session that sets lock_timeout ends an advisory lock wait with
+LockNotAvailable, not QueryCanceled. The delivery lock read that as an
+unreachable database and sent without the lock; it now raises it for the
+retry, as for statement_timeout. The threaded tests run on
+tests.utils.concurrency, and the held SMTP send is tests.utils.emails.HeldTransport.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(notification): a notification task notifies once per dispatch
+
+create_user_notification keys the notification on the running task's id,
+the user and everything the notification says (Notification.dispatch_key,
+unique, built with AddUniqueConstraintAdaptively in a migration of its
+own), so another copy of the task gets back the row the first copy wrote,
+and the push it queues is not queued again. One task can still write two
+different notifications to one user (two likes of a comment). A copy that
+writes at the same moment waits on the unique index.
+
+send_notification_task claims NotificationUser.pushed_at (a compare-and-
+set) before it pushes and gives the claim back when the push fails, so the
+storefront shows one toast per row.
+
+Tests run every notifying task on #720's list twice under one id and once
+under another, push a row twice, and write two copies at the same moment on
+two connections.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(emails): only an unreachable database lets a delivery send without its lock
+
+Any other database error the lock meets is a bug, and sending without the
+lock then would let two copies send; it is raised. An OperationalError or
+InterfaceError that is not a lock wait still sends, so an alert about a
+failing database goes out.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(core): a session the server cannot reach any more lets go of its locks within a minute
+
+Every session sets TCP keepalives (DB_TCP_KEEPALIVES_IDLE, _INTERVAL,
+_COUNT; 30 s, 10 s, 3 probes), so the server ends the session of a client
+whose node was lost without closing its socket, and the advisory locks it
+held go with it: the delivery lock of an email and the store lock of a
+running task. The server's own setting is the kernel's default, hours,
+longer than every retry a waiting copy has.
+
+A test opens a session with the deployed options and reads the three
+settings back; another runs a copy whose lock_timeout or statement_timeout
+ends its wait on a real session and sends nothing.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(notification): a notification's key is what it is about, and a copy after its removal writes nothing
+
+The key was made of everything the notification says, so a copy that
+rendered it differently (a product renamed, a catalogue changed between
+the copies) wrote a second one. It is now the task id, the user, the type,
+the link and distinct_by, which a task that writes several notifications
+of one type and link to one user passes to tell them apart: the comment
+liked task, by liker.
+
+A copy that found its notification removed by the user since failed with
+DoesNotExist, and in a fan-out the users after that one went unnotified;
+it now gets None, as for a notification never written.
+
+The push says when its row is gone rather than calling it already pushed,
+and the order module's comments no longer say the helper is not
+idempotent.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(notification): only a row holding the dispatch key makes a failed insert a copy
+
+Any other integrity violation of the insert was read as a copy and came
+back as None. It is raised as it is now.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* fix(recommendation): an event task records its rows once per dispatch (#784) ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(emails): a mail task queued after a commit mails once per dispatch
+
+A task queued through dispatch_on_commit can run more than once: the
+message a publish wrote before it failed and the sweep's copy of that
+publish, a message delivered again after a worker was lost, a retry. The
+sweep's copy went out under a new task id, so every mail task that the
+audit in #719 listed sent its mail twice.
+
+- dispatch_on_commit publishes each call with a task id of its own,
+  which the kept DeferredDispatch row holds in its options, so the
+  sweep's copy goes out under the same id as the message.
+- tenant.celery.dispatch_key(namespace, *parts) derives an effect's key
+  from the running task's id. emails.log.delivery_id is built on it and
+  gives the same ids as before.
+- emails.log.delivering reads the delivery's row and the transport sends
+  under a session-level advisory lock on the delivery id. Two copies that
+  run at the same moment (the sweep's copy and the message are delivered
+  together) send once, and a copy waiting on a worker that died sends in
+  its place. A send outside a task takes no lock. A database that cannot
+  be reached does not stop the send.
+
+Tests run every mail task on #720's list twice under one id and once
+under another, and run two copies on two connections at once.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(emails): a lock wait that lock_timeout ends is a wait that ran out
+
+A session that sets lock_timeout ends an advisory lock wait with
+LockNotAvailable, not QueryCanceled. The delivery lock read that as an
+unreachable database and sent without the lock; it now raises it for the
+retry, as for statement_timeout. The threaded tests run on
+tests.utils.concurrency, and the held SMTP send is tests.utils.emails.HeldTransport.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(recommendation): an event task records its rows once per dispatch
+
+record_events gives each row the key of the task copy that writes it
+(RecommendationEvent.dispatch_key, unique, built with
+AddUniqueConstraintAdaptively in a migration of its own), so another copy
+of record_recommendation_event, which the order confirmation queues after a
+commit, inserts nothing. Two beacons are two tasks and stay two rows even
+for one impression id; a natural key on the impression would merge separate
+views of a cached strip.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(emails): only an unreachable database lets a delivery send without its lock
+
+Any other database error the lock meets is a bug, and sending without the
+lock then would let two copies send; it is raised. An OperationalError or
+InterfaceError that is not a lock wait still sends, so an alert about a
+failing database goes out.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(core): a session the server cannot reach any more lets go of its locks within a minute
+
+Every session sets TCP keepalives (DB_TCP_KEEPALIVES_IDLE, _INTERVAL,
+_COUNT; 30 s, 10 s, 3 probes), so the server ends the session of a client
+whose node was lost without closing its socket, and the advisory locks it
+held go with it: the delivery lock of an email and the store lock of a
+running task. The server's own setting is the kernel's default, hours,
+longer than every retry a waiting copy has.
+
+A test opens a session with the deployed options and reads the three
+settings back; another runs a copy whose lock_timeout or statement_timeout
+ends its wait on a real session and sends nothing.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* fix(product): a product alert and a gift card are mailed once, whatever path runs them (#783) ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(emails): a mail task queued after a commit mails once per dispatch
+
+A task queued through dispatch_on_commit can run more than once: the
+message a publish wrote before it failed and the sweep's copy of that
+publish, a message delivered again after a worker was lost, a retry. The
+sweep's copy went out under a new task id, so every mail task that the
+audit in #719 listed sent its mail twice.
+
+- dispatch_on_commit publishes each call with a task id of its own,
+  which the kept DeferredDispatch row holds in its options, so the
+  sweep's copy goes out under the same id as the message.
+- tenant.celery.dispatch_key(namespace, *parts) derives an effect's key
+  from the running task's id. emails.log.delivery_id is built on it and
+  gives the same ids as before.
+- emails.log.delivering reads the delivery's row and the transport sends
+  under a session-level advisory lock on the delivery id. Two copies that
+  run at the same moment (the sweep's copy and the message are delivered
+  together) send once, and a copy waiting on a worker that died sends in
+  its place. A send outside a task takes no lock. A database that cannot
+  be reached does not stop the send.
+
+Tests run every mail task on #720's list twice under one id and once
+under another, and run two copies on two connections at once.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(emails): a lock wait that lock_timeout ends is a wait that ran out
+
+A session that sets lock_timeout ends an advisory lock wait with
+LockNotAvailable, not QueryCanceled. The delivery lock read that as an
+unreachable database and sent without the lock; it now raises it for the
+retry, as for statement_timeout. The threaded tests run on
+tests.utils.concurrency, and the held SMTP send is tests.utils.emails.HeldTransport.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(product): a product alert and a gift card are mailed once, whatever path runs them
+
+The restock and price-drop alerts read the armed alerts, mailed them, then
+marked them all, so two runs at once (two stock updates) mailed each alert
+twice. Each alert is now claimed before its mail (is_active off and
+notified_at set by an update on the row still armed); one claimed to find
+its type switched off is armed again.
+
+deliver_gift_card_email, queued by the purchase, the admin's resend and the
+daily sweep, reads delivered_at and sends under an advisory lock on the card
+(core.db.locks.held_across_calls), so a second run finds the card delivered.
+A claim set before the send would lose the card's mail with a worker that
+dies mid-send; the lock goes with that worker's session instead.
+
+Tests run two deliveries of one card and two restock runs at the same
+moment on two connections.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(emails): only an unreachable database lets a delivery send without its lock
+
+Any other database error the lock meets is a bug, and sending without the
+lock then would let two copies send; it is raised. An OperationalError or
+InterfaceError that is not a lock wait still sends, so an alert about a
+failing database goes out.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(core): a session the server cannot reach any more lets go of its locks within a minute
+
+Every session sets TCP keepalives (DB_TCP_KEEPALIVES_IDLE, _INTERVAL,
+_COUNT; 30 s, 10 s, 3 probes), so the server ends the session of a client
+whose node was lost without closing its socket, and the advisory locks it
+held go with it: the delivery lock of an email and the store lock of a
+running task. The server's own setting is the kernel's default, hours,
+longer than every retry a waiting copy has.
+
+A test opens a session with the deployed options and reads the three
+settings back; another runs a copy whose lock_timeout or statement_timeout
+ends its wait on a real session and sends nothing.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(product): an alert is mailed and marked under a lock, so a lost worker loses no mail
+
+The alert was claimed before its mail, so a worker lost mid-send left it
+marked and the copy delivered again skipped it: the mail was gone. Like a
+gift card, each alert is now read, mailed and marked under an advisory
+lock on it. A second run waits and finds it marked, and a worker that dies
+takes the lock with its session, so the copy that waited mails it under
+the same delivery id. A type that is off leaves every alert armed with no
+undo, and the helper returns only how many it sent.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* fix(meta_capi): a Conversions API event is sent once per dispatch (#782) ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(emails): a mail task queued after a commit mails once per dispatch
+
+A task queued through dispatch_on_commit can run more than once: the
+message a publish wrote before it failed and the sweep's copy of that
+publish, a message delivered again after a worker was lost, a retry. The
+sweep's copy went out under a new task id, so every mail task that the
+audit in #719 listed sent its mail twice.
+
+- dispatch_on_commit publishes each call with a task id of its own,
+  which the kept DeferredDispatch row holds in its options, so the
+  sweep's copy goes out under the same id as the message.
+- tenant.celery.dispatch_key(namespace, *parts) derives an effect's key
+  from the running task's id. emails.log.delivery_id is built on it and
+  gives the same ids as before.
+- emails.log.delivering reads the delivery's row and the transport sends
+  under a session-level advisory lock on the delivery id. Two copies that
+  run at the same moment (the sweep's copy and the message are delivered
+  together) send once, and a copy waiting on a worker that died sends in
+  its place. A send outside a task takes no lock. A database that cannot
+  be reached does not stop the send.
+
+Tests run every mail task on #720's list twice under one id and once
+under another, and run two copies on two connections at once.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(emails): a lock wait that lock_timeout ends is a wait that ran out
+
+A session that sets lock_timeout ends an advisory lock wait with
+LockNotAvailable, not QueryCanceled. The delivery lock read that as an
+unreachable database and sent without the lock; it now raises it for the
+retry, as for statement_timeout. The threaded tests run on
+tests.utils.concurrency, and the held SMTP send is tests.utils.emails.HeldTransport.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(meta_capi): a Conversions API event is sent once per dispatch
+
+Every event id is fixed before the task can run again: InitiateCheckout
+and CompleteRegistration without a browser-minted id are named after the
+order and the account (as Purchase already was), and a Refund after its
+dispatch (tenant.celery.dispatch_key), where it was a fresh uuid4 per run.
+Meta's documentation contradicts itself on whether it drops a server event
+sent twice, so _dispatch checks MetaCapiEventLog and sends under an advisory
+lock on the event (core.db.locks.held_across_calls): a copy at the same
+moment waits and finds the row SENT.
+
+Tests run each event's task twice under one id, a refund under two, and two
+copies at the same moment on two connections, in a real store row.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(emails): only an unreachable database lets a delivery send without its lock
+
+Any other database error the lock meets is a bug, and sending without the
+lock then would let two copies send; it is raised. An OperationalError or
+InterfaceError that is not a lock wait still sends, so an alert about a
+failing database goes out.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(core): a session the server cannot reach any more lets go of its locks within a minute
+
+Every session sets TCP keepalives (DB_TCP_KEEPALIVES_IDLE, _INTERVAL,
+_COUNT; 30 s, 10 s, 3 probes), so the server ends the session of a client
+whose node was lost without closing its socket, and the advisory locks it
+held go with it: the delivery lock of an email and the store lock of a
+running task. The server's own setting is the kernel's default, hours,
+longer than every retry a waiting copy has.
+
+A test opens a session with the deployed options and reads the three
+settings back; another runs a copy whose lock_timeout or statement_timeout
+ends its wait on a real session and sends nothing.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* fix(meta_capi): a Refund is one event per ledger row, and a copy that waits retries
+
+A Refund's id is now its ledger REFUND row, which every sender of
+order_refunded passes, so it is one event per refund whatever dispatches
+it, as the refund email already is. The task takes the row as refund_id.
+
+A copy waiting on the event's lock gave up at the session's
+statement_timeout with an OperationalError the tasks do not retry, so it
+failed while the holder was still sending. Taking a lock now raises
+core.db.locks.LockWaitRanOut when the wait runs out, which _dispatch
+retries like a 5xx and the email delivery keeps raising, and the request
+to Meta is bounded by META_CAPI_TIMEOUT_SECONDS (the SDK sets none).
+
+CompleteRegistration's event_id argument is gone: no caller passed one,
+and its id is the account's number.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+### Chores
+
+* chore(i18n): translate the new key and push columns
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* chore(i18n): translate the new key and push columns
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+### Documentation
+
+* docs(core): a lost client's session is held about half an hour without the keepalives
+
+Measured on a staging session: the server's own probes start after 900 s
+and give up after 9 more 100 s apart. Django connects to PostgreSQL
+directly (the server sees the pod's own address), so the session's
+keepalives reach the worker's socket.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* docs(emails): say how long the server's own probes take to give up on a lost client
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* docs(core): a lost client's session is held about half an hour without the keepalives
+
+Measured on a staging session: the server's own probes start after 900 s
+and give up after 9 more 100 s apart. Django connects to PostgreSQL
+directly (the server sees the pod's own address), so the session's
+keepalives reach the worker's socket.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* docs(recommendation): name the event key in the data model and say what it is made of
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* docs(recommendation): say what record_events returns and what its event key is made of
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* docs: the last comments name files under src/, and the guard holds every path (#803) ([`56a5c5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56a5c5e8acb8893a4fab736f068f160372c110f5))
+
+* docs: the last comments name files under src/, and the guard holds every path
+
+The 39 comments and docstrings that open pull requests held, four
+strings that name a file, and three docstrings that are also schema.yml
+descriptions. tests/unit/test_doc_references.py now fails on any path
+a comment or docstring names that does not exist, not only docs/ paths. ([`56a5c5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56a5c5e8acb8893a4fab736f068f160372c110f5))
+
+* docs: drop a pointer to a reason that is gone; the guard reads every bare string
+
+core/tasks.py pointed to order/tasks.py for a gettext rationale neither
+file holds. The guard now takes any string that is a statement of its
+own as a docstring, matched by position, so an attribute docstring is
+checked and a default on a docstring's line is not. ([`56a5c5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56a5c5e8acb8893a4fab736f068f160372c110f5))
+
+* docs(core): a lost client's session is held about half an hour without the keepalives
+
+Measured on a staging session: the server's own probes start after 900 s
+and give up after 9 more 100 s apart. Django connects to PostgreSQL
+directly (the server sees the pod's own address), so the session's
+keepalives reach the worker's socket.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* docs(core): a lost client's session is held about half an hour without the keepalives
+
+Measured on a staging session: the server's own probes start after 900 s
+and give up after 9 more 100 s apart. Django connects to PostgreSQL
+directly (the server sees the pod's own address), so the session's
+keepalives reach the worker's socket.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+### Refactoring
+
+* refactor(tenant): models.py into a models/ package, the choices into tenant/enum.py (#778)
+
+Pure move of src/tenant/models.py (2,288 lines), one module per model:
+tenant.py (TenantQuerySet, Tenant), domain.py, membership.py (the
+last-owner rule and UserTenantMembership), staff_token.py, archive.py,
+stats.py, deferred_dispatch.py. tenant/models/__init__.py imports the
+seven models, as every models package here does, so `from tenant.models
+import Tenant` is unchanged.
+
+The choice classes (TenantPlan, StoreVertical, SuspendedReason,
+TenantMembershipRole, StaffTokenScope) move to tenant/enum.py, the
+app-level enum module the other apps have; every importer of one moves
+with it.
+
+Tenant.clean()'s cross-field rules (the _validate_* methods,
+_newly_added_locales, GOOGLE_ADS_LABEL_FIELDS and the social URL field
+list) become functions taking the tenant in
+tenant/models/tenant_rules.py, called by clean() in the same order.
+They do not join tenant/validators.py: that module holds the
+single-value validators that fields, migrations and EXTRA_SETTINGS name
+by path, and with these it would pass 780 lines.
+
+An AST comparison of every class and moved member shows no change
+besides those renames and the dedented docstrings. No migration,
+schema.yml unchanged, no Celery task in the module, and no cache stores
+an instance of these models (the domain set and the resolve payload hold
+plain data), so no cache generation moves. A new import-linter contract
+keeps tenant.enum and tenant.validators from importing the models.
+
+Closes #584 ([`cfbee5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cfbee5fcba30c992cff9463627cb3d50f121d98e))
+
+* refactor(core): the advisory lock held across a send is one helper
+
+core.db.locks.held_across_calls holds a session-level advisory lock outside
+any transaction (a transaction-scoped one inside one), for a send that waits
+on another service. emails.log.delivering holds the delivery's lock through
+it and keeps its own rule that an unreachable database does not stop a send;
+the Meta Conversions API dispatch is the next user.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* refactor(core): the advisory lock held across a send is one helper
+
+core.db.locks.held_across_calls holds a session-level advisory lock outside
+any transaction (a transaction-scoped one inside one), for a send that waits
+on another service. emails.log.delivering holds the delivery's lock through
+it and keeps its own rule that an unreachable database does not stop a send;
+the Meta Conversions API dispatch is the next user.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* refactor(recommendation): the row's key is event_key, what makes two rows one event
+
+Named for what it guards, not for where it comes from today: the key is the
+task copy's now, and is what any later source of an event's identity
+writes.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* refactor(order): the status machine, cancellation and reorder out of OrderService into OrderLifecycleService (order/lifecycle) (#802) ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* refactor(order): refunds out of OrderService into RefundService
+
+The claim, allocation, provider shares, booking and declines of a refund
+move from order/services.py to order/refunds/service.py, with
+RefundResult, its share records and the paid-statuses set. The methods
+keep their names on RefundService; every caller, test, patch string and
+doc reference is repointed, and no stub stays on OrderService. The
+refunds package no longer imports order.services: cancellation calls
+RefundService.refund_order, and refund reconciliation books its shares
+there.
+
+Refs #569 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* refactor(order): name RefundService where the move left OrderService
+
+The refund signals now come from RefundService, and the loyalty test
+that mimics them sends as it. Comments and docstrings that still named
+OrderService for refund code, and the payments contract's note on who
+removes its ignored edge, are corrected.
+
+Refs #569 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* refactor(order): the status machine, cancellation and reorder out of OrderService into OrderLifecycleService
+
+The status machine, the order lookups, reorder and cancellation with its
+courier follow-ups move from order/services.py to
+order/lifecycle/service.py, with the shipment-cancel flags and windows.
+The transition table becomes the module constant ALLOWED_TRANSITIONS.
+OrderAttributionService moves to order/checkout/attribution_service.py,
+which reorder and creation both read, so lifecycle and services do not
+import each other. The methods keep their names on OrderLifecycleService;
+every caller, test, patch target and doc reference is repointed.
+
+Refs #568 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* refactor(order): point the lifecycle's leftovers at their new home
+
+The courier-cancel test listens on the lifecycle's logger, docstrings
+and docs name the lifecycle and attribution modules and the
+ALLOWED_TRANSITIONS table, and the contract that keeps the order
+services off the tasks and the refund reconciliation covers the
+lifecycle and refund services too.
+
+Refs #568 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* refactor(core): the advisory lock held across a send is one helper
+
+core.db.locks.held_across_calls holds a session-level advisory lock outside
+any transaction (a transaction-scoped one inside one), for a send that waits
+on another service. emails.log.delivering holds the delivery's lock through
+it and keeps its own rule that an unreachable database does not stop a send;
+the Meta Conversions API dispatch is the next user.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* refactor(core): the advisory lock held across a send is one helper
+
+core.db.locks.held_across_calls holds a session-level advisory lock outside
+any transaction (a transaction-scoped one inside one), for a send that waits
+on another service. emails.log.delivering holds the delivery's lock through
+it and keeps its own rule that an unreachable database does not stop a send;
+the Meta Conversions API dispatch is the next user.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+### Testing
+
+* test(emails): mail copies count from a baseline, and the reset reaches an account
+
+Building an order mails its own order_created dispatches, so each case
+counts what the task under test mails. The staff reset mails only an
+account that can sign in.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* test(core): a kept cache purge holds the task id its dispatch was published with
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* test(notification): register the test tasks once, at module level
+
+A task defined in a fixture is a new callable on every call, and each Celery
+app finalized later in the run registered all of them under one name and
+warned DuplicateTaskNameWarning.
+
+Refs #720 ([`3252d42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3252d42858dfa95c76e068e1650b0f03342e5f40))
+
+* test(emails): mail copies count from a baseline, and the reset reaches an account
+
+Building an order mails its own order_created dispatches, so each case
+counts what the task under test mails. The staff reset mails only an
+account that can sign in.
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* test(core): a kept cache purge holds the task id its dispatch was published with
+
+Refs #720 ([`30722f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30722f3ec53bc525ccd29afb219f75ca975d2bb3))
+
+* test(user): the erasure test cancels through OrderLifecycleService
+
+Refs #568 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* test(order): the reorder test names the lifecycle module
+
+Refs #568 ([`d516612`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5166126c8b4d17c4c86f8513cdb1729523a0281))
+
+* test(emails): mail copies count from a baseline, and the reset reaches an account
+
+Building an order mails its own order_created dispatches, so each case
+counts what the task under test mails. The staff reset mails only an
+account that can sign in.
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* test(core): a kept cache purge holds the task id its dispatch was published with
+
+Refs #720 ([`9394dbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9394dbcfd7b53ff7f31a75895fdb740e73b6219d))
+
+* test(emails): mail copies count from a baseline, and the reset reaches an account
+
+Building an order mails its own order_created dispatches, so each case
+counts what the task under test mails. The staff reset mails only an
+account that can sign in.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* test(core): a kept cache purge holds the task id its dispatch was published with
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
+* test(emails): register the email test tasks once, in tests.utils.email_tasks
+
+A task defined in a fixture or a test is a new callable on every call, and
+each Celery app finalized later in the run (the beat and schedule tests
+build their own) registered all of them under one name and warned
+DuplicateTaskNameWarning for tests.delivery_identity and
+tests.delivery_copies. The two retrying tasks with one body are now one.
+
+Refs #720 ([`51b6184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51b6184305355edf414b9a99e97e02b457965e4a))
+
 ## v3.263.0 (2026-11-21)
 
 ### Bug fixes

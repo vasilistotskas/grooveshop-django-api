@@ -13,6 +13,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from shipping_boxnow.factories import BoxNowLockerFactory
+from tests.utils.boxnow import nearest_locker
 
 
 @pytest.mark.django_db
@@ -92,22 +93,7 @@ class TestLockerNearestEndpoint:
         address fields — the serializer previously declared snake_case names
         with no source, silently dropping them (G0056).
         """
-        mock_locker = {
-            "id": "4",
-            "type": "apm",
-            "imageUrl": "https://cdn.boxnow.gr/apm-4.png",
-            "lat": "38.0",
-            "lng": "23.7",
-            "title": "Test Locker",
-            "name": "Chalandri Locker",
-            "postalCode": "15232",
-            "country": "GR",
-            "note": "",
-            "addressLine1": "Leoforos 125",
-            "addressLine2": "Building B",
-            "region": "el-GR",
-            "distance": 0.5,
-        }
+        mock_locker = nearest_locker()
 
         mock_client = MagicMock()
         mock_client.return_value.find_closest_locker.return_value = mock_locker
@@ -200,10 +186,9 @@ class TestLockerNearestEndpoint:
 
     def _searched_size(self, **headers):
         mock_client = MagicMock()
-        mock_client.return_value.find_closest_locker.return_value = {
-            "id": "4",
-            "type": "apm",
-        }
+        mock_client.return_value.find_closest_locker.return_value = (
+            nearest_locker()
+        )
         with patch("shipping_boxnow.client.BoxNowClient", mock_client):
             response = self.client.post(
                 self._url(),
@@ -234,10 +219,9 @@ class TestLockerNearestEndpoint:
 
     def test_a_size_sent_by_the_client_is_ignored(self):
         mock_client = MagicMock()
-        mock_client.return_value.find_closest_locker.return_value = {
-            "id": "4",
-            "type": "apm",
-        }
+        mock_client.return_value.find_closest_locker.return_value = (
+            nearest_locker()
+        )
         with patch("shipping_boxnow.client.BoxNowClient", mock_client):
             response = self._post(compartmentSize=3)
         assert response.status_code == status.HTTP_200_OK

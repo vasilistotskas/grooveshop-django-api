@@ -491,6 +491,11 @@ class TestMine:
 
         assert response.status_code == 404
 
+    # An admin-issued card has no recipient (``""``), which the read-only
+    # ``recipientEmail`` declares as an email (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/giftcard/mine", 200, issue=684
+    )
     def test_lists_only_my_cards_newest_first(self):
         user = UserAccountFactory()
         older = GiftCardFactory(code="GC-MINE-0000-OLDR", issued_to=user)
@@ -518,6 +523,11 @@ class TestMine:
 
         assert response.status_code == 404
 
+    # The bare array is not what the operation documents (its paginated
+    # envelope): the whole list moves to a route of its own (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/giftcard/mine", 200, issue=684
+    )
     def test_pagination_false_returns_every_card_as_a_list(self):
         """The account summary reads every card in one request
         (``GiftCardViewSet.unpaginated_actions``)."""

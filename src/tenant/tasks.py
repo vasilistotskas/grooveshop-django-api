@@ -4,9 +4,13 @@ import logging
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.cache import cache
+from django.db import connections
+from django.utils import timezone
 
 from core import celery_app
 from core.cache.edge import EdgePurgeError
+from core.exceptions import HealthCheckFailed
 from core.monitored_task import MonitoredTask, safe_task_arguments
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
@@ -14,7 +18,10 @@ from core.retry import (
     TRANSIENT_HTTP_ERRORS,
     TRANSIENT_NETWORK_ERRORS,
 )
+from core.tasks import backup_database_task, cleanup_old_backups
+from emails.send import send_email
 from tenant.celery import TenantTask, describe_error, run_for_all_tenants
+from tenant.emails import BackupFailed, HealthAlert, StaffPasswordReset
 
 if TYPE_CHECKING:
     from core.cache.edge import MediaPurge
@@ -531,7 +538,6 @@ def purge_expired_tenant_archives(self) -> dict:
     Runs in the PUBLIC schema: ``TenantArchive`` lives there precisely
     because the schemas it describes no longer exist.
     """
-    from django.utils import timezone
 
     from tenant.models import TenantArchive
     from tenant.offboarding import _remove_tree
@@ -574,7 +580,6 @@ def refresh_stats_snapshot() -> dict:
     No retries: the schedule runs it again within half an hour.
     """
     from django.db.models import Count, Max, Q, Sum
-    from django.utils import timezone
 
     from order.enum.status import PaymentStatus
     from order.models.order import Order
@@ -648,9 +653,7 @@ def send_staff_password_reset_email(
     from django.utils.http import urlsafe_base64_encode
 
     from admin.password_reset import StaffPasswordResetForm
-    from emails.send import send_email
     from tenant.credentials import tenant_site_name
-    from tenant.emails import StaffPasswordReset
     from tenant.membership import bound_tenant
 
     tenant = bound_tenant()
@@ -717,7 +720,6 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     retires that connection: an unlock that releases nothing is an ERROR.
     """
     from django.db import connection
-    from django.utils import timezone
 
     from tenant.models import DeferredDispatch
 
@@ -762,8 +764,6 @@ def redispatch_deferred_tasks() -> dict[str, int]:
 
 def _redispatch_due() -> dict[str, int]:
     from datetime import timedelta
-
-    from django.utils import timezone
 
     from tenant.models import DeferredDispatch
 
@@ -832,3 +832,175 @@ def _redispatch_due() -> dict[str, int]:
             "%s deferred dispatch(es) could not be published again", failed
         )
     return {"published": done, "failed": failed, "expired": expired}
+
+
+@celery_app.task(base=MonitoredTask, name="core.tasks.monitor_system_health")
+def monitor_system_health():
+    """Probe the dependencies a working store needs, and alert on any.
+
+    Deliberately has no ``autoretry_for``. A monitor that retries only
+    re-asks the same question, and this one emails on every failed
+    run — so the old ``max_retries=5`` turned a single outage into six
+    identical alerts. A genuinely transient blip is caught by the next
+    scheduled run instead.
+    """
+    health_checks = {"database": False, "cache": False, "storage": False}
+    errors = []
+
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            if result:
+                health_checks["database"] = True
+                logger.debug("Database health check passed")
+
+    except Exception as e:
+        error_msg = f"Database health check failed: {e}"
+        logger.error(error_msg)
+        errors.append(error_msg)
+
+    try:
+        cache.set("health_check", "ok", 30)
+        if cache.get("health_check") != "ok":
+            raise HealthCheckFailed("cache", "read/write test failed")
+
+        # The round-trip above passes on a Redis that has already lost
+        # its disk — it is served from memory. Ask Redis directly
+        # whether it can still persist, because that failure arrives
+        # first and the crash loop it causes arrives later.
+        failing = cache.failing_persistence_statuses()
+        if failing:
+            raise HealthCheckFailed(
+                "cache",
+                "Redis cannot persist to disk ("
+                + ", ".join(f"{k}={v}" for k, v in sorted(failing.items()))
+                + ") — check free space on its volume",
+            )
+
+        health_checks["cache"] = True
+        logger.debug("Cache health check passed")
+
+    except Exception as e:
+        error_msg = f"Cache health check failed: {e}"
+        logger.warning(error_msg)
+        errors.append(error_msg)
+
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+
+    try:
+        # Probe the configured default storage backend end-to-end
+        # (write → delete). The default storage is a
+        # ``FileSystemStorage`` rooted at ``MEDIA_ROOT`` — in K8s that
+        # is the shared RWX media PVC, which must be mounted read-write
+        # on every pod that runs this task (backend AND celery
+        # workers). A missing mount surfaces as ``[Errno 30] Read-only
+        # file system`` from the container's read-only root filesystem.
+        probe_name = ".health_check"
+        if default_storage.exists(probe_name):
+            default_storage.delete(probe_name)
+        saved_name = default_storage.save(probe_name, ContentFile(b"ok"))
+        default_storage.delete(saved_name)
+        health_checks["storage"] = True
+        logger.debug("Storage health check passed")
+
+    except Exception as e:
+        backend = default_storage.__class__.__name__
+        target = getattr(default_storage, "bucket_name", None) or getattr(
+            default_storage, "location", "<unknown>"
+        )
+        error_msg = (
+            f"Storage health check failed via {backend} at {target!r}: {e}"
+        )
+        logger.warning(error_msg)
+        errors.append(error_msg)
+
+    all_passed = all(health_checks.values())
+    database_up = health_checks["database"]
+    failed = sorted(name for name, ok in health_checks.items() if not ok)
+
+    # Every check alerts, not just the database. Treating cache and
+    # storage as merely "degraded" is what kept this task silent while
+    # Redis crash-looped and the storefront served 503s on 2026-09-09:
+    # the database was fine, so nothing was sent and nothing was
+    # raised. There is no failure here a human should not see — Redis
+    # is the cache, the Channels layer and the SSR store at once, and
+    # a read-only media volume loses every upload.
+    if not all_passed:
+        try:
+            send_email(
+                "platform.health_alert",
+                HealthAlert(failed=tuple(failed), errors=tuple(errors)),
+            )
+        except Exception as e:
+            logger.error(f"Failed to send health check alert email: {e}")
+
+    result = {
+        "status": "healthy"
+        if all_passed
+        else ("degraded" if database_up else "unhealthy"),
+        "timestamp": timezone.now().isoformat(),
+        "checks": health_checks,
+        "errors": errors,
+    }
+
+    if all_passed:
+        logger.info("System health check completed", extra=result)
+        return result
+
+    # Raise so the run is a FAILURE rather than a green task carrying a
+    # "degraded" payload nobody reads. ``MonitoredTask.on_failure``
+    # logs it, which puts the outage in VictoriaLogs as a second
+    # detection path independent of email.
+    logger.error("System health check failed", extra=result)
+    raise HealthCheckFailed(
+        "system", f"unhealthy component(s): {', '.join(failed)}"
+    )
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    name="core.tasks.scheduled_database_backup",
+    max_retries=2,
+    autoretry_for=TRANSIENT_ERRORS,
+    retry_backoff=True,
+)
+def scheduled_database_backup():
+    try:
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"scheduled_backup_{timestamp}"
+
+        logger.info("Starting scheduled database backup")
+
+        # Use Celery chain to avoid blocking the worker with .get()
+        from celery import chain
+
+        chain(
+            backup_database_task.s(
+                output_dir="backups/scheduled",
+                filename=filename,
+                compress=True,
+                format_type="custom",
+            ),
+            cleanup_old_backups.si(days=7, backup_dir="backups/scheduled"),
+        ).apply_async()
+
+        logger.info("Scheduled database backup chain dispatched")
+        return {
+            "status": "dispatched",
+            "message": "Backup task chain started",
+            "filename": filename,
+        }
+
+    except Exception as e:
+        logger.error(f"Scheduled backup failed: {e}")
+
+        try:
+            send_email("platform.backup_failed", BackupFailed(error=str(e)))
+        except Exception as mail_error:
+            logger.error(
+                f"Failed to send backup failure alert email: {mail_error}"
+            )
+
+        raise

@@ -31,6 +31,9 @@ named here, and when a path named here does not exist.
   its `signals` module (or package), and the receivers are connected by
   importing that module from the app's `AppConfig.ready()`. A task that
   changes module keeps its registered name (`name="<its old dotted path>"`).
+- **An app's cache surfaces live in its `cache_surfaces` module**, as a
+  `SURFACES` tuple of `CacheSurface`s that
+  `core.cache.surfaces.register_default_surfaces` collects at boot.
 - **Imports between apps are contracts.** `[tool.importlinter]` in
   `pyproject.toml` lists what may import what; run
   `PYTHONPATH=src uv run lint-imports` (it puts only the working directory
@@ -84,7 +87,8 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   the retry sets (`src/core/retry.py`) and the retention helper
   (`src/core/retention.py`);
 - the cache backend (`src/core/caches.py`) and the cache surface registry
-  (`src/core/cache/`);
+  (`src/core/cache/`), with the surfaces no single app owns (settings,
+  storefront pages, sitemap and SEO);
 - middleware (`src/core/middleware/`), the email templates
   (`src/core/templates/`) and the root URL conf.
 
@@ -114,7 +118,8 @@ secrets), `src/tenant/provisioning.py`, `src/tenant/lifecycle.py`,
 `src/tenant/billing.py`, `src/tenant/cache.py` (`make_tenant_key`,
 `tenant_resolve_key`), `src/tenant/celery.py` (`TenantTask`,
 `run_for_all_tenants`, `dispatch_on_commit`), `src/tenant/tasks.py`
-(every beat fan-out), `src/tenant/features.py` (`STORE_FEATURES`, the
+(every beat fan-out, the health monitor and the scheduled backup, which
+alert the operators through `src/tenant/emails.py`), `src/tenant/features.py` (`STORE_FEATURES`, the
 store feature table) and `src/tenant/customer_accounts.py` (a store
 without customer accounts).
 

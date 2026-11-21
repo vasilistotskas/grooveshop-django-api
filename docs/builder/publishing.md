@@ -19,7 +19,7 @@ catalogue, then the write):
 ## What a release moves
 
 `BuilderRelease` is `invalidated_by` of the `builder` surface
-(`src/core/cache/surfaces.py`: the storefront's `builderPage` handler, every
+(`src/builder/cache_surfaces.py`: the storefront's `builderPage` handler, every
 cached route, `invalidates_tenant_config=True`, so the Cloudflare edge purge
 follows) and `src/tenant/signals.py: bump_generation_on_builder_release` moves
 `Tenant.cache_generation` in the release's own transaction. A draft save or

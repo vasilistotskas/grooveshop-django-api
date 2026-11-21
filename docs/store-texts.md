@@ -3,7 +3,7 @@
 A store changes the wording of its own storefront, per language, from one
 editor page in the store admin. Source: `src/texts/` (`models.py`,
 `storefront.py`, `validation.py`, `services.py`, `editor.py`, `admin.py`,
-`views.py`), `src/core/cache/surfaces.py` (`store_texts`),
+`views.py`), `src/texts/cache_surfaces.py` (`store_texts`),
 `src/tenant/signals.py` (`bump_generation_on_text_override_change`). The code
 wins over this page.
 

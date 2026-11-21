@@ -48,29 +48,8 @@ class TestSoftDeleteQuerySetMixin:
         assert deleted_product in results
         assert results.count() == 1
 
-    def test_with_deleted_returns_all_records(self):
-        """with_deleted() should return all records regardless of deletion status."""
-        # Create active and deleted products
-        active_product = ProductFactory(is_deleted=False)
-        deleted_product = ProductFactory(
-            is_deleted=True, deleted_at=timezone.now()
-        )
-
-        # Query using with_deleted
-        results = Product.objects.with_deleted()
-
-        # Verify both products are returned
-        assert active_product in results
-        assert deleted_product in results
-        assert results.count() == 2
-
-    def test_union_of_exclude_and_deleted_equals_with_deleted(self):
-        """
-        The union of exclude_deleted() and deleted_only() should equal with_deleted().
-
-        This validates Property 3 from the design document:
-        The union of exclude_deleted() and deleted_only() should equal with_deleted()
-        """
+    def test_exclude_deleted_and_deleted_only_partition_the_rows(self):
+        """exclude_deleted() and deleted_only() split every row between them."""
         # Create multiple products with mixed deletion status
         ProductFactory.create_batch(3, is_deleted=False)
         ProductFactory.create_batch(
@@ -84,9 +63,7 @@ class TestSoftDeleteQuerySetMixin:
         deleted_products = set(
             Product.objects.deleted_only().values_list("id", flat=True)
         )
-        all_products = set(
-            Product.objects.with_deleted().values_list("id", flat=True)
-        )
+        all_products = set(Product._base_manager.values_list("id", flat=True))
 
         # Verify the union property
         assert active_products | deleted_products == all_products
@@ -147,6 +124,32 @@ class TestSoftDeleteQuerySetMixin:
         for product in deleted_products:
             assert product in deleted_results
 
-        # Test with_deleted
-        all_results = Product.objects.with_deleted()
-        assert all_results.count() == 15
+        assert Product._base_manager.count() == 15
+
+
+@pytest.mark.django_db
+class TestBulkDeleteIsSoftForEverySoftDeleteModel:
+    """``Product.delete()`` marks the row; a bulk delete of products (the
+    admin's "Delete selected") removed it for good, while orders and
+    builder documents soft-delete in both forms. One queryset now does it
+    for all three."""
+
+    def test_a_bulk_product_delete_keeps_the_row_flagged(self):
+        product = ProductFactory(num_images=0, num_reviews=0)
+
+        result = Product.objects.filter(pk=product.pk).delete()
+
+        row = Product._base_manager.get(pk=product.pk)
+        assert row.is_deleted is True
+        assert row.deleted_at is not None
+        assert result == (1, {"product.Product": 1})
+
+    def test_restore_and_hard_delete(self):
+        product = ProductFactory(num_images=0, num_reviews=0)
+        Product.objects.filter(pk=product.pk).delete()
+
+        assert Product.objects.deleted_only().filter(pk=product.pk).restore()
+        assert not Product._base_manager.get(pk=product.pk).is_deleted
+
+        Product.objects.filter(pk=product.pk).hard_delete()
+        assert not Product._base_manager.filter(pk=product.pk).exists()

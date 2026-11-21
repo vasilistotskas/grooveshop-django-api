@@ -435,7 +435,7 @@ class TestRicherCatalogueSeed:
         from vat.models import Vat
 
         monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
-        Product.objects.filter(slug__startswith="demo-").delete()
+        Product.objects.filter(slug__startswith="demo-").hard_delete()
         Vat.objects.filter(value=24).delete()
 
         with pytest.raises(Vat.DoesNotExist):

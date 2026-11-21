@@ -97,7 +97,7 @@ Every app, the settings package (`src/settings/`) and the `asgi` package live in
 - `SortableModel` — `sort_order` with atomic `move_up()`/`move_down()` using `select_for_update()`
 - `PublishableModel` — `is_published`/`published_at` with `PublishableManager.published()` queryset
 - `MetaDataModel` — `metadata`/`private_metadata` JSONFields with GinIndex
-- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()`, `.deleted_only()`, `.restore()`, `.hard_delete()`)
+- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()`, `.deleted_only()`, `.restore()`, `.hard_delete()`); the queryset and manager behaviour is `core.mixins.soft_delete` (`SoftDeleteQuerySetMixin`, `SoftDeleteManagerMixin`), so a bulk `queryset.delete()` soft-deletes as `instance.delete()` does and only `hard_delete()` removes rows
 
 Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, UUIDModel, MetaDataModel, TaggedModel)` with `ProductTranslation(TranslatedFieldsModel, SeoTranslationModel, IndexMixin)`.
 

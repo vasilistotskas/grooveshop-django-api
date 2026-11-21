@@ -171,14 +171,14 @@ class YourCategoryManager(TreeTranslatableManager):
 
 ### For Soft-Deletable Models
 
-Add `SoftDeleteQuerySetMixin` from `core.mixins.queryset`:
+Add `SoftDeleteQuerySetMixin` from `core.mixins` (`src/core/mixins/soft_delete.py`, the one soft-delete implementation; its bulk `delete()` soft-deletes, `hard_delete()` removes rows):
 
 ```python
 from core.managers.base import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
 )
-from core.mixins.queryset import SoftDeleteQuerySetMixin
+from core.mixins import SoftDeleteQuerySetMixin
 
 
 class YourModelQuerySet(SoftDeleteQuerySetMixin, TranslatableOptimizedQuerySet):
@@ -1015,7 +1015,7 @@ from core.managers.base import (
     TranslatableOptimizedQuerySet,
 )
 from core.managers.tree import TreeTranslatableManager, TreeTranslatableQuerySet
-from core.mixins.queryset import SoftDeleteQuerySetMixin
+from core.mixins import SoftDeleteQuerySetMixin
 
 # Filters
 from core.filters.core import (

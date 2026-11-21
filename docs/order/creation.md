@@ -457,8 +457,13 @@ address it cannot place (prod order #316: street "1", street number
   trailing number ("Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12", "12-14",
   "12/3"; a number in the street's name stays in it: "28ης Οκτωβρίου 15")
   and the order stores both columns, so the ACS voucher, invoices and
-  myDATA read them as before. A number written first ("12 Main St",
-  "28 Οκτωβρίου") is not guessed. A line it cannot split is a 400 with
+  myDATA read them as before. A range written with spaces ("12 - 14") is
+  one number. A wrong split is worse than a 400, so the split is taken
+  only when what is left is plainly a street name: it ends in a letter
+  and holds no number but an ordinal of its own name. A number written
+  first ("12 Main St", "28 Οκτωβρίου"), text after the number ("Ερμού
+  12, όροφος 3", "Εγνατίας 12, 546 22") and digits other than 0-9 are
+  refused. A line it cannot split is a 400 with
   `fields.street` code `street_number_missing`, and the errors of a split
   number (`street_number_is_postcode`) are reported on `street`: the
   caller sent no number field. A sent `streetNumber` is used as sent.

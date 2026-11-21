@@ -267,6 +267,9 @@ class TestSplitStreetLine:
             ("  Ερμού   12 ", ("Ερμού", "12")),
             ("Ermou 12-14", ("Ermou", "12-14")),
             ("Ermou 12/3", ("Ermou", "12/3")),
+            # A range or a slash written with spaces is one number.
+            ("Κηφισίας 12 - 14", ("Κηφισίας", "12-14")),
+            ("Ermou 12 / 3", ("Ermou", "12/3")),
             # A number in the street's name stays in the name.
             ("28ης Οκτωβρίου 15", ("28ης Οκτωβρίου", "15")),
             ("Οδός 25ης Μαρτίου 3", ("Οδός 25ης Μαρτίου", "3")),
@@ -291,3 +294,31 @@ class TestSplitStreetLine:
     )
     def test_refuses_a_line_with_no_number_after_the_street(self, line):
         assert split_street_line(line) is None
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            # The stand-in review's inputs on #766: a split would take a
+            # wrong number, which is worse than asking for it.
+            "Ερμού 12, όροφος 3",
+            "Εγνατίας 12, 546 22",
+            # Floor or extra text after the number.
+            "Ερμού 12 3ος όροφος",
+            # A house number in the street part.
+            "Ερμού 12Α 3",
+            "Αρτέμιδος 2 και Κοσμά Αιτωλού 3",
+            # A dangling separator before the number.
+            "Ερμού - 12",
+            "Ερμού / 12",
+            # Digits other than 0-9: the postcode guard reads ASCII alone.
+            "Ερμού ١٢",
+            "Ερμού １２",
+        ],
+    )
+    def test_refuses_a_line_it_would_have_to_guess(self, line):
+        assert split_street_line(line) is None
+
+    def test_a_postcode_at_the_end_is_split_for_the_postcode_guard(self):
+        # The address rules then refuse it as ``street_number_is_postcode``
+        # (tests/integration/order/test_address_rules.py).
+        assert split_street_line("Εγνατίας 54622") == ("Εγνατίας", "54622")

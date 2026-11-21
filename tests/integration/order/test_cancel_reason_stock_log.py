@@ -28,6 +28,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
@@ -49,27 +50,29 @@ def _order():
     # until this call.
     enable_rate(country)
     return OrderService.create_order_from_cart_offline(
-        legal_acceptance=checkout_acceptance(),
-        cart=cart,
-        shipping_address={
-            "first_name": "Maria",
-            "last_name": "Papadopoulou",
-            "email": "maria@example.com",
-            "street": "Ermou",
-            "street_number": "1",
-            "city": "Athens",
-            "zipcode": "10563",
-            "country_id": country.alpha_2,
-            "phone": "+306900000000",
-            "shipping_kind": "home_delivery",
-        },
-        pay_way=PayWayFactory(
-            settlement=PaySettlement.COURIER_CASH,
-            active=True,
-            cost=Money(Decimal(0), "EUR"),
-            free_threshold=Money(Decimal(0), "EUR"),
-        ),
-        user=None,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address={
+                "first_name": "Maria",
+                "last_name": "Papadopoulou",
+                "email": "maria@example.com",
+                "street": "Ermou",
+                "street_number": "1",
+                "city": "Athens",
+                "zipcode": "10563",
+                "country_id": country.alpha_2,
+                "phone": "+306900000000",
+                "shipping_kind": "home_delivery",
+            },
+            pay_way=PayWayFactory(
+                settlement=PaySettlement.COURIER_CASH,
+                active=True,
+                cost=Money(Decimal(0), "EUR"),
+                free_threshold=Money(Decimal(0), "EUR"),
+            ),
+            user=None,
+        )
     )
 
 

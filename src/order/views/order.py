@@ -1464,10 +1464,9 @@ class OrderViewSet(BaseModelViewSet):
         return placed
 
     @staticmethod
-    def _expected_total(validated_data: dict) -> ExpectedTotal | None:
-        """The total the client says it showed the buyer, if it sent one."""
-        expected = validated_data.get("expected_total")
-        return None if expected is None else ExpectedTotal(**expected)
+    def _expected_total(validated_data: dict) -> ExpectedTotal:
+        """The total the client says it showed the buyer."""
+        return ExpectedTotal(**validated_data["expected_total"])
 
     def _get_cart_and_user(self, request):
         """

@@ -81,9 +81,10 @@ caller:
   own sum is not the quote's `amount_due`: a charge added to one and not
   the other, or a cart line changed between the quote and the line lock,
   fails the creation instead of producing an order no payment matches.
-- **The expected total.** `POST /api/v1/order` takes an optional
+- **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
-  (cents). Both creation paths compare it, exactly, with the quote computed
+  (cents), as the quote returned it. An order is never created at a total
+  the client did not send. Both creation paths compare it, exactly, with the quote computed
   under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the
@@ -101,8 +102,9 @@ caller:
     may send it. Until then clients branch on `code` and the 409
     (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
     `code` already.
-  - **Optional for now.** The storefront and the gateway start sending it,
-    then a later release requires it (#635).
+  - **Required since #635's third release**, once the storefront
+    (v3.345.3) and the gateway (v1.49.0) in production sent it on every
+    order. Nothing creates an order without the total check.
 - **The cart digest.** A quote with a delivery and a pay way also returns
   `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
   `SECRET_KEY`, over a canonical form of what the order would be made of:

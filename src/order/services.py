@@ -684,7 +684,7 @@ class OrderService:
         shipping_address: dict[str, Any],
         loyalty_points_to_redeem: int | None,
         gift_card_codes: list[str] | None,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
         expected_cart_digest: str | None,
     ) -> CheckoutQuote:
         """The total an order is created at, computed once.
@@ -730,10 +730,7 @@ class OrderService:
                 cart.uuid,
             )
             raise OrderCartChangedError(quote)
-        if (
-            expected_total is not None
-            and expected_total != quote.expected_total
-        ):
+        if expected_total != quote.expected_total:
             logger.info(
                 "Order refused for cart %s: the client expected %s, the "
                 "total is %s",
@@ -1026,7 +1023,7 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None = None,
+        expected_total: ExpectedTotal,
         expected_cart_digest: str | None = None,
         agent_checkout: UUID | None = None,
     ) -> Order:
@@ -1045,7 +1042,7 @@ class OrderService:
         2. Validates cart items still exist and prices match
         3. Validates shipping address completeness
         4. Re-compares the intent's amount and currency, and the
-           client's ``expected_total`` when it sent one, with the total
+           client's ``expected_total`` with the total
            computed under lock (``OrderQuoteService.quote``)
         5. Gets stock reservations for cart session
         6. Creates Order with payment_id field populated
@@ -1172,7 +1169,7 @@ class OrderService:
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
         expected_cart_digest: str | None,
         agent_checkout: UUID | None,
     ) -> Order:
@@ -1848,7 +1845,7 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None = None,
+        expected_total: ExpectedTotal,
         expected_cart_digest: str | None = None,
         agent_checkout: UUID | None = None,
     ) -> Order:
@@ -1952,7 +1949,7 @@ class OrderService:
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
         expected_cart_digest: str | None,
         agent_checkout: UUID | None,
     ) -> Order:

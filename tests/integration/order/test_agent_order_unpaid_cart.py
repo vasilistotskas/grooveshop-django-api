@@ -47,6 +47,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import priced, quoted_body
 from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
@@ -110,11 +111,13 @@ class _Cart:
     def order(self, *, pay_way=None, attribution=None) -> Order:
         """Place an order the order-first way (Viva unless told)."""
         return OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=self.cart,
-            shipping_address=self.address(),
-            pay_way=pay_way or _viva(),
-            attribution=attribution,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=self.cart,
+                shipping_address=self.address(),
+                pay_way=pay_way or _viva(),
+                attribution=attribution,
+            )
         )
 
     def pay_first(self, *, attribution=None) -> Order:
@@ -128,12 +131,14 @@ class _Cart:
             "order.payments.payment.get_payment_provider", return_value=provider
         ):
             return OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=self.cart,
-                shipping_address=self.address(),
-                payment_intent_id="pi_agent_second_order",
-                pay_way=PayWayFactory.create_online_payment("stripe"),
-                attribution=attribution,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=self.cart,
+                    shipping_address=self.address(),
+                    payment_intent_id="pi_agent_second_order",
+                    pay_way=PayWayFactory.create_online_payment("stripe"),
+                    attribution=attribution,
+                )
             )
 
     def stock(self) -> int:
@@ -322,27 +327,32 @@ class TestThroughTheEndpoint:
 
     def _post(self, pay_way, *, secret=GATEWAY_SECRET, **body):
         address = self.checkout.address()
-        return APIClient().post(
+        client = APIClient()
+        headers = {
+            "HTTP_X_CART_ID": str(self.checkout.cart.uuid),
+            "HTTP_X_INTERNAL_GATEWAY": secret,
+            "HTTP_X_LANGUAGE": "en",
+        }
+        request = {
+            "payWayId": pay_way.id,
+            "termsAccepted": True,
+            "firstName": address["first_name"],
+            "lastName": address["last_name"],
+            "email": address["email"],
+            "street": address["street"],
+            "streetNumber": address["street_number"],
+            "city": address["city"],
+            "zipcode": address["zipcode"],
+            "countryId": address["country_id"],
+            "regionId": self.region.alpha,
+            "phone": address["phone"],
+            **body,
+        }
+        return client.post(
             reverse("order-list"),
-            {
-                "payWayId": pay_way.id,
-                "termsAccepted": True,
-                "firstName": address["first_name"],
-                "lastName": address["last_name"],
-                "email": address["email"],
-                "street": address["street"],
-                "streetNumber": address["street_number"],
-                "city": address["city"],
-                "zipcode": address["zipcode"],
-                "countryId": address["country_id"],
-                "regionId": self.region.alpha,
-                "phone": address["phone"],
-                **body,
-            },
+            quoted_body(client, request, **headers),
             format="json",
-            HTTP_X_CART_ID=str(self.checkout.cart.uuid),
-            HTTP_X_INTERNAL_GATEWAY=secret,
-            HTTP_X_LANGUAGE="en",
+            **headers,
         )
 
     def _as_gateway(self, pay_way, **kwargs):
@@ -415,11 +425,13 @@ class TestTwoAgentOrdersRacingForOneCart:
         placed, raised = race(
             lambda: (
                 OrderService.create_order_from_cart_offline(
-                    legal_acceptance=acceptance,
-                    cart=checkout.cart,
-                    shipping_address=checkout.address(),
-                    pay_way=pay_way,
-                    attribution=AGENT,
+                    **priced(
+                        legal_acceptance=acceptance,
+                        cart=checkout.cart,
+                        shipping_address=checkout.address(),
+                        pay_way=pay_way,
+                        attribution=AGENT,
+                    )
                 ).pk
             )
         )

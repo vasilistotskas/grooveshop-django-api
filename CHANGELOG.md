@@ -3,6 +3,46 @@
 
 
 
+## v3.257.0 (2026-11-21)
+
+### Documentation
+
+* docs(order): expectedTotal is required, not optional for now
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+### Features
+
+* feat(order): require expectedTotal on order creation (#764) ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+* feat(order): require expectedTotal on order creation
+
+Every order is now created at the total its client showed the buyer:
+expectedTotal is required on POST /api/v1/order and on both
+OrderService creation paths, so no path places an order without the
+total check. The storefront in production (v3.345.3) refuses to place
+an order without the quote's expectedTotal and the gateway sends it on
+every order since v1.49.0.
+
+The storefront's document is generated from this schema, so the API
+contract gate cannot see that it already sends the field: the change
+is accepted in api-contract/ignore.txt until the storefront's next
+release regenerates from it, and the README names the case.
+
+Tests quote the order first and send that total, as the clients do
+(tests/utils/checkout.py).
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+### Testing
+
+* test(order): serializer-only checkout payloads send an expected total
+
+The tests that validate OrderCreateFromCartSerializer alone now send a
+shape-only expectedTotal, which the serializer requires.
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
 ## v3.256.0 (2026-11-20)
 
 ### Bug fixes

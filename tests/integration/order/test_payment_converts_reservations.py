@@ -10,6 +10,7 @@ from order.models import Order, StockLog
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -173,12 +174,14 @@ class TestPaymentConfirmationConvertsReservations:
         # Execute: Create order from cart (this simulates payment confirmation)
         # This should convert reservations to stock decrements
         order = OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id=payment_intent_id,
-            pay_way=pay_way,
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id=payment_intent_id,
+                pay_way=pay_way,
+                user=user,
+            )
         )
 
         # Verify: Order was created successfully
@@ -294,12 +297,14 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id="pi_test_dup_reservations",
-            pay_way=pay_way,
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id="pi_test_dup_reservations",
+                pay_way=pay_way,
+                user=user,
+            )
         )
 
         product.refresh_from_db()
@@ -370,12 +375,14 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id="pi_expired_reservation",
-            pay_way=pay_way,
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id="pi_expired_reservation",
+                pay_way=pay_way,
+                user=user,
+            )
         )
 
         assert order is not None
@@ -458,12 +465,14 @@ class TestPaymentConfirmationConvertsReservations:
             pytest.raises(InsufficientStockError),
         ):
             OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address=shipping_address,
-                payment_intent_id="pi_test_atomic",
-                pay_way=pay_way,
-                user=user,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=cart,
+                    shipping_address=shipping_address,
+                    payment_intent_id="pi_test_atomic",
+                    pay_way=pay_way,
+                    user=user,
+                )
             )
 
         # Verify: Neither reservation was consumed (atomicity)
@@ -529,12 +538,14 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id="pi_test_audit_logs",
-            pay_way=pay_way,
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id="pi_test_audit_logs",
+                pay_way=pay_way,
+                user=user,
+            )
         )
 
         # Verify: RESERVE log was created during reservation

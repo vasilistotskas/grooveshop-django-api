@@ -3,6 +3,107 @@
 
 
 
+## v3.261.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(emails): plain-text bodies render without HTML escaping; the voucher audit copy holds no address
+
+Every .txt email body was rendered with Django's autoescaping, so an
+address such as "Building A & B" reached the plain-text part as
+"Building A &amp; B". emails.render.render_template renders the text
+body with autoescaping off and the HTML body with it on, and the
+per-field |safe workarounds in the text templates are gone; two golden
+files that recorded the escaped apostrophe are re-recorded.
+
+The ACS voucher's audit copy on shipment.metadata records
+Delivery_Notes without the address line 2, since it must hold no
+recipient address, and a floor value outside the choices no longer
+keeps the voucher from being issued.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(order): erasure and export read one list of an order's address fields
+
+Order.SHIPPING_ADDRESS_FIELDS names the delivery address fields that
+are the buyer's own. GDPR erasure blanks them on a retained order, the
+address line 2 included, which it missed, and a data export lists them
+(place, floor and location type were missing). A test holds the list to
+every order field the staging anonymiser scrubs, so a new address field
+cannot be left out of the erasure again.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(user): erasure clears every carrier copy of an order's personal data
+
+- Order.PERSONAL_FIELDS (contact, address, customer's note, the invoice's
+  counterparty in BILLING_FIELDS) and Order.PERSONAL_METADATA (the
+  Conversions API browser identity, a typed cancel reason) are the one
+  definition the data export lists and erasure clears, billing excepted.
+- Each carrier clears its own records through
+  ShippingCarrierInterface.erase_recipient_data: the shipment metadata at
+  PERSONAL_METADATA (the failed request, the notes the voucher or parcel
+  carried), the ACS call history of the orders and their vouchers, and
+  what the carriers sent back (checkpoint notes, the receiver on a COD
+  payout, BOX NOW event text, raw rows). gdpr no longer imports the
+  carrier apps.
+- The ACS audit copy records the notes as sent, less the address line 2
+  (CourierNotes.without_address), so a cut note is recorded as ACS got it.
+- The guard test no longer exempts the JSON columns: an erasure test
+  searches every retained row, JSON included, for the subject's values.
+
+* revert: erasure of every carrier copy moves to its own pull request
+
+This reverts commit c90e61abb. The erasure overhaul (one definition of an
+order's personal data, carrier records, the JSON sweep) ships on its own;
+this branch keeps the address line 2 and its own place in erasure and
+export. ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(shipping_acs): the voucher audit copy records the customer's note as sent
+
+The audit copy of Delivery_Notes rebuilt the notes without the address
+line, so a note cut to make room for the floor and the line was recorded
+longer than ACS received it, and the floor label this branch adds rode
+along. CourierNotes now holds the voucher's notes: .sent is what ACS gets,
+.customer_part the customer's note as it was cut there, which is all the
+copy records (built with the request, from the same order). ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+### Features
+
+* feat(order): an order's address line 2 (#769) ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(order): an order's address line 2
+
+Order creation takes an optional addressLine2 for what the street line
+does not hold (a flat, a floor, a building; UCP's extended_address),
+kept on Order.address_line_2 apart from the customer's notes. It is in
+the order responses, the staff write serializer and the admin, prints
+under the street on the receipt and the order emails, and rides first
+in the ACS voucher's Delivery_Notes, since ACS's Recipient_Address is
+the street alone; the customer's note is cut first to the 500-character
+limit. The receipt no longer prints Order.place, a district field, as
+its second address line.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(order): the voucher's notes lead with the floor, and the receipt prints a place with the city
+
+Until ACS's Recipient_Floor format is known, the floor choice's Greek
+label leads Delivery_Notes, ahead of the address line 2 and the
+customer's note; only the customer's note is ever cut. The receipt
+prints Order.place, a district, beside the city rather than as an
+address line.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(user): saved addresses keep an address line 2, and full_address prints it
+
+UserAddress.address_line_2 (optional, the read and write serializers, the
+admin, the data export, the staging anonymiser) lets checkout prefill an
+order's line 2 from a saved address. Order.full_address carries the line
+after the street and its number ("Ερμού 12, 3ος όροφος, 10563 Αθήνα"), so
+every reader of fullAddress shows it. ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
 ## v3.260.1 (2026-11-21)
 
 ### Documentation

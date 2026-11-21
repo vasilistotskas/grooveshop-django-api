@@ -55,8 +55,10 @@ stored like any other (`docs/celery-results.md`).
 
 ## Limits
 
-- `queryset.update()` emits no signal: the soft-delete and restore querysets
-  of `core.models` and any bulk `update(active=...)` are not announced.
+- `queryset.update()` emits no signal: a bulk `update(active=...)` is not
+  announced. A bulk soft delete or restore is, like a single one: it goes
+  row by row through each row's own `delete()`/`restore()`
+  (`src/core/mixins/soft_delete.py`).
 - A product's page exists for every language the store serves; the URL of a
   language the product has no translation in is still sent.
 - A slug change announces the new address only; the old one is not known.

@@ -5,7 +5,7 @@ rollback: permission first, then validation against the storefront's
 catalogue (refused when the storefront cannot answer), then the write. The
 release is the one thing that reaches the public storefront, so creating
 one is what moves the store's cache generation and the ``builder`` cache
-surface (``tenant.signals``, ``core.cache.surfaces``); a draft save purges
+surface (``tenant.signals``, ``builder.cache_surfaces``); a draft save purges
 nothing, because no public read touches a draft.
 """
 

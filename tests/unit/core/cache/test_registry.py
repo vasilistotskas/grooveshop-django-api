@@ -57,6 +57,46 @@ class TestRegistry:
         assert get_surface("x").label == "V2"
 
 
+class TestCollectedSurfaces:
+    def test_every_app_surface_is_registered_once(self, empty_registry):
+        from core.cache.surfaces import register_default_surfaces
+
+        register_default_surfaces()
+
+        codes = {s.code for s in iter_surfaces()}
+        assert {"settings", "store_pages", "sitemap_seo"} <= codes
+        assert {"products", "pay_way", "builder", "store_texts"} <= codes
+
+    def test_two_modules_declaring_one_code_stop_the_boot(
+        self, empty_registry, monkeypatch
+    ):
+        """The registry keeps the later of two surfaces with one code, so a
+        second declaration would replace the first, and its invalidation
+        wiring, in silence."""
+        from django.core.exceptions import ImproperlyConfigured
+
+        from core.cache.surfaces import register_default_surfaces
+        from pay_way import cache_surfaces
+
+        # Undone inside the test: the fixture restores the registry with
+        # the real declarations after it.
+        with monkeypatch.context() as patched:
+            patched.setattr(
+                cache_surfaces,
+                "SURFACES",
+                (
+                    *cache_surfaces.SURFACES,
+                    CacheSurface(code="settings", label="Dup", description=""),
+                ),
+            )
+            with pytest.raises(
+                ImproperlyConfigured,
+                match=r"'settings' is declared by both core\.cache\.surfaces "
+                r"and pay_way\.cache_surfaces",
+            ):
+                register_default_surfaces()
+
+
 class TestExpandWithRelated:
     def test_expands_one_level(self, empty_registry):
         register_surface(

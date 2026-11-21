@@ -22,10 +22,13 @@ from django.core import mail
 from django.utils import translation
 from django.utils.translation import gettext
 
-from core.tasks import monitor_system_health, scheduled_database_backup
 from tenant.billing import _send_stage_email
 from tenant.enum import TenantPlan
-from tenant.tasks import send_staff_password_reset_email
+from tenant.tasks import (
+    monitor_system_health,
+    scheduled_database_backup,
+    send_staff_password_reset_email,
+)
 from tests.utils.golden import assert_golden, snapshot
 from tests.utils.staff import (
     bind_store_tenant,
@@ -175,9 +178,9 @@ class TestOperatorAlerts:
         cache.get.return_value = "ok"
         cache.failing_persistence_statuses.return_value = {}
         with (
-            patch("core.tasks.cache", cache),
-            patch("core.tasks.connections") as connections,
-            patch("core.tasks.logger"),
+            patch("tenant.tasks.cache", cache),
+            patch("tenant.tasks.connections") as connections,
+            patch("tenant.tasks.logger"),
             pytest.raises(Exception, match="database"),
         ):
             connections.__getitem__.return_value.cursor.side_effect = Exception(
@@ -194,7 +197,7 @@ class TestOperatorAlerts:
         chain.apply_async.side_effect = Exception("Broker unreachable")
         with (
             patch("celery.chain", return_value=chain),
-            patch("core.tasks.logger"),
+            patch("tenant.tasks.logger"),
             pytest.raises(Exception, match="Broker unreachable"),
         ):
             scheduled_database_backup()

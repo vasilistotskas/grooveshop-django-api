@@ -424,7 +424,7 @@ the weight learning — read the same two tiers through
 Cache **candidates** (product-level, shared by every viewer), never
 **results** (viewer-level). Keys are schema-scoped by
 `KEY_FUNCTION = tenant.cache.make_tenant_key`. The engine registers a
-`recommendations` surface in `src/core/cache/surfaces.py` with
+`recommendations` surface in `src/recommendation/cache_surfaces.py` with
 `invalidated_by = (Product, ProductCategory, ProductRelation,
 RecommendationSlot)` — the auto-invalidation in
 `src/core/cache/invalidation.py` — so a merchant curating a relation sees

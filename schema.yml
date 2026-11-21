@@ -14287,9 +14287,9 @@ paths:
   /api/v1/country/all:
     get:
       operationId: listAllCountries
-      description: 'The whole country list as one array, filtered and ordered as the
-        paginated list is: for a picker that needs every row.'
-      summary: Every country, in one list
+      description: 'Ολόκληρη η λίστα χωρών σε έναν πίνακα, φιλτραρισμένη και ταξινομημένη
+        όπως η σελιδοποιημένη λίστα: για έναν επιλογέα που χρειάζεται κάθε γραμμή.'
+      summary: Όλες οι χώρες, σε μία λίστα
       parameters:
       - in: query
         name: alpha2
@@ -15026,8 +15026,10 @@ paths:
   /api/v1/giftcard/mine/all:
     get:
       operationId: listAllMyGiftCards
-      description: Every gift card linked to my account, in one list
-      summary: Every gift card linked to my account, in one list
+      description: Όλες οι δωροκάρτες που είναι συνδεδεμένες με τον λογαριασμό μου,
+        σε μία λίστα
+      summary: Όλες οι δωροκάρτες που είναι συνδεδεμένες με τον λογαριασμό μου, σε
+        μία λίστα
       parameters:
       - in: query
         name: languageCode

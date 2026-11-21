@@ -42,6 +42,9 @@ from pay_way.models import PayWay
 from region.models import Region
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PICKUP_POINT_IN_ANOTHER_COUNTRY,
+    PICKUP_POINT_UNAVAILABLE,
+    PickupPointInAnotherCountry,
     PickupPointUnknown,
     get_provider,
     is_registered,
@@ -1515,7 +1518,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
            number are the line's.
         5. A pickup-point order is delivered to the point: its address,
            from the carrier's catalogue, is the order's delivery address,
-           and the buyer's own is neither required nor kept.
+           and the buyer's own is neither required nor kept. It is
+           resolved last, after every cheaper check, because a point the
+           catalogue misses starts a resync of it.
         """
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
@@ -1524,9 +1529,8 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
                 code="country_invalid",
             )
         self._validate_carrier(attrs)
-        if attrs.get("shipping_kind") == ShippingKind.PICKUP_POINT:
-            self._deliver_to_pickup_point(attrs)
-        else:
+        pickup = attrs.get("shipping_kind") == ShippingKind.PICKUP_POINT
+        if not pickup:
             self._validate_home_address(attrs, country)
 
         document_type = attrs.get("document_type", "RECEIPT")
@@ -1564,7 +1568,6 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             # address instead of relying on read-time fallbacks. A
             # PARTIAL explicit address is rejected — the invoice would
             # otherwise mix the billing street with the shipping city.
-            pickup = attrs.get("shipping_kind") == ShippingKind.PICKUP_POINT
             if not (attrs.get("billing_street") or "").strip() and pickup:
                 # The delivery address is the pickup point's, never the
                 # company's: an invoice to a locker names it explicitly.
@@ -1615,6 +1618,11 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         # view (``_validate_pay_way_for_order``) where the PayWay row is
         # resolved from the DB — keeping this cross-field validator free
         # of DB pay-way lookups.
+
+        # Last: resolving the point can resync a carrier's catalogue, so
+        # every cheaper refusal of the body has run before it.
+        if pickup:
+            self._deliver_to_pickup_point(attrs)
 
         return attrs
 
@@ -1763,16 +1771,14 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             address = ShippingService.pickup_point_address(
                 code, location, country_code=attrs["country_id"]
             )
+        except PickupPointInAnotherCountry:
+            raise serializers.ValidationError(
+                {field: [PICKUP_POINT_IN_ANOTHER_COUNTRY]},
+                code="pickup_point_in_another_country",
+            ) from None
         except PickupPointUnknown:
             raise serializers.ValidationError(
-                {
-                    field: [
-                        _(
-                            "This pickup point is not available. Choose "
-                            "another one."
-                        )
-                    ]
-                },
+                {field: [PICKUP_POINT_UNAVAILABLE]},
                 code="pickup_point_unknown",
             ) from None
         street, number = address.street, address.street_number
@@ -1788,6 +1794,12 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         attrs["street_number"] = number
         attrs["city"] = address.city
         attrs["zipcode"] = address_rules.normalize_postcode(address.postal_code)
+        # Nothing else of the buyer's address is the point's: no region
+        # (``ShippingChoice.of`` prices a pickup delivery without one), no
+        # floor, no location type.
+        attrs["region_id"] = None
+        attrs["floor"] = ""
+        attrs["location_type"] = ""
 
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):

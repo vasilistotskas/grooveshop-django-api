@@ -12,6 +12,7 @@ order page read. Name, email and phone stay required.
 from __future__ import annotations
 
 import logging
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,7 +23,8 @@ from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from region.factories import RegionFactory
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingRate
+from shipping_acs import config as acs_config
 from shipping_acs.factories import AcsStationFactory
 from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.factories import BoxNowLockerFactory
@@ -127,15 +129,36 @@ class TestALockerOrder:
 
         assert response.status_code == 201, response.content
 
-    def test_a_locker_the_catalogue_does_not_hold_is_refused(
-        self, locker_checkout, documented
-    ):
-        response = _post_locker_order(locker_checkout, boxnow_locker_id="99")
+    def test_keeps_none_of_the_buyers_address(self, locker_checkout):
+        region = RegionFactory(country=locker_checkout.country)
+
+        response = _post_locker_order(
+            locker_checkout,
+            region_id=region.alpha,
+            floor="SECOND_FLOOR",
+            location_type="HOME",
+        )
+
+        assert response.status_code == 201, response.content
+        order = Order.objects.get()
+        assert order.region_id is None
+        assert (order.floor, order.location_type) == ("", "")
+
+    def test_a_region_that_does_not_exist_is_not_kept(self, locker_checkout):
+        response = _post_locker_order(locker_checkout, region_id="XX")
+
+        assert response.status_code == 201, response.content
+        assert Order.objects.get().region_id is None
+
+    def test_a_locker_in_another_country_is_refused(self, locker_checkout):
+        locker_checkout.locker.country_code = "CY"
+        locker_checkout.locker.save()
+
+        response = _post_locker_order(locker_checkout)
 
         assert response.status_code == 400, response.content
-        documented(response, "/api/v1/order", "post")
         assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
-            "pickup_point_unknown"
+            "pickup_point_in_another_country"
         )
         assert not Order.objects.exists()
 
@@ -223,6 +246,26 @@ class TestAStationOrder:
             "",
         )
 
+    def test_a_station_in_another_country_is_refused(self, acs):
+        country, station = acs
+        station.country_code = "CY"
+        station.save()
+
+        with patch("shipping.services.ShippingService.active_rate") as gate:
+            serializer = _serializer(
+                country=country,
+                shipping_kind="pickup_point",
+                shipping_provider_code="acs",
+                acs_station_external_id="ATH01",
+                acs_station_branch="12",
+            )
+
+            assert not serializer.is_valid()
+        error = serializer.errors["acs_station_external_id"][0]
+        assert error.code == "pickup_point_in_another_country"
+        # No resync can change a country.
+        gate.assert_not_called()
+
     def test_without_a_station_is_refused_on_the_station(self, acs):
         country, _station = acs
 
@@ -306,8 +349,137 @@ def resync(locker_checkout):
         yield client.return_value.list_destinations
 
 
+# The resync runs on a thread with a connection of its own
+# (``ShippingService._resync_within_deadline``), which sees only committed
+# rows: these tests run outside the test's transaction.
+RESYNC = pytest.mark.django_db(transaction=True)
+
+
+@RESYNC
 class TestALockerTheCatalogueDoesNotHoldYet:
     """A locker BOX NOW's widget shows before the daily sync holds it."""
+
+    def test_is_refused_when_the_resync_does_not_list_it(
+        self, locker_checkout, resync, documented
+    ):
+        response = _post_locker_order(locker_checkout, boxnow_locker_id="99")
+
+        assert response.status_code == 400, response.content
+        documented(response, "/api/v1/order", "post")
+        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        resync.assert_called_once()
+        assert not Order.objects.exists()
+
+    def test_a_withdrawn_locker_is_looked_up_again(
+        self, locker_checkout, resync
+    ):
+        """The sync keeps a withdrawn locker's row and marks it inactive;
+        an order for it counts as a miss."""
+        locker_checkout.locker.is_active = False
+        locker_checkout.locker.save()
+        resync.return_value = []
+
+        refused = _post_locker_order(locker_checkout)
+
+        assert refused.status_code == 400, refused.content
+        assert refused.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        resync.assert_called_once()
+
+    def test_a_locker_the_carrier_lists_again_is_ordered(
+        self, locker_checkout, resync
+    ):
+        locker_checkout.locker.is_active = False
+        locker_checkout.locker.save()
+
+        response = _post_locker_order(locker_checkout)
+
+        assert response.status_code == 201, response.content
+        resync.assert_called_once()
+
+    def test_a_resync_past_its_deadline_is_refused_and_logged(
+        self, locker_checkout, resync, settings, caplog
+    ):
+        settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = 1
+        resync.side_effect = lambda **_kw: time.sleep(2) or []
+
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger="shipping.services"):
+            response = _post_locker_order(
+                locker_checkout, boxnow_locker_id="77"
+            )
+
+        assert response.status_code == 400, response.content
+        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_unknown"
+        )
+        assert time.monotonic() - started < 2
+        assert "did not finish within 1 s" in caplog.text
+
+    def test_a_malformed_id_never_starts_a_resync(
+        self, locker_checkout, resync
+    ):
+        # No quote: the quote refuses the same id on its field.
+        response = locker_checkout.client.post(
+            reverse("order-list"),
+            {
+                **BUYER,
+                "country_id": locker_checkout.country.alpha_2,
+                "pay_way_id": locker_checkout.pay_way.id,
+                "terms_accepted": True,
+                "shipping_kind": "pickup_point",
+                "shipping_provider_code": "boxnow",
+                "boxnow_locker_id": "9" * 65,
+                "expected_total": UNQUOTED,
+            },
+            format="json",
+            HTTP_X_CART_ID=str(locker_checkout.cart.uuid),
+        )
+
+        assert response.status_code == 400, response.content
+        assert "boxnowLockerId" in response.json()["fields"]
+        resync.assert_not_called()
+
+    def test_a_body_refused_for_another_field_starts_no_resync(
+        self, locker_checkout, resync
+    ):
+        with patch("order.serializers.order.feature_on", return_value=True):
+            response = _post_locker_order(
+                locker_checkout,
+                boxnow_locker_id="77",
+                document_type="INVOICE",
+                billing_vat_id="094014201",
+                billing_company_name="Acme ΑΕ",
+                billing_tax_office="Α' Αθηνών",
+                billing_activity="Εμπόριο",
+            )
+
+        assert response.status_code == 400, response.content
+        assert "billingStreet" in response.json()["fields"]
+        resync.assert_not_called()
+
+    def test_a_store_without_lockers_in_that_country_starts_no_resync(
+        self, locker_checkout, resync
+    ):
+        ShippingRate.objects.filter(
+            country=locker_checkout.country, kind="pickup_point"
+        ).update(is_active=False)
+
+        response = _serializer(
+            country=locker_checkout.country,
+            shipping_kind="pickup_point",
+            shipping_provider_code="boxnow",
+            boxnow_locker_id="77",
+        )
+
+        assert not response.is_valid()
+        assert response.errors["boxnow_locker_id"][0].code == (
+            "pickup_point_unknown"
+        )
+        resync.assert_not_called()
 
     def test_is_found_by_a_resync_and_ordered_at_its_address(
         self, locker_checkout, resync
@@ -374,10 +546,18 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         resync.assert_not_called()
 
 
+@RESYNC
 class TestAStationTheCatalogueDoesNotHoldYet:
     def test_is_found_by_a_resync_of_its_country(self):
         ShippingProvider.objects.filter(code="acs").update(is_active=True)
         country = _checkout().country
+        enable_rate(country, provider_code="acs", kind="pickup_point")
+        # The store offers ACS lockers there: the catalogue holds others
+        # of the kinds the country is synced for.
+        AcsStationFactory(
+            country_code=country.alpha_2,
+            shop_kind=acs_config.shop_kinds_for_country(country.alpha_2)[0],
+        )
         client = MagicMock()
         # ``Acs_Stations`` rows as ACS lists them, for every kind asked.
         client.return_value.stations.return_value = [
@@ -392,6 +572,7 @@ class TestAStationTheCatalogueDoesNotHoldYet:
         ]
         with (
             patch("shipping_acs.services.AcsClient", client),
+            patch("shipping_acs.config.is_configured", return_value=True),
             patch("django.core.cache.cache", private_cache()),
         ):
             serializer = _serializer(

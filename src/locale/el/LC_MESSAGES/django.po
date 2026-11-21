@@ -15186,9 +15186,6 @@ msgstr "Η ίδια τιμή με το ``reason``."
 msgid "The scheduled database backup failed with this error:"
 msgstr "Το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε με αυτό το σφάλμα:"
 
-msgid "The selected locker is not in the delivery country."
-msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
-
 msgid "The selected payment method cannot be paid with a card on this page."
 msgstr "Η επιλεγμένη μέθοδος πληρωμής δεν μπορεί να εξοφληθεί με κάρτα σε αυτή τη σελίδα."
 
@@ -15575,6 +15572,9 @@ msgstr "Αυτό το άτομο είναι ήδη στην ομάδα."
 
 msgid "This pickup point is not available. Choose another one."
 msgstr "Αυτό το σημείο παραλαβής δεν είναι διαθέσιμο. Επιλέξτε άλλο."
+
+msgid "This pickup point is not in the delivery country. Choose another one."
+msgstr "Αυτό το σημείο παραλαβής δεν βρίσκεται στη χώρα παράδοσης. Επιλέξτε άλλο."
 
 msgid "This product is already in the user's favorites."
 msgstr "Αυτό το προϊόν βρίσκεται ήδη στα αγαπημένα του χρήστη."
@@ -19613,6 +19613,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgstr ""
 #~ "Ευχαριστούμε που χρησιμοποιείτε το %(site_name)s!\n"
 #~ "%(site_domain)s"
+
+#~ msgid "The selected locker is not in the delivery country."
+#~ msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."

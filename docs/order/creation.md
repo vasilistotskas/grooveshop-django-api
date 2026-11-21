@@ -525,18 +525,33 @@ address it cannot place (prod order #316: street "1", street number
   address, its number split from the street line by `split_street_line`
   where it splits. That one snapshot is what the receipt, the ACS voucher
   and the order page read. Name, email and phone stay required; the
-  region rule does not apply. A point the catalogue does not hold yet (BOX
-  NOW's widget is live data, the catalogue syncs daily at 02:00) is looked
-  for once more: `ShippingService.pickup_point_address` resyncs that
-  carrier's catalogue through its scheduled sync's own path
-  (`refresh_pickup_points`: `sync_lockers`, `sync_stations` for the order's
-  country), before any transaction or lock. At most one resync per store and
+  region rule does not apply: the order keeps no region, floor or location
+  type of the buyer's, and `ShippingChoice.of` prices a pickup delivery
+  without a region, so the quote, the cart digest and the order agree. The
+  point must be deliverable (`deliverable_pickup_point`): in the catalogue,
+  active (a sync keeps a withdrawn point's row and marks it inactive) and in
+  the order's country; one in another country is a 400
+  `pickup_point_in_another_country`, which no resync can change. A point
+  the catalogue misses or holds withdrawn (BOX NOW's widget is live data,
+  the catalogue syncs daily at 02:00) is looked for once more:
+  `ShippingService.pickup_point_address` resyncs that carrier's catalogue
+  through its scheduled sync's own path (`refresh_pickup_points`:
+  `sync_lockers`, `sync_stations` for the order's country). It runs last in
+  `OrderCreateFromCartSerializer.validate`, after every cheaper refusal and
+  outside any transaction or lock, and only where the store delivers that
+  kind in that country (`active_rate`). At most one resync per store and
   carrier runs in `PICKUP_POINT_RESYNC_GUARD_SECONDS` (600 s); inside it a
-  miss is refused at once. A point the resync does not hold either, or a
-  resync that fails (logged), is a 400 `pickup_point_unknown` on the
-  carrier's location field (`boxnowLockerId`, `acsStationExternalId`); no
-  point at all is `pickup_point_required`. The buyer's address is never
-  used instead. An invoice to a pickup point names the
+  miss is refused at once. The request waits for it at most
+  `PICKUP_POINT_RESYNC_TIMEOUT_SECONDS` (5 s, under the agent gateway's 10
+  s): the sync runs on a thread of its own on the store's schema, and past
+  the deadline the order is refused while the sync goes on, so the next
+  order finds the point. A point the resync does not hold either, a resync
+  that fails or passes its deadline (logged), is a 400
+  `pickup_point_unknown` on the carrier's location field (`boxnowLockerId`,
+  `acsStationExternalId`); no point at all is `pickup_point_required`. The
+  carriers' `validate_order_payload` apply the same rule
+  (`pickup_point_errors`). The buyer's address is never used instead. An
+  invoice to a pickup point names the
   company's address (`billingStreet`), since "same as delivery" would copy
   the point's. A retail receipt needs no buyer address (Law 4308/2014 art.
   12 par. 2; the former EUR 50 rule was deleted by Law 5222/2025 art. 238

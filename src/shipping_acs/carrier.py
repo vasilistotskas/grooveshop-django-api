@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PickupPointInAnotherCountry,
     PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
@@ -116,17 +117,41 @@ class AcsCarrier(ShippingCarrierInterface):
         """The address of the exact station ``location`` names: its
         (external_id, branch) pair, a blank branch naming only the row
         without one, read from the catalogue now."""
+        return self._address(self._station(location), location)
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        station = self._station(location)
+        if station is not None and not station.is_active:
+            raise PickupPointUnknown(
+                f"ACS station {station.external_id} "
+                f"{station.branch_code} is withdrawn."
+            )
+        address = self._address(station, location)
+        if (station.country_code or "").upper() != country_code.upper():
+            raise PickupPointInAnotherCountry(
+                f"ACS station {station.external_id} {station.branch_code} "
+                f"is in {station.country_code}, not {country_code}."
+            )
+        return address
+
+    @staticmethod
+    def _station(location: Mapping[str, str]):
         from shipping_acs.models import AcsStation
 
-        external_id = location.get("acs_station_external_id") or ""
-        branch = location.get("acs_station_branch") or ""
-        station = AcsStation.objects.filter(
-            external_id=external_id, branch_code=branch
+        return AcsStation.objects.filter(
+            external_id=location.get("acs_station_external_id") or "",
+            branch_code=location.get("acs_station_branch") or "",
         ).first()
+
+    @staticmethod
+    def _address(station, location: Mapping[str, str]) -> PostalAddress:
         if station is None or not (station.postal_code and station.city):
             raise PickupPointUnknown(
-                f"The address of ACS station {external_id} {branch} is not "
-                "known."
+                "The address of ACS station "
+                f"{location.get('acs_station_external_id') or ''} "
+                f"{location.get('acs_station_branch') or ''} is not known."
             )
         return PostalAddress(
             street=station.address_line_1,
@@ -166,7 +191,14 @@ class AcsCarrier(ShippingCarrierInterface):
                 )
             )
             return {"acs_station_external_id": [error]}
-        return {}
+        return self.pickup_point_errors(
+            "acs_station_external_id",
+            {
+                "acs_station_external_id": payload["acs_station_external_id"],
+                "acs_station_branch": payload.get("acs_station_branch") or "",
+            },
+            country_code=payload.get("country_id") or "",
+        )
 
     # ------------------------------------------------------------------
     # Per-kind feature gating

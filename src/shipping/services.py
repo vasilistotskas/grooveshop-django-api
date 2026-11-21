@@ -117,19 +117,39 @@ class ShippingService:
         the gateway or a stale cache. On a miss the catalogue is fetched
         again through the scheduled sync's own path
         (``refresh_pickup_points``), before any transaction or lock, and
-        read once more. At most one resync per store and carrier runs in
+        read once more. The point must be deliverable
+        (``deliverable_pickup_point``: held, active, in the order's
+        country); a withdrawn one counts as missing. No resync runs where
+        the store does not deliver to that kind in that country
+        (``active_rate``), and at most one per store and carrier in
         ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
-        at once. A resync that fails (the carrier is down) is logged and
-        refused. Raises ``PickupPointUnknown``; never answers with any
-        other address.
+        at once. A resync that fails or passes its deadline
+        (``_resync_within_deadline``) is logged and refused. Raises
+        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``; never
+        answers with any other address.
         """
         from django.core.cache import cache
 
         carrier = get_provider(provider_code)
         try:
-            return carrier.address_of_pickup_point(location)
+            return carrier.deliverable_pickup_point(
+                location, country_code=country_code
+            )
         except PickupPointUnknown:
             pass
+        # A store that cannot deliver to that kind in that country refuses
+        # anyway: no carrier is asked for it.
+        try:
+            cls.active_rate(
+                provider_code=provider_code,
+                kind=ShippingKind.PICKUP_POINT,
+                country_code=country_code,
+            )
+        except ShippingUnavailableError as e:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup points are not offered in "
+                f"{country_code}"
+            ) from e
         guard = f"shipping:pickup-point-resync:{provider_code}"
         if not cache.add(guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS):
             raise PickupPointUnknown(
@@ -137,8 +157,64 @@ class ShippingService:
                 "and its catalogue was resynced in the last "
                 f"{PICKUP_POINT_RESYNC_GUARD_SECONDS} s"
             )
+        cls._resync_within_deadline(
+            carrier, provider_code, location, country_code=country_code
+        )
+        return carrier.deliverable_pickup_point(
+            location, country_code=country_code
+        )
+
+    @staticmethod
+    def _resync_within_deadline(
+        carrier: ShippingCarrierInterface,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> None:
+        """Run the carrier's resync, waiting at most
+        ``PICKUP_POINT_RESYNC_TIMEOUT_SECONDS`` for it.
+
+        The sync runs in a thread of its own, on the request's store
+        schema, because a carrier client has no deadline for a whole sync
+        (each call retries within its own timeout, so a sync can take
+        minutes) and the order call has callers that wait seconds. Past
+        the deadline the order is refused; the thread finishes the sync,
+        so the next order finds the point. A failure is logged and
+        refused alike.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as FutureTimeout
+
+        from django.db import connection, connections
+        from django_tenants.utils import schema_context
+
+        schema = connection.schema_name
+
+        def resync() -> None:
+            try:
+                with schema_context(schema):
+                    carrier.refresh_pickup_points(country_code=country_code)
+            finally:
+                connections.close_all()
+
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(resync)
+        executor.shutdown(wait=False)
         try:
-            carrier.refresh_pickup_points(country_code=country_code)
+            future.result(timeout=settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
+        except FutureTimeout as e:
+            logger.warning(
+                "Resync of the %s catalogue for pickup point %s did not "
+                "finish within %s s; the order is refused and the sync "
+                "goes on",
+                provider_code,
+                dict(location),
+                settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS,
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue resync passed its deadline"
+            ) from e
         except Exception as e:
             logger.exception(
                 "Resync of the %s catalogue for pickup point %s failed",
@@ -148,7 +224,6 @@ class ShippingService:
             raise PickupPointUnknown(
                 f"{provider_code} catalogue could not be resynced"
             ) from e
-        return carrier.address_of_pickup_point(location)
 
     @classmethod
     def adapter_for(cls, provider_code: str):

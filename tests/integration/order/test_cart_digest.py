@@ -31,6 +31,7 @@ from pay_way.factories import PayWayFactory
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
 from promotion.services import PromotionEngine
+from region.factories import RegionFactory
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import (
@@ -362,6 +363,37 @@ class TestThePickupPoint:
         assert elsewhere.status_code == 409, elsewhere.content
         assert elsewhere.json()["code"] == CART_CHANGED_CODE
         assert quoted.status_code == 201, quoted.content
+
+    def test_a_region_sent_with_a_pickup_order_does_not_change_it(
+        self, locker_checkout
+    ):
+        """A pickup order keeps no region (``_deliver_to_pickup_point``),
+        so neither the quote nor the digest reads one: a client that sends
+        the buyer's region with both still orders at its quote."""
+        checkout = locker_checkout
+        region = RegionFactory(country=checkout.country)
+        with_region = {
+            **checkout.choices,
+            "boxnow_locker_id": "4",
+            "region_id": region.alpha,
+        }
+        quote = _quote(checkout, **with_region)
+        bare = _quote(
+            checkout,
+            **{k: v for k, v in with_region.items() if k != "region_id"},
+        )
+
+        response = _post_order(
+            checkout,
+            shipping_kind="pickup_point",
+            shipping_provider_code="boxnow",
+            boxnow_locker_id="4",
+            region_id=region.alpha,
+            **_guards(quote),
+        )
+
+        assert quote["cartDigest"] == bare["cartDigest"]
+        assert response.status_code == 201, response.content
 
 
 class TestTheShippingChoice:

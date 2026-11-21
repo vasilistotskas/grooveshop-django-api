@@ -16,6 +16,7 @@ from django.db.models import Q
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    PickupPointInAnotherCountry,
     PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
@@ -113,13 +114,37 @@ class BoxNowCarrier(ShippingCarrierInterface):
         v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
         "ΑΘΗΝΑ"``). Read from the catalogue now, so a locker a later sync
         added is found (``PickupPointUnknown`` until then)."""
+        return self._address(self._locker(location), location)
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        locker = self._locker(location)
+        if locker is not None and not locker.is_active:
+            raise PickupPointUnknown(
+                f"BOX NOW locker {locker.external_id} is withdrawn."
+            )
+        address = self._address(locker, location)
+        if (locker.country_code or "").upper() != country_code.upper():
+            raise PickupPointInAnotherCountry(
+                f"BOX NOW locker {locker.external_id} is in "
+                f"{locker.country_code}, not {country_code}."
+            )
+        return address
+
+    @staticmethod
+    def _locker(location: Mapping[str, str]):
         from shipping_boxnow.models import BoxNowLocker
 
         external_id = location.get("boxnow_locker_id") or ""
-        locker = BoxNowLocker.objects.filter(external_id=external_id).first()
+        return BoxNowLocker.objects.filter(external_id=external_id).first()
+
+    @staticmethod
+    def _address(locker, location: Mapping[str, str]) -> PostalAddress:
         if locker is None or not (locker.postal_code and locker.address_line_2):
             raise PickupPointUnknown(
-                f"The address of BOX NOW locker {external_id} is not known."
+                "The address of BOX NOW locker "
+                f"{location.get('boxnow_locker_id') or ''} is not known."
             )
         return PostalAddress(
             street=locker.address_line_1,
@@ -203,13 +228,10 @@ class BoxNowCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         payload: dict[str, Any],
     ) -> dict[str, list[str]]:
-        """Locker required for a locker order, held by the catalogue and
-        in the delivery country.
-
-        A locker absent from the local ``BoxNowLocker`` catalogue is
-        refused: the order is delivered to the locker's address, which
-        only the catalogue holds (``address_of_pickup_point``, #642).
-        Order creation refuses it first, field-coded
+        """Locker required for a locker order, and deliverable: held by
+        the catalogue, active and in the delivery country
+        (``deliverable_pickup_point``). Order creation refuses it first,
+        field-coded and after one resync of the catalogue
         (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
         """
         from django.utils.translation import gettext_lazy as _
@@ -230,36 +252,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
                 ]
             }
 
-        from shipping_boxnow.models import BoxNowLocker
-
-        locker = BoxNowLocker.objects.filter(external_id=locker_id).first()
-        if locker is None:
-            return {
-                "boxnow_locker_id": [
-                    str(
-                        _(
-                            "This pickup point is not available. Choose "
-                            "another one."
-                        )
-                    )
-                ]
-            }
-
-        order_country = (payload.get("country_id") or "").upper()
-        if (
-            order_country
-            and locker.country_code
-            and locker.country_code.upper() != order_country
-        ):
-            return {
-                "boxnow_locker_id": [
-                    str(
-                        _("The selected locker is not in the delivery country.")
-                    )
-                ]
-            }
-
-        return {}
+        return self.pickup_point_errors(
+            "boxnow_locker_id",
+            {"boxnow_locker_id": str(locker_id)},
+            country_code=payload.get("country_id") or "",
+        )
 
     def assert_parcel_fits(
         self,

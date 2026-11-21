@@ -228,7 +228,7 @@ def _event_data(**overrides):
 
 def _retrieved(order_code=ORDER_CODE):
     return patch(
-        "order.views.viva_webhook._verify_transaction",
+        "order.payments.viva_settlement.verify_transaction",
         return_value=(
             PaymentStatus.COMPLETED,
             {"order_code": order_code, "amount": 50.0, "currency": "EUR"},
@@ -278,7 +278,7 @@ class TestVivaTransactionPriceCalculated:
 
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(None, {}),
             ),
             pytest.raises(RuntimeError),
@@ -348,7 +348,7 @@ class TestVivaTransactionPriceCalculated:
         assert event.outcome == VivaWebhookEvent.OUTCOME_PROCESSED
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {
@@ -381,7 +381,7 @@ class TestVivaTransactionPriceCalculated:
 
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(None, {}),
             ),
             pytest.raises(RuntimeError),

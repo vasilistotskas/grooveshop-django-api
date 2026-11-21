@@ -3573,14 +3573,14 @@ class OrderService:
 
         if update_order and payment_status_enum != order.payment_status:
             if payment_status_enum == PaymentStatus.COMPLETED:
-                cls._settle_polled_completion(order, status_data)
+                cls.settle_polled_completion(order, status_data)
             else:
                 cls._apply_polled_payment_status(order, payment_status_enum)
 
         return payment_status_enum, status_data
 
     @classmethod
-    def _settle_polled_completion(
+    def settle_polled_completion(
         cls, order: Order, status_data: dict[str, Any]
     ) -> None:
         """Settle an order the provider reports as paid, through the same

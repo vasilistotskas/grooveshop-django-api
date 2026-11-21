@@ -7,7 +7,7 @@ against Viva's Retrieve Transaction API before mutating ``payment_status``
 
 The 1797 tests run the dispatcher against Viva's DOCUMENTED payloads and
 fake only the HTTP boundary (``tests/utils/viva.py``), never our own
-verifier. They used to mock ``_verify_transaction`` into answering
+verifier. They used to mock ``verify_transaction`` into answering
 "REFUNDED" for the event's transaction, which is not what Viva returns: the
 event's ``TransactionId`` is a refund transaction of its own with
 ``statusId`` ``F`` (``R`` belongs to the ORIGINAL payment), so a real
@@ -27,11 +27,11 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.payments.viva_settlement import handle_payment_created
 from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import order_refunded
 from order.views.viva_webhook import (
-    _handle_payment_created,
     _handle_payment_failed,
     _handle_reversal_created,
     _process_event_in_tenant,
@@ -536,7 +536,7 @@ class TestVivaPaymentFailedVerification:
         order = self._order()
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(PaymentStatus.FAILED, {"order_code": "OC2"}),
             ),
             patch(
@@ -569,7 +569,7 @@ class TestVivaPaymentFailedVerification:
     def test_failed_skipped_when_transaction_still_completed(self):
         order = self._order()
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(PaymentStatus.COMPLETED, {"order_code": "OC2"}),
         ):
             _handle_payment_failed(order, {}, "viva_txn_2")
@@ -633,7 +633,7 @@ class TestVivaPaymentCreatedVerification:
             FakeVivaApi(retrieve=(404, "Not Found")),
             pytest.raises(RuntimeError),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
+            handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING
@@ -644,7 +644,7 @@ class TestVivaPaymentCreatedVerification:
             FakeVivaApi(retrieve=(503, "Service Unavailable")),
             pytest.raises(RuntimeError),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "txn")
+            handle_payment_created(order, {"StatusId": "F"}, "txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING
@@ -655,14 +655,14 @@ class TestVivaPaymentCreatedVerification:
         verification failure — so it must NOT raise."""
         order = self._order()
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.PENDING,
                 {"order_code": "OC", "amount": None},
             ),
         ):
             # Does not raise.
-            _handle_payment_created(order, {"StatusId": "F"}, "txn")
+            handle_payment_created(order, {"StatusId": "F"}, "txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING

@@ -384,7 +384,7 @@ class StripePaymentProvider(PaymentProvider):
             logger.warning("Checkout Session %s could not be read", session_id)
             raise PaymentStatusUnavailableError(session_id) from e
         if session.status == "complete":
-            if self._session_payment_may_land(session):
+            if self.session_payment_may_land(session):
                 raise PaymentInProgressError(
                     f"Checkout Session {session_id} of order {order.id} is "
                     "paid or being paid and the order is unpaid"
@@ -406,7 +406,7 @@ class StripePaymentProvider(PaymentProvider):
     )
 
     @classmethod
-    def _session_payment_may_land(cls, session: Any) -> bool:
+    def session_payment_may_land(cls, session: Any) -> bool:
         """Whether a ``complete`` session was paid or is being paid:
         ``payment_status`` "paid" or "no_payment_required", or an
         "unpaid" one whose PaymentIntent is still in flight. One whose
@@ -1451,6 +1451,63 @@ class VivaWalletPaymentProvider(PaymentProvider):
     def _checkout_link(self, code: str) -> str:
         return f"{self.checkout_url}/web/checkout?ref={code}"
 
+    def _order_transactions(
+        self, order_code: str, *, timeout: int
+    ) -> list[dict[str, Any]]:
+        """Every transaction Viva holds for the payment order *order_code*
+        (``GET /api/transactions/?ordercode=``, Basic auth, the call Viva
+        documents for the ISV API). Raises what ``requests`` raises."""
+        import requests
+
+        response = requests.get(
+            f"{self.transactions_url}/api/transactions/",
+            headers={"Authorization": self._get_basic_auth_header()},
+            params={"ordercode": order_code},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.json().get("Transactions") or []
+
+    def landed_charges(self, order: Order) -> list[tuple[str, str]]:
+        """The payments Viva took on the order's payment orders, as
+        ``(order code, transaction id)``: finished (``StatusId`` ``F``),
+        for a positive amount and with no ``ParentId``, which a refund
+        carries (its amount is negative and its parent is the payment it
+        reverses; seen on a demo refund 2026-11-08). Every code is read:
+        a payment on any of them is the order's (``viva_order_code_q``).
+
+        Raises ``PaymentStatusUnavailableError`` when a code could not be
+        read, or the store has no Merchant ID and API Key to read it with.
+        """
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva payments of order %s not read: the store has no Viva "
+                "Merchant ID and API Key",
+                order.id,
+            )
+            raise PaymentStatusUnavailableError(str(order.id))
+        landed: list[tuple[str, str]] = []
+        for code in order_viva_codes_in_order(order):
+            try:
+                rows = self._order_transactions(
+                    code, timeout=self.READ_TIMEOUT_SECONDS
+                )
+            except Exception as e:
+                logger.warning(
+                    "Viva payments of payment order %s could not be read",
+                    code,
+                )
+                raise PaymentStatusUnavailableError(code) from e
+            landed += [
+                (code, str(row["TransactionId"]))
+                for row in rows
+                if row.get("StatusId") == "F"
+                and not row.get("ParentId")
+                and row.get("TransactionId")
+                and Decimal(str(row.get("Amount") or 0)) > 0
+            ]
+        return landed
+
     def __init__(self):
         from tenant.credentials import viva_wallet_credentials
 
@@ -1864,7 +1921,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
         refund made, ``E`` one that failed; any other status is not a
         decision. ``None`` when Viva could not be read.
         """
-        import requests
 
         if not self.has_basic_credentials:
             logger.warning(
@@ -1873,18 +1929,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
             return None
-        authorization = self._get_basic_auth_header()
         found: dict[str, ProviderRefund] = {}
         try:
             for order_code in sorted(order_viva_codes(order)):
-                response = requests.get(
-                    f"{self.transactions_url}/api/transactions/",
-                    headers={"Authorization": authorization},
-                    params={"ordercode": order_code},
-                    timeout=30,
-                )
-                response.raise_for_status()
-                for row in response.json().get("Transactions") or []:
+                for row in self._order_transactions(order_code, timeout=30):
                     refund = self._refund_child(row, payment_id, amount)
                     if refund is not None:
                         found[refund.refund_id] = refund

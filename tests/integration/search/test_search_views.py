@@ -345,9 +345,7 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
             product = ProductFactory(
                 active=True,
                 translations=[
-                    ProductTranslation(
-                        language_code="en", name=marker, description=""
-                    )
+                    ProductTranslation(language_code="en", name=marker)
                 ],
             ).translations.get()
             post = BlogPostFactory(

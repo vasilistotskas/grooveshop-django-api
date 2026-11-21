@@ -34,9 +34,7 @@ def catalogue(db):
                 active=True,
                 num_reviews=0,
                 translations=[
-                    ProductTranslation(
-                        language_code="en", name=marker, description=""
-                    )
+                    ProductTranslation(language_code="en", name=marker)
                 ],
             )
             assign_values(product, key, values)

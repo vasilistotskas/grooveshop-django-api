@@ -12,6 +12,8 @@ from unittest import mock
 
 import pytest
 from django.core import mail
+from django.db import OperationalError, ProgrammingError
+from psycopg.errors import LockNotAvailable, QueryCanceled
 
 from core import celery_app
 from emails.models import EmailLog
@@ -108,6 +110,89 @@ class TestRetry:
         ]
         assert EmailLog.objects.filter(status=Status.SENT).count() == 2
         assert EmailLog.objects.count() == 2
+
+
+class TestCopiesOfOneDispatch:
+    """``dispatch_on_commit`` gives each dispatch its task id, and every copy
+    of it carries that id: the message a failed publish wrote and the
+    sweep's copy of it, a message delivered again after a worker was lost."""
+
+    def test_a_second_copy_sends_nothing(self, catalogue, retrying_task):
+        catalogue(probe())
+
+        retrying_task.apply(task_id="one-dispatch")
+        retrying_task.apply(task_id="one-dispatch")
+
+        [row] = EmailLog.objects.all()
+        assert row.status == Status.SENT
+        assert len(mail.outbox) == 1
+
+    def test_another_dispatch_of_the_task_is_another_delivery(
+        self, catalogue, retrying_task
+    ):
+        catalogue(probe())
+
+        retrying_task.apply(task_id="one-dispatch")
+        retrying_task.apply(task_id="another-dispatch")
+
+        assert EmailLog.objects.filter(status=Status.SENT).count() == 2
+        assert len(mail.outbox) == 2
+
+
+class TestTheDeliveryLock:
+    def test_a_database_out_of_reach_does_not_stop_the_send(
+        self, catalogue, retrying_task, caplog
+    ):
+        """An alert about a failing database must still go out, as it does
+        when the row cannot be written."""
+        catalogue(probe())
+        unreachable = mock.MagicMock(in_atomic_block=False)
+        unreachable.cursor.side_effect = OperationalError("unreachable")
+
+        with mock.patch("core.db.locks.connection", unreachable):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert len(mail.outbox) == 1
+        assert "sent without its lock" in caplog.text
+
+    def test_another_database_error_is_raised_and_sends_nothing(
+        self, catalogue, retrying_task
+    ):
+        """Only a database out of reach lets the send go on unlocked: any
+        other error is a bug, and two copies could send without the lock."""
+        catalogue(probe())
+        broken = mock.MagicMock(in_atomic_block=False)
+        broken.cursor.side_effect = ProgrammingError("a bug")
+
+        with (
+            mock.patch("core.db.locks.connection", broken),
+            pytest.raises(ProgrammingError),
+        ):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert mail.outbox == []
+
+    @pytest.mark.parametrize("cause", [QueryCanceled, LockNotAvailable])
+    def test_a_wait_that_runs_out_is_raised_for_the_retry(
+        self, catalogue, retrying_task, cause
+    ):
+        """``statement_timeout`` or ``lock_timeout`` ended the wait: the copy
+        ahead is still sending, so this one must not send too."""
+        catalogue(probe())
+        waited_out = OperationalError("the wait for the lock ran out")
+        waited_out.__cause__ = cause()
+        held = mock.MagicMock(in_atomic_block=False)
+        held.cursor.return_value.__enter__.return_value.execute.side_effect = (
+            waited_out
+        )
+
+        with (
+            mock.patch("core.db.locks.connection", held),
+            pytest.raises(OperationalError),
+        ):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert mail.outbox == []
 
 
 class TestIdentity:

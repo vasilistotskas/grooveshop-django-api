@@ -12,7 +12,7 @@ hook fires.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from django.core.cache import cache
@@ -62,7 +62,10 @@ def test_a_cache_flush_keeps_its_purge_and_the_schema_it_was_registered_in():
     row = DeferredDispatch.objects.get()
     assert row.task_name == invalidate_cache_surfaces_task.name
     assert row.headers["_schema_name"] == PINNED
-    assert row.options == {"countdown": invalidation.PURGE_DELAY_SECONDS}
+    assert row.options == {
+        "countdown": invalidation.PURGE_DELAY_SECONDS,
+        "task_id": ANY,
+    }
 
 
 def test_an_edge_purge_is_kept_when_the_broker_is_down():
@@ -71,7 +74,10 @@ def test_an_edge_purge_is_kept_when_the_broker_is_down():
 
     row = DeferredDispatch.objects.get()
     assert row.task_name == purge_edge_cache_task.name
-    assert row.options == {"countdown": edge.PURGE_DELAY_SECONDS}
+    assert row.options == {
+        "countdown": edge.PURGE_DELAY_SECONDS,
+        "task_id": ANY,
+    }
 
 
 def test_an_offer_refresh_is_kept_with_its_schema():

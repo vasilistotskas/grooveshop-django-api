@@ -3,6 +3,96 @@
 
 
 
+## v3.260.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): one payable instrument per order, enforced where every payment is recorded
+
+OpenPayment.lock_unchanged is the one place a newly opened payment is
+written, under the order's row lock, for a hosted session and for a
+client-confirmed intent: a request that finds another payment recorded,
+or the order paid or canceled, since it read the order records nothing.
+A session that loses to an intent answers 409 and is expired; an intent
+that loses to a session answers 409 without its client secret; reusing
+a live session closes an open intent first.
+
+The checkout.session.expired webhook no longer writes over the recorded
+session, a complete Stripe session counts as in progress only while its
+payment may land (a failed delayed payment is gone), and Viva's
+ExpirationDate in the repeated autumn hour is its later instant. The
+tests that read it run at a winter and a summer instant.
+
+Refs #643 ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+* fix(order): a live link is reused whatever is left of the window, and Viva needs all four credentials
+
+The provider's minimum session lifetime applies only when a link is
+minted: a live session is returned however little of the window is
+left, and a refused request closes no open intent. A Viva answer with
+no known StateId is unreadable, so no link is minted past it, and Viva
+is offered only to a store holding its Merchant ID and API Key as well
+as the OAuth pair, since Retrieve order uses the Basic pair.
+
+Refs #643 ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+* fix(order): gate each Viva call by the credentials it needs
+
+The four-credential rule is the offer's (is_configured_for_tenant). The
+provider builds with the OAuth pair alone, so a store holding only it
+still settles its webhooks, and _get_basic_auth_header refuses with a
+clear error when the Merchant ID or API Key is missing. A Retrieve
+order answer that is not a JSON object is unreadable (503), never a
+404 or a 500.
+
+Refs #643 ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+* fix(order): a refund never sent to Viva is a refusal, not an unknown outcome
+
+A store with only the OAuth pair raised building the Basic header inside
+the refund's try, which the catch-all recorded as outcome unknown: the
+attempt kept its amount held and reconciliation could not settle it.
+
+- VivaWalletPaymentProvider.has_basic_credentials is checked before the
+  request: without the Merchant ID and API Key the refund is refused at
+  once with a message naming them, and the refund lookup sends nothing.
+- A connection that timed out before it was made (ConnectTimeout) is a
+  refusal too; a read timeout stays unknown.
+- Stripe's refund request is built before its try, so only the call and
+  what follows it can be classed as unknown. ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+* fix(order): Retrieve order on a store without the Viva Basic pair is unreadable, not a 500
+
+Every Basic-auth Viva call now checks has_basic_credentials before sending:
+Retrieve order raises PaymentStatusUnavailableError (the documented 503),
+logged with a clear message, so an order whose store lost its Merchant ID
+or API Key gets a retryable answer and nothing is sent or minted. ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+### Features
+
+* feat(order): an order has one payment link a buyer can pay (#768) ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
+* feat(order): an order has one payment link a buyer can pay
+
+Asking for a payment link is idempotent. create_checkout_session reads
+the order's sessions at the provider first: a link that can still be
+paid is returned again with its own expiry and nothing is minted; one
+that was paid while the order is unpaid (its webhook has not landed)
+answers 409 payment_in_progress with Retry-After; only when none can be
+paid is a new one minted. A provider that cannot say answers 503
+payment_provider_unavailable: no link is minted blind.
+
+Viva is read with Retrieve order for every code of the order (StateId
+0 Pending, 1 Expired, 2 Canceled, 3 Paid), its offset-less
+ExpirationDate as Europe/Athens time; a 404 means gone only once the
+order's hold and grace have ended. Stripe is read from the Checkout
+Session's status, and a session and a PaymentIntent are never open
+together: each closes the other first. Two concurrent requests compare
+the stored reference under the row lock; the second answers with the
+first one's link and records nothing of its own.
+
+Refs #643 ([`f358e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f358e06fc36a80b4576700f7752c5c57aaa41015))
+
 ## v3.259.1 (2026-11-21)
 
 ### Bug fixes

@@ -114,6 +114,30 @@ class BoxNowCarrier(ShippingCarrierInterface):
             city=locker.address_line_2,
         )
 
+    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
+        """The BOX NOW records of the orders, cleared of the recipient:
+        each shipment's ``metadata`` at ``BoxNowShipment.PERSONAL_METADATA``
+        (the rest stays), and what BOX NOW sent back about the parcel, the
+        events' text and the raw bodies they came in (the events stay)."""
+        from core.utils.json_paths import drop_paths
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        scrubbed = 0
+        for shipment in BoxNowShipment.objects.filter(order_id__in=order_ids):
+            metadata = shipment.metadata or {}
+            if drop_paths(metadata, BoxNowShipment.PERSONAL_METADATA):
+                shipment.metadata = metadata
+                shipment.save(update_fields=["metadata"])
+                scrubbed += 1
+
+        return {
+            "carrier_pii_scrubbed": scrubbed,
+            "carrier_events_scrubbed": BoxNowParcelEvent.objects.filter(
+                shipment__order_id__in=order_ids
+            ).update(additional_information="", raw_payload={}),
+        }
+
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:

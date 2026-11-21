@@ -74,9 +74,8 @@ def sanitize_delivery_notes(value: object) -> str:
 DELIVERY_NOTES_SEPARATOR = " | "
 
 
-def courier_delivery_notes(
-    *, floor: str = "", address_line_2: str, customer_notes: str
-) -> str:
+@dataclass(frozen=True, slots=True)
+class CourierNotes:
     """The notes a voucher carries: the floor, the address line 2, then
     the customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
 
@@ -87,21 +86,38 @@ def courier_delivery_notes(
     under the limit); the customer's note is cut first to make room. Each
     part is sanitised as :func:`sanitize_delivery_notes` does.
     """
-    head = DELIVERY_NOTES_SEPARATOR.join(
-        part
-        for part in (
-            sanitize_delivery_notes(floor),
-            sanitize_delivery_notes(address_line_2),
-        )
-        if part
-    )
-    notes = sanitize_delivery_notes(customer_notes)
-    if not head or not notes:
-        return head or notes
-    room = DELIVERY_NOTES_MAX_LEN - len(head) - len(DELIVERY_NOTES_SEPARATOR)
-    if room <= 0:
-        return head
-    return f"{head}{DELIVERY_NOTES_SEPARATOR}{notes[:room].rstrip()}"
+
+    address_line_2: str
+    customer_notes: str
+    floor: str = ""
+
+    def _parts(self) -> tuple[str, str, str]:
+        """The floor, the address line and the customer's note, each as
+        :attr:`sent` carries it."""
+        floor = sanitize_delivery_notes(self.floor)
+        line = sanitize_delivery_notes(self.address_line_2)
+        notes = sanitize_delivery_notes(self.customer_notes)
+        head = DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, line) if p)
+        if head and notes:
+            room = (
+                DELIVERY_NOTES_MAX_LEN
+                - len(head)
+                - len(DELIVERY_NOTES_SEPARATOR)
+            )
+            notes = notes[:room].rstrip() if room > 0 else ""
+        return floor, line, notes
+
+    @property
+    def sent(self) -> str:
+        """The text the courier receives."""
+        return DELIVERY_NOTES_SEPARATOR.join(p for p in self._parts() if p)
+
+    @property
+    def without_address(self) -> str:
+        """:attr:`sent` less its address line: the customer's note as cut
+        for the courier, not cut again for the shorter text."""
+        floor, _line, notes = self._parts()
+        return DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, notes) if p)
 
 
 @dataclass(frozen=True, slots=True)

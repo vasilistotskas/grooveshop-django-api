@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -174,6 +176,13 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
         help_text=_(
             "Full delivery-request response and diagnostics from BoxNow"
         ),
+    )
+    #: The paths inside ``metadata`` that hold the recipient's own data:
+    #: the failed request's error and the customer's note the parcel
+    #: carried. GDPR erasure removes them (``user.services.gdpr``).
+    PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("last_error",),
+        ("create_request", "description"),
     )
 
     # Audit trail mirrors AcsShipment.history. ``metadata``/

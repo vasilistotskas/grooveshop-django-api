@@ -1858,73 +1858,69 @@ class TestSanitizeDeliveryNotes:
         assert len(sanitize_delivery_notes(long_note)) == DELIVERY_NOTES_MAX_LEN
 
 
-class TestCourierDeliveryNotes:
+class TestCourierNotes:
     """The address line 2 rides first in the notes, never cut (#641)."""
 
     def test_the_address_line_comes_first(self):
-        from shipping.services import courier_delivery_notes
+        from shipping.services import CourierNotes
 
         assert (
-            courier_delivery_notes(
+            CourierNotes(
                 address_line_2="Διαμ. 3,  2ος   όροφος",
                 customer_notes="Χτυπήστε\nδύο φορές.",
-            )
+            ).sent
             == "Διαμ. 3, 2ος όροφος | Χτυπήστε δύο φορές."
         )
 
     def test_the_floor_comes_before_the_address_line(self):
-        from shipping.services import courier_delivery_notes
+        from shipping.services import CourierNotes
 
         assert (
-            courier_delivery_notes(
+            CourierNotes(
                 floor="2ος όροφος",
                 address_line_2="Διαμ. 3",
                 customer_notes="Θυρωρός",
-            )
+            ).sent
             == "2ος όροφος | Διαμ. 3 | Θυρωρός"
         )
 
     def test_the_floor_and_the_line_are_never_cut(self):
         from shipping.services import (
             DELIVERY_NOTES_MAX_LEN,
-            courier_delivery_notes,
+            CourierNotes,
         )
 
-        sent = courier_delivery_notes(
+        sent = CourierNotes(
             floor="6ος όροφος +",
             address_line_2="β" * 255,
             customer_notes="α" * 800,
-        )
+        ).sent
 
         assert len(sent) == DELIVERY_NOTES_MAX_LEN
         assert sent.startswith("6ος όροφος + | " + "β" * 255 + " | ")
 
     def test_either_alone_is_sent_alone(self):
-        from shipping.services import courier_delivery_notes
+        from shipping.services import CourierNotes
 
         assert (
-            courier_delivery_notes(address_line_2="Διαμ. 3", customer_notes="")
+            CourierNotes(address_line_2="Διαμ. 3", customer_notes="").sent
             == "Διαμ. 3"
         )
         assert (
-            courier_delivery_notes(address_line_2="", customer_notes="Θυρωρός")
+            CourierNotes(address_line_2="", customer_notes="Θυρωρός").sent
             == "Θυρωρός"
         )
-        assert (
-            courier_delivery_notes(address_line_2="", customer_notes="") == ""
-        )
+        assert CourierNotes(address_line_2="", customer_notes="").sent == ""
 
     def test_the_customer_note_is_cut_first_to_the_limit(self):
         from shipping.services import (
             DELIVERY_NOTES_MAX_LEN,
             DELIVERY_NOTES_SEPARATOR,
-            courier_delivery_notes,
+            CourierNotes,
         )
 
         line = "β" * 255
-        sent = courier_delivery_notes(
-            address_line_2=line, customer_notes="α" * 800
-        )
+        sent = CourierNotes(address_line_2=line, customer_notes="α" * 800).sent
 
         assert len(sent) == DELIVERY_NOTES_MAX_LEN
         assert sent.startswith(line + DELIVERY_NOTES_SEPARATOR)
@@ -1934,7 +1930,7 @@ class TestCourierDeliveryNotes:
         from shipping.services import (
             DELIVERY_NOTES_MAX_LEN,
             DELIVERY_NOTES_SEPARATOR,
-            courier_delivery_notes,
+            CourierNotes,
         )
 
         line = "β" * 100
@@ -1943,9 +1939,37 @@ class TestCourierDeliveryNotes:
         )
         note = "α" * room
 
-        assert courier_delivery_notes(
-            address_line_2=line, customer_notes=note
-        ) == (line + DELIVERY_NOTES_SEPARATOR + note)
+        assert CourierNotes(address_line_2=line, customer_notes=note).sent == (
+            line + DELIVERY_NOTES_SEPARATOR + note
+        )
+
+    def test_the_recorded_copy_keeps_the_note_as_it_was_cut(self):
+        """Less the address line, the customer's note stays as cut for the
+        courier: what reached ACS, not a longer note cut again."""
+        from shipping.services import DELIVERY_NOTES_SEPARATOR, CourierNotes
+
+        notes = CourierNotes(
+            floor="2ος όροφος",
+            address_line_2="β" * 120,
+            customer_notes="α" * 480,
+        )
+        sent_note = notes.sent.split(DELIVERY_NOTES_SEPARATOR)[-1]
+
+        assert notes.without_address == (
+            "2ος όροφος" + DELIVERY_NOTES_SEPARATOR + sent_note
+        )
+        assert len(sent_note) < 480
+
+    def test_the_recorded_copy_without_an_address_line_is_what_was_sent(
+        self,
+    ):
+        from shipping.services import CourierNotes
+
+        notes = CourierNotes(
+            floor="2ος όροφος", address_line_2="", customer_notes="Θυρωρός"
+        )
+
+        assert notes.without_address == notes.sent
 
 
 class TestDeliveryNotesInPayload:
@@ -2087,8 +2111,8 @@ class TestDeliveryNotesInPayload:
 
     def test_the_audit_copy_holds_no_address_line_2(self, acs_client_mock):
         """The voucher's notes carry the address line 2; the audit copy on
-        ``shipment.metadata`` must not, as it holds no recipient address
-        (GDPR anonymisation does not clear it)."""
+        ``shipment.metadata`` does not, as it holds no recipient address.
+        (GDPR erasure removes the notes left in it.)"""
         from order.enum.status import OrderStatus, PaymentStatus
 
         order = courier_cash_order(
@@ -2108,6 +2132,32 @@ class TestDeliveryNotesInPayload:
         envelope = result.metadata["create_request"]
         assert envelope["Delivery_Notes"] == "2ος όροφος | Θυρωρός."
         assert "Διαμ. 3" not in str(result.metadata)
+
+    def test_the_audit_copy_records_the_note_as_it_was_cut(
+        self, acs_client_mock
+    ):
+        """A note cut to make room for the address line is recorded as
+        ACS received it, not cut again for the shorter copy."""
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping.services import DELIVERY_NOTES_SEPARATOR
+
+        line = "β" * 120
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor="SECOND_FLOOR",
+            address_line_2=line,
+            customer_notes="α" * 480,
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        sent = acs_client_mock.last_create_payload["Delivery_Notes"]
+        recorded = result.metadata["create_request"]["Delivery_Notes"]
+        assert recorded == sent.replace(DELIVERY_NOTES_SEPARATOR + line, "")
+        assert line not in recorded
 
     def test_a_floor_outside_the_choices_issues_the_voucher(
         self, acs_client_mock

@@ -113,11 +113,10 @@ class CourierNotes:
         return DELIVERY_NOTES_SEPARATOR.join(p for p in self._parts() if p)
 
     @property
-    def without_address(self) -> str:
-        """:attr:`sent` less its address line: the customer's note as cut
-        for the courier, not cut again for the shorter text."""
-        floor, _line, notes = self._parts()
-        return DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, notes) if p)
+    def customer_part(self) -> str:
+        """The customer's note as :attr:`sent` carries it: cut to make room
+        for the floor and the address line, not cut again on its own."""
+        return self._parts()[2]
 
 
 @dataclass(frozen=True, slots=True)

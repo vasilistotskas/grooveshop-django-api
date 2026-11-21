@@ -31,9 +31,12 @@ KEPT = {
     "billing_street_number": "kept with the issued invoice",
     "billing_city": "kept with the issued invoice",
     "billing_zipcode": "kept with the issued invoice",
-    # Operational data with no address of the buyer in it.
-    "metadata": "operational; carrier PII in it is scrubbed separately",
-    "private_metadata": "operational",
+    # JSON columns: no address of the buyer, but ``metadata`` holds their
+    # browser identity (``meta``) and a typed cancel reason, which this
+    # erasure does not clear yet. Clearing them, and every carrier copy,
+    # is its own change ("erasure reaches every copy of a subject's data").
+    "metadata": "no address; its personal keys are not erased yet",
+    "private_metadata": "no address; nothing writes it on an order",
     "uuid": "the order's identifier",
 }
 

@@ -68,8 +68,9 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 
 - the abstract models (`src/core/models.py`) and the custom fields
   (`src/core/fields/`);
-- `BaseModelViewSet` (`src/core/api/views.py`), permissions
-  (`src/core/api/permissions.py`), Knox token authentication
+- `BaseModelViewSet` (`src/core/api/views.py`), the health and settings
+  endpoints (`src/core/api/health_api.py`, `src/core/api/settings_api.py`),
+  permissions (`src/core/api/permissions.py`), Knox token authentication
   (`src/core/api/tokens.py`), the throttle bases and the shared throttles
   (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
   the OpenAPI helpers (`src/core/utils/serializers.py`,

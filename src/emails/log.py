@@ -16,7 +16,7 @@ from contextlib import ExitStack, contextmanager
 from typing import Any
 
 import requests
-from django.db import Error, transaction
+from django.db import Error, InterfaceError, OperationalError, transaction
 from django.utils import timezone
 from psycopg.errors import LockNotAvailable, QueryCanceled
 
@@ -161,9 +161,11 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
 
     A wait that runs out (``statement_timeout``, or ``lock_timeout`` where a
     session sets one) raises ``OperationalError``, which every mail task
-    retries: the copy ahead is still sending. A
-    database that cannot be reached does not stop the send, as it does not
-    for the row (``_write``): an alert about that database must go out.
+    retries: the copy ahead is still sending. A database that cannot be
+    reached (any other ``OperationalError`` or ``InterfaceError``) does not
+    stop the send, as it does not for the row (``_write``): an alert about
+    that database must go out. Any other database error is a bug and is
+    raised: sending without the lock would let two copies send.
     """
     if delivery is None:
         yield
@@ -172,7 +174,7 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
     with ExitStack() as held:
         try:
             held.enter_context(held_across_calls(key))
-        except Error as error:
+        except (OperationalError, InterfaceError) as error:
             if isinstance(error.__cause__, QueryCanceled | LockNotAvailable):
                 raise
             logger.exception(

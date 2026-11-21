@@ -34,7 +34,11 @@ from order.models import Order
 from order.payments import payment_hold
 from order.payments.payment import VivaWalletPaymentProvider
 from pay_way.factories import PayWayFactory
+from pay_way.services import PayWayService
 from user.factories.account import UserAccountFactory
+
+# The real gate, read before the autouse fixture replaces it.
+_IS_PROVIDER_CONFIGURED = PayWayService.is_provider_configured
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
@@ -882,6 +886,58 @@ class TestVivaCredentialsPerCall:
 
         assert status == PaymentStatus.COMPLETED
         assert data["order_code"] == 1111
+
+    def test_an_order_whose_store_lost_the_basic_pair_is_refused_by_the_gate(
+        self, caplog
+    ):
+        """An order placed while the store had all four values, asking for
+        its link after the Merchant ID was cleared: the offer's gate
+        answers first, with nothing sent to Viva."""
+        order, client = _order("viva_wallet")
+        _with_codes(
+            order, "1111", hold_expires=timezone.now() + timedelta(minutes=5)
+        )
+
+        with (
+            _oauth_only(api_key="k"),
+            patch(
+                "pay_way.services.PayWayService.is_provider_configured",
+                side_effect=_IS_PROVIDER_CONFIGURED,
+            ),
+            patch("requests.get") as get,
+            patch("requests.post") as post,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 400, response.data
+        assert response.data["code"] == "pay_way_unavailable"
+        get.assert_not_called()
+        post.assert_not_called()
+
+    def test_retrieve_order_without_the_basic_pair_is_unreadable(self, caplog):
+        """Past the gate (a caller that does not ask it), Retrieve order on
+        a store without the Merchant ID is a 503 and mints nothing: no
+        request with empty credentials, no traceback."""
+        order, client = _order("viva_wallet")
+        _with_codes(
+            order, "1111", hold_expires=timezone.now() + timedelta(minutes=5)
+        )
+
+        with (
+            _oauth_only(api_key="k"),
+            patch("requests.get") as get,
+            patch("requests.post") as post,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 503, response.data
+        get.assert_not_called()
+        post.assert_not_called()
+        assert not [r for r in caplog.records if r.exc_info]
+        assert any(
+            "no Viva Merchant ID and API Key" in r.getMessage()
+            for r in caplog.records
+        )
 
     @pytest.mark.parametrize("body", [[], None, "pending", 3])
     def test_a_retrieve_order_answer_that_is_no_object_mints_nothing(

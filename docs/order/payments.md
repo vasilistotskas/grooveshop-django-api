@@ -62,8 +62,11 @@ store holding all four credentials (`is_configured_for_tenant`): the OAuth
 pair mints payment orders and reads transactions, the Basic pair (Merchant
 ID, API Key) reads payment orders and refunds. Each call is gated by what it
 needs: the provider builds with the OAuth pair, so a store holding only it
-still settles its webhooks, and `_get_basic_auth_header` refuses with a clear
-error when the Basic pair is missing. A Retrieve order answer that is not a
+still settles its webhooks. Every Basic-auth call checks
+`has_basic_credentials` before sending and fails the way it fails when Viva
+cannot be read: Retrieve order is unreadable (503, an order placed before the
+store lost the pair), a refund is refused, a refund lookup has nothing to say.
+None sends empty credentials. A Retrieve order answer that is not a
 JSON object is "unreadable" too.
 `ExpirationDate` carries no offset and is Greek local time
 (`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated

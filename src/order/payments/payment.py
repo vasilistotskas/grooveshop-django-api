@@ -1378,9 +1378,22 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
     def _payment_order(self, code: str) -> dict[str, Any] | None:
         """Viva's Retrieve order for *code*, ``None`` when Viva answers
-        404 ("Specified order code does not exist or is invalid")."""
+        404 ("Specified order code does not exist or is invalid").
+
+        A store without the Merchant ID and API Key cannot read it: the
+        order is unreadable (``PaymentStatusUnavailableError``, a 503), as
+        when Viva cannot be reached, and nothing is sent. Checkout offers
+        Viva only with all four values, but an order placed earlier can
+        ask after the store lost them."""
         import requests
 
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva payment order %s not read: the store has no Viva "
+                "Merchant ID and API Key",
+                code,
+            )
+            raise PaymentStatusUnavailableError(code)
         try:
             response = requests.get(
                 f"{self.transactions_url}/api/orders/{code}",
@@ -1528,8 +1541,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
     def has_basic_credentials(self) -> bool:
         """Whether the store holds the Merchant ID and API Key, which
         Retrieve order and the transaction calls (refunds, their lookup)
-        need. A money call checks it before sending, so a store without
-        them is refused, never left with an answer that reads as lost."""
+        need. Every one of those calls checks it before sending and fails
+        the way it fails when Viva cannot be read: Retrieve order is
+        unreadable (503), a refund is refused, a refund lookup finds
+        nothing to say. None sends empty credentials or reads as a lost
+        answer."""
         return bool(self.merchant_id and self.api_key)
 
     def _get_basic_auth_header(self) -> str:

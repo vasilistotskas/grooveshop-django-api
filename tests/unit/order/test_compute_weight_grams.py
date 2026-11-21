@@ -1,4 +1,4 @@
-"""Unit tests for ``compute_total_weight_grams`` in shipping/utils.py.
+"""Unit tests for ``compute_total_weight_grams`` in src/shipping/utils.py.
 
 The helper computes the parcel weight that lands on
 ``BoxNowShipment.weight_grams`` (and from there into the BoxNow

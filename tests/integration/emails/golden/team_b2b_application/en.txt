@@ -2,7 +2,7 @@ New B2B application awaiting review
 
 Company: Acme Trading IKE
 VAT number (ΑΦΜ): 094019245
-Tax office: Α&#x27; Αθηνών
+Tax office: Α' Αθηνών
 Activity: Retail trade
 Account: customer@example.test
 VIES: Not checked

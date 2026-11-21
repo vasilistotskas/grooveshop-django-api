@@ -340,6 +340,35 @@ def address_errors(
     return errors
 
 
+def region_errors(
+    country_code: str | None, region_code: str | None
+) -> dict[str, list[StrOrPromise]]:
+    """The error of a ``region_id`` a request body sent, keyed by that
+    field: none sent, or one that exists and belongs to the country, is
+    no error. The request-side check the order and the quote share, so an
+    unknown region is a field error, never a foreign key the database
+    refuses."""
+    from region.models import Region
+
+    if not region_code:
+        return {}
+    region = Region.objects.filter(alpha=region_code).first()
+    if region is None:
+        return {
+            "region_id": [_coded("region_invalid", _("Select a valid region."))]
+        }
+    if country_code and region.country_id != country_code.upper():
+        return {
+            "region_id": [
+                _coded(
+                    "region_country_mismatch",
+                    _("Select a region that belongs to the selected country."),
+                )
+            ]
+        }
+    return {}
+
+
 ADDRESS_FIELDS = ("country", "region", "street", "street_number", "zipcode")
 
 

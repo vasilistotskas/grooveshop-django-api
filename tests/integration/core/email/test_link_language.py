@@ -29,7 +29,6 @@ from djmoney.money import Money
 from b2b.factories import BusinessProfileFactory
 from b2b.tasks import send_business_profile_status_email
 from cart.factories.cart import CartFactory
-from core.tasks import send_inactive_user_notifications
 from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
@@ -70,7 +69,7 @@ from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import UserSubscription
-from user.tasks import export_user_data_task
+from user.tasks import export_user_data_task, send_inactive_user_notifications
 from user.utils.subscription import send_subscription_confirmation
 
 BASE = "https://shop.example"

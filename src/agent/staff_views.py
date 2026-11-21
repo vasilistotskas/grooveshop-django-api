@@ -55,9 +55,9 @@ from agent.staff_serializers import (
     StaffReviewSerializer,
     StaffSalesReportSerializer,
 )
+from agent.throttles import StaffAgentThrottle
 from contact.models import Contact
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import StaffAgentThrottle
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from order.reporting import profit, turnover

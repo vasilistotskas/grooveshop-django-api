@@ -68,18 +68,21 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 
 - the abstract models (`src/core/models.py`) and the custom fields
   (`src/core/fields/`);
-- `BaseModelViewSet` (`src/core/api/views.py`), permissions
-  (`src/core/api/permissions.py`), Knox token authentication
-  (`src/core/api/tokens.py`), throttles (`src/core/api/throttling.py`) and
+- `BaseModelViewSet` (`src/core/api/views.py`), the health and settings
+  endpoints (`src/core/api/health_api.py`, `src/core/api/settings_api.py`),
+  permissions (`src/core/api/permissions.py`), Knox token authentication
+  (`src/core/api/tokens.py`), the throttle bases and the shared throttles
+  (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
   the OpenAPI helpers (`src/core/utils/serializers.py`,
   `src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
 - the Celery app (`src/core/celery.py`) and the transport its publishing
   connections use while RabbitMQ blocks publishers (`src/core/broker.py`,
-  `docs/deferred-dispatch.md`), `MonitoredTask` and the system
-  tasks (`src/core/tasks.py`), the retry sets (`src/core/retry.py`) and
-  the retention helper (`src/core/retention.py`);
+  `docs/deferred-dispatch.md`), `MonitoredTask`
+  (`src/core/monitored_task.py`), the system tasks (`src/core/tasks.py`),
+  the retry sets (`src/core/retry.py`) and the retention helper
+  (`src/core/retention.py`);
 - the cache backend (`src/core/caches.py`) and the cache surface registry
   (`src/core/cache/`);
 - middleware (`src/core/middleware/`), the email templates
@@ -137,7 +140,7 @@ not declare. Read `docs/scheduler.md`.
 
 `Country` and `Region`: reference rows shared by every store, seeded from
 `src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
-of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+of their own; `docs/order/creation-address.md` (section 3.3) has the delivery-address
 rules that read them.
 
 ### `devtools/`
@@ -226,7 +229,8 @@ shipping price and the pay-way fee),
 
 `Cart`, `CartItem` and `CartAttribution` (`src/cart/models/`),
 `src/cart/services.py`, the guest and customer cart API under
-`src/cart/views/`, and the agent's cart token (`src/cart/agent_token.py`).
+`src/cart/views/`, the agent's cart token (`src/cart/agent_token.py`) and
+the guest-cart cleanup tasks (`src/cart/tasks.py`).
 Read `docs/cart-agent-token.md` for the token,
 `docs/order/creation.md` (section 3.0) for `POST /cart/quote`, priced by
 `order.checkout.quote`, and `docs/order/creation-records.md` (section
@@ -381,7 +385,7 @@ OAuth surface has no doc in this repository; the cross-service views are
 
 `meili/` is the Meilisearch layer: `IndexMixin` with a `MeiliMeta` inner
 class (`src/meili/models.py`), the client (`src/meili/_client.py`), the
-index and delete tasks (`src/meili/tasks.py`) and the management
+index and delete tasks and the daily index sync (`src/meili/tasks.py`) and the management
 commands. `search/` is the product-facing side: the product and blog
 search views (`src/search/views/`: `blog`, `product`, `click`, `report`,
 `trending`; query-string parsing in `src/search/params.py`, what a request

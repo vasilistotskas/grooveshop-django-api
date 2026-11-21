@@ -20,7 +20,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.throttling import B2BProfileSubmitThrottle
+from b2b.throttles import B2BProfileSubmitThrottle
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db

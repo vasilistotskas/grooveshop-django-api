@@ -37,7 +37,7 @@ writer: a delivery repeated by the provider records nothing the second time
 from `AcsService._mark_cod_order_paid_if_pending` and
 `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in
 the same atomic step as the payment status, [§4.4](payments.md));
-`OrderService.refund_order`, `handle_stripe_refund_made`,
+`RefundService.refund_order`, `handle_stripe_refund_made`,
 `_handle_reversal_created` (REFUND, through `record_refund`);
 `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The
 Viva handlers (`_handle_account_transaction_event`, and

@@ -89,7 +89,8 @@ class TestSuspendedStores:
     ``include_suspended`` job ever reached a suspended store (#753).
     """
 
-    #: The jobs a suspended store still gets: the retention sweeps, the work
+    #: The jobs a suspended store still gets: the retention sweeps, the
+    #: erasure of carrier data that reached an erased order late, the work
     #: a customer's money or parcel waits on, and the agent outbox sweep,
     #: whose attempts hold a suspended store's events.
     INCLUDE_SUSPENDED = {
@@ -114,6 +115,7 @@ class TestSuspendedStores:
         "shipping_acs.tasks.purge_expired_acs_tracking_events",
         "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
         "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        "user.tasks.erase_late_carrier_data",
         "user.tasks.purge_unconfirmed_guest_subscriptions",
     }
 
@@ -425,7 +427,7 @@ class TestBeatScheduleTenantCoverage:
         ]
         assert not offenders, (
             "Beat entries dispatch tenant-scoped tasks directly — add a "
-            "fanout_* wrapper in tenant/tasks.py (or allowlist a genuinely "
+            "fanout_* wrapper in src/tenant/tasks.py (or allowlist a genuinely "
             f"public-schema task above): {offenders}"
         )
 

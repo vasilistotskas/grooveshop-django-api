@@ -66,7 +66,6 @@ _DEFERRED_TRANSLATED_FIELDS = frozenset(
         "product.ProductCategoryTranslation.name",
         "product.ProductImageTranslation.alt_text",
         "product.ProductReviewTranslation.comment",
-        "product.ProductTranslation.description",
         "product.ProductTranslation.feed_title",
         "product.ProductVariantGroupTranslation.name",
         "region.RegionTranslation.name",

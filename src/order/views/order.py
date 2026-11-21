@@ -656,7 +656,7 @@ class OrderViewSet(BaseModelViewSet):
         order_id: str = self.kwargs[lookup_url_kwarg]
 
         try:
-            # No UUID branch: every route in order/urls.py binds
+            # No UUID branch: every route in src/order/urls.py binds
             # ``<int:pk>``, so a UUID string can never reach this lookup.
             # Guest access by UUID is its own route (retrieve_by_uuid).
             obj = OrderService.get_order_by_id(int(order_id))
@@ -1341,7 +1341,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 2: route on what the pay way settles and what the
         # provider can do — never on a provider name. This carried
         # its own ``{"viva_wallet"}`` literal, a second copy of the
-        # one in order/services.py; both are now the provider's own
+        # one in src/order/services.py; both are now the provider's own
         # ``supports_payment_intent`` declaration.
 
         # An intent-less submission on a non-redirect online pay

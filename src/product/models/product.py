@@ -705,7 +705,7 @@ class ProductTranslation(
         null=True,
     )
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
-    description = RichTextField(_("Description"), blank=True, null=True)
+    description = RichTextField(_("Description"), blank=True, default="")
     feed_title = models.CharField(
         _("Feed title"),
         max_length=150,

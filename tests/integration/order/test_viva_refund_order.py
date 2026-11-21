@@ -23,6 +23,7 @@ from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import order_refunded
 from pay_way.factories import PayWayFactory
@@ -105,7 +106,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         order = _paid_viva_order()
 
         with FakeVivaApi(cancel=(200, CANCEL_REFUSED)):
-            result = OrderService.refund_order(order, reason="changed mind")
+            result = RefundService.refund_order(order, reason="changed mind")
 
         assert result.complete is False
         assert result.paid_something is False
@@ -245,7 +246,7 @@ class TestARefundVivaAcceptsIsRecorded:
         fake = FakeVivaApi()
 
         with fake:
-            result = OrderService.refund_order(
+            result = RefundService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 
@@ -275,7 +276,7 @@ class TestACaptureTheLedgerNeverRecorded:
         fake = FakeVivaApi(captured=21.10)
 
         with fake:
-            result = OrderService.refund_order(
+            result = RefundService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 
@@ -299,7 +300,7 @@ class TestACaptureTheLedgerNeverRecorded:
         fake = FakeVivaApi(retrieve=(404, ["Transaction Id does not exist."]))
 
         with fake:
-            result = OrderService.refund_order(
+            result = RefundService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 

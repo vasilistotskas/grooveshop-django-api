@@ -1,10 +1,10 @@
 """A product without a description, as a search hit.
 
-``ProductTranslation.description`` still allows NULL while the search hit
-declares a string, so the storefront would answer 422 to this hit. The
-column becomes NOT NULL with ``""`` as the empty value (release 1 stops
-writing NULL and backfills, release 2 adds the constraint); until then this
-test meets the drift, and its marker comes off with the fix.
+The search hit declares ``description`` a string, and a translation saved
+with none used to store NULL, served as ``null``, which the storefront
+answers 422 to (#684). Its empty value is now ``""``, written by every
+writer the code has; the column's NOT NULL constraint follows in the next
+release.
 """
 
 from __future__ import annotations
@@ -22,13 +22,6 @@ from tests.utils.meilisearch import LiveSearchIndex, unique_marker
 
 @requires_meilisearch
 @pytest.mark.django_db
-@pytest.mark.known_schema_drift(
-    "GET",
-    "/api/v1/search/product",
-    200,
-    at="$.results[*].description",
-    issue=684,
-)
 def test_a_product_without_a_description_is_found():
     marker = unique_marker()
 
@@ -46,4 +39,4 @@ def test_a_product_without_a_description_is_found():
     assert response.status_code == status.HTTP_200_OK
     [hit] = response.json()["results"]
     assert hit["master"] == product.id
-    assert hit["description"] is None
+    assert hit["description"] == ""

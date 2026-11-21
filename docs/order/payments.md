@@ -327,7 +327,7 @@ order by the dispute's `payment_intent` and are guarded by the
   became a dispute): clears `metadata["disputed"]` and leaves a NOTE. No row.
 - **A refund is refused while a dispute is open.** Stripe: "you can't issue a
   refund on a disputed charge until your customer's card issuer decides in your
-  favor" (docs.stripe.com/disputes/withdrawing). `OrderService.refund_order`
+  favor" (docs.stripe.com/disputes/withdrawing). `RefundService.refund_order`
   raises `PaymentError` when `PaymentLedger.dispute_open` holds (flagged, no
   CHARGEBACK row for that dispute id yet). An inquiry (`dispute_status`
   `warning_*`) is not refused: Stripe lets the merchant refund one to resolve

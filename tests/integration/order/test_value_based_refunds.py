@@ -24,6 +24,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -136,7 +137,7 @@ class TestTheProviderIsRefundedFirst:
         order, _cards = _order()
 
         with FakeStripeRefunds() as stripe_api:
-            result = OrderService.refund_order(order, amount=_eur("40.00"))
+            result = RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is True
         assert stripe_api.amounts == [4000]
@@ -148,7 +149,7 @@ class TestTheProviderIsRefundedFirst:
         order, _cards = _order()
 
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order, amount=_eur("10.00"))
+            RefundService.refund_order(order, amount=_eur("10.00"))
 
         assert stripe_api.amounts == [1000]
         assert _credited(order) == 0
@@ -159,7 +160,7 @@ class TestTheProviderIsRefundedFirst:
         order, [card] = _order()
 
         with FakeStripeRefunds() as stripe_api:
-            result = OrderService.refund_order(order, amount=_eur("100.00"))
+            result = RefundService.refund_order(order, amount=_eur("100.00"))
 
         assert result.complete is True
         assert result.refunded == _eur("40.00")
@@ -177,7 +178,7 @@ class TestTheProviderIsRefundedFirst:
         order, _cards = _order()
 
         with FakeStripeRefunds() as stripe_api:
-            result = OrderService.refund_order(order)
+            result = RefundService.refund_order(order)
 
         assert result.refunded == _eur("40.00")
         assert result.stored == _eur("60.00")
@@ -191,9 +192,9 @@ class TestInParts:
         order, [card] = _order()
 
         with FakeStripeRefunds() as stripe_api:
-            first = OrderService.refund_order(order, amount=_eur("70.00"))
+            first = RefundService.refund_order(order, amount=_eur("70.00"))
             assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
-            second = OrderService.refund_order(order, amount=_eur("30.00"))
+            second = RefundService.refund_order(order, amount=_eur("30.00"))
 
         assert first.refunded == _eur("40.00")
         assert first.stored == _eur("30.00")
@@ -215,7 +216,7 @@ class TestInParts:
         order, _cards = _order()
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("70.00"))
+            RefundService.refund_order(order, amount=_eur("70.00"))
 
         [credit] = GiftCardTransaction.objects.filter(
             order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
@@ -239,7 +240,7 @@ class TestInParts:
         order.refresh_from_db()
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("60.00"))
+            RefundService.refund_order(order, amount=_eur("60.00"))
 
         # 20 card, then 40 of the 80 on cards, split by what is left on
         # each (30 : 50), to the cent: 15.00 and 25.00.
@@ -252,7 +253,7 @@ class TestWhatCannotBeRefunded:
         order, _cards = _order()
 
         with FakeStripeRefunds() as stripe_api, pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("100.01"))
+            RefundService.refund_order(order, amount=_eur("100.01"))
 
         assert stripe_api.calls == []
         assert _credited(order) == 0
@@ -261,7 +262,7 @@ class TestWhatCannotBeRefunded:
         order, _cards = _order()
 
         with FakeStripeRefunds(status="failed"):
-            result = OrderService.refund_order(order, amount=_eur("100.00"))
+            result = RefundService.refund_order(order, amount=_eur("100.00"))
 
         assert result.complete is False
         assert result.stored == _eur("0.00")
@@ -281,7 +282,7 @@ class TestWhatCannotBeRefunded:
         order.save(update_fields=["metadata"])
 
         with FakeStripeRefunds(), pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("100.00"))
+            RefundService.refund_order(order, amount=_eur("100.00"))
 
         assert _credited(order) == 0
 
@@ -290,7 +291,7 @@ class TestAnOrderPaidEntirelyWithGiftCards:
     def test_it_can_be_refunded_onto_the_card(self):
         order, [card] = _order(card="0.00", gift="25.00")
 
-        result = OrderService.refund_order(order, amount=_eur("25.00"))
+        result = RefundService.refund_order(order, amount=_eur("25.00"))
 
         assert result.complete is True
         assert result.refunded == _eur("0.00")
@@ -302,7 +303,7 @@ class TestAnOrderPaidEntirelyWithGiftCards:
         order, _cards = _order(card="0.00", gift="25.00")
 
         assert PaymentLedger.refund_open(order) is True
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
         assert PaymentLedger.refund_open(order) is False
 
 
@@ -319,7 +320,7 @@ class TestPointsGoBackInProportion:
         order, _cards = self._paid()
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("70.00"))
+            RefundService.refund_order(order, amount=_eur("70.00"))
 
         # 40 to the card, 30 of the 60 stored: 20 on the gift card and 10
         # of the 20 of points, which is 1000 of the 2000.
@@ -331,8 +332,8 @@ class TestPointsGoBackInProportion:
         order, _cards = self._paid()
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("70.00"))
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("70.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
 
         assert _credited(order) == Decimal("40.00")
         assert _restored(order) == 2000
@@ -344,11 +345,11 @@ class TestPointsGoBackInProportion:
         )
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("11.00"))
-            OrderService.refund_order(order, amount=_eur("11.00"))
+            RefundService.refund_order(order, amount=_eur("11.00"))
+            RefundService.refund_order(order, amount=_eur("11.00"))
             # The last refund asks for what is left (the dialog's default),
             # whatever rounding the parts before it left behind.
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         assert _credited(order) == Decimal("10.00")
         assert _restored(order) == 999
@@ -361,7 +362,7 @@ class TestPointsGoBackInProportion:
         assert LoyaltyService.get_user_balance(user) == 0
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("100.00"))
+            RefundService.refund_order(order, amount=_eur("100.00"))
 
         assert LoyaltyService.get_user_balance(user) == 2000
 
@@ -369,13 +370,13 @@ class TestPointsGoBackInProportion:
 class TestARepeatIsNotASecondRefund:
     def test_a_stored_share_is_credited_once_when_asked_twice(self):
         order, _cards = _order(card="0.00", gift="25.00")
-        OrderService.refund_order(order, amount=_eur("10.00"))
+        RefundService.refund_order(order, amount=_eur("10.00"))
 
-        OrderService.refund_order(order, amount=_eur("10.00"))
+        RefundService.refund_order(order, amount=_eur("10.00"))
 
         assert _credited(order) == Decimal("20.00")
         with pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("10.00"))
+            RefundService.refund_order(order, amount=_eur("10.00"))
         assert _credited(order) == Decimal("20.00")
 
     def test_a_crash_before_the_credit_is_resumed_not_repeated(self):
@@ -387,7 +388,7 @@ class TestARepeatIsNotASecondRefund:
             amount=_eur("25.00"),
         )
 
-        result = OrderService.refund_order(order, amount=_eur("25.00"))
+        result = RefundService.refund_order(order, amount=_eur("25.00"))
 
         assert result.stored == _eur("25.00")
         assert order.refund_attempts.count() == 1
@@ -413,13 +414,13 @@ class TestClosingAsRefunded:
 
         order, _cards = _order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         with pytest.raises(RefundOutstandingError):
             OrderService.update_order_status(order, OrderStatus.REFUNDED)
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("60.00"))
+            RefundService.refund_order(order, amount=_eur("60.00"))
         OrderService.update_order_status(order, OrderStatus.REFUNDED)
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
@@ -451,9 +452,9 @@ class TestTheLastReturnCompletesTheOrder:
         self._earned(order)
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("70.00"))
+            RefundService.refund_order(order, amount=_eur("70.00"))
             assert self._reversed(order) == 0
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
 
         assert self._reversed(order) == 50
 
@@ -464,7 +465,7 @@ class TestTheLastReturnCompletesTheOrder:
         self._earned(order)
 
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert self._reversed(order) == 0
         assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
@@ -477,7 +478,7 @@ class TestTheLastReturnCompletesTheOrder:
         )
 
         with FakeStripeRefunds():
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, amount=_eur("70.00"), reason="Two items back"
             )
 
@@ -497,7 +498,7 @@ class TestTheLastReturnCompletesTheOrder:
 
         order, _cards = _order(card="0.00", gift="25.00")
 
-        OrderService.refund_order(order, amount=_eur("25.00"))
+        RefundService.refund_order(order, amount=_eur("25.00"))
 
         assert not [
             m
@@ -518,7 +519,7 @@ class TestAStalledStoredShareCanBeFinished:
 
         order, [card] = _order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         attempt = RefundAttempt.objects.create(
             order=order,
             charge=None,
@@ -536,7 +537,7 @@ class TestAStalledStoredShareCanBeFinished:
 
         assert PaymentLedger.refund_open(order) is True
 
-        OrderService.refund_order(order, amount=_eur("60.00"))
+        RefundService.refund_order(order, amount=_eur("60.00"))
 
         attempt.refresh_from_db()
         assert attempt.status == RefundAttemptStatus.SETTLED
@@ -571,7 +572,7 @@ class TestAClaimedStoredShareIsHeldBack:
 
         assert PaymentLedger.refundable_value(order) == Decimal("5.00")
         with pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("6.00"))
+            RefundService.refund_order(order, amount=_eur("6.00"))
         assert _credited(order) == 0
 
 
@@ -592,7 +593,7 @@ class TestWhatIsReportedIsWhatWentBack:
             order, Decimal("20.00"), refund_attempt=_attempt(order)
         )
 
-        result = OrderService.refund_order(order, amount=_eur("25.00"))
+        result = RefundService.refund_order(order, amount=_eur("25.00"))
 
         assert result.stored == _eur("5.00")
         assert result.value_returned == _eur("5.00")
@@ -603,7 +604,7 @@ class TestWhatIsReportedIsWhatWentBack:
             card="0.00", gift="0.00", points_value="20.00", points=2000
         )
 
-        result = OrderService.refund_order(order, amount=_eur("10.00"))
+        result = RefundService.refund_order(order, amount=_eur("10.00"))
 
         assert _restored(order) == 1000
         assert result.stored == _eur("10.00")
@@ -633,7 +634,7 @@ class TestARefundAfterAChargeback:
         )
 
         with FakeStripeRefunds():
-            result = OrderService.refund_order(order, amount=_eur("20.00"))
+            result = RefundService.refund_order(order, amount=_eur("20.00"))
 
         assert result.complete is True
         assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED

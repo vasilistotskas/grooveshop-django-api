@@ -239,8 +239,10 @@ Read `docs/cart-agent-token.md` for the token,
 ### `promotion/`, `giftcard/`, `b2b/`
 
 - `promotion/`: `Promotion`, `PromotionCode`, `PromotionRedemption` and
-  `CartPromotionCode`; the rules are evaluated in
-  `src/promotion/services.py`.
+  `CartPromotionCode`; the rules are evaluated in the `src/promotion/engine/`
+  package (`PromotionEngine` in `engine/evaluation.py`, one module per
+  seam), and the services that call it are `src/promotion/coupons.py`,
+  `src/promotion/coupon_picker.py` and `src/promotion/product_offers.py`.
 - `giftcard/`: `GiftCard`, `GiftCardPurchase`, `GiftCardTransaction` (the
   ledger) and `GiftCardPause`; the rules are in
   `src/giftcard/services.py`.

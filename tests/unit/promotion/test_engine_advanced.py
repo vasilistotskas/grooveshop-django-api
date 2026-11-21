@@ -8,6 +8,7 @@ import pytest
 from djmoney.money import Money
 
 from product.factories import ProductFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import (
     BenefitType,
     CouponRejectionReason,
@@ -16,7 +17,6 @@ from promotion.enum import (
 )
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
-from promotion.services import PromotionEngine
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db

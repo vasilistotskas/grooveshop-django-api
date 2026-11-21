@@ -14,9 +14,9 @@ import pytest
 
 from b2b.factories import CustomerGroupFactory
 from b2b.services import B2BPricingService
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import PromotionTrigger
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 
 pytestmark = pytest.mark.django_db
 
@@ -60,8 +60,8 @@ class TestB2BPromotionGate:
         _bind(cart)
 
         def _get(key, default=None):
-            # ``b2b.services.Setting`` and ``promotion.services.Setting``
-            # are the SAME class — this inner patch replaces the
+            # ``b2b.services`` and ``promotion.engine.evaluation`` read
+            # the SAME ``Setting`` class — this inner patch replaces the
             # enable_promotions fixture's stub, so it must keep
             # PROMOTIONS_ENABLED answering True as well.
             return {

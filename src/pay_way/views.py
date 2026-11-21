@@ -3,14 +3,14 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from core.utils.views import cache_methods
 from pay_way.filters import PayWayFilter
 from pay_way.models import PayWay

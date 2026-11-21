@@ -15,10 +15,10 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from core.api.action_config import SerializersConfig
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
-from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE

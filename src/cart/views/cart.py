@@ -41,16 +41,16 @@ from cart.throttles import (
     CartQuoteThrottle,
     CouponApplyThrottle,
 )
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+)
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-)
 from giftcard.throttles import gift_card_code_throttles
 from order.checkout.quote import (
     CheckoutQuote,

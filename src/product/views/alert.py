@@ -7,15 +7,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.serializers import DetailSerializer, ErrorResponseSerializer
-from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
-from core.api.views import BaseModelViewSet
-from core.utils.i18n import stated_request_language
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from core.api.serializers import DetailSerializer, ErrorResponseSerializer
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
+from core.api.views import BaseModelViewSet
+from core.utils.i18n import stated_request_language
 from emails import optout
 from emails.registry import registry
 from product.alerts import (

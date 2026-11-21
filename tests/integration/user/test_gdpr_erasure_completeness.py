@@ -672,3 +672,24 @@ def test_a_namesake_keeps_their_acs_calls(subject):
 
     assert AcsApiCall.objects.filter(pk__in=[theirs.pk, longer.pk]).count() == 2
     assert not AcsApiCall.objects.filter(pk=mine.pk).exists()
+
+
+def test_an_order_whose_voucher_was_never_minted_is_erased(subject):
+    """A shipment with no voucher yet (``voucher_no`` is ``None``) is part
+    of the erasure like any other, and stops nothing."""
+    from order.factories import OrderFactory
+    from shipping_acs.factories import AcsShipmentFactory
+
+    order = OrderFactory(user=subject, first_name="Ζηνοβία")
+    shipment = AcsShipmentFactory(
+        order=order,
+        voucher_no=None,
+        metadata={"last_error": {"request_params": {"Recipient_Phone": "1"}}},
+    )
+
+    anonymise_and_delete_user(subject)
+
+    order.refresh_from_db()
+    shipment.refresh_from_db()
+    assert order.first_name == "[deleted]"
+    assert "last_error" not in shipment.metadata

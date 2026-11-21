@@ -149,17 +149,19 @@ class AcsCarrier(ShippingCarrierInterface):
         for shipment in AcsShipment.objects.filter(order_id__in=order_ids):
             metadata = shipment.metadata or {}
             children = metadata.get("multipart_vouchers")
+            # A shipment not yet minted has no voucher (``None``).
             vouchers.update(
-                [
+                str(voucher)
+                for voucher in (
                     shipment.voucher_no,
                     *(children if isinstance(children, list) else []),
-                ]
+                )
+                if voucher
             )
             if drop_paths(metadata, AcsShipment.PERSONAL_METADATA):
                 shipment.metadata = metadata
                 shipment.save(update_fields=["metadata"])
                 scrubbed += 1
-        vouchers.discard("")
 
         # A voucher number is the order's own, exact and unique; a name or
         # a phone is not (two customers can share one), so the content is

@@ -26,7 +26,7 @@ from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.views.viva_webhook import (
     _handle_account_transaction_event,
     _handle_webhook_event,
@@ -459,7 +459,7 @@ class TestRefundRefusedWhileDisputed:
         order.refresh_from_db()
 
         with pytest.raises(PaymentError, match="dispute is open"):
-            OrderService.refund_order(order, reason="goodwill")
+            RefundService.refund_order(order, reason="goodwill")
 
         assert not order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND

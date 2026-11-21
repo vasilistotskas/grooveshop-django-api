@@ -67,7 +67,7 @@ class TestAcsCodReconcile:
         assert row.amount == _eur("24.48")
         assert shipment.order.payment_method == "acs_cod"
         # Cash is refundable: the merchant pays it back and records how
-        # (``OrderService.refund_order``, ``repayment_reference``).
+        # (``RefundService.refund_order``, ``repayment_reference``).
         assert PaymentLedger.refundable(shipment.order) == Decimal("24.48")
 
     def test_a_second_reconcile_of_the_same_parcel_records_nothing_more(self):

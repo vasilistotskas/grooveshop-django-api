@@ -579,7 +579,7 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
 
     Triggered from ``handle_order_refunded``, which queues one task per
     refund the ledger takes, so every refund path converges here — the
-    in-app refund (``OrderService.refund_order``), the staff Refund
+    in-app refund (``RefundService.refund_order``), the staff Refund
     action, and dashboard refunds arriving as ``charge.refunded`` / Viva
     reversal webhooks. An order refunded in parts therefore sends one
     email per part, each claimed on its own row (``_claim_refund_email``):

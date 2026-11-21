@@ -199,7 +199,7 @@ def handle_order_status_refunded_loyalty(
 ) -> None:
     """Reverse earned points when the order STATUS becomes REFUNDED.
 
-    The refund paths (``OrderService.refund_order``, the Stripe and Viva
+    The refund paths (``RefundService.refund_order``, the Stripe and Viva
     webhooks) move ``payment_status`` and send ``order_refunded``; the
     order status stays put, and ``RETURNED`` -> ``REFUNDED`` is a
     separate, manual step that sends nothing. Without this receiver

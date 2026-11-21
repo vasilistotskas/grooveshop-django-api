@@ -131,6 +131,7 @@ shipping_acs.tasks.purge_expired_acs_api_calls
 shipping_acs.tasks.purge_expired_acs_tracking_events
 shipping_acs.tasks.reconcile_acs_cod_payouts
 shipping_acs.tasks.sync_acs_stations
+shipping_boxnow.tasks.apply_boxnow_locker_catalogue
 shipping_boxnow.tasks.boxnow_send_arrival_notification
 shipping_boxnow.tasks.create_boxnow_shipment_for_order
 shipping_boxnow.tasks.poll_boxnow_tracking_batch
@@ -138,6 +139,7 @@ shipping_boxnow.tasks.poll_boxnow_tracking_one
 shipping_boxnow.tasks.process_boxnow_webhook_event
 shipping_boxnow.tasks.purge_expired_boxnow_parcel_events
 shipping_boxnow.tasks.settle_uncertain_boxnow_creations
+shipping_boxnow.tasks.sync_boxnow_locker_catalogue
 shipping_boxnow.tasks.sync_boxnow_lockers
 tenant.tasks.fanout_alert_unremitted_cod_payouts
 tenant.tasks.fanout_allocate_credit_sources

@@ -300,8 +300,12 @@ class BoxNowCarrier(ShippingCarrierInterface):
         (``shipping_boxnow.catalogue``); a bigger compartment is not
         assumed to take a smaller parcel."""
         locker = self._locker(location)
+        if locker is None:
+            # A point the catalogue does not hold is refused as unknown
+            # by the point's own resolution (``PickupPointUnknown``).
+            return
         size = resolve_compartment_size(items)
-        if locker is None or int(size) not in locker.compartment_sizes:
+        if int(size) not in locker.compartment_sizes:
             raise PickupPointTooSmall(
                 f"BOX NOW locker {location.get('boxnow_locker_id') or ''} "
                 f"has no size {int(size)} compartment."

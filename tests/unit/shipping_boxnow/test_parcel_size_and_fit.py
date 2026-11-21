@@ -78,8 +78,12 @@ def test_a_locker_that_lists_the_size_fits_and_one_that_does_not_is_refused():
     carrier.assert_pickup_point_fits(
         {"boxnow_locker_id": "fit"}, items=medium_cart
     )
-    for locker_id in ("skip", "blank", "missing"):
+    for locker_id in ("skip", "blank"):
         with pytest.raises(PickupPointTooSmall):
             carrier.assert_pickup_point_fits(
                 {"boxnow_locker_id": locker_id}, items=medium_cart
             )
+    # A locker the catalogue does not hold is the point resolution's refusal.
+    carrier.assert_pickup_point_fits(
+        {"boxnow_locker_id": "missing"}, items=medium_cart
+    )

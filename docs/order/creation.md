@@ -483,6 +483,38 @@ address it cannot place (prod order #316: street "1", street number
   in the Country admin. A blank pattern means only "required".
 - **Street** must contain a letter; **street number** must not itself
   match the country's postcode pattern (4+ characters).
+- **One street line** (#641). Order creation takes `street` without
+  `streetNumber` (or with it blank) as one line whose number follows the
+  street, the Greek and Cypriot form, and `split_street_line` splits it,
+  so the order stores both columns the ACS voucher, invoices and myDATA
+  read. A wrong number sends the parcel elsewhere, which is worse than
+  asking for it again, so the rules are explicit:
+  1. The line is normalised: NFC, every Unicode space a plain space,
+     typographic dashes `-`, a range written with spaces one number
+     ("12 - 14" -> "12-14").
+  2. It ends in the house number: ASCII digits, at most one letter, an
+     optional second number after `-` or `/`. A number written first
+     ("12 Main St") is never read.
+  3. A comma is allowed only directly before the number ("Ερμού, 12");
+     elsewhere ("Ερμού 12, όροφος 3", "Εγνατίας 12, 546 22") the line is
+     refused.
+  4. A floor or flat word (`UNIT_MARKERS`: όροφος, οροφ., ορ., ισόγειο,
+     διαμέρισμα, διαμ., ημιόροφος, floor, fl., apt, apartment, unit, suite,
+     flat; compared without accents or case) refuses the line: the number
+     after it is not the house's ("Ερμού, όροφος 3").
+  5. A word that only says "number" (`NUMBER_MARKERS`: αρ., αριθμός, Νο,
+     No, nr) is dropped from the street ("Ερμού αρ. 12" -> "Ερμού", "12").
+  6. The street holds no number but the day of a date that names it: 1 to
+     31, with or without a Greek ordinal ending, before a month in the
+     genitive ("28 Οκτωβρίου 15", "28η Οκτωβρίου 15", "Οδός 1ης Μαΐου 3").
+  7. The street ends in a letter, or an abbreviation's dot after one
+     ("Main St. 12").
+
+  A line it cannot split is a 400 with `fields.street` code
+  `street_number_missing`, and the errors of a split number
+  (`street_number_is_postcode`) are reported on `street`: the caller sent
+  no number field. A sent `streetNumber` is used as sent. The agent
+  gateway sends the UCP and ACP destination's single street line this way.
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

@@ -10,6 +10,8 @@ an unrelated edit of an old order is not blocked.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from django.core.exceptions import ValidationError
 
@@ -92,14 +94,82 @@ class TestCheckoutSerializer:
         assert not serializer.is_valid()
         assert "country_id" in serializer.errors
 
-    def test_street_number_is_required(self, greece):
+    def test_a_street_without_a_number_is_refused_on_the_street(self, greece):
         payload = _create_payload()
         del payload["street_number"]
 
         serializer = OrderCreateFromCartSerializer(data=payload)
 
         assert not serializer.is_valid()
-        assert "street_number" in serializer.errors
+        assert set(serializer.errors) == {"street"}
+        assert serializer.errors["street"][0].code == "street_number_missing"
+
+    @pytest.mark.parametrize("number", [None, "", "  "])
+    def test_one_street_line_is_split(self, greece, number):
+        payload = _create_payload(street="Εγνατίας 12Α")
+        payload.pop("street_number")
+        if number is not None:
+            payload["street_number"] = number
+
+        serializer = OrderCreateFromCartSerializer(data=payload)
+
+        assert serializer.is_valid(), serializer.errors
+        assert serializer.validated_data["street"] == "Εγνατίας"
+        assert serializer.validated_data["street_number"] == "12Α"
+
+    @pytest.mark.parametrize(("length", "valid"), [(50, True), (51, False)])
+    def test_a_split_number_has_the_fields_length_limit(
+        self, greece, length, valid
+    ):
+        payload = _create_payload(street="Εγνατίας " + "1" * length)
+        payload.pop("street_number")
+
+        serializer = OrderCreateFromCartSerializer(data=payload)
+
+        assert serializer.is_valid() is valid, serializer.errors
+        if valid:
+            assert serializer.validated_data["street_number"] == "1" * length
+        else:
+            assert set(serializer.errors) == {"street"}
+            assert serializer.errors["street"][0].code == "max_length"
+
+    def test_a_sent_number_is_kept_as_sent(self, greece):
+        serializer = OrderCreateFromCartSerializer(
+            data=_create_payload(street="Εγνατίας 12", street_number="14")
+        )
+
+        assert serializer.is_valid(), serializer.errors
+        assert serializer.validated_data["street"] == "Εγνατίας 12"
+        assert serializer.validated_data["street_number"] == "14"
+
+    def test_a_line_ending_in_a_postcode_is_refused_on_the_street(self, greece):
+        payload = _create_payload(street="Εγνατίας 54622")
+        payload.pop("street_number")
+
+        serializer = OrderCreateFromCartSerializer(data=payload)
+
+        assert not serializer.is_valid()
+        assert set(serializer.errors) == {"street"}
+        assert (
+            serializer.errors["street"][0].code == "street_number_is_postcode"
+        )
+
+    def test_an_invoice_copies_the_split_line(self, greece, settings):
+        with patch("order.serializers.order.feature_on", return_value=True):
+            payload = _create_payload(
+                street="Εγνατίας 12",
+                document_type="INVOICE",
+                billing_vat_id="094014201",
+                billing_company_name="Acme ΑΕ",
+                billing_tax_office="Α' Θεσσαλονίκης",
+                billing_activity="Εμπόριο",
+            )
+            payload.pop("street_number")
+            serializer = OrderCreateFromCartSerializer(data=payload)
+
+            assert serializer.is_valid(), serializer.errors
+        assert serializer.validated_data["billing_street"] == "Εγνατίας"
+        assert serializer.validated_data["billing_street_number"] == "12"
 
 
 class TestOwnerEdit:

@@ -40,7 +40,9 @@ outgrows the limit is split on a subject, and this table gains a row.
 Last refresh: 2026-11-21 (the quote's `cartDigest`: an order created
 with `expectedCartDigest` is made of what was quoted, [§3.0](creation.md);
 `expectedTotal` is required on order creation, [§3.0](creation.md);
-before that 2026-11-18: an agent checkout places one order, and a repeat
+order creation takes one street line and splits its number,
+[§3.3](creation.md); before that 2026-11-18: an agent checkout places one
+order, and a repeat
 of its creation is answered with that order, [§3.2](creation.md); one
 checkout total: `OrderQuoteService.quote`
 behind `POST /cart/quote`, the payment intent and both creation paths, and

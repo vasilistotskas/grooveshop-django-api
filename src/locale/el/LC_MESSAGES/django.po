@@ -1493,6 +1493,9 @@ msgstr "Email εκτελούντος"
 msgid "Add synonyms, products or content for these."
 msgstr "Προσθέστε συνώνυμα, προϊόντα ή περιεχόμενο για αυτές."
 
+msgid "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+msgstr "Προσθέστε τον αριθμό μετά το όνομα της οδού, για παράδειγμα Ερμού 12, ή συμπληρώστε τον στο πεδίο του αριθμού οδού."
+
 msgid "Add tracking information to an existing order"
 msgstr "Προσθήκη πληροφοριών παρακολούθησης σε υπάρχουσα παραγγελία"
 
@@ -14022,14 +14025,14 @@ msgstr "Οδός"
 msgid "Street Number"
 msgstr "Αριθμός"
 
-msgid "Street name"
-msgstr "Όνομα οδού"
-
 msgid "Street name and number"
 msgstr "Οδός και αριθμός"
 
-msgid "Street number"
-msgstr "Αριθμός οδού"
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber."
+
+msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
+msgstr "Αριθμός οδού. Προαιρετικός: χωρίς αυτόν, το street πρέπει να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς αριθμό απορρίπτεται με κωδικό street_number_missing στο street."
 
 msgid "Street, street number, and city are required."
 msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
@@ -19543,6 +19546,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 #~ msgstr "Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία ή δεν έχει ακόμα ανατεθεί ID δέματος."
+
+#~ msgid "Street name"
+#~ msgstr "Όνομα οδού"
+
+#~ msgid "Street number"
+#~ msgstr "Αριθμός οδού"
 
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."

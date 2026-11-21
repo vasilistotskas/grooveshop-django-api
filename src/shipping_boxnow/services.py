@@ -15,7 +15,10 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from core.cache.invalidation import mark_surface_stale
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
@@ -396,6 +399,11 @@ class BoxNowService:
             # that landed a moment ago is seen.
             if shipment.order.awaits_online_payment:
                 raise ShipmentAwaitingPaymentError(order.id)
+            # Nor for an order that ships nothing but is not canceled
+            # (``_cancel_for_a_canceled_order`` finishes that one): its
+            # payment all went back, which leaves the order PROCESSING.
+            if shipment.order.ships_nothing:
+                raise ShipmentNotNeededError(order.id)
 
             # Before the claim is stamped, so a store that fills the
             # field in can dispatch again at once instead of waiting

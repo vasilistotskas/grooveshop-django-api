@@ -35,7 +35,10 @@ from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
 from emails.send import send_email, was_sent
 from order.storefront_links import account_order_path
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping_acs import voucher_hold
 from shipping_acs.attention import voucher_requests_held
 from shipping_acs.client import TRACKING_ALIASES
@@ -127,6 +130,17 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
             extra={"order_id": order_id},
         )
         return {"status": "awaiting_payment", "order_id": order_id}
+    except ShipmentNotNeededError as exc:
+        # Not a failure: the order was canceled or refunded while the
+        # request waited (a retry's backoff, a held request). Nothing is
+        # to ship, so no retry and no "creation failed" alert.
+        logger.warning(
+            "ACS voucher not created for order %s: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {"status": "not_needed", "order_id": order_id}
     except AcsConfigError as exc:
         # The tenant has no ACS credentials. AcsConfigError is a SIBLING
         # of AcsAPIError, not a subclass, so it matched neither the

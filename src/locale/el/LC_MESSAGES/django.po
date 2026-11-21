@@ -9854,8 +9854,12 @@ msgid "Order #%(order)s has not been paid yet — the voucher is issued automati
 msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακόμη — το voucher εκδίδεται αυτόματα μόλις επιβεβαιωθεί η online πληρωμή."
 
 #, python-format
-msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
-msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη — ένα νέο δέμα θα έστελνε παραγγελία που κανείς δεν θέλει."
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a parcel would ship an order nobody pays for."
+msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη ή η πληρωμή της επιστράφηκε ολόκληρη — ένα δέμα θα έστελνε παραγγελία που δεν πληρώνει κανείς."
+
+#, python-format
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a voucher would ship an order nobody pays for."
+msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη ή η πληρωμή της επιστράφηκε ολόκληρη — ένα voucher θα έστελνε παραγγελία που δεν πληρώνει κανείς."
 
 #, python-format
 msgid "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."

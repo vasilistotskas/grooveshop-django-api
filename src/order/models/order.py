@@ -28,7 +28,9 @@ from core.validators import address as address_rules
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     DISPATCHED_STATUSES,
+    ORDER_STATUSES_SHIPPING_NOTHING,
     PAYMENT_CLOSING_STATUSES,
+    PAYMENT_STATUSES_KEEPING_NOTHING,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
@@ -1133,6 +1135,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         Cash-on-delivery is never "awaiting" — nothing is owed online,
         so those carts still clear the moment the order is placed.
+
+        A settled payment (``SETTLED_PAYMENT_STATUSES``) awaits nothing,
+        whichever it is: an order paid and then partly refunded still
+        ships and gets its courier voucher. The one-row form of
+        ``order.managers.order.awaiting_online_payment_q``.
         """
         pay_way = self.pay_way
         if (
@@ -1140,7 +1147,24 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             or PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
         ):
             return False
-        return not self.is_paid
+        return self.payment_status not in SETTLED_PAYMENT_STATUSES
+
+    @property
+    def ships_nothing(self) -> bool:
+        """True when no parcel is to leave for this order: it was canceled
+        or refunded as an order, or it was paid online and the store keeps
+        nothing of the payment (a full refund leaves the order's own status
+        where it was). The carriers refuse to create a shipment for it, and
+        their admin buttons say why. The one-row form of
+        ``order.managers.order.ships_nothing_q``."""
+        if self.status in ORDER_STATUSES_SHIPPING_NOTHING:
+            return True
+        pay_way = self.pay_way
+        return (
+            pay_way is not None
+            and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
+            and self.payment_status in PAYMENT_STATUSES_KEEPING_NOTHING
+        )
 
     @property
     def can_be_canceled(self) -> bool:

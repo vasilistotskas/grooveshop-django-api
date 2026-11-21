@@ -152,3 +152,22 @@ class PickupPointCheckUnavailableError(Exception):
     (``ShippingService.pickup_point_address``). Nothing is known about the
     point, so it is not refused as unknown; the same order may succeed
     once the cache is back."""
+
+
+class ShipmentNotNeededError(ShippingError):
+    """A courier shipment was requested for an order that ships nothing.
+
+    Raised by every carrier's mint choke point when ``Order.ships_nothing``
+    holds (canceled, refunded as an order, or its payment all went back)
+    or the carrier retired the shipment. A parcel for such an order would
+    hand over goods nobody keeps paying for. Like
+    :class:`ShipmentAwaitingPaymentError`, not a carrier API error: no
+    retry policy matches it and no "creation failed" alert fires.
+    """
+
+    def __init__(self, order_id: int) -> None:
+        self.order_id = order_id
+        super().__init__(
+            f"Order {order_id} ships nothing: it was canceled or refunded, "
+            "or its shipment was retired, so no courier shipment is created."
+        )

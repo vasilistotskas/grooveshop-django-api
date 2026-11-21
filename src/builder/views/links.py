@@ -8,7 +8,6 @@ from typing import Any
 
 from django.conf import settings
 from django.utils.translation import gettext as _
-from djangorestframework_camel_case.util import camel_to_underscore
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -45,6 +44,7 @@ from builder.serializers import (
 )
 from builder.views.base import StaffView
 from core.api.serializers import ErrorResponseSerializer
+from core.utils.string_case import camel_to_snake
 
 
 def _parse_ids(raw: str) -> set[int] | None:
@@ -114,7 +114,7 @@ class LinkTargetsView(APIView):
         for kind in references.LINK_TARGET_KINDS:
             # The camel-case middleware has already underscored the query
             # keys: a client's ``blogPost`` arrives as ``blog_post``.
-            raw = request.query_params.get(camel_to_underscore(kind.value))
+            raw = request.query_params.get(camel_to_snake(kind.value))
             if raw is None:
                 continue
             wanted = _parse_ids(raw)
@@ -263,7 +263,7 @@ class LinkLabelsView(StaffView):
         wanted: dict[ReferenceKind, set[Any]] = {}
         for kind in link_picker.PICKER_KINDS:
             # Underscored by the camel-case middleware, like link-targets.
-            raw = request.query_params.get(camel_to_underscore(kind.value))
+            raw = request.query_params.get(camel_to_snake(kind.value))
             if raw is None:
                 continue
             ids = (

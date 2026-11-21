@@ -1,5 +1,5 @@
 """``POST /api/v1/order/{id}/retry-payment`` (``OrderViewSet.retry_payment``,
-``order/views/order.py``).
+``src/order/views/order.py``).
 
 The view mints a fresh PaymentIntent for an unpaid order, swaps the new
 intent id onto the order, resets ``payment_status`` to PENDING, re-arms

@@ -344,7 +344,12 @@ def seed_promotions(translate, tenant_is_demo: bool = False) -> dict[str, int]:
     def products_for(slugs: tuple[str, ...], where: str) -> list[Product]:
         if not slugs:
             return []
-        found = {p.slug: p for p in Product.objects.filter(slug__in=slugs)}
+        # A deleted product is not one an offer may target: the offer
+        # would advertise an item the store no longer sells.
+        found = {
+            p.slug: p
+            for p in Product.objects.exclude_deleted().filter(slug__in=slugs)
+        }
         missing = sorted(set(slugs) - set(found))
         if missing:
             raise ValueError(f"{where}: no such product slug(s): {missing}")

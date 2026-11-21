@@ -20,7 +20,6 @@ from rest_framework.response import Response
 from cart.services import cart_item_pairs
 from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import BoxNowNearestThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -34,6 +33,7 @@ from shipping.exceptions import (
     CarrierUnavailableError,
     ShippingParcelTooLargeError,
 )
+from shipping_boxnow.filters import BoxNowLockerFilter
 from shipping_boxnow.models import BoxNowLocker
 from shipping_boxnow.packing import resolve_compartment_size
 from shipping_boxnow.serializers import (
@@ -42,6 +42,7 @@ from shipping_boxnow.serializers import (
     BoxNowNearestLockerRequestSerializer,
     BoxNowNearestLockerResponseSerializer,
 )
+from shipping_boxnow.throttles import BoxNowNearestThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class BoxNowLockerViewSet(BaseModelViewSet):
     queryset = BoxNowLocker.objects.filter(is_active=True)
     serializers_config = serializers_config
     permission_classes = [AllowAny]
+    filterset_class = BoxNowLockerFilter
     search_fields = [
         "external_id",
         "name",

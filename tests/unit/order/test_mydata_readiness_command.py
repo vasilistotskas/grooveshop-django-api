@@ -3,7 +3,7 @@
 Deliberately writes the unmapped-rate Vat rows via the bare ORM
 (``.objects.create``), bypassing ``full_clean()`` — this command exists
 precisely to catch rows that predate ``validate_mydata_vat_rate``
-(vat/models.py), or that were inserted by something other than a form/
+(src/vat/models.py), or that were inserted by something other than a form/
 serializer (a script, a fixture, a pre-validator legacy row).
 """
 

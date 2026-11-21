@@ -23,7 +23,6 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
-from django.conf import settings
 from django.urls import reverse
 from django.utils import formats, timezone
 from django.utils.text import Truncator
@@ -864,19 +863,15 @@ class StoreAlerts(DashboardWidget):
         """Scheduled publishes that failed and that nobody has
         acknowledged yet, for whoever may publish. Acknowledging in the
         list takes the alert away."""
-        from builder.models import (
-            BuilderScheduledPublish,
-            ScheduleStatus,
-            document_label,
-        )
+        from builder.models import BuilderScheduledPublish, document_label
         from builder.services import PUBLISH_PERMISSION
 
         if not self.request.user.has_perm(PUBLISH_PERMISSION):
             return []
         failed = list(
-            BuilderScheduledPublish.objects.filter(
-                status=ScheduleStatus.FAILED, acknowledged_at__isnull=True
-            ).order_by("-scheduled_for")[:5]
+            BuilderScheduledPublish.objects.failed_unacknowledged().order_by(
+                "-scheduled_for"
+            )[:5]
         )
         if not failed:
             return []
@@ -1130,11 +1125,7 @@ class StoreAlerts(DashboardWidget):
         from order.accounting.credit_allocation import describe_blockers
         from order.models import Order
 
-        waiting = list(
-            Order.objects.filter(metadata__receipt_deferred=True).order_by(
-                "-pk"
-            )[:5]
-        )
+        waiting = list(Order.objects.receipt_deferred().order_by("-pk")[:5])
         if not waiting:
             return []
         return [
@@ -1212,20 +1203,25 @@ class StoreAlerts(DashboardWidget):
 
     def _mydata(self) -> list[dict[str, Any]]:
         from order.accounting.movement import loading_address
-        from order.accounting.mydata.config import load_config
-        from order.models.invoice import Invoice, MyDataStatus
+        from order.accounting.mydata.config import (
+            CREDENTIALS,
+            MyDataRequirement,
+            load_config,
+        )
+        from order.models.invoice import Invoice
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.
         if not store_features(self.request).live(RETAIL_DOCUMENTS):
             return []
         config = load_config()
+        unmet = config.unmet()
         alerts = []
         settings_link = (
             self.changelist_url("extra_settings.Setting", "q=MYDATA_"),
             _("Open the myDATA settings"),
         )
-        if config.environment is None:
+        if MyDataRequirement.ENVIRONMENT in unmet:
             alerts.append(
                 _alert(
                     "danger",
@@ -1241,7 +1237,7 @@ class StoreAlerts(DashboardWidget):
         # The ERP channel is only for a business exempt from the fiscal
         # device (ΦΗΜ); a store that takes real orders and has not recorded
         # the ground issues nothing. Sandbox test documents need none.
-        elif not (config.fhm_exemption_ground or config.issues_to_sandbox_only):
+        elif MyDataRequirement.FHM_EXEMPTION_GROUND in unmet:
             alerts.append(
                 _alert(
                     "danger",
@@ -1258,14 +1254,7 @@ class StoreAlerts(DashboardWidget):
                     link=settings_link,
                 )
             )
-        missing = [
-            field
-            for field, value in (
-                ("mydata_user_id", config.user_id),
-                ("mydata_subscription_key", config.subscription_key),
-            )
-            if not value
-        ]
+        missing = [str(field) for field in CREDENTIALS if field in unmet]
         if missing:
             alerts.append(
                 _alert(
@@ -1280,12 +1269,7 @@ class StoreAlerts(DashboardWidget):
                     ),
                 )
             )
-        offline = Invoice.objects.filter(
-            transmission_failed_at__isnull=False, mydata_mark__isnull=True
-        ).exclude(
-            mydata_status__in=[MyDataStatus.REJECTED, MyDataStatus.CANCELED]
-        )
-        waiting = offline.count()
+        waiting = Invoice.objects.transmission_failed().count()
         if waiting:
             alerts.append(
                 _alert(
@@ -1313,15 +1297,7 @@ class StoreAlerts(DashboardWidget):
         # answer (sent and canceled automatically), or for staff: myDATA
         # refused the receipt or the store's credentials (its order's notes
         # say so).
-        held = (
-            Invoice.objects.filter(
-                cancel_requested_at__isnull=False,
-                cancel_requested_at__lte=timezone.now()
-                - timedelta(minutes=settings.MYDATA_RETRY_AFTER_MINUTES),
-            )
-            .exclude(mydata_status=MyDataStatus.CANCELED)
-            .count()
-        )
+        held = Invoice.objects.cancel_overdue().count()
         if held:
             alerts.append(
                 _alert(

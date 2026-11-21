@@ -78,6 +78,41 @@ class UserAddressViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_a_saved_address_keeps_its_address_line_2(self):
+        """Saved with the flat or building, read back with it: checkout
+        prefills an order's ``addressLine2`` from it (#641)."""
+        payload = {
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "phone": "2101234567",
+            "title": "home",
+            "first_name": "Μαρία",
+            "last_name": "Παππά",
+            "street": "Ερμού",
+            "street_number": "12",
+            "address_line_2": "Διαμ. 3, 2ος όροφος",
+            "city": "Αθήνα",
+            "zipcode": "10563",
+            "is_main": False,
+        }
+
+        created = self.client.post(
+            self.get_user_address_list_url(), data=payload, format="json"
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        address = UserAddress.objects.get(pk=created.data["id"])
+        self.assertEqual(address.address_line_2, "Διαμ. 3, 2ος όροφος")
+        read = self.client.get(self.get_user_address_detail_url(address.pk))
+        self.assertEqual(read.data["address_line_2"], "Διαμ. 3, 2ος όροφος")
+
+    def test_an_address_without_line_2_reads_it_blank(self):
+        read = self.client.get(
+            self.get_user_address_detail_url(self.address.pk)
+        )
+
+        self.assertEqual(read.data["address_line_2"], "")
+
     def test_create_invalid(self):
         payload = {
             "title": "invalid_title",

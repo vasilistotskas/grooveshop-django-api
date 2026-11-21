@@ -51,7 +51,7 @@ def two_stores(mt_tenant, mt_tenant_b):
         _switch(tenant, on=False)
         with tenant_context(tenant):
             PendingUrl.objects.all().delete()
-            Product.objects.all().delete()
+            Product.objects.all().hard_delete()
 
 
 def test_only_the_store_that_switched_it_on_queues_its_pages(two_stores):

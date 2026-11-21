@@ -19,7 +19,7 @@ catalogue, then the write):
 ## What a release moves
 
 `BuilderRelease` is `invalidated_by` of the `builder` surface
-(`src/core/cache/surfaces.py`: the storefront's `builderPage` handler, every
+(`src/builder/cache_surfaces.py`: the storefront's `builderPage` handler, every
 cached route, `invalidates_tenant_config=True`, so the Cloudflare edge purge
 follows) and `src/tenant/signals.py: bump_generation_on_builder_release` moves
 `Tenant.cache_generation` in the release's own transaction. A draft save or
@@ -101,11 +101,13 @@ storefront needs no schema of its own for a refusal:
   `BuilderMediaInUse {code: media_in_use, usedBy}` on deleting an asset;
   otherwise the plain body (`schedule_not_pending`, `schedule_not_failed`).
 
-`tests/integration/builder/conftest.py` holds every request of that
-directory to it (`every_answer_is_in_the_schema`): an answer whose status its
-operation does not declare, or whose body does not satisfy the declared
-schema, fails the test that provoked it. A new operation or a new refusal
-that a test reaches cannot go undeclared.
+`tests/response_contract.py` holds every request a test makes to it: under
+`/api/v1/builder/` a path no operation fits, an answer whose status its
+operation does not declare (other than 401/403, answered before any view),
+or a JSON body that does not satisfy the declared schema fails the test
+that provoked it. A declared answer that is not JSON is not judged by its
+body. So a new operation or a new refusal that a test reaches cannot go
+undeclared.
 
 ## The live preview
 

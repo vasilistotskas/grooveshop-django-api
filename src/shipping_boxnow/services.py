@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from core.cache.invalidation import mark_surface_stale
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN
@@ -122,7 +123,7 @@ def _last_error(exc: BoxNowAPIError) -> dict[str, Any]:
 # from the DB without re-running the payload builder. Strictly
 # operational — destination/origin contact details are intentionally
 # excluded because shipment.metadata is not cleared by GDPR
-# anonymisation (see user/services/gdpr.py).
+# anonymisation (see src/user/services/gdpr.py).
 _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "orderNumber",
     "description",
@@ -465,7 +466,7 @@ class BoxNowService:
             # Using total_price overcharged every discounted COD order by
             # the discount and disagreed with ``invoiceValue`` below
             # (also amount_due). Mirrors the ACS COD sync
-            # (shipping_acs/services.py) including the ``> 0`` guard that
+            # (src/shipping_acs/services.py) including the ``> 0`` guard that
             # keeps the amount inside BoxNow's valid (0, 5000) range.
             # Filled here (not at row creation) because amount_due is
             # only persisted after the create_shipment_row hook fires.
@@ -2893,6 +2894,10 @@ class BoxNowService:
             deactivated_count = BoxNowLocker.objects.exclude(
                 external_id__in=seen_external_ids
             ).update(is_active=False)
+            if deactivated_count:
+                # ``update`` sends no ``post_save``: the cached locker
+                # list would keep serving the withdrawn lockers.
+                mark_surface_stale("shipping")
             # Wholesale turnover means this catalogue belongs to a
             # DIFFERENT partner than the rows we already had — the exact
             # shape of a credentials/data mismatch, and the reason every

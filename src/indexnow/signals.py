@@ -13,8 +13,8 @@ A post dated in the future is queued when its date passes, by
 
 A save writes the queue row in its own transaction, so a change that rolls
 back is never announced. ``queryset.update()`` emits no signal and is
-therefore not announced either (the soft-delete and restore querysets of
-``core.models``).
+therefore not announced either; a bulk soft delete or restore goes row by
+row (``core.mixins.soft_delete``) and is announced like a single one.
 """
 
 from __future__ import annotations

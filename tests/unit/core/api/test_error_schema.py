@@ -10,11 +10,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.api.schema import PLAIN_400_BODIES, publish_error_schemas
-from core.api.throttling import ProductAlertCreateThrottle
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from product.factories.product import ProductFactory
 from product.models.alert import ProductAlertKind
+from product.throttles import ProductAlertCreateThrottle
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 
@@ -212,11 +212,11 @@ def test_an_undocumented_status_is_still_the_plain_error(
 
 
 def test_no_generated_operation_documents_a_plain_400_alone(
-    generated_schema,
+    openapi_schema,
 ):
     offenders = [
         f"{method.upper()} {path}"
-        for path, operations in generated_schema["paths"].items()
+        for path, operations in openapi_schema["paths"].items()
         for method, operation in operations.items()
         if isinstance(operation, dict)
         for media in operation.get("responses", {})

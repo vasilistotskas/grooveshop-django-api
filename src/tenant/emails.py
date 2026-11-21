@@ -1,7 +1,9 @@
-"""The platform's mail to a store: billing notices and the staff password
-reset. Their types, builders and samples.
+"""The platform's own mail: billing notices and the staff password reset
+to a store, and the operators' alerts about the platform itself (a failed
+health check, a failed backup). Their types, builders and samples.
 
-Sent by the platform, from ``public``, in the store's own language:
+Sent by the platform, from ``public``: a store's mail in the store's own
+language, an operators' alert to ``settings.ADMINS`` in the platform's.
 ``Owner.PLATFORM`` types are never listed on a store's email page.
 ``emails.EmailsConfig`` imports this module at boot; ``tenant.billing`` and
 ``tenant.tasks`` choose WHEN to send and keep the bookkeeping after a send.
@@ -23,11 +25,13 @@ from django_stubs_ext import StrOrPromise
 from emails.declare import operator_alert, platform_email
 from emails.recipients import Recipient
 from emails.types import Audience, RenderEnv
+from tenant.credentials import tenant_site_name
 
 if TYPE_CHECKING:
     from tenant.models import Tenant
 
 BILLING_TEMPLATE_DIR = "emails/billing"
+OPS_TEMPLATE_DIR = "emails/ops"
 
 #: The sample store of the previews: an unsaved row, so nothing is read.
 SAMPLE_STORE_NAME = "Acme Gadgets"
@@ -97,8 +101,6 @@ def _notice(notice: BillingNotice, env: RenderEnv) -> dict[str, Any]:
 
 
 def _stage_copy(copy: BillingStageCopy, env: RenderEnv) -> dict[str, Any]:
-    from tenant.credentials import tenant_site_name
-
     tenant = copy.tenant
     return {
         "site": tenant_site_name(),
@@ -228,4 +230,67 @@ platform_email(
     build_context=_staff_reset,
     sample=_sample_staff_reset,
     recipients=lambda reset: [Recipient(reset.address, reset.language)],
+)
+
+
+@dataclass(frozen=True, slots=True)
+class HealthAlert:
+    """The components that failed the health check, and what each said."""
+
+    failed: tuple[str, ...]
+    errors: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BackupFailed:
+    """The scheduled database backup could not be dispatched."""
+
+    error: str
+
+
+def _health_alert(alert: HealthAlert, env: RenderEnv) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "components": ", ".join(alert.failed),
+        "errors": alert.errors,
+    }
+
+
+def _backup_failed(alert: BackupFailed, env: RenderEnv) -> dict[str, Any]:
+    return {"site": tenant_site_name(), "error": alert.error}
+
+
+operator_alert(
+    "platform.health_alert",
+    title=_("System health check failed"),
+    description=_(
+        "Tells the platform's operators that the database, the cache or "
+        "the media storage failed its health check."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/health_alert",
+    subject=gettext_noop(
+        "[{site}] CRITICAL: System Health Check Failed ({components})"
+    ),
+    build_context=_health_alert,
+    sample=lambda env: HealthAlert(
+        failed=("cache",),
+        errors=(
+            (
+                "Cache health check failed: Redis cannot persist to disk "
+                "(aof_last_write_status=err) — check free space on its volume"
+            ),
+        ),
+    ),
+)
+operator_alert(
+    "platform.backup_failed",
+    title=_("Scheduled backup failed"),
+    description=_(
+        "Tells the platform's operators that the scheduled database "
+        "backup failed."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/backup_failed",
+    subject=gettext_noop("[{site}] ALERT: Scheduled Database Backup Failed"),
+    build_context=_backup_failed,
+    sample=lambda env: BackupFailed(error="Broker unreachable"),
 )

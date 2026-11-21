@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import jsonschema
 import pytest
 from django.urls import reverse
 from django.utils import timezone
@@ -25,7 +24,7 @@ from builder.models import (
 from builder.serializers import PublishProblemSerializer
 from tests.integration.builder.conftest import api_as
 from tests.utils.builder import document, hero
-from tests.utils.openapi import as_json_schema, assert_matches_response
+from tests.utils.openapi import assert_matches_response, validate_against
 
 pytestmark = [
     pytest.mark.django_db,
@@ -204,9 +203,7 @@ class TestProblems:
         # the check's problems, and every one satisfies their schema.
         problem = openapi_schema["components"]["schemas"]["PublishProblem"]
         for item in refused.json()["errors"]:
-            jsonschema.Draft4Validator(
-                as_json_schema(problem, openapi_schema["components"]["schemas"])
-            ).validate(item)
+            validate_against(openapi_schema, problem, item)
 
     @pytest.mark.parametrize(
         "issue",
@@ -241,9 +238,7 @@ class TestInvalidDocumentIsTyped:
         ]
         assert branches == ["ApiValidationError", "ApiError", self.BRANCH]
         schemas = openapi["components"]["schemas"]
-        jsonschema.Draft4Validator(
-            as_json_schema(schemas[self.BRANCH], schemas)
-        ).validate(body)
+        validate_against(openapi, schemas[self.BRANCH], body)
         assert body["code"] == "invalid_document"
         assert body["errors"]
 
@@ -355,8 +350,9 @@ class TestAFailedScheduleListsTypedProblems:
 class TestEveryErrorStatusIsTyped:
     """The statuses the builder answers are declared, each with its body, so
     the storefront needs no schema of its own for a refusal. (Every answer a
-    test in this directory provokes is also checked against its operation by
-    ``every_answer_is_in_the_schema``.)"""
+    test provokes is also checked against its operation by
+    ``tests/response_contract.py``, which under ``/api/v1/builder/`` also
+    fails a status the operation does not declare.)"""
 
     def test_a_stale_revision_names_the_current_one_and_who_moved_it(
         self, client, openapi_schema

@@ -45,7 +45,7 @@ def make_product(names, *, price="10.00", active=True, **fields):
         active=active,
         stock=5,
         translations=[
-            ProductTranslation(language_code=code, name=name)
+            ProductTranslation(language_code=code, name=name, description="")
             for code, name in names.items()
         ],
         **fields,

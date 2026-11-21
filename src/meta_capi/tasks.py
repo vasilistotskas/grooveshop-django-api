@@ -39,9 +39,9 @@ from django.db import connection
 from django.utils import timezone
 
 from core.db.locks import held_across_calls
+from core.monitored_task import MonitoredTask
 from core.retention import delete_in_batches
 from core.retry import TRANSIENT_DB_ERRORS
-from core.tasks import MonitoredTask
 from meta_capi.client import MetaCapiClient
 from meta_capi.events import StandardEvent
 from meta_capi.exceptions import (

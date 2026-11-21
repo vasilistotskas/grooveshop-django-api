@@ -189,3 +189,62 @@ def test_a_store_without_acs_credentials_has_no_stations(
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["code"] == "not_found"
     assert detail.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestExactFilters:
+    """Exact lookups of one station a client names (the agent gateway's
+    UCP pickup destination); the active-only rule still holds."""
+
+    def _list(self, **params):
+        response = APIClient().get(
+            reverse("shipping-acs-station-list"),
+            {"shopKind": AcsShopKind.SMARTPOINT_LOCKER.value, **params},
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+        body = response.json()
+        return {
+            (row["externalId"], row["branchCode"], row["countryCode"])
+            for row in body.get("results", body)
+        }
+
+    def test_external_id_and_branch_name_one_station(self):
+        for branch in ("1", "2"):
+            AcsStationFactory(
+                external_id="EXACT-1",
+                branch_code=branch,
+                shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+            )
+        AcsStationFactory(
+            external_id="EXACT-10", shop_kind=AcsShopKind.SMARTPOINT_LOCKER
+        )
+
+        assert self._list(externalId="EXACT-1") == {
+            ("EXACT-1", "1", "GR"),
+            ("EXACT-1", "2", "GR"),
+        }
+        assert self._list(externalId="EXACT-1", branch="2") == {
+            ("EXACT-1", "2", "GR")
+        }
+
+    def test_country_code(self):
+        AcsStationFactory(
+            external_id="EXACT-CY",
+            country_code="CY",
+            shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+        )
+        AcsStationFactory(
+            external_id="EXACT-GR", shop_kind=AcsShopKind.SMARTPOINT_LOCKER
+        )
+
+        found = self._list(countryCode="cy", externalId="EXACT-CY")
+        assert found == {("EXACT-CY", "1", "CY")}
+        assert self._list(countryCode="CY", externalId="EXACT-GR") == set()
+
+    def test_a_withdrawn_station_is_never_listed(self):
+        AcsStationFactory(
+            external_id="EXACT-GONE",
+            shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+            is_active=False,
+        )
+
+        assert self._list(externalId="EXACT-GONE") == set()

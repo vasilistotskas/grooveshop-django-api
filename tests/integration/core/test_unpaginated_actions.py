@@ -21,6 +21,11 @@ pytestmark = pytest.mark.django_db
 PAGE_SIZE = 2
 
 
+# The bare array is not what the operation documents (its paginated
+# envelope): the whole list moves to a route of its own (#684).
+@pytest.mark.known_schema_drift(
+    "GET", "/api/v1/country", 200, at="$", issue=684
+)
 def test_an_opted_in_list_returns_every_row():
     CountryFactory.create_batch(PAGE_SIZE + 3)
 

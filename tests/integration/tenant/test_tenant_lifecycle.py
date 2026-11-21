@@ -166,7 +166,7 @@ class TestActivateTenant:
 
     def test_activating_a_suspended_store_queues_its_search_sync(self):
         """Its indexes missed the deploys' settings and the daily sync."""
-        from core.tasks import sync_meilisearch_indexes
+        from meili.tasks import sync_meilisearch_indexes
         from tenant.lifecycle import activate_tenant
 
         tenant = store_tenant(
@@ -184,7 +184,7 @@ class TestActivateTenant:
         ) in [(c.args, c.kwargs) for c in dispatch.call_args_list]
 
     def test_activating_an_active_store_queues_no_search_sync(self):
-        from core.tasks import sync_meilisearch_indexes
+        from meili.tasks import sync_meilisearch_indexes
         from tenant.lifecycle import activate_tenant
 
         tenant = store_tenant("activate_already_active")

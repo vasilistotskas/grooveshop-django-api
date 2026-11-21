@@ -32,12 +32,17 @@ def test_a_translation_saved_without_a_description_stores_empty():
 
 
 def test_the_api_does_not_accept_a_null_description():
-    translations = ProductWriteSerializer().fields["translations"]
-    description = translations.serializer_class().fields["description"]
+    serializer = ProductWriteSerializer(
+        data={"translations": {"en": {"name": "A", "description": None}}},
+        partial=True,
+    )
 
-    assert description.allow_null is False
+    assert not serializer.is_valid()
+    assert "description" in str(serializer.errors["translations"])
 
 
+# Seeds a NULL, which only a nullable column takes: release 2's
+# SET NOT NULL removes this test with the backfill it covers.
 def test_the_migration_turns_every_null_into_empty():
     product = ProductFactory(
         translations=[

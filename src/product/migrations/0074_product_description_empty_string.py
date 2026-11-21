@@ -14,7 +14,9 @@ leaves it to the next release to catch those rows.
 Release 2 (contract, once this one runs in production): backfill again
 and ``ALTER COLUMN description SET NOT NULL`` in a ``RunSQL`` that
 declares ``contract_of = [("product", "0074_product_description_empty_string")]``,
-then reindex the products in Meilisearch.
+then reindex the products in Meilisearch. That release also removes
+``test_the_migration_turns_every_null_into_empty``, which seeds a NULL
+the constraint then refuses.
 """
 
 import core.fields.rich_text

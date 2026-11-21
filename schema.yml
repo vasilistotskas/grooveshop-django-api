@@ -44167,7 +44167,6 @@ components:
           maxLength: 255
         streetNumber:
           type: string
-          minLength: 1
           title: Αριθμός
           maxLength: 255
         addressLine2:
@@ -46159,7 +46158,6 @@ components:
           maxLength: 255
         streetNumber:
           type: string
-          minLength: 1
           title: Αριθμός
           maxLength: 255
         addressLine2:

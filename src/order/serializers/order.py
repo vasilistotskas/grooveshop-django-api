@@ -1869,9 +1869,19 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         Judged only when the payload changes the address, so editing an
         old order's notes does not demand a fix to an address that
         predates the rules. The country and region are not editable at
-        all: see ``PRICED_ADDRESS_FIELDS``; nor is any address field of a
-        pickup-point order: see ``PICKUP_POINT_ADDRESS_FIELDS``.
+        all: see ``PRICED_ADDRESS_FIELDS``. Nor is any delivery-address
+        field of a pickup-point order (``Order.SHIPPING_ADDRESS_FIELDS``):
+        its address is its point's, from the carrier's catalogue
+        (``OrderCreateFromCartSerializer._deliver_to_pickup_point``), and a
+        street, a floor or a line 2 written over it would reach the
+        courier's voucher; a change of point is staff work. A pickup
+        point's street line may name no number, so only an order delivered
+        to the buyer needs one.
         """
+        pickup = (
+            self.instance is not None
+            and self.instance.shipping_kind == ShippingKind.PICKUP_POINT
+        )
         locked = {
             field: [
                 _(
@@ -1881,10 +1891,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             ]
             for field in self._changed(attrs, self.PRICED_ADDRESS_FIELDS)
         }
-        if (
-            self.instance is not None
-            and self.instance.shipping_kind == ShippingKind.PICKUP_POINT
-        ):
+        if pickup:
             locked.update(
                 {
                     field: [
@@ -1894,13 +1901,25 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                         )
                     ]
                     for field in self._changed(
-                        attrs, self.PICKUP_POINT_ADDRESS_FIELDS
+                        attrs, Order.SHIPPING_ADDRESS_FIELDS
                     )
-                    if field not in locked
                 }
             )
         if locked:
             raise serializers.ValidationError(locked, code="order_field_locked")
+        if (
+            not pickup
+            and "street_number" in attrs
+            and not attrs["street_number"].strip()
+        ):
+            raise serializers.ValidationError(
+                {
+                    "street_number": [
+                        self.fields["street_number"].error_messages["blank"]
+                    ]
+                },
+                code="blank",
+            )
         errors = address_rules.address_update_errors(attrs, self.instance)
         if errors:
             raise serializers.ValidationError(errors)
@@ -1913,22 +1932,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     #: order costs. The rest of the address stays editable: it reprices
     #: nothing.
     PRICED_ADDRESS_FIELDS = ("country", "region")
-
-    #: A pickup-point order's delivery address is its point's, from the
-    #: carrier's catalogue (``OrderCreateFromCartSerializer.
-    #: _deliver_to_pickup_point``). A street, a floor or a line 2 written
-    #: over it would reach the courier's voucher; a change of point is
-    #: staff work.
-    PICKUP_POINT_ADDRESS_FIELDS = (
-        "street",
-        "street_number",
-        "address_line_2",
-        "city",
-        "zipcode",
-        "place",
-        "floor",
-        "location_type",
-    )
 
     def _changed(self, attrs, fields) -> list[str]:
         """The ``fields`` this payload sets to a value the order lacks."""
@@ -2021,9 +2024,10 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "user": {
                 "help_text": _("User ID. Leave empty for guest orders."),
             },
-            # The model allows a blank number for a pickup order's point;
-            # an address an owner writes still needs one.
-            "street_number": {"required": True, "allow_blank": False},
+            # Blank on a pickup order whose point's street line names no
+            # number, which a PUT echoes back; ``validate`` requires one
+            # for an order delivered to the buyer.
+            "street_number": {"required": True, "allow_blank": True},
         }
 
 

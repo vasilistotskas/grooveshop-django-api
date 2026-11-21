@@ -4,7 +4,7 @@ from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
@@ -876,10 +876,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         when deductions — promotion, loyalty redemption, gift card —
         cover the whole total (see ``is_paid``); ``calculate_order_total_
         amount`` is exactly that remainder. Anything else is a payment
-        booked on an order whose amount due was never set: the admin
-        form, which edits both fields, is the path this guards (the demo
+        booked on an order whose amount due was never set (the demo
         fixtures that produced eight such rows no longer go through
-        ``save`` at all).
+        ``save`` at all). Model validation refuses to save such a row,
+        whatever the save changes; the admin shows both fields read-only
+        (``OrderAdmin.readonly_fields``), so the error is the order's, not
+        a field's.
 
         Not a ``CheckConstraint``: the total is a sum over the order's
         lines, which a row constraint cannot see. An unsaved order has
@@ -891,8 +893,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             return {}
         if self.calculate_order_total_amount().amount == 0:
             return {}
+        # Not under ``amount_due``: a form error on a read-only field has no
+        # input to land on (``ModelForm.add_error`` raises: a 500).
         return {
-            "amount_due": [
+            NON_FIELD_ERRORS: [
                 _(
                     "A completed payment needs an amount due, unless "
                     "discounts, loyalty points or gift cards cover the "

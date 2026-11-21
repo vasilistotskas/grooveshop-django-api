@@ -70,12 +70,15 @@ address it cannot place (prod order #316: street "1", street number
   NOW locker, the exact ACS station and branch) as the order's delivery
   address, its number split from the street line by `split_street_line`
   where it splits; where it does not, `street_number` stays empty, which
-  `Order.street_number` (`blank=True`) and `Order.clean()` allow for a
-  pickup order only, so the admin saves it. That one snapshot is what the
-  receipt, the ACS voucher and the order page read, and the owner cannot
-  write over it: `OrderWriteSerializer` refuses a change to any of its
-  `PICKUP_POINT_ADDRESS_FIELDS` with `order_field_locked`; a change of
-  point is staff work. Name, email and phone stay required; the
+  `Order.street_number` (`blank=True`), `Order.clean()` and
+  `OrderWriteSerializer` allow for a pickup order only, so the admin saves
+  it and a client can send back the empty number `GET` gave it. That one
+  snapshot is what the receipt, the ACS voucher and the order page read,
+  and the owner cannot write over it: `OrderWriteSerializer` refuses a
+  change to any of `Order.SHIPPING_ADDRESS_FIELDS` (the one list of the
+  delivery-address fields, so a new one is locked too) with
+  `order_field_locked`; a change of point is staff work. Name, email and
+  phone stay required; the
   region rule does not apply: the order keeps no region, floor, location
   type or address line 2 of the buyer's, and `ShippingChoice.of` prices a
   pickup delivery without a region, so the quote, the cart digest and the

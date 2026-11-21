@@ -149,7 +149,7 @@ class TestTheDeliveryLock:
         unreachable = mock.MagicMock(in_atomic_block=False)
         unreachable.cursor.side_effect = OperationalError("unreachable")
 
-        with mock.patch("emails.log.connection", unreachable):
+        with mock.patch("core.db.locks.connection", unreachable):
             retrying_task.apply(task_id="one-dispatch", throw=True)
 
         assert len(mail.outbox) == 1
@@ -169,7 +169,7 @@ class TestTheDeliveryLock:
         )
 
         with (
-            mock.patch("emails.log.connection", held),
+            mock.patch("core.db.locks.connection", held),
             pytest.raises(OperationalError),
         ):
             retrying_task.apply(task_id="one-dispatch", throw=True)

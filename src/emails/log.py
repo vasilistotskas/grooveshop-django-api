@@ -12,14 +12,15 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Any
 
 import requests
-from django.db import Error, connection, transaction
+from django.db import Error, transaction
 from django.utils import timezone
 from psycopg.errors import QueryCanceled
 
+from core.db.locks import held_across_calls
 from emails import optout
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
@@ -150,16 +151,13 @@ def _claim(entry: EmailLog) -> EmailLog:
 
 @contextmanager
 def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
-    """Hold an advisory lock on *delivery* for the block.
+    """Hold the advisory lock of *delivery* for the block
+    (``core.db.locks.held_across_calls``), for as long as the transport
+    takes.
 
     Only a send inside a task can have another copy; a synchronous send's id
-    is fresh and takes no lock. The lock is held on the connection's session,
-    outside any transaction, for as long as the transport takes: a
-    transaction open across the send would be ended by
-    ``idle_in_transaction_session_timeout``. Inside a transaction (a task
-    applied eagerly, or called within one) it is the transaction's and ends
-    with it, so it is never left on a pooled connection. A worker that dies
-    takes its session and the lock with it, and the copy that waits sends.
+    is fresh and takes no lock. A worker that dies takes its session and the
+    lock with it, and the copy that waits sends.
 
     A wait longer than ``statement_timeout`` raises ``OperationalError``,
     which every mail task retries: the copy ahead is still sending. A
@@ -170,47 +168,18 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
         yield
         return
     key = _LOCK_KEY.format(delivery=delivery)
-    if connection.in_atomic_block:
-        _lock("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", key)
-        yield
-        return
-    held = _lock("SELECT pg_advisory_lock(hashtextextended(%s, 0))", key)
-    try:
-        yield
-    finally:
-        if held:
-            _unlock(key)
-
-
-def _lock(statement: str, key: str) -> bool:
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(statement, [key])
-    except Error as error:
-        if isinstance(error.__cause__, QueryCanceled):
-            raise
-        logger.exception(
-            "Email delivery %s is sent without its lock",
-            key,
-            extra={"email_log": key},
-        )
-        return False
-    return True
-
-
-def _unlock(key: str) -> None:
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT pg_advisory_unlock(hashtextextended(%s, 0))", [key]
+    with ExitStack() as held:
+        try:
+            held.enter_context(held_across_calls(key))
+        except Error as error:
+            if isinstance(error.__cause__, QueryCanceled):
+                raise
+            logger.exception(
+                "Email delivery %s is sent without its lock",
+                key,
+                extra={"email_log": key},
             )
-    except Error:
-        # The session broke during the send, and the lock went with it.
-        logger.warning(
-            "Email delivery %s: the session holding its lock broke",
-            key,
-            extra={"email_log": key},
-        )
+        yield
 
 
 def mark_sent(

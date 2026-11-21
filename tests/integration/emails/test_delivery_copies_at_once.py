@@ -58,7 +58,16 @@ class HeldTransport:
         self.release = threading.Event()
         self.real = mail.EmailMultiAlternatives.send
 
-    def __call__(self, message, *args, **kwargs):
+    def patched(self):
+        """The send as the class attribute it replaces: a function, which
+        the message binds to as ``self``."""
+
+        def send(message, *args, **kwargs):
+            return self.send(message, *args, **kwargs)
+
+        return mock.patch("emails.transport.EmailMultiAlternatives.send", send)
+
+    def send(self, message, *args, **kwargs):
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_backend_pid()")
             (pid,) = cursor.fetchone()
@@ -106,7 +115,7 @@ def test_a_copy_that_starts_while_another_sends_waits_and_sends_nothing(
     transport = HeldTransport()
     errors: list[BaseException] = []
 
-    with mock.patch("emails.transport.EmailMultiAlternatives.send", transport):
+    with transport.patched():
         first = run_copy(sending_task, errors)
         assert transport.sending.wait(WAIT)
         second = run_copy(sending_task, errors)
@@ -130,7 +139,7 @@ def test_a_copy_waiting_on_a_worker_that_died_sends_it(sending_task):
     transport = HeldTransport()
     errors: list[BaseException] = []
 
-    with mock.patch("emails.transport.EmailMultiAlternatives.send", transport):
+    with transport.patched():
         first = run_copy(sending_task, errors)
         assert transport.sending.wait(WAIT)
         second = run_copy(sending_task, errors)

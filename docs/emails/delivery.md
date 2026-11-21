@@ -122,9 +122,9 @@ task differ in their subject, so they stay two deliveries.
 **Copies at the same moment.** The sweep's copy and the message that publish
 wrote are delivered together once the broker takes messages again, so two
 workers can send the same delivery at once. `log.delivering` reads the row and
-the transport sends under a PostgreSQL advisory lock on the delivery id: the
-second copy waits until the first has the transport's answer, then finds the
-row `SENT` and sends nothing. The lock is the session's, held outside any
+the transport sends under a PostgreSQL advisory lock on the delivery id
+(`core.db.locks.held_across_calls`): the second copy waits until the first has
+the transport's answer, then finds the row `SENT` and sends nothing. The lock is the session's, held outside any
 transaction (a transaction open across the send would be ended by
 `idle_in_transaction_session_timeout`), so a worker that dies takes it along
 and the waiting copy sends instead. Inside a transaction (a task applied

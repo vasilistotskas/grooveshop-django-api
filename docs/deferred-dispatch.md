@@ -210,9 +210,11 @@ outside a task.
   advisory lock on it (`docs/emails/delivery.md`).
 
 - **Recommendation events** (`recommendation.events.record_events`): each
-  row's `event_key` is the key of the task copy that wrote it, unique, so a
-  second copy inserts nothing. Two beacons are two tasks and stay two rows even for one
-  impression id: a cached strip shows one id to every viewer.
+  row's `event_key` is `dispatch_key` over the task id, the kind, the
+  impression id, the product and the position, unique, so every copy of one
+  dispatch makes the same keys and a second copy inserts nothing. Two beacons
+  are two tasks and stay two rows even for one impression id: a cached strip
+  shows one id to every viewer.
 
 A task whose effect is a state of a row needs no id: it claims the state (a
 compare-and-set, a unique row). A dispatch made inside a task (a chain's next

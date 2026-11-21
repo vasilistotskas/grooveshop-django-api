@@ -10834,6 +10834,9 @@ msgstr "Διαγράφηκαν οριστικά %(count)d κατάστημα(τ�
 msgid "Permissions"
 msgstr "Δικαιώματα"
 
+msgid "Personal data erased at"
+msgstr "Διαγραφή προσωπικών δεδομένων στις"
+
 msgid "Phone"
 msgstr "Τηλέφωνο"
 
@@ -17051,6 +17054,9 @@ msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδο
 
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "Πότε η αυτόματη αναζήτηση ρώτησε τελευταία φορά τον πάροχο πληρωμών γι' αυτή την επιστροφή χωρίς να μπορέσει να αποφασίσει."
+
+msgid "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+msgstr "Πότε διαγράφηκαν τα προσωπικά δεδομένα του αγοραστή (GDPR). Διαγράφονται και όσα δεδομένα μεταφορέα φτάσουν αργότερα."
 
 msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
 msgstr "Πότε η ακύρωση αυτής της απόδειξης σταμάτησε για το προσωπικό: το myDATA δεν τη δείχνει ούτε στην ακύρωση (σφάλμα 301) ούτε στη λίστα των παραστατικών του καταστήματος, οπότε η κατάστασή της εκεί είναι άγνωστη. Το προσωπικό την ακυρώνει στο myDATA ή εκδίδει τα πιστωτικά της."

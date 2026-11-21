@@ -1,6 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -119,6 +119,49 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         converted to this order, linking checkout-time reservations to the
         final order (audit trail, stock-discrepancy debugging).
     """
+
+    #: The invoice's counterparty: personal, and GDPR erasure keeps it only
+    #: on an order whose invoice was issued (``order.privacy``), with
+    #: that invoice (tax law).
+    BILLING_FIELDS: ClassVar[tuple[str, ...]] = (
+        "billing_vat_id",
+        "billing_country",
+        "billing_company_name",
+        "billing_tax_office",
+        "billing_activity",
+        "billing_street",
+        "billing_street_number",
+        "billing_city",
+        "billing_zipcode",
+    )
+    #: The buyer's own data on an order: what a data export lists and what
+    #: GDPR erasure clears, ``BILLING_FIELDS`` of an issued invoice excepted
+    #: (``order.privacy``). A new personal field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_personal_field.py``
+    #: fails for one the staging anonymiser scrubs that is missing.
+    PERSONAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "street",
+        "street_number",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+        "customer_notes",
+        *BILLING_FIELDS,
+    )
+    #: The paths inside ``metadata`` that hold the buyer's own data: the
+    #: browser identity the Conversions API reads (IP address, user agent,
+    #: Meta's browser and click ids) and the reason typed when cancelling.
+    #: Exported and erased with ``PERSONAL_FIELDS``.
+    PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("meta",),
+        ("cancellation", "reason"),
+    )
 
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
@@ -441,6 +484,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         default="",
         db_default="",
         help_text=_("Series and number of that credit invoice."),
+    )
+    personal_data_erased_at = models.DateTimeField(
+        _("Personal data erased at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the buyer's personal data was erased (GDPR). Carrier data "
+            "that arrives later is erased too."
+        ),
     )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""

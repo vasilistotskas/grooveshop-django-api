@@ -172,6 +172,39 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
+    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
+        """Remove the recipient's data from this carrier's records of the
+        given orders, for GDPR erasure (``user.services.gdpr``): the
+        copies of the order's name, address, phone and notes it keeps on
+        rows of its own, which survive the order's anonymisation. Returns
+        a tally of the rows touched, by kind.
+
+        Default: nothing to remove, for a carrier that keeps no records of
+        its own (the flat rate).
+        """
+        return {}
+
+    def orders_in_motion(self, order_ids: list[int]) -> set[int]:
+        """The given orders whose parcel with this carrier may still bring
+        news of the recipient: a shipment not yet in a terminal state, or
+        one waiting on a payout. What decides how long an erased order's
+        carrier records are cleared again (``order.privacy``).
+
+        Default: none, for a carrier that keeps no records of its own.
+        """
+        return set()
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What this carrier reported about the recipient of each of the
+        given orders and :meth:`erase_recipient_data` clears, for a data
+        export (``user.services.gdpr``), by order id. The copies of the
+        order's own data it keeps are not repeated: the export lists the
+        order.
+
+        Default: nothing, for a carrier that keeps no records of its own.
+        """
+        return {}
+
     @abstractmethod
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

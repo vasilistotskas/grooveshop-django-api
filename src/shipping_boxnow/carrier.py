@@ -114,6 +114,83 @@ class BoxNowCarrier(ShippingCarrierInterface):
             city=locker.address_line_2,
         )
 
+    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
+        """The BOX NOW records of the orders, cleared of the recipient:
+        each shipment's ``metadata`` at ``BoxNowShipment.PERSONAL_METADATA``
+        (the rest stays), and the text BOX NOW sent with each parcel event,
+        in its column and in the raw body (the events stay). Run again for
+        orders already erased, it clears the events that arrived since."""
+        from core.utils.json_paths import drop_paths
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        scrubbed = 0
+        for shipment in BoxNowShipment.objects.filter(order_id__in=order_ids):
+            metadata = shipment.metadata or {}
+            if drop_paths(metadata, BoxNowShipment.PERSONAL_METADATA):
+                shipment.metadata = metadata
+                shipment.save(update_fields=["metadata"])
+                scrubbed += 1
+
+        events = 0
+        for event in BoxNowParcelEvent.objects.filter(
+            shipment__order_id__in=order_ids
+        ):
+            raw = (
+                event.raw_payload if isinstance(event.raw_payload, dict) else {}
+            )
+            # A webhook carries it under ``data``, a polled event under
+            # ``event``.
+            dropped = drop_paths(
+                raw,
+                (
+                    ("data", "additionalInformation"),
+                    ("event", "additionalInformation"),
+                ),
+            )
+            if event.additional_information or dropped:
+                event.additional_information = ""
+                event.raw_payload = raw
+                event.save(
+                    update_fields=["additional_information", "raw_payload"]
+                )
+                events += 1
+
+        return {
+            "carrier_pii_scrubbed": scrubbed,
+            "carrier_events_scrubbed": events,
+        }
+
+    def orders_in_motion(self, order_ids: list[int]) -> set[int]:
+        """Orders whose BOX NOW parcel is not in a terminal state: its
+        events still arrive."""
+        from shipping_boxnow.models.shipment import (
+            TERMINAL_STATES,
+            BoxNowShipment,
+        )
+
+        return set(
+            BoxNowShipment.objects.filter(order_id__in=order_ids)
+            .exclude(parcel_state__in=TERMINAL_STATES)
+            .values_list("order_id", flat=True)
+        )
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """The text BOX NOW sent with each order's parcel events, for a
+        data export (what :meth:`erase_recipient_data` clears)."""
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        data: dict[int, dict] = {}
+        for order_id, text in (
+            BoxNowParcelEvent.objects.filter(shipment__order_id__in=order_ids)
+            .exclude(additional_information="")
+            .order_by("event_time")
+            .values_list("shipment__order_id", "additional_information")
+        ):
+            entry = data.setdefault(order_id, {})
+            entry.setdefault("boxnow_event_texts", []).append(text)
+        return data
+
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:

@@ -536,6 +536,19 @@ def purge_unconfirmed_guest_subscriptions(self) -> dict:
     return {"status": "success", "deleted": deleted}
 
 
+@celery_app.task(base=MonitoredTask)
+def erase_late_carrier_data() -> dict:
+    """Clear the carrier data that reached an erased order after its
+    erasure (``order.privacy.erase_late_carrier_data``): a parcel still
+    moving goes on being tracked, delivered and paid out. Registered as a
+    periodic beat task, fanned out per tenant."""
+    from order.privacy import erase_late_carrier_data as erase
+
+    counts = erase()
+    logger.info("erase_late_carrier_data: %s", counts)
+    return {"status": "success", **counts}
+
+
 @celery_app.task(
     base=MonitoredTask,
     bind=True,

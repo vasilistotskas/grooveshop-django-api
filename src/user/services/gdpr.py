@@ -33,6 +33,12 @@ from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from order.privacy import (
+    PLACEHOLDER_NAME,
+    carrier_data,
+    erase_orders,
+    export_order,
+)
 from tenant.credentials import tenant_site_name
 
 logger = logging.getLogger(__name__)
@@ -225,7 +231,13 @@ def compile_user_data(user) -> dict[str, Any]:
     from order.models.order import Order
 
     orders = []
-    for o in Order.objects.filter(user=user).prefetch_related("items"):
+    user_orders = list(
+        Order.objects.all_with_deleted()
+        .filter(user=user)
+        .prefetch_related("items")
+    )
+    reported = carrier_data([o.id for o in user_orders])
+    for o in user_orders:
         orders.append(
             {
                 "id": o.id,
@@ -235,14 +247,8 @@ def compile_user_data(user) -> dict[str, Any]:
                 "amount_due": _serialize_money(o.amount_due),
                 "shipping_price": _serialize_money(o.shipping_price),
                 "total_price": _serialize_money(o.total_price),
-                "first_name": o.first_name,
-                "last_name": o.last_name,
-                "email": o.email,
-                "phone": str(o.phone) if o.phone else None,
-                "street": o.street,
-                "street_number": o.street_number,
-                "city": o.city,
-                "zipcode": o.zipcode,
+                **export_order(o),
+                "carrier": reported.get(o.id, {}),
                 "created_at": _iso(o.created_at),
                 "items": [
                     {
@@ -475,41 +481,6 @@ def create_export_request(user) -> Any:
     )
 
 
-def _scrub_carrier_shipment_pii(order_ids: list[int]) -> int:
-    """Strip the ``metadata['last_error']`` PII envelope from carrier
-    shipments linked to the given orders.
-
-    When voucher/parcel creation fails, the carrier services persist the
-    failing request payload — which includes the recipient's name,
-    address and phone — under ``metadata['last_error']['request_params']``
-    for post-mortem. That envelope survives order anonymisation (it lives
-    on the shipment, not the order), so erasure must clear it explicitly.
-    The rest of the metadata is non-personal operational data (billing
-    code, cached label URL, child voucher numbers) and is retained.
-
-    Returns the number of shipment rows scrubbed.
-    """
-    if not order_ids:
-        return 0
-
-    from shipping_acs.models import AcsShipment
-    from shipping_boxnow.models.shipment import BoxNowShipment
-
-    scrubbed = 0
-    for model in (AcsShipment, BoxNowShipment):
-        shipments = model.objects.filter(
-            order_id__in=order_ids,
-            metadata__has_key="last_error",
-        )
-        for shipment in shipments:
-            metadata = shipment.metadata or {}
-            metadata.pop("last_error", None)
-            shipment.metadata = metadata
-            shipment.save(update_fields=["metadata"])
-            scrubbed += 1
-    return scrubbed
-
-
 def _delete_export_files(user) -> int:
     """Remove this user's GDPR export bundles from the private volume.
 
@@ -575,33 +546,20 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     counts: dict[str, int] = {}
 
     placeholder_email = f"deleted-{uuid.uuid4().hex[:12]}@deleted.invalid"
-    placeholder_name = "[deleted]"
+    placeholder_name = PLACEHOLDER_NAME
 
-    orders_qs = Order.objects.filter(user=user)
-    # Capture the order ids before the FK is nulled below — a later filter by
-    # user would then match nothing.
-    order_ids = list(orders_qs.values_list("id", flat=True))
-    counts["orders_anonymised"] = orders_qs.update(
-        user=None,
-        first_name=placeholder_name,
-        last_name=placeholder_name,
-        email=placeholder_email,
-        phone="",
-        street=placeholder_name,
-        street_number="",
-        city=placeholder_name,
-        zipcode="",
-        place="",
-        floor="",
-        location_type="",
-        customer_notes="",
+    # Every order, soft-deleted ones included: deleting an order in the
+    # admin only hides it, and the subject's data stays on it.
+    order_ids = list(
+        Order.objects.all_with_deleted()
+        .filter(user=user)
+        .values_list("id", flat=True)
     )
-
-    # Carrier shipments keep a failed-creation error envelope in
-    # metadata['last_error'] that includes recipient PII (name, address,
-    # phone). Strip it so erasure is complete — the rest of the shipment
-    # metadata is non-personal operational data and is retained.
-    counts["carrier_pii_scrubbed"] = _scrub_carrier_shipment_pii(order_ids)
+    # The orders are kept (tax law, payment reconciliation, finance
+    # reports), cleared of the buyer's data and every copy of it: the
+    # carriers' records, the typed cancel reason where the cancel flow
+    # copied it. ``order.privacy`` holds what that is.
+    counts.update(erase_orders(order_ids, placeholder_email=placeholder_email))
 
     # Order history rows document the state transitions of an order we
     # are legally required to keep, so the rows stay — but the request

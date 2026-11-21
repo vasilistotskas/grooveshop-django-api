@@ -153,7 +153,8 @@ staging anonymiser (`src/devtools/anonymise/`); the seed commands. Read
 and each store's schema holds its customers. Also `UserAddress`,
 `UserSubscription`, `SubscriptionTopic` and `UserDataExport`. Services are
 a package (`src/user/services/`, with the data export and account
-deletion in `src/user/services/gdpr.py`). Authentication is django-allauth
+deletion in `src/user/services/gdpr.py`; read `docs/gdpr-erasure.md`).
+Authentication is django-allauth
 headless, mounted at `_allauth/` in `src/core/urls.py`; read
 `docs/allauth-schema.md`.
 

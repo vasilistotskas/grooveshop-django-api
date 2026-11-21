@@ -200,6 +200,12 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
+        "erase-late-carrier-data": {
+            # Fanout: clears the carrier data that reached an order after
+            # its buyer's GDPR erasure, for ERASURE_CARRIER_FOLLOW_UP_DAYS.
+            "task": "tenant.tasks.fanout_erase_late_carrier_data",
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+        },
         "purge-expired-recommendation-events": {
             # Fanout: RecommendationEvent is per-tenant. Deletes events
             # older than RECOMMENDATION_EVENT_RETENTION_DAYS.

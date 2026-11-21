@@ -287,7 +287,7 @@ class BooksFilter(DropdownFilter):
 
     def queryset(self, request, queryset):
         if self.value() == "receipt_waiting":
-            return queryset.filter(metadata__receipt_deferred=True)
+            return queryset.receipt_deferred()
         if self.value() == "beyond_receipt":
             return queryset.filter(
                 pk__in=credit_allocation.uncovered_orders().values("order_id")

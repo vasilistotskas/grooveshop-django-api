@@ -1,6 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -119,6 +119,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         converted to this order, linking checkout-time reservations to the
         final order (audit trail, stock-discrepancy debugging).
     """
+
+    #: The delivery address fields that are the buyer's own: what GDPR
+    #: erasure blanks and a data export lists (``user.services.gdpr``). A
+    #: new address field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_address_field.py``
+    #: fails for one that is scrubbed by the staging anonymiser but neither
+    #: listed here nor kept on purpose.
+    SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
 
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(

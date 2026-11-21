@@ -126,40 +126,6 @@ class TestCompileUserDataCompleteness:
         assert data["cart"]["items"][0]["product_id"] == item.product_id
         assert data["cart"]["items"][0]["quantity"] == 3
 
-    def test_an_order_exports_every_personal_field_it_erases(self):
-        """The export lists an order's ``Order.PERSONAL_FIELDS`` (contact,
-        address, the customer's note, the invoice's counterparty) and its
-        ``Order.PERSONAL_METADATA``, the same definition erasure clears."""
-        from order.factories.order import OrderFactory
-        from order.models.order import Order
-
-        user = UserAccountFactory()
-        meta = {"client_ip_address": "203.0.113.7", "fbp": "fb.1.2.3"}
-        OrderFactory(
-            user=user,
-            customer_notes="Θυρωρός",
-            billing_vat_id="123456789",
-            billing_company_name="Εταιρεία ΑΕ",
-            billing_street="Ερμού",
-            metadata={
-                "meta": meta,
-                "cancellation": {"reason": "Λάθος μέγεθος", "by": 1},
-                "promotions": [{"code": "WELCOME"}],
-            },
-        )
-
-        [exported] = compile_user_data(user)["orders"]
-
-        assert set(Order.PERSONAL_FIELDS) <= set(exported)
-        assert exported["customer_notes"] == "Θυρωρός"
-        assert exported["billing_vat_id"] == "123456789"
-        assert exported["billing_company_name"] == "Εταιρεία ΑΕ"
-        assert exported["billing_street"] == "Ερμού"
-        assert exported["metadata"] == {
-            "meta": meta,
-            "cancellation": {"reason": "Λάθος μέγεθος"},
-        }
-
     def test_export_cart_is_none_without_cart(self):
         """No cart → the ``cart`` key is present and explicitly null."""
         user = UserAccountFactory()

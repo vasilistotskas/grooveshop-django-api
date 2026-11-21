@@ -112,64 +112,6 @@ class AcsCarrier(ShippingCarrierInterface):
             city=station.city,
         )
 
-    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
-        """The ACS records of the orders, cleared of the recipient:
-
-        - each shipment's ``metadata`` at ``AcsShipment.PERSONAL_METADATA``;
-          the request's operational fields, the billing code and the child
-          voucher numbers stay;
-        - the call history (``AcsApiCall``) of those orders and their
-          vouchers, children included, which holds each request and answer
-          with the recipient's name, address and phone: deleted, as the
-          diagnostics it is;
-        - what ACS sent back: the tracking checkpoints' notes and the
-          receiver a COD payout names, with the raw rows they came in. The
-          checkpoints and the payout amounts stay.
-        """
-        from django.db.models import Q
-
-        from core.utils.json_paths import drop_paths
-        from shipping_acs.models import (
-            AcsApiCall,
-            AcsCodPayout,
-            AcsShipment,
-            AcsTrackingEvent,
-        )
-
-        # A tracking or COD row names the voucher, not the order.
-        vouchers: set[str] = set()
-        scrubbed = 0
-        for shipment in AcsShipment.objects.filter(order_id__in=order_ids):
-            metadata = shipment.metadata or {}
-            children = metadata.get("multipart_vouchers")
-            vouchers.update(
-                [
-                    shipment.voucher_no,
-                    *(children if isinstance(children, list) else []),
-                ]
-            )
-            if drop_paths(metadata, AcsShipment.PERSONAL_METADATA):
-                shipment.metadata = metadata
-                shipment.save(update_fields=["metadata"])
-                scrubbed += 1
-        vouchers.discard("")
-
-        return {
-            "carrier_pii_scrubbed": scrubbed,
-            "acs_api_calls": AcsApiCall.objects.filter(
-                Q(order_id__in=order_ids) | Q(voucher_no__in=vouchers)
-            ).delete()[0],
-            "carrier_events_scrubbed": (
-                AcsTrackingEvent.objects.filter(
-                    shipment__order_id__in=order_ids
-                ).update(notes="", raw_payload={})
-                + AcsCodPayout.objects.filter(
-                    Q(shipment__order_id__in=order_ids)
-                    | Q(voucher_no__in=vouchers)
-                ).update(pod="", parcel_receiver="", raw_payload={})
-            ),
-        }
-
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:

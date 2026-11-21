@@ -14,10 +14,7 @@ and says which file holds each § number used here.
   (`_floor_label`, the `floor` choice's label, "2ος όροφος"), the order's
   `address_line_2` (a flat, a building), then the customer's note, joined by
   ` | ` within `DELIVERY_NOTES_MAX_LEN` (500); only the customer's note is
-  ever cut (`shipping.services.CourierNotes`). The shipment's audit copy
-  (`metadata["create_request"]`) records the notes as sent less the address
-  line 2; GDPR erasure removes them from it (`AcsShipment.PERSONAL_METADATA`)
-  and deletes the orders' `AcsApiCall` rows. The manual's
+  ever cut (`shipping.services.courier_delivery_notes`). The manual's
   `Recipient_Floor` gives no format or allowed values (p. 6), so the floor is
   not sent there until an ACS stage voucher shows how a value lands; then it
   moves to that field and out of the notes.

@@ -172,18 +172,6 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
-    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
-        """Remove the recipient's data from this carrier's records of the
-        given orders, for GDPR erasure (``user.services.gdpr``): the
-        copies of the order's name, address, phone and notes it keeps on
-        rows of its own, which survive the order's anonymisation. Returns
-        a tally of the rows touched, by kind.
-
-        Default: nothing to remove, for a carrier that keeps no records of
-        its own (the flat rate).
-        """
-        return {}
-
     @abstractmethod
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

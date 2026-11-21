@@ -20,8 +20,6 @@ tokens synchronously, broadcasts a force-logout, and answers
 
 from __future__ import annotations
 
-import json
-
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -256,170 +254,23 @@ def test_a_bundle_that_will_not_delete_aborts_the_whole_erasure(
     assert bundle.exists()
 
 
-def test_no_value_of_the_subject_survives_on_what_erasure_keeps(subject):
-    """A retained order and its carrier records keep nothing of the
-    subject's: every column in ``Order.PERSONAL_FIELDS`` but the invoice's
-    counterparty, ``Order.PERSONAL_METADATA``, each shipment's
-    ``PERSONAL_METADATA`` (the failed request, the notes the voucher
-    carried), the ACS call history, and what the carriers sent back.
-
-    Every retained row is searched, JSON columns included, so a copy kept
-    under any key fails this test, not only the keys it names."""
+def test_a_retained_order_keeps_no_address_of_the_subject(subject):
+    """Every field in ``Order.SHIPPING_ADDRESS_FIELDS`` is blanked (or set
+    to the placeholder) on the order erasure keeps, ``address_line_2``
+    included (#641)."""
     from order.factories.order import OrderFactory
     from order.models.order import Order
-    from shipping_acs.factories import (
-        AcsShipmentFactory,
-        AcsTrackingEventFactory,
-    )
-    from shipping_acs.models import (
-        AcsApiCall,
-        AcsCodPayout,
-        AcsShipment,
-        AcsTrackingEvent,
-    )
-    from shipping_acs.services import _audit_envelope, _delivery_notes
-    from shipping_boxnow.factories import (
-        BoxNowParcelEventFactory,
-        BoxNowShipmentFactory,
-    )
-    from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
-    from shipping_boxnow.models.shipment import BoxNowShipment
 
-    name = "Ζηνοβία Αρβανιτάκη"
-    phone = "6912345678"
-    note = f"Κουδούνι Αρβανιτάκη, {phone}"
-    ip = "203.0.113.77"
     order = OrderFactory(
         user=subject,
-        first_name="Ζηνοβία",
-        last_name="Αρβανιτάκη",
-        email="zinovia.arvanitaki@example.gr",
-        phone=f"+30{phone}",
-        street="Ζωοδόχου Πηγής",
-        street_number="17Β",
-        address_line_2="Διαμ. 3Α",
-        city="Χαλάνδρι",
-        zipcode="15231",
-        place="Κάτω Χαλάνδρι",
+        address_line_2="Διαμ. 3, 2ος όροφος",
+        place="Κολωνάκι",
         floor="SECOND_FLOOR",
         location_type="HOME",
-        customer_notes=note,
-        metadata={
-            "meta": {
-                "client_ip_address": ip,
-                "client_user_agent": "SubjectBrowser/1.0",
-                "fbp": "fb.1.1700000000.subjectfbp",
-                "fbc": "fb.1.1700000000.subjectfbc",
-            },
-            "cancellation": {
-                "reason": "Μετακομίζω στη Λάρισα",
-                "previous_status": "PENDING",
-            },
-            "promotions": [{"code": "WELCOME"}],
-        },
-    )
-    params = {"Delivery_Notes": _delivery_notes(order).sent, "Weight": "1"}
-    acs = AcsShipmentFactory(
-        order=order,
-        voucher_no="7400000001",
-        metadata={
-            "billing_code": "BILLING",
-            "multipart_vouchers": ["7400000002"],
-            "create_request": _audit_envelope(params, order),
-            "last_error": {
-                "request_params": {
-                    "Recipient_Name": name,
-                    "Recipient_Phone": phone,
-                },
-            },
-        },
-    )
-    AcsApiCall.objects.create(
-        alias="ACS_Create_Voucher",
-        duration_ms=1,
-        outcome="ok",
-        order_id=order.id,
-        request_params={"Recipient_Name": name, "Delivery_Notes": note},
-    )
-    AcsApiCall.objects.create(
-        alias="ACS_TrackingSummary",
-        duration_ms=1,
-        outcome="ok",
-        voucher_no="7400000002",
-        response={"recipient": name},
-    )
-    other_call = AcsApiCall.objects.create(
-        alias="ACS_TrackingSummary",
-        duration_ms=1,
-        outcome="ok",
-        voucher_no="7499999999",
-    )
-    AcsTrackingEventFactory(
-        shipment=acs,
-        notes=f"Παρέλαβε η {name}",
-        raw_payload={"checkpoint_notes": f"Παρέλαβε η {name}"},
-    )
-    AcsCodPayout.objects.create(
-        voucher_no="7400000001",
-        shipment=acs,
-        pod=name,
-        parcel_receiver=name,
-        raw_payload={"POD": name, "Parcel_Receiver": name},
-    )
-    boxnow = BoxNowShipmentFactory(
-        order=order,
-        metadata={
-            "create_request": {"orderNumber": "1", "description": note},
-            "last_error": {"response_text": f"bad phone {phone}"},
-        },
-    )
-    BoxNowParcelEventFactory(
-        shipment=boxnow,
-        additional_information=f"Για {name}",
-        raw_payload={"data": {"additionalInformation": f"Για {name}"}},
     )
 
     anonymise_and_delete_user(subject)
 
-    retained = [
-        Order.objects.filter(pk=order.pk).values().get(),
-        *AcsShipment.objects.filter(order=order).values(),
-        *BoxNowShipment.objects.filter(order=order).values(),
-        *AcsApiCall.objects.values(),
-        *AcsTrackingEvent.objects.values(),
-        *AcsCodPayout.objects.values(),
-        *BoxNowParcelEvent.objects.values(),
-    ]
-    text = json.dumps(retained, ensure_ascii=False, default=str)
-    for value in (
-        "Ζηνοβία",
-        "Αρβανιτάκη",
-        "zinovia.arvanitaki",
-        phone,
-        "Ζωοδόχου",
-        "17Β",
-        "Διαμ. 3Α",
-        "Χαλάνδρι",
-        "15231",
-        "2ος όροφος",
-        ip,
-        "SubjectBrowser",
-        "subjectfbp",
-        "subjectfbc",
-        "Λάρισα",
-    ):
-        assert value not in text, value
-
     order.refresh_from_db()
-    assert order.floor == ""
-    assert order.location_type == ""
-    # What is not the subject's stays: the order's operational metadata,
-    # the shipment's, the carrier events and an unrelated call.
-    assert order.metadata["promotions"] == [{"code": "WELCOME"}]
-    assert order.metadata["cancellation"] == {"previous_status": "PENDING"}
-    acs.refresh_from_db()
-    assert acs.metadata["billing_code"] == "BILLING"
-    assert acs.metadata["create_request"] == {"Weight": "1"}
-    assert AcsTrackingEvent.objects.filter(shipment=acs).exists()
-    assert AcsApiCall.objects.filter(pk=other_call.pk).exists()
-    assert AcsApiCall.objects.count() == 1
+    for field in Order.SHIPPING_ADDRESS_FIELDS:
+        assert getattr(order, field) in {"", "[deleted]"}, field

@@ -33,7 +33,7 @@ from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.locks import lock_with_order
-from shipping.services import DELIVERY_NOTES_MAX_LEN, CourierNotes
+from shipping.services import DELIVERY_NOTES_MAX_LEN, courier_delivery_notes
 from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
 from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
@@ -217,28 +217,26 @@ def _stale_claim_message(age: float) -> str:
 
 
 def _audit_envelope(params: dict[str, Any], order: Order) -> dict[str, Any]:
-    """Return a PII-scrubbed copy of the create-voucher params, built
-    with them (``create_voucher_for_order``) from the same order.
+    """Return a PII-scrubbed copy of the create-voucher params.
 
-    ``Delivery_Notes`` is recorded as sent, less the address line 2 it
-    carries (:attr:`CourierNotes.without_address`): that line is the
-    recipient's address. The floor and the customer's note stay, for the
-    "did it reach ACS?" question; GDPR erasure removes them
-    (``AcsShipment.PERSONAL_METADATA``).
+    ``Delivery_Notes`` is recorded without the address line 2 it carries
+    (``_delivery_notes``): that line is the recipient's address.
     """
     envelope = {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
     if "Delivery_Notes" in envelope:
-        envelope["Delivery_Notes"] = _delivery_notes(order).without_address
+        envelope["Delivery_Notes"] = _delivery_notes(order, with_address=False)
     return envelope
 
 
-def _delivery_notes(order: Order) -> CourierNotes:
+def _delivery_notes(order: Order, *, with_address: bool = True) -> str:
     """The voucher's ``Delivery_Notes``: the floor, the address line 2
-    and the customer's note. The floor and the address line come first:
-    ACS's ``Recipient_Address`` is the street alone, so they ride here."""
-    return CourierNotes(
+    and the customer's note (``courier_delivery_notes``). The floor and
+    the address line come first: ACS's ``Recipient_Address`` is the street
+    alone, so they ride here. ``with_address=False`` leaves the address
+    line out, for the audit copy that must hold no recipient address."""
+    return courier_delivery_notes(
         floor=_floor_label(order),
-        address_line_2=order.address_line_2,
+        address_line_2=order.address_line_2 if with_address else "",
         customer_notes=order.customer_notes,
     )
 
@@ -632,7 +630,6 @@ class AcsService:
         # ----- Phase 2: API call (no DB lock held) -----
         try:
             params = cls._build_create_voucher_params(order, shipment, client)
-            audit_request = _audit_envelope(params, order)
         except Exception as exc:
             # Nothing was sent. Refused locally (an invalid postcode) or
             # failed building the request: record it where the admin
@@ -826,7 +823,7 @@ class AcsService:
                 # shipping_boxnow/services.py).
                 metadata.pop("last_error", None)
                 metadata["create_response"] = result
-                metadata["create_request"] = audit_request
+                metadata["create_request"] = _audit_envelope(params, order)
                 metadata["multipart_vouchers"] = children
 
                 # The answer came after another worker found this claim
@@ -880,7 +877,7 @@ class AcsService:
         sent_notes = params.get("Delivery_Notes", "") or ""
         raw_notes_len = len(order.customer_notes or "")
         # ``notes_truncated`` derives from the post-sanitize length —
-        # ``CourierNotes`` collapses whitespace runs before
+        # ``courier_delivery_notes`` collapses whitespace runs before
         # truncating, so a raw note of 600 spaces sanitises to "" and
         # was NOT truncated even though raw_len > MAX. The sanitiser
         # caps at exactly MAX, so sent_len == MAX is the truncation
@@ -1501,7 +1498,7 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            "Delivery_Notes": _delivery_notes(order).sent,
+            "Delivery_Notes": _delivery_notes(order),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:

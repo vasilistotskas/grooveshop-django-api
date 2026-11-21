@@ -8,11 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    ProductAlertCreateThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import stated_request_language
 from core.utils.serializers import (
@@ -30,6 +26,7 @@ from product.alerts import (
 from product.models.alert import ProductAlert, ProductAlertKind
 from product.models.product import Product
 from product.serializers.alert import ProductAlertSerializer
+from product.throttles import ProductAlertCreateThrottle
 from tenant.membership import is_store_staff
 from user.models.subscription import ConfirmOutcome
 

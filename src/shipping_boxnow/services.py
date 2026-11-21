@@ -123,7 +123,7 @@ def _last_error(exc: BoxNowAPIError) -> dict[str, Any]:
 # from the DB without re-running the payload builder. Strictly
 # operational — destination/origin contact details are intentionally
 # excluded because shipment.metadata is not cleared by GDPR
-# anonymisation (see user/services/gdpr.py).
+# anonymisation (see src/user/services/gdpr.py).
 _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "orderNumber",
     "description",
@@ -466,7 +466,7 @@ class BoxNowService:
             # Using total_price overcharged every discounted COD order by
             # the discount and disagreed with ``invoiceValue`` below
             # (also amount_due). Mirrors the ACS COD sync
-            # (shipping_acs/services.py) including the ``> 0`` guard that
+            # (src/shipping_acs/services.py) including the ``> 0`` guard that
             # keeps the amount inside BoxNow's valid (0, 5000) range.
             # Filled here (not at row creation) because amount_due is
             # only persisted after the create_shipment_row hook fires.

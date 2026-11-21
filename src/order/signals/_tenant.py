@@ -5,7 +5,7 @@ API domain (``https://<tenant-api-domain>/stripe/webhook/<uuid>/``), so
 ``TenantMainMiddleware`` has already selected the tenant schema before
 dj-stripe verifies and processes the event. Every Stripe object we
 create is additionally stamped with ``metadata.tenant_schema`` inside
-``order/payments/payment.py`` — these helpers extract that value and re-enter
+``order.payments.payment`` — these helpers extract that value and re-enter
 the schema explicitly, which keeps the handlers correct as defense in depth
 (and for any event replayed outside a tenant request context).
 """
@@ -182,7 +182,7 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
 
             # tenant_context (not schema_context): the latter binds a
             # bare FakeTenant to the connection, and every helper in
-            # tenant/credentials.py reads real fields off
+            # src/tenant/credentials.py reads real fields off
             # ``connection.tenant`` — under a FakeTenant they all return
             # "", so a handler that instantiates a payment provider
             # would raise ImproperlyConfigured. The Viva and Celery

@@ -189,7 +189,7 @@ def activate_tenant(tenant) -> bool:
         # settings and documents. One sync brings both back
         # (``meilisearch_sync_all_indexes`` applies each model's settings
         # first), in the store's schema, once the activation commits.
-        from core.tasks import sync_meilisearch_indexes
+        from meili.tasks import sync_meilisearch_indexes
         from tenant.celery import dispatch_on_commit
 
         dispatch_on_commit(

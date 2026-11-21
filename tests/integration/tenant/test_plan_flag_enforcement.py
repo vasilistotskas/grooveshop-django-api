@@ -1,6 +1,6 @@
 """A paid-plan boundary must hold on the money path, not just at the door.
 
-``tenant/permissions.py`` documents a two-tier contract: the PLAN flag
+``src/tenant/permissions.py`` documents a two-tier contract: the PLAN flag
 on the ``Tenant`` row (platform-controlled, "what this store has paid
 for") AND the ``extra_settings`` toggle (merchant-controlled, "what the
 store wants on right now"). Both must be true.

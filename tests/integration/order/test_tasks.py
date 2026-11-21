@@ -301,7 +301,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         ``send_order_confirmation_email``) must surface the active
         tenant's ``logo_light_url`` as ``SITE_LOGO_URL`` — previously no
         live send included that key, so the template's per-tenant logo
-        branch was dead code (see ``core/utils/email_context.py``).
+        branch was dead code (see ``src/core/utils/email_context.py``).
         """
         order = _quiet_order(
             email="logo-tenant@example.com",

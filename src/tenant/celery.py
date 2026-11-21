@@ -507,7 +507,7 @@ def defer_dispatch(
             next_attempt_at=timezone.now(),
         )
     except Exception:
-        from core.tasks import safe_task_arguments
+        from core.monitored_task import safe_task_arguments
 
         safe_args, safe_kwargs = safe_task_arguments(
             task, payload["args"], payload["kwargs"]

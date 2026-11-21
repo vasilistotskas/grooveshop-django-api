@@ -25,8 +25,8 @@ from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_DB_ERRORS
-from core.tasks import MonitoredTask
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,

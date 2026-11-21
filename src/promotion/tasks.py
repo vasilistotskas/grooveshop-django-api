@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import SEARCH_TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 

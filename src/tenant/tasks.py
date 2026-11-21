@@ -7,13 +7,13 @@ from django.conf import settings
 
 from core import celery_app
 from core.cache.edge import EdgePurgeError
+from core.monitored_task import MonitoredTask, safe_task_arguments
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
     TRANSIENT_NETWORK_ERRORS,
 )
-from core.tasks import MonitoredTask, safe_task_arguments
 from tenant.celery import TenantTask, describe_error, run_for_all_tenants
 
 if TYPE_CHECKING:

@@ -13,7 +13,8 @@ from order.exceptions import OrderCancellationError, PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.inventory.stock import StockManager
-from order.services import OrderService, RefundResult
+from order.refunds.service import RefundResult, RefundService
+from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -89,7 +90,7 @@ class OrderServiceTestCase(TestCase):
             product=ProductFactory(stock=10), price=_eur("50.00"), quantity=2
         )
 
-        with patch.object(OrderService, "refund_order") as mock_refund:
+        with patch.object(RefundService, "refund_order") as mock_refund:
             mock_refund.return_value = RefundResult(
                 refunded=_eur("100.00"), refund_ids=("refund_123",)
             )
@@ -140,7 +141,7 @@ class OrderServiceTestCase(TestCase):
             {"refund_id": "refund_123", "amount": "100.00"},
         )
 
-        result = OrderService.refund_order(
+        result = RefundService.refund_order(
             order=order, amount=None, reason="Test refund"
         )
 
@@ -173,7 +174,7 @@ class OrderServiceTestCase(TestCase):
             {"refund_id": "refund_456", "amount": "25.00"},
         )
 
-        result = OrderService.refund_order(
+        result = RefundService.refund_order(
             order=order, amount=_eur("25.00"), reason="Partial refund"
         )
 
@@ -197,7 +198,7 @@ class OrderServiceTestCase(TestCase):
         )
 
         with self.assertRaises(PaymentError) as context:
-            OrderService.refund_order(order=order)
+            RefundService.refund_order(order=order)
 
         self.assertIn(
             "This order has not been paid yet.", str(context.exception)

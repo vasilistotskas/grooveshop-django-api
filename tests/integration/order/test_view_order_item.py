@@ -435,7 +435,9 @@ class RestockActionTests(TestURLFixerMixin, APITestCase):
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()
 
-        with patch("order.services.order_refunded.send") as refunded_signal:
+        with patch(
+            "order.refunds.service.order_refunded.send"
+        ) as refunded_signal:
             response = self.client.post(
                 self.get_restock_url(self.order_item.id),
                 {"quantity": 2},

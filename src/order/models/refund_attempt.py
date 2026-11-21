@@ -98,7 +98,7 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
         :func:`reconcile_after`: a crash left them unfinished. No provider
         can answer for them and staff have no outcome to record: repeating
         the refund of the same amount resumes and finishes the attempt
-        (``OrderService._attempts_to_resume``). Until then it holds its
+        (``RefundService._attempts_to_resume``). Until then it holds its
         money, defers the order's receipt and refuses a new refund."""
         return self.live().filter(
             kind=RefundAttemptKind.STORED_VALUE,
@@ -109,7 +109,7 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
 class RefundAttempt(models.Model):
     """One share of a refund, claimed before the provider is called.
 
-    ``OrderService.refund_order`` runs in three steps so that no database
+    ``RefundService.refund_order`` runs in three steps so that no database
     transaction is open while a provider answers (a connection idle in a
     transaction is killed after ten seconds): the attempt is claimed under
     the order lock and committed, the provider is called with no

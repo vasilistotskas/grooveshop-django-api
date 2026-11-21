@@ -267,7 +267,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     def refund(self, quantity=None, *, performed_by=None, reason=""):
         """Put ``quantity`` returned units back in stock and record them as
         refunded on this line. Moves NO money: what the customer is paid
-        back is the order's refund (``OrderService.refund_order``), because
+        back is the order's refund (``RefundService.refund_order``), because
         a line's snapshot price is not what was paid for it. Returns the
         value of the units, for the caller's display.
 

@@ -146,23 +146,33 @@ def _python_files() -> list[Path]:
 
 
 def _comments_and_docstrings(source: str) -> list[str]:
-    """The text of every comment and docstring of a Python source."""
-    docstrings = {
-        (node.body[0].lineno, node.body[0].end_lineno)
-        for node in ast.walk(ast.parse(source))
-        if isinstance(
-            node,
-            (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef),
+    """The text of every comment and docstring of a Python source.
+
+    A docstring here is any string that is a statement of its own: a
+    module's, class's or function's, and the one under an assignment that
+    documents it. A string that is a value (a default, a message, a
+    template name) is data and is left out.
+    """
+    statements = [
+        (
+            (node.lineno, node.col_offset),
+            (node.end_lineno, node.end_col_offset),
         )
-        and ast.get_docstring(node, clean=False) is not None
-    }
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    ]
     return [
         token.string
         for token in tokenize.generate_tokens(io.StringIO(source).readline)
         if token.type == tokenize.COMMENT
         or (
             token.type == tokenize.STRING
-            and (token.start[0], token.end[0]) in docstrings
+            and any(
+                start <= token.start and token.end <= end
+                for start, end in statements
+            )
         )
     ]
 
@@ -302,13 +312,18 @@ def test_a_split_or_absent_path_in_python_is_reported(tmp_path, monkeypatch):
         "``docs/product-\n"
         'pricing.md``; the code is ``src/order/services.py``."""\n'
         "# was order/services.py, set in ``settings.py``\n"
-        'TEMPLATE = "order/receipt.html"\n',
+        'TEMPLATE = "order/receipt.html"\n'
+        '"""Loaded by ``order/loader.py``."""\n'
+        'def render(name="order/default.html"): "No path here."\n'
+        'NOTE = ("Kept in "\n'
+        '        "order/notes.txt")\n',
         encoding="utf-8",
     )
     monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
 
     assert _missing_paths_named_in_python() == {
         "src/apps.py: docs/gone.md",
+        "src/apps.py: order/loader.py",
         "src/apps.py: order/services.py",
         "src/apps.py: settings.py",
     }

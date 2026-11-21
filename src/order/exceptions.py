@@ -20,6 +20,7 @@ Exception Hierarchy:
     │   ├── ShippingRefusedError
     │   └── ShippingPriceUnresolvedError
     ├── OrderTotalChangedError
+    ├── OrderCartChangedError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -369,6 +370,23 @@ class OrderTotalChangedError(OrderServiceError):
     def __init__(self, quote):
         self.quote = quote
         super().__init__("the order total is not the total the client expected")
+
+
+class OrderCartChangedError(OrderServiceError):
+    """Raised when the order would be made of something other than what
+    the client says it showed the buyer: the quote's ``cart_digest`` is
+    not the one the request carried (``expectedCartDigest``).
+
+    Nothing was created. The API answers it 409 with the quote the order
+    would have been created at, as for ``OrderTotalChangedError``.
+
+    Attributes:
+        quote (CheckoutQuote): What checkout charges for the cart now.
+    """
+
+    def __init__(self, quote):
+        self.quote = quote
+        super().__init__("the cart is not the cart the client was quoted")
 
 
 class InvalidCouponError(OrderServiceError):

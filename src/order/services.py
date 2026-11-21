@@ -57,6 +57,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    OrderCartChangedError,
     OrderNotCancelableError,
     OrderTotalChangedError,
     ParcelWithCourierError,
@@ -611,12 +612,7 @@ class OrderService:
 
     @staticmethod
     def _shipping_choice(shipping_address: dict[str, Any]) -> ShippingChoice:
-        return ShippingChoice(
-            kind=shipping_address.get("shipping_kind"),
-            provider_code=shipping_address.get("shipping_provider_code"),
-            country_id=shipping_address.get("country_id"),
-            region_id=shipping_address.get("region_id"),
-        )
+        return ShippingChoice.of(shipping_address)
 
     @classmethod
     def _resolve_live_shipping(
@@ -688,7 +684,8 @@ class OrderService:
         shipping_address: dict[str, Any],
         loyalty_points_to_redeem: int | None,
         gift_card_codes: list[str] | None,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None,
     ) -> CheckoutQuote:
         """The total an order is created at, computed once.
 
@@ -707,6 +704,12 @@ class OrderService:
         promotions, rates and pay-way fees can all change between the
         last render and the order, and this is the one place a change
         is caught for a pay way with no provider amount to compare.
+
+        ``expected_cart_digest`` is the quote's ``cart_digest`` the
+        client showed. When it is not this quote's, the order would be
+        made of something else than what the buyer saw (a line swapped
+        at the same price, another pickup point), and
+        ``OrderCartChangedError`` refuses it first, whatever the total.
         """
         quote = OrderQuoteService.quote(
             cart,
@@ -719,9 +722,15 @@ class OrderService:
             lock=True,
         )
         if (
-            expected_total is not None
-            and expected_total != quote.expected_total
+            expected_cart_digest is not None
+            and expected_cart_digest != quote.cart_digest
         ):
+            logger.info(
+                "Order refused for cart %s: it changed since its quote",
+                cart.uuid,
+            )
+            raise OrderCartChangedError(quote)
+        if expected_total != quote.expected_total:
             logger.info(
                 "Order refused for cart %s: the client expected %s, the "
                 "total is %s",
@@ -1014,7 +1023,8 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None = None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None = None,
         agent_checkout: UUID | None = None,
     ) -> Order:
         """
@@ -1032,7 +1042,7 @@ class OrderService:
         2. Validates cart items still exist and prices match
         3. Validates shipping address completeness
         4. Re-compares the intent's amount and currency, and the
-           client's ``expected_total`` when it sent one, with the total
+           client's ``expected_total`` with the total
            computed under lock (``OrderQuoteService.quote``)
         5. Gets stock reservations for cart session
         6. Creates Order with payment_id field populated
@@ -1060,6 +1070,8 @@ class OrderService:
                 or already belongs to another order
             OrderTotalChangedError: If ``expected_total`` is not the
                 amount due computed under lock
+            OrderCartChangedError: If ``expected_cart_digest`` is not the
+                cart digest computed under lock
             AgentCheckoutOrderedError: If another call of
                 ``agent_checkout`` committed its order first
 
@@ -1127,6 +1139,7 @@ class OrderService:
                 attribution=attribution,
                 legal_acceptance=legal_acceptance,
                 expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
                 agent_checkout=agent_checkout,
             )
         except ShippingPriceUnresolvedError:
@@ -1156,7 +1169,8 @@ class OrderService:
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None,
         agent_checkout: UUID | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
@@ -1238,6 +1252,7 @@ class OrderService:
                 loyalty_points_to_redeem=loyalty_points_to_redeem,
                 gift_card_codes=gift_card_codes,
                 expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
             )
             charges = quote.charges()
             promo_result = quote.promotion
@@ -1700,6 +1715,7 @@ class OrderService:
             InvalidGiftCardError,
             InvalidOrderDataError,
             OrderTotalChangedError,
+            OrderCartChangedError,
             PaymentNotFoundError,
             PaymentVerificationError,
             PaymentAmountMismatchError,
@@ -1829,7 +1845,8 @@ class OrderService:
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None = None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None = None,
         agent_checkout: UUID | None = None,
     ) -> Order:
         """
@@ -1863,6 +1880,8 @@ class OrderService:
             InsufficientStockError: If stock unavailable
             OrderTotalChangedError: If ``expected_total`` is not the
                 amount due computed under lock
+            OrderCartChangedError: If ``expected_cart_digest`` is not the
+                cart digest computed under lock
             AgentCheckoutOrderedError: If another call of
                 ``agent_checkout`` committed its order first
 
@@ -1903,6 +1922,7 @@ class OrderService:
                 attribution=attribution,
                 legal_acceptance=legal_acceptance,
                 expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
                 agent_checkout=agent_checkout,
             )
         except ShippingPriceUnresolvedError:
@@ -1929,7 +1949,8 @@ class OrderService:
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
         legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal | None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None,
         agent_checkout: UUID | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart_offline``: one
@@ -2002,6 +2023,7 @@ class OrderService:
                 loyalty_points_to_redeem=loyalty_points_to_redeem,
                 gift_card_codes=gift_card_codes,
                 expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
             )
             charges = quote.charges()
             promo_result = quote.promotion
@@ -2440,6 +2462,7 @@ class OrderService:
             InvalidGiftCardError,
             InvalidOrderDataError,
             OrderTotalChangedError,
+            OrderCartChangedError,
         ):
             raise
         except Exception as e:

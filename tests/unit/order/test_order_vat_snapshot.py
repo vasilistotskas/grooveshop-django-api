@@ -43,6 +43,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.mydata import issuable, mydata_enabled
 from tests.utils.shipping import enable_rate
@@ -100,16 +101,18 @@ def _offline_checkout(cart):
     country = CountryFactory()
     enable_rate(country)
     return OrderService.create_order_from_cart_offline(
-        legal_acceptance=checkout_acceptance(),
-        cart=cart,
-        shipping_address=_address(country),
-        pay_way=PayWayFactory(
-            settlement=PaySettlement.COURIER_CASH,
-            active=True,
-            cost=Money(D(0), "EUR"),
-            free_threshold=Money(D(0), "EUR"),
-        ),
-        user=None,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address=_address(country),
+            pay_way=PayWayFactory(
+                settlement=PaySettlement.COURIER_CASH,
+                active=True,
+                cost=Money(D(0), "EUR"),
+                free_threshold=Money(D(0), "EUR"),
+            ),
+            user=None,
+        )
     )
 
 
@@ -122,12 +125,14 @@ def _payment_first_checkout(cart, user):
             {"payment_id": "pi_test_123", "status": "succeeded"},
         )
         return OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_address(country),
-            payment_intent_id="pi_test_123",
-            pay_way=PayWayFactory(provider_code="stripe"),
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=_address(country),
+                payment_intent_id="pi_test_123",
+                pay_way=PayWayFactory(provider_code="stripe"),
+                user=user,
+            )
         )
 
 

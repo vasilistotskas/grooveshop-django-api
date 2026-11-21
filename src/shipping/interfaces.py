@@ -74,6 +74,13 @@ class ShippingCarrierInterface(ABC):
     # carriers without locker selection).
     payload_keys: ClassVar[tuple[str, ...]] = ()
 
+    # The ``payload_keys`` that name the pickup point the shopper chose
+    # (a locker, a station). The checkout quote takes them as order
+    # creation does, and the cart digest covers them
+    # (``order.checkout.quote.ShippingChoice``), so an order goes to the
+    # pickup point it was quoted for.
+    location_keys: ClassVar[tuple[str, ...]] = ()
+
     @abstractmethod
     def create_shipment(
         self,

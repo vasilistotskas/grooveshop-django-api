@@ -38,6 +38,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
     # Carrier-specific request-body keys popped before Order.create().
     payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
+    location_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
 
     # ------------------------------------------------------------------
     # Lifecycle

@@ -3,6 +3,156 @@
 
 
 
+## v3.259.1 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): the cart digest is the order's contents, without the pay way (#770)
+
+The quote returns cartDigest as soon as a delivery is chosen, and the
+digest no longer holds the pay way: a UCP checkout may name its payment
+method only when it completes, which left that path guarded by its own
+quote alone. The pay way's fee is in expectedTotal, which checks what is
+paid; the digest checks what the order is made of (lines, promotions,
+delivery, pickup point).
+
+Refs #755 ([`94d1053`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94d1053590b051b696b73e6553f51e52ac5849e8))
+
+## v3.259.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): give the street line refusal its code
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): split a street line only when no number has to be guessed
+
+The street left after the split must end in a letter and hold no
+number but an ordinal of its own name, the number is ASCII digits, and
+a range written with spaces is one number. Text after the number
+(a floor, a postcode) was split into a wrong number; it is now refused
+with street_number_missing.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): split a street line by explicit rules
+
+The line is normalised first (NFC, Unicode spaces, typographic dashes,
+spaced ranges). A floor or flat word refuses it, a comma anywhere but
+directly before the number refuses it, a word that only says "number"
+is dropped, and the only number a street may hold is the day of a date
+that names it (1 to 31, with or without an ordinal ending, before a
+month in the genitive). The street ends in a letter or an
+abbreviation's dot.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): a split house number has letter suffixes and the field's length limit
+
+A suffix must be a letter, so a superscript digit is refused, and the
+number split from a street line is validated by the streetNumber field
+it replaces, its errors reported on street.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+### Features
+
+* feat(order): accept one street line and split its number inside Django (#766) ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* feat(order): accept one street line and split its number inside Django
+
+Order creation takes street without streetNumber as one line whose
+number follows the street, the Greek and Cypriot form, and splits it
+in one place (core.validators.address.split_street_line), so the order
+stores the two columns the courier voucher, invoices and myDATA read.
+A number written first is not guessed. A line with no number is a 400
+with code street_number_missing on street, and the errors of a split
+number are reported on street. A sent streetNumber is used as sent.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+## v3.258.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): the cart digest holds each line's promotion money and the routed carrier
+
+The digest now carries each applied promotion's amount and the
+promotion money every line carries, so discounts that move between
+lines at the same total change it, and the carrier a home delivery is
+routed to when it names none. Its docs say it is a check of contents:
+the shipping charge, the fee and the loyalty and gift-card amounts are
+expectedTotal's. The 409's quote help text names expectedCartDigest.
+
+Refs #755 ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
+### Features
+
+* feat(order): the quote returns a cart digest and order creation can refuse a changed cart (#765) ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
+* feat(order): the quote returns a cart digest and order creation can refuse a changed cart
+
+POST /cart/quote returns cartDigest once a delivery and a pay way are
+chosen: an HMAC over the lines (product, quantity, unit price as
+priced), the promotions with their codes and gifts, the delivery with
+its pickup point, and the pay way. POST /order takes an optional
+expectedCartDigest, compared under the cart lock on both creation
+paths before the total; a difference creates nothing and answers 409
+cart_changed with the fresh quote. It refuses an order whose contents
+changed at the same total, which expectedTotal cannot see.
+
+The quote now takes the pickup point with the field names order
+creation uses (PickupPointSerializer), and both build the delivery
+with ShippingChoice.of, which keeps only the chosen carrier's
+location_keys. A test places every order-creation field as digested,
+priced or not priced, so the two bodies cannot drift apart.
+
+cart_changed is a code under error.type invalid_order_data, sent only
+to a request carrying expectedCartDigest, until the storefront lists it.
+
+Refs #755 ([`814b5f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814b5f6c7539e163b6bd92a79474ad32a1182cf1))
+
+## v3.257.0 (2026-11-21)
+
+### Documentation
+
+* docs(order): expectedTotal is required, not optional for now
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+### Features
+
+* feat(order): require expectedTotal on order creation (#764) ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+* feat(order): require expectedTotal on order creation
+
+Every order is now created at the total its client showed the buyer:
+expectedTotal is required on POST /api/v1/order and on both
+OrderService creation paths, so no path places an order without the
+total check. The storefront in production (v3.345.3) refuses to place
+an order without the quote's expectedTotal and the gateway sends it on
+every order since v1.49.0.
+
+The storefront's document is generated from this schema, so the API
+contract gate cannot see that it already sends the field: the change
+is accepted in api-contract/ignore.txt until the storefront's next
+release regenerates from it, and the README names the case.
+
+Tests quote the order first and send that total, as the clients do
+(tests/utils/checkout.py).
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
+### Testing
+
+* test(order): serializer-only checkout payloads send an expected total
+
+The tests that validate OrderCreateFromCartSerializer alone now send a
+shape-only expectedTotal, which the serializer requires.
+
+Refs #635 ([`51047b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51047b1dd56c0c87638154d50c07cc4ff747402a))
+
 ## v3.256.0 (2026-11-20)
 
 ### Bug fixes

@@ -81,9 +81,10 @@ caller:
   own sum is not the quote's `amount_due`: a charge added to one and not
   the other, or a cart line changed between the quote and the line lock,
   fails the creation instead of producing an order no payment matches.
-- **The expected total.** `POST /api/v1/order` takes an optional
+- **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
-  (cents). Both creation paths compare it, exactly, with the quote computed
+  (cents), as the quote returned it. An order is never created at a total
+  the client did not send. Both creation paths compare it, exactly, with the quote computed
   under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the
@@ -101,14 +102,46 @@ caller:
     may send it. Until then clients branch on `code` and the 409
     (`order.enum.create_error.TOTAL_CHANGED_CODE`); the gateway reads
     `code` already.
-  - **Optional for now.** The storefront and the gateway start sending it,
-    then a later release requires it (#635).
+  - **Required since #635's third release**, once the storefront
+    (v3.345.3) and the gateway (v1.49.0) in production sent it on every
+    order. Nothing creates an order without the total check.
+- **The cart digest.** A quote with a delivery chosen also returns
+  `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
+  `SECRET_KEY`, over a canonical form of what the order would be made of:
+  each line (product, quantity, unit price as priced, the promotion money
+  it carries), the promotions that apply with their codes, amounts and
+  gifts, the delivery (kind as `delivery_kind` reads it, the carrier that
+  takes it, as `_carrier` resolves one a home delivery does not name,
+  country, region, the pickup point). It is a check of contents: it holds
+  no pay way (a UCP checkout may name its payment method only when it
+  completes) and no shipping charge, fee, loyalty or gift-card amount;
+  `expectedTotal` holds what is paid, the pay way's fee included. It is stable while those do not change and reveals
+  nothing of the cart. `POST /api/v1/order` takes an optional
+  `expectedCartDigest`; both creation paths compare it under the cart
+  lock, before the total, and a difference creates nothing and answers
+  **409** `{detail, error: {type, quote}, code: "cart_changed"}`. It
+  catches what the total cannot: a line swapped for one at the same
+  price, quantities that trade off, another locker at the same rate.
+  - **The quote takes what the order takes.** The pickup point
+    (`boxnowLockerId`, `acsStationExternalId`, `acsStationBranch`,
+    `order.serializers.quote.PickupPointSerializer`) is a field of both
+    bodies, and both build the delivery with `ShippingChoice.of`, which
+    keeps only the chosen carrier's `location_keys`
+    (`shipping.interfaces.ShippingCarrierInterface`). Every order-creation
+    field is placed as digested, priced or not priced in
+    `tests/integration/order/test_cart_digest.py`, so a field added to one
+    body and not the other fails there.
+  - **A code, not an enum value.** As `total_changed`, `cart_changed` is
+    sent under `error.type` `invalid_order_data`
+    (`order.enum.create_error.CART_CHANGED_CODE`), and only to a request
+    carrying `expectedCartDigest`. Optional until the storefront and the
+    gateway send it; a later release requires it (#755).
 - **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
   body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation
   prices a missing kind as home delivery; a quote does not assume one).
-  Besides the rows it returns `expectedTotal`, to send back with the
-  order, and the priced lists: `shippingOptions` (every delivery the store
+  Besides the rows it returns `expectedTotal` and `cartDigest`, to send
+  back with the order, and the priced lists: `shippingOptions` (every delivery the store
   offers to the country, `ShippingService.available_options` priced with
   the region and a free-shipping promotion, each with `waivedBy`; null
   without a country) and `payWays` (every pay way a shopper is offered
@@ -451,6 +484,38 @@ address it cannot place (prod order #316: street "1", street number
   in the Country admin. A blank pattern means only "required".
 - **Street** must contain a letter; **street number** must not itself
   match the country's postcode pattern (4+ characters).
+- **One street line** (#641). Order creation takes `street` without
+  `streetNumber` (or with it blank) as one line whose number follows the
+  street, the Greek and Cypriot form, and `split_street_line` splits it,
+  so the order stores both columns the ACS voucher, invoices and myDATA
+  read. A wrong number sends the parcel elsewhere, which is worse than
+  asking for it again, so the rules are explicit:
+  1. The line is normalised: NFC, every Unicode space a plain space,
+     typographic dashes `-`, a range written with spaces one number
+     ("12 - 14" -> "12-14").
+  2. It ends in the house number: ASCII digits, at most one letter, an
+     optional second number after `-` or `/`. A number written first
+     ("12 Main St") is never read.
+  3. A comma is allowed only directly before the number ("Ερμού, 12");
+     elsewhere ("Ερμού 12, όροφος 3", "Εγνατίας 12, 546 22") the line is
+     refused.
+  4. A floor or flat word (`UNIT_MARKERS`: όροφος, οροφ., ορ., ισόγειο,
+     διαμέρισμα, διαμ., ημιόροφος, floor, fl., apt, apartment, unit, suite,
+     flat; compared without accents or case) refuses the line: the number
+     after it is not the house's ("Ερμού, όροφος 3").
+  5. A word that only says "number" (`NUMBER_MARKERS`: αρ., αριθμός, Νο,
+     No, nr) is dropped from the street ("Ερμού αρ. 12" -> "Ερμού", "12").
+  6. The street holds no number but the day of a date that names it: 1 to
+     31, with or without a Greek ordinal ending, before a month in the
+     genitive ("28 Οκτωβρίου 15", "28η Οκτωβρίου 15", "Οδός 1ης Μαΐου 3").
+  7. The street ends in a letter, or an abbreviation's dot after one
+     ("Main St. 12").
+
+  A line it cannot split is a 400 with `fields.street` code
+  `street_number_missing`, and the errors of a split number
+  (`street_number_is_postcode`) are reported on `street`: the caller sent
+  no number field. A sent `streetNumber` is used as sent. The agent
+  gateway sends the UCP and ACP destination's single street line this way.
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

@@ -13,6 +13,7 @@ from order.factories.order import OrderFactory
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
 from shipping.models import ShippingProvider
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
@@ -151,10 +152,12 @@ class TestSetAtCreation:
             "order.services.timezone.now", return_value=MONDAY_10_ATHENS
         ):
             return OrderService.create_order_from_cart_offline(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address=address,
-                pay_way=pay_way,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=cart,
+                    shipping_address=address,
+                    pay_way=pay_way,
+                )
             )
 
     def test_order_stores_the_estimate(self):
@@ -205,23 +208,25 @@ def _create_online():
             {"payment_id": "pi_test_123", "status": "succeeded"},
         )
         order = OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address={
-                "first_name": "Maria",
-                "last_name": "Papadopoulou",
-                "email": "maria@example.com",
-                "street": "Ermou",
-                "street_number": "1",
-                "city": "Athens",
-                "zipcode": "10563",
-                "country_id": country.alpha_2,
-                "phone": "+306900000000",
-                "shipping_kind": "home_delivery",
-            },
-            payment_intent_id="pi_test_123",
-            pay_way=PayWayFactory(provider_code="stripe"),
-            user=user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address={
+                    "first_name": "Maria",
+                    "last_name": "Papadopoulou",
+                    "email": "maria@example.com",
+                    "street": "Ermou",
+                    "street_number": "1",
+                    "city": "Athens",
+                    "zipcode": "10563",
+                    "country_id": country.alpha_2,
+                    "phone": "+306900000000",
+                    "shipping_kind": "home_delivery",
+                },
+                payment_intent_id="pi_test_123",
+                pay_way=PayWayFactory(provider_code="stripe"),
+                user=user,
+            )
         )
 
     order.refresh_from_db()

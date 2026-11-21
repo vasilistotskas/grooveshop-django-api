@@ -25,6 +25,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced, quoted_body
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -84,22 +85,24 @@ def _place(*, email="maria@example.com", user=None, pay_way=None):
     country = CountryFactory()
     enable_rate(country)
     return OrderService.create_order_from_cart_offline(
-        legal_acceptance=checkout_acceptance(),
-        cart=cart,
-        shipping_address={
-            "first_name": "Maria",
-            "last_name": "Papadopoulou",
-            "email": email,
-            "street": "Ermou",
-            "street_number": "1",
-            "city": "Athens",
-            "zipcode": "10563",
-            "country_id": country.alpha_2,
-            "phone": "+306900000000",
-            "shipping_kind": "home_delivery",
-        },
-        pay_way=pay_way or _online(),
-        user=user,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address={
+                "first_name": "Maria",
+                "last_name": "Papadopoulou",
+                "email": email,
+                "street": "Ermou",
+                "street_number": "1",
+                "city": "Athens",
+                "zipcode": "10563",
+                "country_id": country.alpha_2,
+                "phone": "+306900000000",
+                "shipping_kind": "home_delivery",
+            },
+            pay_way=pay_way or _online(),
+            user=user,
+        )
     )
 
 
@@ -255,25 +258,30 @@ class TestThroughTheEndpoint:
         from rest_framework.test import APIClient
 
         address = self.checkout.address()
-        return APIClient().post(
+        client = APIClient()
+        headers = {
+            "HTTP_X_CART_ID": str(self.checkout.cart.uuid),
+            "HTTP_X_LANGUAGE": "en",
+        }
+        body = {
+            "payWayId": self.viva.id,
+            "termsAccepted": True,
+            "firstName": address["first_name"],
+            "lastName": address["last_name"],
+            "email": address["email"],
+            "street": address["street"],
+            "streetNumber": address["street_number"],
+            "city": address["city"],
+            "zipcode": address["zipcode"],
+            "countryId": address["country_id"],
+            "regionId": self.region.alpha,
+            "phone": address["phone"],
+        }
+        return client.post(
             reverse("order-list"),
-            {
-                "payWayId": self.viva.id,
-                "termsAccepted": True,
-                "firstName": address["first_name"],
-                "lastName": address["last_name"],
-                "email": address["email"],
-                "street": address["street"],
-                "streetNumber": address["street_number"],
-                "city": address["city"],
-                "zipcode": address["zipcode"],
-                "countryId": address["country_id"],
-                "regionId": self.region.alpha,
-                "phone": address["phone"],
-            },
+            quoted_body(client, body, **headers),
             format="json",
-            HTTP_X_CART_ID=str(self.checkout.cart.uuid),
-            HTTP_X_LANGUAGE="en",
+            **headers,
         )
 
     def test_the_refusal_has_its_own_code_and_sentence(self, documented):

@@ -1062,12 +1062,7 @@ class CartViewSet(BaseModelViewSet):
         # A delivery is priced once it is chosen: a kind and a country.
         shipping = None
         if data.get("shipping_kind") and country_id:
-            shipping = ShippingChoice(
-                kind=data["shipping_kind"],
-                provider_code=data.get("shipping_provider_code"),
-                country_id=country_id,
-                region_id=region_id,
-            )
+            shipping = ShippingChoice.of(data)
         pay_way = None
         if data.get("pay_way_id"):
             pay_way = self._offered_pay_way(data["pay_way_id"], shipping)
@@ -1188,24 +1183,9 @@ class CartViewSet(BaseModelViewSet):
         )
         request_serializer.is_valid(raise_exception=True)
         pay_way_id = request_serializer.validated_data["pay_way_id"]
-        # ``shipping_provider_code`` is normalised to None by the
-        # serializer's validate() when omitted (home_delivery is
-        # provider-agnostic in the frontend); pass it through so the
-        # order-create verification gets the same None and both calc
-        # paths agree on the generic-fallback shipping price.
-        shipping_provider_code = request_serializer.validated_data.get(
-            "shipping_provider_code"
-        )
-        shipping_kind = request_serializer.validated_data["shipping_kind"]
-        country_id = request_serializer.validated_data.get("country_id") or None
-        region_id = request_serializer.validated_data.get("region_id") or None
-
-        shipping = ShippingChoice(
-            kind=shipping_kind,
-            provider_code=shipping_provider_code,
-            country_id=country_id,
-            region_id=region_id,
-        )
+        # The delivery as order creation reads it from the same body
+        # (``ShippingChoice.of``), so both price the same shipping.
+        shipping = ShippingChoice.of(request_serializer.validated_data)
         pay_way = self._offered_pay_way(pay_way_id, shipping)
         if isinstance(pay_way, Response):
             return pay_way

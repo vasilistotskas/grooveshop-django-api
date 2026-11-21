@@ -24,6 +24,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 
 from blog.factories.post import BlogPostFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import quoted_body
 from tests.utils.emails import open_email_gates  # noqa: F401
 from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
@@ -674,25 +675,27 @@ def test_a_guest_checks_out_on_a_store_without_accounts(
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
+    body = {
+        "email": "guest@example.com",
+        "first_name": "Guest",
+        "last_name": "Shopper",
+        "phone": "+12025550195",
+        "street": "Main Street",
+        "street_number": "1",
+        "city": "Testville",
+        "zipcode": "12345",
+        "country_id": country.alpha_2,
+        "region_id": region.alpha,
+        "pay_way_id": pay_way.id,
+        "terms_accepted": True,
+        "shipping_kind": "home_delivery",
+    }
+    headers = {"HTTP_X_CART_ID": str(cart.uuid)}
     response = client.post(
         reverse("order-list"),
-        {
-            "email": "guest@example.com",
-            "first_name": "Guest",
-            "last_name": "Shopper",
-            "phone": "+12025550195",
-            "street": "Main Street",
-            "street_number": "1",
-            "city": "Testville",
-            "zipcode": "12345",
-            "country_id": country.alpha_2,
-            "region_id": region.alpha,
-            "pay_way_id": pay_way.id,
-            "terms_accepted": True,
-            "shipping_kind": "home_delivery",
-        },
+        quoted_body(client, body, **headers),
         format="json",
-        HTTP_X_CART_ID=str(cart.uuid),
+        **headers,
     )
 
     assert response.status_code == status.HTTP_201_CREATED, response.data

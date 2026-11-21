@@ -1491,6 +1491,9 @@ msgstr "Actor email"
 msgid "Add synonyms, products or content for these."
 msgstr "Add synonyms, products or content for these."
 
+msgid "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+msgstr "Add the street number after the street name, for example Ermou 12, or enter it in the street number field."
+
 msgid "Add tracking information to an existing order"
 msgstr "Add tracking information to an existing order"
 
@@ -1774,6 +1777,9 @@ msgstr "An error occurred while processing your request."
 
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
+
+msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
+msgstr "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
@@ -14015,14 +14021,14 @@ msgstr "Street"
 msgid "Street Number"
 msgstr "Street Number"
 
-msgid "Street name"
-msgstr "Street name"
-
 msgid "Street name and number"
 msgstr "Street name and number"
 
-msgid "Street number"
-msgstr "Street number"
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+
+msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
+msgstr "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 
 msgid "Street, street number, and city are required."
 msgstr "Street, street number, and city are required."
@@ -14613,6 +14619,9 @@ msgstr "The VAT on the invoice, kept for your accountant."
 
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 msgstr "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
+
+msgid "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+msgstr "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
 
 msgid "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 msgstr "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
@@ -15275,8 +15284,8 @@ msgstr "The time to pay for this order has run out. Place a new order from your 
 msgid "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 msgstr "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 
-msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
-msgstr "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``, or the client's own amount due in minor units. When sent, the order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgid "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``. The order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
+msgstr "The total the buyer was shown: ``expectedTotal`` of ``POST /cart/quote``. The order is created only if it is exactly the amount due computed now; otherwise the answer is 409 ``total_changed`` with the new quote and nothing is created."
 
 msgid "The type must look like name@version."
 msgstr "The type must look like name@version."
@@ -17511,6 +17520,9 @@ msgstr "Your business account has been approved"
 msgid "Your business's legal details are missing"
 msgstr "Your business's legal details are missing"
 
+msgid "Your cart has changed since its total was shown. Review your order and place it again."
+msgstr "Your cart has changed since its total was shown. Review your order and place it again."
+
 msgid "Your data and preferences are still safely stored"
 msgstr "Your data and preferences are still safely stored"
 
@@ -17867,8 +17879,8 @@ msgstr "``invalid_coupon`` only."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 
-msgid "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
-msgstr "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
+msgid "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
+msgstr "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
@@ -18846,6 +18858,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 #~ msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+
+#~ msgid "Street name"
+#~ msgstr "Street name"
+
+#~ msgid "Street number"
+#~ msgstr "Street number"
 
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."

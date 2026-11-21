@@ -1516,7 +1516,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             split = address_rules.split_street_line(attrs["street"])
             if split is None:
                 raise serializers.ValidationError(
-                    {"street": [address_rules.street_number_missing()]}
+                    {"street": [address_rules.street_number_missing()]},
+                    code="street_number_missing",
                 )
             attrs["street"], attrs["street_number"] = split
         errors = address_rules.address_errors(

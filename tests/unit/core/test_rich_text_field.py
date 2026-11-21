@@ -269,7 +269,7 @@ def test_greek_labels_load_between_the_pack_and_the_editor():
 def test_editor_plugins_are_the_audited_set():
     """The policy covers what THESE plugins emit, measured against the
     bundled TinyMCE. A plugin added or removed here must be re-measured
-    and the allowlist in core/utils/sanitize.py updated to match, or its
+    and the allowlist in src/core/utils/sanitize.py updated to match, or its
     output is refused on save."""
     plugins = {
         name.strip()

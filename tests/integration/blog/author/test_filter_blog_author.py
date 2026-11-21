@@ -1,4 +1,4 @@
-"""``BlogAuthorFilter`` (blog/filters/author.py) through the author list.
+"""``BlogAuthorFilter`` (src/blog/filters/author.py) through the author list.
 
 Every case asserts the exact set of authors returned from one dataset,
 so a filter the view does not apply — or a parameter django-filter

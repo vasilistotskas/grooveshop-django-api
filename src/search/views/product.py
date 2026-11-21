@@ -123,7 +123,7 @@ def _with_catalogue_ranges(
     return search_qs
 
 
-# The `ty: ignore` below is explained in `search/views/blog.py`.
+# The `ty: ignore` below is explained in `src/search/views/blog.py`.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Search products with advanced filters"),
     description=_(
@@ -373,7 +373,7 @@ def product_meili_search(request):
         mark_count_only(request)
 
     # Greeklish queries match the indexed ``*_greeklish`` shadow fields
-    # directly (see search/transliteration.py) — no query rewriting.
+    # directly (see src/search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
 
     search_qs = _visible_products(language_code).paginate(

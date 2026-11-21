@@ -150,12 +150,14 @@ class TestALockerOrder:
             region_id=region.alpha,
             floor="SECOND_FLOOR",
             location_type="HOME",
+            address_line_2="3ος όροφος, διαμ. 4",
         )
 
         assert response.status_code == 201, response.content
         order = Order.objects.get()
         assert order.region_id is None
         assert (order.floor, order.location_type) == ("", "")
+        assert order.address_line_2 == ""
 
     def test_a_region_that_does_not_exist_is_not_kept(self, locker_checkout):
         response = _post_locker_order(locker_checkout, region_id="XX")

@@ -1,5 +1,5 @@
 """Shopper-facing gift-card endpoints (``GiftCardViewSet``,
-``giftcard/views.py``): balance check, purchase, purchase-status poll and
+``src/giftcard/views.py``): balance check, purchase, purchase-status poll and
 "my gift cards".
 
 The merchant toggle (``GIFT_CARDS_ENABLED`` extra-setting) is patched

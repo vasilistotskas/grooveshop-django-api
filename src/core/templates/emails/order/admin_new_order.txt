@@ -15,7 +15,8 @@ CUSTOMER
 {% if order.phone %}  Phone:           {{ order.phone }}
 {% endif %}
 SHIPPING ADDRESS
-  {{ order.street }} {{ order.street_number }}
+  {{ order.street }} {{ order.street_number }}{% if order.address_line_2 %}
+  {{ order.address_line_2 }}{% endif %}
   {{ order.city }}, {{ order.zipcode }}
   {{ order.country }}
 

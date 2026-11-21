@@ -52,7 +52,8 @@ STORAGES = {
 # carry script, and has no size to reserve); names are Pillow's.
 # Most pixels one uploaded image may have, whatever it is uploaded for
 # (``core.uploads``: never above what the media service decodes). The byte
-# caps are the media service's own, copied into ``core/data/image-limits.json``.
+# caps are the media service's own, copied into
+# ``src/core/data/image-limits.json``.
 UPLOAD_IMAGE_MAX_PIXELS = int(getenv("UPLOAD_IMAGE_MAX_PIXELS", "40000000"))
 # An upload over its byte cap or the pixel budget is scaled down to this long
 # edge (twice the widest rendition the media service makes, 2048) and

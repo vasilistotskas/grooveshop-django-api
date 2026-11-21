@@ -1,7 +1,7 @@
 """``TenantConfig.preferences``: each store preference's state.
 
 The switches the API does not refuse on (``STORE_PREFERENCES`` in
-``tenant/features.py``) ride in the tenant payload beside ``features``, so a
+``src/tenant/features.py``) ride in the tenant payload beside ``features``, so a
 client never reads them from a settings call that can fail, and never keeps
 a default of its own for one.
 """

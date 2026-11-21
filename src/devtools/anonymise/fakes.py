@@ -14,7 +14,7 @@ Two kinds of key:
   business fields. An address is the row's own, not the account's.
 
 E-mail addresses end in ``@staging.invalid`` (the convention
-``devtools/demo_store.py`` already uses): ``.invalid`` is reserved by
+``src/devtools/demo_store.py`` already uses): ``.invalid`` is reserved by
 RFC 2606 and never resolves, so a mail that escapes Mailpit bounces
 instead of reaching someone.
 """

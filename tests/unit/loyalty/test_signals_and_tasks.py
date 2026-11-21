@@ -365,7 +365,7 @@ class TestTaskIdempotency:
 
 @pytest.mark.django_db
 class TestTaskRetryBehavior:
-    """A lost database connection is retried; a bug is not (core/retry.py)."""
+    """A lost database connection is retried; a bug is not (core.retry)."""
 
     def test_process_order_points_retries_on_service_error(self):
         """process_order_points calls self.retry() when LoyaltyService raises."""

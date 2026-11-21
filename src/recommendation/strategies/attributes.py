@@ -115,7 +115,7 @@ def _product_tags():
     from tag.models.tagged_item import TaggedItem
 
     # Joined rather than ``ContentType.objects.get_for_model``, for the
-    # reason ``recommendation/context.py`` gives: a constant query count.
+    # reason ``src/recommendation/context.py`` gives: a constant query count.
     opts = Product._meta
     return TaggedItem.objects.filter(
         content_type__app_label=opts.app_label,

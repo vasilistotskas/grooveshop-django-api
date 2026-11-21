@@ -293,7 +293,7 @@ class PublicSettingsSerializer(serializers.Serializer):
     # The structured settings again, typed: the string form above is the
     # JSON text of the same value. ``null`` (offices: ``[]``) is nothing
     # configured. One definition drives the admin's validation and these
-    # shapes (``core/store_setting_shapes.py``).
+    # shapes (``src/core/store_setting_shapes.py``).
     announcement_bar = AnnouncementBarSerializer(allow_null=True)
     auth_panel = AuthPanelSerializer(allow_null=True)
     funding_banner = FundingBannerSerializer()

@@ -3,7 +3,7 @@
 The refresh restores production's ``Tenant`` rows, and staging can decrypt
 them: whoever reaches the staging admin, a shell or a dump would hold the
 live Stripe, Viva, ACS, BoxNow and myDATA keys. ``staging_anonymise``
-clears them (``devtools/anonymise/credentials.py``); these tests fail when
+clears them (``src/devtools/anonymise/credentials.py``); these tests fail when
 a model gains a credential the anonymiser does not clear.
 """
 

@@ -197,7 +197,7 @@ accepting Cyprus orders at the Greek flat rate.
   checkout preselects (the cart knows no address; the payload echoes
   `countryCode`); a promotion holds in every country. The cheapest route
   wins, a promotion on a tie; a units teaser ("2 more items") costs what
-  the engine's own simulation adds (`PromotionEngine.teaser_cost`).
+  the engine's own simulation adds (`promotion.engine.teasers.teaser_cost`).
   `free` once checkout charges 0, else exactly one of `remainingAmount`
   and `remainingQuantity`; `threshold` is the value a meter fills to.
   `null` when the cart has no route at all. `promotionNearMiss` entries

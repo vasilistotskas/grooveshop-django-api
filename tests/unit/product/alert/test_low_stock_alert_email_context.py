@@ -1,6 +1,6 @@
 """The low-stock email is built through ``build_email_context`` — the
-SITE_LOGO_URL flow representative test for ``product/tasks.py`` (see
-``core/utils/email_context.py``): the logo that reaches the sent mail is the
+SITE_LOGO_URL flow representative test for ``src/product/tasks.py`` (see
+``src/core/utils/email_context.py``): the logo that reaches the sent mail is the
 tenant's, or the platform's for the platform's own store.
 """
 

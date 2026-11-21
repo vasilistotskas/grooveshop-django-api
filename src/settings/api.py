@@ -7,7 +7,7 @@ from settings.env import DEBUG
 # Rest Framework
 REST_FRAMEWORK = {
     # Every error gains ``code`` (and ``fields`` for validation); see
-    # core/api/exception_handler.py.
+    # src/core/api/exception_handler.py.
     "EXCEPTION_HANDLER": "core.api.exception_handler.exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.api.tokens.BoundedTokenAuthentication",
@@ -31,7 +31,7 @@ REST_FRAMEWORK = {
         # Tenant scoping is NOT enforced here. Customers live in their
         # tenant's own schema, so an authenticated request on this host
         # is by construction a customer of THIS store — see
-        # tenant/membership.py. The previous default additionally
+        # src/tenant/membership.py. The previous default additionally
         # required a UserTenantMembership, which no shopper can hold
         # (public-schema table, FK to the public user table), so every
         # authenticated write was refused.

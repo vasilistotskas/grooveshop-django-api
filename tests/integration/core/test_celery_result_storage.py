@@ -2,7 +2,7 @@
 
 Nothing in this codebase reads a task's return value — no
 ``AsyncResult``, no ``.get()``, no chord, no group. The one ``chain()``
-(``core/tasks.py``) links an immutable ``.si()`` signature, which celery
+(``src/core/tasks.py``) links an immutable ``.si()`` signature, which celery
 dispatches from ``task_request.chain`` before it ever touches the
 backend. So every stored success was write amplification nobody
 consumed: 2,937 Redis keys a day in production, sharing one 614 MiB

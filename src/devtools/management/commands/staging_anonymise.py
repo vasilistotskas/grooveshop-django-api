@@ -17,7 +17,7 @@ non-zero on any failure, and the whole rewrite is one transaction, so a
 failure leaves the database as restored; the refresh script then drops it.
 
 What the command covers, and why it cannot silently fall behind, is in
-``devtools/anonymise/rules.py`` and ``docs/staging-anonymise.md``.
+``src/devtools/anonymise/rules.py`` and ``docs/staging-anonymise.md``.
 """
 
 from __future__ import annotations

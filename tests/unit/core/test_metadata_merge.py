@@ -5,7 +5,7 @@ instance loaded earlier replaces the WHOLE document — every key another
 transaction added in between is silently gone.
 
 That is reachable today through ``POST /api/v1/loyalty/redeem``
-(``loyalty/views/loyalty.py``), which loads the order with a bare
+(``src/loyalty/views/loyalty.py``), which loads the order with a bare
 ``Order.objects.get()`` — no ``select_for_update``, no surrounding
 ``transaction.atomic`` — runs its validation, and only then writes. Any
 metadata write committed against that order in the meantime is lost.
@@ -79,7 +79,7 @@ def test_it_overwrites_a_key_it_owns():
 def test_the_in_memory_instance_matches_the_row():
     """Callers keep using the instance after the write.
 
-    ``order/services.py`` sets ``order.metadata["loyalty_redemption"]``
+    ``src/order/services.py`` sets ``order.metadata["loyalty_redemption"]``
     immediately after ``redeem_points`` returns and saves later, so the
     instance must carry what the database now holds.
     """

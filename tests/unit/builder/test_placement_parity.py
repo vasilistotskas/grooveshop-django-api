@@ -4,7 +4,7 @@ The editor filters its add-section library with ``builderPlacementAllowed``
 (``shared/builder/placement.ts`` in the storefront) so it never offers a
 block the store would refuse; this module's ``_placement_allowed`` is the one
 that refuses. ``placement-cases.json`` is the storefront's list of cases, a
-pinned copy (``.github/scripts/sync_storefront_sources.py``) that its own test
+pinned copy (``.github/scripts/sync_upstream_sources.py``) that its own test
 runs ``builderPlacementAllowed`` over. Running ``_placement_allowed`` over the
 same cases means a change to the rule on one side that the other does not make
 fails one of the two suites.

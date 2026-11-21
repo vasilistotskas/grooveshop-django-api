@@ -2,7 +2,7 @@
 
 ``schema_context(name)`` binds a bare django-tenants ``FakeTenant`` that
 carries only ``schema_name``. Every commit hook that re-enters its schema
-(``order/signals/handlers.py``), management command and webhook loop runs
+(``src/order/signals/handlers.py``), management command and webhook loop runs
 that way, and ``tenant.credentials`` used to read its fields straight off
 ``connection.tenant`` -- so a store with credentials on its row read as
 unconfigured and the work was skipped without an error. Verified on

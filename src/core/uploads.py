@@ -4,7 +4,7 @@ An upload is served by the media service (grooveshop-media-stream), which
 refuses a source above its per-format byte cap and shows the placeholder
 instead. So the API refuses, when the image is uploaded, what that service
 would refuse when it is shown. The limits are the media service's own, copied
-into ``core/data/image-limits.json`` (pinned by git id, refreshed by
+into ``src/core/data/image-limits.json`` (pinned by git id, refreshed by
 ``.github/scripts/sync_upstream_sources.py``), never written down a second
 time here.
 

@@ -1,6 +1,6 @@
 """Hand-authored Greek value pools for the staging anonymiser.
 
-Hand-authored for the same reason ``devtools/demo_store.py`` is: Faker is
+Hand-authored for the same reason ``src/devtools/demo_store.py`` is: Faker is
 a dev-only dependency and is absent from the deployed image (the staging
 backend cannot ``import faker``), and its English strings would make a
 Greek store unreadable. Everything here is a plain tuple so a pick is a

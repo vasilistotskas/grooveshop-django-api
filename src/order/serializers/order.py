@@ -296,6 +296,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "status_display",
@@ -1130,6 +1131,16 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             "refused with code street_number_missing on street."
         ),
     )
+    address_line_2 = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "What the street line does not hold: a flat, a floor, a "
+            "building. Optional free text, printed under the street and "
+            "given to the courier."
+        ),
+    )
     city = serializers.CharField(
         max_length=100,
         required=False,
@@ -1803,10 +1814,12 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         attrs["zipcode"] = address_rules.normalize_postcode(address.postal_code)
         # Nothing else of the buyer's address is the point's: no region
         # (``ShippingChoice.of`` prices a pickup delivery without one), no
-        # floor, no location type.
+        # floor, no location type, no address line 2 (it would print under
+        # the point's street and reach the courier's notes).
         attrs["region_id"] = None
         attrs["floor"] = ""
         attrs["location_type"] = ""
+        attrs["address_line_2"] = ""
 
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
@@ -1907,6 +1920,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "location_type",
             "street",
             "street_number",
+            "address_line_2",
             "pay_way",
             "status",
             "first_name",

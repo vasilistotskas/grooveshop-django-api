@@ -1,4 +1,4 @@
-"""ANNOUNCEMENT_BAR extra_setting validator (tenant/validators.py).
+"""ANNOUNCEMENT_BAR extra_setting validator (src/tenant/validators.py).
 
 extra_settings validators return a boolean — Setting.validate() wraps a
 falsy result in its ValidationError. The bar renders above the header on

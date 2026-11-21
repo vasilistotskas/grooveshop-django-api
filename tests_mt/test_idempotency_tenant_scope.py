@@ -5,7 +5,7 @@ The main suite strips ``TenantMainMiddleware`` and swaps the cache, so
 whether a replay can cross schemas is invisible there. Here the request
 runs the real middleware order and the production ``KEY_FUNCTION``
 (``tenant.cache.make_tenant_key``), which is what keeps one store's
-scopes out of another's (``core/middleware/idempotency.py``).
+scopes out of another's (``src/core/middleware/idempotency.py``).
 """
 
 from __future__ import annotations

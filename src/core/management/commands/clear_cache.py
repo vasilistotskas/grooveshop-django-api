@@ -272,7 +272,7 @@ class Command(BaseCommand):
             # Job's next step) treated the failed purge as done.
             #
             # The exception text stays in the log and out of the
-            # message, for the reason recorded at admin/admin.py's cache
+            # message, for the reason recorded at src/admin/admin.py's cache
             # views: a redis-py connection error carries the connection
             # target, and the URL in this deployment carries the
             # password.

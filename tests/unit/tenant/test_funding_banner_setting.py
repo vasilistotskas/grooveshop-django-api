@@ -1,4 +1,4 @@
-"""FUNDING_BANNER extra_setting validator (tenant/validators.py).
+"""FUNDING_BANNER extra_setting validator (src/tenant/validators.py).
 
 The EU/ESPA co-funding strip at the top of every page. extra_settings
 validators return a boolean — Setting.validate() wraps a falsy result

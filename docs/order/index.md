@@ -38,8 +38,9 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-21 (an order has one payable payment link: a
-request for one returns the live one, [§4](payments.md); the cart digest leaves out the pay way and
+Last refresh: 2026-11-21 (an order's address line 2, [§3.3](creation.md);
+an order has one payable payment link: a request for one returns the live
+one, [§4](payments.md); the cart digest leaves out the pay way and
 is returned once a delivery is chosen, [§3.0](creation.md); the quote's `cartDigest`: an order created
 with `expectedCartDigest` is made of what was quoted, [§3.0](creation.md);
 `expectedTotal` is required on order creation, [§3.0](creation.md);

@@ -3,7 +3,7 @@
 ``_inject_promotion_gifts`` turns every entitled gift into a physical
 order line, so a gift with dimensions can need a bigger BoxNow
 compartment than the cart's own lines. Every surface that sizes the
-parcel adds ``PromotionEngine.gift_pairs`` to the cart's pairs: the
+parcel adds ``promotion.engine.benefits.gift_pairs`` to the cart's pairs: the
 options flag, the shipping check, and the shipment row's size.
 """
 
@@ -25,9 +25,10 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from promotion.engine.benefits import gift_pairs
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 from shipping.models import ShippingProvider
 from shipping_boxnow.enum import BoxNowCompartmentSize
 from shipping_boxnow.factories import BoxNowLockerFactory
@@ -94,7 +95,7 @@ def test_gift_pairs_are_the_entitled_gifts():
 
     result = PromotionEngine.evaluate(cart)
 
-    assert PromotionEngine.gift_pairs(result) == [(gift, 1)]
+    assert gift_pairs(result) == [(gift, 1)]
 
 
 class TestOptions:

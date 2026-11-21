@@ -226,7 +226,7 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         # when ``from_email_verified`` is set, and that flag is NOT in
         # this allowlist — so a store operator cannot make their own
         # mail go out from a domain the relay has no DKIM key for,
-        # which would fail DMARC on every message (tenant/credentials.py).
+        # which would fail DMARC on every message (src/tenant/credentials.py).
         "from_email",
         "default_locale",
         # ``default_currency`` is deliberately NOT merchant-editable.

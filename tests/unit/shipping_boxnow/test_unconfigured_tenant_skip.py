@@ -2,7 +2,7 @@
 crash) for a tenant with no BoxNow credentials.
 
 BoxNow credentials are tenant-only (no settings fallback — see
-``tenant/credentials.py:box_now_credentials()``), so an unconfigured
+``src/tenant/credentials.py:box_now_credentials()``), so an unconfigured
 tenant must never reach ``BoxNowClient()`` (which would raise
 ``BoxNowConfigError``) inside a fanout task dispatched to every active
 tenant regardless of which carriers they've actually configured.

@@ -37,7 +37,7 @@ caller:
   The callers that pass both read `quote.charges()`.
 - **`lock=True` is order creation.** The candidate `Promotion` rows, the
   customer's row (when points are redeemed) and the gift cards are locked
-  until commit, so what was quoted is what `PromotionEngine.record`,
+  until commit, so what was quoted is what `promotion.engine.redemptions.record_redemptions`,
   `LoyaltyService.redeem_points` and `GiftCardService.record_plan` write.
   A refused attached coupon raises `InvalidCouponError`; without the lock
   it is reported on the quote (`blocking_coupon`).

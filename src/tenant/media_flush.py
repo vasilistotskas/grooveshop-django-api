@@ -2,7 +2,7 @@
 
 Posts media-stream's ``/admin/cache/flush-tenant`` (guarded by
 ``x-internal-secret``), which on every replica first re-reads the tenant
-feed (``tenant/internal.py``: ``suspendedSchemas``) and then drops the
+feed (``src/tenant/internal.py``: ``suspendedSchemas``) and then drops the
 tenant's cached copies. media-stream refuses a suspended store's images
 by that state (503) before reading any cache, so the flush is what makes
 a suspension or a reactivation apply at once rather than at media-stream's

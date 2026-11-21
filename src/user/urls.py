@@ -16,7 +16,7 @@ urlpatterns = [
         "user/account",
         # No "post": accounts are created by allauth's signup flow, not
         # here. See the note beside ``serializers_config`` in
-        # ``user/views/account.py``.
+        # ``src/user/views/account.py``.
         UserAccountViewSet.as_view({"get": "list"}),
         name="user-account-list",
     ),

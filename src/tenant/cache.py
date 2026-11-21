@@ -30,7 +30,7 @@ statement or transaction as the write (``Tenant.save``,
 key and the old entry is never read again; it ages out on its TTL.
 
 A delete-based purge cannot give that guarantee here. ``CustomCache``
-fails open (``core/caches.py``): with Redis unreachable a ``delete`` is
+fails open (``src/core/caches.py``): with Redis unreachable a ``delete`` is
 a logged no-op, so a purge that ran during a blip left the pre-write
 payload in Redis for the rest of its TTL — an hour for the resolve
 payload, served again the moment Redis came back. Making these keys

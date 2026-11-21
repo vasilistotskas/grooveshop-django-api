@@ -24,7 +24,7 @@ is why this is a test and not a comment.
 The rule is deliberately narrow: only the models that carry BOTH a
 ``MoneyField`` and ``HistoricalRecords``, and only when the same function
 both defers and saves.  Deferring for a read-only lookup is fine and
-common (``order/admin.py`` does it to resolve an email).
+common (``src/order/admin.py`` does it to resolve an email).
 """
 
 from __future__ import annotations

@@ -208,6 +208,7 @@ def compile_user_data(user) -> dict[str, Any]:
             "last_name": a.last_name,
             "street": a.street,
             "street_number": a.street_number,
+            "address_line_2": a.address_line_2,
             "city": a.city,
             "zipcode": a.zipcode,
             "country_id": a.country_id,
@@ -239,10 +240,10 @@ def compile_user_data(user) -> dict[str, Any]:
                 "last_name": o.last_name,
                 "email": o.email,
                 "phone": str(o.phone) if o.phone else None,
-                "street": o.street,
-                "street_number": o.street_number,
-                "city": o.city,
-                "zipcode": o.zipcode,
+                **{
+                    field: getattr(o, field)
+                    for field in Order.SHIPPING_ADDRESS_FIELDS
+                },
                 "created_at": _iso(o.created_at),
                 "items": [
                     {
@@ -587,14 +588,12 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
         last_name=placeholder_name,
         email=placeholder_email,
         phone="",
-        street=placeholder_name,
-        street_number="",
-        city=placeholder_name,
-        zipcode="",
-        place="",
-        floor="",
-        location_type="",
         customer_notes="",
+        **{
+            **{field: "" for field in Order.SHIPPING_ADDRESS_FIELDS},
+            "street": placeholder_name,
+            "city": placeholder_name,
+        },
     )
 
     # Carrier shipments keep a failed-creation error envelope in

@@ -17025,6 +17025,9 @@ msgstr "Τι πουλάει το κατάστημα. Καθορίζει το π�
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "Ό,τι πούλησε το κατάστημα, χωρίς ΦΠΑ, με μεταφορικά και χρεώσεις πληρωμής, στην περίοδο που η κάθε παραγγελία έφυγε από το κατάστημα, μείον τα χρήματα που επιστράφηκαν στην περίοδο που επιστράφηκαν."
 
+msgid "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+msgstr "Ό,τι δεν περιέχει η γραμμή της οδού: διαμέρισμα, όροφος, κτίριο. Προαιρετικό ελεύθερο κείμενο, που τυπώνεται κάτω από την οδό και δίνεται στον courier."
+
 msgid "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 msgstr "Τι είναι το voucher (δημιουργήθηκε στην πύλη της ACS, διευθετήθηκε σε κατάστημα ACS, ...). Φυλάσσεται στο voucher."
 

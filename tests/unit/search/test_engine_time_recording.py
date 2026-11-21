@@ -1,6 +1,6 @@
 """Meilisearch's processing time must reach the analytics row.
 
-Before this, `meili/querysets.py` dropped `processingTimeMs` and no search
+Before this, `src/meili/querysets.py` dropped `processingTimeMs` and no search
 endpoint emitted it, so every `SearchQuery` stored NULL and the analytics
 endpoint's `performance.avgProcessingTimeMs` was pinned at 0.0 — a number
 that looked like a measurement and was not one.

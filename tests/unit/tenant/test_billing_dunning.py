@@ -280,7 +280,7 @@ class TestRunBillingCycle:
 
 
 # ---------------------------------------------------------------------------
-# Renewal-driven auto-reactivation (tenant/signals.py)
+# Renewal-driven auto-reactivation (src/tenant/signals.py)
 # ---------------------------------------------------------------------------
 
 

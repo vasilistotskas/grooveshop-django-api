@@ -205,7 +205,7 @@ BUILDERS: dict[str, Callable[[], object]] = {
         tenant_name="Archived store",
         destroyed_at=timezone.now(),
     ),
-    # A failed task row names its store in ``meta`` (core/result_backend.py),
+    # A failed task row names its store in ``meta`` (core.result_backend),
     # so the Store column must resolve it without a query per row.
     "django_celery_results.TaskResult": lambda: __import__(
         "django_celery_results.models", fromlist=["TaskResult"]

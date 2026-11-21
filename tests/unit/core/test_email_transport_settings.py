@@ -3,7 +3,7 @@
 Django raises on ``use_tls`` and ``use_ssl`` both set, but only when a
 message is first sent, which on this platform means a customer's order
 confirmation is the thing that discovers the misconfiguration.
-The settings fail at boot instead (``settings/email.py``). The EMAIL_*
+The settings fail at boot instead (``src/settings/email.py``). The EMAIL_*
 environment variables are the same as before Django 6.1; they now fill
 MAILERS["relay"]["OPTIONS"].
 """

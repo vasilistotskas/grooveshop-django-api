@@ -1,6 +1,6 @@
 """URL patterns for the shipping_boxnow app.
 
-Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``core/urls.py``.
+Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``src/core/urls.py``.
 The webhook URL lives at the **root** level (not under api/v1/) so that
 BoxNow can reach it without authentication headers or language prefixes.
 """

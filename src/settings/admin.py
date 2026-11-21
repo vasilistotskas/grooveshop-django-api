@@ -87,7 +87,7 @@ UNFOLD_PLATFORM = {
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
-    # The ops consoles, for platform superusers (admin/navigation.py).
+    # The ops consoles, for platform superusers (src/admin/navigation.py).
     "SITE_DROPDOWN": "admin.navigation.ops_site_dropdown",
     "ENVIRONMENT": "admin.permissions.platform_environment",
     # ⌘K command palette history. What the palette finds is decided by
@@ -102,7 +102,7 @@ UNFOLD_PLATFORM = {
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
     ],
-    # Built per request, like the store's (admin/navigation.py).
+    # Built per request, like the store's (src/admin/navigation.py).
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
@@ -118,7 +118,7 @@ UNFOLD = {
     "SITE_SYMBOL": "storefront",
     # The store's own storefront ("View site" in the account menu).
     "SITE_URL": "admin.navigation.storefront_url",
-    # Each store's own marks; see ``admin/branding.py`` for the rule.
+    # Each store's own marks; see ``src/admin/branding.py`` for the rule.
     "SITE_ICON": "admin.branding.site_icon",
     "SITE_LOGO": "admin.branding.site_logo",
     "SITE_FAVICONS": "admin.branding.site_favicons",
@@ -129,7 +129,7 @@ UNFOLD = {
     "ENVIRONMENT": "admin.environment.environment_callback",
     # Prefixes the browser-tab title (e.g. "[PROD]") so staff never
     # edit the wrong environment by mistake. Both are silent for a
-    # store's own staff in production (admin/environment.py).
+    # store's own staff in production (src/admin/environment.py).
     "ENVIRONMENT_TITLE_PREFIX": (
         "admin.environment.environment_title_prefix_callback"
     ),
@@ -191,7 +191,7 @@ UNFOLD = {
     "SCRIPTS": [
         lambda request: static("admin/js/tinymce_save_sync.js"),
     ],
-    # Built per request (admin/navigation.py): each entry is listed only
+    # Built per request (src/admin/navigation.py): each entry is listed only
     # for a user its admin page would open for, and only while the
     # store's plan and settings have the feature it belongs to.
     "SIDEBAR": {
@@ -431,7 +431,7 @@ UNFOLD = {
             ],
         },
     ],
-    # The ops consoles, for platform superusers (admin/navigation.py).
+    # The ops consoles, for platform superusers (src/admin/navigation.py).
     "SITE_DROPDOWN": "admin.navigation.ops_site_dropdown",
 }
 
@@ -466,7 +466,7 @@ TINYMCE_DEFAULT_CONFIG = {
             "forecolor backcolor | language | removeformat",
         },
     },
-    # The same declarations the save drops (``core/utils/sanitize.py``),
+    # The same declarations the save drops (``src/core/utils/sanitize.py``),
     # stripped by the editor too, so a paste shows the author what will
     # be stored.
     "invalid_styles": "font font-family font-size",

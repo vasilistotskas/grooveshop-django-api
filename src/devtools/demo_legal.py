@@ -5,7 +5,7 @@ it, because the storefront 404s them — which is the one thing terms, a
 privacy policy and a cookie policy exist to prevent. So a demo store
 that serves `en` needs these before `available_locales` can include it.
 
-These mirror `page_config/legal_documents.py` — the PLATFORM's own Greek
+These mirror `src/page_config/legal_documents.py` — the PLATFORM's own Greek
 boilerplate, which every tenant is seeded with at provisioning — section
 for section, including the `id` on each `<section>`, because the legal
 route builds its table of contents from those ids and an anchor that

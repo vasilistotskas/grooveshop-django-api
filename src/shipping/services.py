@@ -82,6 +82,55 @@ def sanitize_delivery_notes(value: object) -> str:
     return text[:DELIVERY_NOTES_MAX_LEN]
 
 
+# Between the address line 2 and the customer's note in one notes field.
+DELIVERY_NOTES_SEPARATOR = " | "
+
+
+@dataclass(frozen=True, slots=True)
+class CourierNotes:
+    """The notes a voucher carries: the floor, the address line 2, then
+    the customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
+
+    For a courier whose recipient address field is the street alone (ACS's
+    ``Recipient_Address``: "the street without the area or place"), the
+    flat or floor rides in the free-text notes. The floor and the address
+    line are never cut (both are short: a label, and a field capped well
+    under the limit); the customer's note is cut first to make room. Each
+    part is sanitised as :func:`sanitize_delivery_notes` does.
+    """
+
+    address_line_2: str
+    customer_notes: str
+    floor: str = ""
+
+    def _parts(self) -> tuple[str, str, str]:
+        """The floor, the address line and the customer's note, each as
+        :attr:`sent` carries it."""
+        floor = sanitize_delivery_notes(self.floor)
+        line = sanitize_delivery_notes(self.address_line_2)
+        notes = sanitize_delivery_notes(self.customer_notes)
+        head = DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, line) if p)
+        if head and notes:
+            room = (
+                DELIVERY_NOTES_MAX_LEN
+                - len(head)
+                - len(DELIVERY_NOTES_SEPARATOR)
+            )
+            notes = notes[:room].rstrip() if room > 0 else ""
+        return floor, line, notes
+
+    @property
+    def sent(self) -> str:
+        """The text the courier receives."""
+        return DELIVERY_NOTES_SEPARATOR.join(p for p in self._parts() if p)
+
+    @property
+    def customer_part(self) -> str:
+        """The customer's note as :attr:`sent` carries it: cut to make room
+        for the floor and the address line, not cut again on its own."""
+        return self._parts()[2]
+
+
 @dataclass(frozen=True, slots=True)
 class ShippingCharge:
     """What a shipping option costs a cart, and what made it free.

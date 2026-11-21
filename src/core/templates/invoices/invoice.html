@@ -221,7 +221,7 @@
       {% if buyer.address_line_1 %}<p>{{ buyer.address_line_1 }}</p>{% endif %}
       {% if buyer.address_line_2 %}<p>{{ buyer.address_line_2 }}</p>{% endif %}
       {% if buyer.postal_code or buyer.city %}
-        <p>{{ buyer.postal_code }} {{ buyer.city }}{% if buyer.country %}, {{ buyer.country }}{% endif %}</p>
+        <p>{{ buyer.postal_code }} {{ buyer.city }}{% if buyer.place %}, {{ buyer.place }}{% endif %}{% if buyer.country %}, {{ buyer.country }}{% endif %}</p>
       {% endif %}
       {% if buyer.email %}<p>{{ buyer.email }}</p>{% endif %}
       {% if buyer.phone %}<p>{{ buyer.phone }}</p>{% endif %}

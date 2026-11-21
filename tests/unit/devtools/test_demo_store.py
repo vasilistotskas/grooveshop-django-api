@@ -1,6 +1,6 @@
 """Contract tests for the demo-store dataset.
 
-``devtools/demo_store.py`` is a large hand-authored dataset applied to
+``src/devtools/demo_store.py`` is a large hand-authored dataset applied to
 non-production tenants by ``manage.py seed_demo_store``. Nothing else
 type-checks it: a review pointing at a product slug that was renamed,
 or a wholesale net price above retail, fails silently at runtime and

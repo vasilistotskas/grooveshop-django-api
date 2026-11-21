@@ -1,6 +1,6 @@
 """EU VIES VAT-number verification client.
 
-Same outbound-HTTP posture as ``order/accounting/mydata/client.py``: a shared
+Same outbound-HTTP posture as ``order.accounting.mydata.client``: a shared
 ``requests.Session``, an explicit short timeout, and one typed
 "service unavailable" exception so callers can degrade gracefully —
 VIES has scheduled member-state downtime, and an outage must never

@@ -50,6 +50,18 @@ address it cannot place (prod order #316: street "1", street number
   (`street_number_is_postcode`) are reported on `street`: the caller sent
   no number field. A sent `streetNumber` is used as sent. The agent
   gateway sends the UCP and ACP destination's single street line this way.
+- **Address line 2** (#641). `addressLine2` is optional free text for what
+  the street line does not hold (a flat, a floor, a building; UCP's
+  `extended_address`), kept on `Order.address_line_2` apart from the
+  customer's notes. It prints under the street on the receipt and the
+  order emails, and the ACS voucher carries it in `Delivery_Notes`
+  ([§5.1](shipping-acs.md)). `Order.full_address` (`fullAddress`, the one
+  line the order pages print) has it after the street and its number
+  ("Ερμού 12, 3ος όροφος, 10563 Αθήνα"). A saved address
+  (`UserAddress.address_line_2`, `/user/address`) keeps one too, so
+  checkout prefills it. `Order.place` is a different field: a
+  district or area (Τοποθεσία), which nothing writes at checkout; the
+  receipt prints it, when set, with the city.
 - **A pickup-point order is delivered to the point** (#642). For
   `shippingKind=pickup_point` the buyer's `street`, `streetNumber`, `city`
   and `zipcode` are not required and not kept: `OrderCreateFromCartSerializer.
@@ -59,9 +71,10 @@ address it cannot place (prod order #316: street "1", street number
   address, its number split from the street line by `split_street_line`
   where it splits. That one snapshot is what the receipt, the ACS voucher
   and the order page read. Name, email and phone stay required; the
-  region rule does not apply: the order keeps no region, floor or location
-  type of the buyer's, and `ShippingChoice.of` prices a pickup delivery
-  without a region, so the quote, the cart digest and the order agree. The
+  region rule does not apply: the order keeps no region, floor, location
+  type or address line 2 of the buyer's, and `ShippingChoice.of` prices a
+  pickup delivery without a region, so the quote, the cart digest and the
+  order agree. The
   point must be deliverable (`deliverable_pickup_point`): in the catalogue,
   active (a sync keeps a withdrawn point's row and marks it inactive) and in
   the order's country; one in another country is a 400

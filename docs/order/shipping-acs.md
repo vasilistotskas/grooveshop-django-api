@@ -17,6 +17,20 @@ and says which file holds each § number used here.
   `shipping` cache surface, which every station write purges: a saved row
   through `invalidated_by`, a sync's deactivating `update` through
   `mark_surface_stale`, the order-time resync included.
+- **The recipient address** follows the manual's field meanings (p. 6-7):
+  `Recipient_Address` is the street alone ("η οδός του παραλήπτη δίχως την
+  περιοχή ή το τοπωνύμιο"), `Recipient_Address_Number` its number,
+  `Recipient_Region` the city. `Delivery_Notes`, the free-text notes
+  printed on the voucher, carries in this order: the floor's Greek label
+  (`_floor_label`, the `floor` choice's label, "2ος όροφος"), the order's
+  `address_line_2` (a flat, a building), then the customer's note, joined by
+  ` | ` within `DELIVERY_NOTES_MAX_LEN` (500); only the customer's note is
+  ever cut (`shipping.services.CourierNotes`). The shipment's audit copy
+  (`metadata["create_request"]`) records only the customer's note, as cut
+  for ACS (`CourierNotes.customer_part`): it holds no recipient address. The manual's
+  `Recipient_Floor` gives no format or allowed values (p. 6), so the floor is
+  not sent there until an ACS stage voucher shows how a value lands; then it
+  moves to that field and out of the notes.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout`: the row lock used to be held

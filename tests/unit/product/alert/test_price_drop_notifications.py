@@ -1,7 +1,7 @@
 """Unit tests for the ``send_price_drop_notifications`` Celery task.
 
 The earlier audit flagged this task as "never triggered" — that was
-wrong (it fires from the price-history signal in ``product/signals.py``
+wrong (it fires from the price-history signal in ``src/product/signals.py``
 on Product price drops). What was actually missing is happy-path test
 coverage that the favourite fan-out actually creates Notification rows.
 This file adds that coverage.

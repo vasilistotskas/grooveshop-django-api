@@ -27,7 +27,7 @@ def test_the_committed_schema_info_is_what_the_code_generates(openapi_schema):
 
 
 def test_the_info_is_written_in_settings_not_read_from_the_environment():
-    """``TITLE`` and ``DESCRIPTION`` are literals in ``settings/api.py``: a call
+    """``TITLE`` and ``DESCRIPTION`` are literals in ``settings.api``: a call
     (``getenv`` and the like) would make the generated file depend on the
     machine it is generated on."""
     tree = ast.parse(SETTINGS_FILE.read_text(encoding="utf-8"))

@@ -28,9 +28,9 @@ from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
-from promotion.services import PromotionEngine
 from region.factories import RegionFactory
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
@@ -544,6 +544,7 @@ NOT_PRICED = {
     "floor",
     "location_type",
     "customer_notes",
+    "address_line_2",
     # The receipt or invoice the order is documented with.
     "document_type",
     "billing_vat_id",

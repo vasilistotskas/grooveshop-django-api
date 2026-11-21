@@ -38,11 +38,11 @@ from core.api.views import LANGUAGE_PARAMETER
 from product.models.product import Product
 from promotion.managers.promotion import publishable_code_q
 from promotion.models import Promotion, PromotionCode
+from promotion.product_offers import ProductPromotionService
 from promotion.serializers import (
     ProductPromotionSerializer,
     PublicPromotionSerializer,
 )
-from promotion.services import ProductPromotionService
 from tenant.permissions import IsPromotionsEnabled, IsPromotionsRuntimeEnabled
 
 # Guards the payload size on a store running a large campaign set. Far

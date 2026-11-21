@@ -42375,6 +42375,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         payWay:
           type: integer
           nullable: true
@@ -42564,6 +42568,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -42983,6 +42991,12 @@ components:
             να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς
             αριθμό απορρίπτεται με κωδικό street_number_missing στο street.'
           maxLength: 50
+        addressLine2:
+          type: string
+          description: 'Ό,τι δεν περιέχει η γραμμή της οδού: διαμέρισμα, όροφος, κτίριο.
+            Προαιρετικό ελεύθερο κείμενο, που τυπώνεται κάτω από την οδό και δίνεται
+            στον courier.'
+          maxLength: 255
         city:
           type: string
           description: Όνομα πόλης. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία
@@ -43234,6 +43248,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         payWay:
           type: integer
           nullable: true
@@ -43424,6 +43442,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -44147,6 +44169,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         firstName:
           type: string
@@ -46136,6 +46162,10 @@ components:
           minLength: 1
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         firstName:
           type: string
           minLength: 1
@@ -46644,6 +46674,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54291,6 +54325,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         city:
           type: string
           title: Πόλη
@@ -54384,6 +54422,10 @@ components:
         streetNumber:
           type: string
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54480,6 +54522,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string

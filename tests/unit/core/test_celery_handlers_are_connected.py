@@ -18,7 +18,7 @@ stayed blind to every Rosetta save — exactly the "Order Received - #38
 shipped in English" failure the handler's own comment claims to have
 fixed. Correlation ids never reached worker logs either.
 
-`meili/apps.py` documents the identical trap for its own closures, with
+`src/meili/apps.py` documents the identical trap for its own closures, with
 a comment explaining why `weak=False` is required there.
 """
 

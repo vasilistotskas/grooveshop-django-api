@@ -7,7 +7,7 @@ process serves DB values without touching disk — the on-disk .po file
 is only the msgid schema produced by `makemessages`.
 
 Rosetta edits are mirrored into `Translation` via the
-rosetta.signals.entry_changed receiver (see core/signals/rosetta.py).
+rosetta.signals.entry_changed receiver (see src/core/signals/rosetta.py).
 
 The version-bumping + reload primitives are unchanged: on save, we
 bump a Redis key so other pods' middleware notice and re-apply the
@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 # Rosetta save that bumps this key can land in ANY allowed schema
 # (public, or an allowlisted tenant per ROSETTA_ALLOWED_SCHEMAS), while
 # EVERY pod's TranslationReloadMiddleware reads it from whatever schema
-# the CURRENT request resolved to (core/middleware/translation_reload.py
+# the CURRENT request resolved to (src/core/middleware/translation_reload.py
 # runs after TenantMainMiddleware) and every Celery worker's
-# task_prerun handler reads it too (core/celery.py). A schema-prefixed
+# task_prerun handler reads it too (src/core/celery.py). A schema-prefixed
 # key would only propagate the tick within the schema that wrote it.
 TRANSLATION_VERSION_CACHE_KEY = "global:rosetta:translation_version"
 

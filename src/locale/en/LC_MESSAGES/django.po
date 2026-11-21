@@ -9227,6 +9227,9 @@ msgstr "No discounts applied"
 msgid "No email matches."
 msgstr "No email matches."
 
+msgid "No icon"
+msgstr "No icon"
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "No item in the cart qualifies for this promotion"
 
@@ -9644,6 +9647,9 @@ msgstr "One held voucher request is being sent to ACS. The others follow once AC
 
 msgid "One of the files is no longer available. Please re-attach it."
 msgstr "One of the files is no longer available. Please re-attach it."
+
+msgid "One of the page builder's icons. Where it is set, the store shows it for the category instead of the image."
+msgstr "One of the page builder's icons. Where it is set, the store shows it for the category instead of the image."
 
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
@@ -10871,6 +10877,9 @@ msgstr "Phone number for BoxNow shipment notifications, sent as the sender's con
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
+
+msgid "Pick one of the icons the store offers."
+msgstr "Pick one of the icons the store offers."
 
 msgid "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
 msgstr "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
@@ -15259,6 +15268,9 @@ msgstr "The store's terms of use or privacy policy cannot be shown right now, so
 
 msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
 msgstr "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
+
+msgid "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
+msgstr "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
 
 msgid "The storefront catalogue build the draft was last validated against."
 msgstr "The storefront catalogue build the draft was last validated against."

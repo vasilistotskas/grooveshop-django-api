@@ -22,6 +22,21 @@ class BlogCategory(
     image = ImageAndSvgField(
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
+    # One of the page builder's icons, by the name the storefront saves
+    # (``i-fa6-solid-robot``): the list is the store's catalogue, checked
+    # where the field is written (``blog.icons``). ``db_default``: the
+    # release still serving during a deploy inserts without it.
+    icon = models.CharField(
+        _("Icon"),
+        max_length=100,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "One of the page builder's icons. Where it is set, the store "
+            "shows it for the category instead of the image."
+        ),
+    )
     parent = TreeForeignKey(
         "self",
         blank=True,

@@ -6,8 +6,11 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
+from blog import icons
 from blog.models.category import BlogCategory
+from builder.errors import StorefrontUnavailableError
 from core.api.schema import generate_schema_multi_lang
+from core.storefront import StorefrontUnavailable
 from core.utils.serializers import TranslatedFieldExtended
 
 
@@ -55,6 +58,7 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "icon",
             "created_at",
             "updated_at",
         )
@@ -65,6 +69,7 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "icon",
             "created_at",
             "updated_at",
         )
@@ -164,6 +169,26 @@ class BlogCategoryWriteSerializer(
                 )
         return value
 
+    def validate_icon(self, value: str) -> str:
+        """One of the icons the store's catalogue offers, checked when it
+        changes (``blog.icons``): an icon already saved is not checked
+        again, so one the builder stopped offering blocks no other edit.
+        No catalogue, no check: a changed icon is refused with a 503."""
+        if not value or (
+            self.instance is not None and value == self.instance.icon
+        ):
+            return value
+        try:
+            offered = icons.is_offered(value)
+        except StorefrontUnavailable as exc:
+            raise StorefrontUnavailableError() from exc
+        if not offered:
+            raise serializers.ValidationError(
+                _("Pick one of the icons the store offers."),
+                code="unknown_icon",
+            )
+        return value
+
     def validate_slug(self, value: str) -> str:
         if not value:
             raise serializers.ValidationError(
@@ -189,6 +214,7 @@ class BlogCategoryWriteSerializer(
             "parent",
             "sort_order",
             "image",
+            "icon",
         )
         read_only_fields = ("sort_order",)
 

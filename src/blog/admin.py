@@ -1,5 +1,6 @@
 from html import unescape
 
+from django import forms
 from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Count
@@ -7,6 +8,7 @@ from django.utils import timezone
 from django.utils.html import format_html, strip_tags
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
+from parler.forms import TranslatableModelForm
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
@@ -17,6 +19,7 @@ from unfold.contrib.filters.admin import (
 )
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
+from unfold.widgets import UnfoldAdminSelectWidget
 
 from admin.base import BaseTranslatableAdmin
 from admin.bulk import update_each
@@ -28,11 +31,13 @@ from admin.filters import (
     RelatedDropdownFilter,
 )
 from admin.mixins import FeatureInline
+from blog import icons
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
+from core.storefront import StorefrontUnavailable
 
 # ── Local (single-app) variant maps ────────────────────────────────────
 # These states are derived (not backed by a TextChoices field), so they
@@ -257,8 +262,46 @@ class BlogTagAdmin(BaseTranslatableAdmin):
         return obj.posts_count
 
 
+class BlogCategoryAdminForm(TranslatableModelForm):
+    """The category form, with the icon as a choice of the icons the
+    store's catalogue offers, each by the editor's name for it in the
+    admin's language (``blog.icons``). An icon saved before the builder
+    stopped offering it stays a choice, so the form keeps it. With no
+    catalogue the field shows the saved icon and cannot change: the rest
+    of the form still saves."""
+
+    icon = forms.ChoiceField(
+        label=_("Icon"),
+        required=False,
+        widget=UnfoldAdminSelectWidget,
+        help_text=BlogCategory._meta.get_field("icon").help_text,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["icon"]
+        saved = self.initial.get("icon") or ""
+        try:
+            offered = icons.icon_choices()
+        except StorefrontUnavailable:
+            field.disabled = True
+            field.choices = [(saved, saved or _("No icon"))]
+            field.help_text = _(
+                "The storefront cannot be reached, so the icons cannot be "
+                "listed. Try again in a moment."
+            )
+            return
+        names = {name for name, _label in offered}
+        field.choices = [
+            ("", _("No icon")),
+            *offered,
+            *([(saved, saved)] if saved and saved not in names else []),
+        ]
+
+
 @admin.register(BlogCategory)
 class BlogCategoryAdmin(BaseTranslatableAdmin):
+    form = BlogCategoryAdminForm
     list_filter_sheet = False
 
     ordering_field = "sort_order"
@@ -295,7 +338,7 @@ class BlogCategoryAdmin(BaseTranslatableAdmin):
         (
             _("Media"),
             {
-                "fields": ("image",),
+                "fields": ("image", "icon"),
             },
         ),
         (

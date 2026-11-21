@@ -238,12 +238,28 @@ def default_document_kinds() -> dict[str, Any]:
     return {"page": seo, "template": seo}
 
 
+def default_icons() -> list[dict[str, Any]]:
+    """The catalogue's ``icons``, as the storefront states them: each name
+    with the editor's label in every language."""
+    return [
+        {
+            "name": "i-fa6-solid-robot",
+            "labels": {"el": "Ρομπότ", "en": "Robot"},
+        },
+        {
+            "name": "i-lucide-zap",
+            "labels": {"el": "Κεραυνός", "en": "Lightning"},
+        },
+    ]
+
+
 class FakeCatalogue:
     """``requests.get`` for ``/api/builder/catalogue``."""
 
     def __init__(self, blocks: list[dict[str, Any]] | None = None) -> None:
         self.blocks = default_blocks() if blocks is None else blocks
         self.document_kinds = default_document_kinds()
+        self.icons = default_icons()
         self.hash = HASH
         self.calls: list[dict[str, Any]] = []
         self.failure: Exception | None = None
@@ -268,6 +284,7 @@ class FakeCatalogue:
             "blocks": self.blocks,
             "documentKinds": self.document_kinds,
             "templates": ["home", "about", "contact", "product"],
+            "icons": self.icons,
         }
         if self.data_limits is not None:
             body["dataLimits"] = self.data_limits

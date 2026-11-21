@@ -91,6 +91,21 @@ counts). `tests/unit/builder/test_real_catalogue.py` holds the pinned real
 catalogue to this: each `linkRefs` is exactly the settings its schema marks
 `x-builder-link`.
 
+`icons` (required) is every icon the builder offers, `[{name, labels}]`: the
+name as a store saves it (`i-fa6-solid-robot`) and the editor's label for it in
+every language of `settings.LANGUAGES` (`CatalogueIcon`, `Catalogue.icon`). The
+storefront's one list (`shared/builder/icons.ts`, `BUILDER_ICONS`) reaches the
+blocks as each icon setting's `enum`; this key states it once, for a field that
+holds one icon outside a block. A blog category's `icon` is the first
+(`src/blog/icons.py`): the write serializer refuses an icon the store's
+catalogue does not offer (`400 unknown_icon`) and, when the storefront does not
+answer, a changed icon (`503 storefront_unavailable`); an unchanged icon is not
+checked again, so an icon the builder stopped offering blocks no other edit of
+its category. The admin offers the icons by their label in the admin's language
+and, with no catalogue, shows the saved one unchangeable while the rest of the
+form saves. A name or a language without a label is a catalogue bug, refused
+when the catalogue is read.
+
 ## What a save checks
 
 `src/builder/validation.py` collects every problem as `{path, code, message}`,

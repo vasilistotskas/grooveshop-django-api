@@ -18,7 +18,7 @@ from django.conf import settings
 from django.test import Client, override_settings
 from rest_framework.test import APIClient
 
-from core.caches import STRICT_CACHE_UNAVAILABLE_MESSAGE
+from core.cache_backend import STRICT_CACHE_UNAVAILABLE_MESSAGE
 from tests.utils.redis import stopped_default_cache
 from user.factories.account import UserAccountFactory
 

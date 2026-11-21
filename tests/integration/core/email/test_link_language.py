@@ -69,8 +69,8 @@ from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import UserSubscription
+from user.services.subscription_mail import send_subscription_confirmation
 from user.tasks import export_user_data_task, send_inactive_user_notifications
-from user.utils.subscription import send_subscription_confirmation
 
 BASE = "https://shop.example"
 

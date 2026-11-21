@@ -22,6 +22,7 @@ import enum
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from allauth.account.models import EmailAddress
 from django.db import IntegrityError, models, transaction
@@ -34,6 +35,9 @@ from emails.preferences import offered_types
 from emails.registry import registry
 from emails.types import EmailType
 from user.models.subscription import SubscriptionTopic, UserSubscription
+
+if TYPE_CHECKING:
+    from user.models.account import UserAccount
 
 logger = logging.getLogger(__name__)
 
@@ -481,3 +485,42 @@ def ensure_default_newsletter_topic() -> SubscriptionTopic | None:
             topic.description = fields["description"]
         topic.save()
     return topic
+
+
+def claim_guest_subscriptions(user: UserAccount, email: str) -> int:
+    """Attach the guest subscriptions made with ``email`` to ``user``.
+
+    Call ONLY once ``email`` is a verified address of ``user``: a guest
+    row carries its subscriber's consent record, and an unverified
+    address may belong to someone else. Where the account already has a
+    row for the same topic, the ACTIVE one wins and the other is
+    deleted (neither active: the account's own row stays).
+
+    Returns the number of guest rows attached.
+    """
+    active = UserSubscription.SubscriptionStatus.ACTIVE
+    claimed = 0
+    with transaction.atomic():
+        guests = UserSubscription.objects.select_for_update().filter(
+            user__isnull=True, email__iexact=email
+        )
+        for guest in guests:
+            existing = (
+                UserSubscription.objects.select_for_update()
+                .filter(user=user, topic_id=guest.topic_id)
+                .first()
+            )
+            if existing is not None:
+                if guest.status == active and existing.status != active:
+                    existing.delete()
+                else:
+                    guest.delete()
+                    continue
+            guest.user = user
+            guest.save(update_fields=["user", "updated_at"])
+            claimed += 1
+    if claimed:
+        logger.info(
+            "Claimed %s guest subscription(s) for user %s", claimed, user.pk
+        )
+    return claimed

@@ -36,7 +36,7 @@ from admin.filters import (
     RelatedDropdownFilter,
 )
 from core.forms.measurement import MeasurementWidget
-from core.units import DistanceUnits, WeightUnits
+from core.measurement import DistanceUnits, WeightUnits
 from product.admin.filters import (
     DiscountStatusFilter,
     PopularityFilter,

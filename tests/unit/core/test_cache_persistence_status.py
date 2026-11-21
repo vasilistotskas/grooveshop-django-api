@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 HEALTHY_AOF = {
     "loading": 0,

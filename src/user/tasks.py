@@ -96,7 +96,7 @@ def send_subscription_confirmation_email_task(
     and guest (newsletter form) rows alike.
     """
     from user.models.subscription import UserSubscription
-    from user.utils.subscription import send_subscription_confirmation
+    from user.services.subscription_mail import send_subscription_confirmation
 
     try:
         subscription = UserSubscription.objects.select_related(
@@ -233,7 +233,7 @@ def send_newsletter_already_subscribed_email_task(
     starts over with a fresh confirmation link.
     """
     from user.models.subscription import UserSubscription
-    from user.utils.subscription import send_already_subscribed_notice
+    from user.services.subscription_mail import send_already_subscribed_notice
 
     try:
         subscription = UserSubscription.objects.select_related(
@@ -536,6 +536,19 @@ def purge_unconfirmed_guest_subscriptions(self) -> dict:
         "purge_unconfirmed_guest_subscriptions: deleted %s row(s)", deleted
     )
     return {"status": "success", "deleted": deleted}
+
+
+@celery_app.task(base=MonitoredTask)
+def erase_late_carrier_data() -> dict:
+    """Clear the carrier data that reached an erased order after its
+    erasure (``order.privacy.erase_late_carrier_data``): a parcel still
+    moving goes on being tracked, delivered and paid out. Registered as a
+    periodic beat task, fanned out per tenant."""
+    from order.privacy import erase_late_carrier_data as erase
+
+    counts = erase()
+    logger.info("erase_late_carrier_data: %s", counts)
+    return {"status": "success", **counts}
 
 
 @celery_app.task(

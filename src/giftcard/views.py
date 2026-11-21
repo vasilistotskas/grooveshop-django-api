@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from drf_spectacular.utils import extend_schema_view
@@ -66,6 +67,14 @@ serializers_config: SerializersConfig = {
         summary=_("List the gift cards linked to my account"),
         tags=["Gift Cards"],
     ),
+    "mine_all": ActionConfig(
+        response=GiftCardSerializer,
+        many=True,
+        paginated=False,
+        operation_id="listAllMyGiftCards",
+        summary=_("Every gift card linked to my account, in one list"),
+        tags=["Gift Cards"],
+    ),
     "purchase_status": ActionConfig(
         response=GiftCardPurchaseStatusResponseSerializer,
         operation_id="getGiftCardPurchaseStatus",
@@ -109,7 +118,11 @@ class GiftCardViewSet(BaseModelViewSet):
         if self.action == "purchase_status":
             self.permission_classes = [AllowAny]
         else:
-            caller = IsAuthenticated if self.action == "mine" else AllowAny
+            caller = (
+                IsAuthenticated
+                if self.action in ("mine", "mine_all")
+                else AllowAny
+            )
             self.permission_classes = [
                 IsCatalogueEnabled,
                 IsGiftCardsEnabled,
@@ -375,12 +388,35 @@ class GiftCardViewSet(BaseModelViewSet):
         ``many=True`` list actions in the standard paginator shape
         (loyalty transactions precedent).
         """
-        cards = (
-            GiftCard.objects.filter(issued_to=request.user)
-            .prefetch_related("transactions")
-            .order_by("-created_at")
-        )
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(
-            cards, request, serializer_class=response_serializer_class
+            self._my_cards(request),
+            request,
+            serializer_class=response_serializer_class,
+        )
+
+    @action(
+        detail=False, methods=["GET"], pagination_class=None, filter_backends=[]
+    )
+    def mine_all(self, request):
+        """GET /api/v1/giftcard/mine/all: every card linked to my account,
+        newest first, in one array, for the account summary (a short list,
+        the customer's own)."""
+        serializer = self.get_response_serializer()(
+            self._my_cards(request),
+            many=True,
+            context=self.get_serializer_context(),
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _my_cards(request):
+        """The account's cards, each balance summed in the one query
+        (``ledger_total``, which ``GiftCard.balance`` reads) rather than one
+        SUM per card."""
+        return (
+            GiftCard.objects.filter(issued_to=request.user)
+            .annotate(ledger_total=Sum("transactions__amount"))
+            .prefetch_related("transactions")
+            .order_by("-created_at")
         )

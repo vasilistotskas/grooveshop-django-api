@@ -239,7 +239,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # A view that cannot reach a strict cache key (a rate limit, a TOTP
     # replay check, an IdP code, a ticket) answers the coded 503 here, in
-    # the shape of its route, on every route (``core.caches``' rule).
+    # the shape of its route, on every route (``core.cache_backend``' rule).
     "core.middleware.strict_cache.StrictCacheUnavailableMiddleware",
     # The IdP's token endpoints let a refused ``resource`` escape as a 500;
     # it is OAuth's ``invalid_target`` (``core.middleware.idp_oauth_errors``).

@@ -31,6 +31,7 @@ from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -165,7 +166,7 @@ class TestMarkingAnOrderRefunded:
     def test_it_is_allowed_once_the_payment_is_refunded(self):
         order, _charge = _paid_order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         OrderService.update_order_status(order, OrderStatus.REFUNDED)
 
@@ -334,6 +335,6 @@ class TestMarkingRefundedOverTheApi:
     def test_it_succeeds_once_the_payment_is_refunded(self):
         order, _charge = _paid_order(status=OrderStatus.RETURNED)
         with FakeStripeRefunds():
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
         assert self._post(order).status_code == 200

@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from measurement.base import BidimensionalMeasure, MeasureBase
 
 from core.forms.measurement import MeasurementFormField
-from core.utils.measurement import get_measurement
+from core.measurement import get_measurement
 
 logger = logging.getLogger(__name__)
 

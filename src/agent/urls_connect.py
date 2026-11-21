@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from allauth.idp.oidc import views as oidc_views
 from django.contrib.auth.views import LogoutView
-from django.http import Http404
 from django.urls import include, path, reverse_lazy
 
 from agent.staff_connect import (
@@ -20,13 +19,7 @@ from agent.staff_connect import (
     StaffAuthorizationView,
     StaffConnectLoginView,
 )
-
-
-def _not_offered(request, *args, **kwargs):
-    """The device flow is not offered by the staff issuer: its pages sign
-    people in through allauth's account login (``src/agent/staff.py``)."""
-    raise Http404
-
+from core.views import device_flow_not_offered
 
 urlpatterns = [
     # Ahead of allauth's include, so these answer the same paths.
@@ -35,8 +28,8 @@ urlpatterns = [
         StaffAuthorizationView.as_view(),
         name="staff-connect-authorize",
     ),
-    path("identity/o/device", _not_offered),
-    path("identity/o/api/device/code", _not_offered),
+    path("identity/o/device", device_flow_not_offered),
+    path("identity/o/api/device/code", device_flow_not_offered),
     path(
         "identity/staff/login/",
         StaffConnectLoginView.as_view(),

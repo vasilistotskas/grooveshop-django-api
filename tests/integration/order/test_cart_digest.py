@@ -72,17 +72,29 @@ def _guards(quote: dict) -> dict:
 
 
 class TestTheDigest:
-    def test_only_a_complete_order_has_one(self):
+    def test_a_chosen_delivery_is_enough(self):
+        """The digest needs a delivery, not a pay way: a UCP checkout may
+        name its payment method only when it completes (gateway #195)."""
         checkout = _checkout()
         choices = _choices(checkout)
+        without_delivery = {
+            key: value
+            for key, value in choices.items()
+            if key not in {"shipping_kind", "country_id"}
+        }
+        without_pay_way = {
+            key: value for key, value in choices.items() if key != "pay_way_id"
+        }
 
-        del choices["pay_way_id"]
-        without_pay_way = _quote(checkout, **choices)
-        complete = _quote(checkout, **_choices(checkout))
+        nothing = _quote(checkout, **without_delivery)
+        delivery = _quote(checkout, **without_pay_way)
+        complete = _quote(checkout, **choices)
 
-        assert without_pay_way["cartDigest"] is None
-        assert len(complete["cartDigest"]) == 64
-        int(complete["cartDigest"], 16)
+        assert nothing["cartDigest"] is None
+        assert len(delivery["cartDigest"]) == 64
+        int(delivery["cartDigest"], 16)
+        assert delivery["expectedTotal"] is None
+        assert delivery["cartDigest"] == complete["cartDigest"]
 
     def test_it_is_stable_while_nothing_changes(self):
         checkout = _checkout()
@@ -119,22 +131,24 @@ class TestTheDigest:
         assert after["expectedTotal"] == before["expectedTotal"]
         assert after["cartDigest"] != before["cartDigest"]
 
-    def test_another_pay_way_at_the_same_fee_moves_it(self):
+    def test_the_pay_way_is_not_part_of_it(self):
+        """What the order is made of does not depend on how it is paid;
+        another pay way's fee is ``expectedTotal``'s to catch."""
         checkout = _checkout()
-        same_fee = PayWayFactory(
+        dearer = PayWayFactory(
             settlement=PaySettlement.COURIER_CASH,
             active=True,
-            cost=Money(FEE, "EUR"),
+            cost=Money(FEE + Decimal("1.00"), "EUR"),
             free_threshold=Money(THRESHOLD, "EUR"),
         )
         first = _quote(checkout, **_choices(checkout))
 
         second = _quote(
-            checkout, **{**_choices(checkout), "pay_way_id": same_fee.id}
+            checkout, **{**_choices(checkout), "pay_way_id": dearer.id}
         )
 
-        assert second["expectedTotal"] == first["expectedTotal"]
-        assert second["cartDigest"] != first["cartDigest"]
+        assert second["expectedTotal"] != first["expectedTotal"]
+        assert second["cartDigest"] == first["cartDigest"]
 
     def test_the_line_a_discount_lands_on_moves_it(self):
         checkout = _checkout(price=Decimal("10.00"))
@@ -172,7 +186,6 @@ class TestTheDigest:
                 checkout.cart,
                 promotion,
                 shipping=ShippingChoice.of(_choices(checkout)),
-                pay_way=checkout.pay_way,
                 weight_grams=0,
             )
 
@@ -185,6 +198,24 @@ class TestOrderCreation:
         quote = _quote(checkout, **_choices(checkout))
 
         response = _post_order(checkout, **_guards(quote))
+
+        assert response.status_code == 201, response.content
+
+    def test_a_digest_quoted_before_the_pay_way_orders_with_one(self):
+        """A UCP complete that names the checkout's first payment method:
+        the digest was quoted before any pay way, the total after."""
+        checkout = _checkout()
+        choices = _choices(checkout)
+        digest = _quote(
+            checkout,
+            **{k: v for k, v in choices.items() if k != "pay_way_id"},
+        )["cartDigest"]
+        total = _quote(checkout, **choices)["expectedTotal"]
+        assert digest is not None
+
+        response = _post_order(
+            checkout, expected_total=total, expected_cart_digest=digest
+        )
 
         assert response.status_code == 201, response.content
 
@@ -404,7 +435,6 @@ class TestTheShippingChoice:
                 checkout.cart,
                 promotion,
                 shipping=shipping,
-                pay_way=checkout.pay_way,
                 weight_grams=0,
             )
 
@@ -422,7 +452,6 @@ class TestTheShippingChoice:
                 shipping=ShippingChoice(
                     kind=kind, provider_code=None, country_id="GR"
                 ),
-                pay_way=checkout.pay_way,
                 weight_grams=0,
             )
 
@@ -446,7 +475,6 @@ def _fields(choice: ShippingChoice) -> dict:
 # ``test_the_quote_takes_every_input_it_prices``.
 DIGESTED = {
     # What the order is made of: the cart digest covers it.
-    "pay_way_id",
     "shipping_kind",
     "shipping_provider_code",
     "country_id",
@@ -456,7 +484,10 @@ DIGESTED = {
     "acs_station_branch",
 }
 PRICED = {
-    # What it is priced with: the total covers it (``expectedTotal``).
+    # What it is priced with: the total covers it (``expectedTotal``). The
+    # pay way is here, not in the digest: an agent may name it only at
+    # completion, and its fee is part of the total.
+    "pay_way_id",
     "email",
     "loyalty_points_to_redeem",
     "gift_card_codes",

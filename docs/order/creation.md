@@ -458,9 +458,35 @@ caller:
     `cart_has_unpaid_order`, the message under `cart`. It names no order: an
     order's uuid opens a guest order, and the caller may hold only the
     cart's id.
-  - **Limits.** The view checks the cart's stock before the service runs, so
-    when the earlier order took the last units the second call is answered
-    `insufficient_stock`; no second order either way.
+  - **Before the stock.** The cart is validated by the service alone, after
+    this refusal: when the earlier order took the last units, the agent is
+    still told `cart_has_unpaid_order`, not `insufficient_stock`.
+- **A repeated checkout resumes its cart's unpaid order** (#694,
+  `order.checkout.resume`). The storefront's "Back, then order again" with
+  nothing changed would otherwise place a second unpaid online order holding
+  the same stock, with its own payment link.
+  - **The same checkout.** `checkout_fingerprint`, an HMAC of what the
+    shopper chose: the quote's `cart_digest` (lines, promotions, delivery),
+    `amount_due`, the pay way, the loyalty points and gift cards redeemed, and
+    every field of the shipping address. An online order stores it as
+    `metadata["checkout_fingerprint"]`, which is personal
+    (`Order.PERSONAL_METADATA`).
+  - **The order resumed.** `unpaid_order_of_cart`: the cart's latest order
+    with the same pay way that holds its stock for an online payment, is not
+    an agent's (the gateway's are answered by their agent checkout or refused,
+    above), and whose payment window still fits a link of its provider
+    (`payment_hold.window_closed` with `min_hosted_session`).
+  - **When.** Under the cart row lock, before the cart is validated, since the
+    order holds the cart's stock, the last units included. The quote is priced
+    only when the cart has such an order. A quote that refuses is a changed
+    checkout, answered by the creation that follows. Two identical checkouts
+    racing end with one order.
+  - **The answer.** The order, `201`, as for a repeat of an agent checkout.
+    The storefront then asks for its payment link and gets the live one
+    ([§4](payments.md)).
+  - **A changed checkout** places a new order, as before. Cancelling the
+    earlier one in the same step (supersede) waits for a verified way to
+    close its payment link first.
 - For **COD/offline**: dispatches courier task via
   `_dispatch_shipment_creation_task` immediately. The
   dispatch is wrapped in `transaction.on_commit` inside

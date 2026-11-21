@@ -2,8 +2,9 @@
 
 An order paid online keeps its cart until the payment lands
 (``Order.awaits_online_payment``), so the same lines can be ordered again.
-On the storefront a person does that on purpose ("Back, then order again")
-and it keeps working. Through the agent gateway it is a platform that lost
+On the storefront a person does that on purpose ("Back, then order again"):
+the same checkout resumes the cart's order (#694,
+``test_checkout_resumes_unpaid_order.py``) and a changed one places another. Through the agent gateway it is a platform that lost
 its checkout or sent it twice: a second order for the same goods, with its
 own stock decrement, that the buyer never asked for (#692).
 
@@ -393,14 +394,42 @@ class TestThroughTheEndpoint:
         assert set(response.json()) == {"cart", "code", "fields"}
         assert not any(character.isdigit() for character in body), body
 
-    def test_the_storefront_places_the_second_order(self):
+    def test_the_storefront_resumes_its_order(self):
+        """The same checkout from the storefront is answered with the
+        cart's unpaid order, not refused and not placed twice (#694)."""
         first = self._post(self.viva, secret="")
         second = self._post(self.viva, secret="")
 
         assert first.status_code == status.HTTP_201_CREATED, first.json()
         assert second.status_code == status.HTTP_201_CREATED, second.json()
-        assert second.json()["id"] != first.json()["id"]
-        assert self.checkout.stock() == STOCK - 2
+        assert second.json()["id"] == first.json()["id"]
+        assert self.checkout.stock() == STOCK - 1
+
+    def test_the_order_that_took_the_last_unit_is_resumed(self):
+        """Its order took the cart's last unit: the cart now asks for more
+        than the stock holds, and the same checkout still resumes it."""
+        type(self.checkout.product).objects.filter(
+            pk=self.checkout.product.pk
+        ).update(stock=1)
+        first = self._post(self.viva, secret="")
+        second = self._post(self.viva, secret="")
+
+        assert first.status_code == status.HTTP_201_CREATED, first.json()
+        assert second.status_code == status.HTTP_201_CREATED, second.json()
+        assert second.json()["id"] == first.json()["id"]
+
+    def test_the_gateway_on_the_last_unit_is_told_why(self):
+        """Refused for the cart's unpaid order, not for the stock that order
+        holds."""
+        type(self.checkout.product).objects.filter(
+            pk=self.checkout.product.pk
+        ).update(stock=1)
+        self._as_gateway(self.viva)
+
+        response = self._as_gateway(self.viva)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "cart_has_unpaid_order"
 
     @pytest.mark.parametrize("secret", ["", "guess"])
     def test_an_agent_claim_without_the_secret_is_the_storefronts(self, secret):

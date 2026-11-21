@@ -34,6 +34,11 @@ from order.checkout.quote import (
     OrderQuoteService,
     ShippingChoice,
 )
+from order.checkout.resume import (
+    FINGERPRINT_KEY,
+    checkout_fingerprint,
+    unpaid_order_of_cart,
+)
 from order.enum.attribution import OrderSourceType
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
@@ -56,6 +61,7 @@ from order.exceptions import (
     OrderCancellationError,
     OrderCartChangedError,
     OrderNotCancelableError,
+    OrderServiceError,
     OrderTotalChangedError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
@@ -1699,6 +1705,72 @@ class OrderService:
         if waiting.count() >= limit:
             raise UnpaidOrderLimitError(limit)
 
+    @classmethod
+    def _resume_same_checkout(
+        cls,
+        cart,
+        *,
+        user,
+        pay_way,
+        shipping_address: dict[str, Any],
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None,
+    ) -> Order | None:
+        """The cart's unpaid online order when this checkout is the one that
+        made it (``order.checkout.resume``), else ``None``.
+
+        A shopper who goes back and orders the same thing again would
+        otherwise place a second order holding the same stock, with its own
+        payment link. The checkout is compared by its fingerprint, which
+        needs its quote: priced here, under the cart lock, only when the
+        cart has such an order. A quote that refuses (another total, other
+        contents) is a changed checkout, refused again by the creation that
+        follows, in its own order of checks. Called by
+        ``create_order_from_cart_offline`` alone: the payment-first path's
+        order is paid when it is created.
+        """
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
+            return None
+        candidate = unpaid_order_of_cart(cart, pay_way=pay_way)
+        if candidate is None:
+            return None
+        from b2b.services import B2BPricingService
+
+        B2BPricingService.bind_cart(cart, user)
+        try:
+            quote = cls._quote_under_lock(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
+            )
+        except OrderServiceError:
+            # Another total, other contents, a coupon no longer valid: not
+            # the checkout that made the order. The creation that follows
+            # answers it, in its own order of checks.
+            return None
+        fingerprint = checkout_fingerprint(
+            quote,
+            pay_way=pay_way,
+            shipping_address=shipping_address,
+            loyalty_points=loyalty_points_to_redeem,
+            gift_card_codes=gift_card_codes,
+        )
+        if candidate.metadata.get(FINGERPRINT_KEY) != fingerprint:
+            return None
+        logger.info(
+            "Checkout of cart %s resumes its unpaid order %s",
+            cart.uuid,
+            candidate.id,
+        )
+        return candidate
+
     @staticmethod
     def _refuse_agent_order_on_unpaid_cart(
         cart, attribution: AttributionInput | None
@@ -1891,6 +1963,22 @@ class OrderService:
 
             cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
 
+            # The same checkout made again returns the cart's unpaid order
+            # and its payment link (#694), before the cart is validated:
+            # that order holds the cart's stock, the last units included.
+            resumed = cls._resume_same_checkout(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
+            )
+            if resumed is not None:
+                return resumed
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -1898,14 +1986,6 @@ class OrderService:
 
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
-
-            # Step 2.3: An online order holds its stock until it is paid
-            # or auto-canceled; bound how many one customer can hold.
-            cls._enforce_unpaid_order_limit(
-                pay_way=pay_way,
-                user=user,
-                email=shipping_address.get("email") or "",
-            )
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).
@@ -1940,6 +2020,22 @@ class OrderService:
                 gift_card_codes=gift_card_codes,
                 expected_total=expected_total,
                 expected_cart_digest=expected_cart_digest,
+            )
+
+            fingerprint = checkout_fingerprint(
+                quote,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            )
+
+            # Step 2.6: An online order holds its stock until it is paid
+            # or auto-canceled; bound how many one customer can hold.
+            cls._enforce_unpaid_order_limit(
+                pay_way=pay_way,
+                user=user,
+                email=shipping_address.get("email") or "",
             )
             charges = quote.charges()
             promo_result = quote.promotion
@@ -2093,6 +2189,10 @@ class OrderService:
                 # distinction the whole shipping layer turns on.
                 "payment_type": pay_way.settlement,
             }
+            if PaySettlement(pay_way.settlement) == PaySettlement.ONLINE:
+                # What a repeat of this checkout is recognised by (Step
+                # 2.6); an HMAC, and personal (``Order.PERSONAL_METADATA``).
+                order.metadata[FINGERPRINT_KEY] = fingerprint
             # Wholesale audit: which group priced this order. The line
             # prices are already snapshotted on OrderItem rows — this
             # records WHY they differ from retail.

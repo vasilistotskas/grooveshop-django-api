@@ -15,14 +15,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-import jsonschema
 import pytest
 import yaml
 from allauth.account.models import EmailAddress
 from django.test import Client
 from rest_framework import status
 
-from tests.utils.openapi import as_json_schema
+from tests.utils.openapi import validate_against
 from tests.utils.redis import stopped_cache
 from user.factories.account import UserAccountFactory
 
@@ -61,9 +60,7 @@ def assert_documented(document: dict, path: str, method: str, response) -> dict:
     )
     schema = content["application/json"]["schema"]
     body = response.json()
-    jsonschema.Draft4Validator(
-        as_json_schema(schema, document["components"]["schemas"])
-    ).validate(body)
+    validate_against(document, schema, body)
     # A schema that does not forbid extra keys accepts them, so a field the
     # endpoint serves and the document omits would pass the check above and
     # still be missing from the generated parser.

@@ -15,7 +15,7 @@ from product.models.product import Product
 class ProductCategoryFilterTest(APITestCase):
     def setUp(self):
         ProductCategory.objects.all().delete()
-        Product.objects.all().delete()
+        Product.objects.all().hard_delete()
 
         # What is under test here is the FILTERSET, not who may see
         # what. Since 2026-09-19 the read actions hide inactive
@@ -565,4 +565,4 @@ class ProductCategoryFilterTest(APITestCase):
 
     def tearDown(self):
         ProductCategory.objects.all().delete()
-        Product.objects.all().delete()
+        Product.objects.all().hard_delete()

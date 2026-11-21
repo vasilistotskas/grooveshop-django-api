@@ -170,7 +170,7 @@ class TestRelation:
         self, client, category, promotions_on
     ):
         """A FREE_GIFT is documented as carrying exactly one gift
-        product, and ``_gift_entitlement`` resolves a mis-configured
+        product, and ``gift_entitlement`` resolves a mis-configured
         pair to the lowest-pk ACTIVE one. The runner-up must not promise
         a gift nobody would ever receive — its ORDER scope is still
         real, so the offer shows, just not as a reward."""

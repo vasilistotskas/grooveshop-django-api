@@ -44,8 +44,8 @@ from product.pricing.evaluation import (
     ReductionEpisode,
     evaluate_reduction,
 )
+from promotion.engine.evaluation import PromotionEngine
 from promotion.offers import load_price_reducing_promotions
-from promotion.services import PromotionEngine
 
 if TYPE_CHECKING:
     from promotion.models import Promotion

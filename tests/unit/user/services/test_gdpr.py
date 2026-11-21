@@ -212,6 +212,16 @@ class TestCompileUserDataCompleteness:
             "boxnow_event_texts": ["Στο ντουλάπι 12"]
         }
 
+    def test_a_saved_address_exports_its_address_line_2(self):
+        from user.factories.address import UserAddressFactory
+
+        user = UserAccountFactory(num_addresses=0)
+        UserAddressFactory(user=user, address_line_2="Διαμ. 3")
+
+        [address] = compile_user_data(user)["addresses"]
+
+        assert address["address_line_2"] == "Διαμ. 3"
+
     def test_export_cart_is_none_without_cart(self):
         """No cart → the ``cart`` key is present and explicitly null."""
         user = UserAccountFactory()

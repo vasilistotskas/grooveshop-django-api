@@ -214,6 +214,7 @@ def compile_user_data(user) -> dict[str, Any]:
             "last_name": a.last_name,
             "street": a.street,
             "street_number": a.street_number,
+            "address_line_2": a.address_line_2,
             "city": a.city,
             "zipcode": a.zipcode,
             "country_id": a.country_id,

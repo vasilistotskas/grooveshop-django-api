@@ -1,7 +1,7 @@
 """The engine runs on every cart read — it must not scale with promotions.
 
-`_collect_candidates` selected the candidate promotions with no
-`prefetch_related`, and `_matching_items` then asked each one for its
+`collect_candidates` selected the candidate promotions with no
+`prefetch_related`, and `matching_items` then asked each one for its
 `products`, `categories`, `excluded_products` and `excluded_categories`
 through `.values_list()`. So the cost grew with the number of ACTIVE
 PROMOTIONS, not with cart size — and `evaluate()` runs on every cart
@@ -16,16 +16,16 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import PromotionTrigger
 from promotion.factories.promotion import PromotionFactory
-from promotion.services import PromotionEngine
 
 pytestmark = pytest.mark.django_db
 
 
 def _live_promotions(count):
     """Eligible promotions, so each one actually reaches
-    `_matching_items` — a promotion rejected on `min_subtotal`
+    `matching_items` — a promotion rejected on `min_subtotal`
     short-circuits before touching any of the M2Ms and would hide the
     cost entirely. `stackable` so they all evaluate rather than one
     winning and the rest being skipped."""
@@ -53,7 +53,7 @@ def test_cost_does_not_grow_with_the_number_of_live_promotions(
     assert len(many) == len(few), (
         f"evaluate() grew from {len(few)} to {len(many)} queries with "
         f"six more live promotions — the candidate queryset is missing "
-        f"its prefetches, or _matching_items is bypassing them"
+        f"its prefetches, or matching_items is bypassing them"
     )
 
 
@@ -78,9 +78,9 @@ def _live_gift_promotions(count):
 def test_free_gift_promotions_do_not_each_cost_a_query(
     enable_promotions, make_cart
 ):
-    """`_gift_entitlement` must read the prefetched rows, not re-query.
+    """`gift_entitlement` must read the prefetched rows, not re-query.
 
-    `_collect_candidates` prefetches `get_products`, but a FILTERED
+    `collect_candidates` prefetches `get_products`, but a FILTERED
     related-manager call — `promotion.get_products.filter(active=True)` —
     does not use that cache. Django's own docs are explicit that a
     filtered prefetch is not served by the standard manager interface,
@@ -98,7 +98,7 @@ def test_free_gift_promotions_do_not_each_cost_a_query(
 
     assert len(many) == len(few), (
         f"evaluate() grew from {len(few)} to {len(many)} queries with "
-        f"six more FREE_GIFT promotions — _gift_entitlement is "
+        f"six more FREE_GIFT promotions — gift_entitlement is "
         f"re-querying instead of reading the prefetched rows"
     )
 
@@ -128,7 +128,7 @@ def test_category_scoped_promotions_do_not_each_cost_a_descendant_query(
 ):
     """MPTT descendant expansion must be batched across candidates.
 
-    `_matching_items` expands a category-scoped promotion's INCLUDED
+    `matching_items` expands a category-scoped promotion's INCLUDED
     categories and every promotion's EXCLUDED ones, and each expansion
     was its own `get_descendants` query.
     """

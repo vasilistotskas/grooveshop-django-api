@@ -323,7 +323,7 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         AcsTrackingEventFactory,
     )
     from shipping_acs.models import AcsApiCall, AcsCodPayout
-    from shipping_acs.services import _audit_envelope
+    from shipping_acs.services import _audit_envelope, _delivery_notes
     from shipping_boxnow.factories import (
         BoxNowParcelEventFactory,
         BoxNowShipmentFactory,
@@ -347,6 +347,7 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         "phone": f"+30{phone}",
         "street": "Ζωοδόχου Πηγής",
         "street_number": "17Β",
+        "address_line_2": "Διαμ. 3Α, 2ος όροφος",
         "city": "Χαλάνδρι",
         "zipcode": "15231",
         "place": "Κάτω Χαλάνδρι",
@@ -392,7 +393,8 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
             "billing_code": "BILLING",
             "multipart_vouchers": ["7400000002"],
             "create_request": _audit_envelope(
-                {"Delivery_Notes": note, "Weight": "1"}
+                {"Delivery_Notes": _delivery_notes(by_acs).sent, "Weight": "1"},
+                by_acs,
             ),
             "last_error": {
                 "request_params": {
@@ -504,6 +506,7 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
             "zinovia.arvanitaki",
             phone,
             "Ζωοδόχου",
+            "Διαμ. 3Α",
             "15231",
             "Κάτω Χαλάνδρι",
             ip,

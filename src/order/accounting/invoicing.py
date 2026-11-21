@@ -232,8 +232,11 @@ def _buyer_snapshot(order: Order) -> dict[str, str]:
         "email": order.email,
         "phone": str(order.phone) if order.phone else "",
         "address_line_1": f"{order.street} {order.street_number}".strip(),
-        "address_line_2": order.place or "",
+        "address_line_2": order.address_line_2,
         "city": order.city,
+        # A district or area (Τοποθεσία), printed with the city: never the
+        # address's second line, which is ``address_line_2``.
+        "place": order.place,
         "postal_code": order.zipcode,
         "country": (order.country.name if order.country_id else "")
         if hasattr(order, "country")

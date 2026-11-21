@@ -24,6 +24,15 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
     street_number = models.CharField(_("Street Number"), max_length=255)
+    # The flat, entrance or building, as on an order
+    # (``Order.address_line_2``), so checkout prefills it.
+    address_line_2 = models.CharField(
+        _("Address line 2"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zip Code"), max_length=255)
     country = models.ForeignKey(

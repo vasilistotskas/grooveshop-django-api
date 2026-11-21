@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from string import Formatter
 
 from django.db import connection
-from django.template.loader import render_to_string
+from django.template import Context
+from django.template.loader import get_template
 from django.utils import translation
 from django.utils.translation import gettext
 from django_tenants.utils import get_public_schema_name, schema_context
@@ -113,6 +114,20 @@ def _translated_subject(email_type: EmailType) -> str:
     return translated
 
 
+def render_template(
+    name: str, context: Mapping[str, object], *, autoescape: bool
+) -> str:
+    """One body of an email: *name* rendered with *context*.
+
+    Django escapes every template by default, ``.txt`` ones included, so
+    "Building A & B" reached the text part as "Building A &amp; B". The
+    plain-text body has no markup to protect and is rendered with
+    ``autoescape=False``; the HTML body keeps it on.
+    """
+    template = get_template(name).template
+    return template.render(Context(dict(context), autoescape=autoescape))
+
+
 def render(email_type: EmailType, obj: object, env: RenderEnv) -> RenderedEmail:
     """The email *obj* produces for the recipient and language in *env*.
 
@@ -129,8 +144,12 @@ def render(email_type: EmailType, obj: object, env: RenderEnv) -> RenderedEmail:
         )
         return RenderedEmail(
             subject=subject,
-            text=render_to_string(f"{email_type.templates}.txt", context),
-            html=render_to_string(f"{email_type.templates}.html", context),
+            text=render_template(
+                f"{email_type.templates}.txt", context, autoescape=False
+            ),
+            html=render_template(
+                f"{email_type.templates}.html", context, autoescape=True
+            ),
             language=env.language,
             context=context,
         )

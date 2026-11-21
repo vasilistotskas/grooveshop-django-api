@@ -17,14 +17,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    SearchThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from search.models import SearchQuery
 from search.params import VALID_LANGUAGE_CODES
 from search.serializers import TrendingSearchResponseSerializer
+from search.throttles import SearchThrottle
 from tenant.permissions import IsCatalogueEnabled
 
 _TRENDING_CACHE_TTL_SECONDS = 300  # 5 minutes

@@ -322,7 +322,7 @@ class StripePaymentProvider(PaymentProvider):
     a cross-tenant race under ASGI/threads. Webhook verification is
     dj-stripe's job: its UUID-routed webhook view verifies against the
     per-schema ``WebhookEndpoint`` row secret (see
-    ``tenant/management/commands/bootstrap_stripe.py``).
+    ``src/tenant/management/commands/bootstrap_stripe.py``).
     """
 
     code: ClassVar[str] = "stripe"

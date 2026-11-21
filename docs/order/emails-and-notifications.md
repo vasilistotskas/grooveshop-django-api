@@ -253,7 +253,7 @@ in the list.
 ### 6.5 Marketing email and the unsubscribe link
 
 Marketing mail is the mail a customer did not ask for in the moment:
-the re-engagement email (`core.tasks.send_inactive_user_notifications`)
+the re-engagement email (`send_inactive_user_notifications`, `src/user/tasks.py`)
 and the abandoned-cart reminder
 (`order.tasks.send_checkout_abandonment_emails`). Neither belongs to a
 subscription topic, so there is no `UserSubscription` row for the

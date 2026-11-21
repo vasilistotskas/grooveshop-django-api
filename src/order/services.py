@@ -121,6 +121,7 @@ from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
 from promotion.coupons import CouponService
 from promotion.engine.redemptions import record_redemptions
+from shipping.enum import ShippingKind
 from shipping.exceptions import (
     CarrierBusyError,
     CarrierError,
@@ -1407,6 +1408,7 @@ class OrderService:
                 "email": shipping_address.get("email"),
                 "street": shipping_address.get("street"),
                 "street_number": shipping_address.get("street_number"),
+                "address_line_2": shipping_address.get("address_line_2", ""),
                 "city": shipping_address.get("city"),
                 "zipcode": shipping_address.get("zipcode"),
                 "country_id": shipping_address.get("country_id"),
@@ -2079,6 +2081,7 @@ class OrderService:
                 "email": shipping_address.get("email"),
                 "street": shipping_address.get("street"),
                 "street_number": shipping_address.get("street_number"),
+                "address_line_2": shipping_address.get("address_line_2", ""),
                 "city": shipping_address.get("city"),
                 "zipcode": shipping_address.get("zipcode"),
                 "country_id": shipping_address.get("country_id"),
@@ -2595,7 +2598,7 @@ class OrderService:
         Required fields:
         - first_name, last_name
         - email (valid format)
-        - street, street_number, city, zipcode
+        - street, city, zipcode, and street_number for a home delivery
         - country_id
         - phone
 
@@ -2640,6 +2643,12 @@ class OrderService:
             "country_id",
             "phone",
         ]
+
+        # A pickup point's catalogue address may hold its number in the
+        # street line (``address_of_pickup_point``): only a home delivery
+        # needs one of its own.
+        if address.get("shipping_kind") == ShippingKind.PICKUP_POINT:
+            required_fields.remove("street_number")
 
         # Check for missing required fields
         for field in required_fields:
@@ -3210,7 +3219,7 @@ class OrderService:
                 "message": "Payment refunded successfully",
             }
         # ``declined["error"]`` carries raw provider exception text (see
-        # order/payments/payment.py) — log it, never return it (CodeQL
+        # src/order/payments/payment.py) — log it, never return it (CodeQL
         # py/stack-trace-exposure).
         logger.error(
             "Refund failed for canceled order %s: %s",

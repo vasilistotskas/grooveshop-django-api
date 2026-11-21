@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 from collections.abc import Mapping
+from typing import Any
 from uuid import UUID
 
 from django.conf import settings
@@ -29,6 +30,7 @@ from rest_framework.exceptions import (
     ValidationError,
 )
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.api.permissions import (
@@ -38,24 +40,17 @@ from core.api.permissions import (
     StoreStaffModelPermissions,
 )
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    OrderCreateAnonThrottle,
-    OrderCreateThrottle,
-    OrderSpecimenThrottle,
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-    UserBudgetThrottle,
-    VivaReturnThrottle,
-    gift_card_code_throttles,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
+from core.caches import REDIS_UNAVAILABLE
+from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.checkout.quote import (
     ExpectedTotal,
@@ -134,10 +129,20 @@ from order.services import (
     OrderLegalAcceptanceService,
     OrderService,
 )
+from order.throttles import (
+    OrderCreateAnonThrottle,
+    OrderCreateThrottle,
+    OrderSpecimenThrottle,
+    PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
+    VivaReturnThrottle,
+)
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
+from shipping.api_errors import PickupPointCheckUnavailable
+from shipping.exceptions import PickupPointCheckUnavailableError
 from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
@@ -149,6 +154,27 @@ logger = logging.getLogger(__name__)
 PAYMENT_IN_PROGRESS_RETRY_AFTER_SECONDS = 10
 # When a client asks again after ``payment_provider_unavailable``.
 PAYMENT_PROVIDER_UNAVAILABLE_RETRY_AFTER_SECONDS = 30
+
+
+def _meta_context_from(
+    request: Request, raw: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """The storefront's Meta context with the visitor's address set here.
+
+    ``client_ip_address`` in the body is the caller's choice, so it is
+    dropped. The address Meta receives is ``edge_client_ip(request)``, the
+    visitor our Cloudflare edge vouched for, or none (``docs/client-ip.md``).
+    A checkout that sent no other context (the shopper declined marketing
+    cookies) stays without one.
+    """
+    context = {
+        key: value
+        for key, value in (raw or {}).items()
+        if key != "client_ip_address"
+    }
+    if context and (ip := edge_client_ip(request)) is not None:
+        context["client_ip_address"] = ip
+    return context
 
 
 class RefundOutstanding(APIException):
@@ -196,6 +222,7 @@ serializers_config: SerializersConfig = {
         responses={
             400: OrderCreateErrorSerializer,
             409: OrderCreateErrorSerializer,
+            503: ErrorResponseSerializer,
         },
     ),
     "update": ActionConfig(
@@ -1239,6 +1266,16 @@ class OrderViewSet(BaseModelViewSet):
             # Re-raised so the API handler adds code and fields.
             raise
 
+        except PickupPointCheckUnavailableError as e:
+            # Our cache is down, not the shopper's point wrong: a 503 with
+            # Retry-After and no field (logged by ``pickup_point_address``).
+            raise PickupPointCheckUnavailable() from e
+
+        except REDIS_UNAVAILABLE:
+            # Any other cache-held bound that fails closed: the strict-cache
+            # middleware answers it with its coded 503, never a 500.
+            raise
+
         except PermissionDenied:
             return Response(
                 {
@@ -1403,7 +1440,7 @@ class OrderViewSet(BaseModelViewSet):
         # storefront proxy forwarded for Conversions API matching. The
         # service-level helper ``_sanitise_meta_context`` filters this
         # against an allow-list, so it's safe to forward as-is here.
-        meta_context = validated_data.get("meta")
+        meta_context = _meta_context_from(request, validated_data.get("meta"))
 
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show
@@ -1488,7 +1525,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 4.5: Pull Meta Pixel context for the offline path too —
         # COD orders trigger the canonical Purchase event from
         # ``order_paid`` so the dispatcher needs the same fbp/fbc.
-        meta_context = validated_data.get("meta")
+        meta_context = _meta_context_from(request, validated_data.get("meta"))
 
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show
@@ -1675,6 +1712,7 @@ class OrderViewSet(BaseModelViewSet):
             "phone": validated_data.get("phone"),
             "street": validated_data.get("street"),
             "street_number": validated_data.get("street_number"),
+            "address_line_2": validated_data.get("address_line_2", ""),
             "city": validated_data.get("city"),
             "zipcode": validated_data.get("zipcode"),
             "floor": validated_data.get("floor", ""),

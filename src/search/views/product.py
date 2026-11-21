@@ -17,11 +17,7 @@ from rest_framework.response import Response
 
 from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    SearchThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from product.attribute_selection import (
     ATTRIBUTE_VALUES_FIELD,
     AttributeSelection,
@@ -48,6 +44,7 @@ from search.serializers import (
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
 )
+from search.throttles import SearchThrottle
 from tenant.features import feature_on
 from tenant.permissions import IsCatalogueEnabled
 

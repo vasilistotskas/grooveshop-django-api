@@ -5,8 +5,8 @@ from django.conf import settings
 from django.utils import timezone
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from notification.groups import send_to_user_group
 
 logger = logging.getLogger(__name__)

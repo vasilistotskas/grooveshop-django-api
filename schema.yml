@@ -16862,6 +16862,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderCreateError'
           description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/order-items:
     get:
       operationId: listOrderItem
@@ -29077,6 +29083,23 @@ paths:
       operationId: api_v1_shipping_acs_stations_list
       description: List / retrieve ACS stations and Smartpoint lockers.
       parameters:
+      - in: query
+        name: branch
+        schema:
+          type: string
+        description: The station's branch, exactly; empty matches the station without
+          one.
+      - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: ISO 3166-1 alpha-2 country of the station.
+      - in: query
+        name: externalId
+        schema:
+          type: string
+        description: 'The station''s ACS code, exactly (an area code that several
+          Smartpoints share: add branch for one).'
       - name: ordering
         required: false
         in: query
@@ -29101,12 +29124,26 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: postalCode
+        schema:
+          type: string
+        description: Postcode prefix (its first 5 characters).
       - name: search
         required: false
         in: query
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: shopKind
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: 'ACS shop kind. Default: the locker kinds of countryCode, or
+          of every configured country.'
       tags:
       - api
       security:
@@ -29202,10 +29239,20 @@ paths:
       summary: Λίστα Lockers BoxNow
       parameters:
       - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: Χώρα του locker κατά ISO 3166-1 alpha-2.
+      - in: query
         name: cursor
         schema:
           type: string
         description: Δείκτης (cursor) για σελιδοποίηση
+      - in: query
+        name: externalId
+        schema:
+          type: string
+        description: Ο κωδικός BOX NOW του locker, ακριβώς.
       - in: query
         name: languageCode
         schema:
@@ -38660,11 +38707,7 @@ components:
             που θα φέρει το τιμολόγιο. Οι πόντοι πιστότητας εξαργυρώνονται στην παραγγελία
             και δεν αντικατοπτρίζονται εδώ.
         totalItems:
-          oneOf:
-          - type: integer
-          - enum:
-            - 0
-            type: integer
+          type: integer
           description: |-
             Return the total quantity of all items in the cart.
 
@@ -42328,6 +42371,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         payWay:
           type: integer
           nullable: true
@@ -42517,6 +42564,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -42925,9 +42976,10 @@ components:
           description: Email πελάτη
         street:
           type: string
-          minLength: 1
           description: Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά
-            το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber.
+            το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber. Απαιτείται για
+            παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι'
+            αυτό τη διεύθυνση του σημείου.
           maxLength: 255
         streetNumber:
           type: string
@@ -42935,17 +42987,23 @@ components:
             να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς
             αριθμό απορρίπτεται με κωδικό street_number_missing στο street.'
           maxLength: 50
+        addressLine2:
+          type: string
+          description: 'Ό,τι δεν περιέχει η γραμμή της οδού: διαμέρισμα, όροφος, κτίριο.
+            Προαιρετικό ελεύθερο κείμενο, που τυπώνεται κάτω από την οδό και δίνεται
+            στον courier.'
+          maxLength: 255
         city:
           type: string
-          minLength: 1
-          description: Όνομα πόλης
+          description: Όνομα πόλης. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία
+            σε σημείο παραλαβής παίρνει αντί γι' αυτό την πόλη του σημείου.
           maxLength: 100
         zipcode:
           type: string
-          minLength: 1
           description: Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern``
             της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία,
-            μονά κενά).
+            μονά κενά). Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο
+            παραλαβής παίρνει αντί γι' αυτόν τον ταχυδρομικό κώδικα του σημείου.
           maxLength: 20
         countryId:
           type: string
@@ -43105,10 +43163,11 @@ components:
           writeOnly: true
           nullable: true
           description: 'Πλαίσιο Meta Pixel: κλειδιά ``fbp``, ``fbc``, ``client_user_agent``,
-            ``client_ip_address``, ``event_ids`` (dict με {purchase, initiate_checkout,
-            add_payment_info}), ``consent`` (dict με boolean ``ads``). Κενό dict /
-            null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI
-            τότε παραλείπει την αποστολή.'
+            ``event_ids`` (dict με {purchase, initiate_checkout, add_payment_info}),
+            ``consent`` (dict με boolean ``ads``). Ένα ``client_ip_address`` που σταλεί
+            εδώ αγνοείται: ο server το ορίζει από την επαληθευμένη διεύθυνση του edge.
+            Κενό dict / null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας
+            CAPI τότε παραλείπει την αποστολή.'
         agentCheckout:
           type: string
           format: uuid
@@ -43127,7 +43186,6 @@ components:
           description: Ο αγοραστής αποδέχεται τους όρους χρήσης και την πολιτική απορρήτου
             του καταστήματος. Πρέπει να είναι true.
       required:
-      - city
       - countryId
       - email
       - expectedTotal
@@ -43135,9 +43193,7 @@ components:
       - lastName
       - payWayId
       - phone
-      - street
       - termsAccepted
-      - zipcode
     OrderDeliveryMethod:
       type: object
       properties:
@@ -43188,6 +43244,10 @@ components:
         streetNumber:
           type: string
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         payWay:
           type: integer
@@ -43379,6 +43439,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -44100,8 +44164,11 @@ components:
           maxLength: 255
         streetNumber:
           type: string
-          minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         firstName:
           type: string
@@ -46088,8 +46155,11 @@ components:
           maxLength: 255
         streetNumber:
           type: string
-          minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         firstName:
           type: string
@@ -46599,6 +46669,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54246,6 +54320,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         city:
           type: string
           title: Πόλη
@@ -54339,6 +54417,10 @@ components:
         streetNumber:
           type: string
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54435,6 +54517,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string

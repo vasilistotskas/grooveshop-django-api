@@ -3,8 +3,8 @@ import logging
 from django.contrib.auth import get_user_model
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,

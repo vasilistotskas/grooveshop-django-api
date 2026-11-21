@@ -1,3 +1,4 @@
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
@@ -50,6 +51,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
     def get_tagged_item_list_url(self):
         return reverse("tagged-item-list")
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
+    )
     def test_list(self):
         url = self.get_tagged_item_list_url()
         response = self.client.get(url)
@@ -82,6 +91,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             expected_basic_fields.issubset(set(first_result.keys()))
         )
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item/{id}",
+        200,
+        at="$.contentObject.price",
+        issue=684,
+    )
     def test_retrieve_valid(self):
         url = self.get_tagged_item_detail_url(self.tagged_item.id)
         response = self.client.get(url)
@@ -106,6 +123,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST",
+        "/api/v1/tagged-item",
+        201,
+        at="$.contentObject.price",
+        issue=684,
+    )
     def test_create_valid(self):
         new_product = ProductFactory()
         content_type = ContentType.objects.get_for_model(new_product)
@@ -181,6 +206,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("tag_id", response.data)
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "PUT",
+        "/api/v1/tagged-item/{id}",
+        200,
+        at="$.contentObject.price",
+        issue=684,
+    )
     def test_update_valid(self):
         new_tag = TagFactory(active=True)
         payload = {
@@ -226,6 +259,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
+    )
     def test_filtering_by_tag(self):
         url = self.get_tagged_item_list_url()
         response = self.client.get(url, {"tag": self.tag.id})
@@ -234,6 +275,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         for tagged_item_data in response.data["results"]:
             self.assertEqual(tagged_item_data["tag"]["id"], self.tag.id)
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
+    )
     def test_filtering_by_content_type(self):
         url = self.get_tagged_item_list_url()
         response = self.client.get(url, {"content_type": "product"})
@@ -242,6 +291,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         for tagged_item_data in response.data["results"]:
             self.assertEqual(tagged_item_data["content_type_name"], "product")
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
+    )
     def test_filtering_by_object_id(self):
         url = self.get_tagged_item_list_url()
         response = self.client.get(url, {"object_id": self.product.id})
@@ -257,6 +314,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertIn("results", response.data)
 
+    # contentObject is declared as a loose object with a string price, not the Product it is (#684).
+    @pytest.mark.known_schema_drift(
+        "GET",
+        "/api/v1/tagged-item",
+        200,
+        at="$.results[*].contentObject.price",
+        issue=684,
+    )
     def test_ordering_functionality(self):
         url = self.get_tagged_item_list_url()
         response = self.client.get(url, {"ordering": "created_at"})

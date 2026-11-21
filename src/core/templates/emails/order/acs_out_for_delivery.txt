@@ -12,7 +12,8 @@
 ΔΙΕΥΘΥΝΣΗ ΠΑΡΑΔΟΣΗΣ
 --------------------------------------------------------------------------------
 {{ order.first_name }} {{ order.last_name }}
-{{ order.street }} {{ order.street_number }}
+{{ order.street }} {{ order.street_number }}{% if order.address_line_2 %}
+{{ order.address_line_2 }}{% endif %}
 {{ order.city }}, {{ order.zipcode }}
 
 Μπορείτε να παρακολουθήσετε την αποστολή σας με τον αριθμό voucher στον ιστότοπο της ACS Courier.

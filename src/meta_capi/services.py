@@ -26,6 +26,7 @@ from core.store_settings import store_setting
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from meta_capi.events import META_EVENT_ID_KEYS, ContentType, StandardEvent
+from tenant.celery import dispatch_key
 from tenant.credentials import (
     tenant_meta_capi_access_token,
     tenant_meta_pixel_id,
@@ -390,9 +391,12 @@ def build_purchase_event(order: Order) -> tuple[Event, str]:
 
 
 def build_initiate_checkout_event(order: Order) -> tuple[Event, str]:
-    import uuid as uuid_lib
-
-    event_id = _event_id_for(order, "initiate_checkout") or uuid_lib.uuid4().hex
+    # An order starts one checkout: with no browser-minted id, the order's
+    # number keeps every copy of the dispatch one event (see Purchase).
+    event_id = (
+        _event_id_for(order, "initiate_checkout")
+        or f"initiate-checkout-{order.pk}"
+    )
     event = _new_event(
         name=StandardEvent.INITIATE_CHECKOUT,
         event_id=event_id,
@@ -404,13 +408,10 @@ def build_initiate_checkout_event(order: Order) -> tuple[Event, str]:
 
 
 def build_refund_event(
-    order: Order, amount: Decimal | None
+    order: Order, amount: Decimal | None, *, event_id: str
 ) -> tuple[Event, str]:
-    import uuid as uuid_lib
-
-    # Refunds don't dedup against a browser leg (no user interaction),
-    # so a fresh UUID is fine.
-    event_id = uuid_lib.uuid4().hex
+    """Build the Refund event of one refund of ``order``, under
+    ``event_id`` (``refund_event_id``)."""
     # "Refund" isn't a Meta standard event — passed as a custom
     # string so call sites still see it as a known constant.
     event = _new_event(
@@ -421,6 +422,22 @@ def build_refund_event(
         event_source_url=_success_url_for_order(order),
     )
     return event, event_id
+
+
+def refund_event_id(order: Order) -> str:
+    """The Refund event's id: one per dispatch of the task that sends it.
+
+    A refund is announced once, by the ledger row it creates
+    (``order_refunded``), and that is one dispatch of
+    ``dispatch_refund_event``; every copy of it (a retry, a message
+    delivered again, the sweep's copy of a publish) carries the dispatch's
+    task id, so every copy sends the same event. A browser never sends a
+    Refund, so nothing else has to match it.
+    """
+    key = dispatch_key("meta-capi-refund", order.pk)
+    if key is None:
+        raise RuntimeError("a Refund event is sent from its task only")
+    return f"refund-{key.hex}"
 
 
 def should_dispatch_for_order(order: Order) -> bool:
@@ -450,8 +467,6 @@ def build_complete_registration_event(
     pull from — the allauth signal handler is responsible for
     reading the request cookies/headers and passing them in.
     """
-    import uuid as uuid_lib
-
     from facebook_business.adobjects.serverside.user_data import UserData
 
     user_data = UserData(
@@ -462,7 +477,9 @@ def build_complete_registration_event(
         fbp=fbp or None,
         fbc=fbc or None,
     )
-    eid = event_id or uuid_lib.uuid4().hex
+    # An account registers once: with no browser-minted id, its number keeps
+    # every copy of the dispatch one event.
+    eid = event_id or f"complete-registration-{user.pk}"
     event = _new_event(
         name=StandardEvent.COMPLETE_REGISTRATION,
         event_id=eid,

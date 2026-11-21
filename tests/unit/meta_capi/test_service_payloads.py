@@ -172,8 +172,9 @@ class TestCustomData:
         assert sorted(custom.content_ids) == sorted(
             str(i.product_id) for i in order.items.all()
         )
-        # No browser-minted id: a fresh random one is used.
-        assert len(event_id) == 32
+        # No browser-minted id: the order's number, the same in every copy
+        # of the dispatch.
+        assert event_id == f"initiate-checkout-{order.pk}"
 
     def test_initiate_checkout_value_never_goes_negative(self):
         order = OrderFactory(num_order_items=1)
@@ -187,14 +188,15 @@ class TestCustomData:
         order = OrderFactory(num_order_items=0)
         order.amount_due = Money(Decimal("40.00"), "EUR")
 
-        explicit, id_a = build_refund_event(order, Decimal("15.25"))
-        fallback, id_b = build_refund_event(order, None)
+        explicit, id_a = build_refund_event(
+            order, Decimal("15.25"), event_id="refund-a"
+        )
+        fallback, _ = build_refund_event(order, None, event_id="refund-b")
 
         assert explicit.custom_data.value == 15.25
         assert fallback.custom_data.value == 40.0
         assert explicit.custom_data.currency == "EUR"
-        # Refunds carry a fresh id each time (no browser leg to dedup).
-        assert id_a != id_b
+        assert id_a == explicit.event_id == "refund-a"
 
     def test_purchase_reports_amount_due_and_order_id(self):
         order = OrderFactory(num_order_items=1)
@@ -208,13 +210,13 @@ class TestCustomData:
 
 
 class TestCompleteRegistration:
-    def test_generates_an_event_id_when_none_supplied(self):
+    def test_names_the_event_after_the_account_when_none_supplied(self):
         user = UserAccountFactory(email="New@Example.com")
 
         event, event_id = build_complete_registration_event(user)
 
         assert event.event_id == event_id
-        assert len(event_id) == 32
+        assert event_id == f"complete-registration-{user.pk}"
         assert event.user_data.emails == ["new@example.com"]
         assert event.event_source_url is None
         assert event.custom_data is None

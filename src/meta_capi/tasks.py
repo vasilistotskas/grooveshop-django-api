@@ -15,7 +15,15 @@ Idempotency: each task is keyed by ``event_id``. If a row in
 the repeat is logged and returns without touching the row or calling
 Meta. This makes payment-webhook redeliveries safe, and lets the
 offline pay-way Purchase (sent at ``order_created``) coexist with a
-later ``order_paid`` for the same order.
+later ``order_paid`` for the same order. The check and the send run under
+an advisory lock on the event, so two copies at the same moment send once.
+
+Every id is fixed before the task runs again: the browser-minted one when
+the order or the signup carries it, else the order's or the account's
+number (Purchase, InitiateCheckout, CompleteRegistration), and for a Refund
+the dispatch's own task id (``services.refund_event_id``). A task queued
+after a commit can run more than once (docs/deferred-dispatch.md), and a
+fresh id per run was a second event at Meta.
 """
 
 from __future__ import annotations
@@ -27,8 +35,10 @@ from typing import Any
 
 from celery import shared_task
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 
+from core.db.locks import held_across_calls
 from core.retention import delete_in_batches
 from core.retry import TRANSIENT_DB_ERRORS
 from core.tasks import MonitoredTask
@@ -46,6 +56,7 @@ from meta_capi.services import (
     build_purchase_event,
     build_refund_event,
     is_capi_enabled,
+    refund_event_id,
     should_dispatch_for_order,
 )
 from tenant.celery import dispatch_on_commit
@@ -98,7 +109,34 @@ def _dispatch(
     Raises MetaCapiTransientError so Celery's autoretry kicks in;
     permanent MetaCapiError surfaces as a logged failure with a
     FAILED log row (no retry).
+
+    Two copies of a task can send the same event at the same moment (the
+    sweep's copy of a publish and the message it wrote), and Meta's own
+    deduplication of a server event sent twice is not something to count
+    on. So the SENT check and the send run under an advisory lock on the
+    event (``core.db.locks.held_across_calls``): the copy that waits finds
+    the row SENT.
     """
+    with held_across_calls(
+        f"meta_capi.event:{connection.schema_name}:{event_id}"
+    ):
+        _dispatch_once(
+            event=event,
+            event_id=event_id,
+            event_name=event_name,
+            order_id=order_id,
+            user_id=user_id,
+        )
+
+
+def _dispatch_once(
+    *,
+    event: Any,
+    event_id: str,
+    event_name: str,
+    order_id: int | None,
+    user_id: int | None,
+) -> None:
     # Idempotency check — if the row exists and is SENT, we're done.
     existing = MetaCapiEventLog.objects.filter(event_id=event_id).first()
     if existing and existing.status == MetaCapiEventStatus.SENT:
@@ -262,7 +300,9 @@ def dispatch_refund_event(
         return
 
     refund_amount = Decimal(amount) if amount else None
-    event, event_id = build_refund_event(order, refund_amount)
+    event, event_id = build_refund_event(
+        order, refund_amount, event_id=refund_event_id(order)
+    )
     _dispatch(
         event=event,
         event_id=event_id,

@@ -36,6 +36,7 @@ from meta_capi.tasks import (
     schedule_refund,
 )
 from order.factories.order import OrderFactory
+from tests.utils.dispatch import apply_in
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -261,10 +262,12 @@ class TestInitiateCheckoutDispatch:
 
 
 class TestRefundDispatch:
-    def test_explicit_amount_is_reported(self, capi_enabled, meta_send):
+    def test_explicit_amount_is_reported(self, capi_store, meta_send):
         order = _order(metadata=_CONSENTED_META, num_order_items=1)
 
-        dispatch_refund_event.run(order.id, "12.50")
+        apply_in(
+            capi_store, dispatch_refund_event, [order.id, "12.50"], task_id="r"
+        )
 
         event = _sent_event(meta_send)
         assert event.event_name == "Refund"
@@ -275,21 +278,23 @@ class TestRefundDispatch:
         assert row.status == MetaCapiEventStatus.SENT
 
     def test_missing_amount_falls_back_to_amount_due(
-        self, capi_enabled, meta_send
+        self, capi_store, meta_send
     ):
         order = _order(metadata=_CONSENTED_META, num_order_items=1)
         order.refresh_from_db()
 
-        dispatch_refund_event.run(order.id)
+        apply_in(capi_store, dispatch_refund_event, [order.id], task_id="r")
 
         event = _sent_event(meta_send)
         assert event.custom_data.value == float(order.amount_due.amount)
         assert event.custom_data.currency == order.amount_due.currency.code
 
-    def test_refund_without_consent_is_not_sent(self, capi_enabled, meta_send):
+    def test_refund_without_consent_is_not_sent(self, capi_store, meta_send):
         order = _order(metadata={}, num_order_items=1)
 
-        dispatch_refund_event.run(order.id, "5.00")
+        apply_in(
+            capi_store, dispatch_refund_event, [order.id, "5.00"], task_id="r"
+        )
 
         meta_send.assert_not_called()
 

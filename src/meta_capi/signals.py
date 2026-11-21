@@ -64,9 +64,11 @@ def _on_order_created(sender: Any, order: Any, **kwargs: Any) -> None:
 
 @receiver(order_refunded, dispatch_uid="meta_capi.send_refund")
 def _on_order_refunded(
-    sender: Any, order: Any, amount: Money, **kwargs: Any
+    sender: Any, order: Any, amount: Money, refund: Any, **kwargs: Any
 ) -> None:
-    schedule_refund(order.id, amount.amount)
+    """One Refund event per REFUND row of the ledger (``refund``), which
+    every sender of ``order_refunded`` passes."""
+    schedule_refund(order.id, refund.pk, amount.amount)
 
 
 @receiver(user_signed_up, dispatch_uid="meta_capi.send_complete_registration")

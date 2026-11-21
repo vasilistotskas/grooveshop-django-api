@@ -9,6 +9,7 @@ aimed at one of those mix-ups.
 from __future__ import annotations
 
 import importlib
+import unicodedata
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -254,25 +255,65 @@ class TestValidatePostalCodePattern:
             validate_postal_code_pattern(pattern)
 
 
+NBSP = "\u00a0"
+NARROW_NBSP = "\u202f"
+
+
 class TestSplitStreetLine:
-    """One street line, the number after the street (#641)."""
+    """One street line, the number after the street (#641). Every input of
+    both independent reviews of #766 is a case here: a valid line splits
+    exactly, an ambiguous one is refused (``street_number_missing``)."""
 
     @pytest.mark.parametrize(
         ("line", "expected"),
         [
             ("Ερμού 12", ("Ερμού", "12")),
+            ("Ερμού 12Α", ("Ερμού", "12Α")),
             ("Λεωφόρος Κηφισίας 123Α", ("Λεωφόρος Κηφισίας", "123Α")),
             ("Ermou 12b", ("Ermou", "12b")),
             ("Ερμού, 12", ("Ερμού", "12")),
             ("  Ερμού   12 ", ("Ερμού", "12")),
+            ("ΕΡΜΟΥ 12", ("ΕΡΜΟΥ", "12")),
+            ("Ιπποκράτους 33", ("Ιπποκράτους", "33")),
+            ("Main St 12", ("Main St", "12")),
+            # Ranges and slashes, with or without spaces, and the dashes a
+            # phone types for "-".
             ("Ermou 12-14", ("Ermou", "12-14")),
-            ("Ermou 12/3", ("Ermou", "12/3")),
-            # A range or a slash written with spaces is one number.
+            ("Ερμού 12 - 14", ("Ερμού", "12-14")),
             ("Κηφισίας 12 - 14", ("Κηφισίας", "12-14")),
+            ("Ερμού 12\u201314", ("Ερμού", "12-14")),
+            ("Ερμού 12\u201414", ("Ερμού", "12-14")),
+            ("Ermou 12/3", ("Ermou", "12/3")),
             ("Ermou 12 / 3", ("Ermou", "12/3")),
-            # A number in the street's name stays in the name.
+            # Unicode spaces and decomposed accents are normalised first,
+            # and the street comes back in NFC.
+            (f"Ερμού{NBSP}12", ("Ερμού", "12")),
+            (f"Ερμού{NARROW_NBSP}12", ("Ερμού", "12")),
+            (unicodedata.normalize("NFD", "Ερμού 12"), ("Ερμού", "12")),
+            # Abbreviations, apostrophes and hyphens inside the name.
+            ("Λεωφ. Κηφισίας 12", ("Λεωφ. Κηφισίας", "12")),
+            ("Αγ. Παρασκευής 5", ("Αγ. Παρασκευής", "5")),
+            ("Main St. 12", ("Main St.", "12")),
+            ("Γ' Σεπτεμβρίου 12", ("Γ' Σεπτεμβρίου", "12")),
+            (
+                "Παπαδιαμάντη-Καραϊσκάκη 7",
+                ("Παπαδιαμάντη-Καραϊσκάκη", "7"),
+            ),
+            # A date that names the street, with or without its ordinal
+            # ending, and after a street-type word.
             ("28ης Οκτωβρίου 15", ("28ης Οκτωβρίου", "15")),
+            ("28η Οκτωβρίου 15", ("28η Οκτωβρίου", "15")),
+            ("28 Οκτωβρίου 15", ("28 Οκτωβρίου", "15")),
+            ("25ης Μαρτίου 3", ("25ης Μαρτίου", "3")),
+            ("Οδός 1ης Μαΐου 3", ("Οδός 1ης Μαΐου", "3")),
             ("Οδός 25ης Μαρτίου 3", ("Οδός 25ης Μαρτίου", "3")),
+            ("28ΗΣ ΟΚΤΩΒΡΙΟΥ 15", ("28ΗΣ ΟΚΤΩΒΡΙΟΥ", "15")),
+            # A word that only says "number" is dropped from the street.
+            ("Ερμού Νο 12", ("Ερμού", "12")),
+            ("Ερμού αριθμός 12", ("Ερμού", "12")),
+            ("Ερμού αρ. 12", ("Ερμού", "12")),
+            ("Ερμού No. 12", ("Ερμού", "12")),
+            ("Ermou nr 12", ("Ermou", "12")),
         ],
     )
     def test_splits_the_trailing_number(self, line, expected):
@@ -285,37 +326,59 @@ class TestSplitStreetLine:
             "",
             "12",
             "12 14",
-            # A number written first is not guessed: "28 Οκτωβρίου" is a
-            # street name.
-            "12 Main Street",
-            "28 Οκτωβρίου",
             "Ερμού 12 Α",
-        ],
-    )
-    def test_refuses_a_line_with_no_number_after_the_street(self, line):
-        assert split_street_line(line) is None
-
-    @pytest.mark.parametrize(
-        "line",
-        [
-            # The stand-in review's inputs on #766: a split would take a
-            # wrong number, which is worse than asking for it.
+            # A number written first is never read.
+            "12 Main Street",
+            "12 Main St",
+            # A date with no house number after it, and no day 32.
+            "28 Οκτωβρίου",
+            "32 Οκτωβρίου 5",
+            # Text after the number, and a comma anywhere but right
+            # before it.
             "Ερμού 12, όροφος 3",
             "Εγνατίας 12, 546 22",
-            # Floor or extra text after the number.
-            "Ερμού 12 3ος όροφος",
-            # A house number in the street part.
+            "Ερμού, Αθήνα 12",
+            # A number in the street that is not a date's day.
             "Ερμού 12Α 3",
+            "Ερμού 12ος 3",
             "Αρτέμιδος 2 και Κοσμά Αιτωλού 3",
             # A dangling separator before the number.
             "Ερμού - 12",
             "Ερμού / 12",
             # Digits other than 0-9: the postcode guard reads ASCII alone.
-            "Ερμού ١٢",
-            "Ερμού １２",
+            "Ερμού \u0661\u0662",
+            "Ερμού \uff11\uff12",
         ],
     )
     def test_refuses_a_line_it_would_have_to_guess(self, line):
+        assert split_street_line(line) is None
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            # The second review's High: a floor or flat number, no house
+            # number. Each marker word, accent- and case-insensitively.
+            "Ερμού, όροφος 3",
+            "Ερμού όροφος 3",
+            "Ερμού ΟΡΟΦΟΣ 3",
+            "Ερμού οροφ. 2",
+            "Ερμού ορ. 3",
+            "Ερμού ισόγειο 1",
+            "Ερμού διαμέρισμα 5",
+            "Ερμού διαμ. 4",
+            "Ερμού ημιόροφος 2",
+            "Ermou Floor 3",
+            "Ermou fl. 3",
+            "Ermou Apt 4",
+            "Ermou apartment 7",
+            "Ermou Unit 2",
+            "Ermou Suite 4",
+            "Ermou flat 2",
+            # A floor word with the house number before it.
+            "Ερμού 3ος όροφος 12",
+        ],
+    )
+    def test_refuses_a_floor_or_a_flat(self, line):
         assert split_street_line(line) is None
 
     def test_a_postcode_at_the_end_is_split_for_the_postcode_guard(self):

@@ -18,6 +18,7 @@ Callers:
 from __future__ import annotations
 
 import re
+import unicodedata
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -42,20 +43,86 @@ _MIN_POSTCODE_LOOKALIKE_LENGTH = 4
 # addresses are written: "Ερμού 12", "Κηφισίας 123Α", "Ερμού, 12",
 # "Ermou 12-14", "Ermou 12/3". The number is ASCII digits (the postcode
 # guard reads ASCII alone, like the storefront), at most one letter after
-# them, and an optional second number after a dash or a slash. A number
-# written first ("12 Main St") is not read: "28 Οκτωβρίου" is a Greek
-# street with no number, and guessing would send the parcel to number 28
-# of "Οκτωβρίου".
+# them, and an optional second number after a dash or a slash.
 _LETTER = r"[^\W\d_]"
 _HOUSE_NUMBER = rf"[0-9]+{_LETTER}?(?:[-/][0-9]+{_LETTER}?)?"
 _STREET_LINE = re.compile(rf"(?P<street>.+?)[ ,]+(?P<number>{_HOUSE_NUMBER})")
 # A range or a slash written with spaces is one number: "12 - 14".
 _SPACED_RANGE = re.compile(r"(?<=[0-9])\s*([-/])\s*(?=[0-9])")
-# A number a street's own name holds: an ordinal ("28ης Οκτωβρίου",
-# "25ης Μαρτίου"), digits and at least two letters, so "12Α" (a house
-# number) is not one.
-_ORDINAL = re.compile(rf"[0-9]+{_LETTER}{{2,}}")
-_DIGIT = re.compile(r"\d")
+# Dashes keyboards and phones type for "-" in a range ("12–14").
+_DASHES = str.maketrans(
+    {"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"}
+)
+# A street holds a number only as the day of a date that names it ("28ης
+# Οκτωβρίου", "28η Οκτωβρίου", "28 Οκτωβρίου", "Οδός 1ης Μαΐου"): a day
+# 1 to 31, optionally with a Greek ordinal ending, then a month in the
+# genitive. Any other number in it ("Ερμού 12, όροφος 3", "Ερμού 12ος 3",
+# "12 Main St") means the line cannot be split without guessing which
+# number is the house's.
+_DAY = re.compile(r"(?:[1-9]|[12][0-9]|3[01])[α-ω]*")
+MONTHS_GENITIVE = (
+    "ιανουαριου",
+    "φεβρουαριου",
+    "μαρτιου",
+    "απριλιου",
+    "μαιου",
+    "ιουνιου",
+    "ιουλιου",
+    "αυγουστου",
+    "σεπτεμβριου",
+    "οκτωβριου",
+    "νοεμβριου",
+    "δεκεμβριου",
+)
+# Words that name a floor or a flat, not the street: a number after one is
+# the floor's or the flat's, never the house's ("Ερμού, όροφος 3"), so a
+# street holding one is never split. Compared without accents, case or a
+# final dot.
+UNIT_MARKERS = (
+    "οροφος",
+    "οροφ",
+    "ορ",
+    "ισογειο",
+    "διαμερισμα",
+    "διαμ",
+    "ημιοροφος",
+    "floor",
+    "fl",
+    "apt",
+    "apartment",
+    "unit",
+    "suite",
+    "flat",
+)
+# Words that only say "number" before the house number ("Ερμού αρ. 12",
+# "Ermou No 12"): dropped from the street, whose number they announce.
+NUMBER_MARKERS = ("αρ", "αριθ", "αριθμος", "νο", "no", "nr")
+
+
+def _folded(word: str) -> str:
+    """*word* compared as the marker and month lists are written: no
+    accents or diaeresis, case-folded, no final dot."""
+    decomposed = unicodedata.normalize("NFD", word)
+    bare = "".join(c for c in decomposed if unicodedata.category(c) != "Mn")
+    return bare.casefold().rstrip(".")
+
+
+# The lists as ``_folded`` compares them (its casefold turns a final "ς"
+# into "σ", so the lists are folded the same way, once).
+_UNIT_MARKERS = frozenset(map(_folded, UNIT_MARKERS))
+_NUMBER_MARKERS = frozenset(map(_folded, NUMBER_MARKERS))
+_MONTHS_GENITIVE = frozenset(map(_folded, MONTHS_GENITIVE))
+
+
+def _normalised_line(line: str) -> str:
+    """*line* in the one form it is split in: NFC (a decomposed accent is
+    one letter, as the database stores it), every Unicode space a plain
+    space and runs of them one, typographic dashes "-", and a range
+    written with spaces one number."""
+    text = unicodedata.normalize("NFC", line).translate(_DASHES)
+    text = "".join(" " if c.isspace() else c for c in text)
+    text = _WHITESPACE_RUN.sub(" ", text).strip()
+    return _SPACED_RANGE.sub(r"\1", text)
 
 
 def normalize_postcode(value: str) -> str:
@@ -102,31 +169,68 @@ def _coded(code: str, message: StrOrPromise) -> ErrorDetail:
 
 def split_street_line(line: str) -> tuple[str, str] | None:
     """The street and its number from one line whose number follows the
-    street (``_STREET_LINE``), or ``None`` when it cannot be split
-    without guessing. The one place Django splits a street line: a caller
-    that sends one line instead of a street and a number gets the same
-    two columns the courier voucher reads.
+    street, or ``None`` when it cannot be split without guessing. The one
+    place Django splits a street line: a caller that sends one line
+    instead of a street and a number gets the same two columns the courier
+    voucher reads.
 
     A wrong number sends the parcel elsewhere, which is worse than asking
-    for the number again, so the split is taken only when what is left
-    is plainly a street name: it ends in a letter (not a digit, a
-    separator or a dangling mark), and the only numbers it holds are
-    ordinals of its own name. "Ερμού 12, όροφος 3", "Εγνατίας 12, 546 22"
-    and a number in other digits than 0-9 are refused.
+    for the number again (``street_number_missing``), so the rules are
+    explicit:
+
+    1. The line is normalised first (``_normalised_line``).
+    2. It ends in the house number (``_STREET_LINE``); a number written
+       first ("12 Main St") is never read.
+    3. A comma in the street is allowed only directly before the number
+       ("Ερμού, 12"); one anywhere else ("Ερμού 12, όροφος 3",
+       "Εγνατίας 12, 546 22") refuses the line.
+    4. A floor or flat word (``UNIT_MARKERS``) in the street refuses it:
+       the number after it is not the house's ("Ερμού, όροφος 3").
+    5. A word that only says "number" before it (``NUMBER_MARKERS``) is
+       dropped from the street ("Ερμού αρ. 12" -> "Ερμού", "12").
+    6. The street holds no number but the day of a date that names it:
+       a day 1 to 31, with or without a Greek ordinal ending, followed by
+       a month in the genitive (``MONTHS_GENITIVE``): "28 Οκτωβρίου 15",
+       "28η Οκτωβρίου 15", "25ης Μαρτίου 3", "Οδός 1ης Μαΐου 3".
+    7. The street ends in a letter, or in an abbreviation's dot after one
+       ("Main St. 12").
+
+    The street is returned in its normalised form.
     """
-    flat = _SPACED_RANGE.sub(r"\1", _WHITESPACE_RUN.sub(" ", line).strip())
-    match = _STREET_LINE.fullmatch(flat)
+    match = _STREET_LINE.fullmatch(_normalised_line(line))
     if match is None:
         return None
     street = match["street"].rstrip(" ,")
-    if not street or not street[-1].isalpha():
+    if "," in street:
         return None
-    if any(
-        _DIGIT.search(token) and not _ORDINAL.fullmatch(token)
-        for token in street.replace(",", " ").split()
-    ):
+    words = street.split()
+    folded = [_folded(word) for word in words]
+    if any(word in _UNIT_MARKERS for word in folded):
+        return None
+    while folded and folded[-1] in _NUMBER_MARKERS:
+        words.pop()
+        folded.pop()
+    if not _only_date_numbers(words, folded):
+        return None
+    street = " ".join(words)
+    last = street.rstrip(".")[-1:] if street else ""
+    if not last.isalpha():
         return None
     return street, match["number"]
+
+
+def _only_date_numbers(words: list[str], folded: list[str]) -> bool:
+    """Every word holding a digit is a day followed by a month."""
+    for index, word in enumerate(words):
+        if not any(char.isdigit() for char in word):
+            continue
+        is_day = _DAY.fullmatch(folded[index]) is not None
+        next_is_month = (
+            index + 1 < len(folded) and folded[index + 1] in _MONTHS_GENITIVE
+        )
+        if not (is_day and next_is_month):
+            return False
+    return True
 
 
 def street_number_missing() -> ErrorDetail:

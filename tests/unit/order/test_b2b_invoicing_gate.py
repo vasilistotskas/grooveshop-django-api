@@ -5,10 +5,13 @@ from extra_settings.models import Setting
 
 from country.factories import CountryFactory
 from order.serializers.order import OrderCreateFromCartSerializer
+from tests.utils.checkout import UNQUOTED
 
 BASE_PAYLOAD = {
     "pay_way_id": 1,
     "terms_accepted": True,
+    # The serializer checks the shape alone; no quote is compared here.
+    "expected_total": UNQUOTED,
     "first_name": "Nikos",
     "last_name": "Papadopoulos",
     "email": "nikos@example.com",

@@ -413,7 +413,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     )
     def get_applied_promotions(self, obj: Cart) -> list[dict]:
         # The engine already knows this — ``CartDiscountResult.applied``
-        # is what ``PromotionEngine.record`` writes onto the order as
+        # is what ``record_redemptions`` writes onto the order as
         # ``metadata["promotions"]``. Serializing it here is what lets
         # the cart explain a discount instead of showing one opaque
         # number, and what lets the coupon row show ITS OWN amount: a

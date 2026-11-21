@@ -3,6 +3,376 @@
 
 
 
+## v3.262.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): give the street line refusal its code
+
+Refs #641 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): the cart digest holds each line's promotion money and the routed carrier
+
+The digest now carries each applied promotion's amount and the
+promotion money every line carries, so discounts that move between
+lines at the same total change it, and the carrier a home delivery is
+routed to when it names none. Its docs say it is a check of contents:
+the shipping charge, the fee and the loyalty and gift-card amounts are
+expectedTotal's. The 409's quote help text names expectedCartDigest.
+
+Refs #755 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): split a street line only when no number has to be guessed
+
+The street left after the split must end in a letter and hold no
+number but an ordinal of its own name, the number is ASCII digits, and
+a range written with spaces is one number. Text after the number
+(a floor, a postcode) was split into a wrong number; it is now refused
+with street_number_missing.
+
+Refs #641 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): a pickup order goes only to a deliverable point, resolved last and within a deadline
+
+A point is deliverable when the carrier's catalogue holds it, it is
+active and it is in the order's country (deliverable_pickup_point); the
+receipt's lookup still names a point withdrawn after the order. A
+missing or withdrawn point is looked for by one resync, which now runs
+after every cheaper refusal of the body, only where the store delivers
+that kind in that country, and within PICKUP_POINT_RESYNC_TIMEOUT_SECONDS
+on a thread of its own; past the deadline the order is refused and the
+sync goes on. A point in another country is refused without a resync.
+The carriers' validate_order_payload apply the same rule.
+
+A pickup order keeps none of the buyer's region, floor or location type,
+and ShippingChoice.of prices a pickup delivery without a region, so the
+quote, the cart digest and the order agree.
+
+Refs #642 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): refuse an unknown region as a field error and filter pickup-point lists exactly
+
+- The pickup-point resync thread sets its store's schema, logs its own
+  failure and closes its own connection; the guard is taken before it
+  starts, so a request during a sync past its deadline starts no other.
+- A regionId with no such region is a 400 region_invalid on regionId, and
+  one of another country region_country_mismatch, from order creation and
+  from the quote and payment-intent bodies (address_rules.region_errors),
+  never a foreign key the database refuses. Order address errors now name
+  the body field regionId.
+- GET /shipping/acs/stations takes exact externalId and branch filters and
+  documents shopKind, countryCode and postalCode; GET
+  /shipping/boxnow/lockers takes exact externalId and countryCode
+  (BoxNowLockerFilter). Both still list active rows only.
+- A pickup quote with an island region prices and digests like one
+  without it, and the order keeps no region. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(shipping): purge the pickup-point lists on every sync and refuse a resync without the cache
+
+- The shipping cache surface now declares BoxNowLocker, and both
+  catalogue syncs mark it stale for the rows their deactivating update
+  withdraws, so the cached locker and station lists (exact lookups
+  included) follow the daily sync and the order-time resync instead of
+  serving the replaced catalogue for the cache TTL.
+- While the cache holding the resync guard is down, a pickup point the
+  catalogue misses is refused as pickup_point_unknown and logged, with
+  no resync, instead of failing the order with a 500.
+- The resync tests join every resync thread before their teardown and
+  fail if one outlives them. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): answer a pickup point that cannot be checked with a temporary 503
+
+While the cache holding the resync guard is down, a pickup point the
+catalogue misses is not judged: ShippingService.pickup_point_address
+raises PickupPointCheckUnavailableError (logged as a warning, no
+resync), and order creation answers 503 pickup_point_check_unavailable
+with Retry-After (PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS) and no field
+error, instead of telling the shopper to pick another point. The 503 is
+documented on POST /order and in the error contract. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): leave a cache outage during order creation to the coded 503
+
+The create view's catch-all turned any REDIS_UNAVAILABLE into a 500
+server_error. It is re-raised now, so StrictCacheUnavailableMiddleware
+answers it with its 503 temporarily_unavailable, as on every other route. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): staff can save a pickup order and its owner cannot rewrite its address
+
+- Order.street_number allows a blank (a state-only migration): a pickup
+  point whose street line names no number is stored without one, and the
+  admin's change form refused it. Order.clean() requires the number only
+  off a pickup order, and reports a missing street, number or city under
+  that field, never under "address", which is no form field and made the
+  admin's save a 500. The API keeps the number required in responses (an
+  empty string on such an order) and on owner writes.
+- OrderWriteSerializer refuses an owner's change to a pickup-point
+  order's delivery address (PICKUP_POINT_ADDRESS_FIELDS) with
+  order_field_locked: it would reach the courier's voucher over the
+  point's address.
+docs/order/index.md's address line 2 entry points at creation-address.md. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* fix(order): one list of address fields, a blank number echoed back, and a payment error the admin can show
+
+- OrderWriteSerializer locks a pickup-point order's delivery address by
+  Order.SHIPPING_ADDRESS_FIELDS, the one list of those fields, instead of
+  a copy, so a field added there is locked too.
+- A client can send back the empty street number GET gave it for a
+  pickup point whose street line names none: the write field allows a
+  blank, and validate() requires a number only for an order delivered to
+  the buyer. Only the write request's minLength changes in schema.yml.
+- Order.clean() reports a completed payment with nothing due as the
+  order's error, not under amount_due, which the admin shows read-only;
+  a form error on a field with no input made the save a 500. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+### Documentation
+
+* docs(order): say which 503 a Redis outage gives an order, and stage the tests the same way
+
+- While Redis is down from the start of POST /order, the fail-closed
+  order-create throttles refuse it first with 503 temporarily_unavailable
+  (no Retry-After); pickup_point_check_unavailable is reached only when
+  Redis fails mid-request, after the throttles counted it. The error
+  contract and the delivery-address rules now say so.
+- The mid-request test gives the order throttles a real budget and
+  asserts both allowed the request before the guard's cache.add fails;
+  a new test points the whole default cache at a stopped Redis and
+  asserts the throttle's refusal, no resync and no order.
+- The delivery-address rules (section 3.3) move to
+docs/order/creation-address.md: creation.md passed the size a doc
+  file may have. ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+### Features
+
+* feat(order): deliver a pickup-point order to the point's address (#767) ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* feat(order): the quote returns a cart digest and order creation can refuse a changed cart
+
+POST /cart/quote returns cartDigest once a delivery and a pay way are
+chosen: an HMAC over the lines (product, quantity, unit price as
+priced), the promotions with their codes and gifts, the delivery with
+its pickup point, and the pay way. POST /order takes an optional
+expectedCartDigest, compared under the cart lock on both creation
+paths before the total; a difference creates nothing and answers 409
+cart_changed with the fresh quote. It refuses an order whose contents
+changed at the same total, which expectedTotal cannot see.
+
+The quote now takes the pickup point with the field names order
+creation uses (PickupPointSerializer), and both build the delivery
+with ShippingChoice.of, which keeps only the chosen carrier's
+location_keys. A test places every order-creation field as digested,
+priced or not priced, so the two bodies cannot drift apart.
+
+cart_changed is a code under error.type invalid_order_data, sent only
+to a request carrying expectedCartDigest, until the storefront lists it.
+
+Refs #755 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* feat(order): accept one street line and split its number inside Django
+
+Order creation takes street without streetNumber as one line whose
+number follows the street, the Greek and Cypriot form, and splits it
+in one place (core.validators.address.split_street_line), so the order
+stores the two columns the courier voucher, invoices and myDATA read.
+A number written first is not guessed. A line with no number is a 400
+with code street_number_missing on street, and the errors of a split
+number are reported on street. A sent streetNumber is used as sent.
+
+Refs #641 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* feat(order): deliver a pickup-point order to the point's address
+
+For shipping_kind=pickup_point the buyer's street, number, city and
+postcode are no longer required or kept: order creation stores the
+pickup point's address from the carrier's catalogue
+(ShippingCarrierInterface.address_of_pickup_point, the BOX NOW locker
+or the exact ACS station and branch) as the order's delivery address,
+its number split from the street line where it splits. That one
+snapshot is what the receipt, the ACS voucher and the order page read.
+Name, email and phone stay required and the region rule does not
+apply.
+
+A point the catalogue does not hold is refused with
+pickup_point_unknown on the carrier's location field, and no point
+with pickup_point_required, since no address could be stored for it;
+BOX NOW's payload check no longer accepts an unknown locker. An invoice
+to a pickup point must name the company's address. The receipt's buyer
+snapshot no longer cites the deleted EUR 50 rule.
+
+Refs #642 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+* feat(order): look an unknown pickup point up by resyncing its carrier's catalogue
+
+A pickup point the catalogue does not hold yet (BOX NOW's widget is
+live data, the catalogue syncs daily) is looked for once more:
+ShippingService.pickup_point_address resyncs that carrier's catalogue
+through its scheduled sync's own path (refresh_pickup_points), before
+any transaction or lock, and reads it again. At most one resync per
+store and carrier runs in PICKUP_POINT_RESYNC_GUARD_SECONDS; inside it
+a miss is refused at once. A point the resync does not hold, or a
+resync that fails, is refused with pickup_point_unknown, and logged;
+the buyer's address is never used instead.
+
+Refs #642 ([`9ec3b3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ec3b3bf791a57569cd941ec15c7ef8091c3aa43))
+
+## v3.261.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(emails): plain-text bodies render without HTML escaping; the voucher audit copy holds no address
+
+Every .txt email body was rendered with Django's autoescaping, so an
+address such as "Building A & B" reached the plain-text part as
+"Building A &amp; B". emails.render.render_template renders the text
+body with autoescaping off and the HTML body with it on, and the
+per-field |safe workarounds in the text templates are gone; two golden
+files that recorded the escaped apostrophe are re-recorded.
+
+The ACS voucher's audit copy on shipment.metadata records
+Delivery_Notes without the address line 2, since it must hold no
+recipient address, and a floor value outside the choices no longer
+keeps the voucher from being issued.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(order): erasure and export read one list of an order's address fields
+
+Order.SHIPPING_ADDRESS_FIELDS names the delivery address fields that
+are the buyer's own. GDPR erasure blanks them on a retained order, the
+address line 2 included, which it missed, and a data export lists them
+(place, floor and location type were missing). A test holds the list to
+every order field the staging anonymiser scrubs, so a new address field
+cannot be left out of the erasure again.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(user): erasure clears every carrier copy of an order's personal data
+
+- Order.PERSONAL_FIELDS (contact, address, customer's note, the invoice's
+  counterparty in BILLING_FIELDS) and Order.PERSONAL_METADATA (the
+  Conversions API browser identity, a typed cancel reason) are the one
+  definition the data export lists and erasure clears, billing excepted.
+- Each carrier clears its own records through
+  ShippingCarrierInterface.erase_recipient_data: the shipment metadata at
+  PERSONAL_METADATA (the failed request, the notes the voucher or parcel
+  carried), the ACS call history of the orders and their vouchers, and
+  what the carriers sent back (checkpoint notes, the receiver on a COD
+  payout, BOX NOW event text, raw rows). gdpr no longer imports the
+  carrier apps.
+- The ACS audit copy records the notes as sent, less the address line 2
+  (CourierNotes.without_address), so a cut note is recorded as ACS got it.
+- The guard test no longer exempts the JSON columns: an erasure test
+  searches every retained row, JSON included, for the subject's values.
+
+* revert: erasure of every carrier copy moves to its own pull request
+
+This reverts commit c90e61abb. The erasure overhaul (one definition of an
+order's personal data, carrier records, the JSON sweep) ships on its own;
+this branch keeps the address line 2 and its own place in erasure and
+export. ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* fix(shipping_acs): the voucher audit copy records the customer's note as sent
+
+The audit copy of Delivery_Notes rebuilt the notes without the address
+line, so a note cut to make room for the floor and the line was recorded
+longer than ACS received it, and the floor label this branch adds rode
+along. CourierNotes now holds the voucher's notes: .sent is what ACS gets,
+.customer_part the customer's note as it was cut there, which is all the
+copy records (built with the request, from the same order). ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+### Features
+
+* feat(order): an order's address line 2 (#769) ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(order): an order's address line 2
+
+Order creation takes an optional addressLine2 for what the street line
+does not hold (a flat, a floor, a building; UCP's extended_address),
+kept on Order.address_line_2 apart from the customer's notes. It is in
+the order responses, the staff write serializer and the admin, prints
+under the street on the receipt and the order emails, and rides first
+in the ACS voucher's Delivery_Notes, since ACS's Recipient_Address is
+the street alone; the customer's note is cut first to the 500-character
+limit. The receipt no longer prints Order.place, a district field, as
+its second address line.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(order): the voucher's notes lead with the floor, and the receipt prints a place with the city
+
+Until ACS's Recipient_Floor format is known, the floor choice's Greek
+label leads Delivery_Notes, ahead of the address line 2 and the
+customer's note; only the customer's note is ever cut. The receipt
+prints Order.place, a district, beside the city rather than as an
+address line.
+
+Refs #641 ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+* feat(user): saved addresses keep an address line 2, and full_address prints it
+
+UserAddress.address_line_2 (optional, the read and write serializers, the
+admin, the data export, the staging anonymiser) lets checkout prefill an
+order's line 2 from a saved address. Order.full_address carries the line
+after the street and its number ("Ερμού 12, 3ος όροφος, 10563 Αθήνα"), so
+every reader of fullAddress shows it. ([`b1292a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1292a0fa2146bb06430fae9cc7f22c75bc01bc6))
+
+## v3.260.1 (2026-11-21)
+
+### Documentation
+
+* docs(promotion): order docs and the cart serializer name the moved record, gift-pair and teaser helpers ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
+* docs: name files by their path under src/ in comments and docstrings (#771) ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: name files by their path under src/ in comments and docstrings
+
+308 comments and docstrings in 230 Python files named a file by the
+path it had before the move into src/. Each now names a path that
+exists, or the dotted module where the longer path would not fit the
+line. Five named a file that is gone and now name what replaced it.
+No code changes. ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: leave three files other open branches are changing ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: leave six files the core split is about to move ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+### Refactoring
+
+* refactor(promotion): services.py into an engine/ package and one module per service (#772) ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
+* refactor(promotion): services.py into an engine/ package and one module per service
+
+Pure move of src/promotion/services.py (1,968 lines). PromotionEngine's
+classmethods are split at their seams into promotion/engine/:
+
+- evaluation.py: PromotionEngine (is_enabled, evaluate,
+  single_unit_discount, classify, _teaser_holds)
+- teasers.py: near-miss entries, items_after_teaser, teaser_cost
+- redemptions.py: record_redemptions (was PromotionEngine.record)
+- eligibility.py: candidate collection and the per-promotion checks
+- benefits.py: amount_for, benefit_amount, gift_entitlement, gift_pairs
+- stacking.py: resolve_stacking, clamp
+- bxgy.py: the units a buy-X-get-Y discounts
+- scope.py: matching_items, attach_category_scopes
+- results.py: the value types (CartDiscountResult and the rest)
+
+The services get one module each: coupons.py (CouponError,
+CouponService), coupon_picker.py (CouponPickerService) and
+product_offers.py (ProductPromotionService).
+
+Helpers that left the class became module functions without cls.
+Names that now cross a module lose their leading underscore, and
+PromotionEngine.record is record_redemptions. Every body is unchanged:
+an AST comparison of the 46 definitions shows only those renames and
+the docstrings. Every importer, patch string and doc reference moves
+with it, with no re-export. schema.yml is unchanged and there is no
+migration; the module had no Celery task.
+
+Four import-linter contracts keep the layout: the services sit above
+the engine (layers, indirect chains included), and the engine seams'
+direct imports go only downward.
+
+Closes #585 ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
 ## v3.260.0 (2026-11-21)
 
 ### Bug fixes

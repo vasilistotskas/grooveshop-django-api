@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from core.cache.invalidation import mark_surface_stale
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN
@@ -2893,6 +2894,10 @@ class BoxNowService:
             deactivated_count = BoxNowLocker.objects.exclude(
                 external_id__in=seen_external_ids
             ).update(is_active=False)
+            if deactivated_count:
+                # ``update`` sends no ``post_save``: the cached locker
+                # list would keep serving the withdrawn lockers.
+                mark_surface_stale("shipping")
             # Wholesale turnover means this catalogue belongs to a
             # DIFFERENT partner than the rows we already had — the exact
             # shape of a credentials/data mismatch, and the reason every

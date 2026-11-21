@@ -186,7 +186,7 @@ class TestPromotionRules:
         )
 
         with patch(
-            "promotion.services.PromotionEngine.is_enabled",
+            "promotion.engine.evaluation.PromotionEngine.is_enabled",
             return_value=False,
         ):
             assert _kind(product) is None

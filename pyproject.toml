@@ -1,5 +1,5 @@
 [project]
-version = "3.260.0"
+version = "3.262.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -836,5 +836,64 @@ forbidden_modules = [
 ]
 ignore_imports = [
     "order.payments.payment_ledger -> order.accounting.credit_allocation",
+]
+allow_indirect_imports = true
+
+# Inside `promotion` (#585). The engine is one module per seam
+# (`promotion/engine/__init__.py` lists them), and the services that call
+# it (coupons, the checkout coupon picker, the product page's offers) sit
+# above it. The services contract holds for indirect chains too. The
+# engine's seams import the product and order models, which reach back
+# into the engine through `promotion.offers` and `product.pricing`, so a
+# layers contract over the seams would need those app cycles ignored:
+# these contracts check the seams' direct imports, as the order ones do.
+[[tool.importlinter.contracts]]
+name = "promotion services over the engine"
+type = "layers"
+containers = ["promotion"]
+layers = [
+    "views",
+    "coupon_picker | coupons | product_offers",
+    "engine",
+]
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: bxgy, scope and results import no seam above them"
+type = "forbidden"
+source_modules = [
+    "promotion.engine.bxgy",
+    "promotion.engine.results",
+    "promotion.engine.scope",
+]
+forbidden_modules = [
+    "promotion.engine.benefits",
+    "promotion.engine.eligibility",
+    "promotion.engine.evaluation",
+    "promotion.engine.redemptions",
+    "promotion.engine.stacking",
+    "promotion.engine.teasers",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: no seam imports evaluation"
+type = "forbidden"
+source_modules = [
+    "promotion.engine.benefits",
+    "promotion.engine.eligibility",
+    "promotion.engine.redemptions",
+    "promotion.engine.stacking",
+    "promotion.engine.teasers",
+]
+forbidden_modules = ["promotion.engine.evaluation"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "promotion engine: results imports no other seam"
+type = "forbidden"
+source_modules = ["promotion.engine.results"]
+forbidden_modules = [
+    "promotion.engine.bxgy",
+    "promotion.engine.scope",
 ]
 allow_indirect_imports = true

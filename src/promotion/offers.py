@@ -11,7 +11,7 @@ Rules for the promotion branch (``covered_by_live_promotion``):
 
 * AUTOMATIC only — a code promotion advertises nothing until typed.
 * ``target_scope`` PRODUCTS or CATEGORIES (category scope includes the
-  subtree, like ``PromotionEngine._matching_items``). ORDER-scope
+  subtree, like ``engine.scope.matching_items``). ORDER-scope
   promotions are cart-level and never mark a product.
 * Benefit PERCENTAGE, FIXED_AMOUNT, BXGY or FREE_GIFT; FREE_SHIPPING is
   a shipping perk, not a price offer.
@@ -91,14 +91,15 @@ def load_price_reducing_promotions() -> list[Promotion]:
     relations and category subtrees are loaded once, so pricing many
     products against the result costs no further queries.
     """
-    from promotion.services import PromotionEngine
+    from promotion.engine.evaluation import PromotionEngine
+    from promotion.engine.scope import attach_category_scopes
 
     if not PromotionEngine.is_enabled():
         return []
     promotions = list(
         price_reducing_promotions().with_scope_relations().order_by("pk")
     )
-    PromotionEngine.attach_category_scopes(promotions)
+    attach_category_scopes(promotions)
     return promotions
 
 
@@ -171,7 +172,7 @@ def covered_by_live_promotion(prefix: str = ""):
 
 def offer_kind_expression(prefix: str = "") -> Case:
     """SQL ``MARKDOWN`` / ``PROMOTION`` / ``NULL`` for a product row."""
-    from promotion.services import PromotionEngine
+    from promotion.engine.evaluation import PromotionEngine
 
     whens: list[When] = [
         When(

@@ -135,7 +135,7 @@ not declare. Read `docs/scheduler.md`.
 
 `Country` and `Region`: reference rows shared by every store, seeded from
 `src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
-of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+of their own; `docs/order/creation-address.md` (section 3.3) has the delivery-address
 rules that read them.
 
 ### `devtools/`
@@ -241,8 +241,10 @@ Read `docs/cart-agent-token.md` for the token,
 ### `promotion/`, `giftcard/`, `b2b/`
 
 - `promotion/`: `Promotion`, `PromotionCode`, `PromotionRedemption` and
-  `CartPromotionCode`; the rules are evaluated in
-  `src/promotion/services.py`.
+  `CartPromotionCode`; the rules are evaluated in the `src/promotion/engine/`
+  package (`PromotionEngine` in `engine/evaluation.py`, one module per
+  seam), and the services that call it are `src/promotion/coupons.py`,
+  `src/promotion/coupon_picker.py` and `src/promotion/product_offers.py`.
 - `giftcard/`: `GiftCard`, `GiftCardPurchase`, `GiftCardTransaction` (the
   ledger) and `GiftCardPause`; the rules are in
   `src/giftcard/services.py`.

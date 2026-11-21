@@ -1521,6 +1521,7 @@ class OrderAdmin(BaseModelAdmin):
                     "city",
                     "street",
                     "street_number",
+                    "address_line_2",
                     "zipcode",
                     "floor",
                     "location_type",

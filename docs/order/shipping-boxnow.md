@@ -6,6 +6,14 @@ and says which file holds each § number used here.
 ## 5.2 BoxNow (`src/shipping_boxnow/`)
 
 - **REST + webhook** for tracking events.
+- **The locker list** (`GET /shipping/boxnow/lockers`,
+  `src/shipping_boxnow/views/locker.py`, `BoxNowLockerFilter`) serves
+  active rows only and takes the exact filters `externalId` (the locker's
+  BOX NOW id) and `countryCode`, with which the agent gateway resolves a
+  UCP pickup destination. The list is cached (`cache_methods`) under the
+  `shipping` cache surface, which every locker write purges: a saved row
+  through `invalidated_by`, a sync's deactivating `update` through
+  `mark_surface_stale`, the order-time resync included.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
   have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,
@@ -318,7 +326,7 @@ and says which file holds each § number used here.
   allowed, validated). A cart with some measured and some unmeasured items
   takes the larger of the derived size and that setting; with every item
   measured the derived size wins. The free gifts a cart is entitled to
-  (`PromotionEngine.gift_pairs`) are added to the cart's lines everywhere the
+  (`promotion.engine.benefits.gift_pairs`) are added to the cart's lines everywhere the
   parcel is weighed or sized (payment intent, order verification and creation,
   the shipment row, the options flag, the locker search), because they become
   physical order lines. A gift the engine leaves out (sold out) adds nothing;

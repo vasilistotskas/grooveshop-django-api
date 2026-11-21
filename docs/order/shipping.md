@@ -197,7 +197,7 @@ accepting Cyprus orders at the Greek flat rate.
   checkout preselects (the cart knows no address; the payload echoes
   `countryCode`); a promotion holds in every country. The cheapest route
   wins, a promotion on a tie; a units teaser ("2 more items") costs what
-  the engine's own simulation adds (`PromotionEngine.teaser_cost`).
+  the engine's own simulation adds (`promotion.engine.teasers.teaser_cost`).
   `free` once checkout charges 0, else exactly one of `remainingAmount`
   and `remainingQuantity`; `threshold` is the value a meter fills to.
   `null` when the cart has no route at all. `promotionNearMiss` entries
@@ -221,8 +221,10 @@ accepting Cyprus orders at the Greek flat rate.
   own `price`, `freeShippingThreshold`, `deliveryDaysMin`/`Max` and
   `maxWeightGrams` (null when unset) and no cart input. Anonymous, cached
   by `@cache_methods` (`ShippingPolicyView`); the `shipping` cache surface
-  purges it and declares `ShippingRate`, `ShippingProvider` and
-  `shipping_acs.AcsStation` (the locker gate) as `invalidated_by`. A
+  purges it and declares `ShippingRate`, `ShippingProvider`,
+  `shipping_acs.AcsStation` (the locker gate) and
+  `shipping_boxnow.BoxNowLocker` (the locker list) as `invalidated_by`;
+  the catalogue syncs mark it for the rows they deactivate. A
   carrier's credentials live on the `Tenant` row, which no surface watches,
   so connecting or removing one shows after the TTL or a manual purge of
   the `shipping` surface.

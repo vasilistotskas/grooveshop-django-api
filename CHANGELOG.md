@@ -3,6 +3,33 @@
 
 
 
+## v3.263.2 (2026-11-21)
+
+### Refactoring
+
+* refactor(core): the per-action view config moves to core/api/action_config.py (#796) ([`f763c11`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f763c110e4ca67f13f8a8f5a9074f1609efb5e41))
+
+* refactor(core): the per-action view config leaves core/utils/serializers.py for core/api/action_config.py
+
+core/utils/serializers.py held ActionConfig, SerializersConfig,
+crud_config and create_schema_view_config, which configure viewsets and
+their OpenAPI operations, beside one real serializer field. The view
+config is now core/api/action_config.py, next to the base viewsets that
+read it; TranslatedFieldExtended stays where it was. Every importer (35
+modules), the scaffold-endpoint skill, the app map and CLAUDE.md move
+with it. No behaviour change; schema.yml is unchanged.
+
+Part of #594 ([`f763c11`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f763c110e4ca67f13f8a8f5a9074f1609efb5e41))
+
+### Testing
+
+* test(core): the action-config tests move with the module they test
+
+Review follow-up: tests/unit/core/utils/test_serializers.py tested
+mostly core.api.action_config. Its create_schema_view_config tests and
+their fixtures are tests/unit/core/api/test_action_config.py; the
+TranslatedFieldExtended tests stay. ([`f763c11`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f763c110e4ca67f13f8a8f5a9074f1609efb5e41))
+
 ## v3.263.1 (2026-11-21)
 
 ### Bug fixes

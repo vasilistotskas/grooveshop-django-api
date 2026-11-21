@@ -21,7 +21,7 @@ that row. So the flow is Django's own ``PasswordResetView`` /
   task per accepted request, and the task finds the account, so a match
   is not slower either. Budgets per client address and per target
   address (``settings.STAFF_PASSWORD_RESET``) fail closed when the cache
-  is down (503, the rule beside ``core.caches.STRICT_KEY_PREFIXES``),
+  is down (503, the rule beside ``core.cache_backend.STRICT_KEY_PREFIXES``),
   because the form makes us mail an address the caller chose.
 - **MFA is not bypassed.** The reset sets a password and nothing else: it
   does not log the user in (``post_reset_login`` stays off) and leaves
@@ -57,7 +57,7 @@ from unfold.widgets import (
     UnfoldAdminPasswordWidget,
 )
 
-from core.caches import REDIS_UNAVAILABLE
+from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import client_ip_or_peer
 from tenant import staff_login_limits
 from tenant.celery import dispatch_on_commit
@@ -66,7 +66,7 @@ from tenant.membership import get_current_tenant, get_membership
 logger = logging.getLogger(__name__)
 
 #: Keys under ``strict:`` are never served from a failing cache (see
-#: ``core.caches``); a lost counter would lift the budget.
+#: ``core.cache_backend``); a lost counter would lift the budget.
 _BUDGET_KEY = "strict:staff_password_reset:{scope}:{schema}:{digest}"
 
 

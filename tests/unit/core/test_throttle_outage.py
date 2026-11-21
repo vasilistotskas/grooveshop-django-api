@@ -26,9 +26,9 @@ from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
 from cart.throttles import CouponApplyThrottle
-from core import caches as core_caches
+from core import cache_backend
 from core.api import throttling
-from core.caches import STRICT_NAMESPACE
+from core.cache_backend import STRICT_NAMESPACE
 from giftcard.throttles import GiftCardCheckThrottle
 from order.throttles import PaymentAttemptThrottle
 from search.throttles import SearchThrottle
@@ -89,7 +89,7 @@ def _fresh_bursts(monkeypatch):
         monkeypatch.setattr(
             throttling,
             name,
-            core_caches.BurstLogger(
+            cache_backend.BurstLogger(
                 original._message,
                 level=original._level,
                 target=original._logger,
@@ -130,7 +130,7 @@ class TestRedisDown:
 
         with (
             caplog.at_level(logging.ERROR, logger="core.api.throttling"),
-            pytest.raises(core_caches.REDIS_UNAVAILABLE),
+            pytest.raises(cache_backend.REDIS_UNAVAILABLE),
         ):
             throttle.allow_request(_request(), view=None)
 
@@ -162,7 +162,7 @@ class TestRedisDown:
         assert throttle.allow_request(_request(), view=None) is True
 
     def test_the_throttle_key_really_raises_in_the_cache(self):
-        with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+        with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
             stopped_cache().get(
                 GiftCardCheckThrottle.cache_format
                 % {"scope": "gift_card_check", "ident": "1"},
@@ -174,7 +174,7 @@ class TestRedisDown:
 
         with caplog.at_level(logging.ERROR, logger="core.api.throttling"):
             for _ in range(5):
-                with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+                with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
                     throttle.allow_request(_request(), view=None)
 
         assert sum("DENIED" in r.getMessage() for r in caplog.records) == 1
@@ -191,7 +191,7 @@ class TestRedisDown:
         view = type("View", (), {"throttle_scope": "staff_login"})()
 
         throttle = throttling.StaffLoginThrottle()
-        with pytest.raises(core_caches.REDIS_UNAVAILABLE):
+        with pytest.raises(cache_backend.REDIS_UNAVAILABLE):
             throttle.allow_request(_request(), view)
 
     @override_settings(ROOT_URLCONF=__name__)

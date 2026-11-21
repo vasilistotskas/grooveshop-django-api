@@ -150,7 +150,7 @@ def sniff_content_type(upload) -> str | None:
     return kind.mime if kind is not None else None
 
 
-def sanitize_filename(name: str | None) -> str:
+def display_filename(name: str | None) -> str:
     """The uploader's filename, made safe to STORE and to display.
 
     Not used as a path — see ``contact.storage`` — so this is about

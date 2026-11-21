@@ -28,7 +28,7 @@ import pytest
 
 from core.cache import service as cache_service
 from core.cache.service import CacheService, PurgeReport, SurfaceResult
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 
 class _Boom(Exception):

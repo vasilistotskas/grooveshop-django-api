@@ -246,8 +246,8 @@ an alert to the operators must not be mutable. None carries list headers
 | `platform.billing_expiring`, `platform.billing_expired`, `platform.billing_suspended` | `src/tenant/emails.py` | a `BillingNotice` (the `Tenant` row and the grace days), sent by `tenant.billing._send_stage_email` | the owner (`Tenant.owner_email`), in the store's `default_locale` |
 | `platform.billing_stage_copy` | `src/tenant/emails.py` | a `BillingStageCopy` (store, stage), the operators' trail of stages 2 and 3 | `settings.ADMINS` (`platform_operators()`), `settings.LANGUAGE_CODE` |
 | `platform.staff_password_reset` | `src/tenant/emails.py` | a `StaffPasswordReset` (the link, built by `tenant.tasks.send_staff_password_reset_email`) | the staff member's address, in the asked store's language |
-| `platform.health_alert` | `src/core/emails.py` | a `HealthAlert` (the failed components and their errors), from `core.tasks.monitor_system_health` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
-| `platform.backup_failed` | `src/core/emails.py` | a `BackupFailed` (the error), from `core.tasks.scheduled_database_backup` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.health_alert` | `src/tenant/emails.py` | a `HealthAlert` (the failed components and their errors), from `monitor_system_health` (`src/tenant/tasks.py`) | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.backup_failed` | `src/tenant/emails.py` | a `BackupFailed` (the error), from `scheduled_database_backup` (`src/tenant/tasks.py`) | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
 
 The staff reset is built under `public`, which knows only the platform, so
 the task reads the store's name in the store's schema first and carries it

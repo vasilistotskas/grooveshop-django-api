@@ -1,7 +1,7 @@
 """Throttles, and what each one does while Redis is unreachable.
 
 Every throttle keeps its request history in Redis. The default cache
-fails open (``core.caches.CustomCache``): during an outage a read is a
+fails open (``core.cache_backend.CustomCache``): during an outage a read is a
 miss and a write does nothing, so a throttle reading through it would
 see no history and allow everything. For the day-scale ``anon`` /
 ``user`` browsing budgets that is right — a Redis blip must not take the
@@ -9,14 +9,14 @@ storefront API down.
 
 It is wrong for the scopes that guard something. So every throttle
 uses ``ResilientThrottleMixin``: its keys live under
-``core.caches.STRICT_NAMESPACE``, which the cache never fails open on,
+``core.cache_backend.STRICT_NAMESPACE``, which the cache never fails open on,
 and the class decides what an outage means with ONE attribute,
 ``fail_closed``:
 
 - ``fail_closed = True`` — REFUSE: the cache's error goes on to
   ``core.middleware.strict_cache``, which answers 503
   ``temporarily_unavailable`` (the rule beside
-  ``core.caches.STRICT_KEY_PREFIXES``), logged at ERROR once per burst.
+  ``core.cache_backend.STRICT_KEY_PREFIXES``), logged at ERROR once per burst.
   Not a 429: the caller sent nothing too many, and with no history there
   is no honest ``Retry-After``. Which scopes: the endpoint is a secret
   or existence oracle (coupon, gift card, order lookup, staff login),
@@ -51,7 +51,7 @@ from rest_framework.throttling import (
     UserRateThrottle,
 )
 
-from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
+from core.cache_backend import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
 from core.client_ip import client_ip_or_peer
 
 logger = logging.getLogger(__name__)

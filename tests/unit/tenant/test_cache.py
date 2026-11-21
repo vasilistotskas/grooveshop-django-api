@@ -22,7 +22,7 @@ from django.test import Client
 from redis.backoff import NoBackoff
 from redis.retry import Retry
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 from pay_way.enum.settlement import PaySettlement
 from tenant.cache import (
     GLOBAL_CACHE_PREFIX,

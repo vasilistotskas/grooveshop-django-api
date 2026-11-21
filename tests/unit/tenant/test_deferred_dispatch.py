@@ -55,7 +55,8 @@ class TestAFailedPublish:
         assert row.task_name == "demo.task"
         assert (row.args, row.kwargs) == ([7], {"x": 1})
         assert row.headers == {"_schema_name": connection.schema_name}
-        assert row.options == {"countdown": 30}
+        published_id = task.apply_async.call_args.kwargs["task_id"]
+        assert row.options == {"countdown": 30, "task_id": published_id}
         assert row.schema_name == connection.schema_name
         assert "OperationalError" in row.last_error
         assert any(r.levelno == logging.ERROR for r in caplog.records)
@@ -330,6 +331,20 @@ class TestTheSweep:
             countdown=5,
         )
         assert not DeferredDispatch.objects.filter(pk=row.pk).exists()
+
+    def test_a_kept_dispatch_goes_out_again_with_the_task_id_it_had(self):
+        """A publish that wrote its message before it failed is delivered
+        as well as the row: both copies must be the one dispatch, so the
+        task can tell the second from new work."""
+        failed = broker_down_task()
+        dispatch_on_commit(failed, [7])
+        first_id = failed.apply_async.call_args.kwargs["task_id"]
+        task = mock.Mock()
+
+        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
+            redispatch_deferred_tasks()
+
+        assert task.apply_async.call_args.kwargs["task_id"] == first_id
 
     def test_a_broker_still_down_backs_off_and_stops_the_run(self):
         first, second = deferred(), deferred()

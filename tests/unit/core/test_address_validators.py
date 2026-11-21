@@ -348,6 +348,8 @@ class TestSplitStreetLine:
             # Digits other than 0-9: the postcode guard reads ASCII alone.
             "Ερμού \u0661\u0662",
             "Ερμού \uff11\uff12",
+            # A suffix that is alphanumeric but not a letter.
+            "Ερμού 12\u00b2",
         ],
     )
     def test_refuses_a_line_it_would_have_to_guess(self, line):

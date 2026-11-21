@@ -216,7 +216,12 @@ def split_street_line(line: str) -> tuple[str, str] | None:
     last = street.rstrip(".")[-1:] if street else ""
     if not last.isalpha():
         return None
-    return street, match["number"]
+    number = match["number"]
+    # ``[^\W\d_]`` also admits a character that is alphanumeric without
+    # being a digit, such as a superscript "²": the suffix must be a letter.
+    if not all(char.isalpha() for char in number if char not in "0123456789-/"):
+        return None
+    return street, number
 
 
 def _only_date_numbers(words: list[str], folded: list[str]) -> bool:

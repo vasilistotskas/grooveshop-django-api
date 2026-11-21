@@ -1510,7 +1510,16 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
                     {"street": [address_rules.street_number_missing()]},
                     code="street_number_missing",
                 )
-            attrs["street"], attrs["street_number"] = split
+            street, number = split
+            # Fields are validated before ``validate``: the number split
+            # from the line gets the checks of the field it replaces.
+            try:
+                self.fields["street_number"].run_validation(number)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(
+                    {"street": e.detail}, code="street_number_invalid"
+                ) from None
+            attrs["street"], attrs["street_number"] = street, number
         errors = address_rules.address_errors(
             country=country,
             street=attrs["street"],

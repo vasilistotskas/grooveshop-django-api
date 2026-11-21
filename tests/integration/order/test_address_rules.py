@@ -117,6 +117,22 @@ class TestCheckoutSerializer:
         assert serializer.validated_data["street"] == "Εγνατίας"
         assert serializer.validated_data["street_number"] == "12Α"
 
+    @pytest.mark.parametrize(("length", "valid"), [(50, True), (51, False)])
+    def test_a_split_number_has_the_fields_length_limit(
+        self, greece, length, valid
+    ):
+        payload = _create_payload(street="Εγνατίας " + "1" * length)
+        payload.pop("street_number")
+
+        serializer = OrderCreateFromCartSerializer(data=payload)
+
+        assert serializer.is_valid() is valid, serializer.errors
+        if valid:
+            assert serializer.validated_data["street_number"] == "1" * length
+        else:
+            assert set(serializer.errors) == {"street"}
+            assert serializer.errors["street"][0].code == "max_length"
+
     def test_a_sent_number_is_kept_as_sent(self, greece):
         serializer = OrderCreateFromCartSerializer(
             data=_create_payload(street="Εγνατίας 12", street_number="14")

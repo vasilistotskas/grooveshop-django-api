@@ -81,7 +81,8 @@ class AcsStationViewSet(
         return AcsStationSerializer
 
     def get_queryset(self):
-        """Filter by ?shopKind / ?postalCode / ?countryCode if supplied.
+        """Filter by ?shopKind / ?postalCode / ?countryCode / ?externalId
+        / ?branch if supplied (documented on ``list``).
 
         Defaults to the locker kinds configured on the ``acs``
         ``ShippingProvider.metadata`` (currently 7+8 for GR, 7 for CY)
@@ -122,7 +123,62 @@ class AcsStationViewSet(
         if country:
             qs = qs.filter(country_code=country.upper())
 
+        # Exact lookups of one station a client already names: the
+        # (external id, branch) pair is the station's identity.
+        external_id = self._read_param("externalId", "external_id")
+        if external_id:
+            qs = qs.filter(external_id=external_id)
+        branch = self.request.query_params.get("branch")
+        if branch is not None:
+            qs = qs.filter(branch_code=branch)
+
         return qs
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="shopKind",
+                description=(
+                    "ACS shop kind. Default: the locker kinds of "
+                    "countryCode, or of every configured country."
+                ),
+                required=False,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="countryCode",
+                description="ISO 3166-1 alpha-2 country of the station.",
+                required=False,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="postalCode",
+                description="Postcode prefix (its first 5 characters).",
+                required=False,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="externalId",
+                description=(
+                    "The station's ACS code, exactly (an area code that "
+                    "several Smartpoints share: add branch for one)."
+                ),
+                required=False,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="branch",
+                description=(
+                    "The station's branch, exactly; empty matches the "
+                    "station without one."
+                ),
+                required=False,
+                type=str,
+            ),
+        ],
+    )
+    def list(self, request: Request, *args, **kwargs) -> Response:
+        return super().list(request, *args, **kwargs)
 
     def _read_param(self, *aliases: str) -> str | None:
         """Return the first non-empty value among ``aliases``.

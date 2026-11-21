@@ -52,5 +52,14 @@ class OrderModelTestCase(TestCase):
     def test_full_address(self):
         self.assertEqual(self.order.full_address, "Main St 4, 10001 New York")
 
+    def test_full_address_carries_the_address_line_2(self):
+        """After the street and its number, where an address is read
+        (#641): every reader of ``fullAddress`` shows it."""
+        self.order.address_line_2 = "3rd floor"
+
+        self.assertEqual(
+            self.order.full_address, "Main St 4, 3rd floor, 10001 New York"
+        )
+
     def test_str_representation(self):
         self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")

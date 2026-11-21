@@ -221,19 +221,25 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the document is frozen).
+    until the document is frozen); the credit documents render the
+    snapshot taken with the receipt they credit.
 
-    ΕΛΠ art. 12(4) has the seller keep the customer's name and address for
-    every credit document above EUR 50: the credit documents render this
-    snapshot, taken with the receipt they credit.
+    A retail document needs no buyer address: Law 4308/2014 art. 12 par. 2
+    names only the seller's, and the former par. 4 rule (the customer's
+    name and address above EUR 50) was deleted by Law 5222/2025 art. 238
+    par. 2. The address shown is the order's delivery address, which for
+    a pickup-point order is the point's (#642).
     """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
         "email": order.email,
         "phone": str(order.phone) if order.phone else "",
         "address_line_1": f"{order.street} {order.street_number}".strip(),
-        "address_line_2": order.place or "",
+        "address_line_2": order.address_line_2,
         "city": order.city,
+        # A district or area (Τοποθεσία), printed with the city: never the
+        # address's second line, which is ``address_line_2``.
+        "place": order.place,
         "postal_code": order.zipcode,
         "country": (order.country.name if order.country_id else "")
         if hasattr(order, "country")

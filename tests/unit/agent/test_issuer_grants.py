@@ -85,3 +85,19 @@ class TokenWithoutAUserTestCase(AgentAPITestCase):
                 self.assertEqual(
                     response["WWW-Authenticate"], 'Bearer realm="agent"'
                 )
+
+
+def test_client_metadata_documents_are_off_by_default():
+    from agent.checks import client_metadata_documents_stay_off
+
+    assert client_metadata_documents_stay_off(None) == []
+
+
+def test_enabling_client_metadata_documents_fails_the_check(settings):
+    from agent.checks import CIMD_ENABLED, client_metadata_documents_stay_off
+
+    settings.IDP_OIDC_CIMD_ENABLED = True
+
+    errors = client_metadata_documents_stay_off(None)
+
+    assert [error.id for error in errors] == [CIMD_ENABLED]

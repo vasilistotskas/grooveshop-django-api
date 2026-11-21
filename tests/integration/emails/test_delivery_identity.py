@@ -12,7 +12,7 @@ from unittest import mock
 
 import pytest
 from django.core import mail
-from django.db import OperationalError
+from django.db import OperationalError, ProgrammingError
 from psycopg.errors import LockNotAvailable, QueryCanceled
 
 from core import celery_app
@@ -154,6 +154,23 @@ class TestTheDeliveryLock:
 
         assert len(mail.outbox) == 1
         assert "sent without its lock" in caplog.text
+
+    def test_another_database_error_is_raised_and_sends_nothing(
+        self, catalogue, retrying_task
+    ):
+        """Only a database out of reach lets the send go on unlocked: any
+        other error is a bug, and two copies could send without the lock."""
+        catalogue(probe())
+        broken = mock.MagicMock(in_atomic_block=False)
+        broken.cursor.side_effect = ProgrammingError("a bug")
+
+        with (
+            mock.patch("core.db.locks.connection", broken),
+            pytest.raises(ProgrammingError),
+        ):
+            retrying_task.apply(task_id="one-dispatch", throw=True)
+
+        assert mail.outbox == []
 
     @pytest.mark.parametrize("cause", [QueryCanceled, LockNotAvailable])
     def test_a_wait_that_runs_out_is_raised_for_the_retry(

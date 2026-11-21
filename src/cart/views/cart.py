@@ -578,7 +578,7 @@ class CartViewSet(BaseModelViewSet):
         url_path="coupons",
         # A bare array, not a page: ``pagination_class=None`` is the
         # project's convention for saying so to the schema generator
-        # (src/core/api/schema.py), and ``filter_backends=[]`` stops the
+        # (core/api/schema.py), and ``filter_backends=[]`` stops the
         # cart's admin FilterSet documenting query params this action
         # never reads.
         pagination_class=None,
@@ -1292,7 +1292,7 @@ class CartViewSet(BaseModelViewSet):
             # cancel on that PaymentIntent. Anyone able to read the log
             # stream could cancel a customer's in-flight payment or
             # confirm it with their own payment method.
-            # `src/order/payments/payment.py` is already careful to log only the
+            # `order/payments/payment.py` is already careful to log only the
             # id and status.
             logger.info(
                 "Payment intent creation result: success=%s, intent=%s, "

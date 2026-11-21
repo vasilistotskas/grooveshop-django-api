@@ -28,7 +28,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.expense import ExpenseFactory
 from order.factories.order import OrderFactory
 from product.factories import ProductFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     store_staff,

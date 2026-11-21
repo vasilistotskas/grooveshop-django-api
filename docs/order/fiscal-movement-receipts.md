@@ -303,7 +303,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   *without* value be canceled merely because the movement had not started,
   so the 11.1 rests on that rule).
   - **Set aside.** The one path that cancels an order
-    (`OrderService._cancel_order_locked`) sets the receipt aside under its
+    (`OrderLifecycleService._cancel_order_locked`) sets the receipt aside under its
     lock on the order row, before the save that asks for the credits
     (`invoicing.hold_receipt_for_cancel`: `Invoice.cancel_requested_at`, for
     a carrier order that has not shipped, only while the platform issues

@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from tenant.models import Tenant
+from tenant.models.tenant_rules import validate_clarity_project_id
 from tenant.role_scopes import TENANT_SELF_EDITABLE_FIELDS
 from tenant.serializers import TenantConfigSerializer
 
@@ -28,10 +29,10 @@ def _tenant(project_id: str) -> Tenant:
 
 class ClarityProjectIdValidationTests(SimpleTestCase):
     def test_accepts_an_alphanumeric_id(self):
-        _tenant("z8z79wsqeu")._validate_clarity_project_id()
+        validate_clarity_project_id(_tenant("z8z79wsqeu"))
 
     def test_accepts_empty_meaning_disabled(self):
-        _tenant("")._validate_clarity_project_id()
+        validate_clarity_project_id(_tenant(""))
 
     def test_rejects_what_a_copy_from_the_snippet_produces(self):
         for bad in (
@@ -42,7 +43,7 @@ class ClarityProjectIdValidationTests(SimpleTestCase):
         ):
             with self.subTest(project_id=bad):
                 with self.assertRaises(ValidationError) as ctx:
-                    _tenant(bad)._validate_clarity_project_id()
+                    validate_clarity_project_id(_tenant(bad))
                 self.assertIn("clarity_project_id", ctx.exception.message_dict)
 
     def test_clean_runs_the_validator(self):

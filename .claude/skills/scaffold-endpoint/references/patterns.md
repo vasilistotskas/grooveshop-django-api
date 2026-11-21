@@ -534,13 +534,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.views import BaseModelViewSet
 from your_app.filters import YourModelFilter
 from your_app.models import YourModel
 from your_app.serializers import (
@@ -998,14 +998,14 @@ from core.api.views import BaseModelViewSet
 
 # Serializers
 from core.api.serializers import ErrorResponseSerializer
-from core.api.schema import generate_schema_multi_lang
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
-    TranslatedFieldExtended,
     create_schema_view_config,
     crud_config,
 )
+from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 
 # Managers
 from core.managers.base import (

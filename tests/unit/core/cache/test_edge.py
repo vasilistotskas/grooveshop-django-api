@@ -18,6 +18,7 @@ from django.core.management.base import CommandError
 
 from core.cache import edge
 from core.cache.service import CacheService
+from tenant.models.tenant_rules import validate_cloudflare_credentials
 
 pytestmark = pytest.mark.django_db
 
@@ -252,7 +253,7 @@ class TestCredentials:
 
         tenant = Tenant(schema_name="edge_half", cloudflare_zone_id=OWN_ZONE)
         with pytest.raises(ValidationError) as raised:
-            tenant._validate_cloudflare_credentials()
+            validate_cloudflare_credentials(tenant)
         assert "cloudflare_api_token" in raised.value.message_dict
 
     def test_the_token_never_reaches_the_history_table(self):

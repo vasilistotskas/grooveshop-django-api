@@ -24,11 +24,8 @@ from django.test import Client
 from django.urls import reverse
 from django_tenants.utils import get_public_schema_name
 
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
 from tests.utils.staff import enrol_staff_mfa, store_tenant
 from user.factories.account import UserAccountFactory
 

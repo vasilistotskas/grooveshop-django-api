@@ -178,7 +178,7 @@ def test_a_cancel_that_failed_on_the_way_still_propagates():
 
     with (
         patch(
-            "order.services.OrderService.cancel_for_dead_shipment",
+            "order.lifecycle.service.OrderLifecycleService.cancel_for_dead_shipment",
             side_effect=OrderCancellationError(order.id, "lock timed out"),
         ),
         pytest.raises(OrderCancellationError),

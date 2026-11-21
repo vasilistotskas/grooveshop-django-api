@@ -225,8 +225,8 @@ def reactivate_on_renewal(sender, instance, **kwargs):
     """
     from django.utils import timezone
 
+    from tenant.enum import SuspendedReason
     from tenant.lifecycle import activate_tenant
-    from tenant.models import SuspendedReason
 
     if instance.is_active:
         return

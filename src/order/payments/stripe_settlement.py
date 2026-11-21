@@ -48,6 +48,7 @@ def settle_paid_checkout_session(
     canceled, paid by another intent, already settled, or paid another
     amount. Saves the order's ``metadata`` the caller filled.
     """
+    from order.lifecycle.service import OrderLifecycleService
     from order.payments.payment_events import publish_payment_status
     from order.services import OrderService
     from shipping.services import ShippingService
@@ -169,7 +170,7 @@ def settle_paid_checkout_session(
     )
 
     if order.status == OrderStatus.PENDING:
-        OrderService.update_order_status(order, OrderStatus.PROCESSING)
+        OrderLifecycleService.update_order_status(order, OrderStatus.PROCESSING)
 
     # Stripe's guidance is to fulfil hosted Checkout Sessions on
     # checkout.session.completed (not payment_intent.succeeded).

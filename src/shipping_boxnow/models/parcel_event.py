@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils import timezone
@@ -92,6 +94,15 @@ class BoxNowParcelEvent(TimeStampMixinModel):
     raw_payload = models.JSONField(
         _("Raw Payload"),
         help_text=_("Full webhook request body"),
+    )
+    #: The paths inside ``raw_payload`` that hold the recipient's own data:
+    #: the customer BOX NOW names (name, email, phone) and the event's text,
+    #: under ``data`` in a webhook and ``event`` in a polled event. GDPR
+    #: erasure removes them (``BoxNowCarrier.erase_recipient_data``).
+    PERSONAL_RAW: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("data", "customer"),
+        ("data", "additionalInformation"),
+        ("event", "additionalInformation"),
     )
     received_at = models.DateTimeField(
         _("Received At"),

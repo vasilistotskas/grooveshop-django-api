@@ -387,6 +387,7 @@ def handle_payment_created(
 
     from djmoney.money import Money
 
+    from order.lifecycle.service import OrderLifecycleService
     from order.payments.payment import VivaWalletPaymentProvider
     from order.payments.payment_ledger import PaymentLedger
     from order.services import OrderService
@@ -493,7 +494,7 @@ def handle_payment_created(
         # Without this pre-stamp the post-save signal would fire a
         # second PROCESSING email + toast within ms of the
         # confirmation email.
-        OrderService.suppress_customer_status_notifications(
+        OrderLifecycleService.suppress_customer_status_notifications(
             order, OrderStatus.PROCESSING.value
         )
         order.status = OrderStatus.PROCESSING

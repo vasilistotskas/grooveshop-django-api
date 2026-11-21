@@ -27,11 +27,8 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from rest_framework.test import APIClient
 
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
 from tests.utils.staff import store_staff, store_tenant
 
 User = get_user_model()

@@ -33,7 +33,7 @@ sites that change these fields do run inside one:
 - order creation: `OrderService._create_order_for_verified_intent` (behind
   `create_order_from_cart`) and `OrderService.create_order_from_cart_offline`,
   both `@transaction.atomic`, the attribution row included;
-- status: `OrderService.update_order_status`, `_cancel_order_locked` (behind
+- status: `OrderLifecycleService.update_order_status`, `_cancel_order_locked` (behind
   `cancel_order`) and `add_tracking_info`, all `@transaction.atomic`;
 - payment: `OrderService.handle_payment_succeeded`, `handle_payment_failed`,
   `confirm_offline_payment` and `settle_cod_payment` (`@transaction.atomic`),

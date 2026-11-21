@@ -34,7 +34,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.factories.order import OrderFactory
 from order.models.invoice import Invoice
 from promotion.factories.promotion import PromotionFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,

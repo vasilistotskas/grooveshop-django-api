@@ -120,12 +120,9 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         final order (audit trail, stock-discrepancy debugging).
     """
 
-    #: The delivery address fields that are the buyer's own: what GDPR
-    #: erasure blanks and a data export lists (``user.services.gdpr``). A
-    #: new address field joins here, and
-    #: ``tests/unit/user/test_erasure_covers_every_order_address_field.py``
-    #: fails for one that is scrubbed by the staging anonymiser but neither
-    #: listed here nor kept on purpose.
+    #: The buyer's delivery address: what a pickup-point order locks against
+    #: an owner's edit (``OrderWriteSerializer``), and part of
+    #: ``PERSONAL_FIELDS``.
     SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
         "street",
         "street_number",
@@ -135,6 +132,42 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         "place",
         "floor",
         "location_type",
+    )
+    #: The invoice's counterparty: personal, and GDPR erasure keeps it only
+    #: on an order whose invoice was issued (``order.privacy``), with
+    #: that invoice (tax law).
+    BILLING_FIELDS: ClassVar[tuple[str, ...]] = (
+        "billing_vat_id",
+        "billing_country",
+        "billing_company_name",
+        "billing_tax_office",
+        "billing_activity",
+        "billing_street",
+        "billing_street_number",
+        "billing_city",
+        "billing_zipcode",
+    )
+    #: The buyer's own data on an order: what a data export lists and what
+    #: GDPR erasure clears, ``BILLING_FIELDS`` of an issued invoice excepted
+    #: (``order.privacy``). A new personal field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_personal_field.py``
+    #: fails for one the staging anonymiser scrubs that is missing.
+    PERSONAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        *SHIPPING_ADDRESS_FIELDS,
+        "customer_notes",
+        *BILLING_FIELDS,
+    )
+    #: The paths inside ``metadata`` that hold the buyer's own data: the
+    #: browser identity the Conversions API reads (IP address, user agent,
+    #: Meta's browser and click ids) and the reason typed when cancelling.
+    #: Exported and erased with ``PERSONAL_FIELDS``.
+    PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("meta",),
+        ("cancellation", "reason"),
     )
 
     id = models.BigAutoField(primary_key=True)
@@ -472,6 +505,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         db_default="",
         help_text=_("Series and number of that credit invoice."),
     )
+    personal_data_erased_at = models.DateTimeField(
+        _("Personal data erased at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the buyer's personal data was erased (GDPR). Carrier data "
+            "that arrives later is erased too."
+        ),
+    )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
     )
@@ -741,7 +783,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # reported ``updated_at`` equal to its ``created_at``.
         #
         # That is not cosmetic. ``updated_at`` is a documented API filter
-        # (order/filters.py exposes gte/lte/date), so "orders changed
+        # (src/order/filters.py exposes gte/lte/date), so "orders changed
         # since X" silently omitted every status change. Worse,
         # ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
         # bucket with ``updated_at__lt=now - GRACE``, intending a retry
@@ -750,7 +792,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # cancellable on the very next run, with no grace at all.
         #
         # Fixed here rather than at ~35 call sites so it cannot be missed
-        # again — order/inventory/stock.py and the shipping services already
+        # again — src/order/inventory/stock.py and the shipping services already
         # pass "updated_at" by hand, which is the convention Order's own saves
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing
@@ -1113,7 +1155,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """Whether the customer's cancel button should be on offer.
 
         A customer cancel asks the courier to take the parcel back
-        before the order changes (``OrderService.cancel_order``), so on
+        before the order changes (``OrderLifecycleService.cancel_order``), so on
         top of the status rule the offer ends once local data shows the
         courier would refuse: an ACS voucher already on an issued pickup
         list, a BoxNow parcel past ``NEW``. Read from local rows only —

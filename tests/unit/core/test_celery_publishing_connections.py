@@ -32,7 +32,7 @@ linux_only = pytest.mark.skipif(
     sys.platform == "win32",
     reason=(
         "py-amqp packs the socket timeout as a POSIX timeval, so the app "
-        "sets it on Linux only (settings/celery.py)"
+        "sets it on Linux only (src/settings/celery.py)"
     ),
 )
 

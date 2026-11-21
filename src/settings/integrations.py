@@ -20,7 +20,7 @@ INDEXNOW_TIMEOUT_SECONDS = int(getenv("INDEXNOW_TIMEOUT_SECONDS", "15"))
 # STRIPE_TEST_SECRET_KEY / STRIPE_LIVE_MODE / STRIPE_PUBLISHABLE_KEY
 # here — the platform-account concept is gone. Every tenant's Stripe
 # identity (secret + publishable key) lives ONLY on the ``Tenant`` row
-# (see ``tenant/credentials.py:stripe_credentials()``), and each
+# (see ``src/tenant/credentials.py:stripe_credentials()``), and each
 # tenant schema carries its own dj-stripe ``APIKey``/``WebhookEndpoint``
 # rows provisioned by ``manage.py bootstrap_stripe`` — those per-schema
 # rows are the real key source, not a Django setting. dj-stripe itself
@@ -52,7 +52,7 @@ STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 # Viva Wallet Configuration
 # Per-merchant identity (merchant ID, API key, OAuth2 client id/secret,
 # webhook verification key, source code, live/demo mode) lives ONLY on
-# the ``Tenant`` model (see ``tenant/credentials.py:viva_wallet_
+# the ``Tenant`` model (see ``src/tenant/credentials.py:viva_wallet_
 # credentials()``) — there is no platform-wide env-var fallback. Money
 # must never silently route through credentials the operator did not
 # explicitly configure for THIS tenant.
@@ -62,10 +62,10 @@ STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 # Per-merchant identity (OAuth2 client id/secret, partner ID, warehouse
 # ID, notify phone, webhook secret) AND the environment those keys belong
 # to (``Tenant.box_now_live_mode``) live ONLY on the ``Tenant`` model (see
-# ``tenant/credentials.py:box_now_credentials()``) — no platform fallback.
+# ``src/tenant/credentials.py:box_now_credentials()``) — no platform fallback.
 # BoxNow issues separate stage and production keys and each only
 # authenticates against its own API, so the platform carries BOTH hosts and
-# the tenant's flag picks one (``shipping_boxnow/client.py``).
+# the tenant's flag picks one (``src/shipping_boxnow/client.py``).
 BOXNOW_PRODUCTION_API_BASE_URL = getenv(
     "BOXNOW_PRODUCTION_API_BASE_URL", "https://api-production.boxnow.gr"
 )
@@ -136,7 +136,7 @@ BOXNOW_RETRY_AFTER_MAX_SECONDS = int(
 # ---------- ACS Shipping ----------
 # Per-merchant identity (API key, Company_*/User_* credentials, billing
 # code, station origin) lives ONLY on the ``Tenant`` model (see
-# ``tenant/credentials.py:acs_credentials()``) — no platform fallback.
+# ``src/tenant/credentials.py:acs_credentials()``) — no platform fallback.
 # Only transport/platform config (base URL, timeout, stale-shipment
 # threshold) stays here — which countries ACS ships to is now a
 # per-tenant ``ShippingRate`` question, not a platform one.
@@ -146,7 +146,7 @@ ACS_API_BASE_URL = getenv(
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
 # Requests in flight per ACS account across every pod
-# (``shipping_acs/concurrency.py``). ACS answers 406 to overlapping calls
+# (``src/shipping_acs/concurrency.py``). ACS answers 406 to overlapping calls
 # and publishes no figure, so the default is our own measurement: 10 days
 # of production logs (2026-10-11 to 10-20), each tracking task against how
 # many ACS tasks were in flight at its start, gave a rejection rate of 0.9%
@@ -215,6 +215,15 @@ ACS_API_CALL_POLL_RETENTION_DAYS = int(
 CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
     getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
 )
+# The daily sweep of erased orders (``order.privacy.erase_late_carrier_data``)
+# clears the carrier records of an order erased, or written about by a
+# carrier, within this many days: a parcel still moving when its buyer is
+# erased goes on being tracked, delivered and paid out, and each of those
+# writes the recipient's details again. Longer than any gap between two
+# daily runs, so no write is missed while the scheduler is down a few days.
+ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS = int(
+    getenv("ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS", "7")
+)
 # A BoxNow webhook event whose signed time is older than this is ignored.
 # The ``BoxNowParcelEvent`` rows are the replay guard, so the window must
 # end before the sweep above can delete a row an event could still meet.
@@ -242,7 +251,7 @@ ACS_COD_REMITTANCE_ALERT_DAYS = int(
 # add a country, and retunes price/threshold on the same row, no
 # redeploy either way. The master on/off switch is still the
 # ShippingProvider.is_active flag — see Phase 0
-# (shipping/migrations/0002_seed_providers.py).
+# (src/shipping/migrations/0002_seed_providers.py).
 
 # ---------- Meta Conversions API ----------
 # Days a ``MetaCapiEventLog`` delivery row (status, trace id) is kept.
@@ -250,7 +259,7 @@ META_CAPI_EVENT_LOG_RETENTION_DAYS = int(
     getenv("META_CAPI_EVENT_LOG_RETENTION_DAYS", "90")
 )
 # Pixel ID / dataset ID and the access token are per-tenant secrets —
-# they live ONLY on the ``Tenant`` model (see ``tenant/credentials.py:
+# they live ONLY on the ``Tenant`` model (see ``src/tenant/credentials.py:
 # tenant_meta_pixel_id()`` / ``tenant_meta_capi_access_token()``), no
 # platform fallback. The storefront gets pixel IDs from the tenant
 # config (``TenantConfigSerializer``). ``META_CAPI_ENABLED`` in
@@ -268,6 +277,11 @@ META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
 META_CAPI_PARTNER_AGENT = getenv(
     "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
 )
+# Seconds the connect and each read of a CAPI request may take. The event's
+# lock is held across the request (``meta_capi.tasks._dispatch``), and a copy
+# waiting on it gives up at the session's ``statement_timeout`` (30 s), so a
+# request must end well before that.
+META_CAPI_TIMEOUT_SECONDS = float(getenv("META_CAPI_TIMEOUT_SECONDS", "10"))
 
 # ---------- Agent gateway (grooveshop-agent-gateway) ----------
 # Cluster-internal base URL of the agent gateway service. Empty (the

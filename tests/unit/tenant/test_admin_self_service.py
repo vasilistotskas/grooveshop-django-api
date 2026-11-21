@@ -17,11 +17,9 @@ from django.contrib.admin import site as admin_site
 from django.test import RequestFactory
 
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
+from tenant.models.tenant_rules import GOOGLE_ADS_LABEL_FIELDS
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount
@@ -181,7 +179,7 @@ class TestTenantAdminScoping:
             "from_email",
             "ga_tracking_id",
             "google_ads_conversion_id",
-            *Tenant.GOOGLE_ADS_LABEL_FIELDS,
+            *GOOGLE_ADS_LABEL_FIELDS,
             "viva_wallet_client_id",
             "acs_api_key",
             "mydata_user_id",

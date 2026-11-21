@@ -21,8 +21,8 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.refunds.service import RefundService
-from order.services import OrderService
 from order.signals import order_refunded
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
@@ -99,7 +99,7 @@ def test_status_only_refund_reverses_the_points(
         patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
 
     assert _reversals(order).count() == 1
     assert _balance(order.user) == 0
@@ -116,7 +116,7 @@ def test_returned_alone_keeps_the_points(
         patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        OrderService.update_order_status(order, OrderStatus.RETURNED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.RETURNED)
 
     assert not _reversals(order).exists()
     assert _balance(order.user) == earned
@@ -200,7 +200,7 @@ def test_refund_then_status_move_reverses_exactly_once(
         patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
 
     assert _reversals(order).count() == 1
     assert _balance(order.user) == other

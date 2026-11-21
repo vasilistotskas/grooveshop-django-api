@@ -7,10 +7,10 @@ from django.utils import timezone
 from order.enum.status import OrderStatus
 from order.exceptions import InvalidStatusTransitionError
 from order.factories import OrderFactory
-from order.services import OrderService
+from order.lifecycle.service import OrderLifecycleService
 
-# The transitions ``OrderService.update_order_status`` allows. CANCELED is
-# in none of them: a cancel is ``OrderService.cancel_order``.
+# The transitions ``OrderLifecycleService.update_order_status`` allows. CANCELED is
+# in none of them: a cancel is ``OrderLifecycleService.cancel_order``.
 ALLOWED_TRANSITIONS = {
     OrderStatus.PENDING: [OrderStatus.PROCESSING],
     OrderStatus.PROCESSING: [OrderStatus.SHIPPED],
@@ -85,7 +85,7 @@ def test_status_transition_follows_the_state_machine(
     try:
         if should_succeed:
             before = timezone.now()
-            OrderService.update_order_status(order, new_status)
+            OrderLifecycleService.update_order_status(order, new_status)
             order.refresh_from_db()
             assert order.status == new_status
             assert before <= order.status_updated_at <= timezone.now()
@@ -96,7 +96,7 @@ def test_status_transition_follows_the_state_machine(
             assert kwargs["new_status"] == new_status
         else:
             with pytest.raises(InvalidStatusTransitionError) as exc_info:
-                OrderService.update_order_status(order, new_status)
+                OrderLifecycleService.update_order_status(order, new_status)
             assert exc_info.value.current_status == current_status
             assert exc_info.value.new_status == new_status
             order.refresh_from_db()
@@ -122,7 +122,7 @@ def test_maybe_advance_to_completed_paid_delivered_order_advances():
         payment_status=PaymentStatus.COMPLETED,
         num_order_items=0,
     )
-    OrderService.maybe_advance_to_completed(order)
+    OrderLifecycleService.maybe_advance_to_completed(order)
     order.refresh_from_db()
     assert order.status == OrderStatus.COMPLETED
 
@@ -138,7 +138,7 @@ def test_maybe_advance_to_completed_unpaid_delivered_order_stays():
         payment_status=PaymentStatus.PENDING,
         num_order_items=0,
     )
-    OrderService.maybe_advance_to_completed(order)
+    OrderLifecycleService.maybe_advance_to_completed(order)
     order.refresh_from_db()
     assert order.status == OrderStatus.DELIVERED
 
@@ -163,6 +163,6 @@ def test_maybe_advance_to_completed_non_delivered_order_no_op(current):
         payment_status=PaymentStatus.COMPLETED,
         num_order_items=0,
     )
-    OrderService.maybe_advance_to_completed(order)
+    OrderLifecycleService.maybe_advance_to_completed(order)
     order.refresh_from_db()
     assert order.status == current

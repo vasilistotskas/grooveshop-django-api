@@ -34,7 +34,7 @@ SCHEDULE_PRESETS = {
 
 # Minutes between two runs of ``finish-pending-shipment-cancels``. A name,
 # because staff are told how long a cancel left pending waits at most
-# (``order.services.shipment_cancel_wait_minutes``). It must divide 60.
+# (``order.lifecycle.service.shipment_cancel_wait_minutes``). It must divide 60.
 ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES = 15
 
 # The nightly pg_dump (and the pruning of its output) is production's
@@ -154,7 +154,7 @@ def get_celery_beat_schedule():
             # per-tenant; beat fires in public. A row dated in the future
             # goes live with no save, so no signal purges the surfaces
             # that render it or announces it to IndexNow; this sweep
-            # does, per tenant, every minute (core/publication.py).
+            # does, per tenant, every minute (src/core/publication.py).
             "task": "tenant.tasks.fanout_release_due_publications",
             "schedule": SCHEDULE_PRESETS["every_minute"],
             "options": {"queue": "celery", "expires": 50},
@@ -198,6 +198,12 @@ def get_celery_beat_schedule():
             # Fanout: BoxNowParcelEvent is per-tenant; same period as the
             # ACS checkpoints above.
             "task": "tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+        },
+        "erase-late-carrier-data": {
+            # Fanout: clears the carrier data that reached an order after
+            # its buyer's GDPR erasure (ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS).
+            "task": "tenant.tasks.fanout_erase_late_carrier_data",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-recommendation-events": {

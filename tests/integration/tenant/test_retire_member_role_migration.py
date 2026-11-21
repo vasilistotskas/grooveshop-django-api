@@ -13,7 +13,8 @@ import importlib
 import pytest
 from django.apps import apps
 
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

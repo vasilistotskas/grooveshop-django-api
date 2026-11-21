@@ -14,7 +14,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404
 from django.utils import translation
 
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import store_staff
 from tests.utils.texts import COOKIES, FOOTER
 from texts import services, storefront

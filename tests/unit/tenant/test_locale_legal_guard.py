@@ -21,6 +21,10 @@ from django.core.exceptions import ValidationError
 
 from page_config.legal_documents import LEGAL_DOCUMENT_SLUGS
 from tenant.models import Tenant
+from tenant.models.tenant_rules import (
+    newly_added_locales,
+    validate_legal_documents_for_new_locales,
+)
 from tests.utils.staff import store_tenant
 
 GREEK_ONLY = {slug: {"el"} for slug in LEGAL_DOCUMENT_SLUGS}
@@ -43,22 +47,22 @@ def _run_clean(tenant: Tenant, coverage: dict[str, set[str]]) -> None:
             return_value=coverage,
         ),
     ):
-        tenant._validate_legal_documents_for_new_locales()
+        validate_legal_documents_for_new_locales(tenant)
 
 
 class TestNewlyAddedLocales:
     def test_reports_only_what_this_save_adds(self, tenant: Tenant) -> None:
         tenant.available_locales = ["el", "en"]
 
-        assert tenant._newly_added_locales() == ["en"]
+        assert newly_added_locales(tenant) == ["en"]
 
     def test_an_unchanged_set_adds_nothing(self, tenant: Tenant) -> None:
-        assert tenant._newly_added_locales() == []
+        assert newly_added_locales(tenant) == []
 
     def test_removing_a_locale_adds_nothing(self, tenant: Tenant) -> None:
         tenant.available_locales = []
 
-        assert tenant._newly_added_locales() == []
+        assert newly_added_locales(tenant) == []
 
     def test_an_unsaved_tenant_has_no_previous_set(self) -> None:
         # Provisioning seeds the documents AFTER the row exists, so
@@ -66,7 +70,7 @@ class TestNewlyAddedLocales:
         fresh = Tenant(schema_name="fresh", name="Fresh", default_locale="el")
         fresh.available_locales = ["el", "en"]
 
-        assert fresh._newly_added_locales() == []
+        assert newly_added_locales(fresh) == []
 
 
 class TestLegalDocumentGuard:
@@ -125,7 +129,7 @@ class TestLegalDocumentGuard:
                 "page_config.content_pages.legal_translation_coverage"
             ) as reader,
         ):
-            tenant._validate_legal_documents_for_new_locales()
+            validate_legal_documents_for_new_locales(tenant)
 
         reader.assert_not_called()
 
@@ -154,6 +158,6 @@ class TestLegalDocumentGuard:
         with mock.patch(
             "page_config.content_pages.legal_translation_coverage"
         ) as reader:
-            tenant._validate_legal_documents_for_new_locales()
+            validate_legal_documents_for_new_locales(tenant)
 
         reader.assert_not_called()

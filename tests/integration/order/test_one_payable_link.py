@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import requests
 import stripe
+from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse
 from django.utils import timezone
 from extra_settings.models import Setting
@@ -830,3 +831,72 @@ class TestAfterCodeRabbitsReview:
             "tenant.credentials.viva_wallet_credentials", return_value=creds
         ):
             assert not VivaWalletPaymentProvider.is_configured_for_tenant()
+
+
+def _oauth_only(**overrides):
+    creds = {
+        "merchant_id": "",
+        "api_key": "",
+        "client_id": "c",
+        "client_secret": "s",
+        "source_code": "Default",
+        "live_mode": False,
+    }
+    creds.update(overrides)
+    return patch(
+        "tenant.credentials.viva_wallet_credentials", return_value=creds
+    )
+
+
+class TestVivaCredentialsPerCall:
+    """Each Viva call is gated by what it needs (the stand-in review of
+    574ccafdf): the offer needs all four, the OAuth calls the OAuth pair,
+    and Retrieve order the Basic pair."""
+
+    @pytest.mark.parametrize("missing", ["merchant_id", "api_key"])
+    def test_the_provider_builds_without_the_basic_pair(self, missing):
+        with _oauth_only(**{"merchant_id": "m", "api_key": "k", missing: ""}):
+            provider = VivaWalletPaymentProvider()
+            assert not VivaWalletPaymentProvider.is_configured_for_tenant()
+
+        with pytest.raises(ImproperlyConfigured, match="merchant_id"):
+            provider._get_basic_auth_header()
+
+    def test_an_oauth_only_store_still_settles_its_webhooks(self):
+        from order.views.viva_webhook import _verify_transaction
+
+        transaction = Mock(status_code=200)
+        transaction.json.return_value = {
+            "statusId": "F",
+            "amount": 10.0,
+            "currencyCode": "978",
+            "orderCode": 1111,
+        }
+        transaction.raise_for_status.return_value = None
+
+        with (
+            _oauth_only(),
+            patch("requests.get", return_value=transaction),
+        ):
+            status, data = _verify_transaction("tx_1")
+
+        assert status == PaymentStatus.COMPLETED
+        assert data["order_code"] == 1111
+
+    @pytest.mark.parametrize("body", [[], None, "pending", 3])
+    def test_a_retrieve_order_answer_that_is_no_object_mints_nothing(
+        self, body
+    ):
+        order, client = _order("viva_wallet")
+        _with_codes(
+            order, "1111", hold_expires=timezone.now() + timedelta(minutes=5)
+        )
+        answer = Mock(status_code=200)
+        answer.json.return_value = body
+        answer.raise_for_status.return_value = None
+
+        with _states({"1111": answer}), patch("requests.post") as post:
+            response = _ask(order, client)
+
+        assert response.status_code == 503, response.data
+        post.assert_not_called()

@@ -58,8 +58,13 @@ Viva is read with Retrieve order (`GET /api/orders/{orderCode}`, Basic auth)
 for every code in `metadata.viva_order_codes`: `StateId` 0 Pending is
 returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone; an
 answer with no known `StateId` is "unreadable". Viva is offered only to a
-store holding all four credentials: the OAuth pair mints payment orders and
-the Basic pair (Merchant ID, API Key) reads and refunds them.
+store holding all four credentials (`is_configured_for_tenant`): the OAuth
+pair mints payment orders and reads transactions, the Basic pair (Merchant
+ID, API Key) reads payment orders and refunds. Each call is gated by what it
+needs: the provider builds with the OAuth pair, so a store holding only it
+still settles its webhooks, and `_get_basic_auth_header` refuses with a clear
+error when the Basic pair is missing. A Retrieve order answer that is not a
+JSON object is "unreadable" too.
 `ExpirationDate` carries no offset and is Greek local time
 (`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated
 when summer time ends is read as its later instant (`fold=1`), so a payable

@@ -1384,7 +1384,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             return None
         try:
             response.raise_for_status()
-            return response.json()
+            body = response.json()
         except (requests.HTTPError, ValueError) as e:
             logger.warning(
                 "Viva answered %s for payment order %s",
@@ -1392,6 +1392,14 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 code,
             )
             raise PaymentStatusUnavailableError(code) from e
+        if not isinstance(body, dict):
+            # A list, ``null`` or a scalar is no payment order: unreadable,
+            # never "gone" (a 404 is the only "gone").
+            logger.warning(
+                "Viva answered payment order %s with no object", code
+            )
+            raise PaymentStatusUnavailableError(code)
+        return body
 
     def _expiration(self, state: dict[str, Any]) -> datetime:
         """``ExpirationDate`` as an aware instant. Viva writes it without
@@ -1434,17 +1442,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.source_code = creds["source_code"] or "Default"
         self.live_mode = creds["live_mode"]
 
-        missing = self._missing_credentials(creds)
-        if missing:
-            # Viva Wallet is unavailable for this tenant. Fail loudly —
-            # the pay-way availability gate
+        # Each call is gated by what it needs. The offer needs all four
+        # (``is_configured_for_tenant``); the OAuth pair is what every
+        # payment-order and webhook call uses, so it is required here; the
+        # Basic pair is checked where it is used (``_get_basic_auth_header``),
+        # so a store with only the OAuth pair still settles its webhooks.
+        if not (self.client_id and self.client_secret):
+            # The pay-way availability gate
             # (``PayWayService.is_provider_configured``) should have hidden
             # the provider and order-create should have rejected it before
             # this constructor ever runs.
             raise ImproperlyConfigured(
                 "Viva Wallet is not configured for this tenant: no "
-                + ", ".join(f"viva_wallet_{name}" for name in missing)
-                + " set on the Tenant."
+                "viva_wallet_client_id/viva_wallet_client_secret set on "
+                "the Tenant."
             )
 
         if self.live_mode:
@@ -1504,8 +1515,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
         return access_token
 
     def _get_basic_auth_header(self) -> str:
+        """Basic auth with the Merchant ID and API Key: Retrieve order and
+        the transaction calls. A store without them cannot make those calls,
+        and is told so, rather than sending empty credentials."""
         from base64 import b64encode
 
+        if not (self.merchant_id and self.api_key):
+            raise ImproperlyConfigured(
+                "Viva Wallet's Basic credentials are not set for this "
+                "tenant: viva_wallet_merchant_id and viva_wallet_api_key."
+            )
         credentials = b64encode(
             f"{self.merchant_id}:{self.api_key}".encode()
         ).decode()

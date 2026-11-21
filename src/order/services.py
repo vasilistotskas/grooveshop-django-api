@@ -119,7 +119,8 @@ from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
-from promotion.services import CouponService, PromotionEngine
+from promotion.coupons import CouponService
+from promotion.engine.redemptions import record_redemptions
 from shipping.exceptions import (
     CarrierBusyError,
     CarrierError,
@@ -1642,7 +1643,7 @@ class OrderService:
             # gift-card plan locked during payment verification.
             from giftcard.services import GiftCardService
 
-            order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.discount_amount = record_redemptions(order, promo_result)
             order.loyalty_discount = loyalty_discount
             cls._snapshot_line_discounts(
                 order_items, promo_result, loyalty_discount
@@ -2321,7 +2322,7 @@ class OrderService:
 
             # Step 6.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5.
-            order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.discount_amount = record_redemptions(order, promo_result)
             order.loyalty_discount = loyalty_discount
             cls._snapshot_line_discounts(
                 order_items, promo_result, loyalty_discount

@@ -23,7 +23,7 @@ subscription-confirmation. Falls back to ``settings.API_BASE_URL``.
 media-processing (``assets.``) and static-file (``static.``) origin
 siblings — used for absolute media/static URLs in transactional emails
 and other tenant-scoped, non-browser contexts. Unlike the merchant
-CREDENTIAL helpers in ``tenant/credentials.py`` (Stripe, Viva Wallet,
+CREDENTIAL helpers in ``src/tenant/credentials.py`` (Stripe, Viva Wallet,
 ACS, BoxNow, Meta CAPI — tenant-only, no fallback, because those are
 money/secrets), these two fall back to
 ``settings.MEDIA_STREAM_BASE_URL``/``settings.STATIC_BASE_URL`` when

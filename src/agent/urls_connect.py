@@ -3,7 +3,7 @@
 Served on the PUBLIC schema instead of ``tenant.urls_public``
 (``tenant.middleware.PlatformTenantMainMiddleware``), and holding nothing
 but the staff issuer: its OAuth endpoints and the sign-in and consent
-pages (``agent/staff_connect.py``). The platform admin, its API and
+pages (``src/agent/staff_connect.py``). The platform admin, its API and
 allauth's account pages are not routes here at all, so leaving this host
 outside the platform's basic-auth opens nothing else.
 """
@@ -24,7 +24,7 @@ from agent.staff_connect import (
 
 def _not_offered(request, *args, **kwargs):
     """The device flow is not offered by the staff issuer: its pages sign
-    people in through allauth's account login (``agent/staff.py``)."""
+    people in through allauth's account login (``src/agent/staff.py``)."""
     raise Http404
 
 
@@ -49,7 +49,7 @@ urlpatterns = [
     ),
     path("", include("allauth.idp.urls")),
     # RFC 8414: plain OAuth clients look here; the same document as the
-    # OIDC discovery, as on a store's issuer (core/urls.py).
+    # OIDC discovery, as on a store's issuer (src/core/urls.py).
     path(
         ".well-known/oauth-authorization-server",
         oidc_views.configuration,

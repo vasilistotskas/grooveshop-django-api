@@ -3,7 +3,7 @@
 ``GET /settings/public`` carries ``announcementBar``, ``authPanel``,
 ``fundingBanner``, ``storeOffices``, ``businessHours`` and
 ``contactAttachmentsTypes`` next to the string map. The classes that
-validate a save (``core/store_setting_shapes.py``) are the ones that
+validate a save (``src/core/store_setting_shapes.py``) are the ones that
 describe and serve the value, so what is served is what was accepted and
 what ``schema.yml`` says.
 """

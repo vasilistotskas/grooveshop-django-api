@@ -104,7 +104,7 @@ CACHES = {
 }
 
 # No shared log file. ``DEBUG`` is pinned True above, so
-# ``settings/logging.py`` takes its development branch and adds ``app_file``, a
+# ``settings.logging`` takes its development branch and adds ``app_file``, a
 # ``RotatingFileHandler`` on ``logs/grooveshop_<host>.log`` that every xdist
 # worker opens. Once it reaches ``maxBytes`` one worker renames it while the
 # others hold it open; Windows refuses the rename and ``logging`` prints the
@@ -117,7 +117,7 @@ LOGGING = {
 }
 
 # Uploads go to a per-worker tree under the OS temp directory, emptied
-# whenever a worker starts. ``settings/storage.py`` points MEDIA_ROOT at the
+# whenever a worker starts. ``src/settings/storage.py`` points MEDIA_ROOT at the
 # repository's ``mediafiles/``, the tree the development server serves,
 # and the suite never deletes what it uploads: every run added its
 # images there, 4.5 million files by 2026-09-26, and a test that walks

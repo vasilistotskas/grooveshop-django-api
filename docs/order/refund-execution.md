@@ -76,9 +76,12 @@ webhook books the refund and settles the attempt. Cash shares are not attempts
 to resume: their `repayment_reference` is their key. A different amount is its
 own refund under its own key. **What each outcome does to the attempt**: a
 refusal (`success` false without `outcome_unknown`: Stripe 4xx,
-`Success: false` from Viva) marks it `DECLINED` and frees its amount; an
-**unknown outcome** (`outcome_unknown` in the answer: a timeout, a dropped
-connection, a 5xx, or Viva accepting without a `TransactionId`, which cannot be
+`Success: false` from Viva, or a request never sent: a Viva store without the
+Merchant ID and API Key, which `VivaWalletPaymentProvider.has_basic_credentials`
+checks before sending, or a connection that timed out before it was made) marks
+it `DECLINED` and frees its amount; an **unknown outcome** (`outcome_unknown` in
+the answer, only for a request that may have reached the provider: a read
+timeout, a dropped connection, a 5xx, or Viva accepting without a `TransactionId`, which cannot be
 booked under an id the 1797 would not repeat) keeps it `PENDING`, because the
 refund may have been made, writes a staff note saying so, and lets the webhook,
 a retry or the reconciliation below settle it. It keeps holding its amount

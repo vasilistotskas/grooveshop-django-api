@@ -7,7 +7,7 @@ statements. Measured with a spy receiver:
     instance .save()   -> post_save fired: 1
     queryset .delete() -> post_save fired: 0
 
-`active` is an indexed, filterable field and `search/views/product.py` filters
+`active` is an indexed, filterable field and `search.views.product` filters
 the INDEXED value — so "Deactivate selected products" left every one of
 them fully searchable and buyable until the nightly sync, while the
 admin reported success.

@@ -13,7 +13,7 @@ decremented, the dispatch task fires — and nothing else happens. The
 customer has a confirmed PENDING order and no parcel.
 ``check_stale_acs_shipments`` cannot surface it either, because it keys
 off shipments that already have tracking events. The code comment in
-``shipping_acs/tasks.py`` cites a production order stranded for ten days
+``src/shipping_acs/tasks.py`` cites a production order stranded for ten days
 on exactly this shape.
 """
 

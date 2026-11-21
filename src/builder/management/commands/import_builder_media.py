@@ -9,7 +9,7 @@ print the URL -> asset map. External addresses are listed and never fetched.
     uv run python manage.py import_builder_media --tenant webside --mapping-file map.json
 
 ``--dry-run`` reads every file the real run would and writes nothing: no asset,
-no file. Documents are never rewritten (``builder/media_migration.py``).
+no file. Documents are never rewritten (``src/builder/media_migration.py``).
 Safe to run again: an image already in the library is found by its content.
 """
 

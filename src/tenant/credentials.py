@@ -107,7 +107,7 @@ def tenant_contact_email() -> str:
       3. In a store's schema: ``""`` — a store with no contact address
          has none. Its outbound mail then carries no ``Reply-To`` and
          contact-form submissions are skipped with a warning
-         (``contact/tasks.py``); it never borrows the platform's (or,
+         (``src/contact/tasks.py``); it never borrows the platform's (or,
          as ``settings.INFO_EMAIL`` was until 2026-09-10, the first
          store's) address.
       4. Public schema / no active tenant: ``settings.INFO_EMAIL`` — the
@@ -462,7 +462,7 @@ def acs_credentials() -> dict[str, str]:
         "user_id": _get_tenant_field("acs_user_id"),
         "user_password": _get_tenant_field("acs_user_password"),
         "billing_code": _get_tenant_field("acs_billing_code"),
-        # ``shipping_acs/config.py:station_origin()`` derives this value
+        # ``src/shipping_acs/config.py:station_origin()`` derives this value
         # from the billing code when the explicit field is empty — both
         # this helper and that derivation path remain valid.
         "station_origin": _get_tenant_field("acs_station_origin"),

@@ -24,10 +24,10 @@ ALLOWED = {
     "src/tenant/api_tokens.py",
     "src/tenant/staff_api.py",
     # Trades a single-use ticket for a builder PlatformStaffToken: it reads
-    # the PUBLIC identity, like tenant/staff_api.py when it mints one.
+    # the PUBLIC identity, like src/tenant/staff_api.py when it mints one.
     "src/builder/staff_session.py",
     # Authenticates the staff issuer's tokens against the PUBLIC schema, and
-    # re-checks the flag on every call as tenant/api_tokens.py does.
+    # re-checks the flag on every call as src/tenant/api_tokens.py does.
     "src/agent/staff_auth.py",
     "src/user/admin.py",
     "src/user/managers/account.py",

@@ -71,7 +71,7 @@ FAIL_OPEN = {
     "ViewCountThrottle",
     "RecommendationEventThrottle",
     "EmailUnsubscribeThrottle",
-    # Authenticated staff reads (agent/staff_views.py): no secret, oracle
+    # Authenticated staff reads (src/agent/staff_views.py): no secret, oracle
     # or money behind it, and a store's team keeps working through a blip.
     "StaffAgentThrottle",
 }

@@ -2,7 +2,7 @@
 
 Each class is an Unfold component rendered by a partial under
 ``core/templates/admin/dashboard/``; the layout is
-``core/templates/admin/index.html``. Cached data comes from
+``src/core/templates/admin/index.html``. Cached data comes from
 ``admin.dashboard.store.queries``; everything below runs per request, in
 the viewer's language.
 

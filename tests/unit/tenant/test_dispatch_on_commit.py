@@ -167,7 +167,7 @@ class DispatchOnCommitTests(TestCase):
 
 
 def test_helper_is_importable_without_touching_models():
-    """`tenant/celery.py` must stay model-free at import.
+    """`src/tenant/celery.py` must stay model-free at import.
 
     It is imported by signal modules that load during app registry
     population; a model import at module level would make that ordering

@@ -164,8 +164,8 @@ catalogue can no longer change.
   loyalty redemption) reduces the taxable value of the lines it was
   granted on, not of every line: a coupon for the 13% food category must
   not be booked against a 24% line. `PromotionEngine` reports it:
-  `PromotionEngine._clamp` splits each applied promotion over the cart
-  lines it covers (`_covered_weights`: the lines `_matching_items` counts,
+  `promotion.engine.stacking.clamp` splits each applied promotion over the cart
+  lines it covers (`_covered_weights`: the lines `engine.scope.matching_items` counts,
   by value, or the units a buy-X-get-Y actually discounts, by price) with
   `order.checkout.discounts.allocate_capped`, the one largest-remainder rule (cent
   exact, no line pushed below what is left of it), and exposes the result

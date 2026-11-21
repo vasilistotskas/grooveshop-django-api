@@ -4,8 +4,8 @@ A shopper who ticks Black and White under "Colour" and 2 m under "Length"
 means (Black OR White) AND 2 m: alternatives within one attribute, every
 attribute narrowing the result. Every surface that filters products by
 attribute value reads the selection through ``AttributeSelection``, so the
-Meilisearch search (``search/views/product.py``) and the product list
-(``product/filters/product.py``) cannot disagree about it again: a single
+Meilisearch search (``src/search/views/product.py``) and the product list
+(``src/product/filters/product.py``) cannot disagree about it again: a single
 ``attribute_values IN [...]`` or ``attribute_value__in`` over the whole
 flat list is an OR across attributes, and returned the products that were
 black OR 2 m long.

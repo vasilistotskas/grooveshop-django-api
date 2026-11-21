@@ -2,7 +2,7 @@
 
 The staff issuer keeps its clients and tokens in the PUBLIC schema and a
 store's own issuer keeps its customers' in the store's schema
-(``agent/staff.py``). The main suite cannot see that difference: it runs
+(``src/agent/staff.py``). The main suite cannot see that difference: it runs
 every app's tables in ``public``. So the claims that matter most are
 proven here:
 

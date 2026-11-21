@@ -4,7 +4,7 @@ The agent gateway runs several pods, and a chat turn the shopper retries
 can reach Django from another one than the first attempt; a phone can
 change networks between a checkout and its retry. The key used to be
 scoped to the address, so such a retry ran again. Through the real
-middleware chain and view (``core/middleware/idempotency.py``).
+middleware chain and view (``src/core/middleware/idempotency.py``).
 """
 
 from __future__ import annotations

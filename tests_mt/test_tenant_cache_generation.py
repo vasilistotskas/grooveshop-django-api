@@ -2,7 +2,7 @@
 
 ``Tenant.cache_generation`` lives in the PUBLIC schema, and is part of
 every key the resolve payload and domain set are read under
-(``tenant/cache.py``). Pay-ways and the agent settings live in the
+(``src/tenant/cache.py``). Pay-ways and the agent settings live in the
 TENANT schema but are folded into that payload, so their receivers bump
 the public row from inside the tenant schema's transaction, relying on
 the tenant ``search_path`` ending in ``public``. The main suite has no

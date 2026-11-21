@@ -54,8 +54,8 @@ class NotificationTypeEnum(models.TextChoices):
     values read naturally in logs.
     """
 
-    # Order lifecycle — each fires from ``order/communications/notifications.py``
-    # via the corresponding signal handler in ``order/signals/handlers.py``.
+    # Order lifecycle — each fires from ``order.communications.notifications``
+    # via the corresponding signal handler in ``src/order/signals/handlers.py``.
     ORDER_CREATED = "order_created", _("Order created")
     ORDER_PROCESSING = "order_processing", _("Order processing")
     ORDER_SHIPPED = "order_shipped", _("Order shipped")

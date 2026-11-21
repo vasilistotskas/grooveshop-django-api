@@ -25,11 +25,11 @@ class RecommendationSlot(TimeStampMixinModel):
     with what weight, and how many results are worth showing.
 
     One row per ``Surface`` per tenant, seeded from a vertical preset
-    at provisioning (``recommendation/presets.py``) and edited in admin.
+    at provisioning (``src/recommendation/presets.py``) and edited in admin.
     With ``learn_weights`` on, ``weights`` is rewritten nightly by
     ``recommendation.learning`` from the surface's attach rates.
     ``strategy_chain`` and ``weights`` are JSON validated against
-    ``recommendation/json_schemas.py`` rather than a widget-heavy
+    ``src/recommendation/json_schemas.py`` rather than a widget-heavy
     relation table, because a chain is edited a handful of times per
     store, ever.
 

@@ -1,7 +1,7 @@
 """Suspend / activate a tenant — ONE code path for admin and automation.
 
 The semantics used to live inline in the TenantAdmin bulk actions; the
-billing dunning task (tenant/billing.py) needs the exact same rules, so
+billing dunning task (src/tenant/billing.py) needs the exact same rules, so
 they are extracted here rather than duplicated:
 
 - Protected schemas are never touched.
@@ -13,7 +13,7 @@ they are extracted here rather than duplicated:
 
 Resolve-cache invalidation needs nothing here: every ``Tenant.save``
 bumps ``cache_generation`` in the same UPDATE, and the resolve and
-domain cache keys include it (tenant/cache.py), so the next read after
+domain cache keys include it (src/tenant/cache.py), so the next read after
 the commit builds a fresh key.
 """
 

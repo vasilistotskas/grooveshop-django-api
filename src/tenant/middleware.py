@@ -89,7 +89,7 @@ class SuspendedTenantMiddleware:
     """Refuse every request for a suspended store.
 
     ``suspend_tenant`` sets ``is_active=False``, and five consumers
-    honour it — ``tenant/views.py`` resolve 404s, the internal domains
+    honour it — ``src/tenant/views.py`` resolve 404s, the internal domains
     feed skips it, the WebSocket middleware closes 4004, the Celery
     fanout skips it, and the Viva webhook refuses it. The one path that
     was never covered is the one that serves the store: the tenant HTTP
@@ -316,7 +316,7 @@ STAFF_CONNECT_URLCONF = "agent.urls_connect"
 
 
 def is_staff_connect_host(hostname: str) -> bool:
-    """True for the platform's staff connect host (``agent/staff_connect.py``)."""
+    """True for the platform's staff connect host (``agent.staff_connect``)."""
     return bool(settings.STAFF_CONNECT_HOST) and (
         hostname == settings.STAFF_CONNECT_HOST
     )

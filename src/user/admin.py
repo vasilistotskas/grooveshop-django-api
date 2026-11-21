@@ -324,7 +324,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     form = UserChangeForm
     # Generates a handle when the operator leaves ``username``
     # blank, matching what ``UserAccountManager.create_user``
-    # already does for signups. See ``user/forms.py``.
+    # already does for signups. See ``src/user/forms.py``.
     add_form = UserAccountCreationForm
     change_password_form = AdminPasswordChangeForm
 

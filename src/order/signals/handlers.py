@@ -1992,8 +1992,11 @@ def handle_stripe_checkout_expired(sender, **kwargs):
 
             if not order.metadata:
                 order.metadata = {}
-            order.metadata["stripe_checkout_expired"] = True
-            order.metadata["stripe_checkout_session_id"] = session_id
+            # The recorded session is the order's live one: an expired
+            # session is never written over it. A session that lost a
+            # concurrent request, or one that expired before the current
+            # one was opened, would otherwise make the next request mint
+            # a second payable session (#643).
             order.metadata[f"webhook_processed_{event_id}"] = True
             order.save(update_fields=["metadata"])
 

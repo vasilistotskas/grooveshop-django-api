@@ -5,7 +5,7 @@ and in CI after migrating a database to the base commit. Every schema
 ``migrate_schemas`` would touch is checked — ``public`` and every tenant
 row, active or not — against the migrations already applied to it, which
 are the serving release's models. Nothing is written. The rules are in
-``core/db/migration_safety.py`` and ``docs/migrations.md``.
+``src/core/db/migration_safety.py`` and ``docs/migrations.md``.
 
 Exit status 1 names each blocking finding and the schemas it applies to;
 the sync stops and the old pods keep serving. A finding on a migration

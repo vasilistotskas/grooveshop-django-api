@@ -81,8 +81,9 @@ class TestAdminLoginLandsInTheAdmin(TestCase):
     Without ``next``, Django falls back to ``LOGIN_REDIRECT_URL``, the
     shopper account page: production sent an operator signing in at the
     control plane to ``https://webside.gr/account`` on 2026-08-21. The
-    login form carries ``next`` itself (``core/templates/admin/login.html``),
-    and ``AdminSite.login`` fills it with the requested page or this
+    login form carries ``next`` itself
+    (``src/core/templates/admin/login.html``), and ``AdminSite.login``
+    fills it with the requested page or this
     site's index.
     """
 

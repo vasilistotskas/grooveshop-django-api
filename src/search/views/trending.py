@@ -34,7 +34,7 @@ _TRENDING_MAX_LIMIT = 20
 _TRENDING_WINDOW_HOURS = 24
 
 
-# The `ty: ignore` below is explained in `search/views/blog.py`.
+# The `ty: ignore` below is explained in `src/search/views/blog.py`.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     operation_id="listTrendingSearches",
     tags=["Search"],

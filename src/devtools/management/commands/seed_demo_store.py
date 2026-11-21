@@ -92,7 +92,7 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("promotions", "seed_promotions"),
     # After products and promotions: it back-dates each marked-down
     # product's price history so the platform's own Omnibus evaluation
-    # can announce the reduction (see `devtools/demo_price_history.py`).
+    # can announce the reduction (see `src/devtools/demo_price_history.py`).
     ("price-history", "seed_price_history"),
     ("content-pages", "publish_content_pages"),
     # After products and content pages: the pages name a product and the

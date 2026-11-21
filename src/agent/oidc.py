@@ -16,7 +16,7 @@ from agent.staff import (
 
 # Scopes AI agents may request when linking a shopper's account. The
 # per-client granted set lives on each ``allauth.idp.oidc.Client`` row;
-# this list is what the agent-facing API enforces (see agent/views.py)
+# this list is what the agent-facing API enforces (see src/agent/views.py)
 # and what the consent screen can display.
 SCOPE_ORDERS_READ = "orders:read"
 SCOPE_LOYALTY_READ = "loyalty:read"
@@ -58,7 +58,7 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
     On a store host (the store's schema) the issuer links that store's
     CUSTOMERS to an AI agent, for the shopper tools on ``/mcp``. On the
     platform host (the public schema) it connects a store's STAFF, for
-    the store-admin tools on ``/mcp/admin`` (``agent/staff.py``). Each
+    the store-admin tools on ``/mcp/admin`` (``src/agent/staff.py``). Each
     hook answers for the issuer serving the request.
     """
 

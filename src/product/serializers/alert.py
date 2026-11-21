@@ -58,7 +58,7 @@ class ProductAlertSerializer(serializers.ModelSerializer[ProductAlert]):
         # guests omit nothing (they provide ``email``). Uniqueness is
         # still enforced end-to-end via the DB-level UniqueConstraints
         # — the view turns the resulting IntegrityError into a 409
-        # response (`product/views/alert.py`).
+        # response (`src/product/views/alert.py`).
         validators = []
 
     def validate(self, attrs):

@@ -1,4 +1,4 @@
-"""Contract tests for admin/displays.py helpers."""
+"""Contract tests for src/admin/displays.py helpers."""
 
 from __future__ import annotations
 

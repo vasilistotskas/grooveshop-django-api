@@ -1,6 +1,6 @@
 """The control-plane host must not serve the store admin, under any locale.
 
-`tenant/urls_public.py` mounts `platform_admin_site` at the UNPREFIXED
+`src/tenant/urls_public.py` mounts `platform_admin_site` at the UNPREFIXED
 `admin/` and lists it first so it shadows the shared one. But the store
 admin sat in `_shared_i18n_patterns`, which `public_shared_urlpatterns`
 includes — so the shadowing covered only the unprefixed path:

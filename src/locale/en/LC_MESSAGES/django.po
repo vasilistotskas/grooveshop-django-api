@@ -870,6 +870,9 @@ msgstr "A note is required."
 msgid "A password was set on your account"
 msgstr "A password was set on your account"
 
+msgid "A payment for this order was received and is being confirmed. Do not pay again."
+msgstr "A payment for this order was received and is being confirmed. Do not pay again."
+
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "A payment intent is required — the applied discounts do not cover the order total."
 
@@ -3812,9 +3815,6 @@ msgstr "Create a feedback submission"
 
 msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
 msgstr "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
-
-msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
-msgstr "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
 
 msgid "Create a hosted checkout session for an order"
 msgstr "Create a hosted checkout session for an order"
@@ -14947,6 +14947,9 @@ msgstr "The order total is below this wholesale tier's minimum of {minimum}."
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 msgstr "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 
+msgid "The order's hosted payment link (Stripe or Viva Wallet). While a link of the order can still be paid it is returned again, with its own expiry, and successUrl and cancelUrl are those it was opened with; only when none can be paid is a new one opened. 409 payment_in_progress: a payment was made and is being confirmed, so no link is opened; read the order again after Retry-After. 503 payment_provider_unavailable: the provider cannot say whether a link is still payable; try again after Retry-After."
+msgstr "The order's hosted payment link (Stripe or Viva Wallet). While a link of the order can still be paid it is returned again, with its own expiry, and successUrl and cancelUrl are those it was opened with; only when none can be paid is a new one opened. 409 payment_in_progress: a payment was made and is being confirmed, so no link is opened; read the order again after Retry-After. 503 payment_provider_unavailable: the provider cannot say whether a link is still payable; try again after Retry-After."
+
 msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 msgstr "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 
@@ -14972,6 +14975,9 @@ msgstr "The payment method is free once the products, after discounts and exclud
 
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
+
+msgid "The payment provider cannot be reached right now. Try again in a moment."
+msgstr "The payment provider cannot be reached right now. Try again in a moment."
 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "The payment provider cannot be reached to check this reference."
@@ -18336,6 +18342,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Courier receipts cannot be sent: no dispatch point"
 #~ msgstr "Courier receipts cannot be sent: no dispatch point"
+
+#~ msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
+#~ msgstr "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Critical Stock (1-5)"

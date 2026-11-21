@@ -1,7 +1,7 @@
 """A suspended store's images are refused by state, not by moving its files.
 
 Django tells media-stream which stores are suspended (the internal tenant
-feed, ``tenant/internal.py``) and queues a media flush on every suspension
+feed, ``src/tenant/internal.py``) and queues a media flush on every suspension
 and reactivation, which makes media-stream re-read the feed at once and
 drops the cached copies at media-stream and the edge. The originals stay in
 ``MEDIA_ROOT/{schema}``: only media-stream reads them, in-cluster, and the

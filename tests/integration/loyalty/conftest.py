@@ -1,6 +1,6 @@
 """Isolate loyalty integration tests from the seeded default tiers.
 
-See ``tests/unit/test_loyalty/conftest.py`` for the rationale.
+See ``tests/unit/loyalty/conftest.py`` for the rationale.
 """
 
 from __future__ import annotations

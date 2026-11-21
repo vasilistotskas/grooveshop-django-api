@@ -1,4 +1,4 @@
-"""The WebSocket tenant gate (``tenant/middleware_ws.py``).
+"""The WebSocket tenant gate (``src/tenant/middleware_ws.py``).
 
 A socket is admitted only on a host that belongs to an active store:
 an unknown or deactivated host is closed with ``4004`` before the auth

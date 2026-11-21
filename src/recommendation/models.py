@@ -236,8 +236,8 @@ class RecommendationEvent(models.Model):
     """The feedback loop: what was shown, what was clicked, what was
     bought. Follows ``search.SearchClick``.
 
-    ``impression_id`` ties the three together: the API mints one per
-    response, the client echoes it on impression and click, and order
+    ``impression_id`` ties the three together: the impression beacon mints
+    one per showing of a strip and the client sends it on click, and order
     creation writes ``attach`` for any line whose product appeared under
     an impression shown to the same cart or the same signed-in customer
     inside the attribution windows (``settings.RECOMMENDATION_ATTACH_*``,
@@ -311,11 +311,11 @@ class RecommendationEvent(models.Model):
         blank=True,
         default="",
     )
-    # What makes two rows one event (``events.record_events``): the task copy
-    # that writes the row, which every copy of a task repeats per item, so a
-    # second copy inserts nothing. Two beacons are two tasks, so two rows,
-    # even for one impression id. Empty for ``attach`` rows, whose own
-    # constraint below makes them once per order.
+    # What makes two rows one event (``events.record_events``): the kind,
+    # the showing (``impression_id``) and the item, so a beacon sent twice
+    # for one showing and another copy of its task insert nothing. Empty for
+    # ``attach`` rows, whose own constraint below makes them once per order,
+    # and for rows written before showings had ids of their own.
     event_key = models.UUIDField(
         _("Event key"), null=True, blank=True, editable=False
     )

@@ -267,11 +267,11 @@ class CheckoutQuoteSerializer(serializers.Serializer):
         allow_null=True,
         help_text=_(
             "An opaque digest of what the order would be made of: the "
-            "lines, the promotions, the delivery with its pickup point "
-            "and the pay way. Null until a delivery and a pay way are "
-            "chosen. Send it back as ``expectedCartDigest`` when creating "
-            "the order: the order is created only if its cart is still "
-            "this one."
+            "lines, the promotions and the delivery with its pickup "
+            "point, not the pay way. Null until a delivery is chosen. "
+            "Send it back as ``expectedCartDigest`` when creating the "
+            "order: the order is created only if its cart is still this "
+            "one."
         ),
     )
 

@@ -1367,7 +1367,7 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was "
             "shown. When sent, the order is created only if it is made of "
             "exactly what that quote priced (lines, promotions, delivery, "
-            "pickup point, pay way); otherwise the answer is 409 "
+            "pickup point); otherwise the answer is 409 "
             "``cart_changed`` with the new quote and nothing is created."
         ),
     )

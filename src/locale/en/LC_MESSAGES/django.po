@@ -1775,8 +1775,8 @@ msgstr "An error occurred while processing your request."
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
 
-msgid "An opaque digest of what the order would be made of: the lines, the promotions, the delivery with its pickup point and the pay way. Null until a delivery and a pay way are chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
-msgstr "An opaque digest of what the order would be made of: the lines, the promotions, the delivery with its pickup point and the pay way. Null until a delivery and a pay way are chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
+msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
+msgstr "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
@@ -14626,8 +14626,8 @@ msgstr "The VAT on the invoice, kept for your accountant."
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 msgstr "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 
-msgid "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point, pay way); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
-msgstr "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point, pay way); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+msgid "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+msgstr "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
 
 msgid "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 msgstr "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."

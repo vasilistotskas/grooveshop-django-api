@@ -105,16 +105,17 @@ caller:
   - **Required since #635's third release**, once the storefront
     (v3.345.3) and the gateway (v1.49.0) in production sent it on every
     order. Nothing creates an order without the total check.
-- **The cart digest.** A quote with a delivery and a pay way also returns
+- **The cart digest.** A quote with a delivery chosen also returns
   `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
   `SECRET_KEY`, over a canonical form of what the order would be made of:
   each line (product, quantity, unit price as priced, the promotion money
   it carries), the promotions that apply with their codes, amounts and
   gifts, the delivery (kind as `delivery_kind` reads it, the carrier that
   takes it, as `_carrier` resolves one a home delivery does not name,
-  country, region, the pickup point) and the pay way. It holds no shipping
-  charge, fee, loyalty or gift-card amount: `expectedTotal` holds the
-  amount. It is stable while those do not change and reveals
+  country, region, the pickup point). It is a check of contents: it holds
+  no pay way (a UCP checkout may name its payment method only when it
+  completes) and no shipping charge, fee, loyalty or gift-card amount;
+  `expectedTotal` holds what is paid, the pay way's fee included. It is stable while those do not change and reveals
   nothing of the cart. `POST /api/v1/order` takes an optional
   `expectedCartDigest`; both creation paths compare it under the cart
   lock, before the total, and a difference creates nothing and answers

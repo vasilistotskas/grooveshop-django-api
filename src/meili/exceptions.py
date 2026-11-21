@@ -2,7 +2,7 @@
 
 Every failure here used to be a bare ``raise Exception(...)``, which
 callers could only catch as `Exception` — indistinguishable from a bug in
-the calling code. `meili/apps.py` did exactly that: it raised
+the calling code. `src/meili/apps.py` did exactly that: it raised
 ``Exception`` and caught ``Exception`` a line later, so a genuine
 TypeError in the surrounding block would have been swallowed as an
 indexing failure.

@@ -1,7 +1,7 @@
 """Audit the DB translation overlay against the compiled .po catalogue.
 
 Every non-empty `Translation` row is overlaid onto the in-memory
-gettext catalog of every pod and worker (core/rosetta_storage.py), so a
+gettext catalog of every pod and worker (src/core/rosetta_storage.py), so a
 row that disagrees with django.po silently wins over it — across every
 deploy, in every process, with nothing on disk to show for it. That is
 exactly right for a deliberate Rosetta edit and a disaster for a stale

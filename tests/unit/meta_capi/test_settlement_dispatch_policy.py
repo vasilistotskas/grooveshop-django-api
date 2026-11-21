@@ -1,6 +1,6 @@
 """Purchase-at-creation policy for EVERY ``PaySettlement`` value.
 
-Covers ``meta_capi/signals.py``: ``_on_order_created`` schedules Purchase
+Covers ``src/meta_capi/signals.py``: ``_on_order_created`` schedules Purchase
 immediately for any settlement other than ``ONLINE`` (the provider webhook
 covers online payments), and ``_on_order_refunded`` forwards the amount.
 The existing ``test_signals.py`` pins COURIER_CASH, ONLINE and a missing

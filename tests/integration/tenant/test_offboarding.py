@@ -352,7 +352,7 @@ class TestOneDestroyPath:
 class TestSearchIndexErasureActuallyDeletes:
     """`meili_client` has no `delete_index`; the raw SDK client does.
 
-    The wrapper in `meili/_client.py` exposes create/get/get_search
+    The wrapper in `src/meili/_client.py` exposes create/get/get_search
     index helpers and no `delete_index` — `meilisearch_drop.py` reaches
     through to `client.client` for exactly that reason. So the call
     raised `AttributeError` on the first index, the `except` swallowed

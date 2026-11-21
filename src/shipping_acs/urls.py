@@ -1,6 +1,6 @@
 """URL patterns for the shipping_acs app.
 
-Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``core/urls.py``.
+Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``src/core/urls.py``.
 ACS does not have webhooks — there is no root-level URL.
 """
 

@@ -305,7 +305,7 @@ class IsStaffAiAccessEnabled(IsSettingEnabled):
 
     Fails CLOSED (declared ``False``): a store's customer data goes to an
     AI provider only once the store has chosen it, so a settings hiccup
-    must not open the store-admin surface (``agent/staff_views.py``).
+    must not open the store-admin surface (``src/agent/staff_views.py``).
     """
 
     setting_key = "STAFF_AI_ACCESS_ENABLED"

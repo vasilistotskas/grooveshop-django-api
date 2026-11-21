@@ -212,7 +212,7 @@ _shared_i18n_patterns = [
 _storefront_admin_i18n_patterns = [
     # The STORE admin, and storefront-only. It used to sit in
     # ``_shared_i18n_patterns``, which put it on the platform host as
-    # well — and ``tenant/urls_public.py`` shadows only the UNPREFIXED
+    # well — and ``src/tenant/urls_public.py`` shadows only the UNPREFIXED
     # ``admin/`` with the control-plane site. So on the platform host
     # ``/admin/login/`` reached ``PlatformAdminSite`` (superuser only)
     # while ``/en/admin/login/`` reached ``MyAdminSite``, whose
@@ -279,7 +279,7 @@ urlpatterns = (
 )
 
 if bool(settings.ENABLE_DEBUG_TOOLBAR):
-    # No import guard: under the same flag, ``settings/application.py`` does an
+    # No import guard: under the same flag, ``settings.application`` does an
     # unconditional ``INSTALLED_APPS += ["debug_toolbar"]``, so a missing
     # package raises during ``apps.populate()`` — long before this module
     # is imported. The guard that stood here could not fire, and its

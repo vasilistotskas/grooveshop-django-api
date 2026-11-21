@@ -46,7 +46,7 @@ SHARED_APPS = [
     #
     # Task results are PUBLIC-SCHEMA ONLY and deliberately not mirrored
     # into TENANT_APPS. Only failures are ever written (see
-    # CELERY_TASK_IGNORE_RESULT in settings/celery.py), and a failure is
+    # CELERY_TASK_IGNORE_RESULT in src/settings/celery.py), and a failure is
     # platform operations, not one store's data: it belongs where the control
     # plane can read every store's in one list, and where
     # ``celery.backend_cleanup`` — which beat dispatches with no tenant
@@ -86,7 +86,7 @@ SHARED_APPS = [
     # tools on ``/mcp/admin``; its clients and tokens live where those users
     # do. Also in TENANT_APPS, where each store's own issuer links its
     # CUSTOMERS. Two token tables, so neither kind is ever found where the
-    # other is checked (``agent/staff.py``).
+    # other is checked (``src/agent/staff.py``).
     "allauth.idp.oidc",
 ]
 

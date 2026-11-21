@@ -211,7 +211,7 @@ class UserAccount(
         showed an operator ``Paok1441`` where the account plainly holds
         "Webside Admin", and the admin columns that matter had each
         worked around it locally (``obj.user.full_name or
-        obj.user.username``, blog/admin.py and cart's admin). That
+        obj.user.username``, src/blog/admin.py and cart's admin). That
         precedence belongs here, once, so a surface nobody has hand-
         patched still reads as a person.
 

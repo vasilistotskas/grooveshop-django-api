@@ -74,7 +74,7 @@ class UserWriteSerializer(UserSerializer):
         # source of truth; a profile PUT/PATCH must not silently change
         # it. This used to be conditional on ``self.instance is None``
         # so that the account-create endpoint could set it — that
-        # endpoint is gone (see ``user/views/account.py``), and this
+        # endpoint is gone (see ``src/user/views/account.py``), and this
         # serializer only ever serves update/partial_update, so the
         # condition could no longer be false.
         read_only_fields = (

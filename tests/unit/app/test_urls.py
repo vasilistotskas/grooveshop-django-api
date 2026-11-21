@@ -4,12 +4,12 @@ from django.urls import Resolver404, resolve
 
 
 def test_debug_toolbar_urls_are_not_mounted_when_disabled():
-    """``core/urls.py`` mounts ``__debug__/`` only under
+    """``src/core/urls.py`` mounts ``__debug__/`` only under
     ``ENABLE_DEBUG_TOOLBAR``, which is False in production and pinned
     to that by ``tests/settings.py``.
 
     The flag cannot be flipped with ``override_settings``: under it
-    ``settings/application.py`` also adds ``debug_toolbar`` to
+    ``src/settings/application.py`` also adds ``debug_toolbar`` to
     ``INSTALLED_APPS``, so importing the URLconf with the flag on and the
     app absent fails on ``debug_toolbar.models``. The test this replaces
     did exactly that, and passed only on machines whose ``.env`` installed

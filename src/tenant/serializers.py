@@ -215,7 +215,7 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Feature flags ---
     # Each optional feature's EFFECTIVE state, plan flag AND store
-    # settings, from one table (``tenant/features.py``): what the agent
+    # settings, from one table (``src/tenant/features.py``): what the agent
     # gateway gates its tools on. Read-only, so REQUIRED in the schema,
     # deliberately: it is always served, and the gateway's consumer
     # contract requires it, which is what makes the deploy gate refuse a

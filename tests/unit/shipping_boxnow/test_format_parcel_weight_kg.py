@@ -1,4 +1,4 @@
-"""Unit tests for ``_format_parcel_weight_kg`` in shipping_boxnow/services.py.
+"""Unit tests for ``_format_parcel_weight_kg`` in shipping_boxnow.services.
 
 The helper converts the internally-stored integer grams to the
 kilogram-decimal value BoxNow's delivery-request API expects in

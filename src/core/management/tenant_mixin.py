@@ -90,7 +90,7 @@ class TenantCommandMixin:
         the real ``Tenant`` row on ``connection.tenant``; ``schema_
         context`` installs a ``FakeTenant`` that carries a schema name
         and nothing else. Every per-tenant credential is read off
-        exactly that attribute (``tenant/credentials.py:
+        exactly that attribute (``src/tenant/credentials.py:
         _get_tenant_field``), so under ``schema_context``
         ``acs_credentials()`` and its siblings return empty strings —
         and a command that talks to a carrier or a payment provider

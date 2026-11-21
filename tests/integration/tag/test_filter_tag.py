@@ -1,4 +1,4 @@
-"""``TagFilter`` (tag/filters/tag.py) through ``/api/v1/tag``.
+"""``TagFilter`` (src/tag/filters/tag.py) through ``/api/v1/tag``.
 
 Every case asserts the exact set of tags returned from one fixed
 dataset, so an undeclared parameter — which django-filter ignores

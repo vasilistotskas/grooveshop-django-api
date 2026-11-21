@@ -3,7 +3,7 @@
 Every Celery email task previously rebuilt the same
 ``SITE_NAME``/``SITE_URL``/``INFO_EMAIL``/``STATIC_BASE_URL`` dict
 inline, and none of them included ``SITE_LOGO_URL`` — the per-tenant
-logo branch in ``core/templates/emails/base/email_base.html`` was
+logo branch in ``src/core/templates/emails/base/email_base.html`` was
 dead code, so every tenant's transactional emails silently rendered
 the platform's static ``logo-dark.svg`` regardless of what the
 merchant configured on ``Tenant.logo_light_url``. Route every email

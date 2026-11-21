@@ -249,7 +249,7 @@ REST_KNOX = {
 }
 # Hard reject tokens older than this regardless of their expiry field.
 # Mirrors AUTO_REFRESH_MAX_TTL; both should be kept in sync.
-# BoundedTokenAuthentication in core/api/tokens.py reads this setting.
+# BoundedTokenAuthentication in src/core/api/tokens.py reads this setting.
 KNOX_ABSOLUTE_MAX_AGE = datetime.timedelta(days=30)
 KNOX_TOKEN_MODEL = "knox.AuthToken"
 

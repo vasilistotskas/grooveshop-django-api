@@ -4,7 +4,7 @@ nearest-search limit, and weight bounds without a redeploy.
 
 If any of these tests fail, you've reintroduced a hardcoded value
 that the seed migration was meant to eliminate. The migration is
-``shipping/migrations/0004_seed_provider_metadata.py``.
+``src/shipping/migrations/0004_seed_provider_metadata.py``.
 """
 
 from __future__ import annotations
@@ -219,7 +219,7 @@ class TestSeedAndFallbackAgree:
     """The seed migration and ``config.py``'s constants must not drift.
 
     ``config.py`` documents the rule in a comment ("Document any change
-    here in ``shipping/migrations/0004_seed_provider_metadata.py`` so
+    here in ``src/shipping/migrations/0004_seed_provider_metadata.py`` so
     the seed and the fallback agree"), which nothing enforced. A drift
     is invisible: every tenant provisioned before the change keeps the
     seeded value, every fresh caller with a deleted key gets the

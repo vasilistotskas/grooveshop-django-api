@@ -1,4 +1,4 @@
-"""``BlogCategoryFilter`` (blog/filters/category.py) through the list.
+"""``BlogCategoryFilter`` (src/blog/filters/category.py) through the list.
 
 Every case asserts the exact set of categories returned from one
 dataset, so a filter the view does not apply — or a parameter

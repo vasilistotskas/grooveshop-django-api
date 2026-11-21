@@ -7,7 +7,7 @@ view runs. ``InternalDomainsMiddleware`` answers the internal domains
 feed BEFORE tenant resolution (same placement rationale as
 ``HealthProbeMiddleware``): the endpoint is internal-token
 authenticated and reads only SHARED tables, so the request host is
-irrelevant to it. The DRF view in ``tenant/views.py`` shares the same
+irrelevant to it. The DRF view in ``src/tenant/views.py`` shares the same
 helpers and keeps serving host-routed callers (and the test client).
 """
 

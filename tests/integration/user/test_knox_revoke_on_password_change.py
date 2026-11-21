@@ -4,7 +4,7 @@ Covers ``revoke_knox_tokens_on_password_change`` (and the shared
 ``_revoke_knox_tokens`` / ``_broadcast_force_logout`` helpers) wired
 to ``allauth.account.signals.password_changed``.
 
-Signal handler location: ``user/signals.py``.
+Signal handler location: ``src/user/signals.py``.
 
 Design notes
 ------------

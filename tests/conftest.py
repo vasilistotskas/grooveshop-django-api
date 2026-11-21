@@ -676,7 +676,7 @@ def acs_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable ACS credentials.
 
     ACS credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
+    ``src/tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
     is_kind_enabled()``, the ACS fanout Celery tasks, and any test
     exercising ACS availability need an active tenant with
     ``Tenant.acs_*`` fields set. A ``SimpleNamespace`` is enough — the
@@ -725,7 +725,7 @@ def boxnow_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable BoxNow credentials.
 
     BoxNow credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
+    ``src/tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
     is_kind_enabled()``, the BoxNow fanout Celery tasks, and any test
     exercising BoxNow availability need an active tenant with
     ``Tenant.box_now_*`` fields set.

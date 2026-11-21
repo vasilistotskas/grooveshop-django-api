@@ -48,7 +48,7 @@ NO_FORMAT = Country(alpha_2="ZZ")
 # never a query, and every GREECE-based test below only needs a region
 # that genuinely belongs to GR to stay error-free now that a country
 # with any seeded Region rows (GR has 12, from
-# ``region/migrations/0009_seed_default_regions.py``) requires one.
+# ``src/region/migrations/0009_seed_default_regions.py``) requires one.
 ATTICA = Region(alpha="GR-A1", country_id="GR")
 
 

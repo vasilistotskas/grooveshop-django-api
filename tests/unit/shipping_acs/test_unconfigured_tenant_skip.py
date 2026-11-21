@@ -2,7 +2,7 @@
 crash) for a tenant with no ACS credentials.
 
 ACS credentials are tenant-only (no settings fallback — see
-``tenant/credentials.py:acs_credentials()``), so an unconfigured tenant
+``src/tenant/credentials.py:acs_credentials()``), so an unconfigured tenant
 must never reach ``AcsClient()`` (which would raise ``AcsConfigError``)
 inside a fanout task dispatched to every active tenant regardless of
 which carriers they've actually configured.

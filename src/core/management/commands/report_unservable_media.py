@@ -1,11 +1,11 @@
 """List the stored images the media service would not serve.
 
 The media service shows a placeholder for a source above its per-format byte
-cap or pixel limit (``core/data/image-limits.json``), and an upload is checked
-against that when it is made (``core.uploads``). Files stored BEFORE the check
-existed can still be over a cap; this finds them. Read-only: it deletes,
-moves and re-encodes nothing, because what to do with a store's file is the
-store's owner's decision.
+cap or pixel limit (``src/core/data/image-limits.json``), and an upload is
+checked against that when it is made (``core.uploads``). Files stored BEFORE
+the check existed can still be over a cap; this finds them. Read-only: it
+deletes, moves and re-encodes nothing, because what to do with a store's
+file is the store's owner's decision.
 
     uv run python manage.py report_unservable_media
     uv run python manage.py report_unservable_media --schema webside

@@ -1,7 +1,7 @@
 """Activate the request's language for the storefront API.
 
 Django's ``LocaleMiddleware`` cannot do this on its own. With
-``i18n_patterns(prefix_default_language=False)`` (``core/urls.py``) it
+``i18n_patterns(prefix_default_language=False)`` (``src/core/urls.py``) it
 activates ``settings.LANGUAGE_CODE`` for every path that carries no
 language prefix (``django/middleware/locale.py`` ``process_request``:
 ``if not language_from_path and i18n_patterns_used and not

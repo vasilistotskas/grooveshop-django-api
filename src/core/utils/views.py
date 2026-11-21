@@ -79,7 +79,7 @@ def response_cache_key_prefix(class_name: str, method_name: str) -> str:
     their own TTL. Only the response cache is scoped this way —
     sessions, throttle counters and locks share the cache and must
     survive a deploy. The purge patterns (``*<Class>ViewSet_*`` in
-    ``core/cache/surfaces.py``) match inside the key, so they reach
+    ``src/core/cache/surfaces.py``) match inside the key, so they reach
     every release's entries.
     """
     return f"{settings.RELEASE_VERSION}.{class_name}_{method_name}"

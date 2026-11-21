@@ -1,6 +1,6 @@
 """URL patterns for the generic shipping abstraction.
 
-Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``core/urls.py``.
+Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``src/core/urls.py``.
 Per-provider URLs live in their own apps (``shipping_acs.urls``,
 ``shipping_boxnow.urls``) and are mounted alongside this one.
 """

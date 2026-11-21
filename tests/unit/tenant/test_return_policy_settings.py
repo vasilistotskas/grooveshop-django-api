@@ -1,5 +1,5 @@
 """RETURN_WINDOW_DAYS / RETURN_FEES extra_setting validators
-(tenant/validators.py).
+(src/tenant/validators.py).
 
 extra_settings validators return a boolean — Setting.validate() wraps a
 falsy result in its ValidationError. The two values become the store's

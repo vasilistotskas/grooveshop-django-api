@@ -1,5 +1,5 @@
 """H1 — ``TenantAdmin.save_related`` provisions a brand-new tenant the
-same way ``manage.py tenant_create`` does (see ``tenant/provisioning.py``).
+same way ``manage.py tenant_create`` does (see ``src/tenant/provisioning.py``).
 
 Before this, the stock Unfold "New Store" add form only created the
 ``Tenant`` row + Postgres schema: the owner had no membership (locked

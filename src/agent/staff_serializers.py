@@ -1,4 +1,4 @@
-"""Response shapes of the store-admin agent surface (``agent/staff_views.py``).
+"""Response shapes of the store-admin agent surface (``agent.staff_views``).
 
 Plain serializers over dicts the views build: these are read models for
 an AI app, not the admin's forms, and they name exactly what leaves the

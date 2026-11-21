@@ -1,6 +1,6 @@
 """Post-row tenant provisioning — the ONE path for both entry points.
 
-Creating a ``Tenant`` row (``src/tenant/models.py``) only builds the
+Creating a ``Tenant`` row (``src/tenant/models/tenant.py``) only builds the
 Postgres schema (``auto_create_schema=True``). Everything a store
 needs to actually be usable happens here, and lives here ONCE so
 ``tenant_create`` (the CLI path) and ``TenantAdmin`` (the "New Store"
@@ -276,10 +276,8 @@ def provision_owner_membership(
         schema_context,
     )
 
-    from tenant.models import (
-        TenantMembershipRole,
-        UserTenantMembership,
-    )
+    from tenant.enum import TenantMembershipRole
+    from tenant.models import UserTenantMembership
 
     User = get_user_model()
     # Owner/staff identities are platform accounts — the lookup must

@@ -28,8 +28,8 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def stores():
+    from tenant.enum import SuspendedReason
     from tenant.lifecycle import suspend_tenant
-    from tenant.models import SuspendedReason
 
     active = store_tenant("backfill_active")
     suspended = store_tenant("backfill_suspended")

@@ -38,7 +38,7 @@ from recommendation.strategies.base import (
     TenantContext,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 # One feature: its kind and the id of the attribute value, tag or brand.
 type Feature = tuple[str, int]

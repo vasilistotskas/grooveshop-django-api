@@ -27,7 +27,8 @@ from product.factories.product import ProductFactory
 from product.models.product import Product, ProductTranslation
 from tag.factories.tag import TagFactory
 from tag.models.tag import Tag
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

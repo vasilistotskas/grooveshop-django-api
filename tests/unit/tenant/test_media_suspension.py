@@ -43,8 +43,8 @@ class TestSuspendAndActivate:
     def test_suspension_leaves_the_originals_in_place_and_flushes(
         self, media_root
     ):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         _uploads(media_root, "keep_files")
         tenant = store_tenant("keep_files")

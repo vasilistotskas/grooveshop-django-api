@@ -39,7 +39,7 @@ from recommendation.presets import (
     reset_slot_to_preset,
     seed_recommendation_slots,
 )
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 
 SURFACE_VARIANT: dict[str, str] = {
     Surface.PDP: "primary",

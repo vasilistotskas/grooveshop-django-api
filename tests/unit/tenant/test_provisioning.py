@@ -17,11 +17,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django_tenants.utils import schema_context
 
-from tenant.models import (
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import TenantDomain, UserTenantMembership
 from tenant.provisioning import (
     ensure_api_domain,
     provision_owner_membership,

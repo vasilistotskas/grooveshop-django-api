@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 from recommendation.enum import StrategyCode, Surface
 from recommendation.models import RecommendationSlot
 from recommendation.presets import seed_recommendation_slots
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 
 pytestmark = pytest.mark.django_db
 

@@ -121,8 +121,8 @@ class TestSuspendedStores:
 
     @staticmethod
     def _suspended_store(schema_name: str):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         store = store_tenant(schema_name)
         with patch("tenant.tasks.flush_tenant_media_task.apply_async"):

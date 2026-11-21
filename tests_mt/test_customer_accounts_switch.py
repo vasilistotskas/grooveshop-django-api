@@ -247,7 +247,8 @@ def test_a_session_from_before_the_switch_off_is_refused(
 
 
 def test_store_staff_sign_in_to_the_admin_without_accounts(mt_tenant, accounts):
-    from tenant.models import TenantMembershipRole, UserTenantMembership
+    from tenant.enum import TenantMembershipRole
+    from tenant.models import UserTenantMembership
     from user.models import UserAccount
 
     accounts(False)
@@ -284,7 +285,8 @@ def test_store_staff_sign_in_to_the_admin_without_accounts(mt_tenant, accounts):
 def test_a_staff_token_reads_the_customers_without_accounts(
     mt_tenant, accounts
 ):
-    from tenant.models import PlatformStaffToken, StaffTokenScope
+    from tenant.enum import StaffTokenScope
+    from tenant.models import PlatformStaffToken
     from user.models import UserAccount
 
     accounts(False)

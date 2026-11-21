@@ -13,7 +13,8 @@ from django.contrib.admin import site as admin_site
 from django.test import RequestFactory
 from django.utils.translation import gettext
 
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.admin import TenantMembershipInline
 from user.factories.account import UserAccountFactory

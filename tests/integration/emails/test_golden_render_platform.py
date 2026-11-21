@@ -23,7 +23,7 @@ from django.utils import translation
 from django.utils.translation import gettext
 
 from tenant.billing import _send_stage_email
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 from tenant.tasks import (
     monitor_system_health,
     scheduled_database_backup,

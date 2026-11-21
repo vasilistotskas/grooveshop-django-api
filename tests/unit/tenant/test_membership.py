@@ -7,15 +7,12 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
+from tenant.enum import TenantMembershipRole
 from tenant.membership import (
     get_current_tenant,
     get_membership,
 )
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.models import Tenant, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 User = get_user_model()

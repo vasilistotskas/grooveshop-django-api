@@ -60,6 +60,46 @@ class LiveCheckoutSession:
     expires_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class OpenPayment:
+    """What an order records as its payment, read before a provider call
+    opens a new one: the state, the client-confirmed payment
+    (``payment_id``) and the hosted session (``recorded_checkout_session``).
+
+    Every write of a newly opened payment, a hosted session
+    (``create_checkout_session``) or a client-confirmed intent
+    (``PayWayService.process_payment``), goes through :meth:`lock_unchanged`,
+    so an order has one payable instrument: a request that finds another
+    opened, paid or canceled since it read the order records nothing (#643).
+    """
+
+    status: str
+    payment_status: str
+    payment_id: str
+    checkout_session: str | None
+
+    @classmethod
+    def of(cls, order: Order, provider: PaymentProvider) -> OpenPayment:
+        return cls(
+            status=order.status,
+            payment_status=order.payment_status,
+            payment_id=order.payment_id or "",
+            checkout_session=provider.recorded_checkout_session(
+                order.metadata or {}
+            ),
+        )
+
+    def lock_unchanged(self, order: Order, provider: PaymentProvider):
+        """The order's row, locked, if nothing of this changed since it
+        was read; ``None`` when another payment was recorded, or the order
+        was paid or canceled, meanwhile. Call inside ``transaction.atomic``.
+        """
+        from order.models.order import Order as OrderModel
+
+        locked = OrderModel.objects.select_for_update().get(pk=order.pk)
+        return locked if OpenPayment.of(locked, provider) == self else None
+
+
 class PaymentProvider(ABC):
     """A payment service provider, and what it can physically do.
 
@@ -338,16 +378,20 @@ class StripePaymentProvider(PaymentProvider):
             return None
         try:
             session = stripe.checkout.Session.retrieve(
-                session_id, api_key=self.api_key
+                session_id, api_key=self.api_key, expand=["payment_intent"]
             )
         except stripe.StripeError as e:
             logger.warning("Checkout Session %s could not be read", session_id)
             raise PaymentStatusUnavailableError(session_id) from e
         if session.status == "complete":
-            raise PaymentInProgressError(
-                f"Checkout Session {session_id} of order {order.id} is "
-                "complete and the order is unpaid"
-            )
+            if self._session_payment_may_land(session):
+                raise PaymentInProgressError(
+                    f"Checkout Session {session_id} of order {order.id} is "
+                    "paid or being paid and the order is unpaid"
+                )
+            # A delayed method (SEPA Debit) that failed leaves the session
+            # ``complete`` for ever: it can no longer be paid.
+            return None
         if session.status != "open":
             return None
         return LiveCheckoutSession(
@@ -355,6 +399,23 @@ class StripePaymentProvider(PaymentProvider):
             checkout_url=session.url,
             expires_at=datetime.fromtimestamp(session.expires_at, tz=UTC),
         )
+
+    #: A PaymentIntent in these states may still take the money, or has.
+    INTENT_MAY_LAND: ClassVar[frozenset[str]] = frozenset(
+        {"processing", "requires_capture", "requires_action", "succeeded"}
+    )
+
+    @classmethod
+    def _session_payment_may_land(cls, session: Any) -> bool:
+        """Whether a ``complete`` session was paid or is being paid:
+        ``payment_status`` "paid" or "no_payment_required", or an
+        "unpaid" one whose PaymentIntent is still in flight. One whose
+        intent failed (``requires_payment_method``, ``canceled``) is gone."""
+        if session.payment_status in {"paid", "no_payment_required"}:
+            return True
+        intent = session.payment_intent
+        status = getattr(intent, "status", None) if intent else None
+        return status is None or status in cls.INTENT_MAY_LAND
 
     def discard_checkout_session(self, session_id: str) -> None:
         """Expire it: "After it expires, a customer can't complete a
@@ -1317,8 +1378,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
         created with our 22:36:55+02:00 expiry reads
         ``2026-11-20T22:36:55.457``)."""
         try:
-            return datetime.fromisoformat(state["ExpirationDate"]).replace(
-                tzinfo=self.TIME_ZONE
+            # ``fold=1``: an ambiguous wall time (the hour repeated when
+            # summer time ends) is the later of its two instants, so a code
+            # that is still payable is never taken for expired early; the
+            # other way, the worst is returning a link about to expire.
+            # As UTC: an aware time in the repeated hour compares unequal
+            # to every other zone's (PEP 495), so it is not passed on.
+            return (
+                datetime.fromisoformat(state["ExpirationDate"])
+                .replace(tzinfo=self.TIME_ZONE, fold=1)
+                .astimezone(UTC)
             )
         except (KeyError, TypeError, ValueError) as e:
             code = str(state.get("OrderCode", ""))

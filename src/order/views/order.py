@@ -93,6 +93,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
 from order.payments.payment import (
+    OpenPayment,
     get_payment_provider,
     provider_supports,
     registered_provider_codes,
@@ -743,19 +744,37 @@ class OrderViewSet(BaseModelViewSet):
         return Response(response_serializer.validated_data)
 
     def _concurrent_session_answer(
-        self, order, provider, session_id: str
+        self, order, provider, session_id: str, observed: OpenPayment
     ) -> Response:
-        """Answer with the session a concurrent request recorded, and end
-        the one this request opened, which nobody was given."""
+        """End the session this request opened, which nobody was given,
+        and answer with the one a concurrent request recorded. When what
+        changed meanwhile is not a session (an intent was opened, the
+        order was paid or canceled), no link is the answer."""
+        order.refresh_from_db()
         try:
             provider.discard_checkout_session(session_id)
+        except Exception:
+            logger.exception(
+                "Checkout session %s of order %s lost a concurrent request "
+                "and could not be ended",
+                session_id,
+                order.id,
+            )
+        current = OpenPayment.of(order, provider)
+        if (
+            current.payment_id != observed.payment_id
+            or current.status != observed.status
+            or current.payment_status != observed.payment_status
+        ):
+            return self._order_changed_during_payment(order)
+        try:
             live = provider.live_checkout_session(order)
         except PaymentInProgressError:
             return self._payment_in_progress()
         except Exception:
             logger.exception(
                 "Checkout session %s of order %s lost a concurrent "
-                "request and could not be ended or the winner read",
+                "request, and the recorded session could not be read",
                 session_id,
                 order.id,
             )
@@ -2003,19 +2022,21 @@ class OrderViewSet(BaseModelViewSet):
         # is the answer, and a paid one whose webhook has not landed is
         # never followed by a second link. The provider is read with no
         # row locked; a link is never minted blind.
+        # An open client-confirmed intent is closed first, whether the
+        # session is reused or minted: the two are never payable together.
+        observed = OpenPayment.of(order, provider)
         try:
-            live = provider.live_checkout_session(order)
-            if live is None and not self._close_open_intent(order, provider):
+            if not self._close_open_intent(order, provider):
                 raise PaymentInProgressError(
                     f"the open payment of order {order.id} may still land"
                 )
+            live = provider.live_checkout_session(order)
         except PaymentInProgressError:
             return self._payment_in_progress()
         except PaymentStatusUnavailableError:
             return self._payment_provider_unavailable()
         if live is not None:
             return self._checkout_session_answer(order, provider, live)
-        observed = provider.recorded_checkout_session(order.metadata or {})
 
         # Provider-specific extras come from the provider, not from a
         # branch here that every future PSP would have to find.
@@ -2058,19 +2079,22 @@ class OrderViewSet(BaseModelViewSet):
         # cancel too thinly to build on).
         session_id = str(checkout_response["session_id"])
         with transaction.atomic():
-            locked = Order.objects.select_for_update().get(pk=order.pk)
-            metadata = locked.metadata or {}
-            won = provider.recorded_checkout_session(metadata) == observed
-            if won:
+            locked = observed.lock_unchanged(order, provider)
+            if locked is not None:
+                metadata = locked.metadata or {}
                 provider.record_checkout_session(metadata, session_id)
+                locked.metadata = metadata
                 # The expiry the provider applied: the stock is held
                 # until exactly then, and not past it.
                 locked.payment_hold_expires_at = checkout_response["expires_at"]
-            locked.metadata = metadata
-            locked.save(update_fields=["metadata", "payment_hold_expires_at"])
-            order = locked
-        if not won:
-            return self._concurrent_session_answer(order, provider, session_id)
+                locked.save(
+                    update_fields=["metadata", "payment_hold_expires_at"]
+                )
+                order = locked
+        if locked is None:
+            return self._concurrent_session_answer(
+                order, provider, session_id, observed
+            )
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=checkout_response)

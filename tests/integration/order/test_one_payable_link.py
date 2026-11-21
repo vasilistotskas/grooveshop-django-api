@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 import requests
@@ -36,7 +37,22 @@ from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
-ATHENS_WINTER = timedelta(hours=2)
+ATHENS = ZoneInfo("Europe/Athens")
+# One instant in Greek winter time (EET, UTC+2) and one in summer time
+# (EEST, UTC+3): a test that reads Viva's offset-less ExpirationDate runs
+# at both, so its outcome does not depend on the day the suite runs.
+SEASONS = {
+    "EET": datetime(2027, 1, 15, 10, 0, tzinfo=UTC),
+    "EEST": datetime(2027, 7, 15, 10, 0, tzinfo=UTC),
+}
+
+
+@pytest.fixture(params=sorted(SEASONS))
+def frozen_now(request):
+    """``timezone.now`` frozen at a winter or a summer instant."""
+    instant = SEASONS[request.param]
+    with patch("django.utils.timezone.now", return_value=instant):
+        yield instant
 
 
 @pytest.fixture(autouse=True)
@@ -119,10 +135,10 @@ def _with_codes(order, *codes, hold_expires=None):
 
 
 def _athens(instant: datetime) -> str:
-    """``ExpirationDate`` as Viva writes it: Greek local time, no offset
-    (the tests run in November, UTC+2)."""
+    """``ExpirationDate`` as Viva writes it: Greek local time of the day
+    it is written for, with no offset."""
     return (
-        (instant.astimezone(UTC) + ATHENS_WINTER)
+        instant.astimezone(ATHENS)
         .replace(tzinfo=None)
         .isoformat(timespec="milliseconds")
     )
@@ -176,9 +192,11 @@ class TestViva:
         order.refresh_from_db()
         assert order.metadata["viva_order_codes"] == ["1111"]
 
-    def test_a_pending_link_is_returned_again_with_its_own_expiry(self):
+    def test_a_pending_link_is_returned_again_with_its_own_expiry(
+        self, frozen_now
+    ):
         order, client = _order("viva_wallet")
-        expires = timezone.now() + timedelta(minutes=20)
+        expires = frozen_now + timedelta(minutes=20)
         _with_codes(order, "1111", hold_expires=expires)
 
         with (
@@ -308,12 +326,14 @@ class TestViva:
         assert response.status_code == 503, response.data
         post.assert_not_called()
 
-    def test_a_concurrent_request_gets_the_link_that_was_recorded(self):
+    def test_a_concurrent_request_gets_the_link_that_was_recorded(
+        self, frozen_now
+    ):
         """Two requests read no live link and both mint; the second to
         reach the row lock answers with the first one's link and records
         nothing of its own, so the order still has one payable link."""
         order, client = _order("viva_wallet")
-        expires = timezone.now() + timedelta(minutes=30)
+        expires = frozen_now + timedelta(minutes=30)
 
         def mint_while_another_request_records(*_args, **_kwargs):
             # The concurrent request commits its code between this
@@ -341,6 +361,16 @@ class TestViva:
 
 
 class TestVivaExpirationDate:
+    def test_the_repeated_autumn_hour_is_its_later_instant(self):
+        """03:30 on the last Sunday of October happens twice in Athens;
+        the later instant (+02:00) never takes a payable code for expired
+        early."""
+        provider = VivaWalletPaymentProvider()
+
+        parsed = provider._expiration({"ExpirationDate": "2026-10-25T03:30:00"})
+
+        assert parsed == datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
+
     @pytest.mark.parametrize(
         ("written", "utc"),
         [
@@ -358,12 +388,23 @@ class TestVivaExpirationDate:
         assert parsed == datetime.fromisoformat(utc)
 
 
-def _stripe_session(session_id: str, status: str, expires: datetime):
+def _stripe_session(
+    session_id: str,
+    status: str,
+    expires: datetime,
+    *,
+    payment_status: str = "unpaid",
+    intent_status: str | None = None,
+):
     return SimpleNamespace(
         id=session_id,
         status=status,
         url=f"https://checkout.stripe.com/c/pay/{session_id}",
         expires_at=int(expires.timestamp()),
+        payment_status=payment_status,
+        payment_intent=(
+            SimpleNamespace(status=intent_status) if intent_status else None
+        ),
     )
 
 
@@ -402,7 +443,9 @@ class TestStripe:
             patch.object(
                 stripe.checkout.Session,
                 "retrieve",
-                return_value=_stripe_session("cs_1", "complete", expires),
+                return_value=_stripe_session(
+                    "cs_1", "complete", expires, payment_status="paid"
+                ),
             ),
             patch.object(stripe.checkout.Session, "create") as create,
         ):
@@ -518,7 +561,9 @@ class TestStripe:
             patch.object(
                 stripe.checkout.Session,
                 "retrieve",
-                return_value=_stripe_session("cs_1", "complete", expires),
+                return_value=_stripe_session(
+                    "cs_1", "complete", expires, payment_status="paid"
+                ),
             ),
             patch.object(stripe.PaymentIntent, "create") as create,
         ):
@@ -530,3 +575,179 @@ class TestStripe:
 
         assert response.status_code == 400, response.data
         create.assert_not_called()
+
+
+class TestStripeAfterThisReview:
+    """The stand-in review of #768: a delayed payment that failed, a late
+    ``checkout.session.expired`` event, and an intent and a session opened
+    by concurrent requests from different endpoints."""
+
+    @pytest.mark.parametrize(
+        "intent_status", ["requires_payment_method", "canceled"]
+    )
+    def test_a_session_whose_delayed_payment_failed_is_replaced(
+        self, intent_status
+    ):
+        order, client = _order("stripe")
+        expires = timezone.now() + timedelta(minutes=31)
+        _with_session(order, "cs_1", expires)
+
+        with (
+            patch.object(
+                stripe.checkout.Session,
+                "retrieve",
+                return_value=_stripe_session(
+                    "cs_1", "complete", expires, intent_status=intent_status
+                ),
+            ),
+            patch.object(
+                stripe.checkout.Session,
+                "create",
+                return_value=_stripe_session("cs_2", "open", expires),
+            ) as create,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 200, response.data
+        assert response.data["session_id"] == "cs_2"
+        create.assert_called_once()
+
+    def test_a_session_whose_delayed_payment_is_processing_is_409(self):
+        order, client = _order("stripe")
+        expires = timezone.now() + timedelta(minutes=31)
+        _with_session(order, "cs_1", expires)
+
+        with (
+            patch.object(
+                stripe.checkout.Session,
+                "retrieve",
+                return_value=_stripe_session(
+                    "cs_1", "complete", expires, intent_status="processing"
+                ),
+            ),
+            patch.object(stripe.checkout.Session, "create") as create,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 409, response.data
+        assert response.data["code"] == "payment_in_progress"
+        create.assert_not_called()
+
+    def test_a_late_expired_event_keeps_the_recorded_session(self):
+        from unittest.mock import Mock
+
+        from djstripe.models import Event
+
+        from order.signals.handlers import handle_stripe_checkout_expired
+
+        order, client = _order("stripe")
+        expires = timezone.now() + timedelta(minutes=31)
+        _with_session(order, "cs_live", expires)
+        event = Mock(spec=Event)
+        event.id = "evt_expired_old"
+        event.data = {
+            "object": {"id": "cs_old", "metadata": {"order_id": str(order.id)}}
+        }
+
+        handle_stripe_checkout_expired(sender=None, event=event)
+
+        order.refresh_from_db()
+        assert order.metadata["stripe_checkout_session_id"] == "cs_live"
+        with (
+            patch.object(
+                stripe.checkout.Session,
+                "retrieve",
+                return_value=_stripe_session("cs_live", "open", expires),
+            ) as retrieve,
+            patch.object(stripe.checkout.Session, "create") as create,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 200, response.data
+        assert response.data["session_id"] == "cs_live"
+        assert retrieve.call_args.args[0] == "cs_live"
+        create.assert_not_called()
+
+    def test_a_session_loses_to_an_intent_opened_meanwhile(self):
+        """A retry in one tab opens an intent while "pay now" in another
+        mints a session: the session records nothing and is expired."""
+        order, client = _order("stripe")
+        expires = timezone.now() + timedelta(minutes=31)
+
+        def mint_while_an_intent_is_recorded(**_kwargs):
+            Order.objects.filter(pk=order.pk).update(payment_id="pi_2")
+            return _stripe_session("cs_2", "open", expires)
+
+        with (
+            patch.object(
+                stripe.checkout.Session,
+                "create",
+                side_effect=mint_while_an_intent_is_recorded,
+            ),
+            patch.object(stripe.checkout.Session, "expire") as expire,
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 409, response.data
+        assert response.data["code"] == "order_changed_during_payment"
+        expire.assert_called_once_with("cs_2", api_key="sk_test_dummy")
+        order.refresh_from_db()
+        assert "stripe_checkout_session_id" not in (order.metadata or {})
+        assert order.payment_id == "pi_2"
+
+    def test_an_intent_loses_to_a_session_opened_meanwhile(self):
+        order, client = _order("stripe", payment_status=PaymentStatus.FAILED)
+
+        def mint_while_a_session_is_recorded(*_args, **_kwargs):
+            Order.objects.filter(pk=order.pk).update(
+                metadata={"stripe_checkout_session_id": "cs_1"}
+            )
+            return (
+                True,
+                {
+                    "payment_id": "pi_2",
+                    "status": PaymentStatus.PENDING,
+                    "client_secret": "secret",
+                    "amount": "10.00",
+                    "currency": "EUR",
+                    "provider": "stripe",
+                },
+            )
+
+        with patch(
+            "order.payments.payment.StripePaymentProvider.process_payment",
+            side_effect=mint_while_a_session_is_recorded,
+        ):
+            response = client.post(
+                reverse("order-retry-payment", kwargs={"pk": order.pk}),
+                {},
+                format="json",
+            )
+
+        assert response.status_code == 409, response.data
+        assert response.data["code"] == "order_changed_during_payment"
+        order.refresh_from_db()
+        assert order.payment_id == ""
+        assert "client_secret" not in response.data
+
+    def test_reusing_a_session_closes_an_open_intent(self):
+        order, client = _order("stripe", payment_id="pi_1")
+        expires = timezone.now() + timedelta(minutes=31)
+        _with_session(order, "cs_1", expires)
+
+        with (
+            patch(
+                "order.payments.payment.StripePaymentProvider.close_payment",
+                return_value=True,
+            ) as close,
+            patch.object(
+                stripe.checkout.Session,
+                "retrieve",
+                return_value=_stripe_session("cs_1", "open", expires),
+            ),
+        ):
+            response = _ask(order, client)
+
+        assert response.status_code == 200, response.data
+        assert response.data["session_id"] == "cs_1"
+        close.assert_called_once()

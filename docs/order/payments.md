@@ -56,20 +56,38 @@ Viva is read with Retrieve order (`GET /api/orders/{orderCode}`, Basic auth)
 for every code in `metadata.viva_order_codes`: `StateId` 0 Pending is
 returned, 3 Paid is in progress, 1 Expired and 2 Canceled are gone.
 `ExpirationDate` carries no offset and is Greek local time
-(`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens). Viva forgets a code
+(`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated
+when summer time ends is read as its later instant (`fold=1`), so a payable
+code is never taken for expired early. Viva forgets a code
 some time after it ends and answers 404 (codes from two months before
 answered 404 on demo, 2026-11-21); a 404 is "gone" only once the order's
 hold and the grace window have ended (`payment_hold.hold_ended`), else it is
-"unreadable". Stripe is read from the Checkout Session's `status` (`open`,
-`complete`, `expired`). A hosted session and a PaymentIntent are never
+"unreadable". Stripe is read from the Checkout Session's `status`: `open` is
+returned, `expired` is gone, and `complete` is in progress only while its
+payment may land (`payment_status` paid, or its PaymentIntent processing,
+requiring capture or action, or succeeded); a delayed method (SEPA Debit)
+whose intent failed leaves the session `complete` for ever, and it is gone.
+`checkout.session.expired` never writes over the recorded session: a late
+event for an older session, or for one that lost a concurrent request, would
+make the next request mint a second payable one. A hosted session and a PaymentIntent are never
 payable together: an open intent is closed (`close_payment`) before a session
 opens, and an open session is expired before `PayWayService.process_payment`
 mints an intent; one that may still be paid refuses the other.
 
-Two concurrent requests that both find no live link both mint; under the
-order's row lock the second compares the reference it read
-(`recorded_checkout_session`) with the one stored, records nothing of its
-own, leaves the hold alone and answers with the first one's link. Its own
+One payable instrument per order is enforced where every newly opened
+payment is written: `OpenPayment.lock_unchanged` (`src/order/payments/
+payment.py`), under the order's row lock, for a hosted session
+(`create_checkout_session`) and for a client-confirmed intent
+(`PayWayService._record_opened_payment`). Each request reads `OpenPayment`
+(status, payment status, `payment_id`, the recorded session) before its
+provider call; when anything of it changed meanwhile, it records nothing.
+Two concurrent link requests: the second records nothing of its own, leaves
+the hold alone and answers with the first one's link. A link request that
+loses to an intent opened meanwhile (another tab's retry), or an intent that
+loses to a session, answers 409 `order_changed_during_payment`; a lost
+Stripe session is expired, a lost intent's client secret is never
+returned. Reusing a live session closes an open intent first, as minting
+does. Its own
 link reached nobody; a Stripe one is expired (`discard_checkout_session`),
 a Viva one is left, as Viva's cancel is not documented well enough to build
 on.

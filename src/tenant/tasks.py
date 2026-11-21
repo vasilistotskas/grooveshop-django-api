@@ -21,7 +21,7 @@ from core.retry import (
 from core.tasks import backup_database_task, cleanup_old_backups
 from emails.send import send_email
 from tenant.celery import TenantTask, describe_error, run_for_all_tenants
-from tenant.emails import BackupFailed, HealthAlert
+from tenant.emails import BackupFailed, HealthAlert, StaffPasswordReset
 
 if TYPE_CHECKING:
     from core.cache.edge import MediaPurge
@@ -538,7 +538,6 @@ def purge_expired_tenant_archives(self) -> dict:
     Runs in the PUBLIC schema: ``TenantArchive`` lives there precisely
     because the schemas it describes no longer exist.
     """
-    from django.utils import timezone
 
     from tenant.models import TenantArchive
     from tenant.offboarding import _remove_tree
@@ -581,7 +580,6 @@ def refresh_stats_snapshot() -> dict:
     No retries: the schedule runs it again within half an hour.
     """
     from django.db.models import Count, Max, Q, Sum
-    from django.utils import timezone
 
     from order.enum.status import PaymentStatus
     from order.models.order import Order
@@ -655,9 +653,7 @@ def send_staff_password_reset_email(
     from django.utils.http import urlsafe_base64_encode
 
     from admin.password_reset import StaffPasswordResetForm
-    from emails.send import send_email
     from tenant.credentials import tenant_site_name
-    from tenant.emails import StaffPasswordReset
     from tenant.membership import bound_tenant
 
     tenant = bound_tenant()
@@ -724,7 +720,6 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     retires that connection: an unlock that releases nothing is an ERROR.
     """
     from django.db import connection
-    from django.utils import timezone
 
     from tenant.models import DeferredDispatch
 
@@ -769,8 +764,6 @@ def redispatch_deferred_tasks() -> dict[str, int]:
 
 def _redispatch_due() -> dict[str, int]:
     from datetime import timedelta
-
-    from django.utils import timezone
 
     from tenant.models import DeferredDispatch
 

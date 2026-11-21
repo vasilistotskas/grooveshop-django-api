@@ -517,6 +517,8 @@ class TestBackupDatabaseTask:
         assert result["file_size"] == 0
         assert result["backup_file"] is None
 
+
+class TestCleanupOldBackupsTask:
     @patch("core.tasks.Path")
     @patch("core.tasks.logger")
     @override_settings(BASE_DIR="/test/base")

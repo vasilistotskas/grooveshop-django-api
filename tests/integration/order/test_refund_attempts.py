@@ -362,3 +362,92 @@ class TestWhatTheProviderAnswers:
 
         assert success is False
         assert response["outcome_unknown"] is True
+
+
+def _oauth_only():
+    """A store whose Viva settings hold the OAuth pair alone: it was paid
+    through it while the offer needed only that pair."""
+    from tests.utils.viva import CREDENTIALS
+
+    return mock.patch(
+        "tenant.credentials.viva_wallet_credentials",
+        return_value={**CREDENTIALS, "merchant_id": "", "api_key": ""},
+    )
+
+
+class TestOnlyARequestThatMayHaveReachedVivaIsUnknown:
+    """A refund that was never sent is a refusal: it frees what its
+    attempt held at once and tells staff why (the stand-in review of
+    3cc73abb7). Only a request that may have reached Viva is unknown."""
+
+    def test_a_store_without_the_basic_pair_is_refused_before_sending(self):
+        order = _viva_order()
+        api = FakeVivaApi(captured=100.0)
+
+        with api, _oauth_only():
+            result = OrderService.refund_order(order, amount=_eur("40.00"))
+
+        assert not any(r.method == "DELETE" for r in api.sent)
+        assert result.complete is False
+        assert not result.declined.get("outcome_unknown")
+        assert order.refund_attempts.get().status == (
+            RefundAttemptStatus.DECLINED
+        )
+        assert PaymentLedger.refundable(order) == Decimal("100.00")
+        [note] = [
+            row.new_value["note"]
+            for row in OrderHistory.objects.filter(
+                order=order, change_type="NOTE"
+            )
+            if row.new_value["note"].startswith("Refund via ")
+        ]
+        assert "was not processed" in note
+        assert "Merchant ID and API Key are missing" in note
+
+    def test_a_connection_never_made_is_a_refusal(self):
+        import requests
+
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        with (
+            FakeVivaApi(captured=100.0),
+            mock.patch("requests.delete", side_effect=requests.ConnectTimeout),
+        ):
+            success, response = VivaWalletPaymentProvider().refund_payment(
+                VIVA_PAYMENT, _eur("40.00"), idempotency_key="unused"
+            )
+
+        assert success is False
+        assert not response.get("outcome_unknown")
+
+    def test_an_answer_that_never_came_stays_unknown(self):
+        import requests
+
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        with (
+            FakeVivaApi(captured=100.0),
+            mock.patch("requests.delete", side_effect=requests.ReadTimeout),
+        ):
+            success, response = VivaWalletPaymentProvider().refund_payment(
+                VIVA_PAYMENT, _eur("40.00"), idempotency_key="unused"
+            )
+
+        assert success is False
+        assert response["outcome_unknown"] is True
+
+    def test_the_refund_lookup_without_the_basic_pair_sends_nothing(self):
+        from order.payments.payment import VivaWalletPaymentProvider
+
+        order = _viva_order()
+        order.metadata = {"viva_order_codes": ["1111"]}
+        order.save(update_fields=["metadata"])
+        api = FakeVivaApi(captured=100.0)
+
+        with api, _oauth_only():
+            found = VivaWalletPaymentProvider().find_refunds(
+                order, VIVA_PAYMENT, _eur("40.00"), idempotency_key=""
+            )
+
+        assert found is None
+        assert not any("/api/transactions/" in r.url for r in api.sent)

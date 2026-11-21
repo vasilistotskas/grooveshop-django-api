@@ -904,23 +904,26 @@ class StripePaymentProvider(PaymentProvider):
         hours and, asked again with the same parameters, returns it instead
         of refunding twice. That is what makes a retry after a timeout safe.
         Reusing a key with different parameters is an error on Stripe's side.
+
+        The request is built before the ``try``: only an error from the call
+        itself, or after it, may follow a refund Stripe made.
         """
+        from django.db import connection as _connection
+
+        tenant_schema = getattr(_connection, "schema_name", "public")
+        minor_units = round(amount.amount * amount.currency.sub_unit)
+        logger.info(
+            "Processing Stripe refund",
+            extra={
+                "payment_id": payment_id,
+                "amount": str(amount.amount),
+                "idempotency_key": idempotency_key,
+            },
+        )
         try:
-            logger.info(
-                "Processing Stripe refund",
-                extra={
-                    "payment_id": payment_id,
-                    "amount": str(amount.amount),
-                    "idempotency_key": idempotency_key,
-                },
-            )
-
-            from django.db import connection as _connection
-
-            tenant_schema = getattr(_connection, "schema_name", "public")
             stripe_refund = stripe.Refund.create(
                 payment_intent=payment_id,
-                amount=round(amount.amount * amount.currency.sub_unit),
+                amount=minor_units,
                 # Echo the tenant back on the refund for finance
                 # reconciliation, and the attempt, so a refund whose answer
                 # was lost is found by it (``find_refunds``).
@@ -1218,6 +1221,13 @@ VIVA_DISPUTE_OPEN_STATUS_IDS: frozenset[str] = frozenset({"M", "MA", "MI"})
 VIVA_DISPUTE_LOST_STATUS_ID = "ML"
 #: ``MW``: "Dispute Won".
 VIVA_DISPUTE_WON_STATUS_ID = "MW"
+# Why a Viva refund was refused before anything was sent (the order's
+# history shows it to staff).
+VIVA_REFUND_NEEDS_BASIC_PAIR = (
+    "Not sent: this store's Viva Wallet Merchant ID and API Key are "
+    "missing. Add them to the store's Viva Wallet settings, then refund "
+    "again."
+)
 
 
 def order_viva_codes_in_order(order) -> list[str]:
@@ -1514,13 +1524,21 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
         return access_token
 
+    @property
+    def has_basic_credentials(self) -> bool:
+        """Whether the store holds the Merchant ID and API Key, which
+        Retrieve order and the transaction calls (refunds, their lookup)
+        need. A money call checks it before sending, so a store without
+        them is refused, never left with an answer that reads as lost."""
+        return bool(self.merchant_id and self.api_key)
+
     def _get_basic_auth_header(self) -> str:
         """Basic auth with the Merchant ID and API Key: Retrieve order and
         the transaction calls. A store without them cannot make those calls,
         and is told so, rather than sending empty credentials."""
         from base64 import b64encode
 
-        if not (self.merchant_id and self.api_key):
+        if not self.has_basic_credentials:
             raise ImproperlyConfigured(
                 "Viva Wallet's Basic credentials are not set for this "
                 "tenant: viva_wallet_merchant_id and viva_wallet_api_key."
@@ -1697,25 +1715,30 @@ class VivaWalletPaymentProvider(PaymentProvider):
         above what is left on the payment, which is what stops a repeated
         call from refunding twice, and the ledger's unique constraint on
         the refund transaction id stops it being recorded twice.
+
+        Only a request that may have reached Viva has an unknown outcome.
+        One that was never sent (the store has no Merchant ID and API Key,
+        or no connection was made) is a refusal: nothing can have moved.
         """
         import requests
 
-        try:
-            logger.info(
-                "Processing Viva Wallet refund",
-                extra={
-                    "payment_id": payment_id,
-                    "amount": str(amount.amount),
-                },
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva Wallet refund not sent: no Merchant ID and API Key",
+                extra={"payment_id": payment_id},
             )
+            return False, {"error": VIVA_REFUND_NEEDS_BASIC_PAIR}
+        authorization = self._get_basic_auth_header()
 
-            refund_amount = amount.amount
-
+        refund_amount = amount.amount
+        logger.info(
+            "Processing Viva Wallet refund",
+            extra={"payment_id": payment_id, "amount": str(refund_amount)},
+        )
+        try:
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
-                headers={
-                    "Authorization": self._get_basic_auth_header(),
-                },
+                headers={"Authorization": authorization},
                 params={"amount": round(refund_amount * 100)},
                 timeout=30,
             )
@@ -1762,6 +1785,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
             return True, refund_data
 
+        except requests.ConnectTimeout:
+            # No connection was made, so the request never left.
+            logger.warning(
+                "Viva Wallet refund not sent: the connection timed out",
+                extra={"payment_id": payment_id},
+            )
+            return False, {
+                "error": "Not sent: Viva Wallet could not be reached.",
+                "viva_error": True,
+            }
         except requests.HTTPError as e:
             error_body = ""
             if e.response is not None:
@@ -1817,12 +1850,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
         """
         import requests
 
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva Wallet refund lookup not sent: no Merchant ID and "
+                "API Key",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        authorization = self._get_basic_auth_header()
         found: dict[str, ProviderRefund] = {}
         try:
             for order_code in sorted(order_viva_codes(order)):
                 response = requests.get(
                     f"{self.transactions_url}/api/transactions/",
-                    headers={"Authorization": self._get_basic_auth_header()},
+                    headers={"Authorization": authorization},
                     params={"ordercode": order_code},
                     timeout=30,
                 )

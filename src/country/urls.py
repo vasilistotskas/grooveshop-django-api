@@ -10,6 +10,11 @@ urlpatterns = [
         name="country-list",
     ),
     path(
+        "country/all",
+        CountryViewSet.as_view({"get": "all_countries"}),
+        name="country-all",
+    ),
+    path(
         "country/<str:pk>",
         CountryViewSet.as_view(
             {

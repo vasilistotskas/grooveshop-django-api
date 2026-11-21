@@ -225,6 +225,58 @@ class TestEvents:
         assert str(row.impression_id) == payload["impressionId"]
         assert row.position == 1
 
+    def test_an_impression_is_recorded_under_the_id_its_response_names(
+        self, client
+    ):
+        """The beacon is the first request that is one viewer's and passes
+        no cache, so the showing's id is minted there."""
+        payload = self._payload(_product(), kind=EventKind.IMPRESSION)
+        del payload["impressionId"]
+
+        response = client.post(self.url, payload, format="json")
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        row = RecommendationEvent.objects.get()
+        assert row.impression_id == response.data["impression_id"]
+
+    def test_two_showings_get_two_ids_each_with_its_own_cart(self, client):
+        product = _product()
+        carts = [uuid.uuid4(), uuid.uuid4()]
+        named = []
+        for cart in carts:
+            payload = self._payload(product, kind=EventKind.IMPRESSION)
+            del payload["impressionId"]
+            named.append(
+                client.post(
+                    self.url, payload, format="json", HTTP_X_CART_ID=str(cart)
+                ).data["impression_id"]
+            )
+
+        assert named[0] != named[1]
+        assert {
+            (row.impression_id, row.cart_uuid)
+            for row in RecommendationEvent.objects.all()
+        } == set(zip(named, carts, strict=True))
+
+    def test_an_impression_that_names_its_id_is_recorded_under_it(self, client):
+        payload = self._payload(_product(), kind=EventKind.IMPRESSION)
+
+        response = client.post(self.url, payload, format="json")
+
+        assert str(response.data["impression_id"]) == payload["impressionId"]
+        row = RecommendationEvent.objects.get()
+        assert str(row.impression_id) == payload["impressionId"]
+
+    def test_a_click_names_the_showing_it_came_from(self, client):
+        payload = self._payload(_product(), kind=EventKind.CLICK)
+        del payload["impressionId"]
+
+        response = client.post(self.url, payload, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["code"] == "impression_id_required"
+        assert not RecommendationEvent.objects.exists()
+
     def test_a_broker_failure_drops_the_event_and_still_accepts(
         self, client, caplog
     ):

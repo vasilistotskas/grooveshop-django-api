@@ -96,10 +96,33 @@ def test_validate_payload_blocks_when_locker_id_missing():
     assert "acs_station_external_id" in errors
 
 
-def test_validate_payload_passes_with_locker_id():
+def test_validate_payload_passes_with_a_deliverable_station():
+    AcsStationFactory(external_id="LOC-001", branch_code="", country_code="GR")
     adapter = get_provider("acs")
     errors = adapter.validate_order_payload(
         kind=ShippingKind.PICKUP_POINT,
-        payload={"acs_station_external_id": "LOC-001"},
+        payload={"acs_station_external_id": "LOC-001", "country_id": "GR"},
     )
     assert errors == {}
+
+
+@pytest.mark.parametrize(
+    ("country_code", "is_active"),
+    [("CY", True), ("GR", False)],
+    ids=["another-country", "withdrawn"],
+)
+def test_validate_payload_refuses_a_station_it_cannot_deliver_to(
+    country_code, is_active
+):
+    AcsStationFactory(
+        external_id="LOC-001",
+        branch_code="",
+        country_code=country_code,
+        is_active=is_active,
+    )
+    adapter = get_provider("acs")
+    errors = adapter.validate_order_payload(
+        kind=ShippingKind.PICKUP_POINT,
+        payload={"acs_station_external_id": "LOC-001", "country_id": "GR"},
+    )
+    assert set(errors) == {"acs_station_external_id"}

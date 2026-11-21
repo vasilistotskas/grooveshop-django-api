@@ -33,7 +33,7 @@ import pytest
 
 from giftcard.services import GiftCardService
 from loyalty.services import LoyaltyService
-from promotion.services import PromotionEngine
+from promotion.engine.evaluation import PromotionEngine
 
 pytestmark = pytest.mark.assert_english
 

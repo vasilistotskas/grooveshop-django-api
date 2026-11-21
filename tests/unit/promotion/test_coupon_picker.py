@@ -20,6 +20,9 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from product.factories import ProductFactory
+from promotion.coupon_picker import CouponPickerService
+from promotion.coupons import CouponError, CouponService
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import (
     BenefitType,
     CouponRejectionReason,
@@ -32,12 +35,6 @@ from promotion.factories.promotion import (
     PromotionTranslationFactory,
 )
 from promotion.models import PromotionRedemption
-from promotion.services import (
-    CouponError,
-    CouponPickerService,
-    CouponService,
-    PromotionEngine,
-)
 from user.factories.account import UserAccountFactory
 
 
@@ -237,7 +234,7 @@ class TestVerdictMatchesApply:
     def test_a_non_stackable_code_beaten_by_automatics_is_refused(
         self, make_cart, enable_promotions
     ):
-        """``_resolve_stacking`` rejects the losing code, and
+        """``resolve_stacking`` rejects the losing code, and
         ``CouponService.apply`` raises on ANY rejection the evaluation
         produces — COMBINATION_DISALLOWED included. Found on a live
         cart: the picker offered an enabled button for a code the very

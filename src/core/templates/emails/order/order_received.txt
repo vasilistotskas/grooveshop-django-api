@@ -7,13 +7,14 @@
 {% if order.is_paid %}{% trans "Payment Status" %}: {% trans "Paid" %}
 {% endif %}
 {% if payment_instructions_text %}{% trans "HOW TO COMPLETE YOUR PAYMENT" %}
-{# already tag-stripped + entity-unescaped plain text; |safe stops the .txt template re-escaping & < > #}
-{{ payment_instructions_text|safe }}
+
+{{ payment_instructions_text }}
 {% if payment_reference_needed %}{% trans "Please include your order number" %} #{{ order.id }} {% trans "in the payment reference." %}
 {% endif %}
 {% endif %}{% trans "SHIPPING ADDRESS" %}
 {{ order.first_name }} {{ order.last_name }}
-{{ order.street }} {{ order.street_number }}
+{{ order.street }} {{ order.street_number }}{% if order.address_line_2 %}
+{{ order.address_line_2 }}{% endif %}
 {{ order.city }}, {{ order.zipcode }}
 {{ order.country }}
 

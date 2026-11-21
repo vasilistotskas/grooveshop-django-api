@@ -42,9 +42,6 @@ _MAX_REENGAGEMENT_FAILURES = 50
 )
 def download_social_avatar_task(self, user_id: int, picture_url: str):
     """Download a social provider avatar and save it to the user's image field."""
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
 
     try:
         user = User.objects.get(pk=user_id)
@@ -282,9 +279,7 @@ def export_user_data_task(self, export_id: int) -> dict:
     import os
 
     from django.core.files.storage import FileSystemStorage
-    from django.utils import timezone
 
-    from emails.send import send_email, was_sent
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -425,11 +420,8 @@ def delete_user_account_task(self, user_id: int) -> dict:
     the actual scrub, which can take seconds on accounts with lots of
     orders.
     """
-    from django.contrib.auth import get_user_model
 
     from user.services.gdpr import anonymise_and_delete_user
-
-    User = get_user_model()
 
     try:
         user = User.objects.get(id=user_id)
@@ -457,8 +449,6 @@ def cleanup_expired_data_exports(self) -> dict:
     periodic beat task.
     """
     import os
-
-    from django.utils import timezone
 
     from user.models.data_export import UserDataExport
     from user.services.gdpr import get_export_location
@@ -531,9 +521,6 @@ def purge_unconfirmed_guest_subscriptions(self) -> dict:
     per tenant). Account rows are never touched: they are the account's
     own preferences, and erasure of those goes through the account.
     """
-    from datetime import timedelta
-
-    from django.utils import timezone
 
     from user.models.subscription import UserSubscription
 
@@ -583,7 +570,6 @@ def send_allauth_email_task(
 
     An account deleted between the request and this task gets no mail.
     """
-    from emails.send import send_email, was_sent
     from user.emails import AllauthMail
     from user.models.account import UserAccount
 

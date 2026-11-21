@@ -119,7 +119,9 @@ from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
-from promotion.services import CouponService, PromotionEngine
+from promotion.coupons import CouponService
+from promotion.engine.redemptions import record_redemptions
+from shipping.enum import ShippingKind
 from shipping.exceptions import (
     CarrierBusyError,
     CarrierError,
@@ -1406,6 +1408,7 @@ class OrderService:
                 "email": shipping_address.get("email"),
                 "street": shipping_address.get("street"),
                 "street_number": shipping_address.get("street_number"),
+                "address_line_2": shipping_address.get("address_line_2", ""),
                 "city": shipping_address.get("city"),
                 "zipcode": shipping_address.get("zipcode"),
                 "country_id": shipping_address.get("country_id"),
@@ -1642,7 +1645,7 @@ class OrderService:
             # gift-card plan locked during payment verification.
             from giftcard.services import GiftCardService
 
-            order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.discount_amount = record_redemptions(order, promo_result)
             order.loyalty_discount = loyalty_discount
             cls._snapshot_line_discounts(
                 order_items, promo_result, loyalty_discount
@@ -2078,6 +2081,7 @@ class OrderService:
                 "email": shipping_address.get("email"),
                 "street": shipping_address.get("street"),
                 "street_number": shipping_address.get("street_number"),
+                "address_line_2": shipping_address.get("address_line_2", ""),
                 "city": shipping_address.get("city"),
                 "zipcode": shipping_address.get("zipcode"),
                 "country_id": shipping_address.get("country_id"),
@@ -2321,7 +2325,7 @@ class OrderService:
 
             # Step 6.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5.
-            order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.discount_amount = record_redemptions(order, promo_result)
             order.loyalty_discount = loyalty_discount
             cls._snapshot_line_discounts(
                 order_items, promo_result, loyalty_discount
@@ -2594,7 +2598,7 @@ class OrderService:
         Required fields:
         - first_name, last_name
         - email (valid format)
-        - street, street_number, city, zipcode
+        - street, city, zipcode, and street_number for a home delivery
         - country_id
         - phone
 
@@ -2639,6 +2643,12 @@ class OrderService:
             "country_id",
             "phone",
         ]
+
+        # A pickup point's catalogue address may hold its number in the
+        # street line (``address_of_pickup_point``): only a home delivery
+        # needs one of its own.
+        if address.get("shipping_kind") == ShippingKind.PICKUP_POINT:
+            required_fields.remove("street_number")
 
         # Check for missing required fields
         for field in required_fields:

@@ -68,9 +68,11 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 
 - the abstract models (`src/core/models.py`) and the custom fields
   (`src/core/fields/`);
-- `BaseModelViewSet` (`src/core/api/views.py`), permissions
-  (`src/core/api/permissions.py`), Knox token authentication
-  (`src/core/api/tokens.py`), throttles (`src/core/api/throttling.py`) and
+- `BaseModelViewSet` (`src/core/api/views.py`), the health and settings
+  endpoints (`src/core/api/health_api.py`, `src/core/api/settings_api.py`),
+  permissions (`src/core/api/permissions.py`), Knox token authentication
+  (`src/core/api/tokens.py`), the throttle bases and the shared throttles
+  (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
   the OpenAPI helpers (`src/core/utils/serializers.py`,
   `src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
@@ -136,7 +138,7 @@ not declare. Read `docs/scheduler.md`.
 
 `Country` and `Region`: reference rows shared by every store, seeded from
 `src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
-of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+of their own; `docs/order/creation-address.md` (section 3.3) has the delivery-address
 rules that read them.
 
 ### `devtools/`
@@ -242,8 +244,10 @@ Read `docs/cart-agent-token.md` for the token,
 ### `promotion/`, `giftcard/`, `b2b/`
 
 - `promotion/`: `Promotion`, `PromotionCode`, `PromotionRedemption` and
-  `CartPromotionCode`; the rules are evaluated in
-  `src/promotion/services.py`.
+  `CartPromotionCode`; the rules are evaluated in the `src/promotion/engine/`
+  package (`PromotionEngine` in `engine/evaluation.py`, one module per
+  seam), and the services that call it are `src/promotion/coupons.py`,
+  `src/promotion/coupon_picker.py` and `src/promotion/product_offers.py`.
 - `giftcard/`: `GiftCard`, `GiftCardPurchase`, `GiftCardTransaction` (the
   ledger) and `GiftCardPause`; the rules are in
   `src/giftcard/services.py`.

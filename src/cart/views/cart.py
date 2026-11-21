@@ -33,19 +33,17 @@ from cart.serializers.cart import (
     ReserveStockResponseSerializer,
 )
 from cart.services import CartService
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
+from cart.throttles import (
     CartAgentTokenThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CartQuoteAnonThrottle,
     CartQuoteThrottle,
     CouponApplyThrottle,
-    UserBudgetThrottle,
-    gift_card_code_throttles,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
 from core.utils.serializers import (
@@ -53,6 +51,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from giftcard.throttles import gift_card_code_throttles
 from order.checkout.quote import (
     CheckoutQuote,
     OrderQuoteService,
@@ -528,7 +527,7 @@ class CartViewSet(BaseModelViewSet):
     @action(detail=False, methods=["post"], url_path="coupon")
     def apply_coupon(self, request, *args, **kwargs):
         """Attach a coupon code to the cart and return the updated cart."""
-        from promotion.services import CouponError, CouponService
+        from promotion.coupons import CouponError, CouponService
 
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -561,7 +560,7 @@ class CartViewSet(BaseModelViewSet):
     @action(detail=False, methods=["delete"], url_path="coupon")
     def remove_coupon(self, request, *args, **kwargs):
         """Detach the applied coupon code from the cart."""
-        from promotion.services import CouponService
+        from promotion.coupons import CouponService
 
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -590,7 +589,7 @@ class CartViewSet(BaseModelViewSet):
         A read, so it neither creates a cart nor 404s without one: a
         shopper with no cart yet simply has no coupons to judge.
         """
-        from promotion.services import CouponPickerService
+        from promotion.coupon_picker import CouponPickerService
 
         cart = self.cart_service.get_existing_cart()
         owner = self.cart_service.owner

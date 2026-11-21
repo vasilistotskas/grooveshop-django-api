@@ -15,8 +15,8 @@ from django.utils import timezone
 from cart.models import Cart
 from cart.tasks import cleanup_abandoned_carts
 from core.celery import celery_app
+from core.monitored_task import MonitoredTask
 from core.tasks import (
-    MonitoredTask,
     backup_database_task,
     cleanup_old_backups,
     clear_all_cache_task,

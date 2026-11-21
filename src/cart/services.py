@@ -45,7 +45,8 @@ def cart_item_pairs(
     ``X-Cart-Token`` is accepted (the signed-in shopper's chat): it wins
     over ``X-Cart-Id`` and an invalid one is a 401, never a guest cart.
     """
-    from promotion.services import PromotionEngine
+    from promotion.engine.benefits import gift_pairs
+    from promotion.engine.evaluation import PromotionEngine
 
     service = CartService(request, accepts_cart_token=True)
     cart = service.cart
@@ -56,7 +57,7 @@ def cart_item_pairs(
     promo_result = PromotionEngine.evaluate(cart, user=service.owner)
     return [
         (item.product, item.quantity) for item in cart.get_items()
-    ] + PromotionEngine.gift_pairs(promo_result)
+    ] + gift_pairs(promo_result)
 
 
 class CartAttributionService:

@@ -28,16 +28,16 @@ from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart
-from core.api.throttling import (
+from cart.throttles import (
     CartMutationAnonThrottle,
     CartQuoteAnonThrottle,
     CartQuoteThrottle,
-    GiftCardCodeThrottle,
 )
 from country.factories import CountryFactory
 from giftcard.enum import GiftCardTransactionKind
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction
+from giftcard.throttles import GiftCardCodeThrottle
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService

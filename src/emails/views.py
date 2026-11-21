@@ -28,11 +28,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import EmailUnsubscribeThrottle
 from core.utils.i18n import store_language
 from core.utils.tenant_urls import get_tenant_base_url
 from emails import optout
 from emails.models import EmailOptOut
+from emails.throttles import EmailUnsubscribeThrottle
 from user.services.subscription import unsubscribe_from_all_marketing
 
 logger = logging.getLogger(__name__)

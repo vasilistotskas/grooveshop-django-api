@@ -4,7 +4,6 @@ from typing import Any, TypedDict
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure, MeasureBase
 from rest_framework import serializers
@@ -114,20 +113,29 @@ class Representation(TypedDict):
     value: Any
 
 
-#: The serializer of each model a generic relation may point at. Product is
-#: the only one, so the field is declared as exactly its serializer: what
-#: ``to_representation`` returns, which a storefront parser can trust.
-CONTENT_OBJECT_SERIALIZERS: dict[type, str] = {
-    Product: "product.serializers.product.ProductSerializer",
-}
-
-
 @extend_schema_field(
-    lazy_serializer(CONTENT_OBJECT_SERIALIZERS[Product])(read_only=True)
+    {
+        "type": "object",
+        "description": _(
+            "Serialized representation of the related content object"
+        ),
+        "properties": {
+            "id": {"type": "integer", "example": 1},
+            "name": {"type": "string", "example": "Sample Product"},
+            "description": {"type": "string", "example": "Product description"},
+            "price": {"type": "string", "example": "29.99"},
+            "active": {"type": "boolean", "example": True},
+        },
+        "additionalProperties": True,
+    }
 )
 class ContentObjectRelatedField(serializers.RelatedField):
+    SERIALIZER_REGISTRY: dict[type, str] = {
+        Product: "product.serializers.product.ProductSerializer",
+    }
+
     def to_representation(self, value):
-        for model_cls, serializer_path in CONTENT_OBJECT_SERIALIZERS.items():
+        for model_cls, serializer_path in self.SERIALIZER_REGISTRY.items():
             if isinstance(value, model_cls):
                 module_path, cls_name = serializer_path.rsplit(".", 1)
                 module = importlib.import_module(module_path)

@@ -634,9 +634,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/B2BErrorResponse'
+                $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '500':
           content:
@@ -675,10 +673,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/B2BErrorResponse'
+                $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '401':
           content:
@@ -11304,10 +11299,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/CouponErrorResponse'
+                $ref: '#/components/schemas/CouponErrorResponse'
           description: ''
         '401':
           content:
@@ -14437,10 +14429,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/GiftCardErrorResponse'
+                $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -14603,10 +14592,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/GiftCardErrorResponse'
+                $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -16838,10 +16824,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/OrderCreateError'
+                $ref: '#/components/schemas/OrderCreateError'
           description: ''
         '401':
           content:
@@ -17997,10 +17980,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/OrderCancelError'
+                $ref: '#/components/schemas/OrderCancelError'
           description: ''
         '401':
           content:
@@ -53761,8 +53741,25 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          allOf:
-          - $ref: '#/components/schemas/Product'
+          type: object
+          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: Sample Product
+            description:
+              type: string
+              example: Product description
+            price:
+              type: string
+              example: '29.99'
+            active:
+              type: boolean
+              example: true
+          additionalProperties: true
           readOnly: true
         createdAt:
           type: string
@@ -53811,8 +53808,25 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          allOf:
-          - $ref: '#/components/schemas/Product'
+          type: object
+          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: Sample Product
+            description:
+              type: string
+              example: Product description
+            price:
+              type: string
+              example: '29.99'
+            active:
+              type: boolean
+              example: true
+          additionalProperties: true
           readOnly: true
         createdAt:
           type: string
@@ -55354,16 +55368,12 @@ components:
     ApiValidationError:
       type: object
       description: 'A validation error: the field keys DRF always sent, plus ``code``
-        (the one code all errors share, else ``invalid``; when a field is itself named
-        ``code``, that field''s messages instead) and ``fields``, each field''s messages
-        with their codes. A field of a nested serializer holds the nested object.'
+        (the one code all errors share, else ``invalid``; absent when a field is itself
+        named ``code``) and ``fields``, each field''s messages with their codes. A
+        field of a nested serializer holds the nested object.'
       properties:
         code:
-          anyOf:
-          - type: string
-          - type: array
-            items:
-              type: string
+          type: string
         fields:
           type: object
           additionalProperties:

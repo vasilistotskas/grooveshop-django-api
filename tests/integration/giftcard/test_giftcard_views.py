@@ -128,6 +128,10 @@ class TestCheck:
 
         assert response.status_code == 404
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST", "/api/v1/giftcard/check", 400, issue=684
+    )
     def test_missing_code_is_a_field_error(self):
         with _gift_cards():
             response = _client().post(CHECK_URL, {}, format="json")
@@ -258,6 +262,10 @@ class TestPurchaseRefusals:
         provider.process_payment.assert_not_called()
         assert not GiftCardPurchase.objects.exists()
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST", "/api/v1/giftcard/purchase", 400, issue=684
+    )
     def test_unregistered_payment_provider_is_a_field_error(self):
         with _gift_cards():
             response = _client().post(
@@ -272,6 +280,10 @@ class TestPurchaseRefusals:
         assert "payment_provider" in response.data
         assert not GiftCardPurchase.objects.exists()
 
+    # Its 400 body is documented as the view's own only, not the validation error it is (#684).
+    @pytest.mark.known_schema_drift(
+        "POST", "/api/v1/giftcard/purchase", 400, issue=684
+    )
     def test_missing_recipient_email_is_a_field_error(self):
         body = _purchase_body(buyer_email="b@example.com")
         del body["recipient_email"]

@@ -97,10 +97,20 @@ def test_a_marked_drift_is_let_through(tally):
     assert DRIFTS.met == {("GET", PUBLIC_SETTINGS, 200)}
 
 
-def test_a_marker_whose_drift_is_gone_is_reported():
-    allowed, met = DRIFTS.allowed, DRIFTS.met
-    DRIFTS.allowed, DRIFTS.met = {("GET", PUBLIC_SETTINGS, 200): 1}, set()
-    try:
-        assert unmet_drifts() == [f"GET {PUBLIC_SETTINGS} 200 (issue 1)"]
-    finally:
-        DRIFTS.allowed, DRIFTS.met = allowed, met
+def test_a_marker_applied_in_the_test_counts(request, tally):
+    request.applymarker(
+        pytest.mark.known_schema_drift("GET", PUBLIC_SETTINGS, 200, issue=684)
+    )
+
+    check("GET", PUBLIC_SETTINGS, JsonResponse({"unexpected": 1}))
+
+    assert DRIFTS.met == {("GET", PUBLIC_SETTINGS, 200)}
+
+
+def test_a_marker_whose_drift_is_gone_is_reported(request):
+    key = ("GET", PUBLIC_SETTINGS, 200)
+    request.applymarker(pytest.mark.known_schema_drift(*key, issue=1))
+
+    assert unmet_drifts() == [f"GET {PUBLIC_SETTINGS} 200 (issue 1)"]
+    # Met by hand, so this test's own teardown does not report it.
+    DRIFTS.met.add(key)

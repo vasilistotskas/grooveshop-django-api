@@ -76,11 +76,26 @@ class Tally:
 
 @dataclass
 class KnownDrifts:
-    """The current test's ``known_schema_drift`` markers, and which of them
-    a failing body has met."""
+    """The running test, and which of its ``known_schema_drift`` markers a
+    failing body has met. The markers are read when asked for, so one a
+    test applies itself (``request.applymarker``, for one parameter of
+    several) counts too."""
 
-    allowed: dict[tuple[str, str, int], int] = field(default_factory=dict)
+    node: pytest.Item | None = None
     met: set[tuple[str, str, int]] = field(default_factory=set)
+
+    @property
+    def allowed(self) -> dict[tuple[str, str, int], int]:
+        if self.node is None:
+            return {}
+        return {
+            (
+                marker.args[0].upper(),
+                marker.args[1],
+                int(marker.args[2]),
+            ): marker.kwargs["issue"]
+            for marker in self.node.iter_markers("known_schema_drift")
+        }
 
 
 TALLY = Tally()
@@ -193,18 +208,10 @@ def responses_match_the_schema():
 def known_schema_drifts(request):
     """Allow the drifts the test's ``known_schema_drift`` markers name, and
     fail a marker whose drift no longer shows."""
-    DRIFTS.allowed = {
-        (
-            marker.args[0].upper(),
-            marker.args[1],
-            int(marker.args[2]),
-        ): marker.kwargs["issue"]
-        for marker in request.node.iter_markers("known_schema_drift")
-    }
-    DRIFTS.met = set()
+    DRIFTS.node, DRIFTS.met = request.node, set()
     yield
     gone = unmet_drifts()
-    DRIFTS.allowed, DRIFTS.met = {}, set()
+    DRIFTS.node, DRIFTS.met = None, set()
     if gone:
         pytest.fail(
             "No body broke the schema for "
@@ -215,9 +222,10 @@ def known_schema_drifts(request):
 
 def unmet_drifts() -> list[str]:
     """The current test's markers that no failing body has met."""
+    allowed = DRIFTS.allowed
     return [
-        f"{method} {path} {status} (issue {DRIFTS.allowed[method, path, status]})"
-        for method, path, status in sorted(set(DRIFTS.allowed) - DRIFTS.met)
+        f"{method} {path} {status} (issue {allowed[method, path, status]})"
+        for method, path, status in sorted(set(allowed) - DRIFTS.met)
     ]
 
 

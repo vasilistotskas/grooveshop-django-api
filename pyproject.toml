@@ -520,6 +520,7 @@ include = [
     "src/core/fields/**",
     "src/core/forms/**",
     "src/core/filters/**",
+    "src/core/measurement.py",
     "src/core/utils/**",
     "src/asgi/**",
     "src/admin/**",

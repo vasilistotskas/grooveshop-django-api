@@ -314,7 +314,7 @@ and says which file holds each § number used here.
   - **Full cap.** A call waits up to `ACS_SLOT_WAIT_SECONDS`, then raises
     `AcsRetryableError` for Celery to retry. With Redis unreachable the
     cap is skipped and logged: a rejected call was never processed, and
-    `src/core/caches.py` sets the policy that an unreachable Redis costs
+    `src/core/cache_backend.py` sets the policy that an unreachable Redis costs
     speed, not requests.
   - **Retries.** `poll_acs_tracking_one` retries at 10, 20, 40, 80, 160 s
     with no jitter (Celery's jitter draws from zero, which re-entered the

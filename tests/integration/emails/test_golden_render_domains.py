@@ -74,11 +74,11 @@ from user.factories.subscription import SubscriptionTopicFactory
 from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import SubscriptionTopic, UserSubscription
-from user.tasks import export_user_data_task
-from user.utils.subscription import (
+from user.services.subscription_mail import (
     send_already_subscribed_notice,
     send_subscription_confirmation,
 )
+from user.tasks import export_user_data_task
 
 pytestmark = pytest.mark.django_db
 

@@ -80,7 +80,7 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   `docs/deferred-dispatch.md`), `MonitoredTask` and the system
   tasks (`src/core/tasks.py`), the retry sets (`src/core/retry.py`) and
   the retention helper (`src/core/retention.py`);
-- the cache backend (`src/core/caches.py`) and the cache surface registry
+- the cache backend (`src/core/cache_backend.py`) and the cache surface registry
   (`src/core/cache/`);
 - middleware (`src/core/middleware/`), the email templates
   (`src/core/templates/`) and the root URL conf.

@@ -192,7 +192,7 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `src/dev
 - `auto_translations` flag for parler models
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
-- `get_or_create_instance()` helper in `src/core/helpers/factory.py` for dynamic model/factory resolution
+- `get_or_create_instance()` in `src/tag/factories/tagged_item.py`, its only caller, for dynamic model/factory resolution
 - `UserNameGenerator` in `src/core/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration

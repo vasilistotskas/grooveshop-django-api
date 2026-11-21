@@ -19,7 +19,7 @@ from user.tasks import send_subscription_confirmation_email_task
 pytestmark = pytest.mark.django_db
 
 Status = UserSubscription.SubscriptionStatus
-SEND = "user.utils.subscription.send_subscription_confirmation"
+SEND = "user.services.subscription_mail.send_subscription_confirmation"
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ class TestAlreadySubscribedNoticeRefusal:
 
         row = self._active(row)
         with patch(
-            "user.utils.subscription.send_already_subscribed_notice",
+            "user.services.subscription_mail.send_already_subscribed_notice",
             side_effect=_refused(550),
         ):
             sent = send_newsletter_already_subscribed_email_task.run(row.id)
@@ -140,7 +140,7 @@ class TestAlreadySubscribedNoticeRefusal:
         row = self._active(row)
         with (
             patch(
-                "user.utils.subscription.send_already_subscribed_notice",
+                "user.services.subscription_mail.send_already_subscribed_notice",
                 side_effect=_refused(450),
             ),
             pytest.raises(smtplib.SMTPRecipientsRefused),

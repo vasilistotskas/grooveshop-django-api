@@ -416,7 +416,7 @@ class SweepCursor(models.Model):
     A sweep acts on the rows whose date fell in ``(position, now]``
     (``core.sweeps``) and moves the position only after the work ran, so
     a run that fails repeats its window. Kept in Postgres, not the cache:
-    the cache fails open (``core.caches.CustomCache``: an unreachable
+    the cache fails open (``core.cache_backend.CustomCache``: an unreachable
     Redis reads as a miss and drops the write), so a cursor there was lost
     with every outage, and the sweep fell back to a fixed window: missing
     what went live before it, repeating what came after.

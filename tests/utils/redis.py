@@ -9,7 +9,7 @@ from os import getenv
 from redis.backoff import NoBackoff
 from redis.retry import Retry
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 
 def stopped_cache() -> CustomCache:

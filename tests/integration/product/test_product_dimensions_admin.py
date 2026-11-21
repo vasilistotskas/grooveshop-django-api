@@ -8,7 +8,7 @@ from django.test import RequestFactory
 from measurement.measures import Distance
 
 from core.forms.measurement import MeasurementWidget
-from core.units import DistanceUnits
+from core.measurement import DistanceUnits
 from product.admin.product import ProductAdmin
 from product.factories import ProductFactory
 from product.models import Product

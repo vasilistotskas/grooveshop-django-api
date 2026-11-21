@@ -31,7 +31,7 @@ from emails.gates import FeatureGate, ScheduleGate
 from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
 from tenant.customer_accounts import customer_accounts_on
-from user.utils.subscription import subscription_confirmation_url
+from user.services.subscription_mail import subscription_confirmation_url
 
 if TYPE_CHECKING:
     from user.models import UserAccount, UserDataExport, UserSubscription

@@ -23,7 +23,7 @@ a refund by lines its own pieces at their own rates ("Refund by lines" in [§7.2
 laid over its shares in order, and the claim is REFUSED before any provider is
 called when the headroom cannot hold it); a **booked refund row no attempt
 claimed** (a provider's webhook or dashboard refund,
-`PaymentLedger.record_refund`: allocated when booked, pro rata over the
+`RefundService.book_refund`: allocated when booked, pro rata over the
 headroom then, capped, the one rule for money nobody claimed); a
 **goods-returned chargeback** (`decide_chargebacks`: allocated at the staff
 decision, capped to the headroom, so the credit is for what the receipt can
@@ -68,7 +68,7 @@ too).
 
 **Who calls it.** `generate_invoice` (new receipts, before the VAT breakdown),
 `create_pending_credits`, a NEW refund claim (`_claim_refund`),
-`PaymentLedger.record_refund` (a refund nobody claimed is decided there, over
+`RefundService.book_refund` (a refund nobody claimed is decided there, over
 the headroom of that moment) and `decide_chargebacks` (once, after it changed
 its decisions; `credit_allocation.drop(decision__in=...)` clears the changed
 ones first). A read path (a specimen render, the admin) never calls it. The
@@ -160,7 +160,7 @@ each provider source that moved before that moment, the goods it returned
 before any reversal (`CreditAllocation.goods_claimed`: what it owed after the
 duplicate payment, kept on the source's first row and never scaled) less what
 the provider reported failed of it BY THAT CUT
-(`credit_allocation.goods_returned`; a reversal booked at or after the cut is
+(`PaymentLedger.goods_returned`; a reversal booked at or after the cut is
 not known there, so a source decided late owes what it would have owed decided
 on time). The excess is also capped by money: at most what the provider still
 holds (captures less refunds less every dispute, `PaymentLedger.excess_held`),
@@ -251,7 +251,7 @@ is on the dashboard's chargebacks-to-settle worklist, and a decision requests
 the credit documents again), and what a chargeback took whose goods the
 customer kept is left out of it, so "goods kept" means no credit for that part,
 ever. A booked refund that a `RefundAttempt` later claims
-(`PaymentLedger.settle_attempt`) drops its own allocation and the attempt's is
+(`RefundService.book_refund`) drops its own allocation and the attempt's is
 scaled to what really moved (`credit_allocation.link_attempt`). The settlement
 of a closed order is the one credit without an allocation: it takes what the
 receipt still holds at every rate.

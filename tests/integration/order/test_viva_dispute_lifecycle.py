@@ -210,7 +210,7 @@ class TestDisputeLost:
 
 class TestDisputeLostOnAPartlyRefundedSale:
     def _refund(self, order, amount):
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=order.payment_transactions.get(
                 kind=PaymentTransactionKind.CHARGE

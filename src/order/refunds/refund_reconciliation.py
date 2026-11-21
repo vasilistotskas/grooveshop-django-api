@@ -8,7 +8,8 @@ things resolve it, each through the same ledger paths a refund made in one
 go takes (``RefundService.book_share`` to settle, ``RefundAttempt`` to
 decline):
 
-* the provider's own webhook, when it books the refund (``record_refund``);
+* the provider's own webhook, when it books the refund
+  (``RefundService.book_refund``);
 * :func:`reconcile_overdue`, which asks the provider once the attempt is
   overdue (``reconcile_after``) and settles or declines only when the answer
   is unambiguous;

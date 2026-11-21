@@ -34,6 +34,7 @@ from order.models.item import OrderItem
 from order.models.order import (
     Order,
 )
+from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
@@ -45,6 +46,7 @@ from order.payments.payment import (
     registered_provider_codes,
 )
 from order.payments.payment_ledger import (
+    MANUAL_REFUND_PROVIDER,
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
@@ -132,6 +134,123 @@ class _ShareDeclined:
 
 
 class RefundService:
+    @staticmethod
+    def book_refund(
+        order: Order,
+        *,
+        charge: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+        provider: str | None = None,
+        attempt: RefundAttempt | None = None,
+        match_attempt: bool = True,
+    ) -> tuple[PaymentTransaction, bool]:
+        """Book a refund of *amount* on *charge* under *reference* as one
+        unit: the ledger row and ``order.payment_status``
+        (``PaymentLedger.record_refund``), the attempt it fulfils, the
+        allocation of the order's sources and the overcharge flag. Every
+        refund path books here: the refunds this app makes, and those a
+        provider reports.
+
+        *attempt* is the claim this refund fulfils. A refund booked without
+        one (a provider's webhook) settles the oldest PENDING attempt on the
+        charge for the same amount, whatever its age, so the attempt that
+        made it cannot book it a second time (``PaymentLedger.settle_attempt``).
+        A caller that knows the refund names an attempt which is not live
+        passes ``match_attempt=False``: the refund is then nobody's claim,
+        and no other attempt of the same amount may take it.
+
+        A refund the ledger already holds changes nothing and returns
+        ``created=False``.
+        """
+        row, created = PaymentLedger.record_refund(
+            order,
+            charge=charge,
+            amount=amount,
+            reference=reference,
+            description=description,
+            provider=provider,
+        )
+        if attempt is None and created and match_attempt:
+            attempt = (
+                RefundAttempt.objects.live()
+                .filter(charge=charge, amount=amount)
+                .order_by("created_at", "id")
+                .first()
+            )
+        if attempt is not None:
+            if PaymentLedger.settle_attempt(attempt, row):
+                credit_allocation.link_attempt(attempt, row)
+            else:
+                # The refund is another attempt's and carries that attempt's
+                # allocation: this one's money did not move, so it holds no
+                # room and owes no credit.
+                credit_allocation.drop(refund_attempt=attempt)
+        if created:
+            # Whoever booked it, the order's unallocated sources are decided
+            # now, oldest first: a refund nobody claimed (a provider's
+            # webhook, a dashboard refund) over the headroom of this moment.
+            credit_allocation.allocate_order(order)
+            PaymentLedger.sync_overcharge(order, row)
+        return row, created
+
+    @classmethod
+    def book_cod_refund(
+        cls,
+        order: Order,
+        *,
+        collection: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+        attempt: RefundAttempt | None = None,
+    ) -> tuple[PaymentTransaction, bool]:
+        """Book that the merchant paid *amount* of the cash *collection*
+        back to the customer themselves, under *reference* (how: a bank
+        transfer id). The same booking as any refund (:meth:`book_refund`)."""
+        return cls.book_refund(
+            order,
+            charge=collection,
+            amount=amount,
+            reference=PaymentLedger.cod_refund_reference(
+                order, collection, reference
+            ),
+            description=description,
+            provider=MANUAL_REFUND_PROVIDER,
+            attempt=attempt,
+        )
+
+    @staticmethod
+    def book_refund_reversal(
+        order: Order,
+        *,
+        charge: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+    ) -> tuple[PaymentTransaction, bool]:
+        """Book that a refund the ledger counted was reported failed by the
+        provider (``PaymentLedger.record_refund_reversal``), then free its
+        allocation and re-derive the overcharge flag."""
+        row, created = PaymentLedger.record_refund_reversal(
+            order,
+            charge=charge,
+            amount=amount,
+            reference=reference,
+            description=description,
+        )
+        if created:
+            refunded = PaymentTransaction.objects.filter(
+                provider=charge.provider,
+                provider_reference=reference,
+                kind=PaymentTransactionKind.REFUND,
+            ).first()
+            if refunded is not None:
+                credit_allocation.free_reversed(refunded)
+            PaymentLedger.sync_overcharge(order, row)
+        return row, created
+
     @staticmethod
     def _note_refund_declined(
         order: Order, provider_code: str, response: dict[str, Any]
@@ -1001,7 +1120,7 @@ class RefundService:
                 else None
             )
             if refund_id is None:
-                row, created = PaymentLedger.record_cod_refund(
+                row, created = cls.book_cod_refund(
                     order,
                     collection=charge,
                     amount=paid_back,
@@ -1011,7 +1130,7 @@ class RefundService:
                 )
                 refund_id = row.provider_reference
             else:
-                row, created = PaymentLedger.record_refund(
+                row, created = cls.book_refund(
                     order,
                     charge=charge,
                     amount=paid_back,

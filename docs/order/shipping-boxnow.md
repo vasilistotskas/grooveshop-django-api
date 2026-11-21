@@ -6,6 +6,11 @@ and says which file holds each § number used here.
 ## 5.2 BoxNow (`src/shipping_boxnow/`)
 
 - **REST + webhook** for tracking events.
+- **The locker list** (`GET /shipping/boxnow/lockers`,
+  `src/shipping_boxnow/views/locker.py`, `BoxNowLockerFilter`) serves
+  active rows only and takes the exact filters `externalId` (the locker's
+  BOX NOW id) and `countryCode`, with which the agent gateway resolves a
+  UCP pickup destination.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
   have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,

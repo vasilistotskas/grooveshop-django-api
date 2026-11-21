@@ -12,10 +12,12 @@ order page read. Name, email and phone stay required.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.db.backends.base.base import BaseDatabaseWrapper
 from django.urls import reverse
 
 from order.models.order import Order
@@ -519,6 +521,69 @@ class TestALockerTheCatalogueDoesNotHoldYet:
 
         assert first.status_code == second.status_code == 400
         resync.assert_called_once()
+
+    def test_a_request_during_a_sync_past_its_deadline_starts_no_other(
+        self, locker_checkout, resync, settings
+    ):
+        """The guard is taken before the thread starts: a sync the first
+        request stopped waiting for still holds it."""
+        settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = 1
+        release, finished = threading.Event(), threading.Event()
+
+        def slow(**_kw):
+            try:
+                release.wait(10)
+                return []
+            finally:
+                finished.set()
+
+        resync.side_effect = slow
+        try:
+            first = _post_locker_order(locker_checkout, boxnow_locker_id="77")
+            second = _post_locker_order(locker_checkout, boxnow_locker_id="78")
+        finally:
+            release.set()
+            assert finished.wait(10)
+
+        assert first.status_code == second.status_code == 400
+        resync.assert_called_once()
+
+    def test_a_sync_failing_after_its_deadline_is_logged_and_closed(
+        self, locker_checkout, resync, settings, caplog
+    ):
+        """Nobody reads the result of a sync past its deadline: its thread
+        logs the failure itself and closes the connection it opened."""
+        settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = 1
+        release, closed = threading.Event(), threading.Event()
+        close = BaseDatabaseWrapper.close
+
+        def late_failure(**_kw):
+            release.wait(10)
+            raise BoxNowAPIError(503, message="down")
+
+        def recording_close(wrapper):
+            if threading.current_thread().name == "pickup-point-resync":
+                closed.set()
+            return close(wrapper)
+
+        resync.side_effect = late_failure
+        with (
+            patch.object(BaseDatabaseWrapper, "close", recording_close),
+            caplog.at_level(logging.ERROR, logger="shipping.services"),
+        ):
+            response = _post_locker_order(
+                locker_checkout, boxnow_locker_id="77"
+            )
+            release.set()
+            assert closed.wait(10)
+
+        assert response.status_code == 400, response.content
+        assert "Resync of the boxnow catalogue for pickup point" in (
+            caplog.text
+        )
+        (logged,) = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert logged.threadName == "pickup-point-resync"
+        assert isinstance(logged.exc_info[1], BoxNowAPIError)
 
     def test_a_carrier_that_fails_the_resync_is_refused_and_logged(
         self, locker_checkout, resync, caplog

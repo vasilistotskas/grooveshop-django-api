@@ -175,35 +175,48 @@ class ShippingService:
         """Run the carrier's resync, waiting at most
         ``PICKUP_POINT_RESYNC_TIMEOUT_SECONDS`` for it.
 
-        The sync runs in a thread of its own, on the request's store
-        schema, because a carrier client has no deadline for a whole sync
+        The sync runs in a daemon thread of its own, on the request's
+        store schema (the pattern of ``agent.outbox``'s event call),
+        because a carrier client has no deadline for a whole sync
         (each call retries within its own timeout, so a sync can take
         minutes) and the order call has callers that wait seconds. Past
         the deadline the order is refused; the thread finishes the sync,
         so the next order finds the point. A failure is logged and
         refused alike.
         """
-        from concurrent.futures import ThreadPoolExecutor
-        from concurrent.futures import TimeoutError as FutureTimeout
+        import threading
 
-        from django.db import connection, connections
+        from django.db import connection
         from django_tenants.utils import schema_context
 
         schema = connection.schema_name
+        failure: list[BaseException] = []
 
         def resync() -> None:
+            # A thread of its own outlives a request that stops waiting:
+            # it sets its store's schema, logs what goes wrong (nobody may
+            # read its result), and closes the connection it opened.
             try:
                 with schema_context(schema):
                     carrier.refresh_pickup_points(country_code=country_code)
+            except Exception as error:
+                logger.exception(
+                    "Resync of the %s catalogue for pickup point %s failed",
+                    provider_code,
+                    dict(location),
+                )
+                failure.append(error)
             finally:
-                connections.close_all()
+                connection.close()
 
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(resync)
-        executor.shutdown(wait=False)
-        try:
-            future.result(timeout=settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
-        except FutureTimeout as e:
+        # The guard (``pickup_point_address``) is taken before this thread
+        # starts, so requests that stop waiting never run two syncs.
+        worker = threading.Thread(
+            target=resync, name="pickup-point-resync", daemon=True
+        )
+        worker.start()
+        worker.join(settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
+        if worker.is_alive():
             logger.warning(
                 "Resync of the %s catalogue for pickup point %s did not "
                 "finish within %s s; the order is refused and the sync "
@@ -214,16 +227,11 @@ class ShippingService:
             )
             raise PickupPointUnknown(
                 f"{provider_code} catalogue resync passed its deadline"
-            ) from e
-        except Exception as e:
-            logger.exception(
-                "Resync of the %s catalogue for pickup point %s failed",
-                provider_code,
-                dict(location),
             )
+        if failure:
             raise PickupPointUnknown(
                 f"{provider_code} catalogue could not be resynced"
-            ) from e
+            ) from failure[0]
 
     @classmethod
     def adapter_for(cls, provider_code: str):

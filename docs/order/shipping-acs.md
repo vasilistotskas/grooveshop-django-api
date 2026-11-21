@@ -6,6 +6,14 @@ and says which file holds each § number used here.
 ## 5.1 ACS Courier (`src/shipping_acs/`)
 
 - **REST API**, polling-based (no webhooks).
+- **The station list** (`GET /shipping/acs/stations`,
+  `src/shipping_acs/views/station.py`) serves active rows only. It takes
+  `shopKind` (default: the locker kinds of `countryCode`, or of every
+  configured country), `countryCode`, a `postalCode` prefix, and two exact
+  lookups of one station: `externalId` (the area code several Smartpoints
+  share) and `branch` (with it, one station; empty matches the station
+  without a branch). The agent gateway resolves a UCP pickup destination
+  with the exact pair.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout`: the row lock used to be held

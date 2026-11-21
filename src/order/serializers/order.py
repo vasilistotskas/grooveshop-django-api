@@ -1697,6 +1697,10 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         }
         if missing:
             raise serializers.ValidationError(missing, code="required")
+        if errors := address_rules.region_errors(
+            attrs["country_id"], attrs.get("region_id")
+        ):
+            raise serializers.ValidationError(errors, code="region_invalid")
         region = None
         if attrs.get("region_id"):
             region = Region.objects.filter(alpha=attrs["region_id"]).first()
@@ -1728,6 +1732,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         if one_line and "street_number" in errors:
             # The caller sent no number field: its error is the line's.
             errors.setdefault("street", []).extend(errors.pop("street_number"))
+        if "region" in errors:
+            # The rule names the model field; this body's is ``region_id``.
+            errors["region_id"] = errors.pop("region")
         if errors:
             raise serializers.ValidationError(errors)
         attrs["zipcode"] = address_rules.normalize_postcode(attrs["zipcode"])

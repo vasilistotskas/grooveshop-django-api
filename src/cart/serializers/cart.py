@@ -11,6 +11,7 @@ from rest_framework import serializers
 from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
+from core.validators import address as address_rules
 from order.serializers.quote import PickupPointSerializer
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
@@ -852,6 +853,15 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         # Normalise empty string → not present so the view's
         # downstream None-check stays clean.
         attrs["shipping_provider_code"] = code or None
+        # The region order creation would refuse is refused here too, as
+        # a field error. A pickup delivery is priced without one
+        # (``ShippingChoice.of``), so it is not read.
+        if kind != "pickup_point" and (
+            errors := address_rules.region_errors(
+                attrs.get("country_id"), attrs.get("region_id")
+            )
+        ):
+            raise serializers.ValidationError(errors, code="region_invalid")
         return attrs
 
 

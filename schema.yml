@@ -29060,6 +29060,23 @@ paths:
       operationId: api_v1_shipping_acs_stations_list
       description: List / retrieve ACS stations and Smartpoint lockers.
       parameters:
+      - in: query
+        name: branch
+        schema:
+          type: string
+        description: The station's branch, exactly; empty matches the station without
+          one.
+      - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: ISO 3166-1 alpha-2 country of the station.
+      - in: query
+        name: externalId
+        schema:
+          type: string
+        description: 'The station''s ACS code, exactly (an area code that several
+          Smartpoints share: add branch for one).'
       - name: ordering
         required: false
         in: query
@@ -29084,12 +29101,26 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: postalCode
+        schema:
+          type: string
+        description: Postcode prefix (its first 5 characters).
       - name: search
         required: false
         in: query
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: shopKind
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: 'ACS shop kind. Default: the locker kinds of countryCode, or
+          of every configured country.'
       tags:
       - api
       security:
@@ -29185,10 +29216,20 @@ paths:
       summary: Λίστα Lockers BoxNow
       parameters:
       - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: Χώρα του locker κατά ISO 3166-1 alpha-2.
+      - in: query
         name: cursor
         schema:
           type: string
         description: Δείκτης (cursor) για σελιδοποίηση
+      - in: query
+        name: externalId
+        schema:
+          type: string
+        description: Ο κωδικός BOX NOW του locker, ακριβώς.
       - in: query
         name: languageCode
         schema:

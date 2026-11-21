@@ -40,6 +40,7 @@ from tests.integration.order.test_checkout_quote import (
     _address,
     _checkout,
     _choices,
+    _money,
     _post_intent,
     _post_order,
     _product,
@@ -369,9 +370,10 @@ class TestThePickupPoint:
     ):
         """A pickup order keeps no region (``_deliver_to_pickup_point``),
         so neither the quote nor the digest reads one: a client that sends
-        the buyer's region with both still orders at its quote."""
+        the buyer's region (an island one, the region a home delivery could
+        be priced by) pays what the same order without it pays."""
         checkout = locker_checkout
-        region = RegionFactory(country=checkout.country)
+        region = RegionFactory(country=checkout.country, alpha="ION")
         with_region = {
             **checkout.choices,
             "boxnow_locker_id": "4",
@@ -392,8 +394,13 @@ class TestThePickupPoint:
             **_guards(quote),
         )
 
+        assert quote["expectedTotal"] == bare["expectedTotal"]
+        assert quote["shipping"]["price"] == bare["shipping"]["price"]
         assert quote["cartDigest"] == bare["cartDigest"]
         assert response.status_code == 201, response.content
+        order = Order.objects.get()
+        assert order.region_id is None
+        assert order.shipping_price.amount == _money(bare["shipping"]["price"])
 
 
 class TestTheShippingChoice:

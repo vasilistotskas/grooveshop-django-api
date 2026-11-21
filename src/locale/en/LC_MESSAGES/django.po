@@ -7450,6 +7450,9 @@ msgstr "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` 
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 country code."
 
+msgid "ISO 3166-1 alpha-2 country of the locker."
+msgstr "ISO 3166-1 alpha-2 country of the locker."
+
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 
@@ -13009,6 +13012,9 @@ msgstr "Select a region that belongs to the selected country."
 msgid "Select a valid country."
 msgstr "Select a valid country."
 
+msgid "Select a valid region."
+msgstr "Select a valid region."
+
 msgid "Select all"
 msgstr "Select all"
 
@@ -14914,6 +14920,9 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 
 msgid "The link search is not valid."
 msgstr "The link search is not valid."
+
+msgid "The locker's BOX NOW id, exactly."
+msgstr "The locker's BOX NOW id, exactly."
 
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."

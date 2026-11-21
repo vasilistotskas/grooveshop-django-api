@@ -7457,6 +7457,9 @@ msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 — υποχρεωτικό�
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 κωδικός χώρας."
 
+msgid "ISO 3166-1 alpha-2 country of the locker."
+msgstr "Χώρα του locker κατά ISO 3166-1 alpha-2."
+
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Αφαιρεί τους τρόπους πληρωμής που ο διαχειριστής έχει αποκλείσει για τη χώρα αυτή (π.χ. BoxNow PAY ON THE GO στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."
 
@@ -13015,6 +13018,9 @@ msgstr "Επιλέξτε μια περιοχή που ανήκει στην επ
 msgid "Select a valid country."
 msgstr "Επιλέξτε έγκυρη χώρα."
 
+msgid "Select a valid region."
+msgstr "Επιλέξτε έγκυρη περιοχή."
+
 msgid "Select all"
 msgstr "Επιλογή όλων"
 
@@ -14916,6 +14922,9 @@ msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από �
 
 msgid "The link search is not valid."
 msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη."
+
+msgid "The locker's BOX NOW id, exactly."
+msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
 
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει."

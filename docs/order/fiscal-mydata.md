@@ -283,6 +283,11 @@ before that has it canceled
 ([`fiscal-movement-receipts.md`](fiscal-movement-receipts.md)). The admin actions ("Cancel receipt in myDATA
 (issued in error)", and "Cancel in myDATA" on the Retail Credit Documents list)
 do not enforce the "never used" rule yet; the guard is listed in issue #197.
+Both are offered only where the platform issues the store's documents
+(`MyDataConfig.is_ready`): the receipt's to whoever may change the order, the
+credit's to whoever holds `order.change_retailcredit`
+(`RetailCreditAdmin.has_cancel_in_mydata_permission`; the register itself
+refuses `change`, so a credit document is never edited there).
 
 **Invoices (B2B) are not issued by the platform.** From 2.11.2026 AADE decision
 Α.1128/2025 art. 1(2) requires 1.1 and 5.1 documents to come from a licensed

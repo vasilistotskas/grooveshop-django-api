@@ -159,3 +159,96 @@ class TestTheOrderPage:
         for name in RETAIL_DOCUMENT_ACTIONS:
             assert name in html, name
         assert "Issued by the store outside the platform" not in html
+
+
+class TestCancelACreditInMyData:
+    """ "Cancel in myDATA (issued in error)" on the credit documents list
+    (#653). The register refuses ``change`` to everyone, so while the
+    action asked for it nobody was offered it, a superuser included. It
+    asks for the store's own permission on credit documents, and only
+    where the platform issues the store's documents, like the order's
+    "Cancel receipt in myDATA"."""
+
+    @staticmethod
+    def _registered_credit():
+        from datetime import date
+
+        from order.accounting.invoicing import generate_invoice
+        from order.models.retail_credit import CreditReason, RetailCredit
+        from tests.utils.mydata import registered
+
+        order = _shipped_order()
+        invoice = registered(generate_invoice(order))
+        return RetailCredit.objects.create(
+            order=order,
+            invoice=invoice,
+            reason=CreditReason.SETTLEMENT,
+            credit_number="CRD-2026-000001",
+            issue_date=date(2026, 3, 20),
+            mydata_mark=400000000000002,
+        )
+
+    @staticmethod
+    def _store_staff(*codenames):
+        from django.contrib.auth.models import Permission
+
+        user = UserAccountFactory(is_staff=True)
+        user.user_permissions.set(
+            Permission.objects.filter(
+                content_type__app_label="order", codename__in=codenames
+            )
+        )
+        return user
+
+    def _offered(self, user) -> bool:
+        from order.admin import RetailCreditAdmin
+        from order.models.retail_credit import RetailCredit
+
+        model_admin = RetailCreditAdmin(RetailCredit, AdminSite())
+        return "cancel_in_mydata" in model_admin.get_actions(_request(user))
+
+    def test_offered_to_who_may_change_credits_where_the_platform_issues(
+        self,
+    ):
+        user = self._store_staff("view_retailcredit", "change_retailcredit")
+
+        with mydata_enabled():
+            assert self._offered(user)
+
+    def test_not_offered_where_the_store_issues_outside_the_platform(self):
+        user = self._store_staff("view_retailcredit", "change_retailcredit")
+
+        with mydata_enabled(ready=False):
+            assert not self._offered(user)
+
+    def test_not_offered_to_who_may_only_view_credits(self):
+        user = self._store_staff("view_retailcredit")
+
+        with mydata_enabled():
+            assert not self._offered(user)
+
+    def test_the_changelist_schedules_the_cancel_of_a_registered_credit(
+        self,
+    ):
+        from unittest.mock import patch
+
+        from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
+
+        with mydata_enabled():
+            credit = self._registered_credit()
+            client = Client()
+            client.force_login(
+                UserAccountFactory(is_staff=True, is_superuser=True),
+                backend=PLATFORM_STAFF_BACKEND_PATH,
+            )
+            with patch("order.tasks.cancel_mydata_credit.delay") as cancel:
+                response = client.post(
+                    reverse("admin:order_retailcredit_changelist"),
+                    {
+                        "action": "cancel_in_mydata",
+                        "_selected_action": [credit.pk],
+                    },
+                )
+
+        assert response.status_code == 302
+        cancel.assert_called_once_with(credit.pk)

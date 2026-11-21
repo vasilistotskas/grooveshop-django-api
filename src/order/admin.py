@@ -4040,10 +4040,20 @@ class RetailCreditAdmin(BaseModelAdmin):
             label = f"{label} (#{obj.mydata_mark})"
         return obj.mydata_status, label
 
-    # Offered to nobody while this register refuses ``change`` (issue 653).
+    def has_cancel_in_mydata_permission(self, request) -> bool:
+        """Who may cancel a credit document in myDATA: whoever holds the
+        store's permission to change credit documents, and only where the
+        platform issues the store's documents (``MyDataConfig.is_ready``),
+        as for the order's "Cancel receipt in myDATA". Not ``change``
+        itself: this register refuses that to everyone, so a tax record is
+        never edited here."""
+        return request.user.has_perm(
+            "order.change_retailcredit"
+        ) and OrderAdmin._issues_receipts(request)
+
     @admin.action(
         description=_("Cancel in myDATA (issued in error)"),
-        permissions=["change"],
+        permissions=["cancel_in_mydata"],
     )
     def cancel_in_mydata(self, request, queryset):
         from order.tasks import cancel_mydata_credit

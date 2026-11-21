@@ -208,13 +208,12 @@ class ShippingCarrierInterface(ABC):
         """
         return {}
 
-    def orders_written_since(
-        self, order_ids: list[int], since: datetime
-    ) -> set[int]:
-        """The given orders this carrier wrote a record of since *since*:
-        what the daily sweep of erased orders clears again
-        (``order.privacy.erase_late_carrier_data``), so data that arrives
-        after an erasure, the parcel's last event included, does not stay.
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders this carrier wrote a record of since *since*, read
+        from the rows written since then: what the daily sweep of erased
+        orders clears again (``order.privacy.erase_late_carrier_data``),
+        so data that arrives after an erasure, the parcel's last event
+        included, does not stay.
 
         Default: none, for a carrier that keeps no records of its own.
         """

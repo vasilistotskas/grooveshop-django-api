@@ -29,7 +29,9 @@ holds `PERSONAL_FIELDS` to the staging anonymiser's list.
 export and the erasure read. It covers the account's orders and the guest
 orders placed with one of its verified addresses, as every other guest record
 is. Soft-deleted ones are included (`all_with_deleted`), because an admin
-delete only hides an order.
+delete only hides an order. What hangs off those orders goes with them: a
+guest order's promotion redemption and Conversions API logs carry no user,
+so they are found by the order.
 
 ## What erasure does to an order
 
@@ -85,17 +87,26 @@ poll, webhook and COD answer writes the recipient's details again. That
 includes the last one, which often names who took delivery.
 
 `user.tasks.erase_late_carrier_data` runs daily, fanned out to every store
-(suspended included). It runs the carrier erase again for an erased order when
-either of these happened within `ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS` (7):
+(suspended included). It runs the carrier erase again for an erased order
+when a carrier wrote a record of it within `ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS`
+(7). A record is any of these:
 
-- the order was erased;
-- a carrier wrote a record of it (`orders_written_since`): a shipment row, a
-  tracking checkpoint, a COD payout or an ACS call naming it or its vouchers,
-  or a BOX NOW event.
+- a tracking checkpoint;
+- a COD payout, matched by its shipment or by its voucher alone;
+- an ACS call naming the order or any voucher it had;
+- a BOX NOW event or shipment row;
+- an ACS shipment row whose personal metadata a writer changed (those
+  writers bump `updated_at`).
 
-The lookback is longer than any gap between two daily runs, so no write is
-missed. An order nothing is written about is not read again. What arrives is
-cleared within a day.
+Each carrier reads those rows from the ones written since then
+(`orders_written_since`), so the sweep's cost follows what the carriers
+wrote, not how many orders were ever erased. The lookback is longer than any
+gap between two daily runs, so no write is missed. What arrives is cleared
+within a day.
+
+The same sweep clears the billing fields of an erased order that no longer
+needs them: an INVOICE order that was owed an invoice at erasure and was
+canceled since.
 
 ## Orders erased before this
 
@@ -104,11 +115,12 @@ The same daily sweep first finishes the orders an earlier erasure left
 email (`deleted-<hex>@deleted.invalid`) and no stamp. It finds them through
 the email's trigram index (`order_email_search_ix`).
 
-- It redacts the cancel reason's copies, and every email address in their
-  history, because the buyer's own address is gone.
-- It drops their `PERSONAL_METADATA`, applies the billing rule and stamps
-  them.
-- Being stamped that day, their carrier records are cleared in the same run.
+- It works in batches, each one transaction: their carrier records are
+  cleared, the cancel reason's copies and every email address in their
+  history are redacted (the buyer's own address is gone), their
+  `PERSONAL_METADATA` is dropped and the billing rule applied, and the stamp
+  comes last.
+- A batch that fails stays unstamped and is tried again the next day.
 
 The step is idempotent, and it also covers an order erased the old way during
 a deploy's window. Run the sweep once by hand right after the deploy that

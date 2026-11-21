@@ -297,14 +297,12 @@ class AcsCarrier(ShippingCarrierInterface):
             "carrier_events_scrubbed": events,
         }
 
-    def orders_written_since(
-        self, order_ids: list[int], since: datetime
-    ) -> set[int]:
-        """The orders ACS wrote a record of since *since*: a shipment row, a
-        tracking checkpoint, a COD payout, or a call naming the order or one
-        of its vouchers."""
-        from django.db.models import Q
-
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders ACS wrote a record of since *since*: a shipment row,
+        a tracking checkpoint, a COD payout, or a call naming the order or
+        one of its vouchers. Read from the rows written since then (each
+        table's ``created_at``/``updated_at`` index), and a voucher back to
+        its order through :func:`_orders_of_vouchers`."""
         from shipping_acs.models import (
             AcsApiCall,
             AcsCodPayout,
@@ -313,32 +311,31 @@ class AcsCarrier(ShippingCarrierInterface):
         )
 
         written = set(
-            AcsShipment.objects.filter(
-                order_id__in=order_ids, updated_at__gte=since
-            ).values_list("order_id", flat=True)
+            AcsShipment.objects.filter(updated_at__gte=since).values_list(
+                "order_id", flat=True
+            )
         )
         written |= set(
-            AcsTrackingEvent.objects.filter(
-                shipment__order_id__in=order_ids, updated_at__gte=since
-            ).values_list("shipment__order_id", flat=True)
+            AcsTrackingEvent.objects.filter(updated_at__gte=since).values_list(
+                "shipment__order_id", flat=True
+            )
         )
-        by_order = _order_vouchers(order_ids)
-        voucher_order = {
-            voucher: order_id
-            for order_id, numbers in by_order.items()
-            for voucher in numbers
-        }
-        for shipment_order, voucher in AcsCodPayout.objects.filter(
-            Q(shipment__order_id__in=order_ids)
-            | Q(voucher_no__in=voucher_order),
-            updated_at__gte=since,
+        vouchers: set[str] = set()
+        for order_id, voucher in AcsCodPayout.objects.filter(
+            updated_at__gte=since
         ).values_list("shipment__order_id", "voucher_no"):
-            written.add(shipment_order or voucher_order.get(voucher))
+            if order_id:
+                written.add(order_id)
+            elif voucher:
+                vouchers.add(voucher)
         for order_id, voucher in AcsApiCall.objects.filter(
-            Q(order_id__in=order_ids) | Q(voucher_no__in=voucher_order),
-            created_at__gte=since,
+            created_at__gte=since
         ).values_list("order_id", "voucher_no"):
-            written.add(order_id or voucher_order.get(voucher))
+            if order_id:
+                written.add(order_id)
+            elif voucher:
+                vouchers.add(voucher)
+        written |= _orders_of_vouchers(vouchers)
         written.discard(None)
         return written
 
@@ -906,3 +903,26 @@ def _order_vouchers(order_ids: list[int]) -> dict[int, set[str]]:
             str(number) for number in numbers if number
         )
     return vouchers
+
+
+def _orders_of_vouchers(vouchers: set[str]) -> set[int]:
+    """The orders any of *vouchers* belongs to, by every place
+    :func:`_order_vouchers` reads a voucher from."""
+    from django.db.models import Q
+
+    from shipping_acs.models import AcsShipment
+
+    if not vouchers:
+        return set()
+    match = Q(voucher_no__in=vouchers)
+    for voucher in vouchers:
+        for key in (
+            "multipart_vouchers",
+            "previous_vouchers",
+            "orphan_vouchers",
+        ):
+            match |= Q(**{f"metadata__{key}__contains": [voucher]})
+        match |= Q(metadata__adopted_voucher__voucher_no=voucher)
+    return set(
+        AcsShipment.objects.filter(match).values_list("order_id", flat=True)
+    )

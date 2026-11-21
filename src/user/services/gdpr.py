@@ -603,14 +603,17 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     # a stable hash exists precisely so the subject can be recognised —
     # and these rows are replay aids for incident debugging with no
     # retention duty behind them.
+    # A guest order of the subject's logs with no user: found by its order.
     counts["meta_capi_events"] = MetaCapiEventLog.objects.filter(
-        user=user
+        Q(user=user) | Q(order_id__in=order_ids)
     ).delete()[0]
 
     # Redemptions hang off a retained order, so the row stays and only
     # the denormalised address goes.
     counts["promotion_redemptions_scrubbed"] = (
-        PromotionRedemption.objects.filter(user=user).update(email="")
+        PromotionRedemption.objects.filter(
+            Q(user=user) | Q(order_id__in=order_ids)
+        ).update(email="")
     )
     counts["promotion_codes_scrubbed"] = PromotionCode.objects.filter(
         assigned_to=user

@@ -142,18 +142,26 @@ def erase_carrier_data(
     return counts
 
 
+# Orders finished per transaction by :func:`finish_earlier_erasures`.
+_FINISH_BATCH = 200
+
+
 def erase_late_carrier_data() -> dict[str, int]:
-    """Clear the carrier data that arrived for an order after its erasure,
-    and finish the orders an earlier erasure left (:func:`finish_earlier_erasures`).
+    """The daily sweep of erased orders: finish the orders an earlier
+    erasure left (:func:`finish_earlier_erasures`), clear the carrier data
+    that arrived after an erasure, and clear the billing fields of an order
+    that stopped needing them (:func:`keeps_billing`: an owed invoice whose
+    order was canceled since).
 
     A parcel still moving when its buyer is erased goes on being tracked,
     delivered and paid out: each poll, webhook and COD answer writes the
     recipient's details again, the last one (who took delivery, the COD
-    receiver) included. An erased order is swept again when it was erased,
-    or a carrier wrote a record of it (``orders_written_since``), within
-    the last ``ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS``: longer than any gap
-    between two daily runs, so no write is missed, and an order nothing
-    is written about is not read again.
+    receiver) included. An erased order is swept again when a carrier wrote
+    a record of it (``orders_written_since``) within the last
+    ``ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS``: longer than any gap between two
+    daily runs, so no write is missed. The carriers start from the rows
+    written since then, so the sweep's cost follows what they wrote, not
+    how many orders were ever erased.
     """
     from order.models.order import Order
 
@@ -161,24 +169,23 @@ def erase_late_carrier_data() -> dict[str, int]:
     since = timezone.now() - timedelta(
         days=settings.ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS
     )
-    erased = Order.objects.all_with_deleted().filter(
-        personal_data_erased_at__isnull=False
+    written: set[int] = set()
+    for carrier in registered_providers():
+        written |= carrier.orders_written_since(since)
+    swept = sorted(
+        Order.objects.all_with_deleted()
+        .filter(id__in=written, personal_data_erased_at__isnull=False)
+        .values_list("id", flat=True)
     )
-    swept = set(
-        erased.filter(personal_data_erased_at__gte=since).values_list(
-            "id", flat=True
-        )
-    )
-    older = list(
-        erased.filter(personal_data_erased_at__lt=since).values_list(
-            "id", flat=True
-        )
-    )
-    if older:
-        for carrier in registered_providers():
-            swept |= carrier.orders_written_since(older, since)
-    counts = erase_carrier_data(sorted(swept), buyer_values={})
+    counts = erase_carrier_data(swept, buyer_values={})
     counts["earlier_erasures_finished"] = finished
+    counts["billing_cleared"] = (
+        Order.objects.all_with_deleted()
+        .filter(personal_data_erased_at__isnull=False)
+        .exclude(keeps_billing())
+        .exclude(**dict.fromkeys(Order.BILLING_FIELDS, ""))
+        .update(**dict.fromkeys(Order.BILLING_FIELDS, ""))
+    )
     return counts
 
 
@@ -189,18 +196,21 @@ def finish_earlier_erasures() -> int:
     identity and cancel reason in ``metadata``, the reason's copies, the
     "email sent to <address>" history notes, the carriers' records).
 
-    Their copies are redacted by what is left on the order (the cancel
-    reason), and their history by every email address it names, as the
-    buyer's is gone; then they get what every erased order ends with
-    (:func:`_clear_and_stamp`). Stamped today, the sweep clears their
-    carrier records in the same run. Idempotent: a stamped order is never
-    matched again. Found through the email's trigram index
+    In batches, each one transaction: the carriers' records are cleared,
+    the copies redacted by what is left on the order (the cancel reason)
+    and the history by every email address it names, as the buyer's is
+    gone; the stamp comes last (:func:`_clear_and_stamp`), so a stamped
+    order is always one whose carrier records were cleared, and a batch
+    that fails is tried again the next day. Idempotent: a stamped order is
+    never matched again. Found through the email's trigram index
     (``order_email_search_ix``). A soft-deleted order that erasure skipped
     was unlinked from its account with its data and cannot be told apart
     from a guest's."""
+    from django.db import transaction
+
     from order.models.order import Order
 
-    order_ids = list(
+    pending = (
         Order.objects.all_with_deleted()
         .filter(
             user__isnull=True,
@@ -208,13 +218,16 @@ def finish_earlier_erasures() -> int:
             email__endswith="@deleted.invalid",
             personal_data_erased_at__isnull=True,
         )
-        .values_list("id", flat=True)
+        .order_by("id")
     )
-    if not order_ids:
-        return 0
-    _erase_copies(_buyer_values(order_ids), emails=True)
-    _clear_and_stamp(order_ids)
-    return len(order_ids)
+    finished = 0
+    while batch := list(pending.values_list("id", flat=True)[:_FINISH_BATCH]):
+        with transaction.atomic():
+            erase_carrier_data(batch, buyer_values={})
+            _erase_copies(_buyer_values(batch), emails=True)
+            _clear_and_stamp(batch)
+        finished += len(batch)
+    return finished
 
 
 def _buyer_values(order_ids: list[int]) -> dict[int, list[str]]:

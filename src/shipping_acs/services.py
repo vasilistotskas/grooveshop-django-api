@@ -1031,7 +1031,9 @@ class AcsService:
                     "response": getattr(exc, "raw", None),
                 }
                 fresh.metadata = metadata
-                fresh.save(update_fields=["metadata"])
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
+                fresh.save(update_fields=["metadata", "updated_at"])
         except Exception:
             logger.warning(
                 "Failed to persist last_error for shipment=%s",
@@ -1686,11 +1688,14 @@ class AcsService:
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment.cancel_requested_at = timezone.now()
             shipment.metadata = metadata
+            # ``updated_at`` too: the erasure sweep reads a write to the
+            # row by it (``AcsCarrier.orders_written_since``).
             shipment.save(
                 update_fields=[
                     "shipment_state",
                     "cancel_requested_at",
                     "metadata",
+                    "updated_at",
                 ]
             )
 

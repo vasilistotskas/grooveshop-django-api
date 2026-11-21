@@ -200,6 +200,12 @@ class TestCompileUserDataCompleteness:
         BoxNowParcelEventFactory(
             shipment=BoxNowShipmentFactory(order=by_boxnow),
             additional_information="Στο ντουλάπι 12",
+            raw_payload={
+                "data": {
+                    "customer": {"name": "Ζ. Α.", "phoneNumber": "+3069"},
+                    "additionalInformation": "Στο ντουλάπι 12",
+                }
+            },
         )
 
         exported = {o["id"]: o for o in compile_user_data(user)["orders"]}
@@ -209,7 +215,8 @@ class TestCompileUserDataCompleteness:
             "acs_cod_receivers": ["Ζ. Α."],
         }
         assert exported[by_boxnow.id]["carrier"] == {
-            "boxnow_event_texts": ["Στο ντουλάπι 12"]
+            "boxnow_event_texts": ["Στο ντουλάπι 12"],
+            "boxnow_customers": [{"name": "Ζ. Α.", "phoneNumber": "+3069"}],
         }
 
     def test_a_saved_address_exports_its_address_line_2(self):

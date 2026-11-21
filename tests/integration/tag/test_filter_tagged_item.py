@@ -1,9 +1,20 @@
+import pytest
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from product.factories.product import ProductFactory
 from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
+
+# Every test lists tagged products, whose contentObject is declared as a
+# loose object with a string price, not the Product it is (#684).
+pytestmark = pytest.mark.known_schema_drift(
+    "GET",
+    "/api/v1/tagged-item",
+    200,
+    at="$.results[*].contentObject.price",
+    issue=684,
+)
 
 
 class TaggedItemFilterTest(APITestCase):

@@ -22,7 +22,7 @@ from django_tenants.utils import (
     tenant_context,
 )
 
-from core.caches import REDIS_UNAVAILABLE
+from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import client_ip_or_peer
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -211,7 +211,7 @@ def _webhook_get_rate_limit(request, *, answer_is_free: bool) -> bool:
     from Viva with the store's credentials, so an unthrottled caller would
     spend the store's Viva budget: the cache's error goes on, and the
     request is refused with 503 (``core.middleware.strict_cache``, the rule
-    beside ``core.caches.STRICT_KEY_PREFIXES``). Only the cache's
+    beside ``core.cache_backend.STRICT_KEY_PREFIXES``). Only the cache's
     unavailability is caught; any other error is a bug.
 
     Keyed on ``client_ip_or_peer``, never a bare ``X-Real-IP``: a caller

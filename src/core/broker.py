@@ -57,7 +57,7 @@ from django.conf import settings
 from kombu.exceptions import OperationalError
 from kombu.transport import pyamqp
 
-from core.caches import BurstLogger
+from core.cache_backend import BurstLogger
 
 logger = logging.getLogger(__name__)
 

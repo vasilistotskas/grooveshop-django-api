@@ -97,7 +97,7 @@ Every app, the settings package (`src/settings/`) and the `asgi` package live in
 - `SortableModel` — `sort_order` with atomic `move_up()`/`move_down()` using `select_for_update()`
 - `PublishableModel` — `is_published`/`published_at` with `PublishableManager.published()` queryset
 - `MetaDataModel` — `metadata`/`private_metadata` JSONFields with GinIndex
-- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()`, `.deleted_only()`, `.restore()`, `.hard_delete()`)
+- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()` and `.deleted_only()` on the manager, `.restore()` and `.hard_delete()` on its querysets); the queryset and manager behaviour is `core.mixins.soft_delete` (`SoftDeleteQuerySetMixin`, `SoftDeleteManagerMixin`), so a bulk `queryset.delete()` soft-deletes as `instance.delete()` does and only `hard_delete()` removes rows
 
 Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, UUIDModel, MetaDataModel, TaggedModel)` with `ProductTranslation(TranslatedFieldsModel, SeoTranslationModel, IndexMixin)`.
 
@@ -167,7 +167,8 @@ ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/monitored_task.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
-- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session and history cleanup
+- `src/core/tasks.py` — the database dump and old-backup cleanup, cache clearing, session and history cleanup
+- `src/tenant/tasks.py` — the per-store fan-outs, deferred dispatch, and the platform's health monitor and scheduled backup, which alert the operators (`src/tenant/emails.py`)
 - `src/cart/tasks.py` — abandoned and old guest cart cleanup
 - `src/user/tasks.py` — account and allauth emails, data export, the inactive-user re-engagement email
 - `src/meili/tasks.py` — document indexing and the daily index sync
@@ -177,7 +178,7 @@ Tasks are split by domain:
 - `src/loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 - `src/contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
-**Queueing after a commit.** Queue a task that follows a change with `tenant.celery.dispatch_on_commit` (schema pinned at the call). A publish that fails because the broker is unreachable never reaches the caller: it is logged at ERROR and kept as a `tenant.DeferredDispatch` that `redispatch_deferred_tasks` publishes again; a task whose work is the state of a row also gets a sweep over that state (`contact.tasks.rescan_pending_attachments`). See [`docs/deferred-dispatch.md`](docs/deferred-dispatch.md).
+**Queueing after a commit.** Queue a task that follows a change with `tenant.celery.dispatch_on_commit` (schema pinned at the call). A publish that fails because the broker is unreachable never reaches the caller: it is logged at ERROR and kept as a `tenant.DeferredDispatch` that `redispatch_deferred_tasks` publishes again; a task whose work is the state of a row also gets a sweep over that state (`contact.tasks.rescan_pending_attachments`). A task queued this way can run more than once (the failed publish's message and the sweep's copy, a redelivery, a retry), and every copy carries the task id the helper chose: key a non-idempotent effect on it or claim a state, never check and then act. See [`docs/deferred-dispatch.md`](docs/deferred-dispatch.md).
 
 **Data retention.** Every sweep deletes through `core.retention.delete_in_batches` (batch size `RETENTION_PURGE_BATCH_SIZE`; each batch is read with the sweep's filters under row locks and deleted in the same transaction, so a row that stopped being stale is kept) and per-store tables fan out through `tenant.tasks.fanout_purge_*` with `include_suspended=True`, which reaches every store, suspended ones included (`Tenant.objects.stores()`; a fan-out without it reaches `Tenant.objects.active()`). A model whose `HistoricalRecords` sets `excluded_fields` and is saved by a bookkeeping task uses `core.history.ChangeOnlyHistoricalRecords`, or every poll tick writes a history row. The full table (what, how long, which setting) is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
@@ -195,7 +196,7 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `src/dev
 - `auto_translations` flag for parler models
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
-- `get_or_create_instance()` helper in `src/core/helpers/factory.py` for dynamic model/factory resolution
+- `get_or_create_instance()` in `src/tag/factories/tagged_item.py`, its only caller, for dynamic model/factory resolution
 - `UserNameGenerator` in `src/user/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration

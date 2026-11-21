@@ -105,15 +105,39 @@ SMTP returns no id, so it stays null there) or `FAILED` (`error`). A skip is
 one row with its status and, for a closed gate, the gate's label in `reason`.
 
 **Delivery identity across retries.** `EmailLog.uuid` is the delivery's identity (`log.delivery_id`). Inside a Celery
-task it is derived from the task id, which `retry()` keeps, plus the type, the
-recipient hash and the subject; outside a task it is a fresh uuid4. A retry of
-a send that failed (or whose response was lost) therefore finds the row its
-earlier attempt wrote, moves it back to `QUEUED` and sends under the same
-uuid, so one row and, on Resend, one idempotency key cover the whole chain. A
-recipient whose row is already `SENT` is returned as sent without a second
-send: a task that mails two recipients and fails on the second does not mail
-the first again. Two different mails of one type to one recipient in one task
-differ in their subject, so they stay two deliveries.
+task it is derived from the task id plus the type, the recipient hash and the
+subject; outside a task it is a fresh uuid4. Every copy of a task carries the
+same id: its retries, a message delivered again after a worker was lost, and
+the sweep's copy of a publish that also wrote its message
+(`tenant.celery.dispatch_on_commit` picks the id, see
+`docs/deferred-dispatch.md`). A copy of a send that failed (or whose response
+was lost) therefore finds the row the earlier one wrote, moves it back to
+`QUEUED` and sends under the same uuid, so one row and, on Resend, one
+idempotency key cover the whole chain. A recipient whose row is already `SENT`
+is returned as sent without a second send: a task that mails two recipients
+and fails on the second does not mail the first again, and a second copy of a
+task mails nobody. Two different mails of one type to one recipient in one
+task differ in their subject, so they stay two deliveries.
+
+**Copies at the same moment.** The sweep's copy and the message that publish
+wrote are delivered together once the broker takes messages again, so two
+workers can send the same delivery at once. `log.delivering` reads the row and
+the transport sends under a PostgreSQL advisory lock on the delivery id
+(`core.db.locks.held_across_calls`): the second copy waits until the first has
+the transport's answer, then finds the row `SENT` and sends nothing. The lock is the session's, held outside any
+transaction (a transaction open across the send would be ended by
+`idle_in_transaction_session_timeout`), so a worker that dies takes it along
+and the waiting copy sends instead: at once when its process ends, and within
+about a minute when its node is lost without closing the socket (every session
+sets TCP keepalives, `DB_TCP_KEEPALIVES_*` in `src/settings/database.py`; the
+server's own probe a lost client for about half an hour). Inside a transaction (a task applied
+eagerly) it is the transaction's and ends with it. A send outside a task has a
+fresh id and takes no lock. A wait that runs out (`statement_timeout`, or a
+`lock_timeout` a session sets) raises
+`OperationalError`, which the mail tasks retry; a database that cannot be
+reached at all does not stop the send, as for the row below.
+`tests/integration/emails/test_delivery_copies_at_once.py` runs two copies on
+two connections.
 
 What a row holds: type key, status, language, the subject that went out, a
 keyed hash of the address (`optout.address_hash`) and a masked form

@@ -9,7 +9,7 @@ from os import getenv
 from redis.backoff import NoBackoff
 from redis.retry import Retry
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 
 def stopped_default_cache(default: dict) -> dict:
@@ -19,7 +19,7 @@ def stopped_default_cache(default: dict) -> dict:
     alike, as a real Redis outage does."""
     return {
         **default,
-        "BACKEND": "core.caches.CustomCache",
+        "BACKEND": "core.cache_backend.CustomCache",
         "LOCATION": "redis://127.0.0.1:1/0",
         "OPTIONS": {
             "retry": Retry(NoBackoff(), 0),

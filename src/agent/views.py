@@ -74,6 +74,10 @@ class AgentTokenAuthentication(TokenAuthentication):
         )
         if not valid:
             return None
+        if orequest.user is None:
+            # A token that names no person (a machine grant) is nobody's
+            # link: the views read ``request.user``.
+            raise AuthenticationFailed("The token names no account.")
         access_token = get_validator_context().access_token
         resources = access_token.get_resources() if access_token else []
         if resources and not is_resources_subset(

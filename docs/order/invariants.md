@@ -95,7 +95,7 @@ These invariants need more than a table row. Each ends with its anchor.
   - Anchor: commits `61dd09854` (2026-04-29, the amount) and `ffe1718e4`
     (2026-04-30, the weight)
 - The default cache fails open on a Redis outage (reads miss, writes no-op —
-  `src/core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
+  `src/core/cache_backend.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
   the IdP's single-use codes and WebSocket tickets. The checkout, payment,
   coupon and gift-card throttles (`src/order/throttles.py`,

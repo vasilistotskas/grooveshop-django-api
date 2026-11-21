@@ -1103,6 +1103,10 @@ def seed_products() -> dict[str, int]:
         product.discount_percent = Decimal(row.discount)
         product.stock = row.stock
         product.active = True
+        # The dataset is code: a demo product staff deleted comes back with
+        # the rest, or the offers that target it stop the seed.
+        product.is_deleted = False
+        product.deleted_at = None
         product.vat = vat
         # A `Weight`, not a dict: the field is a MeasurementField and
         # hands the raw value to a FloatField. Never zero, either — a

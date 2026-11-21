@@ -212,11 +212,11 @@ def test_an_undocumented_status_is_still_the_plain_error(
 
 
 def test_no_generated_operation_documents_a_plain_400_alone(
-    generated_schema,
+    openapi_schema,
 ):
     offenders = [
         f"{method.upper()} {path}"
-        for path, operations in generated_schema["paths"].items()
+        for path, operations in openapi_schema["paths"].items()
         for method, operation in operations.items()
         if isinstance(operation, dict)
         for media in operation.get("responses", {})

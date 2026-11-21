@@ -1405,12 +1405,12 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         write_only=True,
         help_text=_(
             "Meta Pixel context: keys ``fbp``, ``fbc``, "
-            "``client_user_agent``, ``client_ip_address``, "
-            "``event_ids`` (dict of {purchase, initiate_checkout, "
-            "add_payment_info}), ``consent`` (dict with ``ads`` "
-            "boolean). Empty dict / null when the customer declined "
-            "marketing cookies; the CAPI dispatcher then skips the "
-            "send."
+            "``client_user_agent``, ``event_ids`` (dict of {purchase, "
+            "initiate_checkout, add_payment_info}), ``consent`` (dict "
+            "with ``ads`` boolean). A ``client_ip_address`` sent here is "
+            "ignored: the server sets it from the verified edge address. "
+            "Empty dict / null when the customer declined marketing "
+            "cookies; the CAPI dispatcher then skips the send."
         ),
     )
 

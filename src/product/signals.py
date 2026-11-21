@@ -141,8 +141,8 @@ def post_create_historical_record_callback(
 def reindex_products_by_pk(product_ids) -> int:
     """Reindex the translations of products changed WITHOUT a save().
 
-    ``queryset.update()`` and ``SoftDeleteQuerySet.delete()`` are single
-    SQL statements: they emit no ``post_save``, so
+    ``queryset.update()`` is a single SQL statement: it emits no
+    ``post_save`` (a bulk soft delete goes row by row and does), so
     ``reindex_product_translations`` below never runs and the
     Meilisearch documents keep their old ``active`` / ``is_deleted``
     values. Measured: a bulk update fires **0** post_save receivers

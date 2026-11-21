@@ -3,6 +3,34 @@
 
 
 
+## v3.262.3 (2026-11-21)
+
+### Refactoring
+
+* refactor(order): refunds out of OrderService into RefundService (order/refunds) (#795) ([`a4daf63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4daf638e77d5393d23e6a287412111dece17f37))
+
+* refactor(order): refunds out of OrderService into RefundService
+
+The claim, allocation, provider shares, booking and declines of a refund
+move from order/services.py to order/refunds/service.py, with
+RefundResult, its share records and the paid-statuses set. The methods
+keep their names on RefundService; every caller, test, patch string and
+doc reference is repointed, and no stub stays on OrderService. The
+refunds package no longer imports order.services: cancellation calls
+RefundService.refund_order, and refund reconciliation books its shares
+there.
+
+Refs #569 ([`a4daf63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4daf638e77d5393d23e6a287412111dece17f37))
+
+* refactor(order): name RefundService where the move left OrderService
+
+The refund signals now come from RefundService, and the loyalty test
+that mimics them sends as it. Comments and docstrings that still named
+OrderService for refund code, and the payments contract's note on who
+removes its ignored edge, are corrected.
+
+Refs #569 ([`a4daf63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4daf638e77d5393d23e6a287412111dece17f37))
+
 ## v3.262.2 (2026-11-21)
 
 ### Bug fixes

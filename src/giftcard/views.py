@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from drf_spectacular.utils import extend_schema_view
@@ -410,8 +411,12 @@ class GiftCardViewSet(BaseModelViewSet):
 
     @staticmethod
     def _my_cards(request):
+        """The account's cards, each balance summed in the one query
+        (``ledger_total``, which ``GiftCard.balance`` reads) rather than one
+        SUM per card."""
         return (
             GiftCard.objects.filter(issued_to=request.user)
+            .annotate(ledger_total=Sum("transactions__amount"))
             .prefetch_related("transactions")
             .order_by("-created_at")
         )

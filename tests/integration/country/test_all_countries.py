@@ -20,13 +20,12 @@ from shipping.factories import ShippingProviderFactory, ShippingRateFactory
 
 pytestmark = pytest.mark.django_db
 
-PAGE_SIZE = 2
 
+def test_it_answers_every_country_past_the_list_page():
+    # More rows than the list's default page of 12.
+    CountryFactory.create_batch(15)
 
-def test_it_answers_every_country_past_any_page_size():
-    CountryFactory.create_batch(PAGE_SIZE + 3)
-
-    response = APIClient().get(reverse("country-all"), {"pageSize": PAGE_SIZE})
+    response = APIClient().get(reverse("country-all"))
 
     assert response.status_code == status.HTTP_200_OK
     codes = {row["alpha2"] for row in response.json()}
@@ -53,10 +52,32 @@ def test_it_filters_as_the_list_does(monkeypatch):
     assert unrated.alpha_2 not in codes
 
 
-def test_it_orders_as_the_list_does():
-    CountryFactory.create_batch(3)
+def _countries_created_in_ascending_code_order(count: int) -> list[str]:
+    """Countries whose ``sort_order`` (creation order) runs opposite to a
+    descending code order, so a sort that is not applied shows."""
+    codes = sorted(f"Q{chr(ord('A') + n)}" for n in range(count))
+    for code in codes:
+        CountryFactory(alpha_2=code, alpha_3=f"{code}X")
+    return codes
 
-    whole = APIClient().get(reverse("country-all"), {"ordering": "-alpha_2"})
 
-    codes = [row["alpha2"] for row in whole.json()]
-    assert codes == sorted(codes, reverse=True)
+def test_it_orders_by_the_requested_key():
+    codes = _countries_created_in_ascending_code_order(3)
+
+    response = APIClient().get(reverse("country-all"), {"ordering": "-alpha2"})
+
+    listed = [row["alpha2"] for row in response.json()]
+    assert [code for code in listed if code in codes] == codes[::-1]
+
+
+def test_without_a_key_it_orders_as_the_list_does():
+    _countries_created_in_ascending_code_order(3)
+    client = APIClient()
+
+    whole = [row["alpha2"] for row in client.get(reverse("country-all")).json()]
+    first_page = [
+        row["alpha2"]
+        for row in client.get(reverse("country-list")).json()["results"]
+    ]
+
+    assert whole[: len(first_page)] == first_page

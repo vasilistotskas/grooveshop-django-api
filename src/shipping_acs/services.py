@@ -160,6 +160,15 @@ def _floor_label(order: Order) -> str:
     """
     if not order.floor:
         return ""
+    if order.floor not in FloorChoicesEnum.values:
+        # The column's choices are not a database constraint: a value
+        # outside them must not keep the voucher from being issued.
+        logger.warning(
+            "Order %s has a floor outside the choices: %r",
+            order.id,
+            order.floor,
+        )
+        return ""
     with translation.override("el"):
         return str(FloorChoicesEnum(order.floor).label)
 
@@ -207,9 +216,29 @@ def _stale_claim_message(age: float) -> str:
     )
 
 
-def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
-    """Return a PII-scrubbed copy of the create-voucher params."""
-    return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+def _audit_envelope(params: dict[str, Any], order: Order) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the create-voucher params.
+
+    ``Delivery_Notes`` is recorded without the address line 2 it carries
+    (``_delivery_notes``): that line is the recipient's address.
+    """
+    envelope = {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+    if "Delivery_Notes" in envelope:
+        envelope["Delivery_Notes"] = _delivery_notes(order, with_address=False)
+    return envelope
+
+
+def _delivery_notes(order: Order, *, with_address: bool = True) -> str:
+    """The voucher's ``Delivery_Notes``: the floor, the address line 2
+    and the customer's note (``courier_delivery_notes``). The floor and
+    the address line come first: ACS's ``Recipient_Address`` is the street
+    alone, so they ride here. ``with_address=False`` leaves the address
+    line out, for the audit copy that must hold no recipient address."""
+    return courier_delivery_notes(
+        floor=_floor_label(order),
+        address_line_2=order.address_line_2 if with_address else "",
+        customer_notes=order.customer_notes,
+    )
 
 
 def _kg_from_grams(weight_grams: int | None) -> str:
@@ -794,7 +823,7 @@ class AcsService:
                 # shipping_boxnow/services.py).
                 metadata.pop("last_error", None)
                 metadata["create_response"] = result
-                metadata["create_request"] = _audit_envelope(params)
+                metadata["create_request"] = _audit_envelope(params, order)
                 metadata["multipart_vouchers"] = children
 
                 # The answer came after another worker found this claim
@@ -1469,13 +1498,7 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            # The floor and the address line 2 come first: ACS's
-            # ``Recipient_Address`` is the street alone, so they ride here.
-            "Delivery_Notes": courier_delivery_notes(
-                floor=_floor_label(order),
-                address_line_2=order.address_line_2,
-                customer_notes=order.customer_notes,
-            ),
+            "Delivery_Notes": _delivery_notes(order),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:

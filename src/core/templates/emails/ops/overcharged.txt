@@ -2,10 +2,10 @@
 
 {% blocktrans %}A {{ provider }} payment means the customer has paid more than the order is for. The order keeps its first payment and nothing was refunded automatically.{% endblocktrans %}
 
-{% trans "Order" %}: #{{ order_id|safe }}
-{% trans "Payment method" %}: {{ provider|safe }}
-{% trans "Payment reference" %}: {{ payment_id|safe }}
-{% trans "Paid too much" %}: {{ excess|safe }}
+{% trans "Order" %}: #{{ order_id }}
+{% trans "Payment method" %}: {{ provider }}
+{% trans "Payment reference" %}: {{ payment_id }}
+{% trans "Paid too much" %}: {{ excess }}
 
 {% blocktrans %}Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for.{% endblocktrans %}
 

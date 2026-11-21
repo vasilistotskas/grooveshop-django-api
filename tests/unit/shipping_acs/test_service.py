@@ -2085,6 +2085,52 @@ class TestDeliveryNotesInPayload:
                 f"PII leak in create_request envelope: {forbidden}"
             )
 
+    def test_the_audit_copy_holds_no_address_line_2(self, acs_client_mock):
+        """The voucher's notes carry the address line 2; the audit copy on
+        ``shipment.metadata`` must not, as it holds no recipient address
+        (GDPR anonymisation does not clear it)."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor="SECOND_FLOOR",
+            address_line_2="Διαμ. 3",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == "2ος όροφος | Διαμ. 3 | Θυρωρός."
+        envelope = result.metadata["create_request"]
+        assert envelope["Delivery_Notes"] == "2ος όροφος | Θυρωρός."
+        assert "Διαμ. 3" not in str(result.metadata)
+
+    def test_a_floor_outside_the_choices_issues_the_voucher(
+        self, acs_client_mock
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Θυρωρός.",
+        )
+        from order.models.order import Order
+
+        Order.objects.filter(pk=order.pk).update(floor="ROOF")
+        order.refresh_from_db()
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        assert acs_client_mock.last_create_payload["Delivery_Notes"] == (
+            "Θυρωρός."
+        )
+
     def test_success_clears_stale_last_error(self, acs_client_mock):
         """A retry after a prior failed mint must wipe ``last_error`` so
         ops looking at the row don't mistake a stale error for the

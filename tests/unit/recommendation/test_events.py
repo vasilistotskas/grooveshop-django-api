@@ -153,16 +153,16 @@ def test_a_second_copy_of_the_task_writes_nothing():
     assert all(row.event_key is not None for row in rows)
 
 
-def test_two_beacons_for_one_impression_are_two_sets_of_rows():
-    """A cached strip shows one impression id to every viewer, and each
-    view's beacon is a task of its own: they are separate impressions."""
+def test_one_showing_is_one_set_of_rows_whatever_carries_it():
+    """The showing's id names the event: a beacon sent again for it, under
+    another task, records nothing more."""
     product = ProductFactory(num_images=0)
     impression = uuid.uuid4()
 
-    _record(impression, [product], task_id="one-view")
-    _record(impression, [product], task_id="another-view")
+    _record(impression, [product], task_id="one-beacon")
+    _record(impression, [product], task_id="the-same-beacon-again")
 
     assert (
         RecommendationEvent.objects.filter(impression_id=impression).count()
-        == 2
+        == 1
     )

@@ -104,9 +104,6 @@ class RecommendationItemSerializer(serializers.Serializer):
 class RecommendationResponseSerializer(serializers.Serializer):
     surface = serializers.ChoiceField(choices=Surface.choices)
     items = RecommendationItemSerializer(many=True, read_only=True)
-    impression_id = serializers.UUIDField(
-        help_text=_("Echo on click events so attach can be attributed.")
-    )
 
 
 class RecommendationEventItemSerializer(serializers.Serializer):
@@ -116,7 +113,12 @@ class RecommendationEventItemSerializer(serializers.Serializer):
 
 
 class RecommendationEventRequestSerializer(serializers.Serializer):
-    impression_id = serializers.UUIDField()
+    impression_id = serializers.UUIDField(
+        help_text=_(
+            "The showing's own id, minted by the client each time it shows "
+            "a strip; sent on the impression and on every click of it."
+        )
+    )
     surface = serializers.ChoiceField(choices=Surface.choices)
     # ``attach`` is written server-side by order completion only.
     kind = serializers.ChoiceField(

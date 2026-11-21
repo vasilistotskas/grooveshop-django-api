@@ -5,19 +5,19 @@ anonymous endpoint declares itself — and both sit behind the tenant's
 ``recommendations_enabled`` plan flag, which answers 404 when off so
 the endpoint is indistinguishable from a route that does not exist.
 
-The read path writes nothing. ``impression_id`` is a correlation id
-minted per response; the IMPRESSION itself is reported by the client
+The read path writes nothing. The IMPRESSION is reported by the client
 through the events endpoint when the strip actually becomes visible,
 because "served" is not "shown" — a strip below the fold that nobody
-scrolls to must not count against a strategy's click-through. That
-also lets the storefront cache this body per (surface, seed) for a few
-minutes without the count meaning cache fills: attribution rows carry
-the viewer's session, so a shared correlation id is harmless.
+scrolls to must not count against a strategy's click-through. The
+storefront caches this body per (surface, seed) and the edge caches the
+page it is drawn into, so one body reaches many viewers: the body names
+no impression. The client mints an ``impression_id`` for each showing,
+and sends it with the impression, with every click of that strip and
+on the add to cart that follows one, so each showing is an event of its
+own and an attach is tied to the viewer who saw it.
 """
 
 from __future__ import annotations
-
-import uuid
 
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
@@ -68,9 +68,10 @@ def _user_id(request) -> int | None:
         "(product page, cart, out-of-stock, empty cart). Each item "
         "carries the strategy that produced it and, for merchant-curated "
         "links, the relation type. An empty list means the store has "
-        "nothing worth showing here — render nothing. Report an "
-        "impression event with impression_id once the strip is shown, "
-        "and echo it on click events."
+        "nothing worth showing here — render nothing. Mint an "
+        "impression_id each time the strip is shown, report the "
+        "impression event under it, and send it on that strip's click "
+        "events."
     ),
     tags=["Recommendations"],
     parameters=[RecommendationQuerySerializer],
@@ -104,7 +105,6 @@ def recommendations(request):
         )
     )
     pairs = hydrate_pairs(suggestions, context={"request": request})
-    impression_id = uuid.uuid4()
 
     items = [
         {
@@ -122,7 +122,6 @@ def recommendations(request):
         {
             "surface": data["surface"],
             "items": items,
-            "impression_id": impression_id,
         },
         status=status.HTTP_200_OK,
     )
@@ -131,9 +130,9 @@ def recommendations(request):
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Record a suggestion impression or click"),
     description=_(
-        "Feeds the learning loop. Pass the impression_id from the "
-        "suggestions response. Attach events are written server-side "
-        "when an order completes and cannot be posted here."
+        "Feeds the learning loop. Pass the impression_id the client "
+        "minted for this showing of the strip. Attach events are written "
+        "server-side when an order completes and cannot be posted here."
     ),
     tags=["Recommendations"],
     request=RecommendationEventRequestSerializer,

@@ -95,17 +95,18 @@ class TestRecommendations:
         }
         assert seed.id not in [item["product"]["id"] for item in data["items"]]
 
-        uuid.UUID(str(data["impression_id"]))
-        # The read path writes nothing: the impression is the client's
-        # to report once the strip is actually shown, so a cached or
-        # never-scrolled-to response cannot inflate a strategy's
-        # impression count.
+        # The body names no impression: it is cached and shared, and the
+        # client mints an id for each showing. The read path writes nothing:
+        # the impression is the client's to report once the strip is
+        # actually shown, so a cached or never-scrolled-to response cannot
+        # inflate a strategy's impression count.
+        assert "impression_id" not in data
         assert not RecommendationEvent.objects.exists()
 
     def test_wire_shape_is_camel_case(self, client, curated_seed):
         seed, _ = curated_seed
         body = client.get(self.url, {"seed": seed.id}).json()
-        assert "impressionId" in body
+        assert set(body) == {"surface", "items"}
         assert "relationType" in body["items"][0]["reason"]
 
     def test_nothing_worth_showing_is_an_empty_list(self, client):
@@ -128,7 +129,6 @@ class TestRecommendations:
         assert {item["reason"]["strategy"] for item in items} == {
             StrategyCode.POPULAR
         }
-        uuid.UUID(str(response.data["impression_id"]))
 
     def test_exclusions_are_honoured(self, client, curated_seed):
         seed, curated = curated_seed
@@ -224,6 +224,28 @@ class TestEvents:
         assert row.product_id == product.id
         assert str(row.impression_id) == payload["impressionId"]
         assert row.position == 1
+
+    def test_one_showing_reported_twice_is_one_event(self, client):
+        """A beacon sent again (a retried request, a second mount of the
+        same showing) is the same event: the showing's id names it."""
+        payload = self._payload(_product(), kind=EventKind.IMPRESSION)
+
+        client.post(self.url, payload, format="json")
+        client.post(self.url, payload, format="json")
+
+        assert RecommendationEvent.objects.count() == 1
+
+    def test_two_showings_of_one_strip_are_two_events(self, client):
+        product = _product()
+
+        for _ in range(2):
+            client.post(
+                self.url,
+                self._payload(product, kind=EventKind.IMPRESSION),
+                format="json",
+            )
+
+        assert RecommendationEvent.objects.count() == 2
 
     def test_a_broker_failure_drops_the_event_and_still_accepts(
         self, client, caplog

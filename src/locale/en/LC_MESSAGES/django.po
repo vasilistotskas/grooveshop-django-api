@@ -4591,9 +4591,6 @@ msgstr "Each store's commercial terms, and how the platform records and enforces
 msgid "Earn"
 msgstr "Earn"
 
-msgid "Echo on click events so attach can be attributed."
-msgstr "Echo on click events so attach can be attributed."
-
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 
@@ -5205,8 +5202,8 @@ msgstr "Feedback feature"
 msgid "Feedback received"
 msgstr "Feedback received"
 
-msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
-msgstr "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
+msgid "Feeds the learning loop. Pass the impression_id the client minted for this showing of the strip. Attach events are written server-side when an order completes and cannot be posted here."
+msgstr "Feeds the learning loop. Pass the impression_id the client minted for this showing of the strip. Attach events are written server-side when an order completes and cannot be posted here."
 
 msgid "Fees"
 msgstr "Fees"
@@ -11440,8 +11437,8 @@ msgstr "Products in these categories (subcategories included) are never counted 
 msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 msgstr "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 
-msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
-msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
+msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Mint an impression_id each time the strip is shown, report the impression event under it, and send it on that strip's click events."
+msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Mint an impression_id each time the strip is shown, report the impression event under it, and send it on that strip's click events."
 
 msgid "Profile"
 msgstr "Profile"
@@ -15211,6 +15208,9 @@ msgstr "The shipment whose voucher request returned this voucher after another o
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
 
+msgid "The showing's own id, minted by the client each time it shows a strip; sent on the impression and on every click of it."
+msgstr "The showing's own id, minted by the client each time it shows a strip; sent on the impression and on every click of it."
+
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 
@@ -18393,6 +18393,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Download the BoxNow parcel label PDF for an order"
 #~ msgstr "Download the BoxNow parcel label PDF for an order"
+
+#~ msgid "Echo on click events so attach can be attributed."
+#~ msgstr "Echo on click events so attach can be attributed."
 
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"

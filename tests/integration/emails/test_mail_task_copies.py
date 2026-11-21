@@ -136,7 +136,10 @@ def _feedback(tenant) -> Dispatch:
 
 
 def _staff_password_reset(tenant) -> Dispatch:
-    staff = store_staff(tenant)
+    # Only an account that can sign in is mailed (``can_reset_here``).
+    staff = store_staff(tenant, is_superuser=True)
+    staff.set_password("a-usable-password")
+    staff.save(update_fields=["password"])
     return Dispatch(
         send_staff_password_reset_email,
         [],
@@ -260,12 +263,18 @@ def test_a_second_copy_of_a_dispatch_mails_nobody(build, tenant):
             dispatch.args, dispatch.kwargs, task_id=task_id, throw=True
         )
 
+    # Building an order mails too (its own ``order_created`` dispatches).
+    before = len(mail.outbox)
+
+    def mailed() -> int:
+        return len(mail.outbox) - before
+
     run("one-dispatch")
-    first = len(mail.outbox)
+    first = mailed()
     assert first, "the task mailed nobody: the case proves nothing"
 
     run("one-dispatch")
-    assert len(mail.outbox) == first
+    assert mailed() == first
 
     run("another-dispatch")
-    assert len(mail.outbox) == 2 * first
+    assert mailed() == 2 * first

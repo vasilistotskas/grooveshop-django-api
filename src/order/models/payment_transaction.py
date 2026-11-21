@@ -25,7 +25,10 @@ class PaymentTransaction(models.Model):
     the old ``metadata["refunds"]`` list could. ``Order.amount_due`` is
     what the order costs, never what was paid.
 
-    The one column written after the row exists is ``fee``: what the
+    Two columns are written after the row exists. GDPR erasure redacts
+    the buyer's values (email, name, phone, a typed cancel reason) from
+    ``description`` (``order.privacy``); no amount or reference changes.
+    The other is ``fee``: what the
     provider charged for the movement, which it reports later than the
     movement itself (Stripe's balance transaction, Viva's "transaction price
     calculated" event). It is the provider's own figure or nothing: a row

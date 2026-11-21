@@ -5,7 +5,7 @@ through the REAL service and ledger paths, in any order:
 
   dup           a second payment (a duplicate the customer made)
   receipt       the order ships and its receipt is issued and submitted
-  refund        ``OrderService.refund_order`` for part of what can be
+  refund        ``RefundService.refund_order`` for part of what can be
                 refunded; Stripe answers, times out (a claim left PENDING)
                 or loses its answer (made, but nobody knows)
   refund_full   ``refund_order`` for everything
@@ -131,7 +131,7 @@ from order.refunds.refund_lines import (
     held_values,
     pending_request,
 )
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.tasks import (
     allocate_credit_sources,
     generate_order_invoice,
@@ -662,7 +662,7 @@ class State:
             self.fake.lose_answer = ev == "refund_lost"
             try:
                 try:
-                    res = OrderService.refund_order(
+                    res = RefundService.refund_order(
                         order, amount=None if amt is None else _money(amt)
                     )
                 finally:
@@ -942,7 +942,7 @@ class State:
                 if pending is None:
                     self.log.append("retry_lines skipped (none pending)")
                     return
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, retry_request_id=pending.request_id
                 )
                 self.log.append(f"retry_lines {pending.request_id}")
@@ -979,7 +979,7 @@ class State:
                 include,
                 self.expect_lines(order, chosen, include),
             )
-            res = OrderService.refund_order(
+            res = RefundService.refund_order(
                 order, lines=chosen, include_shipping=include
             )
             self.log.append(
@@ -1007,7 +1007,7 @@ class State:
     def resolve(self, att, how):
         order = self.o()
         if how == "settle_rec":
-            OrderService.book_share(
+            RefundService.book_share(
                 order, att, att.amount, f"re_rec_{next(_ref)}", att.reason
             )
         elif how == "settle_wh":
@@ -1386,16 +1386,16 @@ def test_a_claim_waits_while_an_older_claim_holds_the_duplicate():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d3"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("100.00"))
+        RefundService.refund_order(order, amount=_eur("100.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
 
         with pytest.raises(PaymentError, match="waiting for the payment pro"):
-            OrderService.refund_order(order, amount=_eur("99.00"))
+            RefundService.refund_order(order, amount=_eur("99.00"))
         assert RefundAttempt.objects.filter(order=order).count() == 1
 
         refund_reconciliation._decline(claim, "declined")
-        result = OrderService.refund_order(order, amount=_eur("99.00"))
+        result = RefundService.refund_order(order, amount=_eur("99.00"))
         allocate_credit_sources()
         create_pending_credits(order.id)
 
@@ -1415,9 +1415,9 @@ def test_resuming_the_claim_that_holds_the_duplicate_is_allowed():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d4"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("100.00"))
+        RefundService.refund_order(order, amount=_eur("100.00"))
         f.fail_with = None
-        result = OrderService.refund_order(order, amount=_eur("100.00"))
+        result = RefundService.refund_order(order, amount=_eur("100.00"))
 
     assert result.refunded.amount == Decimal("100.00")
     assert RefundAttempt.objects.filter(order=order).count() == 1
@@ -1523,7 +1523,7 @@ def test_a_claim_made_before_the_duplicate_leaves_the_duplicate_whole():
         FakeStripeRefunds() as f,
     ):
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         dup, _created = PaymentLedger.record_charge(
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d6"
@@ -1565,7 +1565,7 @@ def test_a_reversal_comes_off_the_duplicate_part_of_a_refund_first():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d6b"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
         PaymentLedger.record_refund(
@@ -1650,7 +1650,7 @@ def test_the_settlement_never_credits_a_chargeback_staff_did_not_decide(
             amount=_eur("107.63"),
             reference="dp_settle",
         )
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
         invoice = _receipt(order)
@@ -1739,7 +1739,7 @@ def test_a_refund_nobody_claimed_is_judged_without_netting_a_claim_in_flight():
         FakeStripeRefunds() as f,
     ):
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
         dup, _created = PaymentLedger.record_charge(
@@ -1748,7 +1748,7 @@ def test_a_refund_nobody_claimed_is_judged_without_netting_a_claim_in_flight():
         PaymentLedger.record_refund(
             order, charge=dup, amount=_eur("20.00"), reference="re_d8"
         )
-        OrderService.book_share(
+        RefundService.book_share(
             order, claim, claim.amount, "re_c8", claim.reason
         )
         allocate_credit_sources()

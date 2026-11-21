@@ -182,7 +182,7 @@ def test_refund_then_status_move_reverses_exactly_once(
         patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        # What OrderService.refund_order does once the provider agrees.
+        # What RefundService.refund_order does once the provider agrees.
         order.payment_status = PaymentStatus.REFUNDED
         order.save(update_fields=["payment_status"])
         order_refunded.send(

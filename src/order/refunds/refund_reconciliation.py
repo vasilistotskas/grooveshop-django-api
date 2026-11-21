@@ -5,7 +5,7 @@ ended without an answer (a timeout, a crash between the call and the
 booking), and a PENDING attempt keeps holding its money and its place on the
 receipt's VAT rates until something resolves it, however old it is. Three
 things resolve it, each through the same ledger paths a refund made in one
-go takes (``OrderService.book_share`` to settle, ``RefundAttempt`` to
+go takes (``RefundService.book_share`` to settle, ``RefundAttempt`` to
 decline):
 
 * the provider's own webhook, when it books the refund (``record_refund``);
@@ -38,7 +38,7 @@ from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment import ProviderRefund, get_payment_provider
 from order.payments.payment_ledger import PaymentLedger, is_cash_collection
-from order.services import OrderService
+from order.refunds.service import RefundService
 
 if TYPE_CHECKING:
     from djmoney.money import Money
@@ -125,7 +125,7 @@ def reconcile(attempt: RefundAttempt) -> Resolution:
         return Resolution.UNRESOLVED
     charge = attempt.charge
     if refund.made:
-        OrderService.book_share(
+        RefundService.book_share(
             attempt.order,
             attempt,
             refund.amount,
@@ -278,7 +278,7 @@ def _record_settled(attempt: RefundAttempt, user, reference: str) -> None:
         if locked is None:
             raise PaymentError(_("This refund has already been resolved."))
         paid: Money = locked.amount
-        OrderService.book_share(
+        RefundService.book_share(
             locked.order,
             locked,
             paid,

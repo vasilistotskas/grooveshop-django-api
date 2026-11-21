@@ -38,17 +38,7 @@ from core.api.permissions import (
     StoreStaffModelPermissions,
 )
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    OrderCreateAnonThrottle,
-    OrderCreateThrottle,
-    OrderSpecimenThrottle,
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-    UserBudgetThrottle,
-    VivaReturnThrottle,
-    gift_card_code_throttles,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
@@ -56,6 +46,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.checkout.quote import (
     ExpectedTotal,
@@ -133,6 +124,14 @@ from order.services import (
     OrderAttributionService,
     OrderLegalAcceptanceService,
     OrderService,
+)
+from order.throttles import (
+    OrderCreateAnonThrottle,
+    OrderCreateThrottle,
+    OrderSpecimenThrottle,
+    PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
+    VivaReturnThrottle,
 )
 from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement

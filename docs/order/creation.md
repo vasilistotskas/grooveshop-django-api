@@ -178,7 +178,7 @@ caller:
   - **Guessing a gift-card code is budgeted, using one is not.** The
     quote, the payment intent and order creation each say what a card
     settles (or that the code is no card), so each could be used to guess
-    codes. `core.api.throttling.gift_card_code_throttles`, the one helper
+    codes. `giftcard.throttles.gift_card_code_throttles`, the one helper
     the three views add to their throttles, gives a request that carries
     `giftCardCodes` a `GiftCardCodeThrottle`:
     - only a code **new to the cart** counts. The cart keeps the codes it

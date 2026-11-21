@@ -70,7 +70,8 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   (`src/core/fields/`);
 - `BaseModelViewSet` (`src/core/api/views.py`), permissions
   (`src/core/api/permissions.py`), Knox token authentication
-  (`src/core/api/tokens.py`), throttles (`src/core/api/throttling.py`) and
+  (`src/core/api/tokens.py`), the throttle bases and the shared throttles
+  (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
   the OpenAPI helpers (`src/core/utils/serializers.py`,
   `src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,

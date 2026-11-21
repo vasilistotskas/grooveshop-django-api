@@ -97,7 +97,8 @@ These invariants need more than a table row. Each ends with its anchor.
   `src/core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
   the IdP's single-use codes and WebSocket tickets. The checkout, payment,
-  coupon and gift-card throttles (`src/core/api/throttling.py`,
+  coupon and gift-card throttles (`src/order/throttles.py`,
+  `src/cart/throttles.py`, `src/giftcard/throttles.py`,
   `fail_closed = True`) therefore REFUSE with 503 `temporarily_unavailable`
   during an outage (`src/core/middleware/strict_cache.py`; never a 429: the
   caller sent nothing too often), while

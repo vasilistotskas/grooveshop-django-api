@@ -202,7 +202,7 @@ def get_celery_beat_schedule():
         },
         "erase-late-carrier-data": {
             # Fanout: clears the carrier data that reached an order after
-            # its buyer's GDPR erasure, for ERASURE_CARRIER_FOLLOW_UP_DAYS.
+            # its buyer's GDPR erasure (ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS).
             "task": "tenant.tasks.fanout_erase_late_carrier_data",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },

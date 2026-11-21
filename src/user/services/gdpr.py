@@ -118,6 +118,21 @@ def _verified_email_match(user) -> Q | None:
     return match_any or None
 
 
+def _subject_orders(user):
+    """The subject's orders: those of the account, and the guest orders
+    placed with one of its VERIFIED addresses (``_verified_email_match``),
+    as every other guest record is. Soft-deleted ones included: deleting an
+    order in the admin only hides it, and the subject's data stays on it.
+    The export and the erasure read this one queryset."""
+    from order.models.order import Order
+
+    subject = Q(user=user)
+    verified = _verified_email_match(user)
+    if verified is not None:
+        subject |= Q(user__isnull=True) & verified
+    return Order.objects.all_with_deleted().filter(subject)
+
+
 def _guest_subscriptions(user):
     """Guest (newsletter form) rows made with one of ``user``'s addresses.
 
@@ -229,14 +244,8 @@ def compile_user_data(user) -> dict[str, Any]:
         for a in user.addresses.all()
     ]
 
-    from order.models.order import Order
-
     orders = []
-    user_orders = list(
-        Order.objects.all_with_deleted()
-        .filter(user=user)
-        .prefetch_related("items")
-    )
+    user_orders = list(_subject_orders(user).prefetch_related("items"))
     reported = carrier_data([o.id for o in user_orders])
     for o in user_orders:
         orders.append(
@@ -539,7 +548,6 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     from giftcard.models import GiftCard, GiftCardPurchase
     from meta_capi.models import MetaCapiEventLog
     from order.models.history import OrderHistory
-    from order.models.order import Order
     from promotion.models.code import PromotionCode
     from promotion.models.redemption import PromotionRedemption
     from search.models import SearchQuery
@@ -549,13 +557,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     placeholder_email = f"deleted-{uuid.uuid4().hex[:12]}@deleted.invalid"
     placeholder_name = PLACEHOLDER_NAME
 
-    # Every order, soft-deleted ones included: deleting an order in the
-    # admin only hides it, and the subject's data stays on it.
-    order_ids = list(
-        Order.objects.all_with_deleted()
-        .filter(user=user)
-        .values_list("id", flat=True)
-    )
+    order_ids = list(_subject_orders(user).values_list("id", flat=True))
     # The orders are kept (tax law, payment reconciliation, finance
     # reports), cleared of the buyer's data and every copy of it: the
     # carriers' records, the typed cancel reason where the cancel flow

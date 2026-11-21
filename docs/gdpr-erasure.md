@@ -16,60 +16,101 @@ what that means. The code wins over this page.
   `fbp`, `fbc`) and the typed cancel reason (`cancellation.reason`).
 - Each carrier's own records, through the carrier interface
   (`src/shipping/interfaces.py`): `erase_recipient_data`, `recipient_data` and
-  `orders_in_motion`.
+  `orders_written_since`.
 
 The export lists all three: an order's fields and metadata parts, plus what
 each carrier reported about its recipient (`carrier`). Erasure clears the same
 three. `tests/unit/user/test_erasure_covers_every_order_personal_field.py`
 holds `PERSONAL_FIELDS` to the staging anonymiser's list.
 
+## Whose orders
+
+`_subject_orders` in `src/user/services/gdpr.py` is the one queryset the
+export and the erasure read. It covers the account's orders and the guest
+orders placed with one of its verified addresses, as every other guest record
+is. Soft-deleted ones are included (`all_with_deleted`), because an admin
+delete only hides an order.
+
 ## What erasure does to an order
 
-`order.privacy.erase_orders`, for every order of the subject, soft-deleted
-ones included (`all_with_deleted`: an admin delete only hides an order):
+`order.privacy.erase_orders`:
 
-1. **Carriers** (`erase_recipient_data`). This runs first, while the order
-   still holds the buyer's data.
-   - ACS clears its shipment metadata at `AcsShipment.PERSONAL_METADATA`: the
-     failed request, the notes the voucher carried, and the cancel reason.
-   - It deletes the call history (`AcsApiCall`) of the orders and their
-     vouchers. A call is found by its order or voucher column, or by one of
-     the order's voucher numbers, as a whole number, in its request or answer.
-     A name or a phone is never used, because two customers can share one.
-   - It clears checkpoint notes and a COD payout's `parcel_receiver`, in their
-     columns and in the raw rows. The payout's `pod` stays: it is the voucher
-     number ACS reported.
-   - BOX NOW clears its metadata at `BoxNowShipment.PERSONAL_METADATA`,
-     `cancellations[*].reason` included, and each parcel event's text.
-2. **Copies in the order's own records.** The buyer's email, name, phone and
-   cancel reason, read before the order is cleared, become `[deleted]` in its
-   history (`OrderHistory`: "email sent to …", a refund's reason), the stock
-   log, the refund attempts and the ledger rows. A copy cut at its column's
-   length is matched by its start.
-3. **The order.** `PERSONAL_FIELDS` are blanked, or set to placeholders for
-   the names, email, street and city. `BILLING_FIELDS` are kept only when an
-   invoice was issued in timologio (`timologio_invoice_mark` or
-   `timologio_invoice_number`). The retail receipt keeps its own
-   `buyer_snapshot`, a legal document. `PERSONAL_METADATA` is dropped, and the
-   order is stamped `personal_data_erased_at`.
+1. **The buyer's values are read first.** The order's email, name, phone (also
+   its national ten digits) and typed cancel reason are taken while the order
+   still holds them. The copies in free text are found by them.
+2. **Carriers** (`erase_recipient_data`, given those values for the text
+   staff wrote).
+   - **ACS:**
+     - It clears its shipment metadata at `AcsShipment.PERSONAL_METADATA`:
+       the failed request, the customer's note the voucher carried, and the
+       cancel reason.
+     - It deletes the call history (`AcsApiCall`) of the orders and of every
+       voucher they ever had: live, multipart children, `previous_vouchers`
+       of a re-mint, `orphan_vouchers`, `adopted_voucher`. A call is found by
+       its order or voucher column, or by one of those voucher numbers, as a
+       whole number, in its request or answer. A name or a phone is never
+       used, because two customers can share one.
+     - It clears checkpoint notes and a COD payout's `parcel_receiver`, in
+       their columns and in the raw rows. The payout's `pod` stays: it is the
+       voucher number ACS reported.
+     - It redacts the buyer's values from staff's notes: a COD received
+       outside ACS (with its history copies) and a payout's reconciliation
+       note.
+   - **BOX NOW:**
+     - It clears its metadata at `BoxNowShipment.PERSONAL_METADATA`,
+       `cancellations[*].reason` included.
+     - It clears each parcel event's text and its raw body at
+       `BoxNowParcelEvent.PERSONAL_RAW`, which holds the webhook's `customer`
+       (name, email, phone) and the event text.
+3. **Copies in the order's own records.** The buyer's values become
+   `[deleted]` in the order's history (`OrderHistory`: "email sent to …", a
+   refund's reason), the stock log, the refund attempts and the ledger rows
+   (`core.utils.redaction`). A copy cut at its column's length is matched by
+   its start.
+4. **The order.**
+   - `PERSONAL_FIELDS` are blanked, or set to placeholders for the names,
+     email, street and city.
+   - `BILLING_FIELDS` are kept when an invoice is issued or owed
+     (`order.privacy.keeps_billing`): a timologio MARK or number is
+     recorded, or the order is an INVOICE order that was not canceled, which
+     staff issue by hand from those fields. The retail receipt keeps its own
+     `buyer_snapshot`, a legal document.
+   - `PERSONAL_METADATA` is dropped, and the order is stamped
+     `personal_data_erased_at`.
 
 ## Carrier data that arrives after the erasure
 
 A parcel still moving goes on being tracked, delivered and paid out, and each
-poll, webhook and COD answer writes the recipient's details again.
+poll, webhook and COD answer writes the recipient's details again. That
+includes the last one, which often names who took delivery.
+
 `user.tasks.erase_late_carrier_data` runs daily, fanned out to every store
-(suspended included), and runs the carrier erase again for an erased order in
-two cases:
+(suspended included). It runs the carrier erase again for an erased order when
+either of these happened within `ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS` (7):
 
-- while one of its parcels is in motion (`orders_in_motion`): not in a
-  terminal state, or an ACS parcel delivered with cash to collect and no
-  payout yet;
-- for `ERASURE_CARRIER_FOLLOW_UP_DAYS` (90) after the erasure in any case. That
-  covers what a carrier can still report about a settled parcel: a BOX NOW
-  event is admitted for 90 days (`BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS`), and a
-  COD payout follows delivery by a few days.
+- the order was erased;
+- a carrier wrote a record of it (`orders_written_since`): a shipment row, a
+  tracking checkpoint, a COD payout or an ACS call naming it or its vouchers,
+  or a BOX NOW event.
 
-What arrives is cleared within a day.
+The lookback is longer than any gap between two daily runs, so no write is
+missed. An order nothing is written about is not read again. What arrives is
+cleared within a day.
+
+## Orders erased before this
+
+Migration `order.0115_erase_previously_erased_orders` finishes the orders the
+earlier erasure left: those with the old placeholder email and no stamp.
+
+- It drops their `PERSONAL_METADATA`.
+- It redacts the cancel reason's copies, and every email address in their
+  history notes.
+- It applies the billing rule, and stamps them.
+- The next daily sweep then clears their carrier records.
+
+A soft-deleted order that the earlier erasure skipped was unlinked from its
+account with its data. It cannot be told apart from a guest's, so it cannot be
+found.
 
 ## Tests
 

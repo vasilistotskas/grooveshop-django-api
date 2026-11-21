@@ -28,6 +28,7 @@ from django.utils.translation import gettext_lazy as _
 from shipping.exceptions import ShippingProviderNotFoundError
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from decimal import Decimal
 
     from django.db.models import Q
@@ -191,23 +192,29 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
-    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
         """Remove the recipient's data from this carrier's records of the
-        given orders, for GDPR erasure (``user.services.gdpr``): the
-        copies of the order's name, address, phone and notes it keeps on
-        rows of its own, which survive the order's anonymisation. Returns
-        a tally of the rows touched, by kind.
+        given orders, for GDPR erasure (``order.privacy``): the copies of
+        the order's name, address, phone and notes it keeps on rows of its
+        own, which survive the order's anonymisation. *buyer_values* are
+        each order's email, name, phone and typed cancel reason, to redact
+        from free text staff wrote (empty when the order was erased
+        earlier). Returns a tally of the rows touched, by kind.
 
         Default: nothing to remove, for a carrier that keeps no records of
         its own (the flat rate).
         """
         return {}
 
-    def orders_in_motion(self, order_ids: list[int]) -> set[int]:
-        """The given orders whose parcel with this carrier may still bring
-        news of the recipient: a shipment not yet in a terminal state, or
-        one waiting on a payout. What decides how long an erased order's
-        carrier records are cleared again (``order.privacy``).
+    def orders_written_since(
+        self, order_ids: list[int], since: datetime
+    ) -> set[int]:
+        """The given orders this carrier wrote a record of since *since*:
+        what the daily sweep of erased orders clears again
+        (``order.privacy.erase_late_carrier_data``), so data that arrives
+        after an erasure, the parcel's last event included, does not stay.
 
         Default: none, for a carrier that keeps no records of its own.
         """

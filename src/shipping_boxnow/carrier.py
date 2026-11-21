@@ -27,6 +27,8 @@ from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from order.models.order import Order
     from shipping_boxnow.models import BoxNowShipment
 
@@ -153,12 +155,16 @@ class BoxNowCarrier(ShippingCarrierInterface):
             city=locker.address_line_2,
         )
 
-    def erase_recipient_data(self, order_ids: list[int]) -> dict[str, int]:
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
         """The BOX NOW records of the orders, cleared of the recipient:
         each shipment's ``metadata`` at ``BoxNowShipment.PERSONAL_METADATA``
-        (the rest stays), and the text BOX NOW sent with each parcel event,
-        in its column and in the raw body (the events stay). Run again for
-        orders already erased, it clears the events that arrived since."""
+        (the rest stays), and each parcel event's text and the raw body's
+        ``BoxNowParcelEvent.PERSONAL_RAW`` (the customer BOX NOW names, its
+        text); the events stay. Nothing here is free text staff wrote, so
+        *buyer_values* is not read. Run again for orders already erased, it
+        clears the events that arrived since."""
         from core.utils.json_paths import drop_paths
         from shipping_boxnow.models import BoxNowShipment
         from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
@@ -167,8 +173,9 @@ class BoxNowCarrier(ShippingCarrierInterface):
         for shipment in BoxNowShipment.objects.filter(order_id__in=order_ids):
             metadata = shipment.metadata or {}
             if drop_paths(metadata, BoxNowShipment.PERSONAL_METADATA):
-                shipment.metadata = metadata
-                shipment.save(update_fields=["metadata"])
+                BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                    metadata=metadata
+                )
                 scrubbed += 1
 
         events = 0
@@ -178,15 +185,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
             raw = (
                 event.raw_payload if isinstance(event.raw_payload, dict) else {}
             )
-            # A webhook carries it under ``data``, a polled event under
-            # ``event``.
-            dropped = drop_paths(
-                raw,
-                (
-                    ("data", "additionalInformation"),
-                    ("event", "additionalInformation"),
-                ),
-            )
+            dropped = drop_paths(raw, BoxNowParcelEvent.PERSONAL_RAW)
             if event.additional_information or dropped:
                 event.additional_information = ""
                 event.raw_payload = raw
@@ -200,18 +199,22 @@ class BoxNowCarrier(ShippingCarrierInterface):
             "carrier_events_scrubbed": events,
         }
 
-    def orders_in_motion(self, order_ids: list[int]) -> set[int]:
-        """Orders whose BOX NOW parcel is not in a terminal state: its
-        events still arrive."""
-        from shipping_boxnow.models.shipment import (
-            TERMINAL_STATES,
-            BoxNowShipment,
-        )
+    def orders_written_since(
+        self, order_ids: list[int], since: datetime
+    ) -> set[int]:
+        """The orders BOX NOW wrote a record of since *since*: a shipment
+        row or a parcel event."""
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
 
         return set(
-            BoxNowShipment.objects.filter(order_id__in=order_ids)
-            .exclude(parcel_state__in=TERMINAL_STATES)
-            .values_list("order_id", flat=True)
+            BoxNowShipment.objects.filter(
+                order_id__in=order_ids, updated_at__gte=since
+            ).values_list("order_id", flat=True)
+        ) | set(
+            BoxNowParcelEvent.objects.filter(
+                shipment__order_id__in=order_ids, created_at__gte=since
+            ).values_list("shipment__order_id", flat=True)
         )
 
     def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:

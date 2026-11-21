@@ -18,23 +18,30 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.utils.json_paths import drop_paths, pick_paths
+from core.utils.redaction import redact, redaction_texts
 from shipping.interfaces import registered_providers
 
 PLACEHOLDER_NAME = "[deleted]"
-# Replaces the buyer's values in the free text of the order's records.
-REDACTED = "[deleted]"
-# Shorter values (a two-letter name) would match unrelated text.
-_MIN_COPIED_VALUE = 6
-# A copy cut at its column's length ends with the start of the value; one
-# this short is never cut there, so it is only matched whole.
-_MIN_CUT_TEXT = 32
 
-# An order whose invoice was issued (in AADE's timologio app) keeps the
-# invoice's counterparty with it; any other order has no document that
-# needs the billing fields.
-ISSUED_INVOICE = Q(timologio_invoice_mark__isnull=False) | ~Q(
-    timologio_invoice_number=""
-)
+
+def keeps_billing() -> Q:
+    """Orders whose billing fields (``Order.BILLING_FIELDS``) erasure keeps:
+    an invoice was issued in AADE's timologio app (its MARK or number is
+    recorded), or one is owed: an INVOICE order that was not canceled,
+    which staff issue by hand from those fields. Any other order has no
+    document that needs them (a retail receipt keeps its own
+    ``buyer_snapshot``)."""
+    from order.enum.document_type import OrderDocumentTypeEnum
+    from order.enum.status import OrderStatus
+
+    return (
+        Q(timologio_invoice_mark__isnull=False)
+        | ~Q(timologio_invoice_number="")
+        | (
+            Q(document_type=OrderDocumentTypeEnum.INVOICE)
+            & ~Q(status=OrderStatus.CANCELED)
+        )
+    )
 
 
 def export_order(order: Any) -> dict[str, Any]:
@@ -67,15 +74,17 @@ def erase_orders(
     replaced with *placeholder_email*, the one the rest of the subject's
     records get.
 
-    The carriers go first: they look for the recipient's name and phone in
-    their call history, and those are still on the order.
+    The buyer's values (email, name, phone, the typed cancel reason) are
+    read first, while the order holds them: the copies in free text are
+    found by them.
     """
     from order.models.order import Order
 
-    counts = erase_carrier_data(order_ids)
     if not order_ids:
-        return {"orders_anonymised": 0, **counts}
-    counts["copies_redacted"] = _erase_copies(order_ids)
+        return {"orders_anonymised": 0, "carrier_pii_scrubbed": 0}
+    values = _buyer_values(order_ids)
+    counts = erase_carrier_data(order_ids, buyer_values=values)
+    counts["copies_redacted"] = _erase_copies(values)
 
     placeholders = {
         "first_name": PLACEHOLDER_NAME,
@@ -94,7 +103,7 @@ def erase_orders(
     counts["orders_anonymised"] = orders.update(
         user=None, personal_data_erased_at=now, **erased
     )
-    orders.exclude(ISSUED_INVOICE).update(
+    orders.exclude(keeps_billing()).update(
         **dict.fromkeys(Order.BILLING_FIELDS, "")
     )
     for order_id, metadata in orders.values_list("id", "metadata"):
@@ -105,15 +114,21 @@ def erase_orders(
     return counts
 
 
-def erase_carrier_data(order_ids: list[int]) -> dict[str, int]:
+def erase_carrier_data(
+    order_ids: list[int], *, buyer_values: dict[int, list[str]]
+) -> dict[str, int]:
     """Every carrier's records of the given orders, cleared of the
-    recipient. Also what clears the carrier data that reaches an order
-    after its erasure (``erase_late_carrier_data``)."""
+    recipient; *buyer_values* are what to redact from the free text staff
+    wrote on them, by order. Also what clears the carrier data that
+    reaches an order after its erasure (``erase_late_carrier_data``), when
+    those values are gone."""
     counts = {"carrier_pii_scrubbed": 0}
     if not order_ids:
         return counts
     for carrier in registered_providers():
-        for kind, rows in carrier.erase_recipient_data(order_ids).items():
+        for kind, rows in carrier.erase_recipient_data(
+            order_ids, buyer_values=buyer_values
+        ).items():
             counts[kind] = counts.get(kind, 0) + rows
     return counts
 
@@ -123,21 +138,22 @@ def erase_late_carrier_data() -> dict[str, int]:
 
     A parcel still moving when its buyer is erased goes on being tracked,
     delivered and paid out: each poll, webhook and COD answer writes the
-    recipient's details again. An erased order is swept again while one
-    of its parcels is in motion (``orders_in_motion``: not in a terminal
-    state, or delivered and waiting on its COD payout), and in any case for
-    ``ERASURE_CARRIER_FOLLOW_UP_DAYS`` after the erasure, for what a carrier
-    reports about a parcel that has settled.
+    recipient's details again, the last one (who took delivery, the COD
+    receiver) included. An erased order is swept again when it was erased,
+    or a carrier wrote a record of it (``orders_written_since``), within
+    the last ``ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS``: longer than any gap
+    between two daily runs, so no write is missed, and an order nothing
+    is written about is not read again.
     """
     from order.models.order import Order
 
+    since = timezone.now() - timedelta(
+        days=settings.ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS
+    )
     erased = Order.objects.all_with_deleted().filter(
         personal_data_erased_at__isnull=False
     )
-    since = timezone.now() - timedelta(
-        days=settings.ERASURE_CARRIER_FOLLOW_UP_DAYS
-    )
-    recent = set(
+    swept = set(
         erased.filter(personal_data_erased_at__gte=since).values_list(
             "id", flat=True
         )
@@ -147,26 +163,17 @@ def erase_late_carrier_data() -> dict[str, int]:
             "id", flat=True
         )
     )
-    moving: set[int] = set()
     if older:
         for carrier in registered_providers():
-            moving |= carrier.orders_in_motion(older)
-    return erase_carrier_data(sorted(recent | moving))
+            swept |= carrier.orders_written_since(older, since)
+    return erase_carrier_data(sorted(swept), buyer_values={})
 
 
-def _erase_copies(order_ids: list[int]) -> int:
-    """Remove the buyer's values from the free text the order's own records
-    copy them into: its history (``OrderHistory``: "email sent to <their
-    address>", a refund's reason), the stock log of restocked lines, the
-    refund attempts and the ledger rows. The values are the order's email,
-    name and phone and its typed cancel reason, read before the order is
-    cleared. The carriers' copies are in their own records; the order's
-    own are its ``PERSONAL_FIELDS`` and ``PERSONAL_METADATA``."""
-    from order.models.history import OrderHistory
+def _buyer_values(order_ids: list[int]) -> dict[int, list[str]]:
+    """Each order's email, name, phone (also its national ten digits, as a
+    carrier or a note writes it) and typed cancel reason, the texts its
+    copies are found by."""
     from order.models.order import Order
-    from order.models.payment_transaction import PaymentTransaction
-    from order.models.refund_attempt import RefundAttempt
-    from order.models.stock_log import StockLog
 
     values: dict[int, list[str]] = {}
     for order_id, email, first, last, phone, reason in (
@@ -181,21 +188,29 @@ def _erase_copies(order_ids: list[int]) -> int:
             "metadata__cancellation__reason",
         )
     ):
-        texts = [
-            str(text)
-            for text in (
-                reason if isinstance(reason, str) else "",
-                email,
-                f"{first} {last}".strip(),
-                str(phone or ""),
-                # The national number, as a carrier or a note writes it.
-                str(phone or "")[-10:],
-            )
-            if text and len(str(text)) >= _MIN_COPIED_VALUE
-        ]
+        texts = redaction_texts(
+            reason if isinstance(reason, str) else "",
+            email,
+            f"{first} {last}".strip(),
+            str(phone or ""),
+            str(phone or "")[-10:],
+        )
         if texts:
-            # Longest first: a name inside a reason goes with the reason.
-            values[order_id] = sorted(texts, key=len, reverse=True)
+            values[order_id] = texts
+    return values
+
+
+def _erase_copies(values: dict[int, list[str]]) -> int:
+    """Remove the buyer's values from the free text the order's own records
+    copy them into: its history (``OrderHistory``: "email sent to <their
+    address>", a refund's reason), the stock log of restocked lines, the
+    refund attempts and the ledger rows. The carriers' copies are in their
+    own records; the order's own are its ``PERSONAL_FIELDS`` and
+    ``PERSONAL_METADATA``."""
+    from order.models.history import OrderHistory
+    from order.models.payment_transaction import PaymentTransaction
+    from order.models.refund_attempt import RefundAttempt
+    from order.models.stock_log import StockLog
 
     changed = 0
     for model, columns in (
@@ -208,34 +223,10 @@ def _erase_copies(order_ids: list[int]) -> int:
             update = {}
             for column in columns:
                 value = getattr(row, column)
-                redacted = _redact(value, values[row.order_id])
+                redacted = redact(value, values[row.order_id])
                 if redacted != value:
                     update[column] = redacted
             if update:
                 model.objects.filter(pk=row.pk).update(**update)
                 changed += 1
     return changed
-
-
-def _redact(value: Any, texts: list[str]) -> Any:
-    """*value* (a string, or JSON holding strings) with each of *texts*
-    replaced, also where a column's length cut one short."""
-    if isinstance(value, dict):
-        return {key: _redact(item, texts) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_redact(item, texts) for item in value]
-    if not isinstance(value, str):
-        return value
-    for text in texts:
-        value = _without(value, text)
-    return value
-
-
-def _without(value: str, text: str) -> str:
-    """*value* with *text* replaced, also where a column's length cut it."""
-    if text in value:
-        return value.replace(text, REDACTED)
-    for length in range(len(text) - 1, _MIN_CUT_TEXT - 1, -1):
-        if value.endswith(text[:length]):
-            return value[:-length] + REDACTED
-    return value

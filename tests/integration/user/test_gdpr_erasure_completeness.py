@@ -322,7 +322,7 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         AcsShipmentFactory,
         AcsTrackingEventFactory,
     )
-    from shipping_acs.models import AcsApiCall, AcsCodPayout
+    from shipping_acs.models import AcsApiCall, AcsCodPayout, AcsShipment
     from shipping_acs.services import _audit_envelope, _delivery_notes
     from shipping_boxnow.factories import (
         BoxNowParcelEventFactory,
@@ -392,6 +392,8 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         metadata={
             "billing_code": "BILLING",
             "multipart_vouchers": ["7400000002"],
+            # A voucher a re-mint replaced: its polls still name the buyer.
+            "previous_vouchers": ["7400000008"],
             "create_request": _audit_envelope(
                 {"Delivery_Notes": _delivery_notes(by_acs).sent, "Weight": "1"},
                 by_acs,
@@ -470,11 +472,22 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
             ]
         },
     )
+    AcsApiCall.objects.create(
+        alias="ACS_Trackingsummary",
+        duration_ms=1,
+        outcome="ok",
+        voucher_no="7400000008",
+        response={"recipient": name},
+    )
     other_call = AcsApiCall.objects.create(
         alias="ACS_Trackingsummary",
         duration_ms=1,
         outcome="ok",
         voucher_no="7499999999",
+    )
+    # What staff wrote about the money.
+    AcsShipment.objects.filter(pk=acs.pk).update(
+        cod_received_outside_acs_note=f"Τράπεζα, από {name}"
     )
     AcsTrackingEventFactory(
         shipment=acs,
@@ -490,11 +503,26 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         pod="7400000001",
         parcel_receiver=name,
         raw_payload={"POD": "7400000001", "Parcel_Receiver": name},
+        reconciliation_note=f"Πλήρωσε η {name} στο κατάστημα",
     )
+    # A webhook event as BOX NOW sends it: its data names the customer.
     BoxNowParcelEventFactory(
         shipment=boxnow,
         additional_information=f"Για {name}",
-        raw_payload={"data": {"additionalInformation": f"Για {name}"}},
+        raw_payload={
+            "specversion": "1.0",
+            "type": "gr.boxnow.parcel_event_change",
+            "data": {
+                "parcelId": "9000000001",
+                "event": "delivered",
+                "customer": {
+                    "name": name,
+                    "email": "zinovia.arvanitaki@example.gr",
+                    "phoneNumber": f"+30{phone}",
+                },
+                "additionalInformation": f"Για {name}",
+            },
+        },
     )
 
     anonymise_and_delete_user(subject)
@@ -555,11 +583,95 @@ def test_the_billing_of_an_issued_invoice_stays(subject):
     assert order.first_name == "[deleted]"
 
 
+@pytest.mark.parametrize(
+    ("document_type", "status", "kept"),
+    [
+        ("INVOICE", "DELIVERED", True),
+        ("INVOICE", "PENDING", True),
+        ("INVOICE", "CANCELED", False),
+        ("RECEIPT", "DELIVERED", False),
+    ],
+)
+def test_the_billing_of_an_owed_invoice_stays(
+    subject, document_type, status, kept
+):
+    """An INVOICE order staff have yet to issue in timologio needs its
+    counterparty; a canceled one or a receipt does not."""
+    from order.factories import OrderFactory
+
+    order = OrderFactory(
+        user=subject,
+        document_type=document_type,
+        status=status,
+        billing_vat_id="998877665",
+        billing_company_name="Αρβανιτάκη Ατομική",
+    )
+
+    anonymise_and_delete_user(subject)
+
+    order.refresh_from_db()
+    assert (order.billing_vat_id == "998877665") is kept
+    assert (order.billing_company_name == "Αρβανιτάκη Ατομική") is kept
+
+
+def test_a_guest_order_with_a_verified_address_is_the_subjects(subject):
+    """A guest order placed with an address the account verified is the
+    subject's, as every other guest record is: erased (and exported). One
+    placed with an address the account never proved is not."""
+    from allauth.account.models import EmailAddress
+
+    from order.factories import OrderFactory
+
+    EmailAddress.objects.create(
+        user=subject, email=subject.email, verified=True, primary=True
+    )
+    guest = OrderFactory(user=None, email=subject.email.upper())
+    stranger = OrderFactory(user=None, email="stranger@example.gr")
+
+    anonymise_and_delete_user(subject)
+
+    guest.refresh_from_db()
+    stranger.refresh_from_db()
+    assert guest.email.endswith("@deleted.invalid")
+    assert guest.personal_data_erased_at is not None
+    assert stranger.email == "stranger@example.gr"
+    assert stranger.personal_data_erased_at is None
+
+
+def test_a_guest_order_under_an_unverified_address_of_the_account_stays(
+    subject,
+):
+    """An address the account holds but never verified may be anyone's:
+    a guest order placed with it is neither erased nor exported."""
+    from allauth.account.models import EmailAddress
+
+    from order.factories import OrderFactory
+    from user.services.gdpr import compile_user_data
+
+    EmailAddress.objects.create(
+        user=subject, email=subject.email, verified=True, primary=True
+    )
+    EmailAddress.objects.create(
+        user=subject, email="unproven@example.gr", verified=False
+    )
+    guest = OrderFactory(user=None, email="unproven@example.gr")
+
+    assert guest.id not in {
+        o["id"] for o in compile_user_data(subject)["orders"]
+    }
+    anonymise_and_delete_user(subject)
+
+    guest.refresh_from_db()
+    assert guest.email == "unproven@example.gr"
+    assert guest.personal_data_erased_at is None
+
+
 def test_carrier_data_that_arrives_later_is_erased_by_the_sweep(subject):
     """A parcel still moving when its buyer is erased goes on being
-    tracked and paid out; the daily sweep clears what arrives while a
-    parcel is in motion, and for ``ERASURE_CARRIER_FOLLOW_UP_DAYS`` in any
-    case. A settled order past that window is not read again."""
+    tracked, delivered and paid out. The daily sweep clears what a carrier
+    writes about an erased order, however long ago the erasure was, the
+    event that settles the parcel included; an order nothing was written
+    about within ``ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS`` is not read."""
     from datetime import timedelta
 
     from django.utils import timezone
@@ -571,14 +683,14 @@ def test_carrier_data_that_arrives_later_is_erased_by_the_sweep(subject):
         AcsShipmentFactory,
         AcsTrackingEventFactory,
     )
-    from shipping_acs.models import AcsApiCall, AcsTrackingEvent
+    from shipping_acs.models import AcsApiCall, AcsCodPayout, AcsTrackingEvent
     from user.tasks import erase_late_carrier_data
 
     recent = OrderFactory(user=subject)
     recent_acs = AcsShipmentFactory(
         order=recent,
         voucher_no="7400000003",
-        shipment_state=AcsShipmentState.DELIVERED,
+        shipment_state=AcsShipmentState.IN_TRANSIT,
     )
     stuck = OrderFactory(user=subject)
     stuck_acs = AcsShipmentFactory(
@@ -586,19 +698,19 @@ def test_carrier_data_that_arrives_later_is_erased_by_the_sweep(subject):
         voucher_no="7400000005",
         shipment_state=AcsShipmentState.IN_TRANSIT,
     )
-    settled = OrderFactory(user=subject)
-    settled_acs = AcsShipmentFactory(
-        order=settled,
+    quiet = OrderFactory(user=subject)
+    quiet_acs = AcsShipmentFactory(
+        order=quiet,
         voucher_no="7400000004",
         shipment_state=AcsShipmentState.DELIVERED,
     )
     anonymise_and_delete_user(subject)
     long_ago = timezone.now() - timedelta(days=400)
-    Order.objects.filter(pk__in=[stuck.pk, settled.pk]).update(
+    Order.objects.filter(pk__in=[stuck.pk, quiet.pk]).update(
         personal_data_erased_at=long_ago
     )
 
-    # What the carriers write after the erasure.
+    # The next poll after a recent erasure.
     late = AcsTrackingEventFactory(
         shipment=recent_acs,
         notes="Παρέλαβε ο γείτονας",
@@ -611,12 +723,30 @@ def test_carrier_data_that_arrives_later_is_erased_by_the_sweep(subject):
         voucher_no="7400000003",
         response={"recipient": "Γείτονας"},
     )
-    moving = AcsTrackingEventFactory(
-        shipment=stuck_acs, notes="Επιστροφή στο κατάστημα"
+    # A parcel stuck for 400 days is delivered and paid out today: the
+    # event and the payout that settle it are written in the same pass.
+    AcsShipment = type(stuck_acs)
+    AcsShipment.objects.filter(pk=stuck_acs.pk).update(
+        shipment_state=AcsShipmentState.DELIVERED
     )
-    beyond = AcsTrackingEventFactory(
-        shipment=settled_acs, notes="Παρέλαβε η ίδια"
+    settling = AcsTrackingEventFactory(
+        shipment=stuck_acs,
+        notes="Παρέλαβε η ίδια",
+        raw_payload={"checkpoint_notes": "Παρέλαβε η ίδια"},
     )
+    payout = AcsCodPayout.objects.create(
+        voucher_no="7400000005",
+        shipment=stuck_acs,
+        pod="7400000005",
+        parcel_receiver="Ζ. Α.",
+        raw_payload={"Parcel_Receiver": "Ζ. Α."},
+    )
+    # Written long before, and not since: not read again.
+    old = AcsTrackingEventFactory(shipment=quiet_acs, notes="Κάτι παλιό")
+    AcsTrackingEvent.objects.filter(pk=old.pk).update(
+        created_at=long_ago, updated_at=long_ago
+    )
+    AcsShipment.objects.filter(pk=quiet_acs.pk).update(updated_at=long_ago)
 
     erase_late_carrier_data()
 
@@ -624,12 +754,12 @@ def test_carrier_data_that_arrives_later_is_erased_by_the_sweep(subject):
     assert late.notes == ""
     assert late.raw_payload == {}
     assert not AcsApiCall.objects.filter(pk=call.pk).exists()
-    # Still in motion past the window: swept.
-    assert AcsTrackingEvent.objects.get(pk=moving.pk).notes == ""
-    # Settled and past the window: nothing is read again.
-    assert AcsTrackingEvent.objects.get(pk=beyond.pk).notes == (
-        "Παρέλαβε η ίδια"
-    )
+    settling.refresh_from_db()
+    assert settling.notes == ""
+    payout.refresh_from_db()
+    assert payout.parcel_receiver == ""
+    assert payout.raw_payload == {}
+    assert AcsTrackingEvent.objects.get(pk=old.pk).notes == "Κάτι παλιό"
 
 
 def test_a_namesake_keeps_their_acs_calls(subject):
@@ -696,3 +826,74 @@ def test_an_order_whose_voucher_was_never_minted_is_erased(subject):
     shipment.refresh_from_db()
     assert order.first_name == "[deleted]"
     assert "last_error" not in shipment.metadata
+
+
+def test_orders_erased_before_are_finished(subject):
+    """Orders the earlier erasure left (the old placeholder email, no
+    stamp) lose what it kept: the browser identity and the cancel reason,
+    the reason's copies, the email addresses in their history; they are
+    stamped, so the daily sweep clears their carrier records next."""
+    import importlib
+
+    from django.apps import apps
+
+    from order.factories import OrderFactory
+    from order.inventory.stock import StockManager
+    from order.models.history import OrderHistory
+    from order.models.order import Order
+    from order.models.stock_log import StockLog
+    from product.factories import ProductFactory
+
+    migration = importlib.import_module(
+        "order.migrations.0115_erase_previously_erased_orders"
+    )
+    order = OrderFactory(
+        user=None,
+        email="deleted-0123456789ab@deleted.invalid",
+        first_name="[deleted]",
+        metadata={
+            "meta": {"client_ip_address": "203.0.113.9"},
+            "cancellation": {
+                "reason": "Μετακομίζω στη Λάρισα οριστικά",
+                "previous_status": "PENDING",
+            },
+            "promotions": [{"code": "WELCOME"}],
+        },
+        billing_vat_id="998877665",
+    )
+    note = OrderHistory.log_note(
+        order=order,
+        note="Order confirmation email sent to old.buyer@example.gr",
+    )
+    product = ProductFactory(stock=10)
+    StockManager.decrement_stock(
+        product_id=product.id,
+        quantity=1,
+        order_id=order.id,
+        reason=f"Order {order.id} canceled: Μετακομίζω στη Λάρισα οριστικά",
+    )
+    fresh = OrderFactory(
+        user=None,
+        email="deleted-fffff@deleted.invalid",
+        billing_vat_id="111222333",
+    )
+    Order.objects.filter(pk=fresh.pk).update(
+        personal_data_erased_at=timezone.now()
+    )
+
+    migration.finish_erasure(apps, None)
+
+    order.refresh_from_db()
+    assert "meta" not in order.metadata
+    assert order.metadata["cancellation"] == {"previous_status": "PENDING"}
+    assert order.metadata["promotions"] == [{"code": "WELCOME"}]
+    assert order.personal_data_erased_at is not None
+    assert order.billing_vat_id == ""
+    note.refresh_from_db()
+    assert "old.buyer@example.gr" not in str(note.new_value)
+    assert not StockLog.objects.filter(
+        order=order, reason__contains="Λάρισα"
+    ).exists()
+    # An order already stamped by the new erasure is not touched.
+    fresh.refresh_from_db()
+    assert fresh.billing_vat_id == "111222333"

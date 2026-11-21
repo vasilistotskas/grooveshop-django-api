@@ -215,15 +215,14 @@ ACS_API_CALL_POLL_RETENTION_DAYS = int(
 CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
     getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
 )
-# Days after a buyer's GDPR erasure that their orders' carrier records are
-# cleared again each day (``order.privacy.erase_late_carrier_data``), past
-# the time their parcels are in motion (also swept). A parcel still moving
-# goes on being tracked, delivered and paid out, and each of those writes
-# the recipient's details again. Once it has settled, what can still come
-# is a late BoxNow event, admitted as long as below, or a COD payout (~4
-# days after delivery), so this is as long as a BoxNow event is admitted.
-ERASURE_CARRIER_FOLLOW_UP_DAYS = int(
-    getenv("ERASURE_CARRIER_FOLLOW_UP_DAYS", "90")
+# The daily sweep of erased orders (``order.privacy.erase_late_carrier_data``)
+# clears the carrier records of an order erased, or written about by a
+# carrier, within this many days: a parcel still moving when its buyer is
+# erased goes on being tracked, delivered and paid out, and each of those
+# writes the recipient's details again. Longer than any gap between two
+# daily runs, so no write is missed while the scheduler is down a few days.
+ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS = int(
+    getenv("ERASURE_CARRIER_SWEEP_LOOKBACK_DAYS", "7")
 )
 # A BoxNow webhook event whose signed time is older than this is ignored.
 # The ``BoxNowParcelEvent`` rows are the replay guard, so the window must

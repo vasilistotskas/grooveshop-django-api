@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 from collections.abc import Mapping
+from typing import Any
 from uuid import UUID
 
 from django.conf import settings
@@ -29,6 +30,7 @@ from rest_framework.exceptions import (
     ValidationError,
 )
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.api.permissions import (
@@ -50,6 +52,7 @@ from core.api.throttling import (
     gift_card_code_throttles,
 )
 from core.api.views import BaseModelViewSet
+from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
@@ -141,6 +144,25 @@ from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 
 logger = logging.getLogger(__name__)
+
+
+def _meta_context_from(
+    request: Request, raw: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """The storefront's Meta context with the visitor's address set here.
+
+    ``client_ip_address`` in the body is the caller's choice, so it is
+    dropped. The address Meta receives is ``edge_client_ip(request)``, the
+    visitor our Cloudflare edge vouched for, or none (``docs/client-ip.md``).
+    """
+    context = {
+        key: value
+        for key, value in (raw or {}).items()
+        if key != "client_ip_address"
+    }
+    if (ip := edge_client_ip(request)) is not None:
+        context["client_ip_address"] = ip
+    return context
 
 
 class RefundOutstanding(APIException):
@@ -1271,7 +1293,7 @@ class OrderViewSet(BaseModelViewSet):
         # storefront proxy forwarded for Conversions API matching. The
         # service-level helper ``_sanitise_meta_context`` filters this
         # against an allow-list, so it's safe to forward as-is here.
-        meta_context = validated_data.get("meta")
+        meta_context = _meta_context_from(request, validated_data.get("meta"))
 
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show
@@ -1356,7 +1378,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 4.5: Pull Meta Pixel context for the offline path too —
         # COD orders trigger the canonical Purchase event from
         # ``order_paid`` so the dispatcher needs the same fbp/fbc.
-        meta_context = validated_data.get("meta")
+        meta_context = _meta_context_from(request, validated_data.get("meta"))
 
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show

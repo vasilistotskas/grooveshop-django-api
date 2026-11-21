@@ -1777,6 +1777,9 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επεξεργα
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορά του προϊόντος στο απόθεμα. Δοκιμάστε ξανά αργότερα."
 
+msgid "An opaque digest of what the order would be made of: the lines, the promotions, the delivery with its pickup point and the pay way. Null until a delivery and a pay way are chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
+msgstr "Ένα αδιαφανές αποτύπωμα του τι θα περιέχει η παραγγελία: οι γραμμές, οι προωθητικές ενέργειες, η αποστολή με το σημείο παραλαβής της και ο τρόπος πληρωμής. Null μέχρι να επιλεγούν αποστολή και τρόπος πληρωμής. Στείλτε το πίσω ως ``expectedCartDigest`` κατά τη δημιουργία της παραγγελίας: η παραγγελία δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό."
+
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "Μια παραγγελία είναι πώληση στην περίοδο που έφυγε από το κατάστημα, όποιος κι αν είναι ο τρόπος πληρωμής: η αντικαταβολή μετράει όταν αποστέλλεται το δέμα, όχι όταν την αποδίδει ο courier. Ό,τι οφείλει ακόμη ο πελάτης στις αποσταλμένες παραγγελίες εμφανίζεται ως «Αναμένεται είσπραξη». Ένα δέμα που ο πελάτης αρνήθηκε αφαιρείται στην περίοδο που επέστρεψε."
 
@@ -14616,6 +14619,9 @@ msgstr "Ο ΦΠΑ του τιμολογίου, για τον λογιστή σα
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 msgstr "Τα διαπιστευτήρια Viva Wallet και Stripe κάθε tenant είναι οι δικοί του λογαριασμοί εμπόρου για την ολοκλήρωση αγοράς των πελατών του — άσχετα με το τι οφείλει ο έμπορος στην πλατφόρμα. Το Stripe Connect Account ID είναι δεσμευμένο για μελλοντικό κανάλι χρέωσης της πλατφόρμας και παραμένει αδρανές σήμερα."
 
+msgid "The ``cartDigest`` of the ``POST /cart/quote`` the buyer was shown. When sent, the order is created only if it is made of exactly what that quote priced (lines, promotions, delivery, pickup point, pay way); otherwise the answer is 409 ``cart_changed`` with the new quote and nothing is created."
+msgstr "Το ``cartDigest`` του ``POST /cart/quote`` που είδε ο αγοραστής. Όταν αποστέλλεται, η παραγγελία δημιουργείται μόνο αν περιέχει ακριβώς ό,τι κοστολόγησε εκείνη η κοστολόγηση (γραμμές, προωθητικές ενέργειες, αποστολή, σημείο παραλαβής, τρόπος πληρωμής)· διαφορετικά η απάντηση είναι 409 ``cart_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται τίποτα."
+
 msgid "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 msgstr "Το aade-user-id του λογαριασμού προγραμματιστή myDATA του καταστήματος στο TAXISnet. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το myDATA."
 
@@ -17507,6 +17513,9 @@ msgstr "Ο εταιρικός σας λογαριασμός εγκρίθηκε"
 msgid "Your business's legal details are missing"
 msgstr "Λείπουν νομικά στοιχεία της επιχείρησής σας"
 
+msgid "Your cart has changed since its total was shown. Review your order and place it again."
+msgstr "Το καλάθι σας άλλαξε από τότε που εμφανίστηκε το σύνολό του. Ελέγξτε την παραγγελία σας και υποβάλετέ την ξανά."
+
 msgid "Your data and preferences are still safely stored"
 msgstr "Τα δεδομένα και οι προτιμήσεις σας διατηρούνται με ασφάλεια"
 
@@ -17863,8 +17872,8 @@ msgstr "Μόνο για ``invalid_coupon``."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` για κάθε επισκέπτη: μπορεί να ακολουθήσει email, χωρίς υπόσχεση. ``already_subscribed`` μόνο όταν ο συνδεδεμένος λογαριασμός υπέβαλε δική του επαληθευμένη διεύθυνση και η συνδρομή του λογαριασμού στο newsletter είναι ήδη επιβεβαιωμένη· τότε δεν στέλνεται email."
 
-msgid "``total_changed`` only: what checkout charges for the cart now. Show its total and send its ``expectedTotal`` to order at it."
-msgstr "Μόνο για ``total_changed``: τι χρεώνει τώρα το ταμείο για το καλάθι. Δείξτε το σύνολό του και στείλτε το ``expectedTotal`` του για να γίνει η παραγγελία σε αυτό."
+msgid "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal`` and ``cartDigest`` to order at it."
+msgstr "Μόνο για ``total_changed`` και ``cart_changed``: τι χρεώνει τώρα το ταμείο για το καλάθι. Εμφανίστε το και στείλτε τα ``expectedTotal`` και ``cartDigest`` του για να παραγγείλετε με αυτό."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστώνει αυτό το παραστατικό, παγωμένες κατά την έκδοση."

@@ -103,12 +103,39 @@ caller:
     `code` already.
   - **Optional for now.** The storefront and the gateway start sending it,
     then a later release requires it (#635).
+- **The cart digest.** A quote with a delivery and a pay way also returns
+  `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
+  `SECRET_KEY`, over a canonical form of what the order would be made of:
+  each line (product, quantity, unit price as priced), the promotions that
+  apply with their codes and gifts, the delivery (kind as
+  `delivery_kind` reads it, carrier, country, region, the pickup point)
+  and the pay way. It is stable while those do not change and reveals
+  nothing of the cart. `POST /api/v1/order` takes an optional
+  `expectedCartDigest`; both creation paths compare it under the cart
+  lock, before the total, and a difference creates nothing and answers
+  **409** `{detail, error: {type, quote}, code: "cart_changed"}`. It
+  catches what the total cannot: a line swapped for one at the same
+  price, quantities that trade off, another locker at the same rate.
+  - **The quote takes what the order takes.** The pickup point
+    (`boxnowLockerId`, `acsStationExternalId`, `acsStationBranch`,
+    `order.serializers.quote.PickupPointSerializer`) is a field of both
+    bodies, and both build the delivery with `ShippingChoice.of`, which
+    keeps only the chosen carrier's `location_keys`
+    (`shipping.interfaces.ShippingCarrierInterface`). Every order-creation
+    field is placed as digested, priced or not priced in
+    `tests/integration/order/test_cart_digest.py`, so a field added to one
+    body and not the other fails there.
+  - **A code, not an enum value.** As `total_changed`, `cart_changed` is
+    sent under `error.type` `invalid_order_data`
+    (`order.enum.create_error.CART_CHANGED_CODE`), and only to a request
+    carrying `expectedCartDigest`. Optional until the storefront and the
+    gateway send it; a later release requires it (#755).
 - **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
   body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation
   prices a missing kind as home delivery; a quote does not assume one).
-  Besides the rows it returns `expectedTotal`, to send back with the
-  order, and the priced lists: `shippingOptions` (every delivery the store
+  Besides the rows it returns `expectedTotal` and `cartDigest`, to send
+  back with the order, and the priced lists: `shippingOptions` (every delivery the store
   offers to the country, `ShippingService.available_options` priced with
   the region and a free-shipping promotion, each with `waivedBy`; null
   without a country) and `payWays` (every pay way a shopper is offered

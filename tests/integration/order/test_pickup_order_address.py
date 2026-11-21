@@ -23,7 +23,7 @@ from django.test import override_settings
 from django.urls import reverse
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from core.caches import REDIS_UNAVAILABLE, STRICT_CACHE_UNAVAILABLE_CODE
+from core.cache_backend import REDIS_UNAVAILABLE, STRICT_CACHE_UNAVAILABLE_CODE
 from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from order.throttles import OrderCreateAnonThrottle, OrderCreateThrottle

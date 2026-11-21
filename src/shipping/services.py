@@ -21,7 +21,7 @@ from django.conf import settings
 from django.db.models import Q
 from djmoney.money import Money
 
-from core.caches import REDIS_UNAVAILABLE
+from core.cache_backend import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
     PickupPointCheckUnavailableError,

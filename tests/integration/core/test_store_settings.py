@@ -83,7 +83,7 @@ def test_several_settings_resolve_like_one(django_assert_max_num_queries):
 def test_several_settings_are_read_from_the_cache_in_one_round_trip():
     """A Redis round trip costs ~1.6 ms in production: 28 single reads
     were ~45 ms of ``settings/public``."""
-    from core.caches import CustomCache
+    from core.cache_backend import CustomCache
 
     names = ("GIFT_CARD_MIN_AMOUNT", "GIFT_CARD_MAX_AMOUNT", "RETURN_FEES")
     store_settings(names)  # warm every key

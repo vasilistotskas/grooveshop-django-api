@@ -102,6 +102,12 @@ BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
 PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = int(
     getenv("PICKUP_POINT_RESYNC_TIMEOUT_SECONDS", "5")
 )
+# The Retry-After of the 503 ``pickup_point_check_unavailable``: the
+# pickup point could not be checked because the cache holding the resync
+# guard (Redis) is down, which is ours to fix, not the shopper's choice.
+PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS = int(
+    getenv("PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS", "30")
+)
 # Seconds after a parcel creation whose outcome is uncertain (a timeout, a
 # 5xx: the request may have reached BoxNow) during which an empty lookup by
 # ``orderNumber`` does not prove that no parcel exists: BoxNow may still be

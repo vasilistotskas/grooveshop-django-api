@@ -24,6 +24,7 @@ from djmoney.money import Money
 from core.caches import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
+    PickupPointCheckUnavailableError,
     ShippingParcelTooLargeError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
@@ -126,8 +127,9 @@ class ShippingService:
         ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
         at once. A resync that fails or passes its deadline
         (``_resync_within_deadline``) is logged and refused. Raises
-        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``; never
-        answers with any other address.
+        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``, or
+        ``PickupPointCheckUnavailableError`` when the guard's cache is down
+        (no resync, nothing judged); never answers with any other address.
         """
         from django.core.cache import cache
 
@@ -166,7 +168,7 @@ class ShippingService:
                 dict(location),
                 exc_info=True,
             )
-            raise PickupPointUnknown(
+            raise PickupPointCheckUnavailableError(
                 f"{provider_code} pickup point {dict(location)} is unknown "
                 "and its catalogue cannot be resynced without the cache"
             ) from e

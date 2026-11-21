@@ -616,12 +616,14 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         assert "Resync of the boxnow catalogue" in caplog.text
         assert not Order.objects.exists()
 
-    def test_a_cache_outage_refuses_without_a_resync(
-        self, locker_checkout, resync, caplog
+    def test_a_cache_outage_is_a_temporary_503_without_a_resync(
+        self, locker_checkout, resync, caplog, settings, documented
     ):
-        """``CustomCache.add`` raises while Redis is down; without its
-        guard no resync runs, and the order is the field error, never a
-        500."""
+        """``CustomCache.add`` raises while Redis is down. Without its
+        guard no resync runs, and the point is not judged: the fault is
+        ours, so the answer is a retryable 503 with ``Retry-After`` and no
+        field error, never ``pickup_point_unknown`` and never a 500."""
+        settings.PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS = 30
         with (
             patch(
                 "django.core.cache.cache.add",
@@ -633,12 +635,19 @@ class TestALockerTheCatalogueDoesNotHoldYet:
                 locker_checkout, boxnow_locker_id="77"
             )
 
-        assert response.status_code == 400, response.content
-        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
-            "pickup_point_unknown"
-        )
+        assert response.status_code == 503, response.content
+        documented(response, "/api/v1/order", "post")
+        assert response["Retry-After"] == "30"
+        body = response.json()
+        assert body["code"] == "pickup_point_check_unavailable"
+        assert "fields" not in body
         resync.assert_not_called()
-        assert "the cache holding its guard is unavailable" in caplog.text
+        (logged,) = [
+            r
+            for r in caplog.records
+            if "the cache holding its guard is unavailable" in r.getMessage()
+        ]
+        assert logged.levelno == logging.WARNING
         assert not Order.objects.exists()
 
     def test_a_known_locker_asks_the_carrier_nothing(

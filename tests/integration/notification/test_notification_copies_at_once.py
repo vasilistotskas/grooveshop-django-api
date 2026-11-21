@@ -28,22 +28,19 @@ pytestmark = pytest.mark.django_db(transaction=True)
 WAIT = 10
 
 
-@pytest.fixture
-def notifying_task():
-    @celery_app.task(bind=True, name="tests.notification_copies")
-    def task(self, user_id: int) -> int:
-        return create_user_notification(
-            UserAccount.objects.get(pk=user_id),
-            translations={"en": {"title": "Hi", "message": "Once"}},
-        ).pk
+# Registered once, here: a task defined inside a fixture is a new callable on
+# every call, and every Celery app finalized later in the run (the beat and
+# schedule tests build their own) registers each one under the same name and
+# warns ``DuplicateTaskNameWarning``.
+@celery_app.task(bind=True, name="tests.notification_copies")
+def notifying_task(self, user_id: int) -> int:
+    return create_user_notification(
+        UserAccount.objects.get(pk=user_id),
+        translations={"en": {"title": "Hi", "message": "Once"}},
+    ).pk
 
-    yield task
-    celery_app.tasks.pop("tests.notification_copies", None)
 
-
-def test_a_copy_writing_at_the_same_moment_gets_the_first_ones_row(
-    notifying_task,
-):
+def test_a_copy_writing_at_the_same_moment_gets_the_first_ones_row():
     user = UserAccountFactory(num_addresses=0)
     inserted = threading.Event()
     release = threading.Event()

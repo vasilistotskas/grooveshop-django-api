@@ -120,6 +120,7 @@ from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
+from shipping.enum import ShippingKind
 from shipping.exceptions import (
     CarrierBusyError,
     CarrierError,
@@ -2597,7 +2598,7 @@ class OrderService:
         Required fields:
         - first_name, last_name
         - email (valid format)
-        - street, street_number, city, zipcode
+        - street, city, zipcode, and street_number for a home delivery
         - country_id
         - phone
 
@@ -2642,6 +2643,12 @@ class OrderService:
             "country_id",
             "phone",
         ]
+
+        # A pickup point's catalogue address may hold its number in the
+        # street line (``address_of_pickup_point``): only a home delivery
+        # needs one of its own.
+        if address.get("shipping_kind") == ShippingKind.PICKUP_POINT:
+            required_fields.remove("street_number")
 
         # Check for missing required fields
         for field in required_fields:

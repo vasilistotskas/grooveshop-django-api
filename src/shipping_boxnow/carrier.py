@@ -92,6 +92,15 @@ class BoxNowCarrier(ShippingCarrierInterface):
         return shipment.has_parcel
 
     def pickup_point_address(self, shipment: Any) -> PostalAddress:
+        """The address of the shipment's locker
+        (:meth:`address_of_pickup_point`)."""
+        return self.address_of_pickup_point(
+            {"boxnow_locker_id": shipment.locker_external_id}
+        )
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
         """The locker's address as BOX NOW lists it. Its destinations carry
         no city field: the city is ``addressLine2`` (BOX NOW API manual
         v7.2, the ``/api/v1/destinations`` example: ``"addressLine2":
@@ -99,13 +108,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
         added is found (``PickupPointUnknown`` until then)."""
         from shipping_boxnow.models import BoxNowLocker
 
-        locker = BoxNowLocker.objects.filter(
-            external_id=shipment.locker_external_id
-        ).first()
+        external_id = location.get("boxnow_locker_id") or ""
+        locker = BoxNowLocker.objects.filter(external_id=external_id).first()
         if locker is None or not (locker.postal_code and locker.address_line_2):
             raise PickupPointUnknown(
-                "The address of BOX NOW locker "
-                f"{shipment.locker_external_id} is not known."
+                f"The address of BOX NOW locker {external_id} is not known."
             )
         return PostalAddress(
             street=locker.address_line_1,
@@ -189,15 +196,14 @@ class BoxNowCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         payload: dict[str, Any],
     ) -> dict[str, list[str]]:
-        """Locker required for a locker order, and it must be in the
-        delivery country.
+        """Locker required for a locker order, held by the catalogue and
+        in the delivery country.
 
-        A locker absent from the local ``BoxNowLocker`` cache is
-        ACCEPTED with a warning rather than rejected: the daily sync
-        task lags behind BoxNow's own catalogue, so a locker that
-        genuinely exists can be momentarily unknown to us — rejecting
-        it would block a real order over our own stale cache, not a
-        bad selection.
+        A locker absent from the local ``BoxNowLocker`` catalogue is
+        refused: the order is delivered to the locker's address, which
+        only the catalogue holds (``address_of_pickup_point``, #642).
+        Order creation refuses it first, field-coded
+        (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
         """
         from django.utils.translation import gettext_lazy as _
 
@@ -221,13 +227,16 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         locker = BoxNowLocker.objects.filter(external_id=locker_id).first()
         if locker is None:
-            logger.warning(
-                "BoxNow locker %s not found in the local cache — "
-                "accepting anyway (daily sync lags BoxNow's own catalogue)",
-                locker_id,
-                extra={"boxnow_locker_external_id": locker_id},
-            )
-            return {}
+            return {
+                "boxnow_locker_id": [
+                    str(
+                        _(
+                            "This pickup point is not available. Choose "
+                            "another one."
+                        )
+                    )
+                ]
+            }
 
         order_country = (payload.get("country_id") or "").upper()
         if (

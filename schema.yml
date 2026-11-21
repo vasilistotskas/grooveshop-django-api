@@ -42907,9 +42907,10 @@ components:
           description: Email πελάτη
         street:
           type: string
-          minLength: 1
           description: Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά
-            το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber.
+            το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber. Απαιτείται για
+            παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι'
+            αυτό τη διεύθυνση του σημείου.
           maxLength: 255
         streetNumber:
           type: string
@@ -42919,15 +42920,15 @@ components:
           maxLength: 50
         city:
           type: string
-          minLength: 1
-          description: Όνομα πόλης
+          description: Όνομα πόλης. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία
+            σε σημείο παραλαβής παίρνει αντί γι' αυτό την πόλη του σημείου.
           maxLength: 100
         zipcode:
           type: string
-          minLength: 1
           description: Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern``
             της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία,
-            μονά κενά).
+            μονά κενά). Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο
+            παραλαβής παίρνει αντί γι' αυτόν τον ταχυδρομικό κώδικα του σημείου.
           maxLength: 20
         countryId:
           type: string
@@ -43111,16 +43112,13 @@ components:
           description: Ο αγοραστής αποδέχεται τους όρους χρήσης και την πολιτική απορρήτου
             του καταστήματος. Πρέπει να είναι true.
       required:
-      - city
       - countryId
       - email
       - firstName
       - lastName
       - payWayId
       - phone
-      - street
       - termsAccepted
-      - zipcode
     OrderDeliveryMethod:
       type: object
       properties:

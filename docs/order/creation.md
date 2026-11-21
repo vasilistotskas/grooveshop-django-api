@@ -491,6 +491,23 @@ address it cannot place (prod order #316: street "1", street number
   caller sent no number field. A sent `streetNumber` is used as sent.
   The agent gateway sends the UCP and ACP destination's single street
   line this way.
+- **A pickup-point order is delivered to the point** (#642). For
+  `shippingKind=pickup_point` the buyer's `street`, `streetNumber`, `city`
+  and `zipcode` are not required and not kept: `OrderCreateFromCartSerializer.
+  _deliver_to_pickup_point` stores the point's address from the carrier's
+  catalogue (`ShippingCarrierInterface.address_of_pickup_point`: the BOX
+  NOW locker, the exact ACS station and branch) as the order's delivery
+  address, its number split from the street line by `split_street_line`
+  where it splits. That one snapshot is what the receipt, the ACS voucher
+  and the order page read. Name, email and phone stay required; the
+  region rule does not apply. A point the catalogue does not hold is a 400
+  `pickup_point_unknown` on the carrier's location field (`boxnowLockerId`,
+  `acsStationExternalId`), no point at all `pickup_point_required`: no
+  address could be stored for it. An invoice to a pickup point names the
+  company's address (`billingStreet`), since "same as delivery" would copy
+  the point's. A retail receipt needs no buyer address (Law 4308/2014 art.
+  12 par. 2; the former EUR 50 rule was deleted by Law 5222/2025 art. 238
+  par. 2).
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

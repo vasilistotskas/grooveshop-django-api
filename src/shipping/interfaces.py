@@ -172,6 +172,19 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The address of the pickup point ``location`` names (this
+        carrier's ``location_keys``), from its catalogue now.
+
+        A pickup-point order is delivered there, so checkout stores it as
+        the order's delivery address (``OrderCreateFromCartSerializer``).
+        Raises ``PickupPointUnknown`` when the catalogue does not hold it;
+        a carrier with no pickup points holds none.
+        """
+        raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
+
     @abstractmethod
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

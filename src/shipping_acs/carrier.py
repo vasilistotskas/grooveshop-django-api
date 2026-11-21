@@ -91,19 +91,35 @@ class AcsCarrier(ShippingCarrierInterface):
         catalogue at checkout), whose address the receipt must not name; a
         booking without a branch names only the row without one, never the
         first station of its area."""
-        from shipping_acs.models import AcsStation
 
         if shipment.delivery_kind != ShippingKind.PICKUP_POINT:
             return None
+        return self.address_of_pickup_point(
+            {
+                "acs_station_external_id": (
+                    shipment.station_destination_external_id
+                ),
+                "acs_station_branch": shipment.station_branch_destination,
+            }
+        )
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The address of the exact station ``location`` names: its
+        (external_id, branch) pair, a blank branch naming only the row
+        without one, read from the catalogue now."""
+        from shipping_acs.models import AcsStation
+
+        external_id = location.get("acs_station_external_id") or ""
+        branch = location.get("acs_station_branch") or ""
         station = AcsStation.objects.filter(
-            external_id=shipment.station_destination_external_id,
-            branch_code=shipment.station_branch_destination,
+            external_id=external_id, branch_code=branch
         ).first()
         if station is None or not (station.postal_code and station.city):
             raise PickupPointUnknown(
-                "The address of ACS station "
-                f"{shipment.station_destination_external_id} "
-                f"{shipment.station_branch_destination} is not known."
+                f"The address of ACS station {external_id} {branch} is not "
+                "known."
             )
         return PostalAddress(
             street=station.address_line_1,

@@ -3256,6 +3256,9 @@ msgstr "Choose a new password for %(store)s"
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
 
+msgid "Choose a pickup point."
+msgstr "Choose a pickup point."
+
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
@@ -3281,11 +3284,11 @@ msgctxt "legal details alert"
 msgid "City"
 msgstr "City"
 
-msgid "City name"
-msgstr "City name"
-
 msgid "City name for nearest-locker lookup"
 msgstr "City name for nearest-locker lookup"
+
+msgid "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
+msgstr "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
 
 msgid "Claim"
 msgstr "Claim"
@@ -4849,6 +4852,9 @@ msgstr "Enter the code from your authenticator app for %(account)s, or one of yo
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
+
+msgid "Enter the company's address: a pickup point is not one."
+msgstr "Enter the company's address: a pickup point is not one."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
@@ -11112,8 +11118,8 @@ msgstr "Postal code of the event location"
 msgid "Postal code of the locker"
 msgstr "Postal code of the locker"
 
-msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
-msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
+msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
+msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
 
 msgid "Posts"
 msgstr "Posts"
@@ -14024,8 +14030,8 @@ msgstr "Street Number"
 msgid "Street name and number"
 msgstr "Street name and number"
 
-msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
-msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
+msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
 
 msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 msgstr "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
@@ -15564,6 +15570,9 @@ msgstr "This payout is tied to a shipment; there is nothing to reconcile."
 
 msgid "This person is already on the team."
 msgstr "This person is already on the team."
+
+msgid "This pickup point is not available. Choose another one."
+msgstr "This pickup point is not available. Choose another one."
 
 msgid "This product is already in the user's favorites."
 msgstr "This product is already in the user's favorites."
@@ -18299,6 +18308,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Cancel the BoxNow shipment for an order"
+
+#~ msgid "City name"
+#~ msgstr "City name"
 
 #~ msgid "Click the button below to retry your payment with a different card or method."
 #~ msgstr "Click the button below to retry your payment with a different card or method."

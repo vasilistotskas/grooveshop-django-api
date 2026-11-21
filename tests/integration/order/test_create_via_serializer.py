@@ -475,6 +475,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         go')."""
         from pay_way.factories import PayWayShippingExclusionFactory
         from shipping.models import ShippingProvider
+        from shipping_boxnow.factories import BoxNowLockerFactory
 
         boxnow = ShippingProvider.objects.get(code="boxnow")
         boxnow.is_active = True
@@ -489,6 +490,10 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             pay_way=pay_way,
             shipping_provider=boxnow,
             shipping_kind="pickup_point",
+        )
+        BoxNowLockerFactory(
+            external_id="123",
+            country_code=self._base_address()["country_id"],
         )
 
         data = {

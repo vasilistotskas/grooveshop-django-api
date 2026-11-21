@@ -3263,6 +3263,9 @@ msgstr "Νέος κωδικός πρόσβασης για %(store)s"
 msgid "Choose a new password for {store_name}"
 msgstr "Νέος κωδικός πρόσβασης για {store_name}"
 
+msgid "Choose a pickup point."
+msgstr "Επιλέξτε σημείο παραλαβής."
+
 msgid "Choose a time in the future."
 msgstr "Διάλεξε μια ώρα στο μέλλον."
 
@@ -3288,11 +3291,11 @@ msgctxt "legal details alert"
 msgid "City"
 msgstr "Πόλη"
 
-msgid "City name"
-msgstr "Όνομα πόλης"
-
 msgid "City name for nearest-locker lookup"
 msgstr "Όνομα πόλης για αναζήτηση πλησιέστερου locker"
+
+msgid "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
+msgstr "Όνομα πόλης. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτό την πόλη του σημείου."
 
 msgid "Claim"
 msgstr "Δέσμευση"
@@ -4854,6 +4857,9 @@ msgstr "Πληκτρολογήστε τον κωδικό της εφαρμογή
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης. Αν δεν έχετε πια το κινητό σας, χρησιμοποιήστε έναν από τους κωδικούς ανάκτησης."
+
+msgid "Enter the company's address: a pickup point is not one."
+msgstr "Εισαγάγετε τη διεύθυνση της εταιρείας: ένα σημείο παραλαβής δεν είναι διεύθυνση εταιρείας."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
@@ -11119,8 +11125,8 @@ msgstr "Ταχυδρομικός κώδικας της τοποθεσίας το
 msgid "Postal code of the locker"
 msgstr "Ταχ. κώδικας του locker"
 
-msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
-msgstr "Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern`` της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία, μονά κενά)."
+msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
+msgstr "Ταχυδρομικός κώδικας. Πρέπει να ταιριάζει με το ``postal_code_pattern`` της χώρας· αποθηκεύεται κανονικοποιημένος (χωρίς κενά στα άκρα, κεφαλαία, μονά κενά). Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτόν τον ταχυδρομικό κώδικα του σημείου."
 
 msgid "Posts"
 msgstr "Άρθρα"
@@ -14028,8 +14034,8 @@ msgstr "Αριθμός"
 msgid "Street name and number"
 msgstr "Οδός και αριθμός"
 
-msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
-msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber."
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
+msgstr "Όνομα οδού, ή ολόκληρη η γραμμή της οδού με τον αριθμό μετά το όνομα (Ερμού 12) όταν δεν αποστέλλεται streetNumber. Απαιτείται για παράδοση στο σπίτι· μια παραγγελία σε σημείο παραλαβής παίρνει αντί γι' αυτό τη διεύθυνση του σημείου."
 
 msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 msgstr "Αριθμός οδού. Προαιρετικός: χωρίς αυτόν, το street πρέπει να τελειώνει με τον αριθμό, που διαχωρίζεται από αυτό· μια οδός χωρίς αριθμό απορρίπτεται με κωδικό street_number_missing στο street."
@@ -15566,6 +15572,9 @@ msgstr "Αυτή η απόδοση συνδέεται με αποστολή· δ
 
 msgid "This person is already on the team."
 msgstr "Αυτό το άτομο είναι ήδη στην ομάδα."
+
+msgid "This pickup point is not available. Choose another one."
+msgstr "Αυτό το σημείο παραλαβής δεν είναι διαθέσιμο. Επιλέξτε άλλο."
 
 msgid "This product is already in the user's favorites."
 msgstr "Αυτό το προϊόν βρίσκεται ήδη στα αγαπημένα του χρήστη."
@@ -18467,6 +18476,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Category Analytics"
 #~ msgstr "Αναλυτικά κατηγοριών"
+
+#~ msgid "City name"
+#~ msgstr "Όνομα πόλης"
 
 #~ msgid "Clear search"
 #~ msgstr "Καθαρισμός αναζήτησης"

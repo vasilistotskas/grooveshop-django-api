@@ -15,7 +15,7 @@ import threading
 import time
 from datetime import timedelta
 from email.utils import format_datetime
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -114,6 +114,7 @@ class RecordTests(TestCase):
         self.assertEqual(event.status, Status.PENDING)
         self.assertEqual(event.attempts, 0)
         task.apply_async.assert_called_once_with(
+            task_id=ANY,
             args=[str(event.pk)],
             headers={"_schema_name": connection.schema_name},
         )
@@ -726,6 +727,7 @@ class RetryNowTests(TestCase):
         self.assertLessEqual(failed.next_attempt_at, timezone.now())
         self.assertEqual(delivered.status, Status.DELIVERED)
         task.apply_async.assert_called_once_with(
+            task_id=ANY,
             args=[str(failed.pk)],
             headers={"_schema_name": connection.schema_name},
         )

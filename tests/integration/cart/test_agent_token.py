@@ -38,6 +38,7 @@ from cart.models import Cart
 from cart.services import CartService
 from cart.throttles import CartAgentTokenThrottle
 from product.factories import ProductFactory
+from tests.utils.boxnow import nearest_locker
 from tests.utils.staff import (
     bind_store_tenant,
     store_tenant,
@@ -339,10 +340,7 @@ class TestShippingReads:
         from unittest.mock import MagicMock
 
         boxnow = MagicMock()
-        boxnow.return_value.find_closest_locker.return_value = {
-            "id": "4",
-            "type": "apm",
-        }
+        boxnow.return_value.find_closest_locker.return_value = nearest_locker()
         with patch("shipping_boxnow.client.BoxNowClient", boxnow):
             response = client.post(
                 reverse("shipping-boxnow-locker-nearest"),

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 import stripe
@@ -405,7 +405,7 @@ class TestRefundWebhook:
         assert mock_email.call_count == 1
         [refund] = _refunds(order)
         mock_email.assert_called_with(
-            args=[refund.pk], headers={"_schema_name": "public"}
+            task_id=ANY, args=[refund.pk], headers={"_schema_name": "public"}
         )
 
     def test_charge_refunded_books_no_order_refund(self):

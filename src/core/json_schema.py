@@ -23,12 +23,10 @@ from typing import Any
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
 from django.utils.module_loading import import_string
-from djangorestframework_camel_case.util import (
-    camelize_re,
-    underscore_to_camel,
-)
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError as SchemaError
+
+from core.utils.string_case import snake_to_camel
 
 
 @deconstructible
@@ -110,14 +108,11 @@ def wire_schema(schema: Any) -> Any:
     for key, value in schema.items():
         if key == "properties":
             wired[key] = {
-                _camel(name): wire_schema(sub) for name, sub in value.items()
+                snake_to_camel(name): wire_schema(sub)
+                for name, sub in value.items()
             }
         elif key == "required":
-            wired[key] = [_camel(name) for name in value]
+            wired[key] = [snake_to_camel(name) for name in value]
         else:
             wired[key] = wire_schema(value)
     return wired
-
-
-def _camel(name: str) -> str:
-    return camelize_re.sub(underscore_to_camel, name)

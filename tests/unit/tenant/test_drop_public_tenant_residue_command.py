@@ -10,7 +10,8 @@ So the two refusals below are the point of the command, not decoration.
 This very test module runs in that routerless lane, which makes it the
 exact environment that must be refused — and means these tests cannot
 drop a real table even if the guards were removed, because the
-table-name set is monkeypatched in the one test that executes a drop.
+table-name set is monkeypatched, where the command looks it up, in every
+test that reaches it.
 """
 
 from __future__ import annotations
@@ -24,6 +25,10 @@ from django.db import DEFAULT_DB_ALIAS, connection, connections
 from django_tenants.utils import get_public_schema_name
 
 ROUTER_PATH = "django_tenants.routers.TenantSyncRouter"
+# The command binds ``tenant_only_table_names`` when it is imported, so a
+# test replaces it there: patching ``tenant.app_labels`` reached nothing,
+# and the tests then saw the real set of every tenant table.
+COMMAND = "tenant.management.commands.drop_public_tenant_residue"
 
 
 def _run(**kwargs) -> str:
@@ -62,7 +67,7 @@ class TestRefusals:
         settings.DATABASE_ROUTERS = []
         called = []
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names",
+            f"{COMMAND}.tenant_only_table_names",
             lambda: called.append(1) or set(),
         )
 
@@ -85,7 +90,7 @@ class TestDryRunIsTheDefault:
         public = get_public_schema_name()
         table = "unit_lane_fake_tenant_table"
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names", lambda: {table}
+            f"{COMMAND}.tenant_only_table_names", lambda: {table}
         )
 
         with connection.cursor() as cursor:
@@ -110,7 +115,7 @@ class TestDryRunIsTheDefault:
             raising=False,
         )
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names",
+            f"{COMMAND}.tenant_only_table_names",
             lambda: {"table_that_does_not_exist_anywhere"},
         )
 
@@ -133,7 +138,7 @@ class TestExecution:
         residue = "unit_lane_fake_tenant_table"
         decoy = "unit_lane_decoy_table"
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names", lambda: {residue}
+            f"{COMMAND}.tenant_only_table_names", lambda: {residue}
         )
 
         with connection.cursor() as cursor:
@@ -169,7 +174,7 @@ class TestExecution:
         public = get_public_schema_name()
         table = "unit_lane_fake_tenant_table"
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names", lambda: {table}
+            f"{COMMAND}.tenant_only_table_names", lambda: {table}
         )
 
         with connection.cursor() as cursor:
@@ -209,7 +214,7 @@ class TestLegacyInboundForeignKeys:
         residue = "unit_lane_fake_tenant_table"
         referrer = "unit_lane_shared_referrer"
         monkeypatch.setattr(
-            "tenant.app_labels.tenant_only_table_names", lambda: {residue}
+            f"{COMMAND}.tenant_only_table_names", lambda: {residue}
         )
 
         null_clause = "not null" if not_null else ""

@@ -80,7 +80,9 @@ no cart.
 `edge_client_ip` itself never falls back to
 `REMOTE_ADDR`. An address handed on as the visitor's own, such as the
 `client_ip_address` of a Meta Conversions API event
-(`src/meta_capi/signals.py`), is `edge_client_ip` or nothing: the peer is
+(`src/meta_capi/signals.py`, and the order's Meta context set by
+`_meta_context_from` in `src/order/views/order.py`, which drops the body's
+value), is `edge_client_ip` or nothing: the peer is
 a proxy, not the visitor. It is named for where the proof comes from: CodeQL treats
 any function whose name says `trusted` or `secret` as a source of
 secrets, so under its old name every log line carrying an address was a

@@ -18,7 +18,9 @@ Rules both carriers share:
   `BoxNowService.create_shipment_for_order`) raise
   `shipping.exceptions.ShipmentAwaitingPaymentError` while
   `Order.awaits_online_payment` holds — checked on the order row loaded
-  under the shipment lock. An online-paid voucher carries no COD amount,
+  under the shipment lock. That is an online pay way whose payment is not
+  settled (`SETTLED_PAYMENT_STATUSES`): an order paid and then partly
+  refunded still gets its voucher (#649). An online-paid voucher carries no COD amount,
   so a voucher minted for an unpaid card order would hand the goods over
   for free (prod order 304 was one admin click away, 2026-09-24). The
   tasks return `{"status": "awaiting_payment"}` with no retry and no

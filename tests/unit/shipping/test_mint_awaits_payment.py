@@ -293,3 +293,73 @@ class TestStaleDigest:
             result = check_stale_acs_shipments.run()
 
         assert result["ids"] == [refunded.pk]
+
+
+def _partially_refunded_card_order():
+    """Paid by card, part of it refunded before its voucher exists (#649):
+    nothing is owed online, and the rest still ships."""
+    return OrderFactory(
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.PARTIALLY_REFUNDED,
+        pay_way=PayWayFactory.create_online_payment(),
+    )
+
+
+class TestSettledPaymentGetsItsVoucher:
+    """``Order.awaits_online_payment`` was ``not is_paid``, true for every
+    settled status but COMPLETED: a partially refunded card order was
+    refused its voucher as unpaid, and the admin's remedy said the same."""
+
+    @pytest.mark.parametrize("status", list(PaymentStatus))
+    def test_the_property_is_the_queryset_rule_for_every_status(self, status):
+        from order.managers.order import awaiting_online_payment_q
+        from order.models.order import Order
+
+        order = OrderFactory(
+            payment_status=status,
+            pay_way=PayWayFactory.create_online_payment(),
+        )
+
+        assert order.awaits_online_payment is (
+            Order.objects.filter(
+                awaiting_online_payment_q(), pk=order.pk
+            ).exists()
+        )
+
+    def test_acs_mints_for_a_partially_refunded_card_order(self):
+        from shipping_acs.services import AcsService
+
+        order = _partially_refunded_card_order()
+        AcsShipmentFactory(order=order)
+        client = MagicMock()
+        client.return_value.billing_code = "B"
+        client.return_value.create_voucher.return_value = {
+            "Voucher_No": "9810000002"
+        }
+
+        with patch("shipping_acs.services.AcsClient", client):
+            shipment = AcsService.create_voucher_for_order(order)
+
+        assert shipment.voucher_no == "9810000002"
+
+    def test_boxnow_mints_for_a_partially_refunded_card_order(
+        self, boxnow_configured_tenant
+    ):
+        from shipping_boxnow.services import BoxNowService
+
+        order = _partially_refunded_card_order()
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+        client = MagicMock()
+        client.return_value.create_delivery_request.return_value = {
+            "id": "42224",
+            "parcels": [{"id": "9219709201"}],
+        }
+
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            shipment = BoxNowService.create_shipment_for_order(order)
+
+        assert shipment.parcel_id == "9219709201"

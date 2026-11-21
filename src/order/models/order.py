@@ -1091,6 +1091,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         Cash-on-delivery is never "awaiting" — nothing is owed online,
         so those carts still clear the moment the order is placed.
+
+        A settled payment (``SETTLED_PAYMENT_STATUSES``) awaits nothing,
+        whichever it is: an order paid and then partly refunded still
+        ships and gets its courier voucher. The one-row form of
+        ``order.managers.order.awaiting_online_payment_q``.
         """
         pay_way = self.pay_way
         if (
@@ -1098,7 +1103,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             or PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
         ):
             return False
-        return not self.is_paid
+        return self.payment_status not in SETTLED_PAYMENT_STATUSES
 
     @property
     def can_be_canceled(self) -> bool:

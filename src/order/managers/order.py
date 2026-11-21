@@ -36,9 +36,7 @@ def awaiting_online_payment_q(prefix: str = "") -> Q:
 
     ``prefix`` reaches the order from a related model (``"order__"``). The
     database form of "the shopper still owes money through a hosted flow",
-    deliberately NOT ``Order.awaits_online_payment``: that property is also
-    true for an online order that was refunded, partially refunded or
-    canceled, which is not waiting for anything.
+    and of ``Order.awaits_online_payment`` for one row.
     """
     return Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE}) & ~Q(
         **{f"{prefix}payment_status__in": SETTLED_PAYMENT_STATUSES}

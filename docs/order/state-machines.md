@@ -189,9 +189,8 @@ The unpaid-online exclusion, for both:
 - it is not an online order still waiting for its payment
   (`OrderQuerySet.awaiting_online_payment()`: `pay_way.settlement=online`
   and `payment_status` not in `SETTLED_PAYMENT_STATUSES`). An unpaid card
-  order is an abandoned checkout, not a parcel to chase. Do **not** use
-  `Order.awaits_online_payment` for this: it is also true for an online
-  order that is refunded, partially refunded or canceled.
+  order is an abandoned checkout, not a parcel to chase.
+  `Order.awaits_online_payment` is the same rule for one loaded row.
 
 The rule is one queryset, `OrderQuerySet.needing_follow_up(now)`; the
 changelist's `with_follow_up()` annotation (`needs_follow_up`, no query

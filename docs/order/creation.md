@@ -106,10 +106,13 @@ caller:
 - **The cart digest.** A quote with a delivery and a pay way also returns
   `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
   `SECRET_KEY`, over a canonical form of what the order would be made of:
-  each line (product, quantity, unit price as priced), the promotions that
-  apply with their codes and gifts, the delivery (kind as
-  `delivery_kind` reads it, carrier, country, region, the pickup point)
-  and the pay way. It is stable while those do not change and reveals
+  each line (product, quantity, unit price as priced, the promotion money
+  it carries), the promotions that apply with their codes, amounts and
+  gifts, the delivery (kind as `delivery_kind` reads it, the carrier that
+  takes it, as `_carrier` resolves one a home delivery does not name,
+  country, region, the pickup point) and the pay way. It holds no shipping
+  charge, fee, loyalty or gift-card amount: `expectedTotal` holds the
+  amount. It is stable while those do not change and reveals
   nothing of the cart. `POST /api/v1/order` takes an optional
   `expectedCartDigest`; both creation paths compare it under the cart
   lock, before the total, and a difference creates nothing and answers

@@ -17882,8 +17882,8 @@ msgstr "``invalid_coupon`` only."
 msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 msgstr "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 
-msgid "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal`` and ``cartDigest`` to order at it."
-msgstr "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal`` and ``cartDigest`` to order at it."
+msgid "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
+msgstr "``total_changed`` and ``cart_changed`` only: what checkout charges for the cart now. Show it and send its ``expectedTotal``, and its ``cartDigest`` as ``expectedCartDigest``, to order at it."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."

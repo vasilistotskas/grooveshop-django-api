@@ -2211,7 +2211,8 @@ class OrderCreateErrorDetailSerializer(serializers.Serializer):
         help_text=_(
             "``total_changed`` and ``cart_changed`` only: what checkout "
             "charges for the cart now. Show it and send its "
-            "``expectedTotal`` and ``cartDigest`` to order at it."
+            "``expectedTotal``, and its ``cartDigest`` as "
+            "``expectedCartDigest``, to order at it."
         ),
     )
 

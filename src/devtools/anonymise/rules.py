@@ -182,6 +182,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "last_name": Kind.LAST_NAME,
             "phone": Kind.PHONE,
             "notes": Kind.FREE_TEXT,
+            "address_line_2": Kind.BLANK,
             **_ADDRESS,
         },
     ),

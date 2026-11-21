@@ -521,7 +521,11 @@ address it cannot place (prod order #316: street "1", street number
   `extended_address`), kept on `Order.address_line_2` apart from the
   customer's notes. It prints under the street on the receipt and the
   order emails, and the ACS voucher carries it in `Delivery_Notes`
-  ([§5.1](shipping-acs.md)). `Order.place` is a different field: a
+  ([§5.1](shipping-acs.md)). `Order.full_address` (`fullAddress`, the one
+  line the order pages print) has it after the street and its number
+  ("Ερμού 12, 3ος όροφος, 10563 Αθήνα"). A saved address
+  (`UserAddress.address_line_2`, `/user/address`) keeps one too, so
+  checkout prefills it. `Order.place` is a different field: a
   district or area (Τοποθεσία), which nothing writes at checkout; the
   receipt prints it, when set, with the city.
 - **Region**: required exactly when the country has any (`Country.

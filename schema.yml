@@ -42521,6 +42521,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -43393,6 +43397,10 @@ components:
             μόνο το ποσό που χρεώνει ο πάροχος πληρωμής.
         fullAddress:
           type: string
+          description: |-
+            The delivery address on one line: the street and its number, the
+            address line 2 when there is one, then the postcode and the city
+            ("Ερμού 12, 3ος όροφος, 10563 Αθήνα").
           readOnly: true
         paymentId:
           type: string
@@ -46621,6 +46629,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54268,6 +54280,10 @@ components:
           type: string
           title: Αριθμός
           maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
+          maxLength: 255
         city:
           type: string
           title: Πόλη
@@ -54361,6 +54377,10 @@ components:
         streetNumber:
           type: string
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string
@@ -54457,6 +54477,10 @@ components:
           type: string
           minLength: 1
           title: Αριθμός
+          maxLength: 255
+        addressLine2:
+          type: string
+          title: Διεύθυνση γραμμή 2
           maxLength: 255
         city:
           type: string

@@ -915,6 +915,7 @@ class UserAddressAdmin(BaseModelAdmin):
                 "fields": (
                     "street",
                     "street_number",
+                    "address_line_2",
                     "city",
                     "zipcode",
                     "country",

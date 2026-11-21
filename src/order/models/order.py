@@ -979,7 +979,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def full_address(self) -> str:
-        return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
+        """The delivery address on one line: the street and its number, the
+        address line 2 when there is one, then the postcode and the city
+        ("Ερμού 12, 3ος όροφος, 10563 Αθήνα")."""
+        street = f"{self.street} {self.street_number}".strip()
+        place = f"{self.zipcode} {self.city}".strip()
+        return ", ".join(
+            part for part in (street, self.address_line_2, place) if part
+        )
 
     @property
     def customer_full_name(self) -> str:

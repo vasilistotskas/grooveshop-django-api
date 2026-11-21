@@ -667,7 +667,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     #                          party still holding a live card.
     counts["giftcards_scrubbed"] = GiftCard.objects.filter(
         issued_to=user
-    ).update(recipient_email="", recipient_name=placeholder_name)
+    ).update(recipient_email=None, recipient_name=placeholder_name)
     counts["giftcard_purchases_scrubbed"] = GiftCardPurchase.objects.filter(
         buyer=user
     ).update(buyer_email=placeholder_email, sender_name=placeholder_name)

@@ -13257,9 +13257,6 @@ msgstr "Αύξων αριθμός της μορφής ``CRD-{YEAR}-{NNNNNN}``."
 msgid "Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not allowed by Greek tax law."
 msgstr "Διαδοχικό αναγνωριστικό στη μορφή ``INV-{YEAR}-{NNNNNN}``. Δεν επιτρέπονται κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
 
-msgid "Serialized representation of the related content object"
-msgstr "Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου"
-
 msgid "Series and number of that credit invoice."
 msgstr "Σειρά και αριθμός αυτού του πιστωτικού τιμολογίου."
 
@@ -19473,6 +19470,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Sent when order is shipped"
 #~ msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
+
+#~ msgid "Serialized representation of the related content object"
+#~ msgstr "Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου"
 
 #, python-format
 #~ msgid "Setting '%(key)s' not found"

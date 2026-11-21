@@ -69,7 +69,7 @@ def deliver_scheduled_gift_cards(self) -> dict:
         delivered_at__isnull=True,
         deliver_at__isnull=False,
         deliver_at__lte=timezone.now(),
-    ).exclude(recipient_email="")
+    ).filter(recipient_email__isnull=False)
     sent = 0
     for card in due:
         # .delay(), never .apply(): the eager path does NOT carry the
@@ -162,7 +162,7 @@ def send_gift_card_expiry_reminders(self) -> dict:
             expires_at__lte=window_end,
             expiry_reminder_sent_at__isnull=True,
         )
-        .exclude(recipient_email="")
+        .filter(recipient_email__isnull=False)
         .select_related("issued_to")
     )
 

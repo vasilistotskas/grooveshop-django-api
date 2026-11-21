@@ -9,7 +9,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.schema import PLAIN_400_BODIES, publish_error_schemas
+from core.api.schema import publish_error_schemas
 from core.api.throttling import ProductAlertCreateThrottle
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
@@ -22,16 +22,16 @@ GENERIC = {"$ref": "#/components/schemas/ErrorResponse"}
 SPECIFIC = {"$ref": "#/components/schemas/B2BErrorResponse"}
 
 
-def _operation(schema):
+def _operation(schema, status="400"):
     return {
         "responses": {
-            "400": {"content": {"application/json": {"schema": schema}}}
+            status: {"content": {"application/json": {"schema": schema}}}
         }
     }
 
 
-def _documented_400(result, path, method):
-    return result["paths"][path][method]["responses"]["400"]["content"][
+def _documented_400(result, path, method, status="400"):
+    return result["paths"][path][method]["responses"][status]["content"][
         "application/json"
     ]["schema"]
 
@@ -74,12 +74,44 @@ def test_a_provider_400_also_documents_the_plain_error():
     }
 
 
-def test_a_400_a_view_names_itself_is_left_alone():
+def test_a_400_a_view_names_itself_also_documents_the_raised_errors():
+    """A view with its own refusal body still validates its input and
+    parses its body, so the handler's two bodies stand beside it."""
     result = {"paths": {"/a": {"get": _operation(copy.deepcopy(SPECIFIC))}}}
 
     publish_error_schemas(result, None, None, True)
 
-    assert _documented_400(result, "/a", "get") == SPECIFIC
+    assert _documented_400(result, "/a", "get") == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/ApiValidationError"},
+            {"$ref": "#/components/schemas/ApiError"},
+            SPECIFIC,
+        ]
+    }
+
+
+def test_a_404_a_view_names_itself_also_documents_the_plain_error():
+    """A feature gate or ``get_object`` answers 404 before the view's own
+    refusal can."""
+    result = {
+        "paths": {"/a": {"get": _operation(copy.deepcopy(SPECIFIC), "404")}}
+    }
+
+    publish_error_schemas(result, None, None, True)
+
+    assert _documented_400(result, "/a", "get", "404") == {
+        "anyOf": [{"$ref": "#/components/schemas/ApiError"}, SPECIFIC]
+    }
+
+
+def test_a_generic_404_is_left_as_it_is():
+    result = {
+        "paths": {"/a": {"get": _operation(copy.deepcopy(GENERIC), "404")}}
+    }
+
+    publish_error_schemas(result, None, None, True)
+
+    assert _documented_400(result, "/a", "get", "404") == GENERIC
 
 
 @pytest.mark.django_db
@@ -211,9 +243,7 @@ def test_an_undocumented_status_is_still_the_plain_error(
     assert set(response.json()) == {"detail", "code"}
 
 
-def test_no_generated_operation_documents_a_plain_400_alone(
-    openapi_schema,
-):
+def test_no_generated_operation_documents_a_400_body_alone(openapi_schema):
     offenders = [
         f"{method.upper()} {path}"
         for path, operations in openapi_schema["paths"].items()
@@ -223,8 +253,7 @@ def test_no_generated_operation_documents_a_plain_400_alone(
         .get("400", {})
         .get("content", {})
         .values()
-        if media.get("schema", {}).get("$ref", "").rsplit("/", 1)[-1]
-        in PLAIN_400_BODIES
+        if "$ref" in media.get("schema", {})
     ]
 
     assert offenders == []

@@ -217,7 +217,7 @@ class GiftCardService:
         *,
         source: str = GiftCardSource.ADMIN,
         issued_to=None,
-        recipient_email: str = "",
+        recipient_email: str | None = None,
         recipient_name: str = "",
         sender_name: str = "",
         message: str = "",

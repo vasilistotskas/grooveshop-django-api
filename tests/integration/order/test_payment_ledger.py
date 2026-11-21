@@ -366,6 +366,44 @@ class TestRecording:
         assert collection.kind == PaymentTransactionKind.COD_COLLECTION
         assert collection.provider_reference == "V1"
 
+    def test_the_ledger_writes_the_refund_row_and_books_nothing_more(self):
+        """``record_refund`` is a ledger write: the row and the status. The
+        attempt it fulfils is settled, and the order's sources allocated, by
+        ``RefundService.book_refund`` (#658), so a caller that writes the
+        row alone leaves a live attempt live."""
+        from order.models.credit_allocation import CreditAllocation
+        from order.models.refund_attempt import (
+            RefundAttempt,
+            RefundAttemptStatus,
+        )
+
+        order = _order()
+        charge = _charge(order, "50.00")
+        attempt = RefundAttempt.objects.create(
+            order=order, charge=charge, amount=_eur("15.00")
+        )
+
+        row, created = PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("15.00"), reference="re_1"
+        )
+
+        assert created is True
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+        assert attempt.refund is None
+        assert not CreditAllocation.objects.filter(refund=row).exists()
+
+        RefundService.book_refund(
+            order, charge=charge, amount=_eur("15.00"), reference="re_1"
+        )
+
+        # The row is the ledger's already: booking it again settles nothing
+        # by matching (that needs a new row) and allocates nothing.
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+
 
 class TestPlanningARefund:
     def test_everything_left_when_no_amount_is_given(self):

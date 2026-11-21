@@ -40,8 +40,9 @@ refunded, payment by payment) and:
   settled or declined attempt lets go (`RefundAttempt.objects.live()`). **(2)
   call** the provider with
   `idempotency_key=f"refund-{attempt.idempotency_key}"` and no transaction
-  open. **(3) record**: under the lock again, `record_refund` writes the REFUND
-  row, settles the attempt and signals `order_refunded`;
+  open. **(3) record**: under the lock again, `RefundService.book_refund` books
+  it (the REFUND row through `PaymentLedger.record_refund`, then the attempt
+  and its allocation) and `order_refunded` is signalled;
 - records each refund the provider accepted as it goes, and signals it, so a
   failure on the second payment keeps (and has announced) the first; the shares
   after a refused one are released (`DECLINED`), they were never called;
@@ -87,7 +88,7 @@ refund may have been made, writes a staff note saying so, and lets the webhook,
 a retry or the reconciliation below settle it. It keeps holding its amount
 until one does. **A webhook that books the refund mid-call** (`refund.created`
 or 1797 arriving before step 3) settles the matching `PENDING` attempt (same
-charge, same amount, whatever its age) in `record_refund`, and step 3 then
+charge, same amount, whatever its age) in `RefundService.book_refund`, and step 3 then
 books nothing and signals nothing: the refund is counted once and announced
 once. A Stripe attempt Stripe ANSWERED with an error keeps that answer for its
 key for up to 24 hours: refund it in the dashboard instead, and the webhook
@@ -103,7 +104,7 @@ forgotten the key, so a resend could refund twice). Three things resolve it,
 all through the ledger paths a refund made in one go takes
 (`RefundService.book_share` settles, a `DECLINED` status frees):
 
-- the provider's webhook (`record_refund`);
+- the provider's webhook (`RefundService.book_refund`);
 - the beat task `order.tasks.reconcile_pending_refunds`
   (`reconcile-pending-refunds`, hourly, through
   `tenant.tasks.fanout_reconcile_pending_refunds`), which asks the provider

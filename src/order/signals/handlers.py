@@ -1204,7 +1204,7 @@ def handle_stripe_refund_made(sender, **kwargs):
     cannot disagree. A refund this app made is already
     in the ledger under the same id, so its event adds nothing, and so
     does a redelivery. One nobody claimed settles the PENDING attempt that
-    matches it (``PaymentLedger.record_refund``).
+    matches it (``RefundService.book_refund``).
 
     ``Order.status`` is intentionally NOT changed: deciding whether a
     refund means the goods came back is a business call.

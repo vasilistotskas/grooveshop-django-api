@@ -4430,6 +4430,9 @@ msgstr "Έκπτωση: %(percent)s%%. Εξοικονομείτε %(value)s αν
 msgid "Discounted price excluding VAT"
 msgstr "Τιμή έκπτωσης χωρίς ΦΠΑ"
 
+msgid "Dispatch key"
+msgstr "Κλειδί αποστολής"
+
 #, python-format
 msgid "Dispatched tracking poll for %(count)d shipment(s)."
 msgstr "Στάλθηκε αίτημα ενημέρωσης παρακολούθησης για %(count)d αποστολή/ές."
@@ -11614,6 +11617,9 @@ msgstr "Εκκαθαρίστηκε στις"
 
 msgid "Purpose of movement"
 msgstr "Σκοπός διακίνησης"
+
+msgid "Pushed at"
+msgstr "Ώρα ειδοποίησης"
 
 msgid "Put the returned units back in stock"
 msgstr "Επαναφορά των επιστρεφόμενων τεμαχίων στο απόθεμα"

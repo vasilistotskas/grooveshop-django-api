@@ -10,7 +10,7 @@ PENDING -> PROCESSING -> SHIPPED across two days and still reported
 
 Two things depended on it:
 
-* ``order/filters.py`` exposes ``updated_at`` as a client-facing filter
+* ``src/order/filters.py`` exposes ``updated_at`` as a client-facing filter
   (gte/lte/date), so "orders changed since X" omitted every transition.
 * ``auto_cancel_stuck_pending_orders`` selects the FAILED bucket with
   ``updated_at__lt=now - ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES``,

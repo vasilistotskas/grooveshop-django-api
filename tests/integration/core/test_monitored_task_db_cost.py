@@ -17,7 +17,7 @@ from django.test.utils import CaptureQueriesContext
 
 from core.celery import celery_app
 from core.logging import JsonFormatter
-from core.tasks import MonitoredTask
+from core.monitored_task import MonitoredTask
 
 pytestmark = pytest.mark.django_db
 
@@ -44,13 +44,13 @@ def _fails_after_a_query():
 
 
 def _only_record(caplog) -> dict:
-    (record,) = [r for r in caplog.records if r.name == "core.tasks"]
+    (record,) = [r for r in caplog.records if r.name == "core.monitored_task"]
     return json.loads(JsonFormatter().format(record))
 
 
 def test_the_completion_line_counts_the_task_queries(caplog):
     with (
-        caplog.at_level(logging.INFO, logger="core.tasks"),
+        caplog.at_level(logging.INFO, logger="core.monitored_task"),
         CaptureQueriesContext(connection) as django_count,
     ):
         _runs_queries.apply()
@@ -62,7 +62,7 @@ def test_the_completion_line_counts_the_task_queries(caplog):
 
 
 def test_a_task_with_no_query_logs_zero(caplog):
-    with caplog.at_level(logging.INFO, logger="core.tasks"):
+    with caplog.at_level(logging.INFO, logger="core.monitored_task"):
         _runs_none.apply()
 
     payload = _only_record(caplog)
@@ -71,7 +71,7 @@ def test_a_task_with_no_query_logs_zero(caplog):
 
 
 def test_the_failure_line_carries_the_cost_too(caplog):
-    with caplog.at_level(logging.INFO, logger="core.tasks"):
+    with caplog.at_level(logging.INFO, logger="core.monitored_task"):
         _fails_after_a_query.apply(throw=False)
 
     payload = _only_record(caplog)

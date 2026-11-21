@@ -10857,6 +10857,9 @@ msgstr "Permanently destroyed %(count)d tenant(s): %(names)s"
 msgid "Permissions"
 msgstr "Permissions"
 
+msgid "Personal data erased at"
+msgstr "Personal data erased at"
+
 msgid "Phone"
 msgstr "Phone"
 
@@ -17106,6 +17109,9 @@ msgstr "When staff recorded that this payout was accounted for. A payout matchin
 
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
+
+msgid "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+msgstr "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
 
 msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
 msgstr "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."

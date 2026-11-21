@@ -29,6 +29,8 @@ from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from order.models.order import Order
     from shipping_boxnow.models import BoxNowShipment
 
@@ -154,6 +156,97 @@ class BoxNowCarrier(ShippingCarrierInterface):
             postal_code=locker.postal_code,
             city=locker.address_line_2,
         )
+
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
+        """The BOX NOW records of the orders, cleared of the recipient:
+        each shipment's ``metadata`` at ``BoxNowShipment.PERSONAL_METADATA``
+        (the rest stays), and each parcel event's text and the raw body's
+        ``BoxNowParcelEvent.PERSONAL_RAW`` (the customer BOX NOW names, its
+        text); the events stay. Nothing here is free text staff wrote, so
+        *buyer_values* is not read. Run again for orders already erased, it
+        clears the events that arrived since."""
+        from core.utils.json_paths import drop_paths
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        scrubbed = 0
+        for shipment in BoxNowShipment.objects.filter(order_id__in=order_ids):
+            metadata = shipment.metadata or {}
+            if drop_paths(metadata, BoxNowShipment.PERSONAL_METADATA):
+                BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                    metadata=metadata
+                )
+                scrubbed += 1
+
+        events = 0
+        for event in BoxNowParcelEvent.objects.filter(
+            shipment__order_id__in=order_ids
+        ):
+            raw = (
+                event.raw_payload if isinstance(event.raw_payload, dict) else {}
+            )
+            dropped = drop_paths(raw, BoxNowParcelEvent.PERSONAL_RAW)
+            if event.additional_information or dropped:
+                event.additional_information = ""
+                event.raw_payload = raw
+                event.save(
+                    update_fields=["additional_information", "raw_payload"]
+                )
+                events += 1
+
+        return {
+            "carrier_pii_scrubbed": scrubbed,
+            "carrier_events_scrubbed": events,
+        }
+
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders BOX NOW wrote a record of since *since*: a shipment
+        row or a parcel event, read from the rows written since then."""
+        from shipping_boxnow.models import BoxNowShipment
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        return set(
+            BoxNowShipment.objects.filter(updated_at__gte=since).values_list(
+                "order_id", flat=True
+            )
+        ) | set(
+            BoxNowParcelEvent.objects.filter(
+                created_at__gte=since, shipment__isnull=False
+            ).values_list("shipment__order_id", flat=True)
+        )
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What BOX NOW reported about each order's recipient, for a data
+        export: each parcel event's text and the raw body's
+        ``BoxNowParcelEvent.PERSONAL_RAW`` (the customer it names), what
+        :meth:`erase_recipient_data` clears."""
+        from core.utils.json_paths import pick_paths
+        from shipping_boxnow.models.parcel_event import BoxNowParcelEvent
+
+        data: dict[int, dict] = {}
+        for order_id, text, raw in (
+            BoxNowParcelEvent.objects.filter(shipment__order_id__in=order_ids)
+            .order_by("event_time")
+            .values_list(
+                "shipment__order_id", "additional_information", "raw_payload"
+            )
+        ):
+            entry = data.setdefault(order_id, {})
+            # A polled event keeps its text in the raw body only.
+            polled = pick_paths(raw, (("event", "additionalInformation"),))
+            text = text or polled.get("event", {}).get(
+                "additionalInformation", ""
+            )
+            if text:
+                entry.setdefault("boxnow_event_texts", []).append(text)
+            customer = pick_paths(raw, (("data", "customer"),))
+            if customer:
+                entry.setdefault("boxnow_customers", []).append(
+                    customer["data"]["customer"]
+                )
+        return {order_id: entry for order_id, entry in data.items() if entry}
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

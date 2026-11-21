@@ -167,7 +167,8 @@ ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/monitored_task.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
-- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session and history cleanup
+- `src/core/tasks.py` — the database dump and old-backup cleanup, cache clearing, session and history cleanup
+- `src/tenant/tasks.py` — the per-store fan-outs, deferred dispatch, and the platform's health monitor and scheduled backup, which alert the operators (`src/tenant/emails.py`)
 - `src/cart/tasks.py` — abandoned and old guest cart cleanup
 - `src/user/tasks.py` — account and allauth emails, data export, the inactive-user re-engagement email
 - `src/meili/tasks.py` — document indexing and the daily index sync

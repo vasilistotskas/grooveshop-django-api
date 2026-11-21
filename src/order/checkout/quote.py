@@ -347,16 +347,16 @@ class OrderQuoteService:
             currency,
         )
 
-        # Only of a complete order: the one order creation compares.
+        # Once a delivery is chosen: what the order is made of. The pay
+        # way is not part of it; its fee is in ``expected_total``.
         cart_digest = (
             cls.cart_digest(
                 cart,
                 promotion,
                 shipping=shipping,
-                pay_way=pay_way,
                 weight_grams=weight_grams,
             )
-            if shipping is not None and pay_way is not None
+            if shipping is not None
             else None
         )
         grand_total = amount_due = gift_cards = None
@@ -397,7 +397,6 @@ class OrderQuoteService:
         promotion: CartDiscountResult,
         *,
         shipping: ShippingChoice,
-        pay_way: PayWay,
         weight_grams: int,
     ) -> str:
         """What an order of ``cart`` is made of, as one opaque value.
@@ -406,12 +405,13 @@ class OrderQuoteService:
         money it carries), the promotions that apply with their codes,
         amounts and gifts, the delivery (kind, the carrier that takes it,
         as :meth:`_carrier` resolves one a home delivery does not name,
-        country, region, pickup point) and the pay way. Two quotes of the
-        same order give the same digest, and an order whose contents
-        changed since its quote gives another even when its total did not
-        (a line swapped for one at the same price). It holds no shipping
-        charge, fee, loyalty or gift-card amount: ``expectedTotal`` holds
-        the amount.
+        country, region, pickup point). Two quotes of the same order give
+        the same digest, and an order whose contents changed since its
+        quote gives another even when its total did not (a line swapped
+        for one at the same price). It is a check of contents: it holds no
+        pay way (an agent may name it only at completion), no shipping
+        charge, fee, loyalty or gift-card amount; ``expectedTotal`` holds
+        what is paid and for what.
 
         An HMAC over a canonical form, keyed by the ``SECRET_KEY``: it
         reveals nothing of the cart, and no client can compute it.
@@ -460,7 +460,6 @@ class OrderQuoteService:
                 "promotions": promotions,
                 "gifts": gifts,
                 "delivery": delivery,
-                "pay_way": pay_way.id,
             },
             separators=(",", ":"),
             sort_keys=True,

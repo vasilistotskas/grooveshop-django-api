@@ -160,16 +160,17 @@ def _meta_context_from(
     """The storefront's Meta context with the visitor's address set here.
 
     ``client_ip_address`` in the body is the caller's choice, so it is
-    dropped. A checkout that sent no context (the shopper declined marketing
-    cookies) stays without one. The address Meta receives is ``edge_client_ip(request)``, the
+    dropped. The address Meta receives is ``edge_client_ip(request)``, the
     visitor our Cloudflare edge vouched for, or none (``docs/client-ip.md``).
+    A checkout that sent no other context (the shopper declined marketing
+    cookies) stays without one.
     """
     context = {
         key: value
         for key, value in (raw or {}).items()
         if key != "client_ip_address"
     }
-    if raw and (ip := edge_client_ip(request)) is not None:
+    if context and (ip := edge_client_ip(request)) is not None:
         context["client_ip_address"] = ip
     return context
 

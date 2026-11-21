@@ -22,7 +22,7 @@ from typing import Any
 from django_tenants.utils import schema_context
 
 from core import celery_app
-from core.tasks import MonitoredTask
+from core.monitored_task import MonitoredTask
 
 logger = logging.getLogger(__name__)
 

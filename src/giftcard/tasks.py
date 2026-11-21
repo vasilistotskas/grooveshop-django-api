@@ -3,8 +3,8 @@ import logging
 from django.utils import timezone
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 
 logger = logging.getLogger(__name__)

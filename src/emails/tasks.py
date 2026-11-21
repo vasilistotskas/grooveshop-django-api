@@ -8,10 +8,10 @@ from datetime import timedelta
 from django.utils import timezone
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retention import delete_in_batches
 from core.retry import TRANSIENT_DB_ERRORS
 from core.store_settings import store_setting
-from core.tasks import MonitoredTask
 from emails.events import EmailLogNotFound, route
 from emails.models import EmailLog
 

@@ -91,6 +91,23 @@ BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+
+# The longest checkout waits for a carrier's catalogue to be resynced when
+# an order names a pickup point the catalogue does not hold yet
+# (``ShippingService.pickup_point_address``). A full sync can take minutes
+# (a carrier client's own retries and timeouts), and the agent gateway
+# waits 10 s (its UPSTREAM_TIMEOUT) for the whole order call, so the order
+# is refused with ``pickup_point_unknown`` well inside that; the sync goes
+# on and the next order finds the point.
+PICKUP_POINT_RESYNC_TIMEOUT_SECONDS = int(
+    getenv("PICKUP_POINT_RESYNC_TIMEOUT_SECONDS", "5")
+)
+# The Retry-After of the 503 ``pickup_point_check_unavailable``: the
+# pickup point could not be checked because the cache holding the resync
+# guard (Redis) is down, which is ours to fix, not the shopper's choice.
+PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS = int(
+    getenv("PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS", "30")
+)
 # Seconds after a parcel creation whose outcome is uncertain (a timeout, a
 # 5xx: the request may have reached BoxNow) during which an empty lookup by
 # ``orderNumber`` does not prove that no parcel exists: BoxNow may still be

@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from core.generators import UserNameGenerator
 from user.factories.account import UserAccountFactory
+from user.generators import UserNameGenerator
 
 User = get_user_model()
 

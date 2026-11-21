@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_ERRORS, TRANSIENT_HTTP_ERRORS
-from core.tasks import MonitoredTask
 from indexnow.service import send_pending
 
 

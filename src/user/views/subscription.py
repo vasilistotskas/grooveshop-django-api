@@ -16,11 +16,7 @@ from core.api.permissions import (
     StoreStaffModelPermissions,
 )
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    NewsletterSubscribeThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.client_ip import edge_client_ip
 from core.utils.i18n import resolve_request_language
@@ -58,6 +54,7 @@ from user.services.subscription import (
     holds_active_newsletter_subscription,
     subscribe_account,
 )
+from user.throttles import NewsletterSubscribeThrottle
 
 logger = logging.getLogger(__name__)
 

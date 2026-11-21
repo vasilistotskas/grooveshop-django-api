@@ -21,6 +21,7 @@ from celery import Task
 from django.db.utils import IntegrityError, OperationalError
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     MEILI_TRANSIENT_ERRORS,
@@ -29,7 +30,6 @@ from core.retry import (
     is_permanent_failure,
     is_permanent_http_failure,
 )
-from core.tasks import MonitoredTask
 from meili.exceptions import MeiliTaskFailed
 from meili.tasks import MeiliTask
 

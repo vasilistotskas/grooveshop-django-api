@@ -20,7 +20,7 @@ it. Use `edge_client_ip(request)`, which believes Cloudflare's
 returns `None`; everything that keys on a caller uses
 `client_ip_or_peer(request)` (the proven visitor, else the rightmost
 `X-Forwarded-For` hop Traefik appended, else `REMOTE_ADDR`). That includes
-every DRF throttle: they are all defined in `src/core/api/throttling.py`,
+every DRF throttle: they are all built on `src/core/api/throttling.py`,
 whose `ResilientThrottleMixin.get_ident` is `client_ip_or_peer`, the
 `anon`/`user` defaults too (`AnonIpRateThrottle`, `UserBudgetThrottle`).
 DRF's own classes take the rightmost hop alone, the shared peer, and no

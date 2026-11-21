@@ -19,26 +19,23 @@ partner-API proxies — so signing in was how you removed the limit.
 
 from __future__ import annotations
 
-import inspect
-
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory
 
-from core.api import throttling
 from core.api.throttling import UserOrIpRateThrottle
+from giftcard.throttles import GiftCardCheckThrottle
+from tests.utils.throttles import project_throttle_classes
 
 User = get_user_model()
 
 
 def _scoped_throttle_classes():
-    """Every throttle this module defines that carries its own scope."""
+    """Every throttle the project defines that carries its own scope."""
     return [
         obj
-        for _, obj in inspect.getmembers(throttling, inspect.isclass)
-        if obj.__module__ == throttling.__name__
-        and getattr(obj, "scope", None)
-        and obj is not UserOrIpRateThrottle
+        for obj in project_throttle_classes().values()
+        if getattr(obj, "scope", None) and obj is not UserOrIpRateThrottle
     ]
 
 
@@ -86,7 +83,7 @@ def test_a_signed_in_caller_gets_their_own_bucket_not_a_shared_one():
     two = User.objects.create_user(
         email="two@example.gr", password="pw", username="two"
     )
-    throttle = throttling.GiftCardCheckThrottle()
+    throttle = GiftCardCheckThrottle()
 
     assert throttle.get_cache_key(
         _request(one), None
@@ -94,7 +91,7 @@ def test_a_signed_in_caller_gets_their_own_bucket_not_a_shared_one():
 
 
 def test_anonymous_callers_are_still_keyed_by_address():
-    throttle = throttling.GiftCardCheckThrottle()
+    throttle = GiftCardCheckThrottle()
 
     key = throttle.get_cache_key(_request(), None)
 
@@ -114,7 +111,7 @@ def test_the_anon_half_of_a_pair_stays_anon_only():
         "OrderCreateAnonThrottle",
         "CartMutationAnonThrottle",
     ):
-        klass = getattr(throttling, name)
+        klass = project_throttle_classes()[name]
         assert klass().get_cache_key(_request(signed_in), None) is None, (
             f"{name} is half of an Anon/User pair — its sibling covers "
             f"authenticated callers, so it must stay anon-only."

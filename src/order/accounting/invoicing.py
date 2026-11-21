@@ -221,11 +221,14 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the document is frozen).
+    until the document is frozen); the credit documents render the
+    snapshot taken with the receipt they credit.
 
-    ΕΛΠ art. 12(4) has the seller keep the customer's name and address for
-    every credit document above EUR 50: the credit documents render this
-    snapshot, taken with the receipt they credit.
+    A retail document needs no buyer address: Law 4308/2014 art. 12 par. 2
+    names only the seller's, and the former par. 4 rule (the customer's
+    name and address above EUR 50) was deleted by Law 5222/2025 art. 238
+    par. 2. The address shown is the order's delivery address, which for
+    a pickup-point order is the point's (#642).
     """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
@@ -260,7 +263,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
-    Gift-card amounts are payment, never allocated (order/checkout/discounts.py).
+    Gift-card amounts are payment, never allocated (order.checkout.discounts).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
     allocation = _returned_before_receipt(order)

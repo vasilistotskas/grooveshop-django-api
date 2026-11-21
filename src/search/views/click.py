@@ -12,15 +12,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    SearchClickThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from search.serializers import (
     SearchClickRequestSerializer,
     SearchClickResponseSerializer,
 )
+from search.throttles import SearchClickThrottle
 from tenant.celery import publish_or_drop
 
 

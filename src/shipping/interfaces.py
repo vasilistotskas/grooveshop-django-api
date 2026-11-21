@@ -23,6 +23,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from django.utils.translation import gettext_lazy as _
+
 from shipping.exceptions import ShippingProviderNotFoundError
 
 if TYPE_CHECKING:
@@ -46,6 +48,23 @@ class PostalAddress:
     street_number: str
     postal_code: str
     city: str
+
+
+# The refusals of a pickup point at checkout, one text each for every
+# carrier: the serializer's field errors and the carriers'
+# ``validate_order_payload`` say the same.
+PICKUP_POINT_UNAVAILABLE = _(
+    "This pickup point is not available. Choose another one."
+)
+PICKUP_POINT_IN_ANOTHER_COUNTRY = _(
+    "This pickup point is not in the delivery country. Choose another one."
+)
+
+
+class PickupPointInAnotherCountry(ValueError):
+    """The pickup point is in another country than the order's: no order
+    is sent there under the order's country (``deliverable_pickup_point``).
+    A resync cannot change that, so none runs."""
 
 
 class PickupPointUnknown(ValueError):
@@ -171,6 +190,55 @@ class ShippingCarrierInterface(ABC):
         address is not known.
         """
         return None
+
+    def address_of_pickup_point(
+        self, location: Mapping[str, str]
+    ) -> PostalAddress:
+        """The address of the pickup point ``location`` names (this
+        carrier's ``location_keys``), from its catalogue now.
+
+        A pickup-point order is delivered there, so checkout stores it as
+        the order's delivery address (``OrderCreateFromCartSerializer``).
+        Raises ``PickupPointUnknown`` when the catalogue does not hold it;
+        a carrier with no pickup points holds none.
+        """
+        raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
+
+    def pickup_point_errors(
+        self, field: str, location: Mapping[str, str], *, country_code: str
+    ) -> dict[str, list[str]]:
+        """``validate_order_payload``'s errors for the point *location*
+        names: :meth:`deliverable_pickup_point`'s rule, as field errors."""
+        try:
+            self.deliverable_pickup_point(location, country_code=country_code)
+        except PickupPointInAnotherCountry:
+            return {field: [str(PICKUP_POINT_IN_ANOTHER_COUNTRY)]}
+        except PickupPointUnknown:
+            return {field: [str(PICKUP_POINT_UNAVAILABLE)]}
+        return {}
+
+    def deliverable_pickup_point(
+        self, location: Mapping[str, str], *, country_code: str
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names when an order
+        for *country_code* can be sent there now: the catalogue holds it,
+        it is active (a sync marks a point the carrier withdrew inactive
+        and keeps its row), and it is in that country.
+
+        The order-time rule; :meth:`address_of_pickup_point` stays the
+        receipt's, which must still name a point withdrawn after the order.
+        Raises ``PickupPointUnknown`` for a point missing or withdrawn (a
+        resync may bring it back) and ``PickupPointInAnotherCountry``.
+        """
+        raise PickupPointUnknown(f"Carrier {self.code} has no pickup points.")
+
+    def refresh_pickup_points(self, *, country_code: str) -> None:
+        """Fetch the carrier's catalogue of pickup points again, now,
+        through the path its scheduled sync takes, for checkout to find
+        a point the last sync did not hold (``ShippingService.
+        pickup_point_address``). A carrier with no pickup points has none
+        to fetch."""
+        return
 
     @abstractmethod
     def serialize_shipment(

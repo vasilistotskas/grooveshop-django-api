@@ -13,8 +13,8 @@ is COPIED here:
   names: what a new store's seeds are read against, without a storefront,
   and what the builder tests hold every store's design to;
 * ``legacy-image-fields``: ``test/fixtures/builder/legacy-image-fields.json``
-  -> ``builder/legacy_image_fields.json``, each block's old image settings, for
-  ``manage.py migrate_builder_media``. Application data, like the seeds;
+  -> ``src/builder/legacy_image_fields.json``, each block's old image settings,
+  for ``manage.py migrate_builder_media``. Application data, like the seeds;
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   rest this and the one above are application data, not test inputs.

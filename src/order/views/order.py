@@ -50,6 +50,7 @@ from core.api.throttling import (
     gift_card_code_throttles,
 )
 from core.api.views import BaseModelViewSet
+from core.caches import REDIS_UNAVAILABLE
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
@@ -1114,6 +1115,11 @@ class OrderViewSet(BaseModelViewSet):
             # Our cache is down, not the shopper's point wrong: a 503 with
             # Retry-After and no field (logged by ``pickup_point_address``).
             raise PickupPointCheckUnavailable() from e
+
+        except REDIS_UNAVAILABLE:
+            # Any other cache-held bound that fails closed: the strict-cache
+            # middleware answers it with its coded 503, never a 500.
+            raise
 
         except PermissionDenied:
             return Response(

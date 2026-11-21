@@ -140,7 +140,9 @@ on every route, with **503** and the code `temporarily_unavailable`
 shape: `{detail, code}` on a DRF view, allauth's
 `{status, errors: [{code, message}]}` on `/_allauth/`, OAuth's
 `{error, error_description}` on the IdP's `identity/o/api/` endpoints, and an
-HTML page anywhere else. Never a 429 and never a 500.
+HTML page anywhere else. Never a 429 and never a 500: a view's own
+catch-all re-raises `REDIS_UNAVAILABLE` so the middleware answers it
+(`OrderViewSet.create`).
 
 ## Temporary 503s with Retry-After
 

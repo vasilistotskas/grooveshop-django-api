@@ -16,8 +16,8 @@ from django.utils import timezone
 from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.services.gdpr import anonymise_and_delete_user, compile_user_data
+from user.services.subscription import claim_guest_subscriptions
 from user.tasks import purge_unconfirmed_guest_subscriptions
-from user.utils.subscription import claim_guest_subscriptions
 
 pytestmark = pytest.mark.django_db
 
@@ -223,7 +223,7 @@ class TestConfirmationRetry:
         )
         with (
             patch(
-                "user.utils.subscription.send_subscription_confirmation",
+                "user.services.subscription_mail.send_subscription_confirmation",
                 side_effect=OSError("smtp down"),
             ),
             patch.object(

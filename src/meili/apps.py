@@ -271,9 +271,9 @@ class MeiliConfig(AppConfig):
             #
             # Per-tenant indexes are provisioned at the correct tenant
             # boundaries instead:
-            #   * `src/tenant/provisioning.py` (`_create_meili_indexes`)
-            #     creates them when a store is provisioned.
-            #   * `meili.management.commands.meilisearch_sync_all_indexes`
+            #   * `tenant/management/commands/create_tenant.py` creates them
+            #     when a new Tenant row is added.
+            #   * `meili/management/commands/meilisearch_sync_all_indexes.py`
             #     and `meilisearch_sync_index.py` create + re-settings any
             #     missing indexes.
             #   * The signal handlers below call `add_documents`, which

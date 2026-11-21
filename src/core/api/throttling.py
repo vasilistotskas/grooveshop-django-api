@@ -349,7 +349,7 @@ class CartAgentTokenThrottle(ResilientThrottleMixin, UserRateThrottle):
 
 
 class StaffAgentThrottle(UserOrIpRateThrottle):
-    """The store-admin agent surface (``src/agent/staff_views.py``).
+    """The store-admin agent surface (``agent/staff_views.py``).
 
     Keyed by the staff member, and per store, since the cache key carries
     the schema (``tenant.cache.make_tenant_key``): one AI app's burst of
@@ -686,7 +686,7 @@ class RecommendationEventThrottle(UserOrIpRateThrottle):
 
 class StaffLoginThrottle(ResilientThrottleMixin, ScopedRateThrottle):
     """The platform staff token endpoint — a credential-guessing surface
-    (``src/tenant/staff_api.py``). Scoped by the view's ``throttle_scope``,
+    (``tenant/staff_api.py``). Scoped by the view's ``throttle_scope``,
     and keyed like every throttle here on the proven caller, so one
     caller behind a shared edge node cannot spend everyone's budget."""
 

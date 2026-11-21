@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connections, transaction
 from django.db.models import F
 
-# See order.tasks for rationale — eager gettext over lazy for email subjects.
+# See order/tasks.py for rationale — eager gettext over lazy for email subjects.
 from django.utils import timezone
 
 from cart.models import Cart

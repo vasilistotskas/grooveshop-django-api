@@ -177,3 +177,22 @@ class TestBulkDeleteIsSoftForEverySoftDeleteModel:
         assert sorted(saved) == sorted(
             (p.pk, frozenset({"deleted_at", "is_deleted"})) for p in products
         )
+
+    def test_a_row_already_deleted_keeps_its_deleted_at(self):
+        product = ProductFactory(num_images=0, num_reviews=0)
+        product.delete()
+        first = Product._base_manager.get(pk=product.pk).deleted_at
+
+        result = Product.objects.filter(pk=product.pk).delete()
+
+        assert result == (0, {"product.Product": 0})
+        assert Product._base_manager.get(pk=product.pk).deleted_at == first
+
+    def test_a_values_queryset_refuses_delete_and_restore(self):
+        """As Django's own ``delete()`` does: the rows are dicts."""
+        ProductFactory(num_images=0, num_reviews=0)
+
+        with pytest.raises(TypeError):
+            Product.objects.values("pk").delete()
+        with pytest.raises(TypeError):
+            Product.objects.values_list("pk").restore()

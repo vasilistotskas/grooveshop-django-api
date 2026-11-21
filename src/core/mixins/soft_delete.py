@@ -52,6 +52,7 @@ class SoftDeleteQuerySetMixin:
         have sent none. A row already deleted keeps its ``deleted_at``.
         Returns Django's ``(count, {model label: count})``.
         """
+        self._refuse_values("delete")
         count = 0
         with transaction.atomic():
             for row in self.exclude_deleted().order_by("pk"):
@@ -62,12 +63,21 @@ class SoftDeleteQuerySetMixin:
     def restore(self) -> int:
         """Un-delete every soft-deleted row through its own ``restore()``,
         for the same signals; returns how many."""
+        self._refuse_values("restore")
         count = 0
         with transaction.atomic():
             for row in self.deleted_only().order_by("pk"):
                 row.restore()
                 count += 1
         return count
+
+    def _refuse_values(self, method: str) -> None:
+        """Refuse a ``values()``/``values_list()`` queryset, as Django's own
+        ``delete()`` does: its rows are dicts or tuples, not instances."""
+        if self._fields is not None:
+            raise TypeError(
+                f"Cannot call {method}() after .values() or .values_list()"
+            )
 
     def hard_delete(self) -> tuple[int, dict[str, int]]:
         """Remove the rows for good (Django's own ``delete()``)."""

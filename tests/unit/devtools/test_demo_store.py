@@ -428,6 +428,23 @@ class TestRicherCatalogueSeed:
         )
         assert rates == {STANDARD_VAT_RATE}
 
+    def test_a_deleted_demo_product_comes_back_with_the_next_seed(
+        self, seeded, monkeypatch
+    ):
+        """The dataset is code: a product staff deleted (a soft delete) is
+        restored by the next run, or the offers that target it stop the
+        seed at the promotions step."""
+        from product.models import Product
+
+        slug = demo_store.PRODUCTS[0].slug
+        Product.objects.filter(slug=slug).delete()
+
+        demo_store.seed_products()
+
+        product = Product.objects.get(slug=slug)
+        assert product.is_deleted is False
+        assert product.deleted_at is None
+
     def test_a_store_without_the_standard_row_is_not_seeded(
         self, demo_tenant, monkeypatch
     ):

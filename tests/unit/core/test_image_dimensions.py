@@ -1,0 +1,195 @@
+"""``ImageAndSvgField`` records the size a browser shows an image at, from
+the file it is given, and never reads a stored file to load a row.
+
+The storefront states the media service's rendition size from these two
+columns (og:image:width/height), so they must match what the media service
+sees: EXIF orientation applied, nothing for an SVG.
+"""
+
+from __future__ import annotations
+
+import io
+from unittest.mock import patch
+
+import pytest
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from PIL import Image
+
+from blog.factories.post import BlogPostFactory
+from blog.models.post import BlogPost
+from core.management.commands.backfill_image_dimensions import (
+    Command,
+    backfill_current_schema,
+    measured_fields,
+)
+
+pytestmark = pytest.mark.django_db
+
+SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32">'
+    b'<rect width="64" height="32"/></svg>'
+)
+#: EXIF orientation 6: stored landscape-sideways, displayed rotated 90 deg.
+ROTATE_90 = 6
+
+
+def _jpeg(size: tuple[int, int], orientation: int | None = None) -> bytes:
+    buffer = io.BytesIO()
+    exif = Image.Exif()
+    if orientation is not None:
+        exif[0x0112] = orientation
+    Image.new("RGB", size, "red").save(buffer, "JPEG", exif=exif)
+    return buffer.getvalue()
+
+
+def _upload(name: str, content: bytes) -> SimpleUploadedFile:
+    return SimpleUploadedFile(name, content)
+
+
+def _image_field():
+    return BlogPost._meta.get_field("image")
+
+
+def _sizes(post: BlogPost) -> tuple[int | None, int | None]:
+    post.refresh_from_db()
+    return post.image_width, post.image_height
+
+
+def test_an_upload_is_measured_on_save():
+    post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+
+    assert _sizes(post) == (1080, 567)
+
+
+def test_the_displayed_size_is_recorded_with_exif_orientation_applied():
+    post = BlogPostFactory(
+        image=_upload("phone.jpg", _jpeg((800, 600), ROTATE_90))
+    )
+
+    assert _sizes(post) == (600, 800)
+
+
+def test_an_svg_has_no_raster_size():
+    post = BlogPostFactory(image=_upload("icon.svg", SVG))
+
+    assert post.image.name.endswith(".svg")
+    assert _sizes(post) == (None, None)
+
+
+def test_a_replaced_image_is_measured_again_and_a_cleared_one_forgotten():
+    post = BlogPostFactory(image=_upload("a.jpg", _jpeg((1200, 630))))
+
+    post.image = _upload("b.jpg", _jpeg((1600, 900)))
+    post.save()
+    assert _sizes(post) == (1600, 900)
+
+    post.image = None
+    post.save()
+    assert _sizes(post) == (None, None)
+
+
+def test_a_row_created_with_a_stored_file_name_is_measured_on_save():
+    field = _image_field()
+    name = field.storage.save(
+        "uploads/blog/stored.jpg", ContentFile(_jpeg((640, 480)))
+    )
+
+    post = BlogPostFactory(image=name)
+
+    assert _sizes(post) == (640, 480)
+
+
+def test_a_save_naming_a_file_missing_from_storage_keeps_no_size():
+    post = BlogPostFactory(image="uploads/blog/not-there.jpg")
+
+    assert _sizes(post) == (None, None)
+
+
+def test_loading_or_refreshing_a_row_never_opens_its_file():
+    """Django's own ``ImageField`` opens the stored file of every row loaded
+    with a null size, which an SVG row always has."""
+    svg = BlogPostFactory(image=_upload("icon.svg", SVG))
+    jpeg = BlogPostFactory(image=_upload("cover.jpg", _jpeg((300, 200))))
+    storage = _image_field().storage
+
+    with (
+        patch.object(storage, "open", side_effect=AssertionError("opened")),
+        patch.object(Image, "open", side_effect=AssertionError("decoded")),
+    ):
+        rows = list(BlogPost.objects.filter(pk__in=[svg.pk, jpeg.pk]))
+        for row in rows:
+            row.refresh_from_db()
+
+    assert {(row.image_width, row.image_height) for row in rows} == {
+        (None, None),
+        (300, 200),
+    }
+
+
+class TestBackfill:
+    def _unmeasured(self, content: bytes, name: str):
+        post = BlogPostFactory(image=_upload(name, content))
+        BlogPost.objects.filter(pk=post.pk).update(
+            image_width=None, image_height=None
+        )
+        return post
+
+    def test_measures_rows_stored_before_the_fields_existed(self):
+        post = self._unmeasured(_jpeg((800, 600), ROTATE_90), "old.jpg")
+
+        tallies = backfill_current_schema(measured_fields())
+
+        assert _sizes(post) == (600, 800)
+        assert tallies["blog.BlogPost.image"].measured == 1
+
+    def test_counts_svgs_and_missing_files_and_writes_nothing_for_them(self):
+        svg = self._unmeasured(SVG, "icon.svg")
+        gone = self._unmeasured(_jpeg((300, 200)), "gone.jpg")
+        _image_field().storage.delete(gone.image.name)
+
+        tally = backfill_current_schema(measured_fields())[
+            "blog.BlogPost.image"
+        ]
+
+        assert (tally.scanned, tally.unmeasurable, tally.missing) == (2, 1, 1)
+        assert _sizes(svg) == (None, None)
+        assert _sizes(gone) == (None, None)
+
+    def test_skips_measured_rows_and_a_dry_run_writes_nothing(self):
+        BlogPostFactory(image=_upload("done.jpg", _jpeg((300, 200))))
+        post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")
+
+        tally = backfill_current_schema(measured_fields(), dry_run=True)[
+            "blog.BlogPost.image"
+        ]
+
+        assert (tally.scanned, tally.measured) == (1, 1)
+        assert _sizes(post) == (None, None)
+
+    def test_the_command_measures_the_current_store(self):
+        post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")
+
+        out = io.StringIO()
+        # The suite's connection is the store; the command refuses the
+        # public schema without --tenant/--all-tenants, which
+        # test_backfills_reach_suspended_stores.py covers.
+        with patch.object(Command, "require_tenant_scope", False):
+            call_command("backfill_image_dimensions", stdout=out)
+
+        assert _sizes(post) == (640, 480)
+        assert "measured 1 row(s)." in out.getvalue()
+
+    def test_every_image_the_storefront_states_a_size_for_is_covered(self):
+        labels = {
+            f"{model._meta.label}.{field.name}"
+            for model, field in measured_fields()
+        }
+
+        assert labels == {
+            "blog.BlogPost.image",
+            "blog.BlogCategory.image",
+            "user.UserAccount.image",
+            "product.ProductImage.image",
+        }

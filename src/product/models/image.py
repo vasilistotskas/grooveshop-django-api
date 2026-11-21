@@ -24,7 +24,20 @@ class ProductImage(
         on_delete=models.CASCADE,
         verbose_name=_("Product"),
     )
-    image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
+    image = ImageAndSvgField(
+        _("Image"),
+        upload_to="uploads/products/",
+        width_field="image_width",
+        height_field="image_height",
+    )
+    # The size a browser shows the image at (EXIF orientation applied),
+    # measured by ``ImageAndSvgField``; null for an SVG.
+    image_width = models.PositiveIntegerField(
+        _("Width"), null=True, blank=True, editable=False
+    )
+    image_height = models.PositiveIntegerField(
+        _("Height"), null=True, blank=True, editable=False
+    )
     is_main = models.BooleanField(_("Is Main"), default=False)
     # Where a catalogue import fetched the file from, and the digest of
     # the bytes kept, so a second import skips an image it already has.

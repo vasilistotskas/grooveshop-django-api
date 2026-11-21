@@ -17,6 +17,7 @@ from rest_framework import serializers
 from rest_framework.fields import get_attribute
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.image_field import MainImageSizeMixin
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import MeasurementSerializerField
 from core.utils.serializers import TranslatedFieldExtended
@@ -150,7 +151,17 @@ class PotentialPointsMixin(serializers.Serializer):
         return LoyaltyService.calculate_item_points(obj, 1, rates)
 
 
+# The size of the product's main image, a ``ProductImage`` row
+# (``Product.main_image``, prefetched by the queryset optimizers).
+class ProductMainImageSizeMixin(MainImageSizeMixin):
+    main_image_width = serializers.IntegerField(read_only=True, allow_null=True)
+    main_image_height = serializers.IntegerField(
+        read_only=True, allow_null=True
+    )
+
+
 class ProductCardSerializer(
+    ProductMainImageSizeMixin,
     HiddenReviewsMixin,
     PotentialPointsMixin,
     TranslatableModelSerializer,
@@ -199,6 +210,8 @@ class ProductCardSerializer(
             "announced_discount_percent",
             "potential_points",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "review_average",
             "review_count",
             "created_at",
@@ -214,6 +227,7 @@ class ProductCardSerializer(
 # shows ``prior_price`` and ``announced_discount_percent``; the markdown is
 # written through ``ProductWriteSerializer``.
 class ProductSerializer(
+    ProductMainImageSizeMixin,
     HiddenReviewsMixin,
     PotentialPointsMixin,
     TranslatableModelSerializer,
@@ -293,6 +307,8 @@ class ProductSerializer(
             "reduction_started_at",
             "potential_points",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "image_paths",
             "review_average",
             "review_count",
@@ -324,6 +340,8 @@ class ProductSerializer(
             "announced_discount_percent",
             "reduction_started_at",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "image_paths",
             "review_average",
             "review_count",

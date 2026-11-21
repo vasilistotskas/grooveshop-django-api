@@ -102,3 +102,15 @@ def test_a_list_below_the_minimum_fraction_changes_nothing(
 
     assert {_state(i) for i in IDS[4:]} == {(True, 0)}
     assert [r for r in caplog.records if r.levelno == logging.ERROR]
+
+
+def test_lockers_the_response_adds_do_not_raise_the_bar_of_the_guard(
+    lockers, settings
+):
+    """Ten active lockers, a response of six other ones: six is more than
+    half of the ten that were active, so the absences are counted."""
+    settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION = 0.5
+
+    _sync([f"new-{n}" for n in range(6)])
+
+    assert _state("0") == (True, 1)

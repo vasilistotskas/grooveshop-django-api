@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from django import forms
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseFilterMixin
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.models import BoxNowLocker
+
+
+class CompartmentSizeFilter(filters.NumberFilter):
+    """A compartment size as the integer the API speaks (1 to 3)."""
+
+    field_class = forms.IntegerField
 
 
 class BoxNowLockerFilter(CamelCaseFilterMixin, filters.FilterSet):
@@ -25,9 +32,9 @@ class BoxNowLockerFilter(CamelCaseFilterMixin, filters.FilterSet):
         help_text=_("ISO 3166-1 alpha-2 country of the locker."),
     )
 
-    compartment_size = filters.TypedChoiceFilter(
-        choices=BoxNowCompartmentSize.choices,
-        coerce=int,
+    compartment_size = CompartmentSizeFilter(
+        min_value=min(BoxNowCompartmentSize),
+        max_value=max(BoxNowCompartmentSize),
         method="filter_compartment_size",
         help_text=_(
             "Only lockers that have a compartment of this size (1 small, "

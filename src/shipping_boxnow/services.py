@@ -2817,6 +2817,9 @@ class BoxNowService:
             },
         )
 
+        # The baseline of the guard below, taken before the upserts: the
+        # lockers this response adds must not raise the bar it is held to.
+        active_before = BoxNowLocker.objects.filter(is_active=True).count()
         seen_external_ids: set[str] = set()
         created_count = 0
         updated_count = 0
@@ -2898,7 +2901,6 @@ class BoxNowService:
         # is deactivated at BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION
         # in a row. A returned locker was reset and reactivated above.
         deactivated_count = 0
-        active_before = BoxNowLocker.objects.filter(is_active=True).count()
         too_small = (
             len(seen_external_ids)
             < active_before * settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION

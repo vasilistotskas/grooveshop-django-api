@@ -441,6 +441,24 @@ class TestQuoteRefusals:
         # The carrier's own wording stays in the log.
         assert "too big" not in body["detail"]
 
+    def test_a_locker_without_the_carts_size_is_named(self):
+        from order.exceptions import PickupPointTooSmallError
+
+        checkout = _checkout()
+
+        with patch.object(
+            OrderQuoteService,
+            "_assert_pickup_point_fits",
+            side_effect=PickupPointTooSmallError(
+                "boxnow_locker_id", "Choose another one."
+            ),
+        ):
+            response = _post_quote(checkout, **_choices(checkout))
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["code"] == body["reason"] == "pickup_point_too_small"
+
     def test_the_payment_intent_keeps_its_own_answer(self):
         """Only the quote names the refusal: the payment intent and order
         creation answer ``invalid_order_data`` with the field, as before."""

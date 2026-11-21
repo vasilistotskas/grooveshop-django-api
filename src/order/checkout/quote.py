@@ -329,10 +329,7 @@ class OrderQuoteService:
                 # price was resolved before (``resolve_live_shipping``).
                 cached_only=lock,
             )
-            if lock:
-                # Order creation's refusal: the choice of a locker is the
-                # shopper's to change, and the quote only previews.
-                cls._assert_pickup_point_fits(shipping, parcel_items)
+            cls._assert_pickup_point_fits(shipping, parcel_items)
         payment_fee = None
         if pay_way is not None:
             payment_fee = PaymentFee(

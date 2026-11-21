@@ -29241,17 +29241,13 @@ paths:
       - in: query
         name: compartmentSize
         schema:
-          type: string
-          enum:
-          - 1
-          - 2
-          - 3
-        description: |-
-          Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2 μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ.
-
-          * `1` - Μικρό
-          * `2` - Μεσαίο
-          * `3` - Μεγάλο
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2
+          μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας
+          της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ.
       - in: query
         name: countryCode
         schema:

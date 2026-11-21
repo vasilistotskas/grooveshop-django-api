@@ -11,9 +11,11 @@ delivery.
 
 from __future__ import annotations
 
+import json
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from core.utils.tenant_urls import validate_storefront_path
 from notification.enum import (
@@ -23,7 +25,10 @@ from notification.enum import (
 )
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
+from tenant.celery import dispatch_key
 from tenant.customer_accounts import refuses_customer
+
+_DISPATCH_NAMESPACE = "notification"
 
 
 def supported_notification_languages() -> list[str]:
@@ -72,18 +77,47 @@ def create_user_notification(
     ``core.utils.tenant_urls.storefront_path``). It is validated here
     because ``objects.create`` never runs the field's validators, and
     this is the one write path every task goes through.
+
+    Inside a task the notification is written once per dispatch: its
+    ``dispatch_key`` is made of the task id, the user and everything the
+    notification says (``tenant.celery.dispatch_key``), and is unique, so
+    one task can still write two different notifications to one user (two
+    likes of a comment). Another copy of the task (a retry, a message
+    delivered again, the sweep's copy of a publish) gets back the row the
+    first one wrote, and the live push that follows a new row is not
+    queued again. A copy that runs at the same moment waits on the unique
+    index for the first to commit.
     """
     if refuses_customer(user):
         return None
     if link:
         validate_storefront_path(link)
-    notification = Notification.objects.create(
-        kind=kind,
-        category=category,
-        priority=priority,
-        notification_type=notification_type,
-        link=link,
+    key = dispatch_key(
+        _DISPATCH_NAMESPACE,
+        user.pk,
+        kind,
+        category,
+        priority,
+        notification_type,
+        link,
+        json.dumps(translations, sort_keys=True, ensure_ascii=False),
     )
+    try:
+        with transaction.atomic():
+            notification = Notification.objects.create(
+                kind=kind,
+                category=category,
+                priority=priority,
+                notification_type=notification_type,
+                link=link,
+                dispatch_key=key,
+            )
+    except IntegrityError:
+        if key is None:
+            raise
+        return NotificationUser.objects.get(
+            user=user, notification__dispatch_key=key
+        )
 
     supported = supported_notification_languages()
     # Fallback chain used when a locale has no entry in the caller's

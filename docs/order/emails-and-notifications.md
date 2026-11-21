@@ -237,6 +237,19 @@ All WS notifications go through `notification.consumers.NotificationConsumer`
 and require auth; **guest orders silently get no live notification** (the email
 IS sent for guests since it goes to `order.email`).
 
+**Once per dispatch.** Each of these tasks can run more than once (a retry, a
+message delivered again, the sweep's copy of a publish, see
+`docs/deferred-dispatch.md`). `create_user_notification` writes the
+notification with a `dispatch_key` made of the task id, the user and
+everything the notification says, unique among `Notification` rows, so a
+second copy gets the first copy's row back and writes nothing; one task can
+still write two different notifications to one user. The push that a new row
+queues (`notification.tasks.send_notification_task`) claims the row first
+(`NotificationUser.pushed_at`, a compare-and-set) and gives the claim back
+when the push fails, so the storefront gets one toast per row. A worker that
+dies between the claim and the push loses that toast; the notification stays
+in the list.
+
 ### 6.5 Marketing email and the unsubscribe link
 
 Marketing mail is the mail a customer did not ask for in the moment:

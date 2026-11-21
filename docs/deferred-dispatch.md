@@ -208,6 +208,11 @@ outside a task.
   derived from the task id (`emails.log.delivery_id`); a second copy finds
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
+- **In-app notification**: every notification is written by
+  `notification.services.create_user_notification`, under a unique
+  `Notification.dispatch_key`; a second copy gets the first one's row back.
+  Its live push claims `NotificationUser.pushed_at` before it sends
+  (`docs/order/emails-and-notifications.md`, section 6.4).
 
 A task whose effect is a state of a row needs no id: it claims the state (a
 compare-and-set, a unique row). A dispatch made inside a task (a chain's next

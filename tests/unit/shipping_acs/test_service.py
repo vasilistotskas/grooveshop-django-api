@@ -1872,6 +1872,33 @@ class TestCourierDeliveryNotes:
             == "Διαμ. 3, 2ος όροφος | Χτυπήστε δύο φορές."
         )
 
+    def test_the_floor_comes_before_the_address_line(self):
+        from shipping.services import courier_delivery_notes
+
+        assert (
+            courier_delivery_notes(
+                floor="2ος όροφος",
+                address_line_2="Διαμ. 3",
+                customer_notes="Θυρωρός",
+            )
+            == "2ος όροφος | Διαμ. 3 | Θυρωρός"
+        )
+
+    def test_the_floor_and_the_line_are_never_cut(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            courier_delivery_notes,
+        )
+
+        sent = courier_delivery_notes(
+            floor="6ος όροφος +",
+            address_line_2="β" * 255,
+            customer_notes="α" * 800,
+        )
+
+        assert len(sent) == DELIVERY_NOTES_MAX_LEN
+        assert sent.startswith("6ος όροφος + | " + "β" * 255 + " | ")
+
     def test_either_alone_is_sent_alone(self):
         from shipping.services import courier_delivery_notes
 
@@ -1928,6 +1955,8 @@ class TestDeliveryNotesInPayload:
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
             customer_notes="Χτυπήστε το κουδούνι 2  φορές.\nΘυρωρός.",
         )
         AcsShipmentFactory(order=order)
@@ -1945,6 +1974,8 @@ class TestDeliveryNotesInPayload:
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
             address_line_2="Διαμ. 3, 2ος όροφος",
             customer_notes="Θυρωρός.",
         )
@@ -1957,12 +1988,50 @@ class TestDeliveryNotesInPayload:
         # ACS's ``Recipient_Address`` is the street alone.
         assert sent["Recipient_Address"] == order.street
 
+    @pytest.mark.parametrize(
+        ("floor", "label"),
+        [
+            ("BASEMENT", "Υπόγειο"),
+            ("GROUND_FLOOR", "Ισόγειο"),
+            ("FIRST_FLOOR", "1ος όροφος"),
+            ("SECOND_FLOOR", "2ος όροφος"),
+            ("THIRD_FLOOR", "3ος όροφος"),
+            ("FOURTH_FLOOR", "4ος όροφος"),
+            ("FIFTH_FLOOR", "5ος όροφος"),
+            ("SIXTH_FLOOR_PLUS", "6ος όροφος +"),
+        ],
+    )
+    def test_the_floor_rides_first_in_greek(
+        self, acs_client_mock, floor, label
+    ):
+        """Until ``Recipient_Floor``'s format is known (an ACS stage
+        voucher), the floor's label leads the free-text notes, whatever
+        the voucher's language."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor=floor,
+            address_line_2="Διαμ. 3",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == f"{label} | Διαμ. 3 | Θυρωρός."
+        assert "Recipient_Floor" not in sent
+
     def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
             customer_notes="",
         )
         AcsShipmentFactory(order=order)
@@ -1982,6 +2051,7 @@ class TestDeliveryNotesInPayload:
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            floor="",
             customer_notes="Χτυπήστε το κουδούνι 2 φορές.",
         )
         AcsShipmentFactory(order=order)

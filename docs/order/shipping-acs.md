@@ -9,14 +9,15 @@ and says which file holds each § number used here.
 - **The recipient address** follows the manual's field meanings (p. 6-7):
   `Recipient_Address` is the street alone ("η οδός του παραλήπτη δίχως την
   περιοχή ή το τοπωνύμιο"), `Recipient_Address_Number` its number,
-  `Recipient_Region` the city. The order's `address_line_2` (a flat, a
-  floor, a building) has no field of its own, so it rides first in
-  `Delivery_Notes`, the free-text notes printed on the voucher, ahead of the
-  customer's note and within `DELIVERY_NOTES_MAX_LEN` (500); the customer's
-  note is cut first (`shipping.services.courier_delivery_notes`). The
-  manual's `Recipient_Floor` gives no format or allowed values, so the
-  order's `floor` choice is not sent until an ACS stage voucher shows how it
-  lands.
+  `Recipient_Region` the city. `Delivery_Notes`, the free-text notes
+  printed on the voucher, carries in this order: the floor's Greek label
+  (`_floor_label`, the `floor` choice's label, "2ος όροφος"), the order's
+  `address_line_2` (a flat, a building), then the customer's note, joined by
+  ` | ` within `DELIVERY_NOTES_MAX_LEN` (500); only the customer's note is
+  ever cut (`shipping.services.courier_delivery_notes`). The manual's
+  `Recipient_Floor` gives no format or allowed values (p. 6), so the floor is
+  not sent there until an ACS stage voucher shows how a value lands; then it
+  moves to that field and out of the notes.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout`: the row lock used to be held

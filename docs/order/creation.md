@@ -521,7 +521,8 @@ address it cannot place (prod order #316: street "1", street number
   customer's notes. It prints under the street on the receipt and the
   order emails, and the ACS voucher carries it in `Delivery_Notes`
   ([§5.1](shipping-acs.md)). `Order.place` is a different field: a
-  district or area (Τοποθεσία), which nothing writes at checkout.
+  district or area (Τοποθεσία), which nothing writes at checkout; the
+  receipt prints it, when set, with the city.
 - **Region**: required exactly when the country has any (`Country.
   has_regions`, an `Exists(Region…)` annotation `for_list()`/
   `for_detail()` add — never a prefetch, so the storefront's country

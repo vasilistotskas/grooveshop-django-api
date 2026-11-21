@@ -23,10 +23,11 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
+from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
@@ -146,6 +147,21 @@ _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Language",
     "Delivery_Notes",
 )
+
+
+def _floor_label(order: Order) -> str:
+    """The order's floor as the courier reads it: the choice's Greek label
+    ("2ος όροφος"), the text the checkout shows, or "" without one.
+
+    It rides in ``Delivery_Notes`` (free text by ACS's manual, p. 7). The
+    manual's ``Recipient_Floor`` gives no format or allowed values (p. 6),
+    so the field is not sent until an ACS stage voucher shows how a value
+    lands; the floor then moves there and out of the notes.
+    """
+    if not order.floor:
+        return ""
+    with translation.override("el"):
+        return str(FloorChoicesEnum(order.floor).label)
 
 
 def _recipient_name(order: Order) -> str:
@@ -1453,9 +1469,10 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            # The address line 2 comes first: ACS's ``Recipient_Address``
-            # is the street alone, so the flat or floor rides here.
+            # The floor and the address line 2 come first: ACS's
+            # ``Recipient_Address`` is the street alone, so they ride here.
             "Delivery_Notes": courier_delivery_notes(
+                floor=_floor_label(order),
                 address_line_2=order.address_line_2,
                 customer_notes=order.customer_notes,
             ),

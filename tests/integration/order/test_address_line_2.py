@@ -10,6 +10,7 @@ ACS voucher's ``Delivery_Notes`` (``tests/unit/shipping_acs``).
 from __future__ import annotations
 
 import pytest
+from django.template.loader import render_to_string
 
 from order.accounting.invoicing import _buyer_snapshot
 from order.models.order import Order
@@ -64,6 +65,23 @@ def test_the_receipt_prints_it_under_the_street():
     snapshot = _buyer_snapshot(order)
 
     assert snapshot["address_line_2"] == "Διαμ. 3"
+
+
+def test_the_receipt_prints_a_place_with_the_city_not_as_line_2():
+    checkout = _checkout()
+    _post_order(checkout)
+    order = Order.objects.get()
+    order.place = "Καλαμαριά"
+
+    snapshot = _buyer_snapshot(order)
+
+    assert snapshot["address_line_2"] == ""
+    assert snapshot["place"] == "Καλαμαριά"
+    html = render_to_string(
+        "invoices/invoice.html",
+        {"buyer": snapshot, "seller": {}, "lines": [], "vat_breakdown": []},
+    )
+    assert f"{order.city}, Καλαμαριά" in html
 
 
 @pytest.mark.parametrize(

@@ -74,25 +74,34 @@ def sanitize_delivery_notes(value: object) -> str:
 DELIVERY_NOTES_SEPARATOR = " | "
 
 
-def courier_delivery_notes(*, address_line_2: str, customer_notes: str) -> str:
-    """The notes a voucher carries: the address line 2 first, then the
-    customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
+def courier_delivery_notes(
+    *, floor: str = "", address_line_2: str, customer_notes: str
+) -> str:
+    """The notes a voucher carries: the floor, the address line 2, then
+    the customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
 
     For a courier whose recipient address field is the street alone (ACS's
     ``Recipient_Address``: "the street without the area or place"), the
-    flat or floor rides in the free-text notes. The address line is never
-    cut (the order field caps it well under the limit); the customer's
-    note is cut first to make room. Each part is sanitised as
-    :func:`sanitize_delivery_notes` does.
+    flat or floor rides in the free-text notes. The floor and the address
+    line are never cut (both are short: a label, and a field capped well
+    under the limit); the customer's note is cut first to make room. Each
+    part is sanitised as :func:`sanitize_delivery_notes` does.
     """
-    line = sanitize_delivery_notes(address_line_2)
+    head = DELIVERY_NOTES_SEPARATOR.join(
+        part
+        for part in (
+            sanitize_delivery_notes(floor),
+            sanitize_delivery_notes(address_line_2),
+        )
+        if part
+    )
     notes = sanitize_delivery_notes(customer_notes)
-    if not line or not notes:
-        return line or notes
-    room = DELIVERY_NOTES_MAX_LEN - len(line) - len(DELIVERY_NOTES_SEPARATOR)
+    if not head or not notes:
+        return head or notes
+    room = DELIVERY_NOTES_MAX_LEN - len(head) - len(DELIVERY_NOTES_SEPARATOR)
     if room <= 0:
-        return line
-    return f"{line}{DELIVERY_NOTES_SEPARATOR}{notes[:room].rstrip()}"
+        return head
+    return f"{head}{DELIVERY_NOTES_SEPARATOR}{notes[:room].rstrip()}"
 
 
 @dataclass(frozen=True, slots=True)

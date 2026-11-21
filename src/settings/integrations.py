@@ -268,6 +268,11 @@ META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
 META_CAPI_PARTNER_AGENT = getenv(
     "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
 )
+# Seconds the connect and each read of a CAPI request may take. The event's
+# lock is held across the request (``meta_capi.tasks._dispatch``), and a copy
+# waiting on it gives up at the session's ``statement_timeout`` (30 s), so a
+# request must end well before that.
+META_CAPI_TIMEOUT_SECONDS = float(getenv("META_CAPI_TIMEOUT_SECONDS", "10"))
 
 # ---------- Agent gateway (grooveshop-agent-gateway) ----------
 # Cluster-internal base URL of the agent gateway service. Empty (the

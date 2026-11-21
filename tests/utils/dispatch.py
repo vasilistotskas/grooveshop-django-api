@@ -28,13 +28,19 @@ def assert_published_once(
 
 
 def apply_in(
-    store: Any, task: Any, args: Sequence[Any], *, task_id: str
+    store: Any,
+    task: Any,
+    args: Sequence[Any],
+    kwargs: Mapping[str, Any] | None = None,
+    *,
+    task_id: str,
 ) -> Any:
     """Run *task* as a worker runs one copy of a dispatch: in *store*
     (``TenantTask`` binds the store the ``_schema_name`` header names) and
     under *task_id*, the id every copy of the dispatch carries."""
     return task.apply(
         args,
+        kwargs,
         task_id=task_id,
         headers={"_schema_name": store.schema_name},
         throw=True,

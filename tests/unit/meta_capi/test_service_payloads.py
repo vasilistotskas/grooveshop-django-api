@@ -189,14 +189,14 @@ class TestCustomData:
         order.amount_due = Money(Decimal("40.00"), "EUR")
 
         explicit, id_a = build_refund_event(
-            order, Decimal("15.25"), event_id="refund-a"
+            order, Decimal("15.25"), refund_id=7
         )
-        fallback, _ = build_refund_event(order, None, event_id="refund-b")
+        fallback, _ = build_refund_event(order, None, refund_id=8)
 
         assert explicit.custom_data.value == 15.25
         assert fallback.custom_data.value == 40.0
         assert explicit.custom_data.currency == "EUR"
-        assert id_a == explicit.event_id == "refund-a"
+        assert id_a == explicit.event_id == "refund-7"
 
     def test_purchase_reports_amount_due_and_order_id(self):
         order = OrderFactory(num_order_items=1)
@@ -210,7 +210,7 @@ class TestCustomData:
 
 
 class TestCompleteRegistration:
-    def test_names_the_event_after_the_account_when_none_supplied(self):
+    def test_names_the_event_after_the_account(self):
         user = UserAccountFactory(email="New@Example.com")
 
         event, event_id = build_complete_registration_event(user)

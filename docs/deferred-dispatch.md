@@ -209,9 +209,11 @@ outside a task.
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
 - **Meta Conversions API**: each event's id is fixed before the task can run
-  again (the order's or the account's number, a Refund's dispatch key,
+  again (the order's or the account's number, a Refund's ledger row,
   `src/meta_capi/services.py`), and `MetaCapiEventLog` is checked and the
-  event sent under an advisory lock on that id.
+  event sent under an advisory lock on that id. A copy whose wait for the
+  lock runs out (`core.db.locks.LockWaitRanOut`) retries, and finds the event
+  sent; the request to Meta is bounded by `META_CAPI_TIMEOUT_SECONDS`.
 
 A task whose effect is a state of a row needs no id: it claims the state (a
 compare-and-set, a unique row). A dispatch made inside a task (a chain's next

@@ -19,11 +19,11 @@ later ``order_paid`` for the same order. The check and the send run under
 an advisory lock on the event, so two copies at the same moment send once.
 
 Every id is fixed before the task runs again: the browser-minted one when
-the order or the signup carries it, else the order's or the account's
-number (Purchase, InitiateCheckout, CompleteRegistration), and for a Refund
-the dispatch's own task id (``services.refund_event_id``). A task queued
-after a commit can run more than once (docs/deferred-dispatch.md), and a
-fresh id per run was a second event at Meta.
+the order carries it, else the order's number (Purchase, InitiateCheckout);
+the account's number (CompleteRegistration); and the ledger's REFUND row
+(Refund). A task queued after a commit can run more than once
+(docs/deferred-dispatch.md), and a fresh id per run was a second event at
+Meta.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from django.conf import settings
 from django.db import connection
 from django.utils import timezone
 
-from core.db.locks import held_across_calls
+from core.db.locks import LockWaitRanOut, held_across_calls
 from core.monitored_task import MonitoredTask
 from core.retention import delete_in_batches
 from core.retry import TRANSIENT_DB_ERRORS
@@ -56,7 +56,6 @@ from meta_capi.services import (
     build_purchase_event,
     build_refund_event,
     is_capi_enabled,
-    refund_event_id,
     should_dispatch_for_order,
 )
 from tenant.celery import dispatch_on_commit
@@ -115,18 +114,24 @@ def _dispatch(
     deduplication of a server event sent twice is not something to count
     on. So the SENT check and the send run under an advisory lock on the
     event (``core.db.locks.held_across_calls``): the copy that waits finds
-    the row SENT.
+    the row SENT. A copy whose wait runs out (the holder is still waiting on
+    Meta) retries like a 5xx, and its next attempt finds the row SENT.
     """
-    with held_across_calls(
-        f"meta_capi.event:{connection.schema_name}:{event_id}"
-    ):
-        _dispatch_once(
-            event=event,
-            event_id=event_id,
-            event_name=event_name,
-            order_id=order_id,
-            user_id=user_id,
-        )
+    try:
+        with held_across_calls(
+            f"meta_capi.event:{connection.schema_name}:{event_id}"
+        ):
+            _dispatch_once(
+                event=event,
+                event_id=event_id,
+                event_name=event_name,
+                order_id=order_id,
+                user_id=user_id,
+            )
+    except LockWaitRanOut as exc:
+        raise MetaCapiTransientError(
+            f"Meta CAPI event {event_id} is being sent by another copy"
+        ) from exc
 
 
 def _dispatch_once(
@@ -284,7 +289,7 @@ def dispatch_initiate_checkout_event(self, order_id: int) -> None:
     ignore_result=True,
 )
 def dispatch_refund_event(
-    self, order_id: int, amount: str | None = None
+    self, order_id: int, amount: str | None = None, *, refund_id: int
 ) -> None:
     from order.models.order import Order
 
@@ -301,7 +306,7 @@ def dispatch_refund_event(
 
     refund_amount = Decimal(amount) if amount else None
     event, event_id = build_refund_event(
-        order, refund_amount, event_id=refund_event_id(order)
+        order, refund_amount, refund_id=refund_id
     )
     _dispatch(
         event=event,
@@ -330,7 +335,6 @@ def dispatch_complete_registration_event(
     fbc: str | None = None,
     client_ip_address: str | None = None,
     client_user_agent: str | None = None,
-    event_id: str | None = None,
     event_source_url: str | None = None,
 ) -> None:
     from user.models.account import UserAccount
@@ -349,7 +353,6 @@ def dispatch_complete_registration_event(
         fbc=fbc,
         client_ip_address=client_ip_address,
         client_user_agent=client_user_agent,
-        event_id=event_id,
         event_source_url=event_source_url,
     )
     _dispatch(
@@ -375,9 +378,13 @@ def schedule_initiate_checkout(order_id: int) -> None:
     dispatch_on_commit(dispatch_initiate_checkout_event, [order_id])
 
 
-def schedule_refund(order_id: int, amount: Decimal | None) -> None:
+def schedule_refund(
+    order_id: int, refund_id: int, amount: Decimal | None
+) -> None:
     amount_str = str(amount) if amount is not None else None
-    dispatch_on_commit(dispatch_refund_event, [order_id, amount_str])
+    dispatch_on_commit(
+        dispatch_refund_event, [order_id, amount_str], {"refund_id": refund_id}
+    )
 
 
 @shared_task(

@@ -122,7 +122,7 @@ def fetch_catalogues() -> dict[str, dict[str, list]]:
 
     ``{country: {locker id: [sizes, probability]}}``, JSON-serialisable
     so the fan-out hands the same copy to each store
-    (``tenant.tasks.fanout_sync_boxnow_locker_catalogue``). A country whose
+    (``shipping_boxnow.tasks.sync_boxnow_locker_catalogue``). A country whose
     catalogue cannot be read is logged at ERROR and left out: its lockers
     keep what they hold.
     """
@@ -157,27 +157,51 @@ def apply_catalogues(
     keep what they hold. Returns ``{"updated": N, "unknown": M}``.
     """
     updated = unknown = 0
+    changed_any = False
     for country_code, facts in sorted(catalogues.items()):
         lockers = list(
             BoxNowLocker.objects.filter(
                 is_active=True, country_code__iexact=country_code
             )
         )
+        if len(facts) < len(lockers) * settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION:
+            # An empty or truncated file is a bad answer, not a withdrawal
+            # of the lockers' sizes: it would make every locker unknown
+            # and refuse every order to them.
+            logger.error(
+                "BOX NOW catalogue for %s lists %d lockers for %d active "
+                "ones (minimum fraction %s) — sizes kept",
+                country_code,
+                len(facts),
+                len(lockers),
+                settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION,
+                extra={"boxnow_country": country_code},
+            )
+            continue
         missing = [
             locker.external_id
             for locker in lockers
             if locker.external_id not in facts
         ]
+        changed = []
         for locker in lockers:
             known = facts.get(locker.external_id)
-            locker.compartment_sizes = known[0] if known else []
-            locker.availability_probability = known[1] if known else None
+            sizes = known[0] if known else []
+            probability = known[1] if known else None
+            if (
+                locker.compartment_sizes != sizes
+                or locker.availability_probability != probability
+            ):
+                locker.compartment_sizes = sizes
+                locker.availability_probability = probability
+                changed.append(locker)
         with transaction.atomic():
             BoxNowLocker.objects.bulk_update(
-                lockers,
+                changed,
                 ["compartment_sizes", "availability_probability"],
                 batch_size=BATCH_SIZE,
             )
+        changed_any = changed_any or bool(changed)
         updated += len(lockers) - len(missing)
         unknown += len(missing)
         if missing:
@@ -189,7 +213,7 @@ def apply_catalogues(
                 ", ".join(sorted(missing)),
                 extra={"boxnow_country": country_code},
             )
-    if updated or unknown:
+    if changed_any:
         mark_surface_stale("shipping")
     logger.info(
         "BOX NOW catalogue applied: updated=%d unknown=%d at %s",

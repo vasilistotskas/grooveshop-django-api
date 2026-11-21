@@ -200,3 +200,35 @@ def test_a_store_without_boxnow_skips_the_application():
             "updated": 0,
             "unknown": 0,
         }
+
+
+@pytest.mark.parametrize("rows", [[], ["1"]])
+def test_an_empty_or_truncated_catalogue_keeps_the_sizes(rows, caplog):
+    for external_id in ("1", "2", "3", "4"):
+        BoxNowLockerFactory(external_id=external_id, compartment_sizes=[2])
+
+    with caplog.at_level(logging.ERROR, logger="shipping_boxnow.catalogue"):
+        with _serve(_body([_row(i) for i in rows])):
+            sync_catalogue_facts()
+
+    sizes = {
+        tuple(locker.compartment_sizes) for locker in BoxNowLocker.objects.all()
+    }
+    assert sizes == {(2,)}
+    assert "minimum fraction" in caplog.text
+
+
+def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
+    BoxNowLockerFactory(
+        external_id="1",
+        compartment_sizes=[1, 2, 3],
+        availability_probability=1.0,
+    )
+
+    with (
+        _serve(_body([_row("1")])),
+        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+    ):
+        sync_catalogue_facts()
+
+    purge.assert_not_called()

@@ -24,7 +24,7 @@ from django.utils.translation import gettext
 
 from core.tasks import monitor_system_health, scheduled_database_backup
 from tenant.billing import _send_stage_email
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 from tenant.tasks import send_staff_password_reset_email
 from tests.utils.golden import assert_golden, snapshot
 from tests.utils.staff import (

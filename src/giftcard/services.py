@@ -188,8 +188,8 @@ class GiftCardService:
         """Whether *user* may put more than the staff limit on gift cards:
         a platform superuser, or the OWNER of this store. An admin or staff
         role may not: gift-card value is spendable money."""
+        from tenant.enum import TenantMembershipRole
         from tenant.membership import get_membership, is_platform_superuser
-        from tenant.models import TenantMembershipRole
 
         if is_platform_superuser(user):
             return True

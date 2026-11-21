@@ -23,8 +23,8 @@ named here, and when a path named here does not exist.
 - **A module becomes a package at about 500 lines.** `services.py` turns
   into `services/` with one module per subject, and every import site
   moves in the same change (no re-export shim). The modules that are far
-  past that today (`src/order/services.py`, `src/shipping_acs/services.py`,
-  `src/tenant/models.py` and others) are being split by the architecture
+  past that today (`src/order/services.py`, `src/shipping_acs/services.py`
+  and others) are being split by the architecture
   programme, epic #558.
 - **Tasks live in `tasks`, receivers in `signals`.** A Celery task is
   defined in the app's `tasks` module (or package), a signal receiver in
@@ -96,7 +96,10 @@ The multi-tenancy control plane. Models: `Tenant` (the django-tenants
 `TenantMixin`, with branding, plan flags and every per-store credential
 field), `TenantDomain`, `UserTenantMembership` (staff roles),
 `PlatformStaffToken`, `TenantArchive`, `TenantStatsSnapshot` and
-`DeferredDispatch`. A domain is a bare lowercase host name:
+`DeferredDispatch`, one module each in `src/tenant/models/`; the choices
+(`TenantPlan`, `StoreVertical`, `SuspendedReason`, `TenantMembershipRole`,
+`StaffTokenScope`) are in `src/tenant/enum.py`, and the cross-field rules
+`Tenant.clean()` runs are in `src/tenant/models/tenant_rules.py`. A domain is a bare lowercase host name:
 `tenant.validators.validate_store_hostname` runs in the form and in
 `save()`, because routing matches the text exactly.
 

@@ -13,11 +13,8 @@ from __future__ import annotations
 from django.db import connection
 
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
 from user.factories.account import UserAccountFactory
 
 

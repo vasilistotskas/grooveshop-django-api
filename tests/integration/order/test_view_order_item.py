@@ -20,7 +20,7 @@ from order.serializers.item import (
 )
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils import TestURLFixerMixin
 from tests.utils.staff import (
     bind_store_tenant,

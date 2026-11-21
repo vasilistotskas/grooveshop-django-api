@@ -8,12 +8,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import translation
 
-from tenant.models import (
-    Tenant,
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 User = get_user_model()

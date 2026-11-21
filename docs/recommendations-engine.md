@@ -517,7 +517,7 @@ admin offers must render somewhere.
 
 ### 9.3 Adding a vertical preset
 
-Add the member to `tenant.models.StoreVertical` and its entry to
+Add the member to `tenant.enum.StoreVertical` and its entry to
 `src/recommendation/presets.py:PRESETS` — the two are pinned to be the same
 set, and every preset must cover every `Surface` and pass
 `RecommendationSlot.clean()` (`tests/unit/recommendation/test_presets.py`).

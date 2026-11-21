@@ -25,6 +25,7 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from tenant.models import Tenant
+from tenant.models.tenant_rules import validate_openai_pixel_id
 from tenant.serializers import TenantConfigSerializer
 
 
@@ -39,12 +40,12 @@ class OpenAIPixelIdValidationTests(SimpleTestCase):
         )
 
     def test_accepts_an_alphanumeric_id(self):
-        self._tenant("8MktrqpXN1MRdD2NUfkXmU")._validate_openai_pixel_id()
+        validate_openai_pixel_id(self._tenant("8MktrqpXN1MRdD2NUfkXmU"))
 
     def test_accepts_empty_meaning_disabled(self):
         # Empty is how a tenant opts out; it must not raise, and it also
         # keeps bzrcdn.openai.com out of that tenant's CSP.
-        self._tenant("")._validate_openai_pixel_id()
+        validate_openai_pixel_id(self._tenant(""))
 
     def test_rejects_non_alphanumeric(self):
         # The trailing-character case that actually happened, plus the
@@ -58,7 +59,7 @@ class OpenAIPixelIdValidationTests(SimpleTestCase):
         ):
             with self.subTest(pixel_id=bad):
                 with self.assertRaises(ValidationError) as ctx:
-                    self._tenant(bad)._validate_openai_pixel_id()
+                    validate_openai_pixel_id(self._tenant(bad))
                 self.assertIn("openai_pixel_id", ctx.exception.message_dict)
 
     def test_full_clean_runs_the_validator(self):

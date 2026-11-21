@@ -830,8 +830,8 @@ class TestASuspendedStore:
         from extra_settings.models import Setting
 
         from meta_capi.client import MetaCapiResponse
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
         from tests.utils.staff import store_tenant
 
         store = store_tenant(

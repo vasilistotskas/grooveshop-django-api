@@ -52,6 +52,7 @@ from admin.branding import store_mark_url
 from admin.displays import format_dt, header_two_line
 from core.db.encrypted_fields import EncryptedCharField
 from tenant.admin_labels import billing_badge, label, plan_badge, status_badge
+from tenant.enum import SuspendedReason, TenantMembershipRole
 from tenant.lifecycle import (
     SUSPEND_COOLDOWN,
     activate_tenant,
@@ -61,11 +62,9 @@ from tenant.lifecycle import (
 )
 from tenant.membership import bound_tenant
 from tenant.models import (
-    SuspendedReason,
     Tenant,
     TenantArchive,
     TenantDomain,
-    TenantMembershipRole,
     UserTenantMembership,
 )
 from tenant.role_scopes import selectable_roles

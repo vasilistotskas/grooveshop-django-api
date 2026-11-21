@@ -23,7 +23,7 @@ from order.enum.expense import ExpenseCategory
 from order.models import Expense
 from product.factories import ProductFactory
 from product.models.product import COST_PRICE_PERMISSION
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tenant.role_scopes import OWNER_ONLY_PERMISSIONS
 from tests.utils.staff import (
     bind_store_tenant,

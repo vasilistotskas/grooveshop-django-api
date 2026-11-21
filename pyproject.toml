@@ -898,3 +898,13 @@ forbidden_modules = [
     "promotion.engine.scope",
 ]
 allow_indirect_imports = true
+
+# Inside `tenant` (#584). The choices and the single-value validators are
+# leaves the models import, and migrations import the validators by path:
+# neither reaches back into the models.
+[[tool.importlinter.contracts]]
+name = "tenant choices and validators import no tenant model"
+type = "forbidden"
+source_modules = ["tenant.enum", "tenant.validators"]
+forbidden_modules = ["tenant.models"]
+allow_indirect_imports = true

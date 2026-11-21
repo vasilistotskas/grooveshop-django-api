@@ -144,7 +144,7 @@ class TestOnAStoreHost:
     def test_store_staff_get_a_link_on_the_stores_own_domain(
         self, store, mt_tenant
     ):
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
 
         user = _account("mt-reset-store-staff@example.com")
         _member(user, mt_tenant, TenantMembershipRole.STAFF)
@@ -165,7 +165,7 @@ class TestOnAStoreHost:
     def test_the_link_saves_the_password_to_the_public_account(
         self, store, mt_tenant
     ):
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
 
         user = _account("mt-reset-store-save@example.com")
         _member(user, mt_tenant, TenantMembershipRole.STAFF)
@@ -192,7 +192,7 @@ class TestOnAStoreHost:
     def test_staff_who_cannot_open_this_store_are_not_mailed(
         self, store, mt_tenant, membership
     ):
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
 
         user = _account(f"mt-reset-{membership}@example.com")
         if membership == "inactive":
@@ -275,7 +275,7 @@ class TestOnThePlatformHost:
     def test_store_staff_are_not_mailed_on_the_platform_host(
         self, platform, mt_tenant
     ):
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
 
         user = _account("mt-reset-platform-staff@example.com")
         _member(user, mt_tenant, TenantMembershipRole.OWNER)

@@ -120,7 +120,7 @@ def selectable_roles(
     name. ``may_grant_owner`` is False for an ADMIN, who cannot mint an
     OWNER.
     """
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
 
     return [
         ("", _("Select value")),

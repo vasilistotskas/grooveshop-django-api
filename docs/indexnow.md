@@ -3,7 +3,7 @@
 Tells search engines that a product or a blog post of a store was created,
 changed or unpublished, instead of waiting for them to crawl it. Source:
 `src/indexnow/` (`models.py`, `signals.py`, `service.py`, `tasks.py`),
-`src/tenant/models.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
+`src/tenant/models/tenant.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
 `src/tenant/validators.py` (`generate_indexnow_key`), `src/tenant/serializers.py`
 (`TenantConfigSerializer.indexnow_key`), `src/core/utils/tenant_urls.py` (the
 URLs). The code wins over this page.

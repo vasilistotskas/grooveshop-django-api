@@ -65,7 +65,7 @@ def billing_state(tenant: Any, today: date) -> str:
     in-term trial reads "trial", an expiring or lapsed one reads
     "expiring"/"past_due" so it enters the same dunning pipeline.
     """
-    from tenant.models import TenantPlan
+    from tenant.enum import TenantPlan
 
     is_trial = tenant.plan == TenantPlan.TRIAL
     if tenant.suspended_at is not None:
@@ -139,11 +139,12 @@ def run_billing_cycle() -> dict[str, int]:
     """
     from django.utils import timezone
 
+    from tenant.enum import SuspendedReason
     from tenant.lifecycle import (
         is_protected_tenant,
         suspend_tenant,
     )
-    from tenant.models import SuspendedReason, Tenant
+    from tenant.models import Tenant
 
     conf = billing_config()
     warn = int(conf["WARN_DAYS"])

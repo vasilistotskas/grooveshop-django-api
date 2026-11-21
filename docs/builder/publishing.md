@@ -102,10 +102,12 @@ storefront needs no schema of its own for a refusal:
   otherwise the plain body (`schedule_not_pending`, `schedule_not_failed`).
 
 `tests/response_contract.py` holds every request a test makes to it: under
-`/api/v1/builder/` an answer whose status its operation does not declare
-(other than 401/403, answered before any view), or whose body does not
-satisfy the declared schema, fails the test that provoked it. A new
-operation or a new refusal that a test reaches cannot go undeclared.
+`/api/v1/builder/` a path no operation fits, an answer whose status its
+operation does not declare (other than 401/403, answered before any view),
+or a JSON body that does not satisfy the declared schema fails the test
+that provoked it. A declared answer that is not JSON is not judged by its
+body. So a new operation or a new refusal that a test reaches cannot go
+undeclared.
 
 ## The live preview
 

@@ -21,7 +21,8 @@ document ``manage.py spectacular`` writes (``tests.utils.openapi``):
   a CSV, a redirect), a method the path does not have (405) and an
   ``/api/v1`` path no operation fits. The terminal summary gives the
   counts; ``-v`` lists them by operation, so the gap stays visible.
-  Under ``STRICT_PREFIXES`` an undocumented status fails as well.
+  Under ``STRICT_PREFIXES`` a path no operation fits and an undocumented
+  status fail as well.
 - **A known drift**: ``@pytest.mark.known_schema_drift(method, path,
   status, at=..., issue=N)`` on a test lets a body of that operation and
   status fail at the places ``at`` names (``"$.results[*].description"``;
@@ -183,6 +184,11 @@ def check(method: str, path: str, response) -> None:
     template = operation_path(path)
     status = response.status_code
     if template is None:
+        if path.startswith(STRICT_PREFIXES):
+            raise AssertionError(
+                f"{method} {path} answered {response.status_code}, and no "
+                "operation of the schema fits the path"
+            )
         TALLY.not_judged[f"no operation fits {method} {path}"] += 1
         return
     operation = openapi_document()["paths"][template].get(method.lower())
@@ -273,12 +279,12 @@ def known_schema_drifts(request):
 
 
 def drift_gone_report() -> str | None:
-    """The failure for markers no failing body met, or ``None``. A test
-    whose own call failed may have stopped before the drifting request,
-    so its markers are not judged."""
+    """The failure for markers no failing body met, or ``None``. Only a
+    test whose call ran and passed is judged: one that failed may have
+    stopped before the drifting request, and one skipped never made it."""
     gone = unmet_drifts()
     if not gone or (
-        DRIFTS.node is not None and DRIFTS.node.stash.get(CALL_FAILED, False)
+        DRIFTS.node is None or not DRIFTS.node.stash.get(CALL_PASSED, False)
     ):
         return None
     return (
@@ -297,15 +303,15 @@ def unmet_drifts() -> list[str]:
     ]
 
 
-#: Whether the test's own call failed, for ``known_schema_drifts``.
-CALL_FAILED = pytest.StashKey[bool]()
+#: Whether the test's own call ran and passed, for ``known_schema_drifts``.
+CALL_PASSED = pytest.StashKey[bool]()
 
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_makereport(item, call):
     report = yield
     if report.when == "call":
-        item.stash[CALL_FAILED] = report.failed
+        item.stash[CALL_PASSED] = report.passed
     return report
 
 

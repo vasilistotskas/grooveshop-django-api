@@ -51,10 +51,12 @@ _EMAIL = re.compile(
     r"(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]"
     r"@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}"
 )
-# WHATWG's special schemes other than ``file``: a URL of one has a host,
-# which may not hold a forbidden domain code point.
-_SCHEMES_WITH_A_HOST = frozenset({"http", "https", "ws", "wss", "ftp"})
+# WHATWG's special schemes: their host is a domain or an address, and all
+# but ``file`` must have one. Another scheme's host is opaque, which may
+# hold a ``%``.
+_SPECIAL_SCHEMES = frozenset({"http", "https", "ws", "wss", "ftp", "file"})
 _FORBIDDEN_IN_HOST = re.compile(r"[\x00-\x20#%/:<>?@\[\\\]^|\x7f]")
+_FORBIDDEN_IN_OPAQUE_HOST = re.compile(r"[\x00-\x20#/:<>?@\[\\\]^|\x7f]")
 
 #: The formats the document uses that a client checks; ``double`` and
 #: ``binary`` constrain nothing a JSON body carries.
@@ -90,27 +92,32 @@ def _is_email(value: object) -> bool:
 @FORMATS.checks("uri", raises=ValueError)
 def _is_uri(value: object) -> bool:
     """What ``URL.canParse`` accepts (the storefront's ``z.url()``), or
-    stricter: a scheme; for a special scheme a host without a forbidden
-    code point, an address when it ends in a number, and a port in range.
-    A relative path is not a URL. ``urlsplit`` raises ``ValueError`` on a
-    malformed bracketed host or port, which fails the value."""
+    stricter. A scheme; a special scheme other than ``file`` has an
+    authority; an authority's port is in range and its host is an IPv6
+    address without a zone, or a host without a forbidden code point (a
+    special scheme's host, when it ends in a number, an IPv4 address). A
+    relative path is not a URL. ``urlsplit`` and ``ipaddress`` raise
+    ``ValueError`` on a malformed host or port, which fails the value."""
     if not isinstance(value, str):
         return True
-    parts = urlsplit(value.strip())
+    text = value.strip()
+    parts = urlsplit(text)
     if not _SCHEME.fullmatch(parts.scheme):
         return False
-    if parts.scheme.lower() not in _SCHEMES_WITH_A_HOST:
-        return True
-    parts.port  # noqa: B018 - raises ValueError for a port out of range
+    scheme = parts.scheme.lower()
+    special = scheme in _SPECIAL_SCHEMES
+    if not text[len(parts.scheme) + 1 :].startswith("//"):
+        return not special or scheme == "file"
+    port = parts.port  # raises ValueError for a port out of range
     host = parts.hostname or ""
-    if not host:
-        return False
     if "[" in parts.netloc:
-        ipaddress.IPv6Address(host)
-        return True
-    if _FORBIDDEN_IN_HOST.search(host):
+        return not ipaddress.IPv6Address(host).scope_id
+    if not host:
+        return scheme == "file" and port is None
+    forbidden = _FORBIDDEN_IN_HOST if special else _FORBIDDEN_IN_OPAQUE_HOST
+    if forbidden.search(host):
         return False
-    if host.rstrip(".").rsplit(".", 1)[-1].isdigit():
+    if special and host.rstrip(".").rsplit(".", 1)[-1].isdigit():
         ipaddress.IPv4Address(host.rstrip("."))
     return True
 

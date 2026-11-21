@@ -150,7 +150,7 @@ def test_a_second_copy_of_the_task_writes_nothing():
 
     rows = RecommendationEvent.objects.filter(impression_id=impression)
     assert rows.count() == 2
-    assert all(row.dispatch_key is not None for row in rows)
+    assert all(row.event_key is not None for row in rows)
 
 
 def test_two_beacons_for_one_impression_are_two_sets_of_rows():

@@ -59,7 +59,7 @@ def record_events(
     would poison the nightly aggregation with nothing to say why.
     ``attach`` is never accepted from here — it is derived from orders.
 
-    Each row carries the key of the task copy that writes it
+    Each row's ``event_key`` is the key of the task copy that writes it
     (``tenant.celery.dispatch_key``): another copy of the task (a retry, a
     message delivered again, the sweep's copy of a publish) makes the same
     keys, and the unique constraint on them leaves its rows out.
@@ -86,7 +86,7 @@ def record_events(
             session_key=session_key or "",
             user_id=user_id,
             cart_uuid=_as_uuid(cart_uuid),
-            dispatch_key=dispatch_key(
+            event_key=dispatch_key(
                 "recommendation-event",
                 kind,
                 impression_id,

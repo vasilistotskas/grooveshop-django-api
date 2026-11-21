@@ -209,9 +209,9 @@ outside a task.
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
 
-- **Recommendation events** (`recommendation.events.record_events`): each row
-  carries the key of the task copy that wrote it, unique, so a second copy
-  inserts nothing. Two beacons are two tasks and stay two rows even for one
+- **Recommendation events** (`recommendation.events.record_events`): each
+  row's `event_key` is the key of the task copy that wrote it, unique, so a
+  second copy inserts nothing. Two beacons are two tasks and stay two rows even for one
   impression id: a cached strip shows one id to every viewer.
 
 A task whose effect is a state of a row needs no id: it claims the state (a

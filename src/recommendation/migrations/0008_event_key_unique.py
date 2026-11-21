@@ -1,11 +1,11 @@
-"""One recommendation event per item per task copy.
+"""One recommendation event row per event key.
 
 Built concurrently on a live table (``AddUniqueConstraintAdaptively``). The
 column is new and empty, so no existing row can collide, and NULLs are
 outside the constraint. Duplicates, if any ever had to be checked:
 
-    SELECT dispatch_key, count(*) FROM recommendation_recommendationevent
-    WHERE dispatch_key IS NOT NULL GROUP BY dispatch_key HAVING count(*) > 1;
+    SELECT event_key, count(*) FROM recommendation_recommendationevent
+    WHERE event_key IS NOT NULL GROUP BY event_key HAVING count(*) > 1;
 """
 
 from django.db import migrations, models
@@ -18,16 +18,16 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ('recommendation', '0007_event_dispatch_key'),
+        ('recommendation', '0007_event_key'),
     ]
 
     operations = [
         AddUniqueConstraintAdaptively(
             'recommendationevent',
             models.UniqueConstraint(
-                condition=models.Q(('dispatch_key__isnull', False)),
-                fields=('dispatch_key',),
-                name='rec_event_dispatch_key_unique',
+                condition=models.Q(('event_key__isnull', False)),
+                fields=('event_key',),
+                name='rec_event_key_unique',
             ),
         ),
     ]

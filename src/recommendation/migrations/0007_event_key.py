@@ -1,4 +1,4 @@
-"""The key of the task copy that wrote a recommendation event.
+"""The key that makes two recommendation event rows one event.
 
 Nullable and unindexed here: the release still serving writes none, and
 ``attach`` rows never carry one. The unique constraint on it is built in the
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='recommendationevent',
-            name='dispatch_key',
-            field=models.UUIDField(blank=True, editable=False, null=True, verbose_name='Dispatch key'),
+            name='event_key',
+            field=models.UUIDField(blank=True, editable=False, null=True, verbose_name='Event key'),
         ),
     ]

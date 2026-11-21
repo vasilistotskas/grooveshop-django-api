@@ -3,8 +3,9 @@
 A soft-deleted row keeps its data and is marked ``is_deleted`` with its
 ``deleted_at`` (``core.models.SoftDeleteModel``). ``SoftDeleteModel.delete()``
 marks one row; :class:`SoftDeleteQuerySetMixin` gives a bulk delete the
-same meaning, so ``Model.objects.filter(...).delete()`` and the admin's
-"Delete selected" never remove a row for good: ``hard_delete()`` does.
+same meaning, row by row so the same signals run, and
+``Model.objects.filter(...).delete()`` and the admin's "Delete selected"
+never remove a row for good: ``hard_delete()`` does.
 
 Compose the mixins into an app's own classes, before the Django base in
 the inheritance list so their methods win::
@@ -21,7 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from django.utils import timezone
+from django.db import transaction
 
 if TYPE_CHECKING:
     from typing import Self
@@ -42,19 +43,31 @@ class SoftDeleteQuerySetMixin:
         return self.filter(is_deleted=True)
 
     def delete(self) -> tuple[int, dict[str, int]]:
-        """Soft-delete every row, as ``SoftDeleteModel.delete()`` does one.
+        """Soft-delete every row through its own ``delete()``.
 
-        A single UPDATE: no ``pre_delete``/``post_delete`` or ``post_save``
-        signal runs, so a caller that indexes the rows reindexes them
-        (``product.signals.reindex_products_by_pk``). Returns Django's
-        ``(count, {model label: count})``.
+        Row by row, in pk order and in one transaction, so a bulk delete
+        (the admin's "Delete selected") sends the ``post_save`` signals the
+        single-row delete sends: the storefront cache purge, the
+        Meilisearch reindex, IndexNow and the history row. One UPDATE would
+        have sent none. A row already deleted keeps its ``deleted_at``.
+        Returns Django's ``(count, {model label: count})``.
         """
-        count = super().update(deleted_at=timezone.now(), is_deleted=True)
+        count = 0
+        with transaction.atomic():
+            for row in self.exclude_deleted().order_by("pk"):
+                row.delete()
+                count += 1
         return count, {self.model._meta.label: count}
 
     def restore(self) -> int:
-        """Un-delete the rows; returns how many."""
-        return super().update(deleted_at=None, is_deleted=False)
+        """Un-delete every soft-deleted row through its own ``restore()``,
+        for the same signals; returns how many."""
+        count = 0
+        with transaction.atomic():
+            for row in self.deleted_only().order_by("pk"):
+                row.restore()
+                count += 1
+        return count
 
     def hard_delete(self) -> tuple[int, dict[str, int]]:
         """Remove the rows for good (Django's own ``delete()``)."""

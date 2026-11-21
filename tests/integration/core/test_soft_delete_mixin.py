@@ -153,3 +153,27 @@ class TestBulkDeleteIsSoftForEverySoftDeleteModel:
 
         Product.objects.filter(pk=product.pk).hard_delete()
         assert not Product._base_manager.filter(pk=product.pk).exists()
+
+    def test_a_bulk_delete_sends_each_rows_post_save(self):
+        """The receivers a single delete runs (cache purge, search
+        reindex, IndexNow) run for a bulk delete too: one UPDATE would
+        have sent no signal and left the search index serving them."""
+        from django.db.models.signals import post_save
+
+        products = [
+            ProductFactory(num_images=0, num_reviews=0) for _ in range(2)
+        ]
+        saved = []
+
+        def spy(sender, instance, update_fields=None, **kwargs):
+            saved.append((instance.pk, frozenset(update_fields or ())))
+
+        post_save.connect(spy, sender=Product, weak=False)
+        try:
+            Product.objects.filter(pk__in=[p.pk for p in products]).delete()
+        finally:
+            post_save.disconnect(spy, sender=Product)
+
+        assert sorted(saved) == sorted(
+            (p.pk, frozenset({"deleted_at", "is_deleted"})) for p in products
+        )

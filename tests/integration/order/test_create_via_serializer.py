@@ -433,7 +433,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
     ):
         """An active Viva Wallet pay-way is still rejected at order
         creation when the tenant holds no Viva credentials — tenant-only,
-        no settings fallback (see tenant/credentials.py). The GET
+        no settings fallback (see src/tenant/credentials.py). The GET
         pay-way list already hides it via ``is_provider_configured``;
         this pins the same gate at the create boundary for a direct
         API call / stale client."""
@@ -466,6 +466,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         go')."""
         from pay_way.factories import PayWayShippingExclusionFactory
         from shipping.models import ShippingProvider
+        from shipping_boxnow.factories import BoxNowLockerFactory
 
         boxnow = ShippingProvider.objects.get(code="boxnow")
         boxnow.is_active = True
@@ -480,6 +481,10 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             pay_way=pay_way,
             shipping_provider=boxnow,
             shipping_kind="pickup_point",
+        )
+        BoxNowLockerFactory(
+            external_id="123",
+            country_code=self._base_address()["country_id"],
         )
 
         data = {

@@ -42,17 +42,19 @@ class CamelCaseOrderingFilterTest(APITestCase):
         result = self._get_ordering(request, queryset)
         self.assertEqual(result, ["created_at"])
 
-    def test_get_ordering_pascal_case(self):
+    def test_a_key_the_schema_does_not_advertise_is_ignored(self):
+        # The schema advertises ``createdAt``; the keys read back with the
+        # same rules the API's parsers use, so ``CreatedAt`` names no field.
         request = self.create_request("CreatedAt")
         queryset = BlogPost.objects.all()
         result = self._get_ordering(request, queryset)
-        self.assertEqual(result, ["created_at"])
+        self.assertEqual(result, self._get_default_ordering())
 
     def test_get_ordering_mixed_case(self):
         request = self.create_request("CreatedAt,updatedAt")
         queryset = BlogPost.objects.all()
         result = self._get_ordering(request, queryset)
-        self.assertEqual(result, ["created_at", "updated_at"])
+        self.assertEqual(result, ["updated_at"])
 
     def test_get_ordering_snake_case(self):
         request = self.create_request("created_at,updated_at")
@@ -67,7 +69,7 @@ class CamelCaseOrderingFilterTest(APITestCase):
         self.assertEqual(result, ["-created_at", "updated_at"])
 
     def test_get_ordering_mixed_directions(self):
-        request = self.create_request("-CreatedAt,updatedAt,-viewCount")
+        request = self.create_request("-createdAt,updatedAt,-viewCount")
         queryset = BlogPost.objects.all()
         result = self._get_ordering(request, queryset)
         self.assertEqual(result, ["-created_at", "updated_at", "-view_count"])
@@ -98,7 +100,6 @@ class CamelCaseOrderingFilterTest(APITestCase):
     def test_camel_to_snake_conversion(self):
         test_cases = [
             ("createdAt", "created_at"),
-            ("CreatedAt", "created_at"),
             ("HTTPResponse", "http_response"),
             ("getHTTPResponseCode", "get_http_response_code"),
             ("already_snake_case", "already_snake_case"),
@@ -118,6 +119,9 @@ class CamelCaseOrderingFilterTest(APITestCase):
             ("commentsCount", "comments_count"),
             ("tagsCount", "tags_count"),
             ("publishedAt", "published_at"),
+            # The digit segments the schema advertises (``alpha_2``).
+            ("alpha2", "alpha_2"),
+            ("alpha3", "alpha_3"),
         ]
 
         for input_str, expected in test_cases:
@@ -131,12 +135,8 @@ class CamelCaseOrderingFilterTest(APITestCase):
         response = self.client.get(url, {"ordering": "createdAt"})
         self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(url, {"ordering": "CreatedAt"})
-        self.assertEqual(response.status_code, 200)
-
         response = self.client.get(url, {"ordering": "-createdAt"})
         self.assertEqual(response.status_code, 200)
 
         response = self.client.get(url, {"ordering": "-publishedAt,viewCount"})
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.status_code, 200)

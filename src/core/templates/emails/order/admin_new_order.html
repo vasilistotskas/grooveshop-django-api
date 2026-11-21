@@ -28,7 +28,8 @@
 <div class="email-card">
     <h2>Shipping address</h2>
     <p>
-        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.street }} {{ order.street_number }}<br>{% if order.address_line_2 %}
+        {{ order.address_line_2 }}<br>{% endif %}
         {{ order.city }}, {{ order.zipcode }}<br>
         {{ order.country }}
     </p>

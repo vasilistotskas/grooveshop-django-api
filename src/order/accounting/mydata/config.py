@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 from typing import Literal
 
 from django.conf import settings
@@ -68,6 +69,21 @@ def validate_series_prefix_setting(value: object) -> bool:
     )
 
 
+class MyDataRequirement(StrEnum):
+    """One condition of :meth:`MyDataConfig.is_ready`; a credential is
+    named by its ``Tenant`` field."""
+
+    ENABLED = "enabled"
+    ENVIRONMENT = "environment"
+    FHM_EXEMPTION_GROUND = "fhm_exemption_ground"
+    USER_ID = "mydata_user_id"
+    SUBSCRIPTION_KEY = "mydata_subscription_key"
+
+
+#: The store's own myDATA credentials, in the order they are listed.
+CREDENTIALS = (MyDataRequirement.USER_ID, MyDataRequirement.SUBSCRIPTION_KEY)
+
+
 @dataclass(frozen=True)
 class MyDataConfig:
     """Immutable snapshot of the myDATA runtime config.
@@ -106,20 +122,30 @@ class MyDataConfig:
         relies on, so no ΦΗΜ exemption is needed for them."""
         return self.environment == "dev" and not self.takes_real_orders
 
+    def unmet(self) -> list[MyDataRequirement]:
+        """The conditions of :meth:`is_ready` this store does not meet, in
+        order: myDATA enabled, a known environment, the legal ground of its
+        ΦΗΜ exemption recorded (or only issuing to the sandbox), and its
+        credentials populated. The store dashboard tells the merchant
+        which ones are missing from this same list."""
+        checks = (
+            (MyDataRequirement.ENABLED, self.enabled),
+            (MyDataRequirement.ENVIRONMENT, self.environment is not None),
+            (
+                MyDataRequirement.FHM_EXEMPTION_GROUND,
+                self.fhm_exemption_ground or self.issues_to_sandbox_only,
+            ),
+            (MyDataRequirement.USER_ID, self.user_id),
+            (MyDataRequirement.SUBSCRIPTION_KEY, self.subscription_key),
+        )
+        return [requirement for requirement, met in checks if not met]
+
     def is_ready(self) -> bool:
         """True when the platform issues this store's retail documents:
-        myDATA is enabled with a known environment, the store has
-        recorded the legal ground of its ΦΗΜ exemption (or only issues to
-        the sandbox), and its credentials are populated. The call sites
-        should no-op rather than raise when False — the store then issues
-        its documents outside the platform."""
-        return bool(
-            self.enabled
-            and self.environment is not None
-            and (self.fhm_exemption_ground or self.issues_to_sandbox_only)
-            and self.user_id
-            and self.subscription_key
-        )
+        every condition of :meth:`unmet` holds. The call sites should no-op
+        rather than raise when False — the store then issues its documents
+        outside the platform."""
+        return not self.unmet()
 
     @property
     def send_window(self) -> timedelta:

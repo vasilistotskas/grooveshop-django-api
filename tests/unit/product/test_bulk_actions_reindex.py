@@ -1,11 +1,11 @@
 """A bulk UPDATE emits no post_save, so nothing reindexes on its own.
 
-`queryset.update()` and `SoftDeleteQuerySet.delete()` are single SQL
-statements. Measured with a spy receiver:
+`queryset.update()` is a single SQL statement (a bulk soft delete goes row
+by row, `core.mixins.soft_delete`). Measured with a spy receiver:
 
     bulk .update()     -> post_save fired: 0
     instance .save()   -> post_save fired: 1
-    queryset .delete() -> post_save fired: 0
+    queryset .delete() -> post_save fired: 1 per row (soft delete)
 
 `active` is an indexed, filterable field and `search.views.product` filters
 the INDEXED value — so "Deactivate selected products" left every one of

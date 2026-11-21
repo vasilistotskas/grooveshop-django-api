@@ -1,169 +1,38 @@
 import logging
 import os
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connections, transaction
-from django.db.models import F
+from django.db import transaction
 
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
 from django.utils import timezone
 
-from cart.models import Cart
-from core import celery_app, db_cost
+from core import celery_app
 from core.cache import edge as edge_cache
 from core.cache import invalidation as cache_invalidation
 from core.cache.edge import EdgePurgeError
-from core.emails import BackupFailed, HealthAlert
 from core.exceptions import (
-    HealthCheckFailed,
-    ManagementCommandFailed,
     StorePagesPurgeFailed,
 )
+from core.monitored_task import MonitoredTask
 from core.retention import (
     delete_in_batches,
     purge_expired_auth_tokens,
     purge_orphaned_user_sessions,
 )
 from core.retry import (
-    MAIL_TRANSIENT_ERRORS,
-    SEARCH_TRANSIENT_ERRORS,
     TRANSIENT_DB_ERRORS,
     TRANSIENT_ERRORS,
-    is_permanent_failure,
 )
 from core.store_settings import store_setting
-from emails.send import Status, send_email, was_sent
-from tenant.celery import TenantTask
-
-User = get_user_model()
 
 logger = logging.getLogger(__name__)
-
-
-_SECRET_KEYS = frozenset(
-    {"password", "token", "key", "secret", "auth", "credential", "passwd"}
-)
-_ARG_TRUNCATE = 500
-
-# ``send_inactive_user_notifications`` stops once MORE than this many
-# sends have failed in one run: that many failures points at the mail
-# backend, not at individual users, and the next run resumes anyway.
-_MAX_REENGAGEMENT_FAILURES = 50
-
-
-def _safe_repr(value: Any, key: str | None = None) -> str:
-    """Return a truncated repr of *value*, masking secret-looking keys."""
-    if key is not None:
-        lower = str(key).lower()
-        if any(sk in lower for sk in _SECRET_KEYS):
-            return "***"
-    text = repr(value)
-    if len(text) > _ARG_TRUNCATE:
-        return text[:_ARG_TRUNCATE] + "…"
-    return text
-
-
-def safe_task_arguments(
-    task: Any, args: Any, kwargs: Any
-) -> tuple[list[str], dict[str, str]]:
-    """A task's arguments as a log line may show them.
-
-    Masks what ``_safe_repr`` catches by name and what the task declares in
-    ``sensitive_kwargs``. ``task`` is ``None`` when nothing in this process
-    knows it: nothing then says which of its values is secret, so none is
-    shown.
-    """
-    if task is None:
-        return ["***"] * len(args or []), dict.fromkeys(kwargs or {}, "***")
-    sensitive = getattr(task, "sensitive_kwargs", frozenset())
-    return (
-        [_safe_repr(a) for a in (args or [])],
-        {
-            k: ("***" if k in sensitive else _safe_repr(v, key=k))
-            for k, v in (kwargs or {}).items()
-        },
-    )
-
-
-class MonitoredTask(TenantTask):
-    """Base task with tenant context propagation and monitoring."""
-
-    #: Kwarg names whose VALUES must never reach the logs, whatever they
-    #: are called. ``_safe_repr`` masks by NAME — it catches ``token`` and
-    #: ``password`` — but a payload can carry a secret under an innocent
-    #: key. ``send_allauth_email_task`` is the case: its ``context`` kwarg
-    #: carries the password-reset link or the login code, which would
-    #: otherwise land in an ERROR log on the exact failure this masking
-    #: exists for.
-    sensitive_kwargs: frozenset[str] = frozenset()
-
-    def retry(self, *args: Any, **options: Any) -> Any:
-        """Reschedule the task, unless ``exc`` says a retry cannot help.
-
-        Both ``autoretry_for`` and an explicit ``raise self.retry(...)``
-        land here, so an SMTP 5xx or an HTTP 4xx stops at once however
-        the task asked for the retry. See ``core.retry``. Celery passes
-        ``exc`` by keyword from every call site.
-        """
-        exc = options.get("exc")
-        if exc is not None and is_permanent_failure(exc):
-            raise exc
-        return super().retry(*args, **options)
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Run the task and keep what it cost the database on its request.
-
-        ``on_success`` and ``on_failure`` run after ``__call__`` returns,
-        on the same request context, so the figures are stored there.
-        """
-        started = time.perf_counter()
-        with db_cost.measure() as cost:
-            try:
-                return super().__call__(*args, **kwargs)
-            finally:
-                self.request.cost_fields = {
-                    "duration_ms": round(
-                        (time.perf_counter() - started) * 1000, 1
-                    ),
-                    **cost.as_fields(),
-                }
-
-    def _cost_fields(self) -> dict[str, Any]:
-        return getattr(self.request, "cost_fields", {})
-
-    def on_success(self, retval, task_id, args, kwargs):
-        logger.info(
-            f"Task {self.name} completed successfully. Task ID: {task_id}",
-            extra={"fields": self._cost_fields()},
-        )
-
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        safe_args, safe_kwargs = safe_task_arguments(self, args, kwargs)
-        # ``exc_info=exc`` and not ``einfo.exception``: Celery wraps the
-        # latter in billiard's ``ExceptionWithTraceback`` (its ``str()``
-        # is the traceback text and its ``__traceback__`` is ``None``),
-        # so passing it would log a bogus exception type with no frames.
-        # ``exc`` is the exception the task raised, with its traceback
-        # attached by Celery before this handler runs.
-        logger.error(
-            "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
-            self.name,
-            task_id,
-            exc,
-            safe_args,
-            safe_kwargs,
-            exc_info=exc,
-            extra={"fields": self._cost_fields()},
-        )
 
 
 class _DeletedLogFile(TypedDict):
@@ -528,87 +397,6 @@ def clear_expired_notifications_task(days=365):
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=TRANSIENT_ERRORS,
-    retry_backoff=True,
-)
-def cleanup_abandoned_carts():
-    try:
-        days = store_setting("ABANDONED_CART_CLEANUP_DAYS")
-        cutoff_date = timezone.now() - timedelta(days=days)
-
-        with transaction.atomic():
-            count, _ = Cart.objects.filter(
-                user__isnull=True,
-                last_activity__lt=cutoff_date,
-                items__isnull=True,
-            ).delete()
-
-        message = (
-            f"Cleaned up {count} abandoned guest carts"
-            if count > 0
-            else "No abandoned carts to clean up"
-        )
-        logger.info(message)
-
-        return {
-            "status": "success",
-            "message": message,
-            "deleted_count": count,
-            "cutoff_date": cutoff_date.isoformat(),
-            "timestamp": timezone.now().isoformat(),
-        }
-    except Exception:
-        logger.exception("Error cleaning up abandoned carts")
-        raise
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    max_retries=3,
-    autoretry_for=TRANSIENT_ERRORS,
-    retry_backoff=True,
-)
-def cleanup_old_guest_carts():
-    try:
-        days = store_setting("OLD_GUEST_CART_CLEANUP_DAYS")
-        cutoff_date = timezone.now() - timedelta(days=days)
-
-        # Delete ALL sufficiently-old guest carts, empty or not. The
-        # 7-day ``cleanup_abandoned_carts`` job already sweeps *empty*
-        # guest carts; without dropping the ``items__isnull`` filter here
-        # a guest cart that still held items after a tab-close / cookie
-        # clear was never deleted by anything and lingered forever. Safe
-        # to remove non-empty ones at 30 days: guests get no abandoned-
-        # cart email (that flow is authenticated-only), the recovery page
-        # is auth-gated, and any StockReservations are long past their
-        # 15-minute TTL by then.
-        count, _ = Cart.objects.filter(
-            user__isnull=True,
-            last_activity__lt=cutoff_date,
-        ).delete()
-
-        message = (
-            f"Cleaned up {count} old guest carts ({days}+ days inactive)"
-            if count > 0
-            else "No old guest carts to clean up"
-        )
-        logger.info(message)
-
-        return {
-            "status": "success",
-            "message": message,
-            "deleted_count": count,
-            "cutoff_date": cutoff_date.isoformat(),
-            "timestamp": timezone.now().isoformat(),
-        }
-    except Exception:
-        logger.exception("Error cleaning up old guest carts")
-        raise
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    max_retries=3,
     soft_time_limit=300,
     time_limit=600,
     autoretry_for=TRANSIENT_ERRORS,
@@ -705,274 +493,6 @@ def clear_development_log_files_task(days=7):
         "deleted_files": deleted_files[:20],
         "errors": errors,
     }
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    max_retries=3,
-    soft_time_limit=600,
-    time_limit=900,
-    autoretry_for=MAIL_TRANSIENT_ERRORS,
-    retry_backoff=True,
-)
-def send_inactive_user_notifications() -> dict[str, Any]:
-    """
-    Send re-engagement emails to inactive users.
-
-    Limits to ``REENGAGEMENT_EMAIL_MAX_COUNT`` emails per user with a
-    ``REENGAGEMENT_EMAIL_COOLDOWN_DAYS`` cooldown between sends (both
-    extra settings). Uses iterator() for memory-efficient processing.
-
-    Returns:
-        Dictionary with task execution statistics
-    """
-    now = timezone.now()
-    max_emails = store_setting("REENGAGEMENT_EMAIL_MAX_COUNT")
-    cooldown_days = store_setting("REENGAGEMENT_EMAIL_COOLDOWN_DAYS")
-    inactive_days = store_setting("INACTIVE_USER_THRESHOLD_DAYS")
-    cutoff_date = now - timedelta(days=inactive_days)
-    cooldown_cutoff = now - timedelta(days=cooldown_days)
-
-    # Who opted out is the pipeline's to decide (``EmailOptOut``).
-    inactive_users_qs = (
-        User.objects.filter(
-            last_login__lt=cutoff_date,
-            is_active=True,
-            email__isnull=False,
-            email__gt="",
-            reengagement_email_count__lt=max_emails,
-        )
-        .exclude(
-            last_reengagement_email_at__gt=cooldown_cutoff,
-        )
-        .only("id", "email", "first_name", "username")
-    )
-
-    success_count = 0
-    failed_emails: list[dict[str, Any]] = []
-    total_users = 0
-    timed_out = False
-
-    logger.info("Starting to send emails to inactive users")
-
-    for user in inactive_users_qs.iterator(chunk_size=200):
-        total_users += 1
-
-        try:
-            deliveries = send_email("user.reengagement", user)
-            if not was_sent(deliveries):
-                if deliveries[0].status in (
-                    Status.SKIPPED_FEATURE_OFF,
-                    Status.SKIPPED_SWITCHED_OFF,
-                ):
-                    # The whole run is off (not scheduled, or the store
-                    # switched the mail off): nobody is written to.
-                    logger.info(
-                        "Re-engagement run stopped: %s", deliveries[0].status
-                    )
-                    break
-                # Opted out through the one-click link: not counted as a
-                # send, so the cooldown and the count stay as they were.
-                continue
-
-            User.objects.filter(pk=user.pk).update(
-                reengagement_email_count=F("reengagement_email_count") + 1,
-                last_reengagement_email_at=now,
-            )
-
-            success_count += 1
-
-            if success_count % 100 == 0:
-                logger.info(f"Sent {success_count} emails so far...")
-
-        except SoftTimeLimitExceeded:
-            # Caught BEFORE the generic arm, and it has to be: Celery
-            # raises this INSIDE the task at ``soft_time_limit``, it is
-            # an ordinary ``Exception`` subclass, and it is raised ONCE.
-            # Landing in the per-user handler below, it was recorded as
-            # "failed to send email to user X" and the loop carried on —
-            # so the soft limit bought nothing and the run continued to
-            # the hard ``time_limit``, where Celery kills the worker
-            # process outright. That is the outcome the soft limit
-            # exists to prevent, and the kill also loses the summary and
-            # the in-flight user's bookkeeping.
-            #
-            # Stopping is safe and self-resuming rather than a failure:
-            # every user emailed already has ``last_reengagement_email_at``
-            # set, so the next scheduled run excludes them by the
-            # cooldown and continues from here. Re-raising instead would
-            # hand ``autoretry_for`` a full rescan that can
-            # only time out again.
-            timed_out = True
-            logger.error(
-                "Re-engagement run hit its soft time limit after %s users "
-                "(%s sent). The next scheduled run resumes from here.",
-                total_users,
-                success_count,
-            )
-            break
-        except Exception as e:
-            logger.error(
-                f"Failed to send email to user {user.pk}",
-                extra={"user_id": user.pk, "error": str(e)},
-            )
-            failed_emails.append(
-                {
-                    "user_id": user.pk,
-                    "email": (user.email or "")[:3] + "***",
-                    "error": str(e),
-                }
-            )
-
-            if len(failed_emails) > _MAX_REENGAGEMENT_FAILURES:
-                logger.error("Too many email failures, stopping task")
-                break
-
-    message = f"Sent {success_count} re-engagement emails to inactive users"
-    logger.info(
-        message,
-        extra={
-            "total_users": total_users,
-            "emails_sent": success_count,
-            "failed_count": len(failed_emails),
-            "timed_out": timed_out,
-        },
-    )
-
-    return {
-        "status": "completed",
-        "message": message,
-        "total_users": total_users,
-        "emails_sent": success_count,
-        "failed": len(failed_emails),
-        "failed_details": failed_emails[:10],
-        "timed_out": timed_out,
-    }
-
-
-@celery_app.task(base=MonitoredTask)
-def monitor_system_health():
-    """Probe the dependencies a working store needs, and alert on any.
-
-    Deliberately has no ``autoretry_for``. A monitor that retries only
-    re-asks the same question, and this one emails on every failed
-    run — so the old ``max_retries=5`` turned a single outage into six
-    identical alerts. A genuinely transient blip is caught by the next
-    scheduled run instead.
-    """
-    health_checks = {"database": False, "cache": False, "storage": False}
-    errors = []
-
-    try:
-        with connections["default"].cursor() as cursor:
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            if result:
-                health_checks["database"] = True
-                logger.debug("Database health check passed")
-
-    except Exception as e:
-        error_msg = f"Database health check failed: {e}"
-        logger.error(error_msg)
-        errors.append(error_msg)
-
-    try:
-        cache.set("health_check", "ok", 30)
-        if cache.get("health_check") != "ok":
-            raise HealthCheckFailed("cache", "read/write test failed")
-
-        # The round-trip above passes on a Redis that has already lost
-        # its disk — it is served from memory. Ask Redis directly
-        # whether it can still persist, because that failure arrives
-        # first and the crash loop it causes arrives later.
-        failing = cache.failing_persistence_statuses()
-        if failing:
-            raise HealthCheckFailed(
-                "cache",
-                "Redis cannot persist to disk ("
-                + ", ".join(f"{k}={v}" for k, v in sorted(failing.items()))
-                + ") — check free space on its volume",
-            )
-
-        health_checks["cache"] = True
-        logger.debug("Cache health check passed")
-
-    except Exception as e:
-        error_msg = f"Cache health check failed: {e}"
-        logger.warning(error_msg)
-        errors.append(error_msg)
-
-    from django.core.files.base import ContentFile
-    from django.core.files.storage import default_storage
-
-    try:
-        # Probe the configured default storage backend end-to-end
-        # (write → delete). The default storage is a
-        # ``FileSystemStorage`` rooted at ``MEDIA_ROOT`` — in K8s that
-        # is the shared RWX media PVC, which must be mounted read-write
-        # on every pod that runs this task (backend AND celery
-        # workers). A missing mount surfaces as ``[Errno 30] Read-only
-        # file system`` from the container's read-only root filesystem.
-        probe_name = ".health_check"
-        if default_storage.exists(probe_name):
-            default_storage.delete(probe_name)
-        saved_name = default_storage.save(probe_name, ContentFile(b"ok"))
-        default_storage.delete(saved_name)
-        health_checks["storage"] = True
-        logger.debug("Storage health check passed")
-
-    except Exception as e:
-        backend = default_storage.__class__.__name__
-        target = getattr(default_storage, "bucket_name", None) or getattr(
-            default_storage, "location", "<unknown>"
-        )
-        error_msg = (
-            f"Storage health check failed via {backend} at {target!r}: {e}"
-        )
-        logger.warning(error_msg)
-        errors.append(error_msg)
-
-    all_passed = all(health_checks.values())
-    database_up = health_checks["database"]
-    failed = sorted(name for name, ok in health_checks.items() if not ok)
-
-    # Every check alerts, not just the database. Treating cache and
-    # storage as merely "degraded" is what kept this task silent while
-    # Redis crash-looped and the storefront served 503s on 2026-09-09:
-    # the database was fine, so nothing was sent and nothing was
-    # raised. There is no failure here a human should not see — Redis
-    # is the cache, the Channels layer and the SSR store at once, and
-    # a read-only media volume loses every upload.
-    if not all_passed:
-        try:
-            send_email(
-                "platform.health_alert",
-                HealthAlert(failed=tuple(failed), errors=tuple(errors)),
-            )
-        except Exception as e:
-            logger.error(f"Failed to send health check alert email: {e}")
-
-    result = {
-        "status": "healthy"
-        if all_passed
-        else ("degraded" if database_up else "unhealthy"),
-        "timestamp": timezone.now().isoformat(),
-        "checks": health_checks,
-        "errors": errors,
-    }
-
-    if all_passed:
-        logger.info("System health check completed", extra=result)
-        return result
-
-    # Raise so the run is a FAILURE rather than a green task carrying a
-    # "degraded" payload nobody reads. ``MonitoredTask.on_failure``
-    # logs it, which puts the outage in VictoriaLogs as a second
-    # detection path independent of email.
-    logger.error("System health check failed", extra=result)
-    raise HealthCheckFailed(
-        "system", f"unhealthy component(s): {', '.join(failed)}"
-    )
 
 
 @celery_app.task(
@@ -1085,52 +605,6 @@ def backup_database_task(
 
 @celery_app.task(
     base=MonitoredTask,
-    max_retries=2,
-    autoretry_for=TRANSIENT_ERRORS,
-    retry_backoff=True,
-)
-def scheduled_database_backup():
-    try:
-        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"scheduled_backup_{timestamp}"
-
-        logger.info("Starting scheduled database backup")
-
-        # Use Celery chain to avoid blocking the worker with .get()
-        from celery import chain
-
-        chain(
-            backup_database_task.s(
-                output_dir="backups/scheduled",
-                filename=filename,
-                compress=True,
-                format_type="custom",
-            ),
-            cleanup_old_backups.si(days=7, backup_dir="backups/scheduled"),
-        ).apply_async()
-
-        logger.info("Scheduled database backup chain dispatched")
-        return {
-            "status": "dispatched",
-            "message": "Backup task chain started",
-            "filename": filename,
-        }
-
-    except Exception as e:
-        logger.error(f"Scheduled backup failed: {e}")
-
-        try:
-            send_email("platform.backup_failed", BackupFailed(error=str(e)))
-        except Exception as mail_error:
-            logger.error(
-                f"Failed to send backup failure alert email: {mail_error}"
-            )
-
-        raise
-
-
-@celery_app.task(
-    base=MonitoredTask,
     max_retries=3,
     autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
@@ -1230,34 +704,3 @@ def validate_task_configuration():
         )
 
     logger.info("Task configuration validated successfully")
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    max_retries=3,
-    autoretry_for=SEARCH_TRANSIENT_ERRORS,
-    retry_backoff=True,
-)
-def sync_meilisearch_indexes():
-    """
-    Sync all Meilisearch indexes by calling the management command.
-    Scheduled to run daily at 2 AM.
-    """
-    logger.info("Starting Meilisearch index synchronization")
-
-    try:
-        management.call_command("meilisearch_sync_all_indexes")
-        logger.info("Meilisearch index synchronization completed successfully")
-        return {
-            "status": "success",
-            "result_message": "All Meilisearch indexes synchronized successfully",
-            "timestamp": timezone.now().isoformat(),
-        }
-    except SystemExit as e:
-        raise ManagementCommandFailed("meilisearch sync", e.code) from e
-    except management.CommandError as e:
-        logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
-        raise
-    except Exception:
-        logger.exception("Unexpected error in sync_meilisearch_indexes")
-        raise

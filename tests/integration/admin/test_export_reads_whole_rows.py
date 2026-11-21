@@ -24,7 +24,7 @@ pytestmark = pytest.mark.django_db
 
 
 def _export_queries(rows: int) -> int:
-    Product.objects.all().delete()
+    Product.objects.all().hard_delete()
     ProductFactory.create_batch(rows, num_images=0, num_reviews=0)
     request = RequestFactory().get("/admin/product/product/")
     request.user = UserAccountFactory(is_staff=True, is_superuser=True)

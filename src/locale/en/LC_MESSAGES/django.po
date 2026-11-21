@@ -876,6 +876,9 @@ msgstr "A payment for this order was received and is being confirmed. Do not pay
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "A payment intent is required — the applied discounts do not cover the order total."
 
+msgid "A pickup-point order is delivered to its point's address, which can't be changed."
+msgstr "A pickup-point order is delivered to its point's address, which can't be changed."
+
 msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 msgstr "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 
@@ -3259,6 +3262,9 @@ msgstr "Choose a new password for %(store)s"
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
 
+msgid "Choose a pickup point."
+msgstr "Choose a pickup point."
+
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
@@ -3284,11 +3290,11 @@ msgctxt "legal details alert"
 msgid "City"
 msgstr "City"
 
-msgid "City name"
-msgstr "City name"
-
 msgid "City name for nearest-locker lookup"
 msgstr "City name for nearest-locker lookup"
+
+msgid "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
+msgstr "City name. Required for a home delivery; a pickup-point order takes the point's city instead."
 
 msgid "Claim"
 msgstr "Claim"
@@ -4849,6 +4855,9 @@ msgstr "Enter the code from your authenticator app for %(account)s, or one of yo
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
+
+msgid "Enter the company's address: a pickup point is not one."
+msgstr "Enter the company's address: a pickup point is not one."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
@@ -7447,6 +7456,9 @@ msgstr "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` 
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 country code."
 
+msgid "ISO 3166-1 alpha-2 country of the locker."
+msgstr "ISO 3166-1 alpha-2 country of the locker."
+
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 
@@ -8788,8 +8800,8 @@ msgstr "Meta Pixel ID"
 msgid "Meta Pixel ID must contain digits only (e.g. '123456789012345')."
 msgstr "Meta Pixel ID must contain digits only (e.g. '123456789012345')."
 
-msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
-msgstr "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
+msgid "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). A ``client_ip_address`` sent here is ignored: the server sets it from the verified edge address. Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
+msgstr "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). A ``client_ip_address`` sent here is ignored: the server sets it from the verified edge address. Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
 
 msgid "Meta fbtrace_id"
 msgstr "Meta fbtrace_id"
@@ -11115,8 +11127,8 @@ msgstr "Postal code of the event location"
 msgid "Postal code of the locker"
 msgstr "Postal code of the locker"
 
-msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
-msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces)."
+msgid "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
+msgstr "Postal/ZIP code. Must match the country's ``postal_code_pattern``; stored normalised (trimmed, upper-case, single spaces). Required for a home delivery; a pickup-point order takes the point's postcode instead."
 
 msgid "Posts"
 msgstr "Posts"
@@ -13006,6 +13018,9 @@ msgstr "Select a region that belongs to the selected country."
 msgid "Select a valid country."
 msgstr "Select a valid country."
 
+msgid "Select a valid region."
+msgstr "Select a valid region."
+
 msgid "Select all"
 msgstr "Select all"
 
@@ -14027,14 +14042,11 @@ msgstr "Street Number"
 msgid "Street name and number"
 msgstr "Street name and number"
 
-msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
-msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent."
+msgid "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
+msgstr "Street name, or the whole street line with its number after the name (Ermou 12) when streetNumber is not sent. Required for a home delivery; a pickup-point order takes the point's address instead."
 
 msgid "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
 msgstr "Street number. Optional: without it, street must end in the number, which is split from it; a street with no number is refused with code street_number_missing on street."
-
-msgid "Street, street number, and city are required."
-msgstr "Street, street number, and city are required."
 
 msgid "Stripe"
 msgstr "Stripe"
@@ -14912,6 +14924,9 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 msgid "The link search is not valid."
 msgstr "The link search is not valid."
 
+msgid "The locker's BOX NOW id, exactly."
+msgstr "The locker's BOX NOW id, exactly."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 
@@ -15008,6 +15023,9 @@ msgstr "The payment provider's result for the failed call."
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "The payment this share is refunded against; none for gift cards and points."
+
+msgid "The pickup point cannot be checked right now. Try again in a moment."
+msgstr "The pickup point cannot be checked right now. Try again in a moment."
 
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
@@ -15186,9 +15204,6 @@ msgstr "The same value as ``reason``."
 
 msgid "The scheduled database backup failed with this error:"
 msgstr "The scheduled database backup failed with this error:"
-
-msgid "The selected locker is not in the delivery country."
-msgstr "The selected locker is not in the delivery country."
 
 msgid "The selected payment method cannot be paid with a card on this page."
 msgstr "The selected payment method cannot be paid with a card on this page."
@@ -15573,6 +15588,12 @@ msgstr "This payout is tied to a shipment; there is nothing to reconcile."
 
 msgid "This person is already on the team."
 msgstr "This person is already on the team."
+
+msgid "This pickup point is not available. Choose another one."
+msgstr "This pickup point is not available. Choose another one."
+
+msgid "This pickup point is not in the delivery country. Choose another one."
+msgstr "This pickup point is not in the delivery country. Choose another one."
 
 msgid "This product is already in the user's favorites."
 msgstr "This product is already in the user's favorites."
@@ -17005,6 +17026,9 @@ msgstr "What the store sells. Selects the recommendation preset the store starts
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 
+msgid "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+msgstr "What the street line does not hold: a flat, a floor, a building. Optional free text, printed under the street and given to the courier."
+
 msgid "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 msgstr "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
 
@@ -18309,6 +18333,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Cancel the BoxNow shipment for an order"
 
+#~ msgid "City name"
+#~ msgstr "City name"
+
 #~ msgid "Click the button below to retry your payment with a different card or method."
 #~ msgstr "Click the button below to retry your payment with a different card or method."
 
@@ -18868,6 +18895,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Street number"
 #~ msgstr "Street number"
 
+#~ msgid "Street, street number, and city are required."
+#~ msgstr "Street, street number, and city are required."
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
@@ -18898,6 +18928,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgstr ""
 #~ "Thank you for using %(site_name)s!\n"
 #~ "%(site_domain)s"
+
+#~ msgid "The selected locker is not in the delivery country."
+#~ msgstr "The selected locker is not in the delivery country."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

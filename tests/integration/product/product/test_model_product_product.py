@@ -449,7 +449,7 @@ class ProductQuerySetTestCase(TestCase):
 
     def test_empty_queryset_annotations(self):
         """Test annotations work on empty querysets"""
-        Product.objects.all().delete()
+        Product.objects.all().hard_delete()
 
         queryset = Product.objects.with_likes_count()
         self.assertEqual(queryset.count(), 0)

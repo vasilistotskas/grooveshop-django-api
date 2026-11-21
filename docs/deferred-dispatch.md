@@ -17,7 +17,7 @@ never reaches the caller:
 2. it is kept as a `tenant.DeferredDispatch` row in `public` (the task name,
    `args`, `kwargs`, headers including the schema, and the options), so it is
    not lost. If even the row cannot be written, the log line says what the work
-   was, with its secrets masked (`core.tasks.safe_task_arguments`, the same mask
+   was, with its secrets masked (`core.monitored_task.safe_task_arguments`, the same mask
    as a failed task's);
 3. `tenant.tasks.redispatch_deferred_tasks` (beat, every minute) publishes the
    rows again and deletes each once its task is out. A row that fails again

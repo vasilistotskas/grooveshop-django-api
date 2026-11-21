@@ -119,9 +119,7 @@ class TestFilters:
                 active=True,
                 num_reviews=0,
                 translations=[
-                    ProductTranslation(
-                        language_code="en", name=marker, description=""
-                    )
+                    ProductTranslation(language_code="en", name=marker)
                 ],
                 **kwargs,
             )

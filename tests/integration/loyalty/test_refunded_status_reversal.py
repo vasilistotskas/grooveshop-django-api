@@ -21,6 +21,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import order_refunded
 from product.factories import ProductFactory
@@ -136,7 +137,7 @@ def test_a_partial_refund_keeps_the_points(
         order.payment_status = PaymentStatus.PARTIALLY_REFUNDED
         order.save(update_fields=["payment_status"])
         order_refunded.send(
-            sender=OrderService,
+            sender=RefundService,
             order=order,
             amount=Money(Decimal("5.00"), "EUR"),
             refund=RefundTransactionFactory(
@@ -160,7 +161,7 @@ def test_the_refund_that_completes_the_order_reverses_the_points(
         order.payment_status = PaymentStatus.REFUNDED
         order.save(update_fields=["payment_status"])
         order_refunded.send(
-            sender=OrderService,
+            sender=RefundService,
             order=order,
             amount=Money(Decimal("95.00"), "EUR"),
             refund=RefundTransactionFactory(
@@ -182,11 +183,11 @@ def test_refund_then_status_move_reverses_exactly_once(
         patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        # What OrderService.refund_order does once the provider agrees.
+        # What RefundService.refund_order does once the provider agrees.
         order.payment_status = PaymentStatus.REFUNDED
         order.save(update_fields=["payment_status"])
         order_refunded.send(
-            sender=OrderService,
+            sender=RefundService,
             order=order,
             amount=Money(Decimal("100.00"), "EUR"),
             refund=RefundTransactionFactory(

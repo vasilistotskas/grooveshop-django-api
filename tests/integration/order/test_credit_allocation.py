@@ -35,7 +35,7 @@ from order.models import (
 )
 from order.models.refund_attempt import RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from tests.integration.order.test_mydata_lifecycle import (
     _credits,
     _eur,
@@ -78,8 +78,8 @@ class TestTheSplitIsFixedWhenClaimed:
 
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("30.00"))
-            OrderService.refund_order(order, amount=_eur("20.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("20.00"))
 
         first, second = order.refund_attempts.order_by("id")
         assert credit_allocation.allocation_of(refund_attempt=first) == {
@@ -117,7 +117,7 @@ class TestTheSplitIsFixedWhenClaimed:
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
             with pytest.raises(PaymentError, match="holds only"):
-                OrderService.refund_order(order, amount=_eur("100.00"))
+                RefundService.refund_order(order, amount=_eur("100.00"))
 
         assert api.calls == []
         assert not order.refund_attempts.exists()
@@ -138,8 +138,8 @@ class TestOrderIndependence:
             )
             # Both refunds are claimed (in flight) before either settles.
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur(amounts["A"]))
-                OrderService.refund_order(order, amount=_eur(amounts["B"]))
+                RefundService.refund_order(order, amount=_eur(amounts["A"]))
+                RefundService.refund_order(order, amount=_eur(amounts["B"]))
             for name in settled:
                 PaymentLedger.record_refund(
                     order,
@@ -170,7 +170,7 @@ class TestAClaimBeforeTheReceiptBookedAfter:
 
         with mydata_enabled(), FakeAade():
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur("30.00"))
+                RefundService.refund_order(order, amount=_eur("30.00"))
             [attempt] = order.refund_attempts.all()
             # Allocated against the order's lines: no receipt yet.
             assert credit_allocation.allocation_of(refund_attempt=attempt) == {
@@ -319,7 +319,7 @@ class TestTheBackfill:
         order = _mixed()
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
             create_pending_credits(order.id)
         CreditAllocation.objects.all().delete()
 
@@ -357,7 +357,7 @@ class TestTheBackfill:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur("30.00"))
+                RefundService.refund_order(order, amount=_eur("30.00"))
         [attempt] = order.refund_attempts.all()
         claimed = _rows(refund_attempt=attempt)
         CreditAllocation.objects.all().delete()
@@ -396,7 +396,7 @@ class TestAnAttemptStatesItsStatus:
             with FakeStripeRefunds(
                 fail_with=stripe.InvalidRequestError("no", "x")
             ):
-                OrderService.refund_order(order, amount=_eur("30.00"))
+                RefundService.refund_order(order, amount=_eur("30.00"))
         [attempt] = order.refund_attempts.all()
         assert attempt.status == RefundAttemptStatus.DECLINED
         assert credit_allocation.headroom_total(order) == Decimal("100.00")
@@ -450,7 +450,7 @@ class TestPointsOweNoCredit:
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             invoice = _receipt(order)
             assert invoice.total.amount == Decimal("90.00")
-            result = OrderService.refund_order(order)
+            result = RefundService.refund_order(order)
             create_pending_credits(order.id)
 
         # The card is paid back and the points are restored.
@@ -471,7 +471,7 @@ class TestPointsOweNoCredit:
 
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             _receipt(order)
-            result = OrderService.refund_order(order)
+            result = RefundService.refund_order(order)
             create_pending_credits(order.id)
 
         # 70 by card + 20 gift card + 10 points = the 100 of goods.
@@ -495,7 +495,7 @@ class TestPointsOweNoCredit:
             kind=RefundAttemptKind.STORED_VALUE,
             amount=_eur("10.00"),
         )
-        OrderService._return_stored_value(order, attempt, "points back")
+        RefundService._return_stored_value(order, attempt, "points back")
 
         # 10.00 of points are back; the 90.00 that was paid is still held.
         assert not fully_refunded_before_receipt(order)
@@ -641,7 +641,7 @@ class TestEveryWritePathAllocatesFirst:
             # 100.00 of the 140.00 claimed is the duplicate; the other 40.00
             # is the sale's, and the older refund must have its 60.00 of the
             # receipt first (it is allocated before the claim is judged).
-            OrderService.refund_order(order, amount=_eur("140.00"))
+            RefundService.refund_order(order, amount=_eur("140.00"))
 
         assert api.calls
         old = order.payment_transactions.get(provider_reference="re_old")
@@ -684,7 +684,7 @@ class TestALinkedBookedRefundKeepsOneAllocation:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur("30.00"))
+                RefundService.refund_order(order, amount=_eur("30.00"))
             [attempt] = order.refund_attempts.all()
             # The provider's webhook books 29.00 (not the claimed 30.00):
             # it matches no attempt and is allocated as unclaimed money.
@@ -725,8 +725,8 @@ class TestSmallCentsDoNotDependOnTheSettlementOrder:
                 kind=PaymentTransactionKind.CHARGE
             )
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur(amounts["A"]))
-                OrderService.refund_order(order, amount=_eur(amounts["B"]))
+                RefundService.refund_order(order, amount=_eur(amounts["A"]))
+                RefundService.refund_order(order, amount=_eur(amounts["B"]))
             for name in settled:
                 PaymentLedger.record_refund(
                     order,
@@ -772,8 +772,8 @@ class TestADuplicatePaymentOwesNoCredit:
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             _receipt(order)
             _duplicate_payment(order)
-            first = OrderService.refund_order(order, amount=_eur("100.00"))
-            second = OrderService.refund_order(order, amount=_eur("100.00"))
+            first = RefundService.refund_order(order, amount=_eur("100.00"))
+            second = RefundService.refund_order(order, amount=_eur("100.00"))
             create_pending_credits(order.id)
 
         assert first.complete
@@ -829,8 +829,8 @@ class TestASettledAttemptWithoutItsRefundHoldsNothing:
             )
             for _ in range(2)
         )
-        OrderService._allocate_claim(order, [first])
-        OrderService._allocate_claim(order, [second])
+        RefundService._allocate_claim(order, [first])
+        RefundService._allocate_claim(order, [second])
         assert credit_allocation.headroom_total(order) == Decimal("40.00")
         row, _ = PaymentLedger.record_refund(
             order,
@@ -1005,7 +1005,7 @@ class TestRoomHeldByAClaimInFlightIsOnlyTemporary:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-                OrderService.refund_order(order, amount=_eur("100.00"))
+                RefundService.refund_order(order, amount=_eur("100.00"))
             [claim] = order.refund_attempts.all()
             late, _ = PaymentLedger.record_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
@@ -1075,7 +1075,7 @@ class TestTheExcessIsReadAtTheSourcesOwnMoment:
 def _pending_claim(order, amount):
     """A refund claim whose outcome is unknown: it stays PENDING."""
     with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
-        OrderService.refund_order(order, amount=_eur(amount))
+        RefundService.refund_order(order, amount=_eur(amount))
     return order.refund_attempts.get(amount=amount)
 
 
@@ -1217,7 +1217,7 @@ class TestOneRuleForUndecided:
             calls = len(api.calls)
 
             with pytest.raises(PaymentError, match="waiting for"):
-                OrderService.refund_order(order, amount=_eur("5.00"))
+                RefundService.refund_order(order, amount=_eur("5.00"))
 
         assert len(api.calls) == calls
 
@@ -1641,7 +1641,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
                     reference="re_80",
                 )
                 api.fail_with = stripe.APIConnectionError("x")
-                OrderService.refund_order(order, amount=_eur("5.00"))
+                RefundService.refund_order(order, amount=_eur("5.00"))
                 api.fail_with = None
                 claim = RefundAttempt.objects.live().get(order=order)
                 dup, _ = PaymentLedger.record_charge(
@@ -1660,7 +1660,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
                     reference="re_80",
                 )
                 order.refresh_from_db()
-                OrderService.book_share(
+                RefundService.book_share(
                     order, claim, claim.amount, "re_c", claim.reason
                 )
                 allocate_credit_sources()
@@ -1784,7 +1784,7 @@ class TestAWaitIsOnlyForWhatChangesTheOutcome:
             _duplicate_payment(order)
             _pending_claim(order, "10.00")
             with FakeStripeRefunds():
-                OrderService.refund_order(order, amount=_eur("5.00"))
+                RefundService.refund_order(order, amount=_eur("5.00"))
 
         assert order.refund_attempts.filter(amount="5.00").exists()
 
@@ -1798,7 +1798,7 @@ class TestAWaitIsOnlyForWhatChangesTheOutcome:
                 FakeStripeRefunds(),
                 pytest.raises(PaymentError, match="waiting for"),
             ):
-                OrderService.refund_order(order, amount=_eur("70.00"))
+                RefundService.refund_order(order, amount=_eur("70.00"))
 
 
 class TestEachKindOfDifferenceIsAcknowledgedOnItsOwn:
@@ -1850,7 +1850,7 @@ def _legacy_gift_return(order):
         kind=RefundAttemptKind.STORED_VALUE,
         amount=_eur("30.00"),
     )
-    OrderService._return_stored_value(order, attempt, "old release")
+    RefundService._return_stored_value(order, attempt, "old release")
     CreditAllocation.objects.filter(refund_attempt=attempt).delete()
     return attempt
 
@@ -1911,7 +1911,7 @@ class TestAClaimDeclinedWhileTheProviderWasAsked:
         _decline(claim)
 
         with mydata_enabled(), FakeAade():
-            OrderService.book_share(
+            RefundService.book_share(
                 order, stale, _eur("30.00"), "re_late", "late answer"
             )
 

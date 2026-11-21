@@ -218,7 +218,9 @@ covers what you are changing. Models under `src/order/models/`: `Order`,
 and `VivaWebhookEvent`.
 
 Entry points: `src/order/services.py` (creation, the state machine,
-cancel, refund), `src/order/checkout/quote.py` (`OrderQuoteService`: the
+cancel), `src/order/refunds/service.py` (`RefundService`: claiming,
+allocating, making, booking and declining a refund),
+`src/order/checkout/quote.py` (`OrderQuoteService`: the
 checkout quote, which is the one total, the free-shipping basis, the
 shipping price and the pay-way fee),
 `src/order/inventory/stock.py` (`StockManager`),

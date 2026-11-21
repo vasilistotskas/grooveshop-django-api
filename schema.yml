@@ -41328,7 +41328,6 @@ components:
           format: email
           readOnly: true
           nullable: true
-          title: Email παραλήπτη
         recipientName:
           type: string
           readOnly: true

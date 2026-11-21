@@ -180,10 +180,8 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
         ),
         verbose_name=_("Issued To"),
     )
-    # NULL, not "": a card issued with no recipient (in the admin, to an
-    # account) has no address, and the API serves it as null.
     recipient_email = models.EmailField(
-        _("Recipient Email"), blank=True, null=True
+        _("Recipient Email"), blank=True, default=""
     )
     recipient_name = models.CharField(
         _("Recipient Name"), max_length=255, blank=True, default=""

@@ -93,7 +93,7 @@ def test_promotion_and_giftcard_addresses_are_scrubbed(subject):
     anonymise_and_delete_user(subject)
 
     card.refresh_from_db()
-    assert card.recipient_email is None
+    assert card.recipient_email == ""
     assert subject.email not in card.recipient_name
     # The instrument itself survives — erasing a holder must not destroy
     # the stored value.

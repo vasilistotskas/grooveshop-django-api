@@ -209,21 +209,23 @@ outside a task.
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
 
-A task whose effect is a state of a row needs no id: it claims the state (a
-compare-and-set, a unique row), which also covers two dispatches of it from
-different paths. A dispatch made inside a task (a chain's next link) is a
+A task whose effect is a state of a row needs no id, and its state also covers
+two dispatches of it from different paths. When the effect is the row's own
+state, the task claims it (a compare-and-set, a unique row). When the state
+records a call to another service (a mail), the task reads the row, calls and
+marks it under an advisory lock on the row (`core.db.locks.held_across_calls`)
+instead: a mark set before the call would lose the call with a worker that
+dies mid-call, and the lock goes with that worker's session, so the run after
+it calls again. A dispatch made inside a task (a chain's next link) is a
 dispatch of its own, with an id of its own.
 
-- **A product alert** (`product.tasks._notify_alerts`) is claimed before its
-  mail: `is_active` off and `notified_at` set by an update on the row still
-  armed, so a second run (another stock or price update) skips every alert the
-  first one took. An alert claimed to find its type switched off is armed again.
+- **A product alert** (`product.tasks._notify_alerts`) is read, mailed and
+  marked (`is_active` off, `notified_at` set) under a lock on the alert, so a
+  second run (another stock or price update) waits and finds it marked. A type
+  that is switched off leaves every alert armed.
 - **A gift card's delivery** (`giftcard.tasks.deliver_gift_card_email`), queued
   by the purchase, the admin's resend and the daily sweep, reads
-  `delivered_at` and sends under an advisory lock on the card
-  (`core.db.locks.held_across_calls`). A claim set before the send would lose
-  the card's mail with a worker that dies mid-send; the lock goes with that
-  worker's session, and the run after it sends the card.
+  `delivered_at` and sends under a lock on the card.
 
 ## One sweep at a time
 

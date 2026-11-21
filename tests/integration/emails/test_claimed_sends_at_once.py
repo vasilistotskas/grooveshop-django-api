@@ -11,10 +11,9 @@ first run mid-send.
 
 from __future__ import annotations
 
-import time
-
 import pytest
 from django.core import mail
+from django.db import connection
 
 from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
@@ -44,13 +43,6 @@ def run_in_the_store(tenant, task, args, task_id, failures):
         task.apply(args, task_id=task_id, throw=True)
 
     return in_thread(run, failures)
-
-
-def eventually(condition) -> None:
-    deadline = time.monotonic() + WAIT
-    while not condition():
-        assert time.monotonic() < deadline, "the condition never held"
-        time.sleep(0.05)
 
 
 def test_two_deliveries_of_one_card_at_once_mail_it_once(tenant):
@@ -92,12 +84,12 @@ def test_two_restock_runs_at_once_mail_each_alert_once(tenant):
             tenant, send_product_alert_restock, [product.id], "one", failures
         )
         assert transport.sending.wait(WAIT)
-        # The first run holds its first alert's send; the second skips that
-        # alert and sends the other.
+        # The first run holds its first alert's send; the second waits on
+        # that alert's lock, then finds it marked.
         second = run_in_the_store(
             tenant, send_product_alert_restock, [product.id], "two", failures
         )
-        eventually(lambda: len(transport.calls) == 2)
+        wait_for_a_blocked_backend(WAIT)
 
         transport.release.set()
         first.finish(WAIT)
@@ -109,3 +101,42 @@ def test_two_restock_runs_at_once_mail_each_alert_once(tenant):
         "two@example.test",
     ]
     assert not ProductAlert.objects.filter(is_active=True).exists()
+
+
+def test_an_alert_whose_worker_died_mid_send_is_mailed_by_the_next_copy(
+    tenant,
+):
+    """The run's worker is lost while it sends: its message is delivered
+    again under the same task id. The alert was not marked, and the lock
+    went with the dead session, so the copy that waited mails it, under the
+    same delivery id."""
+    product = ProductFactory(stock=5, num_images=0, num_reviews=0)
+    alert = ProductAlert.objects.create(
+        kind=ProductAlertKind.RESTOCK, product=product, email="one@example.test"
+    )
+    transport = HeldTransport(WAIT)
+    died: list[BaseException] = []
+    failures: list[BaseException] = []
+
+    with transport.patched():
+        first = run_in_the_store(
+            tenant, send_product_alert_restock, [product.id], "one", died
+        )
+        assert transport.sending.wait(WAIT)
+        again = run_in_the_store(
+            tenant, send_product_alert_restock, [product.id], "one", failures
+        )
+        wait_for_a_blocked_backend(WAIT)
+
+        [dead] = transport.calls
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_terminate_backend(%s)", [dead])
+        transport.release.set()
+        first.finish(WAIT)
+        again.finish(WAIT)
+
+    assert not failures, failures
+    assert len(transport.calls) == 2
+    alert.refresh_from_db()
+    assert alert.is_active is False
+    assert alert.notified_at is not None

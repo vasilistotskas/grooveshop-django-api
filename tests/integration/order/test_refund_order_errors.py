@@ -1,5 +1,6 @@
 """Refusal and failure branches of ``RefundService.refund_order`` and the
-refund leg of ``OrderService.cancel_order`` (``src/order/services.py``).
+refund leg of ``OrderLifecycleService.cancel_order``
+(``src/order/refunds/service.py``, ``src/order/lifecycle/service.py``).
 
 The happy paths are covered in ``test_service_order.py`` and
 ``test_partial_refunds.py``; this module pins what happens when a refund
@@ -22,9 +23,9 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
 from order.refunds.service import RefundService
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from user.factories.account import UserAccountFactory
 
@@ -225,7 +226,7 @@ class TestCancelOrderWhenTheRefundFails:
                 False,
                 {"error": "stripe said: insufficient balance acct_123"},
             )
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind", refund_payment=True
             )
 
@@ -252,7 +253,7 @@ class TestCancelOrderWhenTheRefundFails:
             get_provider.return_value.refund_payment.side_effect = RuntimeError(
                 "stripe timeout"
             )
-            _canceled, refund_info = OrderService.cancel_order(
+            _canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="", refund_payment=True
             )
 
@@ -283,7 +284,7 @@ class TestCancelOrderWhenTheRefundFails:
                 (True, {"refund_id": "re_1", "amount": "50.00"}),
                 (False, {"error": "stripe said: declined acct_123"}),
             ]
-            _canceled, refund_info = OrderService.cancel_order(
+            _canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind", refund_payment=True
             )
 
@@ -301,7 +302,7 @@ class TestCancelOrderWhenTheRefundFails:
         with patch(
             "order.payments.payment.get_payment_provider"
         ) as get_provider:
-            _canceled, refund_info = OrderService.cancel_order(
+            _canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, refund_payment=False
             )
 

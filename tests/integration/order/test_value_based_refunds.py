@@ -22,10 +22,10 @@ from loyalty.models.transaction import PointsTransaction
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
 from order.refunds.service import RefundService
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
 
@@ -402,7 +402,7 @@ class TestACancelAndARefundShareOneRedemption:
         order, [card] = _order(status=OrderStatus.PROCESSING)
 
         with FakeStripeRefunds():
-            OrderService.cancel_order(order, customer_initiated=False)
+            OrderLifecycleService.cancel_order(order, customer_initiated=False)
 
         assert _credited(order) == Decimal("60.00")
         assert card.balance == _eur("60.00")
@@ -417,11 +417,13 @@ class TestClosingAsRefunded:
             RefundService.refund_order(order, amount=_eur("40.00"))
 
         with pytest.raises(RefundOutstandingError):
-            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.REFUNDED
+            )
 
         with FakeStripeRefunds():
             RefundService.refund_order(order, amount=_eur("60.00"))
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.REFUNDED)
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
 

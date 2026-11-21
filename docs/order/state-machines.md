@@ -5,7 +5,7 @@ and says which file holds each § number used here.
 
 ## 2. State machines
 
-### 2.1 OrderStatus transitions (the `allowed_transitions` map in `OrderService.update_order_status`)
+### 2.1 OrderStatus transitions (`ALLOWED_TRANSITIONS` in `src/order/lifecycle/service.py`, read by `OrderLifecycleService.update_order_status`)
 
 ```
 PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
@@ -16,11 +16,11 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
    └──► CANCELED               (cancel_order only)
 ```
 
-- `OrderService.update_order_status(order, new_status)` validates
+- `OrderLifecycleService.update_order_status(order, new_status)` validates
   every transition against this table.
 - **CANCELED is not in the table.** A cancel releases stock, settles or refunds
   the payment and records `metadata['cancellation']`, so the only way into
-  CANCELED is `OrderService.cancel_order` ([§7.1](cancel.md)).
+  CANCELED is `OrderLifecycleService.cancel_order` ([§7.1](cancel.md)).
   `update_order_status(order, CANCELED)` raises `InvalidStatusTransitionError`
   for every caller, and the staff endpoint
   `POST /api/v1/order/{id}/update_status` answers it with 400
@@ -49,7 +49,7 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     (`_apply_order_status_transition` in both services).
   - `SHIPPED → DELIVERED` from carrier events.
   - `DELIVERED → COMPLETED` for paid orders
-    (`OrderService.maybe_advance_to_completed`), applied inline by the carrier
+    (`OrderLifecycleService.maybe_advance_to_completed`), applied inline by the carrier
     poll and the COD reconcile and swept hourly by
     `order.tasks.complete_paid_delivered_orders` for everything that lands
     outside those two moments (a payment entered by hand, a webhook after
@@ -64,7 +64,7 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     a Smartpoint (prod order 284).
   - A CANCELED shipment state (only ever produced by the admin retire action or
     a voucher cancel, never by tracking) routes the order through
-    `OrderService.cancel_order` (`OrderService.cancel_for_dead_shipment`,
+    `OrderLifecycleService.cancel_order` (`OrderLifecycleService.cancel_for_dead_shipment`,
     `refund_payment=False`: a paid order logs a WARNING, shows in "Canceled
     orders to refund" (`OrderQuerySet.refund_owed`) and staff refund it) —
     stock back, payment settled, cancellation recorded — never a bare status

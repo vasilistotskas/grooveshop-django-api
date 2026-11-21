@@ -13,6 +13,7 @@ from order.exceptions import OrderCancellationError, PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.inventory.stock import StockManager
+from order.lifecycle.service import OrderLifecycleService
 from order.refunds.service import RefundResult, RefundService
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -32,12 +33,14 @@ class OrderServiceTestCase(TestCase):
     def test_get_order_by_id(self):
         order = OrderFactory(num_order_items=0)
 
-        self.assertEqual(OrderService.get_order_by_id(order.id).id, order.id)
+        self.assertEqual(
+            OrderLifecycleService.get_order_by_id(order.id).id, order.id
+        )
 
     def test_get_order_by_uuid(self):
         order = OrderFactory(num_order_items=0)
 
-        result = OrderService.get_order_by_uuid(str(order.uuid))
+        result = OrderLifecycleService.get_order_by_uuid(str(order.uuid))
 
         self.assertEqual(result.id, order.id)
 
@@ -48,7 +51,7 @@ class OrderServiceTestCase(TestCase):
             user=UserAccountFactory(num_addresses=0), num_order_items=0
         )
 
-        result = OrderService.get_user_orders(user.id)
+        result = OrderLifecycleService.get_user_orders(user.id)
 
         self.assertEqual({o.id for o in result}, {o.id for o in own})
 
@@ -68,7 +71,7 @@ class OrderServiceTestCase(TestCase):
             reason="test: order created",
         )
 
-        canceled_order, refund_info = OrderService.cancel_order(
+        canceled_order, refund_info = OrderLifecycleService.cancel_order(
             order=order, reason="Test cancellation", refund_payment=False
         )
 
@@ -94,7 +97,7 @@ class OrderServiceTestCase(TestCase):
             mock_refund.return_value = RefundResult(
                 refunded=_eur("100.00"), refund_ids=("refund_123",)
             )
-            canceled_order, refund_info = OrderService.cancel_order(
+            canceled_order, refund_info = OrderLifecycleService.cancel_order(
                 order=order, reason="Customer requested", refund_payment=True
             )
 
@@ -267,7 +270,7 @@ def test_cancel_order_refuses_an_order_past_processing(status):
     order = OrderFactory(status=status, num_order_items=0)
 
     with pytest.raises(OrderCancellationError, match="cannot be canceled"):
-        OrderService.cancel_order(order=order, refund_payment=False)
+        OrderLifecycleService.cancel_order(order=order, refund_payment=False)
 
     order.refresh_from_db()
     assert order.status == status

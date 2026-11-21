@@ -23,11 +23,11 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
 from order.refunds.service import RefundService
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
 from tests.utils.viva import CANCEL_SUCCESS, FakeVivaApi
@@ -105,7 +105,7 @@ class TestNoTransactionIsOpenWhileTheProviderAnswers:
         order = _order(status=OrderStatus.PROCESSING)
 
         with _TransactionWatchingStripe() as stripe_api:
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind", customer_initiated=False
             )
 
@@ -121,7 +121,7 @@ class TestNoTransactionIsOpenWhileTheProviderAnswers:
         order = _order(status=OrderStatus.PROCESSING)
 
         with FakeStripeRefunds(status="failed"):
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind", customer_initiated=False
             )
 

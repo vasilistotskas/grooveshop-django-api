@@ -141,7 +141,7 @@ def hold_receipt_for_cancel(order: Order) -> bool:
     was set aside.
 
     Called by the one path that cancels an order
-    (``OrderService._cancel_order_locked``), in its transaction and under
+    (``OrderLifecycleService._cancel_order_locked``), in its transaction and under
     its lock on the order row, the lock every credit is created under: no
     credit can be created between the cancel and the hold. The receipt's
     email reads the hold when it runs (``Invoice.is_deliverable``).

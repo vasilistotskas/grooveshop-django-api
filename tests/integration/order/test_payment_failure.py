@@ -40,7 +40,7 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
     The terminal release path is ``order.tasks.auto_cancel_stuck_pending_
     orders``, which cancels PENDING orders whose payment has been FAILED
     for longer than ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` (default
-    30 minutes) via ``OrderService.cancel_order`` — see
+    30 minutes) via ``OrderLifecycleService.cancel_order`` — see
     ``TestAutoCancelReleasesStockAfterGracePeriod`` below.
     """
 
@@ -258,7 +258,7 @@ class TestAutoCancelReleasesStockAfterGracePeriod:
     failed-payment order's stock gets released. It cancels PENDING
     orders whose payment has been FAILED for longer than
     ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` (default 30 minutes) via
-    ``OrderService.cancel_order``, which restores stock through
+    ``OrderLifecycleService.cancel_order``, which restores stock through
     ``StockManager.increment_stock`` on each order item and releases any
     reservation still linked via ``metadata['stock_reservation_ids']``.
     """

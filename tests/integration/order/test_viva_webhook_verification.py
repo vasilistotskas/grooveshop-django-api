@@ -25,10 +25,10 @@ from djmoney.money import Money
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.refunds.service import RefundService
-from order.services import OrderService
 from order.signals import order_refunded
 from order.views.viva_webhook import (
     _handle_payment_created,
@@ -311,7 +311,7 @@ class TestVivaReversalWebhook:
         )
 
         with viva:
-            OrderService.cancel_order(order, reason="changed mind")
+            OrderLifecycleService.cancel_order(order, reason="changed mind")
             assert len(refunded_signals) == 1
             _deliver(refund_id=in_app_refund)
 

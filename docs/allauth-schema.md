@@ -55,7 +55,7 @@ added. Every operation may also answer 503 `UnavailableResponse`
 (`temporarily_unavailable`): with Redis unreachable a security control (a rate
 limit, TOTP replay protection) refuses the call rather than lift itself
 (`src/core/middleware/strict_cache.py`, the rule beside `STRICT_KEY_PREFIXES`
-in `src/core/caches.py`). The contract test also
+in `src/core/cache_backend.py`). The contract test also
 fails on any key an endpoint serves that the document does not declare.
 
 A new correction is a hook on the adapter where allauth offers one, otherwise

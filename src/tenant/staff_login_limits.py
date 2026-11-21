@@ -58,7 +58,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpRequest
 
-from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE
+from core.cache_backend import REDIS_UNAVAILABLE, STRICT_NAMESPACE
 from core.client_ip import edge_client_ip
 from tenant.cache import GLOBAL_CACHE_PREFIX
 

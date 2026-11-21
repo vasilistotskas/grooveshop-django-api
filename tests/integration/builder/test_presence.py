@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from builder.presence import _who_key
 from tenant.enum import TenantMembershipRole
 from tests.integration.builder.conftest import api_as
 from tests.utils.staff import store_staff
@@ -83,12 +82,19 @@ class TestHeartbeat:
         assert again == first
 
     def test_a_person_lapses_after_the_ttl(self, maria, nikos, settings):
-        settings.BUILDER_PRESENCE_TTL_SECONDS = 1
         a, b = api_as(maria), api_as(nikos)
         beat(a, HOME)
         assert len(beat(b, HOME).json()["documents"][HOME]) == 1
 
-        time.sleep(1.5)
+        # The heartbeat writes the record with the configured TTL ...
+        key = cache.make_and_validate_key(_who_key(HOME, maria.pk))
+        ttl = cache._cache.get_client(key).ttl(key)
+        assert 0 < ttl <= settings.BUILDER_PRESENCE_TTL_SECONDS
+
+        # ... and once it runs out, she is gone. Forced here, not waited
+        # for: a one-second TTL and a sleep failed on a busy runner, where
+        # the two heartbeats above took longer than the TTL itself.
+        cache.touch(_who_key(HOME, maria.pk), 0)
 
         assert beat(b, HOME).json()["documents"][HOME] == []
 

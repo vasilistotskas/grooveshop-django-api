@@ -76,7 +76,7 @@ def test_of_many_concurrent_spends_exactly_one_wins():
 
 
 def test_every_ticket_key_is_under_the_namespace_that_never_fails_open():
-    from core.caches import STRICT_NAMESPACE, _is_strict
+    from core.cache_backend import STRICT_NAMESPACE, _is_strict
 
     for purpose in tickets.PURPOSES:
         assert _is_strict(tickets._key(purpose, "t"))

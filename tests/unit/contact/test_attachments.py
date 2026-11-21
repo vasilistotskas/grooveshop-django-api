@@ -15,7 +15,7 @@ from extra_settings.models import Setting
 
 from contact.attachments import (
     AttachmentPolicy,
-    sanitize_filename,
+    display_filename,
     sniff_content_type,
     validate_attachment_types_setting,
 )
@@ -154,7 +154,7 @@ class TestSanitizeFilename:
         ],
     )
     def test_hygiene(self, given, expected):
-        assert sanitize_filename(given) == expected
+        assert display_filename(given) == expected
 
     def test_length_is_bounded(self):
-        assert len(sanitize_filename("a" * 5000)) == 255
+        assert len(display_filename("a" * 5000)) == 255

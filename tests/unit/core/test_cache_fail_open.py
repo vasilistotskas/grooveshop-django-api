@@ -23,17 +23,17 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from core import caches
-from core.caches import CustomCache
+from core import cache_backend
+from core.cache_backend import CustomCache
 from tests.utils.redis import stopped_cache
 
 
 @pytest.fixture(autouse=True)
 def _fresh_burst_window(monkeypatch):
     monkeypatch.setattr(
-        caches,
+        cache_backend,
         "_burst_warning",
-        caches.BurstLogger(caches._burst_warning._message),
+        cache_backend.BurstLogger(cache_backend._burst_warning._message),
     )
 
 
@@ -174,7 +174,7 @@ class TestOnlyUnavailabilityIsAbsorbed:
 
 class TestOneWarningPerBurst:
     def test_a_burst_logs_once(self, stopped, caplog):
-        with caplog.at_level(logging.WARNING, logger="core.caches"):
+        with caplog.at_level(logging.WARNING, logger="core.cache_backend"):
             for _ in range(5):
                 stopped.get("k")
                 stopped.set("k", "v")
@@ -188,14 +188,16 @@ class TestOneWarningPerBurst:
         self, stopped, caplog
     ):
         clock = iter([1000.0, 1001.0, 1002.0, 1100.0])
-        # Replace only the module's ``time`` name: ``core.caches.time`` is
+        # Replace only the module's ``time`` name: ``core.cache_backend.time`` is
         # the global module, and patching its ``monotonic`` also feeds this
         # clock to redis-py's own timing, which then exhausts it.
         with (
             patch.object(
-                caches, "time", SimpleNamespace(monotonic=lambda: next(clock))
+                cache_backend,
+                "time",
+                SimpleNamespace(monotonic=lambda: next(clock)),
             ),
-            caplog.at_level(logging.WARNING, logger="core.caches"),
+            caplog.at_level(logging.WARNING, logger="core.cache_backend"),
         ):
             for _ in range(4):
                 stopped.get("k")

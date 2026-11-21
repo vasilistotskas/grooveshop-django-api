@@ -10,7 +10,7 @@ from rest_framework import serializers
 from contact.attachments import (
     CLAIM_WINDOW_HOURS,
     AttachmentPolicy,
-    sanitize_filename,
+    display_filename,
     sniff_content_type,
 )
 from contact.models import Contact, ContactAttachment, Feedback
@@ -125,7 +125,7 @@ class ContactAttachmentSerializer(
 
         checksum, size = _digest(upload, ceiling=policy.max_bytes)
         attachment = ContactAttachment(
-            original_name=sanitize_filename(upload.name),
+            original_name=display_filename(upload.name),
             content_type=self._sniffed_type,
             size=size,
             checksum=checksum,

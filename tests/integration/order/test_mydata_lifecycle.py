@@ -40,6 +40,7 @@ from order.factories.item import OrderItemFactory
 from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_refund_made
 from order.tasks import generate_order_invoice, send_invoice_to_mydata
@@ -284,7 +285,7 @@ class TestReceiptIssuedWhenTheOrderShips:
             OrderService.update_order_status(order, OrderStatus.DELIVERED)
             OrderService.update_order_status(order, OrderStatus.COMPLETED)
             generate_order_invoice(order.id)
-            OrderService.refund_order(order, amount=_eur("10.00"))
+            RefundService.refund_order(order, amount=_eur("10.00"))
 
         assert aade.sent == []
         assert not Invoice.objects.exists()
@@ -316,7 +317,7 @@ class TestCreditForEveryRefundSource:
     def test_the_in_app_refund(self):
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             order = self._shipped()
-            OrderService.refund_order(order, reason="return")
+            RefundService.refund_order(order, reason="return")
 
         self._assert_one_credit(order, aade, "100.00")
 
@@ -413,11 +414,11 @@ class TestPartialCredits:
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             invoice = _receipt(order)
             for amount in refunds[:2]:
-                OrderService.refund_order(order, amount=_eur(amount))
+                RefundService.refund_order(order, amount=_eur(amount))
             # Two partial credits, together below the receipt.
             assert sum(c.gross for c in aade.credits) == Decimal("50.01")
             assert sum(c.gross for c in aade.credits) < invoice.total.amount
-            OrderService.refund_order(order, amount=_eur(refunds[2]))
+            RefundService.refund_order(order, amount=_eur(refunds[2]))
 
         assert [c.gross for c in aade.credits] == [Decimal(a) for a in refunds]
         for credit in aade.credits:
@@ -507,7 +508,7 @@ class TestNoCreditWithoutAReceipt:
     def test_a_refund_before_the_receipt_needs_no_document(self):
         order = _order(lines=(("24", "100.00"),))
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
-            OrderService.refund_order(order, amount=_eur("10.00"))
+            RefundService.refund_order(order, amount=_eur("10.00"))
             _receipt(order)
             create_pending_credits(order.id)
 
@@ -521,7 +522,7 @@ class TestNoCreditWithoutAReceipt:
             _mark_shipped(order)
             # The receipt row exists; AADE has not registered it yet.
             generate_invoice(order)
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
             assert aade.sent == []
             assert not RetailCredit.objects.exists()
 
@@ -538,7 +539,7 @@ class TestNoCreditWithoutAReceipt:
         order = _order(lines=(("24", "100.00"),))
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
             assert create_pending_credits(order.id) == []
             assert create_pending_credits(order.id) == []
 
@@ -588,7 +589,7 @@ class TestOrderClosedWithoutASale:
         )
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             invoice = _receipt(order)
-            OrderService.refund_order(order, reason="return")
+            RefundService.refund_order(order, reason="return")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
@@ -610,7 +611,7 @@ class TestOrderClosedWithoutASale:
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             invoice = _receipt(order)
             OrderService.update_order_status(order, OrderStatus.RETURNED)
-            OrderService.refund_order(order, reason="returned")
+            RefundService.refund_order(order, reason="returned")
 
         assert sum(c.gross for c in aade.credits) == invoice.total.amount
         assert all(c.correlated is None for c in aade.credits)
@@ -628,7 +629,7 @@ class TestDocuments:
 
         with mydata_enabled(), FakeAade(), FakeStripeRefunds():
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
             credit = _credits(order).get()
             with patch(
                 "order.accounting.invoicing._render_pdf_bytes",
@@ -759,7 +760,7 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
             yield
 
     def _refund(self, order, amount=None):
-        OrderService.refund_order(
+        RefundService.refund_order(
             order, amount=_eur(amount) if amount else None
         )
 
@@ -954,10 +955,10 @@ class TestTheReceiptRowIsTheCutOff:
 
     def test_a_refund_after_a_failed_render_is_credited_not_netted(self):
         order = _order(lines=(("24", "100.00"),))
-        OrderService.refund_order(order, amount=_eur("30.00"))
+        RefundService.refund_order(order, amount=_eur("30.00"))
         invoice = self._failed_render(order)
         assert invoice.total == _eur("70.00")
-        OrderService.refund_order(order, amount=_eur("20.00"))
+        RefundService.refund_order(order, amount=_eur("20.00"))
 
         with mydata_enabled(), FakeAade() as aade:
             generate_invoice(order)
@@ -973,11 +974,11 @@ class TestTheReceiptRowIsTheCutOff:
 
     def test_force_on_an_unregistered_row_behaves_the_same(self):
         order = _order(lines=(("24", "100.00"),))
-        OrderService.refund_order(order, amount=_eur("30.00"))
+        RefundService.refund_order(order, amount=_eur("30.00"))
         with mydata_enabled(), FakeAade():
             _mark_shipped(order)
             generate_invoice(order)
-            OrderService.refund_order(order, amount=_eur("20.00"))
+            RefundService.refund_order(order, amount=_eur("20.00"))
 
             invoice = generate_invoice(order, force=True)
 
@@ -992,7 +993,7 @@ class TestTheReceiptRowIsTheCutOff:
 
         order = _order(lines=(("24", "100.00"),))
         invoice = self._failed_render(order)
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
         # The row is later than the refund (an older release's row).
         Invoice.objects.filter(pk=invoice.pk).update(
             created_at=invoice.created_at + timedelta(days=1)
@@ -1009,7 +1010,7 @@ class TestTheReceiptRowIsTheCutOff:
     def test_a_refund_after_the_row_never_triggers_the_guard(self):
         order = _order(lines=(("24", "100.00"),))
         self._failed_render(order)
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
 
         with mydata_enabled(), FakeAade() as aade:
             generate_invoice(order)
@@ -1023,7 +1024,7 @@ class TestTheReceiptRowIsTheCutOff:
         order = _order(lines=(("24", "100.00"),))
         with mydata_enabled(), FakeAade():
             invoice = _receipt(order)
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
             assert generate_invoice(order, force=True).total == _eur("100.00")
         assert invoice.mydata_mark
@@ -1075,7 +1076,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
         order = self._gift_card_order(card="0.00", gift="100.00")
         with mydata_enabled(), FakeAade() as aade:
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         [credit] = _credits(order)
         assert credit.total == _eur("40.00")
@@ -1087,7 +1088,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
         order = self._gift_card_order()
         with mydata_enabled(), FakeAade() as aade:
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("75.00"))
+            RefundService.refund_order(order, amount=_eur("75.00"))
 
         issued = list(_credits(order))
         assert sum((c.total.amount for c in issued), Decimal(0)) == Decimal(
@@ -1105,7 +1106,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
 
     def test_a_return_before_the_receipt_makes_no_credit(self):
         order = self._gift_card_order()
-        OrderService.refund_order(order, amount=_eur("75.00"))
+        RefundService.refund_order(order, amount=_eur("75.00"))
 
         with mydata_enabled(), FakeAade() as aade:
             invoice = _receipt(order)
@@ -1119,8 +1120,8 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
         order = self._gift_card_order()
         with mydata_enabled(), FakeAade() as aade:
             invoice = _receipt(order)
-            OrderService.refund_order(order, amount=_eur("60.00"))
-            OrderService.refund_order(order)
+            RefundService.refund_order(order, amount=_eur("60.00"))
+            RefundService.refund_order(order)
             create_pending_credits(order.id)
 
         total = sum((c.total.amount for c in _credits(order)), Decimal(0))
@@ -1131,7 +1132,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
         order = self._gift_card_order(card="0.00", gift="100.00")
         with mydata_enabled(), FakeAade() as aade:
             _receipt(order)
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
             create_pending_credits(order.id)
             create_pending_credits(order.id)
 
@@ -1142,7 +1143,7 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
         """Value returned before the receipt row existed was netted; its
         attempt must not be credited by a later reconciliation."""
         order = self._gift_card_order()
-        OrderService.refund_order(order, amount=_eur("75.00"))
+        RefundService.refund_order(order, amount=_eur("75.00"))
         with mydata_enabled(), FakeAade():
             _receipt(order)
             create_pending_credits(order.id)

@@ -1,4 +1,4 @@
-"""Refusal and failure branches of ``OrderService.refund_order`` and the
+"""Refusal and failure branches of ``RefundService.refund_order`` and the
 refund leg of ``OrderService.cancel_order`` (``src/order/services.py``).
 
 The happy paths are covered in ``test_service_order.py`` and
@@ -23,6 +23,7 @@ from order.exceptions import PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.models.order import Order
+from order.refunds.service import RefundService
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from user.factories.account import UserAccountFactory
@@ -65,7 +66,7 @@ class TestRefundOrderRefusals:
             "order.payments.payment.get_payment_provider"
         ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, amount=Money(Decimal("50.01"), "EUR")
                 )
 
@@ -87,7 +88,7 @@ class TestRefundOrderRefusals:
                 True,
                 {"refund_id": "re_1", "amount": "50.00"},
             )
-            result = OrderService.refund_order(order, amount=amount)
+            result = RefundService.refund_order(order, amount=amount)
 
         assert result.complete is True
         assert result.refunded == amount
@@ -109,7 +110,7 @@ class TestRefundOrderRefusals:
             "order.payments.payment.get_payment_provider"
         ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, amount=Money(Decimal(amount), "EUR")
                 )
 
@@ -127,7 +128,7 @@ class TestRefundOrderRefusals:
             "order.payments.payment.get_payment_provider"
         ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(order)
+                RefundService.refund_order(order)
 
         assert str(excinfo.value) == (
             "This order was not paid through a payment provider, so there "
@@ -146,7 +147,7 @@ class TestRefundOrderRefusals:
             "order.payments.payment.get_payment_provider"
         ) as get_provider:
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(order)
+                RefundService.refund_order(order)
 
         assert str(excinfo.value) == "This order has not been paid yet."
         get_provider.assert_not_called()
@@ -157,7 +158,7 @@ class TestRefundOrderRefusals:
         stale.payment_status = PaymentStatus.PENDING  # never saved
 
         with pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(stale)
+            RefundService.refund_order(stale)
 
         assert str(excinfo.value) == (
             "This order was not paid through a payment provider, so there "
@@ -173,10 +174,10 @@ class TestRefundOrderRefusals:
                 True,
                 {"refund_id": "re_1", "amount": "50.00"},
             )
-            OrderService.refund_order(order)
+            RefundService.refund_order(order)
 
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(order)
+                RefundService.refund_order(order)
 
         assert str(excinfo.value) == "This order has already been refunded."
         assert get_provider.return_value.refund_payment.call_count == 1
@@ -188,13 +189,15 @@ class TestRefundOrderRefusals:
             patch(
                 "order.payments.payment.get_payment_provider"
             ) as get_provider,
-            patch("order.services.order_refunded.send") as refunded_signal,
+            patch(
+                "order.refunds.service.order_refunded.send"
+            ) as refunded_signal,
         ):
             get_provider.return_value.refund_payment.return_value = (
                 False,
                 {"error": "charge_already_refunded"},
             )
-            result = OrderService.refund_order(order, reason="customer")
+            result = RefundService.refund_order(order, reason="customer")
 
         assert result.complete is False
         assert result.paid_something is False

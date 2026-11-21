@@ -1,5 +1,5 @@
 [project]
-version = "3.262.2"
+version = "3.262.3"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -821,7 +821,7 @@ allow_indirect_imports = true
 # models, which reach every app and so every subpackage, so the layers
 # contract above cannot hold it without one ignored chain per module: this
 # contract checks its direct imports. The one ignored edge is the ledger
-# booking a refund's allocation (#658), removed by #569.
+# booking a refund's allocation (#658), removed by #658's refund booking.
 [[tool.importlinter.contracts]]
 name = "order payments import neither accounting, refunds, reporting nor checkout"
 type = "forbidden"

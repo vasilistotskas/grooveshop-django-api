@@ -155,11 +155,15 @@ choice for it:
 
 - `pickup_point_check_unavailable` (`shipping.api_errors.
   PickupPointCheckUnavailable`, `POST /order`): the order names a pickup
-  point its carrier's catalogue does not hold, and the cache holding the
-  resync guard is down, so the point could not be looked for again
+  point its carrier's catalogue does not hold, and Redis failed after the
+  order throttles counted the request but before the resync guard was
+  taken, so the point could not be looked for again
   (`ShippingService.pickup_point_address`). `Retry-After` is
   `PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS` (30 s). No order is created and
-  no resync runs.
+  no resync runs. A Redis outage that lasts the whole request never gets
+  this far: the fail-closed order-create throttles refuse it first with
+  `temporarily_unavailable` ([a security store that is down](#a-security-store-that-is-down)), so
+  a client retrying `POST /order` treats both codes as "try again".
 
 `carrier_unavailable` (`shipping.api_errors.CarrierUnavailable`) is the
 courier's outage, a 503 without `Retry-After`.

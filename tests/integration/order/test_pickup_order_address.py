@@ -14,13 +14,17 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
+from django.test import override_settings
 from django.urls import reverse
 from redis.exceptions import ConnectionError as RedisConnectionError
 
+from core.api.throttling import OrderCreateAnonThrottle, OrderCreateThrottle
+from core.caches import REDIS_UNAVAILABLE, STRICT_CACHE_UNAVAILABLE_CODE
 from order.models.order import Order
 from order.serializers.order import OrderCreateFromCartSerializer
 from pay_way.enum.settlement import PaySettlement
@@ -33,7 +37,7 @@ from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import _checkout
 from tests.utils.checkout import UNQUOTED, quoted_body
-from tests.utils.redis import private_cache
+from tests.utils.redis import private_cache, stopped_default_cache
 from tests.utils.shipping import enable_rate
 
 pytestmark = [
@@ -80,11 +84,9 @@ def locker_checkout():
         yield checkout
 
 
-def _post_locker_order(checkout, **body):
-    """Quote the locker order, then place it at the quote's total, as a
-    client does."""
-    headers = {"HTTP_X_CART_ID": str(checkout.cart.uuid)}
-    order = quoted_body(
+def _locker_order_body(checkout, **body) -> dict:
+    """The locker order a client sends, at the total its quote gave."""
+    return quoted_body(
         checkout.client,
         {
             **BUYER,
@@ -96,10 +98,18 @@ def _post_locker_order(checkout, **body):
             "boxnow_locker_id": "4",
             **body,
         },
-        **headers,
+        HTTP_X_CART_ID=str(checkout.cart.uuid),
     )
+
+
+def _post_locker_order(checkout, **body):
+    """Quote the locker order, then place it at the quote's total, as a
+    client does."""
     return checkout.client.post(
-        reverse("order-list"), order, format="json", **headers
+        reverse("order-list"),
+        _locker_order_body(checkout, **body),
+        format="json",
+        HTTP_X_CART_ID=str(checkout.cart.uuid),
     )
 
 
@@ -364,6 +374,49 @@ def _join_resync_threads() -> None:
             assert not thread.is_alive(), "a resync thread outlived its test"
 
 
+REFUSED = "refused"
+
+
+@contextmanager
+def _counting_order_throttles():
+    """Give the order-create throttles a real budget (the suite's rates
+    are ``None``, which never reads the cache) and record what each
+    decided: True, or ``REFUSED`` when Redis made it refuse."""
+    allowed: list[object] = []
+
+    def recording(decide):
+        def allow_request(throttle, request, view):
+            try:
+                decision = decide(throttle, request, view)
+            except REDIS_UNAVAILABLE:
+                allowed.append(REFUSED)
+                raise
+            allowed.append(decision)
+            return decision
+
+        return allow_request
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.dict(
+                OrderCreateThrottle.THROTTLE_RATES,
+                {
+                    OrderCreateThrottle.scope: "1000/minute",
+                    OrderCreateAnonThrottle.scope: "1000/minute",
+                },
+            )
+        )
+        for throttle in (OrderCreateThrottle, OrderCreateAnonThrottle):
+            stack.enter_context(
+                patch.object(
+                    throttle,
+                    "allow_request",
+                    recording(throttle.allow_request),
+                )
+            )
+        yield allowed
+
+
 # The resync runs on a thread with a connection of its own
 # (``ShippingService._resync_within_deadline``), which sees only committed
 # rows: these tests run outside the test's transaction.
@@ -616,15 +669,17 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         assert "Resync of the boxnow catalogue" in caplog.text
         assert not Order.objects.exists()
 
-    def test_a_cache_outage_is_a_temporary_503_without_a_resync(
+    def test_redis_failing_mid_request_is_a_temporary_503_without_a_resync(
         self, locker_checkout, resync, caplog, settings, documented
     ):
-        """``CustomCache.add`` raises while Redis is down. Without its
-        guard no resync runs, and the point is not judged: the fault is
-        ours, so the answer is a retryable 503 with ``Retry-After`` and no
-        field error, never ``pickup_point_unknown`` and never a 500."""
+        """Redis fails after the order throttles counted the request and
+        before the guard's ``cache.add``: no resync runs and the point is
+        not judged. The fault is ours, so the answer is a retryable 503
+        with ``Retry-After`` and no field error, never
+        ``pickup_point_unknown`` and never a 500."""
         settings.PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS = 30
         with (
+            _counting_order_throttles() as allowed,
             patch(
                 "django.core.cache.cache.add",
                 side_effect=RedisConnectionError("down"),
@@ -635,6 +690,7 @@ class TestALockerTheCatalogueDoesNotHoldYet:
                 locker_checkout, boxnow_locker_id="77"
             )
 
+        assert allowed == [True, True]
         assert response.status_code == 503, response.content
         documented(response, "/api/v1/order", "post")
         assert response["Retry-After"] == "30"
@@ -648,6 +704,33 @@ class TestALockerTheCatalogueDoesNotHoldYet:
             if "the cache holding its guard is unavailable" in r.getMessage()
         ]
         assert logged.levelno == logging.WARNING
+        assert not Order.objects.exists()
+
+    def test_a_sustained_redis_outage_is_refused_by_the_order_throttles(
+        self, locker_checkout, resync, settings
+    ):
+        """Redis down from the start of the request: the fail-closed order
+        throttles refuse first (``core.middleware.strict_cache``'s 503
+        ``temporarily_unavailable``, no ``Retry-After``), so the pickup
+        point is never looked for."""
+        order = _locker_order_body(locker_checkout, boxnow_locker_id="77")
+        stopped = stopped_default_cache(settings.CACHES["default"])
+        with (
+            _counting_order_throttles() as allowed,
+            override_settings(CACHES={"default": stopped}),
+        ):
+            response = locker_checkout.client.post(
+                reverse("order-list"),
+                order,
+                format="json",
+                HTTP_X_CART_ID=str(locker_checkout.cart.uuid),
+            )
+
+        assert allowed == [REFUSED]
+        assert response.status_code == 503, response.content
+        assert response.json()["code"] == STRICT_CACHE_UNAVAILABLE_CODE
+        assert "Retry-After" not in response
+        resync.assert_not_called()
         assert not Order.objects.exists()
 
     def test_a_known_locker_asks_the_carrier_nothing(

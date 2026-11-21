@@ -16,7 +16,8 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 |---|---|---|
 | 1 | [`overview.md`](overview.md) | anything here: the three axes of an order (status, payment status, settlement), the two "payment method" columns, the carrier adapter |
 | 2 | [`state-machines.md`](state-machines.md) | an order status or payment status transition, who may make it, the follow-up flag |
-| 3, 3.0 to 3.3 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds, delivery-address rules |
+| 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds |
+| 3.3 | [`creation-address.md`](creation-address.md) | delivery-address rules: the country's postcode and street rules, regions, pickup-point orders delivered to the point's address |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
 | 4 | [`payments.md`](payments.md) | Stripe, Viva Wallet or cash on delivery: per-tenant credentials, webhooks, fees, provider refunds, disputes |
 | 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares (the lock order included), shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
@@ -43,8 +44,8 @@ is returned once a delivery is chosen, [§3.0](creation.md); the quote's `cartDi
 with `expectedCartDigest` is made of what was quoted, [§3.0](creation.md);
 `expectedTotal` is required on order creation, [§3.0](creation.md);
 order creation takes one street line and splits its number,
-[§3.3](creation.md); a pickup-point order is delivered to the point's
-address and needs none of the buyer's, [§3.3](creation.md); before that
+[§3.3](creation-address.md); a pickup-point order is delivered to the point's
+address and needs none of the buyer's, [§3.3](creation-address.md); before that
 2026-11-18: an agent checkout places one order, and a repeat
 of its creation is answered with that order, [§3.2](creation.md); one
 checkout total: `OrderQuoteService.quote`

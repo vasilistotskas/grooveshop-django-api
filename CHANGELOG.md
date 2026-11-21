@@ -3,6 +3,64 @@
 
 
 
+## v3.260.1 (2026-11-21)
+
+### Documentation
+
+* docs(promotion): order docs and the cart serializer name the moved record, gift-pair and teaser helpers ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
+* docs: name files by their path under src/ in comments and docstrings (#771) ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: name files by their path under src/ in comments and docstrings
+
+308 comments and docstrings in 230 Python files named a file by the
+path it had before the move into src/. Each now names a path that
+exists, or the dotted module where the longer path would not fit the
+line. Five named a file that is gone and now name what replaced it.
+No code changes. ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: leave three files other open branches are changing ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+* docs: leave six files the core split is about to move ([`bcdfb9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcdfb9b7b1d8f4edd0a214e273373d1e5c7f197d))
+
+### Refactoring
+
+* refactor(promotion): services.py into an engine/ package and one module per service (#772) ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
+* refactor(promotion): services.py into an engine/ package and one module per service
+
+Pure move of src/promotion/services.py (1,968 lines). PromotionEngine's
+classmethods are split at their seams into promotion/engine/:
+
+- evaluation.py: PromotionEngine (is_enabled, evaluate,
+  single_unit_discount, classify, _teaser_holds)
+- teasers.py: near-miss entries, items_after_teaser, teaser_cost
+- redemptions.py: record_redemptions (was PromotionEngine.record)
+- eligibility.py: candidate collection and the per-promotion checks
+- benefits.py: amount_for, benefit_amount, gift_entitlement, gift_pairs
+- stacking.py: resolve_stacking, clamp
+- bxgy.py: the units a buy-X-get-Y discounts
+- scope.py: matching_items, attach_category_scopes
+- results.py: the value types (CartDiscountResult and the rest)
+
+The services get one module each: coupons.py (CouponError,
+CouponService), coupon_picker.py (CouponPickerService) and
+product_offers.py (ProductPromotionService).
+
+Helpers that left the class became module functions without cls.
+Names that now cross a module lose their leading underscore, and
+PromotionEngine.record is record_redemptions. Every body is unchanged:
+an AST comparison of the 46 definitions shows only those renames and
+the docstrings. Every importer, patch string and doc reference moves
+with it, with no re-export. schema.yml is unchanged and there is no
+migration; the module had no Celery task.
+
+Four import-linter contracts keep the layout: the services sit above
+the engine (layers, indirect chains included), and the engine seams'
+direct imports go only downward.
+
+Closes #585 ([`73cd930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73cd9300eac5527b659db794f8bebaf8c30ed206))
+
 ## v3.260.0 (2026-11-21)
 
 ### Bug fixes

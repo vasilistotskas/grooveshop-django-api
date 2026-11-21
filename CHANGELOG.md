@@ -3,6 +3,60 @@
 
 
 
+## v3.259.0 (2026-11-21)
+
+### Bug fixes
+
+* fix(order): give the street line refusal its code
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): split a street line only when no number has to be guessed
+
+The street left after the split must end in a letter and hold no
+number but an ordinal of its own name, the number is ASCII digits, and
+a range written with spaces is one number. Text after the number
+(a floor, a postcode) was split into a wrong number; it is now refused
+with street_number_missing.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): split a street line by explicit rules
+
+The line is normalised first (NFC, Unicode spaces, typographic dashes,
+spaced ranges). A floor or flat word refuses it, a comma anywhere but
+directly before the number refuses it, a word that only says "number"
+is dropped, and the only number a street may hold is the day of a date
+that names it (1 to 31, with or without an ordinal ending, before a
+month in the genitive). The street ends in a letter or an
+abbreviation's dot.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* fix(order): a split house number has letter suffixes and the field's length limit
+
+A suffix must be a letter, so a superscript digit is refused, and the
+number split from a street line is validated by the streetNumber field
+it replaces, its errors reported on street.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+### Features
+
+* feat(order): accept one street line and split its number inside Django (#766) ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
+* feat(order): accept one street line and split its number inside Django
+
+Order creation takes street without streetNumber as one line whose
+number follows the street, the Greek and Cypriot form, and splits it
+in one place (core.validators.address.split_street_line), so the order
+stores the two columns the courier voucher, invoices and myDATA read.
+A number written first is not guessed. A line with no number is a 400
+with code street_number_missing on street, and the errors of a split
+number are reported on street. A sent streetNumber is used as sent.
+
+Refs #641 ([`e03a12a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e03a12a96b2aadd9aa06f26436a6b849170518db))
+
 ## v3.258.0 (2026-11-21)
 
 ### Bug fixes

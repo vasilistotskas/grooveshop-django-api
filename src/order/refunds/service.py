@@ -2,8 +2,9 @@
 payments, making each provider share, booking it and declining it.
 
 ``RefundService`` is the one place a refund is made; ``refund_order`` is
-its entry point (the staff action, the order-item refund view and
-``OrderService``'s cancellation call it).
+its entry point (the staff Refund action and ``OrderService``'s
+cancellation call it), and refund reconciliation books a settled share
+through ``book_share``.
 """
 
 from __future__ import annotations

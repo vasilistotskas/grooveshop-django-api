@@ -96,7 +96,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.product = ProductFactory(
             active=True, stock=20, num_images=0, num_reviews=0
         )
-        self.locker = BoxNowLockerFactory(external_id="4")
+        self.locker = BoxNowLockerFactory(
+            external_id="4", country_code=self.country.alpha_2
+        )
 
         self.cart = CartFactory(user=self.user)
         CartItemFactory(cart=self.cart, product=self.product, quantity=1)

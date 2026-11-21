@@ -130,12 +130,29 @@ class GiftCardSerializer(serializers.ModelSerializer[GiftCard]):
     initial_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     balance = serializers.SerializerMethodField()
     transactions = GiftCardTransactionSerializer(many=True, read_only=True)
+    # Override the ModelSerializer default for ``recipient_email``: the
+    # column is ``EmailField(blank=True, default="")``, and a card issued
+    # with no recipient (in the admin, to an account) stores "". A
+    # read-only model field loses ``allow_blank``, so the OpenAPI contract
+    # declared a plain email, and Zod 4's ``z.email()`` rejects "": the
+    # shopper's whole card list was refused mid-parse even though Django
+    # answered 200. Declared ``allow_null=True`` it reads ``string | null``,
+    # and ``to_representation`` surfaces "" as ``null``.
+    recipient_email = serializers.EmailField(read_only=True, allow_null=True)
 
     @extend_schema_field(
         serializers.DecimalField(max_digits=11, decimal_places=2)
     )
     def get_balance(self, obj: GiftCard):
         return obj.balance.amount
+
+    def to_representation(self, instance):
+        """The column stores "" for a card with no recipient, but on the
+        wire that is ``null``, as its ``nullable: true`` declares."""
+        data = super().to_representation(instance)
+        if data.get("recipient_email") == "":
+            data["recipient_email"] = None
+        return data
 
     class Meta:
         model = GiftCard

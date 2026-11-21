@@ -37,6 +37,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import priced, quoted_body
 from tests.utils.fake_stripe import fake_stripe
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
@@ -125,12 +126,14 @@ def _cart_intent(stripe, cart, **overrides) -> str:
 def _create_order(checkout, intent_id: str) -> Order:
     cart, pay_way, country = checkout
     return OrderService.create_order_from_cart(
-        legal_acceptance=checkout_acceptance(),
-        cart=cart,
-        shipping_address=_address(country),
-        payment_intent_id=intent_id,
-        pay_way=pay_way,
-        user=None,
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address=_address(country),
+            payment_intent_id=intent_id,
+            pay_way=pay_way,
+            user=None,
+        )
     )
 
 
@@ -152,6 +155,7 @@ def _buy_gift_card(stripe, amount: Decimal) -> GiftCardPurchase:
 
 
 class TestOneIntentCannotBuyTwoThings:
+    @pytest.mark.usefixtures("checkout_legal_documents")
     def test_a_paid_gift_card_intent_cannot_pay_an_order(
         self, stripe, checkout
     ):
@@ -164,27 +168,32 @@ class TestOneIntentCannotBuyTwoThings:
         assert GiftCard.objects.filter(purchase=purchase).exists()
 
         cart, pay_way, country = checkout
-        response = APIClient().post(
+        client = APIClient()
+        headers = {"HTTP_X_CART_ID": str(cart.uuid)}
+        body = {
+            "paymentIntentId": purchase.payment_id,
+            "termsAccepted": True,
+            "payWayId": pay_way.id,
+            "countryId": country.alpha_2,
+            "shippingKind": "home_delivery",
+            "firstName": "John",
+            "lastName": "Doe",
+            "email": "john@example.com",
+            "street": "Main St",
+            "streetNumber": "123",
+            "city": "Athens",
+            "zipcode": "12345",
+            "phone": "+306900000000",
+        }
+        response = client.post(
             ORDER_URL,
-            {
-                "paymentIntentId": purchase.payment_id,
-                "payWayId": pay_way.id,
-                "countryId": country.alpha_2,
-                "shippingKind": "home_delivery",
-                "firstName": "John",
-                "lastName": "Doe",
-                "email": "john@example.com",
-                "street": "Main St",
-                "streetNumber": "123",
-                "city": "Athens",
-                "zipcode": "12345",
-                "phone": "+306900000000",
-            },
+            quoted_body(client, body, **headers),
             format="json",
-            HTTP_X_CART_ID=str(cart.uuid),
+            **headers,
         )
 
         assert response.status_code == 400, response.content
+        assert response.json()["code"] == "payment_verification"
         assert not Order.objects.exists()
         assert cart.items.count() == 1, "the cart was not consumed"
 

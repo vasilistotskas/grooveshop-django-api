@@ -39536,6 +39536,14 @@ components:
           description: 'Το amountDue όπως το συγκρίνει η δημιουργία παραγγελίας. Στείλτε
             το πίσω ως ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: η παραγγελία
             δημιουργείται μόνο σε αυτό το σύνολο.'
+        cartDigest:
+          type: string
+          nullable: true
+          description: 'Ένα αδιαφανές αποτύπωμα του τι θα περιέχει η παραγγελία: οι
+            γραμμές, οι προωθητικές ενέργειες, η αποστολή με το σημείο παραλαβής της
+            και ο τρόπος πληρωμής. Null μέχρι να επιλεγούν αποστολή και τρόπος πληρωμής.
+            Στείλτε το πίσω ως ``expectedCartDigest`` κατά τη δημιουργία της παραγγελίας:
+            η παραγγελία δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό.'
         shippingOptions:
           type: array
           items:
@@ -39556,6 +39564,7 @@ components:
       - amountDue
       - appliedPromotions
       - blockingCoupon
+      - cartDigest
       - currency
       - discountTotal
       - expectedTotal
@@ -39577,9 +39586,23 @@ components:
         be asked before the shopper has chosen a delivery or a pay way, and
         the rows that depend on a missing choice come back null. A delivery
         is priced once both ``shipping_kind`` and ``country_id`` are given.
-        Send what the order-create body will carry, the email included, so
-        the quote is the total that order is created at.
+        Send what the order-create body will carry, the email and the pickup
+        point included, so the quote is the total that order is created at
+        and its ``cartDigest`` the cart that order is made of.
       properties:
+        boxnowLockerId:
+          type: string
+          description: ID locker APM BoxNow από το widget
+          maxLength: 64
+        acsStationExternalId:
+          type: string
+          description: Εξωτερικό ID καταστήματος/Smartpoint ACS (ροή σημείου παραλαβής
+            Φάσης 2).
+          maxLength: 32
+        acsStationBranch:
+          type: string
+          description: Τιμή ACS_Station_Branch_Destination.
+          maxLength: 32
         payWayId:
           type: integer
           minimum: 1
@@ -39747,10 +39770,19 @@ components:
           description: 'Το amountDue όπως το συγκρίνει η δημιουργία παραγγελίας. Στείλτε
             το πίσω ως ``expectedTotal`` κατά τη δημιουργία της παραγγελίας: η παραγγελία
             δημιουργείται μόνο σε αυτό το σύνολο.'
+        cartDigest:
+          type: string
+          nullable: true
+          description: 'Ένα αδιαφανές αποτύπωμα του τι θα περιέχει η παραγγελία: οι
+            γραμμές, οι προωθητικές ενέργειες, η αποστολή με το σημείο παραλαβής της
+            και ο τρόπος πληρωμής. Null μέχρι να επιλεγούν αποστολή και τρόπος πληρωμής.
+            Στείλτε το πίσω ως ``expectedCartDigest`` κατά τη δημιουργία της παραγγελίας:
+            η παραγγελία δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό.'
       required:
       - amountDue
       - appliedPromotions
       - blockingCoupon
+      - cartDigest
       - currency
       - discountTotal
       - expectedTotal
@@ -42721,9 +42753,10 @@ components:
         409 is ``legal_document_unavailable`` (a checkout legal text the
         store cannot show in the order's language) or ``total_changed``
         (the request's ``expectedTotal`` is not the amount due computed
-        now). Tell ``total_changed`` by ``code`` and the status: its
-        ``error.type`` is ``invalid_order_data`` until every client lists
-        the new value.
+        now) or ``cart_changed`` (its ``expectedCartDigest`` is not the
+        cart digest computed now). Tell those two by ``code`` and the
+        status: their ``error.type`` is ``invalid_order_data`` until every
+        client lists the new values.
 
         A refusal the order service understands carries ``error.type``; a
         malformed payload is DRF's field-error map instead (``{field:
@@ -42786,9 +42819,10 @@ components:
         quote:
           allOf:
           - $ref: '#/components/schemas/CheckoutQuote'
-          description: 'Μόνο για ``total_changed``: τι χρεώνει τώρα το ταμείο για
-            το καλάθι. Δείξτε το σύνολό του και στείλτε το ``expectedTotal`` του για
-            να γίνει η παραγγελία σε αυτό.'
+          description: 'Μόνο για ``total_changed`` και ``cart_changed``: τι χρεώνει
+            τώρα το ταμείο για το καλάθι. Εμφανίστε το και στείλτε το ``expectedTotal``
+            του, και το ``cartDigest`` του ως ``expectedCartDigest``, για να παραγγείλετε
+            με αυτό.'
       required:
       - type
     OrderCreateErrorType:
@@ -42836,6 +42870,19 @@ components:
         The order is created from an existing cart identified via X-Cart-Id header.
         Cart is NOT sent in request body - it's retrieved from the header using CartService.
       properties:
+        boxnowLockerId:
+          type: string
+          description: ID locker APM BoxNow από το widget
+          maxLength: 64
+        acsStationExternalId:
+          type: string
+          description: Εξωτερικό ID καταστήματος/Smartpoint ACS (ροή σημείου παραλαβής
+            Φάσης 2).
+          maxLength: 32
+        acsStationBranch:
+          type: string
+          description: Τιμή ACS_Station_Branch_Destination.
+          maxLength: 32
         payWayId:
           type: integer
           description: ID μεθόδου πληρωμής
@@ -42985,10 +43032,6 @@ components:
             3). Όταν καλύπτουν ολόκληρο το σύνολο, παράλειψε το payment_intent_id
             — δεν γίνεται καμία χρέωση από τον πάροχο.
           maxItems: 3
-        boxnowLockerId:
-          type: string
-          description: ID locker APM BoxNow από το widget
-          maxLength: 64
         shippingProviderCode:
           description: Κωδικός μεταφορέα από /api/v1/shipping/options (π.χ. 'acs').
           oneOf:
@@ -43005,15 +43048,6 @@ components:
 
             * `home_delivery` - Κατ' οίκον παράδοση
             * `pickup_point` - Σημείο παραλαβής / locker
-        acsStationExternalId:
-          type: string
-          description: Εξωτερικό ID καταστήματος/Smartpoint ACS (ροή σημείου παραλαβής
-            Φάσης 2).
-          maxLength: 32
-        acsStationBranch:
-          type: string
-          description: Τιμή ACS_Station_Branch_Destination.
-          maxLength: 32
         acsChargeType:
           allOf:
           - $ref: '#/components/schemas/AcsChargeType'
@@ -43035,11 +43069,19 @@ components:
           - $ref: '#/components/schemas/ExpectedTotalRequest'
           writeOnly: true
           description: 'Το σύνολο που είδε ο αγοραστής: το ``expectedTotal`` του ``POST
-            /cart/quote``, ή το οφειλόμενο ποσό που υπολόγισε ο ίδιος ο client, σε
-            υποδιαιρέσεις του νομίσματος. Όταν αποστέλλεται, η παραγγελία δημιουργείται
-            μόνο αν είναι ακριβώς το οφειλόμενο ποσό που υπολογίζεται τώρα· διαφορετικά
-            η απάντηση είναι 409 ``total_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται
-            τίποτα.'
+            /cart/quote``. Η παραγγελία δημιουργείται μόνο αν είναι ακριβώς το οφειλόμενο
+            ποσό που υπολογίζεται τώρα· διαφορετικά η απάντηση είναι 409 ``total_changed``
+            με τη νέα κοστολόγηση και δεν δημιουργείται τίποτα.'
+        expectedCartDigest:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Το ``cartDigest`` του ``POST /cart/quote`` που είδε ο αγοραστής.
+            Όταν αποστέλλεται, η παραγγελία δημιουργείται μόνο αν περιέχει ακριβώς
+            ό,τι κοστολόγησε εκείνη η κοστολόγηση (γραμμές, προωθητικές ενέργειες,
+            αποστολή, σημείο παραλαβής, τρόπος πληρωμής)· διαφορετικά η απάντηση είναι
+            409 ``cart_changed`` με τη νέα κοστολόγηση και δεν δημιουργείται τίποτα.
+          maxLength: 64
         meta:
           type: object
           additionalProperties: {}
@@ -43071,6 +43113,7 @@ components:
       - city
       - countryId
       - email
+      - expectedTotal
       - firstName
       - lastName
       - payWayId

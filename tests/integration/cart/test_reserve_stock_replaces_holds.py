@@ -32,6 +32,7 @@ from order.models import StockLog, StockReservation
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -240,23 +241,25 @@ class TestOrderCreationAfterReReserve:
                 )
             )
             order = OrderService.create_order_from_cart(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address={
-                    "first_name": "Test",
-                    "last_name": "User",
-                    "email": "test@example.com",
-                    "street": "123 Test St",
-                    "street_number": "1",
-                    "city": "Test City",
-                    "zipcode": "12345",
-                    "country_id": country.alpha_2,
-                    "phone": "+1234567890",
-                    "shipping_kind": "home_delivery",
-                },
-                payment_intent_id="pi_replace_holds",
-                pay_way=PayWayFactory(provider_code="stripe"),
-                user=user,
+                **priced(
+                    legal_acceptance=checkout_acceptance(),
+                    cart=cart,
+                    shipping_address={
+                        "first_name": "Test",
+                        "last_name": "User",
+                        "email": "test@example.com",
+                        "street": "123 Test St",
+                        "street_number": "1",
+                        "city": "Test City",
+                        "zipcode": "12345",
+                        "country_id": country.alpha_2,
+                        "phone": "+1234567890",
+                        "shipping_kind": "home_delivery",
+                    },
+                    payment_intent_id="pi_replace_holds",
+                    pay_way=PayWayFactory(provider_code="stripe"),
+                    user=user,
+                )
             )
 
         assert order.metadata["stock_reservation_ids"] == current_ids

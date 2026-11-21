@@ -24,6 +24,7 @@ from order.serializers.order import (
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import UNQUOTED
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
@@ -49,6 +50,8 @@ def _create_payload(**overrides):
     data = {
         "pay_way_id": pay_way.id,
         "terms_accepted": True,
+        # The serializer checks the shape alone; no quote is compared here.
+        "expected_total": UNQUOTED,
         "first_name": "Jane",
         "last_name": "Doe",
         "email": "jane@example.com",

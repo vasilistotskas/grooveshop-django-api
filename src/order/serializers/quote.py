@@ -3,8 +3,9 @@
 ``CheckoutQuoteSerializer`` renders an ``order.checkout.quote.CheckoutQuote``:
 the body of ``POST /cart/quote`` (with the priced option lists,
 ``CartQuoteSerializer``) and the ``error.quote`` of an order refused
-because its total changed. ``ExpectedTotalSerializer`` is the total a
-client sends back with the order.
+because its total or its cart changed. ``ExpectedTotalSerializer`` is the
+total a client sends back with the order, and ``PickupPointSerializer``
+the pickup point both the quote and the order take.
 """
 
 from __future__ import annotations
@@ -14,6 +15,36 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shipping.enum import FreeShippingSource, ShippingKind
+
+
+class PickupPointSerializer(serializers.Serializer):
+    """The pickup point a checkout chose, by the carrier's own fields
+    (its ``location_keys``). Order creation and ``POST /cart/quote``
+    take the same fields, so the quote's ``cartDigest`` covers the
+    point the order is sent to."""
+
+    # BoxNow locker (required when carrier=boxnow + kind=pickup_point)
+    boxnow_locker_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        help_text=_("BoxNow APM locker ID from the widget"),
+    )
+    # ACS station, only honoured when shipping_provider_code='acs'.
+    acs_station_external_id = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
+        ),
+    )
+    acs_station_branch = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_("ACS_Station_Branch_Destination value."),
+    )
 
 
 class ExpectedTotalSerializer(serializers.Serializer):
@@ -230,6 +261,17 @@ class CheckoutQuoteSerializer(serializers.Serializer):
             "amountDue as order creation compares it. Send it back as "
             "``expectedTotal`` when creating the order: the order is "
             "created only at this total."
+        ),
+    )
+    cart_digest = serializers.CharField(
+        allow_null=True,
+        help_text=_(
+            "An opaque digest of what the order would be made of: the "
+            "lines, the promotions, the delivery with its pickup point "
+            "and the pay way. Null until a delivery and a pay way are "
+            "chosen. Send it back as ``expectedCartDigest`` when creating "
+            "the order: the order is created only if its cart is still "
+            "this one."
         ),
     )
 

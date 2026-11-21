@@ -8,6 +8,7 @@ from djmoney.money import Money
 
 from cart.models.cart import Cart
 from cart.models.item import CartItem
+from order.checkout.quote import ExpectedTotal
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartNotReadyError,
@@ -21,6 +22,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import UNQUOTED, priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from user.factories.account import UserAccountFactory
@@ -114,7 +116,7 @@ class TestCreateOrderFromCart:
         }
         kwargs.update(overrides)
         return OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(), **kwargs
+            **priced(legal_acceptance=checkout_acceptance(), **kwargs)
         )
 
     @patch("order.payments.payment.get_payment_provider")
@@ -161,7 +163,11 @@ class TestCreateOrderFromCart:
         )
 
         with pytest.raises(InvalidOrderDataError, match="last_name"):
-            self._create(shipping_address={"first_name": "John"})
+            # An address the quote cannot price either: no total to send.
+            self._create(
+                shipping_address={"first_name": "John"},
+                expected_total=ExpectedTotal(**UNQUOTED),
+            )
 
         assert not Order.objects.filter(user=self.user).exists()
 

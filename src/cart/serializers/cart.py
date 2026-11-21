@@ -11,6 +11,7 @@ from rest_framework import serializers
 from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
+from order.serializers.quote import PickupPointSerializer
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
@@ -854,15 +855,18 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         return attrs
 
 
-class CartQuoteRequestSerializer(CartCreatePaymentIntentRequestSerializer):
+class CartQuoteRequestSerializer(
+    PickupPointSerializer, CartCreatePaymentIntentRequestSerializer
+):
     """Request body for ``POST /api/v1/cart/quote``.
 
     The choices of the payment-intent body, each optional: a quote may
     be asked before the shopper has chosen a delivery or a pay way, and
     the rows that depend on a missing choice come back null. A delivery
     is priced once both ``shipping_kind`` and ``country_id`` are given.
-    Send what the order-create body will carry, the email included, so
-    the quote is the total that order is created at.
+    Send what the order-create body will carry, the email and the pickup
+    point included, so the quote is the total that order is created at
+    and its ``cartDigest`` the cart that order is made of.
     """
 
     pay_way_id = serializers.IntegerField(

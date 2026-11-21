@@ -37,6 +37,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.checkout import priced
 from tests.utils.concurrency import race
 from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
@@ -134,7 +135,7 @@ class _Checkout:
         }
         kwargs.update(overrides)
         return OrderService.create_order_from_cart(
-            legal_acceptance=checkout_acceptance(), **kwargs
+            **priced(legal_acceptance=checkout_acceptance(), **kwargs)
         )
 
     def _stock(self):

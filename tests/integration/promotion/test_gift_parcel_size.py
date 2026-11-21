@@ -32,6 +32,7 @@ from shipping.models import ShippingProvider
 from shipping_boxnow.enum import BoxNowCompartmentSize
 from shipping_boxnow.factories import BoxNowLockerFactory
 from shipping_boxnow.models import BoxNowShipment
+from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -175,11 +176,13 @@ class TestOrderCreation:
 
     def _place(self, checkout):
         order = OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=checkout["cart"],
-            shipping_address=checkout["shipping_address"],
-            pay_way=checkout["pay_way"],
-            user=checkout["user"],
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=checkout["cart"],
+                shipping_address=checkout["shipping_address"],
+                pay_way=checkout["pay_way"],
+                user=checkout["user"],
+            )
         )
         return BoxNowShipment.objects.get(order=order).compartment_size
 

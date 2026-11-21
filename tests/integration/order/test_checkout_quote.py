@@ -57,6 +57,7 @@ from shipping.interfaces import get_provider
 from shipping.models import ShippingProvider
 from shipping_acs import config as acs_config
 from shipping_acs.exceptions import AcsAPIError
+from tests.utils.checkout import UNQUOTED, priced, quoted_body
 from tests.utils.fake_stripe import fake_stripe
 from tests.utils.legal import checkout_acceptance
 from tests.utils.redis import private_cache
@@ -183,17 +184,21 @@ def _address(checkout) -> dict:
     }
 
 
-def _post_order(checkout, **extra):
+def _post_order(checkout, *, expected_total=None, **extra):
+    """Place the order, at ``expected_total`` or else at its own quote's."""
+    body = {
+        **_address(checkout),
+        "pay_way_id": checkout.pay_way.id,
+        "terms_accepted": True,
+        **extra,
+    }
+    headers = {"HTTP_X_CART_ID": str(checkout.cart.uuid)}
+    if expected_total is None:
+        body = quoted_body(checkout.client, body, **headers)
+    else:
+        body["expected_total"] = expected_total
     return checkout.client.post(
-        reverse("order-list"),
-        {
-            **_address(checkout),
-            "pay_way_id": checkout.pay_way.id,
-            "terms_accepted": True,
-            **extra,
-        },
-        format="json",
-        HTTP_X_CART_ID=str(checkout.cart.uuid),
+        reverse("order-list"), body, format="json", **headers
     )
 
 
@@ -635,7 +640,16 @@ class TestPayWaysAreJudgedOnce:
         listed = {row["id"] for row in _quote(checkout, **choices)["payWays"]}
         quote = _post_quote(checkout, **choices, pay_way_id=pay_way.id)
         intent = _post_intent(checkout, pay_way, **delivery)
-        order = _post_order(checkout, **delivery, pay_way_id=pay_way.id)
+        order = _post_order(
+            checkout,
+            **delivery,
+            pay_way_id=pay_way.id,
+            expected_total=(
+                quote.json()["expectedTotal"]
+                if quote.status_code == 200
+                else UNQUOTED
+            ),
+        )
 
         assert (pay_way.id in listed) is offered
         if offered:
@@ -683,7 +697,14 @@ class TestPayWaysAreJudgedOnce:
         )
         order = checkout.client.post(
             reverse("order-list"),
-            body,
+            {
+                **body,
+                "expected_total": (
+                    quote.json()["expectedTotal"]
+                    if quote.status_code == 200
+                    else UNQUOTED
+                ),
+            },
             format="json",
             HTTP_X_CART_ID=str(checkout.cart.uuid),
         )
@@ -951,10 +972,19 @@ class TestGiftCardGuessesAreBudgeted:
     def test_on_order_creation(self):
         checkout = _checkout()
 
-        statuses = self._spend(lambda codes: _post_order(checkout, **codes))
+        statuses = self._spend(
+            lambda codes: _post_order(
+                checkout, **codes, expected_total=UNQUOTED
+            )
+        )
 
         assert statuses == [400] * self.LIMIT + [429]
-        assert _post_order(checkout, **_guess(0)).status_code == 400
+        assert (
+            _post_order(
+                checkout, **_guess(0), expected_total=UNQUOTED
+            ).status_code
+            == 400
+        )
         assert not Order.objects.exists()
         assert _post_order(checkout).status_code == 201
 
@@ -978,6 +1008,11 @@ class TestGiftCardGuessesAreBudgeted:
                     **_address(checkout),
                     "pay_way_id": checkout.pay_way.id,
                     "terms_accepted": "true",
+                    # A nested field in a form body, by its dotted keys.
+                    **{
+                        f"expected_total.{key}": value
+                        for key, value in UNQUOTED.items()
+                    },
                 },
             ),
         }[route]
@@ -1021,9 +1056,17 @@ class TestGiftCardGuessesAreBudgeted:
             return _post_quote(checkout, **_choices(checkout), **codes)
 
         assert [quote(_guess(n)).status_code for n in range(3)] == [400] * 3
-        assert _post_order(checkout, **_guess(0)).status_code == 400
+        assert (
+            _post_order(
+                checkout, **_guess(0), expected_total=UNQUOTED
+            ).status_code
+            == 400
+        )
         assert [
-            _post_order(checkout, **_guess(n)).status_code for n in (3, 4, 5, 6)
+            _post_order(
+                checkout, **_guess(n), expected_total=UNQUOTED
+            ).status_code
+            for n in (3, 4, 5, 6)
         ] == [400, 400, 400, 429]
 
     def test_two_gateway_carts_do_not_share_a_budget(self, settings):
@@ -1131,7 +1174,9 @@ class TestPointsWorthLessThanACent:
     def test_order_creation_refuses_and_spends_nothing(self):
         checkout = self._member()
 
-        response = _post_order(checkout, loyalty_points_to_redeem=4)
+        response = _post_order(
+            checkout, loyalty_points_to_redeem=4, expected_total=UNQUOTED
+        )
 
         assert response.status_code == 400
         body = response.json()
@@ -1185,18 +1230,26 @@ class TestLivePrice:
         )
         return checkout
 
-    def _order(self, checkout, **extra):
-        return OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=checkout.cart,
-            shipping_address={
+    def _creation(self, checkout) -> dict:
+        return {
+            "legal_acceptance": checkout_acceptance(),
+            "cart": checkout.cart,
+            "shipping_address": {
                 **_address(checkout),
                 "shipping_provider_code": "acs",
             },
-            pay_way=checkout.pay_way,
-            user=checkout.user,
-            **extra,
-        )
+            "pay_way": checkout.pay_way,
+            "user": checkout.user,
+        }
+
+    def _order(self, checkout, *, expected_total=None):
+        """Create the order at ``expected_total``, or else at its quote's."""
+        creation = self._creation(checkout)
+        if expected_total is None:
+            creation = priced(**creation)
+        else:
+            creation["expected_total"] = expected_total
+        return OrderService.create_order_from_cart_offline(**creation)
 
     def test_a_polled_quote_asks_the_carrier_once(self):
         checkout = self._checkout()
@@ -1216,9 +1269,13 @@ class TestLivePrice:
         nothing locked, and prices from the cache once it holds the cart,
         the promotions, the customer and the gift cards."""
         checkout = self._checkout()
+        with _acs_prices_live(self.LIVE):
+            shown = priced(**self._creation(checkout))["expected_total"]
 
+        # A fresh cache: the price the order is created at is asked for
+        # by order creation itself.
         with _acs_prices_live(self.LIVE) as calls:
-            order = self._order(checkout)
+            order = self._order(checkout, expected_total=shown)
 
         assert order.shipping_price.amount == Decimal("5.21")
         assert calls == [0]
@@ -1230,13 +1287,17 @@ class TestLivePrice:
         priced again with nothing locked, and the order is refused as a
         changed total with that quote."""
         checkout = self._checkout()
+        # The buyer was shown the live price; its cache entry is gone by
+        # the time the order is placed (``_acs_prices_live`` clears it).
+        with _acs_prices_live(self.LIVE):
+            shown = priced(**self._creation(checkout))["expected_total"]
 
         with (
             _acs_prices_live(self.LIVE) as calls,
             patch.object(OrderQuoteService, "resolve_live_shipping"),
             pytest.raises(OrderTotalChangedError) as refused,
         ):
-            self._order(checkout)
+            self._order(checkout, expected_total=shown)
 
         assert refused.value.quote.charges().shipping.price.amount == Decimal(
             "5.21"
@@ -1264,7 +1325,9 @@ class TestLivePrice:
 
         with _acs_prices_live(down) as calls:
             quote = _quote(checkout, **acs)
-            order = self._order(checkout)
+            order = self._order(
+                checkout, expected_total=ExpectedTotal(**quote["expectedTotal"])
+            )
 
         assert _money(quote["shipping"]["price"]) == SHIPPING
         assert order.shipping_price.amount == SHIPPING
@@ -1284,12 +1347,56 @@ class TestExpectedTotal:
         order = Order.objects.get()
         assert ExpectedTotal.of(order.amount_due) == ExpectedTotal(2500, "EUR")
 
-    def test_no_expected_total_is_still_accepted(self):
+    def _post_without_total(self, checkout, **extra):
+        return checkout.client.post(
+            reverse("order-list"),
+            {
+                **_address(checkout),
+                "pay_way_id": checkout.pay_way.id,
+                "terms_accepted": True,
+                **extra,
+            },
+            format="json",
+            HTTP_X_CART_ID=str(checkout.cart.uuid),
+        )
+
+    def _assert_required(self, response) -> None:
+        assert response.status_code == 400, response.content
+        [error] = response.json()["fields"]["expectedTotal"]
+        assert error["code"] == "required"
+        assert not Order.objects.exists()
+
+    def test_an_order_first_order_without_one_is_refused(self, documented):
         checkout = _checkout()
 
-        response = _post_order(checkout)
+        response = self._post_without_total(checkout)
 
-        assert response.status_code == 201, response.content
+        self._assert_required(response)
+        documented(response, "/api/v1/order", "post")
+        checkout.product.refresh_from_db()
+        assert checkout.product.stock == 10
+        assert checkout.cart.items.count() == 1
+
+    def test_a_payment_first_order_without_one_is_refused(self):
+        checkout = _checkout()
+        stripe = PayWayFactory(
+            provider_code="stripe",
+            settlement=PaySettlement.ONLINE,
+            active=True,
+            cost=Money(FEE, "EUR"),
+            free_threshold=Money(THRESHOLD, "EUR"),
+        )
+        with fake_stripe():
+            intent = _post_intent(checkout, stripe)
+            assert intent.status_code == 200, intent.content
+
+            response = self._post_without_total(
+                checkout,
+                pay_way_id=stripe.id,
+                payment_intent_id=intent.data["payment_intent_id"],
+            )
+
+        self._assert_required(response)
 
     def test_another_total_is_409_with_the_quote(self, documented):
         checkout = _checkout()
@@ -1488,7 +1595,9 @@ class TestDeductions:
         too_many = _post_quote(
             checkout, **_choices(checkout), loyalty_points_to_redeem=1000
         )
-        order_too_many = _post_order(checkout, loyalty_points_to_redeem=1000)
+        order_too_many = _post_order(
+            checkout, loyalty_points_to_redeem=1000, expected_total=UNQUOTED
+        )
         quote = _quote(
             checkout, **_choices(checkout), loyalty_points_to_redeem=500
         )
@@ -1554,11 +1663,13 @@ def test_an_order_that_does_not_add_up_to_its_quote_is_not_created():
         pytest.raises(InvalidOrderDataError),
     ):
         OrderService.create_order_from_cart_offline(
-            legal_acceptance=checkout_acceptance(),
-            cart=checkout.cart,
-            shipping_address=_address(checkout),
-            pay_way=checkout.pay_way,
-            user=checkout.user,
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=checkout.cart,
+                shipping_address=_address(checkout),
+                pay_way=checkout.pay_way,
+                user=checkout.user,
+            )
         )
 
     assert not Order.objects.exists()

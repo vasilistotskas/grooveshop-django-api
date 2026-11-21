@@ -20,6 +20,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -101,13 +102,14 @@ class TestPaymentFirstOrderCreation(APITestCase):
         data.update(overrides)
         return data
 
-    def _post(self, data, cart=None):
-        return self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str((cart or self.cart).uuid),
-        )
+    def _post(self, data, cart=None, *, expected_total=None):
+        """Place the order at ``expected_total``, or else at its quote's."""
+        headers = {"HTTP_X_CART_ID": str((cart or self.cart).uuid)}
+        if expected_total is None:
+            data = quoted_body(self.client, data, **headers)
+        else:
+            data = {**data, "expected_total": expected_total}
+        return self.client.post(self.create_url, data, format="json", **headers)
 
     def _provider_confirming_payment(self):
         provider = MagicMock()
@@ -259,7 +261,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             ("pay_way_id", self._order_data(pay_way_id=99999)),
         ):
             with self.subTest(field=field, value=data[field]):
-                response = self._post(data)
+                response = self._post(data, expected_total=UNQUOTED)
 
                 self.assertEqual(
                     response.status_code, status.HTTP_400_BAD_REQUEST

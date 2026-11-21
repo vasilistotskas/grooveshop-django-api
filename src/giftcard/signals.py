@@ -2,7 +2,7 @@
 
 A CANCELED order that was (partly) settled by gift cards gives the
 redemption back to the source card(s) as REFUND_CREDIT ledger rows. A
-REFUND does not go through a signal: ``OrderService.refund_order`` pays
+REFUND does not go through a signal: ``RefundService.refund_order`` pays
 the provider first and credits the cards with the value beyond it
 (``GiftCardService.credit_refund``), in parts, as staff enter it.
 """

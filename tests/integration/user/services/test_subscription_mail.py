@@ -7,7 +7,7 @@ from django.test import override_settings
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
-from user.utils.subscription import (
+from user.services.subscription_mail import (
     send_subscription_confirmation,
 )
 
@@ -56,7 +56,7 @@ class TestSubscriptionUtils:
         assert "/newsletter/confirm/test-token-123" in sent.body
         assert "/newsletter/confirm/test-token-123" in html
 
-    @patch("user.utils.subscription.get_tenant_frontend_url")
+    @patch("user.services.subscription_mail.get_tenant_frontend_url")
     def test_confirmation_url_is_the_storefront_page(self, mock_frontend_url):
         """The link opens the STOREFRONT confirmation page on the tenant's
         primary domain — built like every other storefront link in mail —
@@ -145,7 +145,7 @@ class TestSubscriptionUtils:
         ):
             send_subscription_confirmation(subscription)
 
-    @patch("user.utils.subscription.logger")
+    @patch("user.services.subscription_mail.logger")
     def test_send_subscription_confirmation_logs_warning_not_pending(
         self, mock_logger
     ):
@@ -161,7 +161,7 @@ class TestSubscriptionUtils:
         mock_logger.warning.assert_called_once()
         assert "non-pending" in mock_logger.warning.call_args[0][0]
 
-    @patch("user.utils.subscription.logger")
+    @patch("user.services.subscription_mail.logger")
     def test_send_subscription_confirmation_logs_error_no_token(
         self, mock_logger
     ):

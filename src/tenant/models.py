@@ -378,7 +378,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # statement or transaction as each write that changes them. A
     # committed write moves every reader to a new key, so no Redis
     # DELETE has to land for a stale entry to stop being served — and
-    # the fail-open cache (``src/core/caches.py``) drops deletes during an
+    # the fail-open cache (``src/core/cache_backend.py``) drops deletes during an
     # outage. Only ever written relatively, as ``F() + 1`` (``save``
     # below, ``tenant.cache.bump_cache_generation``), so a stale
     # in-memory copy can never write an older generation back — and the

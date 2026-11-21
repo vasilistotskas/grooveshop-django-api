@@ -27,6 +27,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import order_refunded
 from order.views.viva_webhook import (
@@ -341,7 +342,7 @@ class TestVivaReversalWebhook:
         )
 
         with viva:
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, amount=Money(Decimal("10.00"), "EUR")
             )
             _deliver(refund_id=in_app_refund)

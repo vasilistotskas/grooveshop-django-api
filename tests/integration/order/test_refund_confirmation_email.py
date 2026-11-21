@@ -24,7 +24,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory, PaymentTransaction, RefundNotification
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.tasks import _claim_refund_email, send_refund_confirmation_email
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -296,8 +296,8 @@ class TestEachRefundQueuesItsOwnTask:
             FakeStripeRefunds(),
             django_capture_on_commit_callbacks(execute=True),
         ):
-            OrderService.refund_order(order, amount=Money("30.00", "EUR"))
-            OrderService.refund_order(order, amount=Money("20.00", "EUR"))
+            RefundService.refund_order(order, amount=Money("30.00", "EUR"))
+            RefundService.refund_order(order, amount=Money("20.00", "EUR"))
 
         rows = order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND

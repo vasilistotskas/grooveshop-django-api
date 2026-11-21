@@ -24,6 +24,7 @@ from simple_history.models import HistoricalRecords
 
 from core.fields.measurement import MeasurementField
 from core.fields.rich_text import RichTextField
+from core.measurement import DistanceUnits, WeightUnits
 from core.models import (
     MetaDataModel,
     SeoTranslationModel,
@@ -31,7 +32,6 @@ from core.models import (
     TimeStampMixinModel,
     UUIDModel,
 )
-from core.units import DistanceUnits, WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
 from core.utils.html_text import visible_text
 from core.weight import zero_weight
@@ -705,7 +705,7 @@ class ProductTranslation(
         null=True,
     )
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
-    description = RichTextField(_("Description"), blank=True, null=True)
+    description = RichTextField(_("Description"), blank=True, default="")
     feed_title = models.CharField(
         _("Feed title"),
         max_length=150,

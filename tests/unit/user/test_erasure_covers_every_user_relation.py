@@ -63,16 +63,27 @@ _NOT_SUBJECT_DATA = {
 def _handled_model_names() -> frozenset[str]:
     """Model names the erasure function names for itself.
 
-    Read out of the function's own source rather than from a hand-kept
+    Read out of the function's own source, and that of the module's own
+    helpers it calls (``_subject_orders``), rather than from a hand-kept
     list, so the two cannot drift: a model stops counting as handled the
     moment its queryset is removed.
     """
+    sources = [gdpr.anonymise_and_delete_user]
     tree = ast.parse(inspect.getsource(gdpr.anonymise_and_delete_user))
-    names = set()
     for node in ast.walk(tree):
         match node:
-            case ast.Attribute(value=ast.Name(id=name), attr="objects"):
-                names.add(name)
+            case ast.Call(func=ast.Name(id=called)):
+                helper = getattr(gdpr, called, None)
+                if inspect.isfunction(helper) and helper.__module__ == (
+                    gdpr.__name__
+                ):
+                    sources.append(helper)
+    names = set()
+    for source in sources:
+        for node in ast.walk(ast.parse(inspect.getsource(source))):
+            match node:
+                case ast.Attribute(value=ast.Name(id=name), attr="objects"):
+                    names.add(name)
     return frozenset(names)
 
 

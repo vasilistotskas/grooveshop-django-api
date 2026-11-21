@@ -25,7 +25,7 @@ order_completed = Signal()
 # (``order_stored_value_returned``), never because this signal fired.
 order_refunded = Signal()
 # Dispatched once per refund share that went back onto gift cards and
-# loyalty points (``OrderService._return_stored_value``): value returned
+# loyalty points (``RefundService._return_stored_value``): value returned
 # without a provider moving money, so there is no ledger row and no
 # ``order_refunded``. Keyword arguments: ``amount`` (``Money``, the value
 # of the share), ``gift_card`` (``Money`` credited to cards), ``points``

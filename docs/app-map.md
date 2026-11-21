@@ -86,7 +86,7 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   (`src/core/monitored_task.py`), the system tasks (`src/core/tasks.py`),
   the retry sets (`src/core/retry.py`) and the retention helper
   (`src/core/retention.py`);
-- the cache backend (`src/core/caches.py`) and the cache surface registry
+- the cache backend (`src/core/cache_backend.py`) and the cache surface registry
   (`src/core/cache/`), with the surfaces no single app owns (settings,
   storefront pages, sitemap and SEO);
 - middleware (`src/core/middleware/`), the email templates
@@ -161,7 +161,8 @@ staging anonymiser (`src/devtools/anonymise/`); the seed commands. Read
 and each store's schema holds its customers. Also `UserAddress`,
 `UserSubscription`, `SubscriptionTopic` and `UserDataExport`. Services are
 a package (`src/user/services/`, with the data export and account
-deletion in `src/user/services/gdpr.py`). Authentication is django-allauth
+deletion in `src/user/services/gdpr.py`; read `docs/gdpr-erasure.md`).
+Authentication is django-allauth
 headless, mounted at `_allauth/` in `src/core/urls.py`; read
 `docs/allauth-schema.md`.
 
@@ -217,7 +218,9 @@ covers what you are changing. Models under `src/order/models/`: `Order`,
 and `VivaWebhookEvent`.
 
 Entry points: `src/order/services.py` (creation, the state machine,
-cancel, refund), `src/order/checkout/quote.py` (`OrderQuoteService`: the
+cancel), `src/order/refunds/service.py` (`RefundService`: claiming,
+allocating, making, booking and declining a refund),
+`src/order/checkout/quote.py` (`OrderQuoteService`: the
 checkout quote, which is the one total, the free-shipping basis, the
 shipping price and the pay-way fee),
 `src/order/inventory/stock.py` (`StockManager`),
@@ -401,7 +404,9 @@ analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 
 Meta Conversions API: `MetaCapiEventLog`, the receivers on order and
 registration events (`src/meta_capi/signals.py`) and the tasks that post
-the events (`src/meta_capi/tasks.py`). It has no doc in this repository;
+the events (`src/meta_capi/tasks.py`), each event once: its id is fixed
+before a task can run again (`src/meta_capi/services.py`) and the check and
+the send hold an advisory lock on it. It has no doc in this repository;
 the cross-service view is
 `grooveshop-docs/src/dev/flows/analytics-and-consent.md`.
 

@@ -520,7 +520,7 @@ class PaymentLedger:
 
         Either the ledger holds refundable money, or the order was paid
         through a registered provider whose capture the ledger never
-        recorded: ``OrderService.refund_order`` reads that from the provider
+        recorded: ``RefundService.refund_order`` reads that from the provider
         once (:meth:`ensure_charge`), so the money is refundable although
         :meth:`refundable` is 0. A cheap predicate on purpose (no provider
         call): it decides whether an admin button is drawn and whether an

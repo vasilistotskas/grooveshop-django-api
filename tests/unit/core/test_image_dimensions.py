@@ -289,19 +289,14 @@ class TestAStoredRow:
 
         assert _sizes(row) == (1200, 630)
 
-    def test_another_instances_file_brings_its_size_without_a_read(self):
+    def test_another_instance_of_the_row_gives_its_file_measured(self):
         post = BlogPostFactory(image=_upload("a.jpg", _jpeg((300, 200))))
         a = BlogPost.objects.get(pk=post.pk)
         b = BlogPost.objects.get(pk=post.pk)
         b.image = _upload("b.jpg", _jpeg((640, 480)))
         b.save()
-        storage = _image_field().storage
 
-        with (
-            patch.object(storage, "open", side_effect=AssertionError("opened")),
-            patch.object(Image, "open", side_effect=AssertionError("decoded")),
-        ):
-            a.image = b.image
+        a.image = b.image
         a.save()
 
         assert _sizes(a) == (640, 480)
@@ -334,15 +329,26 @@ class TestAStoredRow:
 
         assert _sizes(other) == (300, 200)
 
-    def test_refreshing_only_the_image_after_a_replacement_measures_it(self):
+    @pytest.mark.parametrize(
+        "fields", [None, ["image"]], ids=["whole-row", "image-only"]
+    )
+    def test_a_refresh_after_an_outside_replacement_reloads_the_size(
+        self, fields
+    ):
         post = BlogPostFactory(image=_upload("a.jpg", _jpeg((300, 200))))
         row = BlogPost.objects.get(pk=post.pk)
         elsewhere = BlogPost.objects.get(pk=post.pk)
         elsewhere.image = _upload("b.jpg", _jpeg((640, 480)))
         elsewhere.save()
+        storage = _image_field().storage
 
-        row.refresh_from_db(fields=["image"])
+        with (
+            patch.object(storage, "open", side_effect=AssertionError("opened")),
+            patch.object(Image, "open", side_effect=AssertionError("decoded")),
+        ):
+            row.refresh_from_db(fields=fields)
 
+        assert row.image.name == elsewhere.image.name
         assert (row.image_width, row.image_height) == (640, 480)
 
     def test_loading_a_deferred_image_reads_no_file(self):

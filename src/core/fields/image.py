@@ -8,21 +8,23 @@ schema.org ImageObject), so it must be the displayed one, not the stored
 one Django's own ``ImageField`` records. An SVG has no raster size: both
 are null.
 
-The size is measured when a file is assigned after ``Model.__init__`` that
-differs from the one the row holds (an upload, on save, or another stored
-file; also when the row's file was NULL or deferred), and on the save that
-adds a row built with a file (an upload, or a stored file's name). Only
-then: never when a row is loaded (Django's ``ImageField`` opens the stored
-file of every row loaded with a null size, which an SVG always has), never
-when ``refresh_from_db`` or a deferred field's load assigns the row's own
-stored file, never for a reassignment of the same file, never for another
-instance's file while that instance still holds it with its size (the size
-is copied with it), and never on a later save of a row whose file has no size (an SVG, an
-unreadable or missing file): the file it names has not changed. A save whose ``update_fields``
-names the image also writes its size (``ImageSizeModelMixin``). Rows stored
-before a model gained the fields are measured by ``manage.py
-backfill_image_dimensions``. A queryset ``update()`` of the file bypasses
-the field: it has to write the size itself.
+The size is measured when a file is assigned after ``Model.__init__`` whose
+stored name differs from the one the instance holds (an upload, on save, or
+another stored file, from another instance too; also when the row's file
+was NULL or deferred), and on the save that adds a row built with a file (an
+upload, or a stored file's name). Only then: never when a row is loaded
+(Django's ``ImageField`` opens the stored file of every row loaded with a
+null size, which an SVG always has), never inside ``refresh_from_db`` or a
+deferred field's load (``ImageSizeModelMixin`` reloads the stored size with
+the file), never for a reassignment of the same file, and never on a later
+save of a row whose file has no size (an SVG, an unreadable or missing
+file): the file it names has not changed. A save whose ``update_fields``
+names the image also writes its size. Django's ``FETCH_PEERS`` fetch mode
+loads a deferred file for many rows by assigning their stored names, which
+counts as an assignment: one header read per row (nothing here sets a fetch
+mode). Rows stored before a model gained the fields are measured by
+``manage.py backfill_image_dimensions``. A queryset ``update()`` of the file
+bypasses the field: it has to write the size itself.
 """
 
 from __future__ import annotations
@@ -59,51 +61,31 @@ def _stored_name(value: Any) -> str | None:
 _INITIALISED = "image_sizes_initialised"
 
 
+#: Set on ``instance._state`` by ``ImageSizeModelMixin.refresh_from_db``: what
+#: it assigns is the stored file, reloaded with its stored size.
+_REFRESHING = "image_sizes_refreshing"
+
+
 def _is_initialised(instance: Model) -> bool:
     return getattr(instance._state, _INITIALISED, False)
 
 
-def _holding_instance(instance: Model, value: Any) -> Model | None:
-    """The other instance of *instance*'s model that holds the stored file
-    *value* now, in the same field: a copy between instances, or what
-    ``refresh_from_db`` and a deferred field's load assign. ``None`` when
-    that instance has moved on to another file since *value* was read from
-    it (a swap, a file kept from before its row changed): its size is no
-    longer this file's."""
-    source = getattr(value, "instance", None)
-    if (
-        isinstance(value, FieldFile)
-        and value._committed
-        and source is not None
-        and source is not instance
-        and type(source) is type(instance)
-        and source.__dict__.get(value.field.attname) is value
-    ):
-        return source
-    return None
+def _is_refreshing(instance: Model) -> bool:
+    return getattr(instance._state, _REFRESHING, False)
 
 
 class DisplayedSizeDescriptor(ImageFileDescriptor):
     """Measures on an assignment that changes the file (see the module)."""
 
     def __set__(self, instance: Model, value: Any) -> None:
-        # Missing for a deferred file, None for a NULL one: no name to
-        # compare, so a stored name assigned to such a row is measured.
-        deferred = self.field.attname not in instance.__dict__
+        # None for a NULL or deferred file: no name to compare, so a stored
+        # name assigned to such a row is measured.
         previous = instance.__dict__.get(self.field.attname)
         FileDescriptor.__set__(self, instance, value)
         # Inside ``Model.__init__`` the row is being loaded, or built with
         # a file that its save measures.
-        if not _is_initialised(instance):
+        if not _is_initialised(instance) or _is_refreshing(instance):
             return
-        source = _holding_instance(instance, value)
-        if source is not None and value.field is self.field:
-            if self.field.copy_size(source, instance):
-                return
-            if deferred and source.pk is not None and source.pk == instance.pk:
-                # A deferred field's load: the row's own file, whose size
-                # this instance already holds.
-                return
         name = _stored_name(value)
         if name is not None and name == _stored_name(previous):
             return
@@ -168,17 +150,6 @@ class ImageAndSvgField(ImageField):
         if self.height_field:
             setattr(instance, self.height_field, height)
 
-    def copy_size(self, source: Model, instance: Model) -> bool:
-        """Give *instance* the size *source* holds for the file it is given
-        from *source*, without reading it; ``False`` when *source* did not
-        load its size."""
-        names = [n for n in (self.width_field, self.height_field) if n]
-        if not names or not all(n in source.__dict__ for n in names):
-            return False
-        for name in names:
-            setattr(instance, name, source.__dict__[name])
-        return True
-
     @staticmethod
     def _measure(file: FieldFile) -> tuple[int, int] | None:
         """An upload not stored yet is read from its content; a stored file
@@ -213,10 +184,11 @@ def with_size_fields(
 
 
 class ImageSizeModelMixin(Model):
-    """For a model with an ``ImageAndSvgField`` that records its size: a
-    save naming the image in ``update_fields`` writes the size the field
-    measured on assignment too, so the row never pairs a new file with the
-    previous file's size."""
+    """For a model with an ``ImageAndSvgField`` that records its size, the
+    file and its size move together: a save naming the image in
+    ``update_fields`` writes the size the field measured on assignment, and
+    a refresh naming it (a deferred field's load among them) reloads the
+    stored size with it instead of measuring the file."""
 
     class Meta:
         abstract = True
@@ -228,3 +200,19 @@ class ImageSizeModelMixin(Model):
                 type(self), update_fields
             )
         super().save(*args, **kwargs)
+
+    def refresh_from_db(
+        self,
+        using: str | None = None,
+        fields: Iterable[str] | None = None,
+        from_queryset: Any = None,
+    ) -> None:
+        if fields is not None:
+            fields = with_size_fields(type(self), fields)
+        setattr(self._state, _REFRESHING, True)
+        try:
+            super().refresh_from_db(
+                using=using, fields=fields, from_queryset=from_queryset
+            )
+        finally:
+            setattr(self._state, _REFRESHING, False)

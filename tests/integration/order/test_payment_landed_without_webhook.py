@@ -30,7 +30,7 @@ from extra_settings.models import Setting
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.models.order import Order
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments import payment_hold
@@ -511,14 +511,12 @@ class TestStripeLostWebhook:
         assert order.status == OrderStatus.PENDING
 
 
-class TestAPaymentThatSettlesNothingIsNotCountedSettled:
-    def test_a_viva_charge_refused_without_a_flag_keeps_the_order_open(
-        self, caplog
-    ):
+class TestAPaymentThatSettlesNothing:
+    def test_a_viva_charge_refused_without_a_flag_goes_to_review(self):
         """A charge the checks refuse without flagging it (Retrieve
         Transaction names another payment order) settled nothing: the
-        sweep keeps the order for a person instead of calling it settled
-        for ever."""
+        money is Viva's to explain and the store's to decide, so the order
+        is flagged for review, never repeated as open by every run."""
         order = _viva_order()
         api = _paid_at_viva(order)
         api.transactions[TXN] = (
@@ -531,15 +529,17 @@ class TestAPaymentThatSettlesNothingIsNotCountedSettled:
             ),
         )
 
-        with api, caplog.at_level("ERROR", logger="order.payments"):
+        with api, patch("emails.send.send_email") as sent:
             result = auto_cancel_stuck_pending_orders()
 
-        assert result["settled"] == 0
-        assert result["skipped_open"] == 1
+        assert result["settled"] == 1
         assert result["canceled_pending"] == 0
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
-        assert any(r.levelname == "ERROR" for r in caplog.records)
+        assert payment_hold.awaits_payment_review(order)
+        assert [c.args[0] for c in sent.call_args_list] == [
+            "ops.payment_mismatch"
+        ]
 
     def test_a_stripe_session_still_being_paid_is_not_settled(self):
         order = _expired_unpaid(
@@ -615,28 +615,35 @@ class TestAnUnreadableAmountIsAnUnreadableViva:
         assert order.status == OrderStatus.PENDING
 
     @pytest.mark.parametrize("status_id", ["R", "M", "MA", "MI", "ML", "MS"])
-    def test_a_payment_refunded_or_disputed_since_keeps_the_order(
-        self, status_id, caplog
+    def test_a_payment_refunded_or_disputed_since_goes_to_review(
+        self, status_id
     ):
         """Viva writes ``R`` (refunded in full or in part) or a dispute
-        status on the ORIGINAL payment: the money was taken, so the order
-        is never canceled as unpaid. No webhook settles such a payment, so
-        nothing is applied or recorded for it: the order is kept for a
-        person, with an ERROR."""
+        status on the ORIGINAL payment: the money was taken, so the order is
+        never canceled as unpaid, and no webhook settles such a payment, so
+        nothing is applied for it. The order is flagged for the store, once:
+        it is on the review worklist, which the sweep leaves alone."""
         order = _viva_order()
         api = _paid_at_viva(order)
         api.by_order_code[CODE][1]["Transactions"][0]["StatusId"] = status_id
 
-        with api, caplog.at_level("ERROR", logger="order.payments"):
-            result = auto_cancel_stuck_pending_orders()
+        with api, patch("emails.send.send_email") as sent:
+            first = auto_cancel_stuck_pending_orders()
+            second = auto_cancel_stuck_pending_orders()
 
-        assert result["skipped_open"] == 1
-        assert result["canceled_pending"] == 0
+        assert first["canceled_pending"] == 0
+        assert first["settled"] == 1
+        assert second["settled"] == 0
+        assert second["canceled_pending"] == 0
         assert not VivaWebhookEvent.objects.exists()
         assert TXN not in api.retrieved
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
-        assert any(r.levelname == "ERROR" for r in caplog.records)
+        assert order.metadata[AMOUNT_MISMATCH_FLAG]["transaction_id"] == TXN
+        assert payment_hold.awaits_payment_review(order)
+        assert [c.args[0] for c in sent.call_args_list] == [
+            "ops.payment_mismatch"
+        ]
 
     @pytest.mark.parametrize(
         "body",

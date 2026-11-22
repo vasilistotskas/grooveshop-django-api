@@ -91,14 +91,6 @@ MANUAL_REFUND_PROVIDER = "manual"
 #: it with the order and the collection it refunds.
 REPAYMENT_REFERENCE_MAX_LENGTH = 100
 
-#: What a provider can say about a payment that was captured. Viva reports
-#: ``R`` for a payment that was refunded afterwards, which is still a
-#: capture; Stripe keeps a refunded PaymentIntent ``succeeded``.
-_CAPTURED_STATUSES = frozenset(
-    {PaymentStatus.COMPLETED, PaymentStatus.REFUNDED}
-)
-
-
 #: Payment statuses of an order money is still held for, and so one whose
 #: capture a refund may have to read from the provider.
 _HELD_PAYMENT_STATUSES = frozenset(
@@ -1320,6 +1312,7 @@ class PaymentLedger:
         """
         from order.payments.payment import (
             get_payment_provider,
+            get_payment_provider_class,
             provider_amount,
         )
 
@@ -1346,7 +1339,7 @@ class PaymentLedger:
         # A capture is a positive amount: a refund (negative) named as the
         # payment is none.
         if (
-            status not in _CAPTURED_STATUSES
+            not get_payment_provider_class(provider_code).captured(status, data)
             or captured is None
             or captured <= 0
         ):

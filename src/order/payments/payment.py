@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, ClassVar, cast
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import moneyed
@@ -23,6 +24,7 @@ from order.enum.status import PaymentStatus
 from order.exceptions import (
     PaymentInProgressError,
     PaymentStatusUnavailableError,
+    ProviderTransactionUnknownError,
 )
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 
@@ -48,6 +50,19 @@ class ProviderRefund:
     refund_id: str
     amount: Money
     made: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LandedCharge:
+    """A payment Viva lists as having taken money on one of an order's
+    payment orders (:meth:`VivaWalletPaymentProvider.landed_charges`)."""
+
+    order_code: str
+    transaction_id: str
+    #: Viva's ``StatusId`` for it now: ``F`` finished, or refunded or
+    #: disputed since (``VIVA_MONEY_TAKEN_STATUS_IDS``).
+    status_id: str
+    amount: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,6 +235,14 @@ class PaymentProvider(ABC):
         """End a session nobody was given: the one a request opened while
         a concurrent request recorded its own first. Default nothing."""
         return
+
+    @classmethod
+    def captured(cls, status: PaymentStatus, data: dict[str, Any]) -> bool:
+        """Whether :meth:`get_payment_status`'s answer (*status*, *data*) is
+        a payment that took the money, whatever happened to it since.
+        Default: paid, or refunded afterwards (Stripe keeps a refunded
+        PaymentIntent ``succeeded``)."""
+        return status in {PaymentStatus.COMPLETED, PaymentStatus.REFUNDED}
 
     def close_payment(self, order: Order) -> bool:
         """Stop accepting payment on *order*; True once none can land.
@@ -1503,15 +1526,14 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
         return rows
 
-    def landed_charges(self, order: Order) -> list[tuple[str, str, str]]:
-        """The payments Viva took on the order's payment orders, as
-        ``(order code, transaction id, StatusId)``: in a status of money
-        taken (``VIVA_MONEY_TAKEN_STATUS_IDS``: finished, refunded since,
-        or disputed), for a positive amount and with no ``ParentId``,
-        which a refund carries (its amount is negative and its parent is
-        the payment it reverses; seen on a demo refund 2026-11-08). Every
-        code is read: a payment on any of them is the order's
-        (``viva_order_code_q``).
+    def landed_charges(self, order: Order) -> list[LandedCharge]:
+        """The payments Viva took on the order's payment orders: in a
+        status of money taken (``VIVA_MONEY_TAKEN_STATUS_IDS``: finished,
+        refunded since, or disputed), for a positive amount and with no
+        ``ParentId``, which a refund carries (its amount is negative and
+        its parent is the payment it reverses; seen on a demo refund
+        2026-11-08). Every code is read: a payment on any of them is the
+        order's (``viva_order_code_q``).
 
         Raises ``PaymentStatusUnavailableError`` when a code could not be
         read, or the store has no Merchant ID and API Key to read it with.
@@ -1523,7 +1545,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 order.id,
             )
             raise PaymentStatusUnavailableError(str(order.id))
-        landed: list[tuple[str, str, str]] = []
+        landed: list[LandedCharge] = []
         for code in order_viva_codes_in_order(order):
             try:
                 rows = self._order_transactions(
@@ -1554,7 +1576,12 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     raise PaymentStatusUnavailableError(code)
                 if amount > 0:
                     landed.append(
-                        (code, str(row["TransactionId"]), str(status_id))
+                        LandedCharge(
+                            order_code=code,
+                            transaction_id=str(row["TransactionId"]),
+                            status_id=str(status_id),
+                            amount=amount,
+                        )
                     )
         return landed
 
@@ -1670,6 +1697,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
             f"{self.merchant_id}:{self.api_key}".encode()
         ).decode()
         return f"Basic {credentials}"
+
+    @classmethod
+    def captured(cls, status: PaymentStatus, data: dict[str, Any]) -> bool:
+        """Viva's own ``StatusId`` says it: finished, refunded since, or
+        disputed at any stage (``VIVA_MONEY_TAKEN_STATUS_IDS``). The mapped
+        status cannot: an open dispute maps to ``PROCESSING``."""
+        return data.get("raw_status") in VIVA_MONEY_TAKEN_STATUS_IDS
 
     def _map_viva_status(self, status_id: str) -> PaymentStatus:
         status_mapping = {
@@ -2056,7 +2090,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
             access_token = self._get_access_token()
 
             response = requests.get(
-                f"{self.api_url}/checkout/v2/transactions/{payment_id}",
+                # The id can come from a webhook body (a 1797's ParentId):
+                # one path segment, whatever it holds.
+                f"{self.api_url}/checkout/v2/transactions/"
+                f"{quote(payment_id, safe='')}",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                 },
@@ -2100,6 +2137,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 error_body,
                 extra={"payment_id": payment_id},
             )
+            if e.response is not None and e.response.status_code == 404:
+                raise ProviderTransactionUnknownError(payment_id) from e
             raise PaymentStatusUnavailableError(payment_id) from e
         except Exception as e:
             logger.exception(

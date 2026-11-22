@@ -3135,11 +3135,26 @@ class OrderService:
         flag also keeps ``auto_cancel_stuck_pending_orders`` from closing
         the order with ``refund_payment=False``; a human reconciles it.
         Called with the order row locked by the payment handler.
+
+        Once per payment: the same payment met again while the order still
+        waits for that review (a read-back's next run, a refund of it, a
+        redelivery) changes nothing and emails no one. Another payment is
+        news, and flags it again.
         """
         from emails.send import send_email
         from order.emails import PaymentMismatch
         from order.models.history import OrderHistory
         from order.models.order import AMOUNT_MISMATCH_FLAG
+        from order.payments import payment_hold
+
+        flagged = (order.metadata or {}).get(AMOUNT_MISMATCH_FLAG)
+        if (
+            isinstance(flagged, dict)
+            and str(flagged.get("transaction_id", "")).lower()
+            == str(payment_id).lower()
+            and payment_hold.awaits_payment_review(order)
+        ):
+            return
 
         if not order.metadata:
             order.metadata = {}

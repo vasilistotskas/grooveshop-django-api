@@ -20,7 +20,9 @@ Differences from the Stripe path that are easy to miss:
   event's ``EventRead`` (`_EVENT_HANDLERS` pairs each handler with one)
   retrieves what the handler needs before the lock (the transaction; for
   a 1797 also the payment its ``ParentId`` names when the ledger lacks
-  it), and the handler judges that answer under the lock.
+  it, read only once the refund is on one of the order's codes, and sent
+  as one quoted path segment), and the handler judges that answer under
+  the lock.
 - **Idempotency** uses the ``VivaWebhookEvent`` table
   (``src/order/models/viva_webhook_event.py``), unique on
   ``(transaction_id, event_type_id)`` and written last in the same
@@ -63,9 +65,12 @@ applied through
 `viva_settlement.apply_event` as the 1796 its webhook carries, so it is
 verified with Retrieve Transaction, booked, settled and confirmed exactly as
 the webhook would, and the `VivaWebhookEvent` row makes the webhook a no-op
-when it does land. One refunded or disputed since is applied by no webhook:
-nothing is recorded for it, and the order is kept for a person with an ERROR
-(`UNSETTLED`), never canceled as unpaid. A Viva that cannot be read raises
+when it does land. Money Viva took that settles nothing (one refunded or
+disputed since, which no webhook applies, or one the checks refuse without
+a flag) never lets the order be canceled as unpaid: the order is flagged for
+the store's review (`viva_settlement._flag_for_review`, under the order's
+lock), so it is on the "Payment review" worklist, which the sweep leaves
+alone. A Viva that cannot be read raises
 `PaymentStatusUnavailableError`: the sweep keeps the order, `viva_return`
 answers with the order as it is. An answer with no `Transactions` list, or a
 finished payment without a finite amount, is one that cannot be read; only an
@@ -141,15 +146,15 @@ unauthenticated body except `ParentId`:
    ([§7.2](refund-execution.md));
    `Order.status` is not touched, with one exception for an order still
    `PENDING` (never confirmed), which no sweep selects once its payment is
-   settled. A refund that leaves it holding nothing cancels it
-   (`cancel_order(refund_payment=False)`, stock released). A part refund
-   whose payment this very refund booked flags it for the store
+   settled. A refund that leaves it holding none of the customer's money
+   (`PaymentLedger.held` at zero; a gift card or points it also paid with
+   go back with the cancel) cancels it (`cancel_order(refund_payment=False)`,
+   stock released). One that leaves part held flags it for the store
    (`OrderService.flag_payment_mismatch`: what is held against what the
    order is for), so it is on the "Payment review" worklist
-   (`payment_hold.payment_review_orders`). A part refund of a charge it
-   already held (the excess of one waiting for review, flagged then) is the
-   store's own step, and the order stays on that worklist until the store
-   decides it.
+   (`payment_hold.payment_review_orders`); an order already flagged (a
+   charge held for review, whose excess the store refunded) keeps the flag
+   it has, and staff are not emailed again.
 
 The dispatcher stores the handler's real outcome in
 `VivaWebhookEvent.outcome`: every skip above (and a 1798 that changed

@@ -5,6 +5,7 @@ import logging
 from base64 import b64encode
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 if TYPE_CHECKING:
     from tenant.credentials import VivaWalletCredentials
@@ -1243,7 +1244,6 @@ def _handle_reversal_created(
     # ledger rows, the order's own ``payment_id``, or Viva saying the parent
     # was paid on one of the order's codes (:func:`_viva_charge_for`).
     parent_id = str(event_data.get("ParentId") or "")
-    booked_before = viva_settlement.ledger_charge(order, parent_id) is not None
     charge = _viva_charge_for(order, parent_id, reported=parent)
     if charge is None:
         logger.error(
@@ -1294,15 +1294,15 @@ def _handle_reversal_created(
 
     # An order never confirmed must not stay PENDING with a refunded
     # payment unnoticed: no sweep selects a settled payment. One the
-    # refund leaves holding nothing is canceled and its stock released.
-    # One whose payment this very refund booked (it landed before its
-    # 1796) and that still holds part of it is flagged for the store, as
-    # a charge that does not match the order. A part refund of a charge
-    # it already held (the excess of one waiting for review, flagged
-    # then) is the store's own step.
+    # refund leaves holding none of the customer's money is canceled, its
+    # stock released and anything paid by gift card or points given back.
+    # One still holding part is flagged for the store as a charge that
+    # does not match the order (once per payment: a charge held for
+    # review whose excess the store refunded keeps the flag it has).
     if order.status != OrderStatus.PENDING:
         return None
-    if order.payment_status == PaymentStatus.REFUNDED:
+    held = PaymentLedger.held(order)
+    if held <= 0:
         from order.lifecycle.service import OrderLifecycleService
 
         OrderLifecycleService.cancel_order(
@@ -1311,7 +1311,7 @@ def _handle_reversal_created(
             refund_payment=False,
             customer_initiated=False,
         )
-    elif not booked_before:
+    else:
         from order.payments.payment import VivaWalletPaymentProvider
         from order.services import OrderService
 
@@ -1319,7 +1319,7 @@ def _handle_reversal_created(
             order,
             payment_id=charge.provider_reference,
             provider=VivaWalletPaymentProvider.code,
-            observed=Money(PaymentLedger.held(order), charge.amount.currency),
+            observed=Money(held, charge.amount.currency),
             expected=order.calculate_order_total_amount(),
         )
     return None
@@ -1336,9 +1336,10 @@ def _viva_charge_for(order, payment_id: str, reported=None):
     has booked yet (its 1796 is late, lost, or verified and waiting for
     the order's lock): a refund or dispute of it is booked against it;
     one Viva reports uncaptured is none. *reported* is Retrieve
-    Transaction's answer for *payment_id* when the caller has read it.
-    Raises ``RuntimeError`` (→ 500, Viva retries) when Viva cannot be
-    read: retry rather than guess.
+    Transaction's answer for *payment_id*, read before the order was
+    locked; nothing is read here. Raises ``RuntimeError`` (→ 500, Viva
+    retries) when the order's own payment has no such answer, or Viva
+    reports it uncaptured: retry rather than guess.
     """
     from order.payments.payment import VivaWalletPaymentProvider
     from order.payments.payment_ledger import PaymentLedger
@@ -1353,10 +1354,15 @@ def _viva_charge_for(order, payment_id: str, reported=None):
     )
     if owned:
         payment_id = order.payment_id
-    else:
         if reported is None:
-            reported = viva_settlement.retrieve_transaction(payment_id)
-        if not viva_settlement.transaction_belongs_to_order(order, reported[1]):
+            # Read before the lock when it is needed; never under it.
+            raise RuntimeError(
+                f"Viva payment {payment_id} was not read before the lock"
+            )
+    else:
+        if reported is None or not viva_settlement.transaction_belongs_to_order(
+            order, reported[1]
+        ):
             return None
     charge = PaymentLedger.ensure_charge(
         order,
@@ -1780,16 +1786,66 @@ def _read_event_transaction(order, event_data, transaction_id):
 def _read_reversal(order, event_data, transaction_id):
     """:data:`viva_settlement.EventRead` of a 1797: the refund, and the
     payment its ``ParentId`` names when the ledger does not hold it yet
-    (:func:`_viva_charge_for` books it from this answer)."""
+    (:func:`_viva_charge_for` books it from this answer).
+
+    ``ParentId`` is the unauthenticated body's, so it is sent to Viva only
+    once the refund itself is verified as one of this order's
+    (:func:`_verify_viva_reversal` on the answer just read) and it has the
+    shape of a Viva transaction id (a GUID). A parent Viva does not know is
+    a payment of nobody's: it is not read, and the handler skips the event
+    rather than answer 500 for a retry that cannot succeed."""
+    from order.exceptions import (
+        PaymentStatusUnavailableError,
+        ProviderTransactionUnknownError,
+    )
+    from order.payments.payment import (
+        VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
+        VIVA_REFUND_TRANSACTION_TYPE_IDS,
+        VivaWalletPaymentProvider,
+    )
+
     read = _read_event_transaction(order, event_data, transaction_id)
     parent_id = str(event_data.get("ParentId") or "")
-    if (
+    if not (
         read
-        and parent_id
+        and _is_viva_transaction_id(parent_id)
         and not viva_settlement.ledger_charge(order, parent_id)
+        and _verify_viva_reversal(
+            f"order {order.id}",
+            transaction_id,
+            order_viva_codes(order),
+            VIVA_REFUND_TRANSACTION_TYPE_IDS
+            | VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
+            reported=read["reported"],
+        )
     ):
-        read["parent"] = viva_settlement.retrieve_transaction(parent_id)
+        return read
+    try:
+        read["parent"] = VivaWalletPaymentProvider().get_payment_status(
+            parent_id
+        )
+    except ProviderTransactionUnknownError:
+        logger.warning(
+            "Viva reversal of order %s names parent %r, which Viva does not "
+            "know: skipping",
+            order.id,
+            parent_id,
+        )
+    except PaymentStatusUnavailableError as e:
+        raise RuntimeError(
+            f"Viva payment {parent_id} could not be read for a reversal"
+        ) from e
     return read
+
+
+def _is_viva_transaction_id(value: str) -> bool:
+    """Whether *value* has the shape of a Viva transaction id, a GUID
+    (Retrieve Transaction: ``transactionId``, ``string <uuid>``)."""
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
 
 
 #: The handler of each Viva ``EventTypeId`` an order receives, per Viva's

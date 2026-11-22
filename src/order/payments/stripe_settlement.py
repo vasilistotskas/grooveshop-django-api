@@ -227,8 +227,8 @@ def settle_landed_payment(order: Order) -> LandedPayment:
     settled by its ``checkout.session.completed`` code
     (:func:`settle_checkout_session`). A complete session whose payment is
     still in flight (a delayed method) settled nothing yet and keeps the
-    order (``UNSETTLED``), as does a payment the checks refused without a
-    flag.
+    order (``UNSETTLED``) for its webhook; a payment taken that settled
+    nothing is flagged for the store's review (:func:`_what_settled`).
 
     Raises ``PaymentStatusUnavailableError`` when Stripe could not be read.
     """
@@ -255,7 +255,7 @@ def settle_landed_payment(order: Order) -> LandedPayment:
                     "currency": str(received.currency),
                 },
             )
-            return _what_settled(order)
+            return _what_settled(order, payment_id, received)
 
     session_id = provider.recorded_checkout_session(order.metadata or {})
     if not session_id:
@@ -286,27 +286,41 @@ def settle_landed_payment(order: Order) -> LandedPayment:
         # an answer that could not be read.
         logger.warning("Checkout Session %s states no amount", session_id)
         raise PaymentStatusUnavailableError(session_id)
+    captured = money_from_minor_units(session.amount_total, session.currency)
     settle_checkout_session(
         order.pk,
         session_id=session_id,
         payment_intent_id=intent_id,
-        captured=money_from_minor_units(session.amount_total, session.currency),
+        captured=captured,
     )
-    return _what_settled(order)
+    return _what_settled(order, intent_id, captured)
 
 
-def _what_settled(order: Order) -> LandedPayment:
-    """``SETTLED`` when the payment Stripe took left *order* paid or
-    waiting for the store's review; otherwise it settled nothing, which
-    is logged as an ERROR and keeps the order for a person."""
+def _what_settled(
+    order: Order, payment_id: str, captured: Money
+) -> LandedPayment:
+    """``SETTLED`` once the payment Stripe took (*payment_id*, *captured*)
+    left *order* paid or waiting for the store's review. One that settled
+    nothing is flagged for that review (``OrderService.flag_payment_mismatch``,
+    under the order's lock), never left for the next run to repeat."""
+    from order.services import OrderService
+
     order.refresh_from_db()
     if order.payment_status == PaymentStatus.COMPLETED or (
         payment_hold.awaits_payment_review(order)
     ):
         return LandedPayment.SETTLED
-    logger.error(
-        "Stripe holds a payment for order %s that settled nothing: the "
-        "order is kept for a person",
-        order.id,
-    )
-    return LandedPayment.UNSETTLED
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        if (
+            locked.status == OrderStatus.PENDING
+            and locked.payment_status != PaymentStatus.COMPLETED
+        ):
+            OrderService.flag_payment_mismatch(
+                locked,
+                payment_id=payment_id,
+                provider=StripePaymentProvider.code,
+                observed=captured,
+                expected=locked.calculate_order_total_amount(),
+            )
+    return LandedPayment.SETTLED

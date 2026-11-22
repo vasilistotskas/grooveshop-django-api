@@ -25,6 +25,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.payments import payment_hold, viva_settlement
 from order.payments.payment_ledger import PaymentLedger
 from order.refunds.service import RefundService
 from order.views.viva_webhook import (
@@ -394,6 +395,46 @@ class TestEventsThatAreNotOurDisputes:
         assert fake.retrieved == [SALE]
         [row] = _chargebacks(order)
         assert row.charge.provider_reference == SALE
+
+        # No webhook settles a sale Viva lists as a lost dispute: the read
+        # back puts the order on the store's review worklist, never leaves it
+        # PENDING on none.
+        listing = {
+            "Transactions": [
+                {
+                    "TransactionId": SALE,
+                    "StatusId": "ML",
+                    "Amount": CAPTURED,
+                    "ParentId": None,
+                }
+            ],
+            "Success": True,
+        }
+        with (
+            FakeVivaApi(by_order_code={str(ORDER_CODE): (200, listing)}),
+            patch("emails.send.send_email"),
+        ):
+            viva_settlement.settle_landed_payment(order)
+
+        order.refresh_from_db()
+        assert payment_hold.awaits_payment_review(order)
+
+    def test_an_open_dispute_of_the_orders_unbooked_payment_is_noted(self):
+        """An order paid before the ledger recorded its charge: a dispute
+        Viva reports open on that payment (``M``) is money taken, so the
+        charge is booked from the sale already read and the dispute noted,
+        never answered 500 for every retry."""
+        order = _paid_order()
+        order.payment_transactions.all().delete()
+
+        email = _dispute("M", "wallet-open-unbooked")
+
+        assert order.payment_transactions.filter(
+            kind=PaymentTransactionKind.CHARGE, provider_reference=SALE
+        ).exists()
+        order.refresh_from_db()
+        assert order.metadata.get("disputed")
+        email.assert_called_once()
 
     def test_an_unverifiable_sale_answers_500_and_writes_nothing(self):
         order = _paid_order()

@@ -2453,8 +2453,9 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             return "open", still_as_read
         if landed == LandedPayment.SETTLED:
             logger.warning(
-                "Auto-cancel found order %s paid at its provider "
-                "with no webhook: settled it instead",
+                "Auto-cancel found money for order %s at its provider "
+                "with no webhook: settled it, or put it to the store's "
+                "review, instead",
                 order.id,
             )
             return "settled", still_as_read

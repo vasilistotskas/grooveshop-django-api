@@ -29,7 +29,11 @@ from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
-from order.payments.payment import order_viva_codes, provider_amount
+from order.payments.payment import (
+    LandedCharge,
+    order_viva_codes,
+    provider_amount,
+)
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -678,11 +682,13 @@ def settle_landed_payment(order: Order) -> LandedPayment:
     transaction is verified with Viva, and the ledger row, the status and
     the confirmation are the webhook's own, once. A charge Viva could not
     verify, or that settles nothing (another amount, a canceled order),
-    is left to those checks, which record and flag it as for the webhook;
-    one they refused without a flag settled nothing, is logged as an
-    ERROR, and keeps the order (``UNSETTLED``) for a person. So does a
-    payment refunded or disputed since (``R``, ``M``...): the money was
-    taken, and no webhook settles it, so nothing is applied for it.
+    is left to those checks, which record and flag it as for the webhook.
+    A payment refunded or disputed since (``R``, ``M``...) is applied by
+    no webhook. Viva holding money that settled nothing, for either
+    reason, flags the order for the store's review
+    (:func:`_flag_for_review`): the read-back settles it, flags it, or
+    finds nothing taken, and never answers ``UNSETTLED`` for a run to
+    repeat.
 
     Raises ``PaymentStatusUnavailableError`` when Viva could not be read:
     a payment may have landed, so the caller must not act as if none did.
@@ -693,13 +699,13 @@ def settle_landed_payment(order: Order) -> LandedPayment:
     )
 
     landed = VivaWalletPaymentProvider().landed_charges(order)
-    for order_code, transaction_id, status_id in landed:
-        if status_id != VIVA_STATUS_FINISHED:
+    for charge in landed:
+        if charge.status_id != VIVA_STATUS_FINISHED:
             continue
         logger.info(
             "Viva holds payment txn_hash=%s for order %s: settling it as "
             "its webhook would",
-            transaction_hash(transaction_id),
+            transaction_hash(charge.transaction_id),
             order.id,
         )
         try:
@@ -707,14 +713,14 @@ def settle_landed_payment(order: Order) -> LandedPayment:
                 order,
                 event_type_id=VIVA_TRANSACTION_PAYMENT_CREATED,
                 event_data={"StatusId": "F"},
-                transaction_id=transaction_id,
-                order_code=order_code,
+                transaction_id=charge.transaction_id,
+                order_code=charge.order_code,
                 status_id="F",
                 handle=handle_payment_created,
                 read=read_payment_created,
             )
         except RuntimeError as e:
-            raise PaymentStatusUnavailableError(transaction_id) from e
+            raise PaymentStatusUnavailableError(charge.transaction_id) from e
     if not landed:
         return LandedPayment.NONE
     order.refresh_from_db()
@@ -722,11 +728,42 @@ def settle_landed_payment(order: Order) -> LandedPayment:
         payment_hold.awaits_payment_review(order)
     ):
         return LandedPayment.SETTLED
-    logger.error(
-        "Viva holds %s payment(s) for order %s that settled nothing "
-        "(StatusId %s): the order is kept for a person",
-        len(landed),
-        order.id,
-        ", ".join(sorted({status_id for _, _, status_id in landed})),
+    # Viva took money that settled nothing: refunded or disputed since, or
+    # refused by the checks without a flag. The store decides it.
+    unsettled = next(
+        (c for c in landed if c.status_id != VIVA_STATUS_FINISHED), landed[0]
     )
-    return LandedPayment.UNSETTLED
+    _flag_for_review(order, unsettled)
+    return LandedPayment.SETTLED
+
+
+def _flag_for_review(order: Order, charge: LandedCharge) -> None:
+    """Put *order* on the store's review worklist for *charge*, a payment
+    Viva took that settled nothing (refunded or disputed before any
+    webhook reached the order, or refused by the payment checks): what is
+    held is the store's to reconcile (``OrderService.flag_payment_mismatch``,
+    which flags a payment once). Under the order's lock: an order paid or
+    moved on meanwhile is left as it is."""
+    from djmoney.money import Money
+
+    from order.payments.payment import VivaWalletPaymentProvider
+    from order.services import OrderService
+
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        if (
+            locked.status != OrderStatus.PENDING
+            or locked.payment_status == PaymentStatus.COMPLETED
+        ):
+            return
+        expected = locked.calculate_order_total_amount()
+        OrderService.flag_payment_mismatch(
+            locked,
+            payment_id=charge.transaction_id,
+            provider=VivaWalletPaymentProvider.code,
+            observed=(
+                f"{Money(charge.amount, expected.currency)} "
+                f"(Viva StatusId {charge.status_id})"
+            ),
+            expected=expected,
+        )

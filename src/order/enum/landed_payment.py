@@ -5,15 +5,16 @@ class LandedPayment(StrEnum):
     """What a provider read back holds for an unpaid order
     (``order.payments.settlement.settle_landed_payment``).
 
-    Only ``NONE`` lets the sweep cancel the order: a payment the provider
-    holds that the order does not show settled (``UNSETTLED``) means the
-    money may have moved, so the order waits for its webhook or a person.
+    Only ``NONE`` lets the sweep cancel the order. Money the provider took
+    is settled or put to the store's review (``SETTLED``); ``UNSETTLED`` is
+    a payment still in flight, which its webhook settles.
     """
 
     #: The provider holds no payment for the order.
     NONE = "none"
-    #: The order is paid now, or its charge waits for the store's review
-    #: (``payment_hold.awaits_payment_review``).
+    #: The order is paid now, or the money taken waits for the store's
+    #: review (``payment_hold.awaits_payment_review``).
     SETTLED = "settled"
-    #: The provider holds a payment, or one in flight, that settled nothing.
+    #: A payment still in flight (a Stripe session paid by a delayed
+    #: method), or one Stripe took that settled nothing.
     UNSETTLED = "unsettled"

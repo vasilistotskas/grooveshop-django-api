@@ -237,8 +237,14 @@ locks stock.
   not succeed still has the recorded session read: opening a hosted link
   cancels the open intent and leaves its `payment_id`. The order is then
   paid, never canceled unpaid, the webhook that arrives later is a no-op, and
-  the sweep reports it as `settled`. A provider that cannot be read leaves the
-  order for the next run (`skipped_open`): a payment may have landed. Only then
+  the sweep reports it as `settled`. Money the provider took that settles
+  nothing (a Viva payment refunded or disputed before its webhook, one the
+  checks refuse without a flag) flags the order once for the store's review
+  (`flag_payment_mismatch`), also reported `settled`: a read-back settles,
+  flags, or finds nothing taken, and never leaves an order for every run to
+  repeat. Only a Stripe payment still in flight waits for its webhook
+  (`skipped_open`). A provider that cannot be read leaves the order for the
+  next run (`skipped_open`): a payment may have landed. Only then
   is the provider asked to close the payment (`close_payment(order)`): Stripe
   cancels the PaymentIntent and the
   order is canceled at once, whatever its hold says. A provider with nothing to

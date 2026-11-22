@@ -139,7 +139,10 @@ match is booked on the ledger (the money moved) but does not pay the order:
 `OrderService.flag_payment_mismatch` stamps `AMOUNT_MISMATCH_FLAG` (which
 also keeps `auto_cancel_stuck_pending_orders` away from it), notes the order
 and mails `ops.payment_mismatch`; the Viva amount/currency refusals
-use the same function. The flag is never cleared, so while the order is
+use the same function, and it flags a payment once: the same payment met
+again while the order waits for that review (a read-back's next run, a
+refund of it, a redelivery) changes nothing and emails no one. The flag is
+never cleared, so while the order is
 still undecided (PENDING, and the charge not accepted: payment not
 `COMPLETED`, whatever else it says, a refund in full or in part included;
 `payment_hold.payment_review_orders`) the order detail serves

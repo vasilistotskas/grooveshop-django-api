@@ -32,10 +32,7 @@ class BlogCategory(
         blank=True,
         default="",
         db_default="",
-        help_text=_(
-            "One of the page builder's icons. Where it is set, the store "
-            "shows it for the category instead of the image."
-        ),
+        help_text=_("The category's icon, one of the page builder's icons."),
     )
     parent = TreeForeignKey(
         "self",

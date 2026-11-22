@@ -37,6 +37,7 @@ from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
+from builder.errors import STOREFRONT_UNAVAILABLE_MESSAGE
 from core.storefront import StorefrontUnavailable
 
 # ── Local (single-app) variant maps ────────────────────────────────────
@@ -265,10 +266,13 @@ class BlogTagAdmin(BaseTranslatableAdmin):
 class BlogCategoryAdminForm(TranslatableModelForm):
     """The category form, with the icon as a choice of the icons the
     store's catalogue offers, each by the editor's name for it in the
-    admin's language (``blog.icons``). An icon saved before the builder
-    stopped offering it stays a choice, so the form keeps it. With no
-    catalogue the field shows the saved icon and cannot change: the rest
-    of the form still saves."""
+    admin's language. A saved icon the builder no longer offers stays a
+    choice, so the form keeps it.
+
+    A posted icon is held to ``blog.icons.check_icon``, the API's rule:
+    with no catalogue an unchanged icon saves with the rest of the form
+    and a changed one is refused, never dropped. A form opened with no
+    catalogue shows the saved icon and cannot change it."""
 
     icon = forms.ChoiceField(
         label=_("Icon"),
@@ -280,23 +284,47 @@ class BlogCategoryAdminForm(TranslatableModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         field = self.fields["icon"]
-        saved = self.initial.get("icon") or ""
+        saved = self.instance.icon
         try:
             offered = icons.icon_choices()
         except StorefrontUnavailable:
-            field.disabled = True
-            field.choices = [(saved, saved or _("No icon"))]
-            field.help_text = _(
-                "The storefront cannot be reached, so the icons cannot be "
-                "listed. Try again in a moment."
-            )
-            return
+            if not self.is_bound:
+                field.disabled = True
+                field.choices = [(saved, saved or _("No icon"))]
+                field.help_text = _(
+                    "The storefront cannot be reached, so the icons cannot "
+                    "be listed. Try again in a moment."
+                )
+                return
+            offered = []
         names = {name for name, _label in offered}
+        # The saved icon, and on a posted form the posted one, are choices
+        # whatever the catalogue says: ``clean_icon`` decides on them.
+        posted = self.data.get(self.add_prefix("icon"), "")
+        others = [saved, posted] if self.is_bound else [saved]
         field.choices = [
             ("", _("No icon")),
             *offered,
-            *([(saved, saved)] if saved and saved not in names else []),
+            *(
+                (name, name)
+                for name in dict.fromkeys(others)
+                if name and name not in names
+            ),
         ]
+
+    def clean_icon(self) -> str:
+        value = self.cleaned_data["icon"]
+        match icons.check_icon(value, saved=self.instance.icon):
+            case icons.IconCheck.UNKNOWN:
+                raise forms.ValidationError(
+                    icons.UNKNOWN_ICON_MESSAGE, code=icons.IconCheck.UNKNOWN
+                )
+            case icons.IconCheck.UNAVAILABLE:
+                raise forms.ValidationError(
+                    STOREFRONT_UNAVAILABLE_MESSAGE,
+                    code=icons.IconCheck.UNAVAILABLE,
+                )
+        return value
 
 
 @admin.register(BlogCategory)

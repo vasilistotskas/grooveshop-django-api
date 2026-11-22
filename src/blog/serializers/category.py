@@ -10,7 +10,6 @@ from blog import icons
 from blog.models.category import BlogCategory
 from builder.errors import StorefrontUnavailableError
 from core.api.schema import generate_schema_multi_lang
-from core.storefront import StorefrontUnavailable
 from core.utils.serializers import TranslatedFieldExtended
 
 
@@ -170,23 +169,16 @@ class BlogCategoryWriteSerializer(
         return value
 
     def validate_icon(self, value: str) -> str:
-        """One of the icons the store's catalogue offers, checked when it
-        changes (``blog.icons``): an icon already saved is not checked
-        again, so one the builder stopped offering blocks no other edit.
-        No catalogue, no check: a changed icon is refused with a 503."""
-        if not value or (
-            self.instance is not None and value == self.instance.icon
-        ):
-            return value
-        try:
-            offered = icons.is_offered(value)
-        except StorefrontUnavailable as exc:
-            raise StorefrontUnavailableError() from exc
-        if not offered:
-            raise serializers.ValidationError(
-                _("Pick one of the icons the store offers."),
-                code="unknown_icon",
-            )
+        """``blog.icons.check_icon``: a changed icon the catalogue does
+        not offer is a 400, one that cannot be checked a 503."""
+        saved = self.instance.icon if self.instance is not None else ""
+        match icons.check_icon(value, saved=saved):
+            case icons.IconCheck.UNKNOWN:
+                raise serializers.ValidationError(
+                    icons.UNKNOWN_ICON_MESSAGE, code=icons.IconCheck.UNKNOWN
+                )
+            case icons.IconCheck.UNAVAILABLE:
+                raise StorefrontUnavailableError()
         return value
 
     def validate_slug(self, value: str) -> str:

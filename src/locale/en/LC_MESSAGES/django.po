@@ -9648,9 +9648,6 @@ msgstr "One held voucher request is being sent to ACS. The others follow once AC
 msgid "One of the files is no longer available. Please re-attach it."
 msgstr "One of the files is no longer available. Please re-attach it."
 
-msgid "One of the page builder's icons. Where it is set, the store shows it for the category instead of the image."
-msgstr "One of the page builder's icons. Where it is set, the store shows it for the category instead of the image."
-
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 
@@ -14715,6 +14712,9 @@ msgstr "The cart's lines at the prices the shopper pays."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+
+msgid "The category's icon, one of the page builder's icons."
+msgstr "The category's icon, one of the page builder's icons."
 
 #, python-format
 msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."

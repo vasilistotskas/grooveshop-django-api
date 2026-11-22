@@ -67,6 +67,20 @@ class BlogCategoryIconTestCase(TestURLFixerMixin, APITestCase):
         ]
         assert row["icon"] == ROBOT
 
+    def test_a_category_is_created_with_an_offered_icon(self):
+        response = self.client.post(
+            reverse("blog-category-list"),
+            {
+                "translations": {"el": {"name": "Ρομπότ"}},
+                "slug": "robots",
+                "icon": ROBOT,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert BlogCategory.objects.get(slug="robots").icon == ROBOT
+
     def test_an_icon_the_store_does_not_offer_is_refused(self):
         response = self.patch(icon="i-mdi-gamepad")
 
@@ -124,15 +138,30 @@ class BlogCategoryAdminFormIconTestCase(APITestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(clear_catalogue_cache)
 
-    def form(self, instance=None):
-        """The category form as the admin builds it (``get_form``)."""
+    def form(self, instance=None, data=None):
+        """The category form as the admin builds it (``get_form``),
+        submitted when *data* is given."""
         request = RequestFactory().get("/")
         request.user = UserAccountFactory(
             num_addresses=0, is_superuser=True, is_staff=True
         )
         model_admin = BlogCategoryAdmin(BlogCategory, site)
         form_class = model_admin.get_form(request, instance)
-        return form_class(instance=instance)
+        return form_class(data=data, instance=instance)
+
+    def submit(self, category, **changes):
+        """The change form of *category* posted with *changes*: what an
+        editor sends after opening it."""
+        data = {
+            "name": "AI",
+            "description": "",
+            "parent": "",
+            "slug": category.slug,
+            "sort_order": category.sort_order or 0,
+            "icon": category.icon,
+            **changes,
+        }
+        return self.form(category, data)
 
     def choices(self, instance=None):
         return list(self.form(instance).fields["icon"].choices)
@@ -149,6 +178,19 @@ class BlogCategoryAdminFormIconTestCase(APITestCase):
         assert (ROBOT, "Robot") in english
         assert greek[0][0] == ""
 
+    def test_labels_a_region_variant_in_its_language(self):
+        with translation.override("en-us"):
+            choices = self.choices()
+
+        assert (ROBOT, "Robot") in choices
+
+    @override_settings(LANGUAGE_CODE="el")
+    def test_labels_in_the_store_language_with_no_active_language(self):
+        with translation.override(None):
+            choices = self.choices()
+
+        assert (ROBOT, "Ρομπότ") in choices
+
     def test_keeps_a_saved_icon_the_builder_no_longer_offers(self):
         category = BlogCategoryFactory(slug="old", icon="i-retired-icon")
 
@@ -164,3 +206,47 @@ class BlogCategoryAdminFormIconTestCase(APITestCase):
 
         assert field.disabled
         assert list(field.choices) == [(ROBOT, ROBOT)]
+
+    def test_a_submitted_form_saves_an_offered_icon(self):
+        category = BlogCategoryFactory(slug="ai")
+
+        form = self.submit(category, icon=ROBOT)
+
+        assert form.is_valid(), form.errors
+        form.save()
+        category.refresh_from_db()
+        assert category.icon == ROBOT
+
+    def test_a_submitted_form_refuses_an_icon_the_store_does_not_offer(self):
+        category = BlogCategoryFactory(slug="ai")
+
+        form = self.submit(category, icon="i-mdi-gamepad")
+
+        assert not form.is_valid()
+        assert form.errors.as_data()["icon"][0].code == "unknown_icon"
+
+    def test_with_no_catalogue_a_submitted_form_keeps_the_icon_and_saves(
+        self,
+    ):
+        category = BlogCategoryFactory(slug="ai", icon=ROBOT)
+        self.fake.failure = requests.ConnectionError("down")
+
+        form = self.submit(category, slug="ai-renamed")
+
+        assert form.is_valid(), form.errors
+        form.save()
+        category.refresh_from_db()
+        assert category.slug == "ai-renamed"
+        assert category.icon == ROBOT
+
+    def test_with_no_catalogue_a_changed_icon_is_refused_not_dropped(self):
+        # Opened while the catalogue answered, posted once it does not.
+        category = BlogCategoryFactory(slug="ai")
+        self.fake.failure = requests.ConnectionError("down")
+
+        form = self.submit(category, icon=ROBOT)
+
+        assert not form.is_valid()
+        assert form.errors.as_data()["icon"][0].code == "storefront_unavailable"
+        category.refresh_from_db()
+        assert category.icon == ""

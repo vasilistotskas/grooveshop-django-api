@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='blogcategory',
             name='icon',
-            field=models.CharField(blank=True, db_default='', default='', help_text="One of the page builder's icons. Where it is set, the store shows it for the category instead of the image.", max_length=100, verbose_name='Icon'),
+            field=models.CharField(blank=True, db_default='', default='', help_text="The category's icon, one of the page builder's icons.", max_length=100, verbose_name='Icon'),
         ),
     ]

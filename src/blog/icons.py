@@ -6,20 +6,37 @@ editor's label per language), never copied here, so a category can name
 exactly the icons a builder section can, and the storefront can paint
 every one of them.
 
-Nothing is checked on a guess: when the storefront does not answer,
-:class:`core.storefront.StorefrontUnavailable` reaches the caller, which
-refuses a changed icon (the API) or offers no choice (the admin), the rule
-of ``builder.storefront``. An unchanged icon is never checked again, so an
-icon the builder stopped offering does not block other edits of its
-category.
+:func:`check_icon` is the one rule both writers apply, the API's write
+serializer and the admin form: nothing is checked on a guess, so when the
+storefront does not answer a changed icon is refused (the rule of
+``builder.storefront``), while an unchanged or cleared icon is never
+checked, so an icon the builder stopped offering blocks no other edit of
+its category.
 """
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from django.db import connection
-from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
 
 from builder import storefront
+from core.storefront import StorefrontUnavailable
+from core.utils.i18n import active_language_code
+
+
+class IconCheck(StrEnum):
+    """What :func:`check_icon` found; the two refusals are the codes the
+    writers answer with."""
+
+    VALID = "valid"
+    UNKNOWN = "unknown_icon"
+    UNAVAILABLE = "storefront_unavailable"
+
+
+#: The refusal of an icon the store's catalogue does not offer.
+UNKNOWN_ICON_MESSAGE = _("Pick one of the icons the store offers.")
 
 
 def offered_icons() -> tuple[storefront.CatalogueIcon, ...]:
@@ -30,20 +47,30 @@ def offered_icons() -> tuple[storefront.CatalogueIcon, ...]:
     return storefront.fetch_catalogue(connection.schema_name).icons
 
 
-def is_offered(name: str) -> bool:
-    """Whether *name* is one of the icons the store offers.
-
-    Raises :class:`core.storefront.StorefrontUnavailable`.
-    """
-    return any(icon.name == name for icon in offered_icons())
+def check_icon(name: str, *, saved: str) -> IconCheck:
+    """Whether a category whose icon is *saved* may be written with
+    *name*: an unchanged or cleared icon needs no catalogue, any other
+    must be one the store's catalogue offers, and with no catalogue it
+    cannot be checked."""
+    if not name or name == saved:
+        return IconCheck.VALID
+    try:
+        catalogue = storefront.fetch_catalogue(connection.schema_name)
+    except StorefrontUnavailable:
+        return IconCheck.UNAVAILABLE
+    if catalogue.icon(name) is None:
+        return IconCheck.UNKNOWN
+    return IconCheck.VALID
 
 
 def icon_choices() -> list[tuple[str, str]]:
     """Every offered icon as ``(name, label)``, labelled in the active
-    language (the catalogue labels every icon in every language,
-    ``builder.storefront._parse_icon``).
+    language as ``settings.LANGUAGES`` names it (``active_language_code``:
+    ``en-us`` reads ``en``, no active language reads the store's), the
+    languages the catalogue labels every icon in
+    (``builder.storefront._parse_icon``).
 
     Raises :class:`core.storefront.StorefrontUnavailable`.
     """
-    language = get_language()
+    language = active_language_code()
     return [(icon.name, icon.labels[language]) for icon in offered_icons()]

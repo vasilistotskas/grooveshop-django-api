@@ -9654,9 +9654,6 @@ msgstr "Ένα αίτημα voucher που ήταν σε αναμονή στέλ
 msgid "One of the files is no longer available. Please re-attach it."
 msgstr "Ένα από τα αρχεία δεν είναι πλέον διαθέσιμο. Επισυνάψτε το ξανά."
 
-msgid "One of the page builder's icons. Where it is set, the store shows it for the category instead of the image."
-msgstr "Ένα από τα εικονίδια του δημιουργού σελίδων. Όπου έχει οριστεί, το κατάστημα το δείχνει για την κατηγορία αντί για την εικόνα."
-
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "Ένα προϊόν ανά γραμμή: sku;καθαρή τιμή (προ ΦΠΑ). Το κόμμα λειτουργεί επίσης ως διαχωριστικό και ως υποδιαστολή. Οι υπάρχουσες γραμμές αυτής της ομάδας ενημερώνονται."
 
@@ -14717,6 +14714,9 @@ msgstr "Οι γραμμές του καλαθιού στις τιμές που �
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
+
+msgid "The category's icon, one of the page builder's icons."
+msgstr "Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού σελίδων."
 
 #, python-format
 msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."

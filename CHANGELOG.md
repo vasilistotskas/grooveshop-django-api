@@ -3,6 +3,207 @@
 
 
 
+## v3.264.0 (2026-11-22)
+
+### Bug fixes
+
+* fix(shipping): run the locker catalogue task from the beat in public and keep resync tests in step with sizes ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+* fix(shipping): keep sizes on an empty catalogue, write only changed lockers, refuse a small locker at order creation only ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+* fix(shipping): name a too-small locker in the quote, fix the filter schema and the sync guard baseline ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+* fix(images): never fail a save on an unreadable image, match libvips on PNG orientation
+
+displayed_dimensions returns no size for a file Pillow cannot read
+(OSError, SyntaxError, ValueError: a truncated or corrupt file), so the
+save that names it and the backfill go on. A PNG's EXIF orientation
+counts only when its eXIf chunk precedes the pixel data: libvips ignores
+one after IDAT (a quarter-turn tag there is served unrotated), and
+reading it made Pillow decode the whole image.
+
+A product card or detail serialized without the optimizers' prefetch
+resolves its main image once for the path and both sizes. The backfill
+queues the purge of the cache surfaces that render a model it changed,
+as a save would. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): measure every image in one place, and only when its file changes
+
+displayed_size and displayed_dimensions move to core.utils.image_size,
+the one measurement behind the image field, its backfill, an upload's
+validation and the sizes recorded in rich text. The PNG rule (EXIF
+orientation counts only from an eXIf chunk before IDAT, as libvips reads
+it) now holds for all of them, so no caller makes Pillow decode a PNG's
+pixels to look for EXIF, and natural_size reuses the same error handling.
+
+ImageAndSvgField measures on the save that adds a row and on an
+assignment of a different file, never on a later save of a row whose
+file has no size (an SVG, an unreadable or missing file). ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): no unreadable stored file aborts a save or the backfill, and avatar sizes purge
+
+natural_size catches the ValueError storage raises for a name it refuses
+(a NUL byte decoded from %00), so a rich-text save naming such a src
+records no size instead of failing. The image field and the backfill
+catch every OSError from storage (a directory, no permission), so the
+row keeps no size and the other rows and stores go on.
+
+The blog and products surfaces declare user.UserAccount: authors,
+commenters and reviewers show its public identity, avatar size
+included. A save of only the account's bookkeeping fields (a sign-in,
+the locale sync, loyalty XP and tier) is ignored. The backfill purges
+through surfaces_invalidated_by. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): every assignment after init is measured, a partial save writes the size
+
+The descriptor told a row being built or loaded from a later assignment
+by a missing previous value, so a stored file assigned to a row whose
+image was NULL or deferred was never measured. post_init now marks the
+instance initialised; after it, an assignment is measured unless it
+names the same file or is the row's own stored file coming back from
+refresh_from_db or a deferred load.
+
+ImageSizeModelMixin adds an image's size fields to a save's
+update_fields that names the image, on every model that records one.
+
+The backfill writes a size only while the row still names the file it
+measured, and purges what it wrote also when the run stops early. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): another instance's file brings its size, a stopped backfill still purges
+
+Assigning the stored file of another instance of the same model (a copy
+between instances of one row, refresh_from_db) copies the size that
+instance holds for it, without reading the file; a deferred field's load
+of the row's own file still keeps the size the instance holds. Before,
+any committed file from an instance of the same row was skipped, so a
+copy of a replaced file kept the previous size.
+
+The backfill records a model before writing to it, so a run stopped
+between the write and the bookkeeping still purges. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): copy a size only from the instance that still holds the file
+
+A FieldFile stays bound to the instance it was read from after that
+instance moves to another file, so a swap between two rows, or a file
+kept from before its row changed, copied the size of the instance's new
+file. The size is copied only while the source instance still holds the
+file in the same field; otherwise the file is measured.
+
+The row's own file is taken as loaded only when the field was deferred:
+refresh_from_db(fields=["image"]) after another save replaced the file
+measures the new file instead of keeping the old size. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* fix(images): measure every new file name, reload the stored size on refresh
+
+A size is no longer copied from another instance: each round of that
+optimisation paired a file with a size that was not its own (a swap
+between rows, a file kept from before its row changed). Any assignment
+after init of a stored name different from the instance's own is
+measured, which is one header read.
+
+ImageSizeModelMixin.refresh_from_db reloads the size fields with the
+image and marks the refresh, so a refresh or a deferred field's load
+brings back the stored size and reads no file, also after another save
+replaced the file. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+### Chores
+
+* chore(api-contract): imageDimensions' accepted break expires with storefront v3.353.0
+
+The storefront release that first regenerates from this schema is
+v3.353.0 (#510, after #511 and #512). ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* chore(api-contract): expectedTotal's accepted break expires with storefront v3.348.1 (#808)
+
+The three ignore.txt entries that let expectedTotal become required on
+POST /api/v1/order were bounded until storefront v3.346.2. Production
+now runs storefront v3.348.1, whose generated document requires the
+field, so the entries have expired and check-ignore refuses them.
+
+Closes #635 ([`e31ae98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e31ae98d64203f66152a056bc719233031a7ef40))
+
+### Features
+
+* feat(shipping): BOX NOW locker sizes stored from the public catalogue, and a safer locker withdrawal rule (#800) ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+* feat(shipping): size BOX NOW lockers from the public catalogue and refuse a locker without the order's size
+
+Each locker keeps its compartment sizes and availability from BOX NOW's public
+locker catalogue, fetched once for every store. The lockers list filters by
+size, the quote names the cart's size, and order creation refuses a locker that
+does not list it. A locker is withdrawn after consecutive absences, not the
+first. ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+* feat(images): store the displayed size of every image the storefront states (#810) ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* feat(images): store the displayed size of every image the storefront states
+
+The storefront writes og:image:width/height and schema.org ImageObject
+sizes from the upload's size, so every image that feeds one now stores
+it: BlogPost, BlogCategory, UserAccount (a blog author's avatar) and
+ProductImage gain nullable image_width/image_height, filled by
+ImageAndSvgField's width_field/height_field.
+
+ImageAndSvgField records the displayed size (EXIF orientation applied,
+as the media service applies it), null for an SVG or a file missing from
+storage. It measures when a different file is assigned and on the save
+of a row with a file and no size, never when a row is loaded or
+refreshed: Django's ImageField opens the stored file of every loaded row
+with a null size, which an SVG row always has.
+
+The API exposes mainImageWidth/mainImageHeight next to mainImagePath on
+the blog post, blog category, public user, product card, product and
+product image serializers (a product's from its prefetched main image).
+ProductImageDetailSerializer's imageDimensions, which opened the stored
+file on every response and failed on an SVG, is replaced by them; no
+consumer calls the product image routes (accepted in
+api-contract/ignore.txt).
+
+manage.py backfill_image_dimensions --all-tenants measures the rows
+stored before, to run once after the rollout. The staging anonymiser
+clears the size with the avatar; the demo blog seeder writes it with
+the avatar it sets through update(). ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* feat(shipping): price the cheapest delivery of one product for its page (#809)
+
+GET /api/v1/shipping/product/<product_id> answers what shipping a cart
+holding that product alone would cost: ShippingService.
+product_shipping_from runs available_options to the store's first
+shipping country, at the threshold value of the product's price after
+the automatic promotions such a cart gets (PromotionEngine.
+evaluate_single_unit, the cart's own classification, stacking and clamp
+over a one-line cart), with the parcel it would ship (gifts included),
+leaving out rows that exceed a weight cap or a parcel size. A
+free-shipping promotion covering the product waives every carrier; a
+live-priced carrier is asked as checkout asks it. The response carries
+the cheapest price, whether it is free, the country and the lowest
+free-shipping threshold of the carriers that can take the product;
+estimate is null when the store ships nowhere or no delivery can take it.
+
+Cached by cache_methods and purged by the shipping, products and
+promotions surfaces, since a rate, the product and a promotion each
+move it. ([`3dd8750`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dd87504ef41282d5fc6e69c4fb02eb0b24c28f1))
+
+### Refactoring
+
+* refactor(shipping): keep the BOX NOW locker sizes stored and unused until their release
+
+The compartment size filter, the sizes on the locker list and the quote, and the pickup_point_too_small refusal move to a second release that follows once the catalogue has populated the sizes in production. ([`e2ab345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ab34558ed65918135470030a72a384a4c537d0))
+
+### Testing
+
+* test(user): allow the avatar's size on the public byline
+
+mainImageWidth/mainImageHeight describe the public avatar's pixels
+(the storefront states them as the author page's og:image size) and
+carry nothing the avatar itself does not. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
+* test(images): a stored row's replaced file is measured, an unchanged one never read
+
+Covers the admin form, an update's assignment and another stored file on a
+row loaded from the database: a larger replacement, an SVG replaced by a
+raster and back, and a save without a file change that opens no file. ([`847f01c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/847f01cc61255bb842f4dae624200404eac7c168))
+
 ## v3.263.2 (2026-11-21)
 
 ### Refactoring

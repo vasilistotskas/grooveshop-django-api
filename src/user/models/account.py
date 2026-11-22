@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from user.managers.account import UserAccountManager
@@ -21,7 +21,11 @@ from user.validators import ExtendedUnicodeUsernameValidator
 
 
 class UserAccount(
-    AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel
+    ImageSizeModelMixin,
+    AbstractBaseUser,
+    PermissionsMixin,
+    UUIDModel,
+    TimeStampMixinModel,
 ):
     username_validator = ExtendedUnicodeUsernameValidator()
 
@@ -99,7 +103,20 @@ class UserAccount(
         verbose_name=_("Region"),
     )
     image = ImageAndSvgField(
-        _("Image"), upload_to="uploads/users/", blank=True, null=True
+        _("Image"),
+        upload_to="uploads/users/",
+        blank=True,
+        null=True,
+        width_field="image_width",
+        height_field="image_height",
+    )
+    # The size a browser shows the image at (EXIF orientation applied),
+    # measured by ``ImageAndSvgField``; null for an SVG.
+    image_width = models.PositiveIntegerField(
+        _("Width"), null=True, blank=True, editable=False
+    )
+    image_height = models.PositiveIntegerField(
+        _("Height"), null=True, blank=True, editable=False
     )
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)

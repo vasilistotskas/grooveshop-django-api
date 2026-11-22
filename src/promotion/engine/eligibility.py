@@ -74,6 +74,20 @@ def collect_candidates(
     return candidates, rejected
 
 
+def automatic_candidates() -> list[tuple[Promotion, PromotionCode | None]]:
+    """The live automatic promotions, as candidates for a cart no code
+    is applied to: what ``collect_candidates`` gives such a cart,
+    without a lock."""
+    promotions = list(
+        Promotion.objects.live()
+        .automatic()
+        .with_scope_relations()
+        .order_by("pk")
+    )
+    attach_category_scopes(promotions)
+    return [(promotion, None) for promotion in promotions]
+
+
 def dead_window_reason(promotion: Promotion) -> CouponRejectionReason:
     """Why a non-live promotion is refused: scheduled vs over."""
     if (

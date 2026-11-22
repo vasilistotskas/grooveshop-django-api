@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface
 from core.cache.surfaces import (
+    ACCOUNT_BOOKKEEPING_FIELDS,
     nuxt_functions,
     nuxt_handlers_matching,
     nuxt_routes,
@@ -55,7 +56,12 @@ SURFACES = (
             # Approving or hiding a comment is a moderator edit.
             "blog.BlogComment",
             "blog.BlogCommentTranslation",
+            # An author's and a commenter's public identity: name and
+            # avatar with its size (``UserPublicSerializer``).
+            "user.UserAccount",
         ),
+        # A sign-in or a loyalty update changes no public identity.
+        ignored_update_fields=ACCOUNT_BOOKKEEPING_FIELDS,
         icon="article",
         group="content",
     ),

@@ -306,6 +306,45 @@ class TestAStoredRow:
 
         assert _sizes(a) == (640, 480)
 
+    def test_swapping_two_rows_files_swaps_their_sizes(self):
+        a = BlogPost.objects.get(
+            pk=BlogPostFactory(image=_upload("a.jpg", _jpeg((300, 200)))).pk
+        )
+        b = BlogPost.objects.get(
+            pk=BlogPostFactory(image=_upload("b.jpg", _jpeg((640, 480)))).pk
+        )
+
+        a.image, b.image = b.image, a.image
+        a.save()
+        b.save()
+
+        assert (_sizes(a), _sizes(b)) == ((640, 480), (300, 200))
+
+    def test_a_file_kept_from_before_its_row_changed_is_measured(self):
+        post = BlogPostFactory(image=_upload("old.jpg", _jpeg((300, 200))))
+        other = BlogPost.objects.get(
+            pk=BlogPostFactory(image=_upload("x.jpg", _jpeg((90, 90)))).pk
+        )
+        old = post.image
+        post.image = _upload("new.jpg", _jpeg((640, 480)))
+        post.save()
+
+        other.image = old
+        other.save()
+
+        assert _sizes(other) == (300, 200)
+
+    def test_refreshing_only_the_image_after_a_replacement_measures_it(self):
+        post = BlogPostFactory(image=_upload("a.jpg", _jpeg((300, 200))))
+        row = BlogPost.objects.get(pk=post.pk)
+        elsewhere = BlogPost.objects.get(pk=post.pk)
+        elsewhere.image = _upload("b.jpg", _jpeg((640, 480)))
+        elsewhere.save()
+
+        row.refresh_from_db(fields=["image"])
+
+        assert (row.image_width, row.image_height) == (640, 480)
+
     def test_loading_a_deferred_image_reads_no_file(self):
         post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((300, 200))))
         row = BlogPost.objects.defer("image").get(pk=post.pk)

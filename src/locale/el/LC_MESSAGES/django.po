@@ -2052,6 +2052,9 @@ msgstr "Οι αυτόματες προσφορές εφαρμόζονται σε
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Αυτόματες προσφορές στις οποίες λείπει ακριβώς μία ελάχιστη προϋπόθεση (ποσό, τεμάχια ή προϊόν-ανταμοιβή) — 'πρόσθεσε X ακόμα για να την ξεκλειδώσεις'"
 
+msgid "Availability probability"
+msgstr "Πιθανότητα διαθεσιμότητας"
+
 msgid "Available Locales"
 msgstr "Διαθέσιμες Γλώσσες"
 
@@ -2096,6 +2099,9 @@ msgstr "Μεταφορέας BOX NOW"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "Δέμα BOX NOW στο locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "Η εκτίμηση της BOX NOW, από 0 έως 1, ότι το locker έχει ελεύθερη θυρίδα. Κενό σημαίνει άγνωστη."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "Οι προσφορές BXGY απαιτούν τόσο ποσότητα αγοράς όσο και ποσότητα λήψης."
@@ -3470,6 +3476,9 @@ msgstr "Σύγκριση με"
 msgid "Compartment Size"
 msgstr "Μέγεθος θυρίδας"
 
+msgid "Compartment sizes"
+msgstr "Μεγέθη θυρίδων"
+
 msgid "Complete"
 msgstr "Πλήρες"
 
@@ -3569,6 +3578,9 @@ msgstr "Επιβεβαιώθηκε χειροκίνητα"
 
 msgid "Connection or timeout"
 msgstr "Σύνδεση ή χρονικό όριο"
+
+msgid "Consecutive absent syncs"
+msgstr "Συνεχόμενοι συγχρονισμοί χωρίς το locker"
 
 msgid "Consent"
 msgstr "Συγκατάθεση"
@@ -10484,6 +10496,9 @@ msgstr "Συνεργαζόμενο κατάστημα (2)"
 msgid "Partner shop (3)"
 msgstr "Συνεργαζόμενο κατάστημα (3)"
 
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Συνεχόμενοι συγχρονισμοί με τον συνεργάτη που δεν επέστρεψαν το locker. Αποσύρεται όταν φτάσει τη ρύθμιση BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Ο κωδικός πρόσβασης έγινε δεκτός. Επιβεβαιώστε ότι είστε εσείς με έναν κωδικό."
 
@@ -14737,6 +14752,9 @@ msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης το�
 #, python-format
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
+
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker, από τον δημόσιο κατάλογο lockers της BOX NOW. Κενό σημαίνει άγνωστα: ποτέ ότι δέχεται κάθε μέγεθος."
 
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."

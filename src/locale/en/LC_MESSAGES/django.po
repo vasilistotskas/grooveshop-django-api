@@ -2047,6 +2047,9 @@ msgstr "Automatic promotions apply to every eligible cart; code promotions requi
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 
+msgid "Availability probability"
+msgstr "Availability probability"
+
 msgid "Available Locales"
 msgstr "Available Locales"
 
@@ -2091,6 +2094,9 @@ msgstr "BOX NOW carrier"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "BOX NOW parcel at the locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "BXGY promotions need both a buy quantity and a get quantity."
@@ -3463,6 +3469,9 @@ msgstr "Compare with"
 msgid "Compartment Size"
 msgstr "Compartment Size"
 
+msgid "Compartment sizes"
+msgstr "Compartment sizes"
+
 msgid "Complete"
 msgstr "Complete"
 
@@ -3565,6 +3574,9 @@ msgstr "Confirmed by hand"
 
 msgid "Connection or timeout"
 msgstr "Connection or timeout"
+
+msgid "Consecutive absent syncs"
+msgstr "Consecutive absent syncs"
 
 msgid "Consent"
 msgstr "Consent"
@@ -10477,6 +10489,9 @@ msgstr "Partner shop (2)"
 msgid "Partner shop (3)"
 msgstr "Partner shop (3)"
 
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Password accepted. Confirm it is you with a code."
 
@@ -14735,6 +14750,9 @@ msgstr "The code has reached its usage limit"
 #, python-format
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
+
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."

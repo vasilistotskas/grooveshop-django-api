@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -2775,8 +2776,11 @@ class BoxNowService:
         We collect all ``external_id`` values returned by BoxNow and
         process them in batches of 100 inside their own ``atomic``
         blocks.  After all batches are done, any locker whose
-        ``external_id`` is absent from the API response is marked
-        ``is_active=False``.
+        ``external_id`` is absent from the API response for
+        ``BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION`` syncs in a row
+        is marked ``is_active=False``; a list that is empty or smaller
+        than ``BOXNOW_LOCKER_SYNC_MIN_FRACTION`` of the active lockers
+        changes no counter and deactivates nothing.
 
         Returns:
             ``{"created": N, "updated": M, "deactivated": K,
@@ -2813,6 +2817,9 @@ class BoxNowService:
             },
         )
 
+        # The baseline of the guard below, taken before the upserts: the
+        # lockers this response adds must not raise the bar it is held to.
+        active_before = BoxNowLocker.objects.filter(is_active=True).count()
         seen_external_ids: set[str] = set()
         created_count = 0
         updated_count = 0
@@ -2888,42 +2895,71 @@ class BoxNowService:
                     else:
                         updated_count += 1
 
-        # --- Deactivate stale lockers ------------------------------------
+        # --- Withdraw lockers the partner stopped returning ----------------
+        # The partner list churns about 3% a day, so one absence withdraws
+        # nothing: an active locker it did not return counts an absence, and
+        # is deactivated at BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION
+        # in a row. A returned locker was reset and reactivated above.
         deactivated_count = 0
-        if seen_external_ids:
-            deactivated_count = BoxNowLocker.objects.exclude(
+        too_small = (
+            len(seen_external_ids)
+            < active_before * settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION
+        )
+        if not seen_external_ids or too_small:
+            # An empty or far smaller list is an error response, not a
+            # withdrawal of the rest: nothing moves, the counters included,
+            # so a bad answer cannot count towards a deactivation.
+            logger.error(
+                "sync_lockers: partner=%s returned %d destinations for %d "
+                "active lockers (minimum fraction %s) — no locker "
+                "deactivated and no absence counted",
+                client.partner_id,
+                len(seen_external_ids),
+                active_before,
+                settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION,
+                extra={
+                    "boxnow_partner_id": client.partner_id,
+                    "boxnow_destinations": len(seen_external_ids),
+                    "boxnow_active": active_before,
+                },
+            )
+        else:
+            absent = BoxNowLocker.objects.filter(is_active=True).exclude(
                 external_id__in=seen_external_ids
+            )
+            absent_count = absent.update(
+                consecutive_absent_syncs=F("consecutive_absent_syncs") + 1
+            )
+            deactivated_count = BoxNowLocker.objects.filter(
+                is_active=True,
+                consecutive_absent_syncs__gte=(
+                    settings.BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION
+                ),
             ).update(is_active=False)
             if deactivated_count:
                 # ``update`` sends no ``post_save``: the cached locker
                 # list would keep serving the withdrawn lockers.
                 mark_surface_stale("shipping")
-            # Wholesale turnover means this catalogue belongs to a
+            # Wholesale absence means this catalogue belongs to a
             # DIFFERENT partner than the rows we already had — the exact
             # shape of a credentials/data mismatch, and the reason every
             # subsequent voucher would fail with "invalid locker".
-            if known_before and deactivated_count > known_before / 2:
+            if known_before and absent_count > known_before / 2:
                 logger.warning(
-                    "sync_lockers: partner=%s deactivated %d of %d existing "
-                    "lockers — the local catalogue likely belonged to a "
-                    "different BoxNow account. Vouchers minted against the "
-                    "old ids will be rejected as invalid lockers.",
+                    "sync_lockers: partner=%s did not return %d of %d "
+                    "existing lockers — the local catalogue likely belongs "
+                    "to a different BoxNow account. Vouchers minted "
+                    "against the old ids will be rejected as invalid "
+                    "lockers.",
                     client.partner_id,
-                    deactivated_count,
+                    absent_count,
                     known_before,
                     extra={
                         "boxnow_partner_id": client.partner_id,
-                        "boxnow_deactivated": deactivated_count,
+                        "boxnow_absent": absent_count,
                         "boxnow_known_before": known_before,
                     },
                 )
-        else:
-            # BoxNow returned an empty list — don't deactivate everything;
-            # that's almost certainly an API error.  Log a warning and bail.
-            logger.warning(
-                "sync_lockers: BoxNow returned zero destinations — "
-                "skipping deactivation to avoid wiping all lockers"
-            )
 
         logger.info(
             "sync_lockers: partner=%s created=%d updated=%d deactivated=%d "
@@ -3329,5 +3365,6 @@ class BoxNowService:
             "country_code": (dest.get("country") or "").strip().upper(),
             "note": dest.get("note", ""),
             "is_active": True,
+            "consecutive_absent_syncs": 0,
             "last_synced_at": timezone.now(),
         }

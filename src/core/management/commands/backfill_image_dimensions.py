@@ -92,7 +92,7 @@ def _measure_rows(
     dry_run: bool,
 ) -> None:
     """Measure *field*'s unmeasured rows of *model*, adding *model* to
-    *changed* at its first write."""
+    *changed* before its first write."""
     rows = (
         model._base_manager.order_by()
         .exclude(**{f"{field.attname}__isnull": True})
@@ -118,13 +118,15 @@ def _measure_rows(
         if dry_run:
             tally.measured += 1
             continue
+        # Before the write, so a run stopped right after it still purges
+        # (at worst one purge too many when the row was replaced).
+        changed.add(model)
         # Only while the row still names the file measured: a save that
         # replaced it meanwhile measured its own file.
         if model._base_manager.filter(
             **{model._meta.pk.name: pk, field.attname: name}
         ).update(**{field.width_field: size[0], field.height_field: size[1]}):
             tally.measured += 1
-            changed.add(model)
 
 
 class Command(TenantCommandMixin, BaseCommand):

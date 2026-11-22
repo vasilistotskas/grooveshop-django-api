@@ -16,6 +16,7 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db.models import QuerySet
 from django.forms import modelform_factory
 from PIL import Image, PngImagePlugin
 
@@ -288,6 +289,23 @@ class TestAStoredRow:
 
         assert _sizes(row) == (1200, 630)
 
+    def test_another_instances_file_brings_its_size_without_a_read(self):
+        post = BlogPostFactory(image=_upload("a.jpg", _jpeg((300, 200))))
+        a = BlogPost.objects.get(pk=post.pk)
+        b = BlogPost.objects.get(pk=post.pk)
+        b.image = _upload("b.jpg", _jpeg((640, 480)))
+        b.save()
+        storage = _image_field().storage
+
+        with (
+            patch.object(storage, "open", side_effect=AssertionError("opened")),
+            patch.object(Image, "open", side_effect=AssertionError("decoded")),
+        ):
+            a.image = b.image
+        a.save()
+
+        assert _sizes(a) == (640, 480)
+
     def test_loading_a_deferred_image_reads_no_file(self):
         post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((300, 200))))
         row = BlogPost.objects.defer("image").get(pk=post.pk)
@@ -512,6 +530,26 @@ class TestBackfill:
             "blog.BlogPost" in get_surface(code).invalidated_by
             for code in marked
         )
+
+    def test_a_run_stopped_right_after_a_write_purges_it(self):
+        self._unmeasured(_jpeg((640, 480)), "a.jpg")
+        real_update = QuerySet.update
+
+        def write_then_stop(queryset, **kwargs):
+            real_update(queryset, **kwargs)
+            raise KeyboardInterrupt
+
+        with (
+            patch.object(QuerySet, "update", write_then_stop),
+            patch(
+                "core.management.commands.backfill_image_dimensions."
+                "mark_surface_stale"
+            ) as stale,
+            pytest.raises(KeyboardInterrupt),
+        ):
+            backfill_current_schema(measured_fields())
+
+        assert stale.call_args_list
 
     def test_the_command_measures_the_current_store(self):
         post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")

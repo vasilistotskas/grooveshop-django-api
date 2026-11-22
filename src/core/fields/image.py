@@ -15,9 +15,10 @@ adds a row built with a file (an upload, or a stored file's name). Only
 then: never when a row is loaded (Django's ``ImageField`` opens the stored
 file of every row loaded with a null size, which an SVG always has), never
 when ``refresh_from_db`` or a deferred field's load assigns the row's own
-stored file, never for a reassignment of the same file, and never on a later
-save of a row whose file has no size (an SVG, an unreadable or missing
-file): the file it names has not changed. A save whose ``update_fields``
+stored file, never for a reassignment of the same file, never for another
+instance's file when that instance holds its size (the size is copied with
+it), and never on a later save of a row whose file has no size (an SVG, an
+unreadable or missing file): the file it names has not changed. A save whose ``update_fields``
 names the image also writes its size (``ImageSizeModelMixin``). Rows stored
 before a model gained the fields are measured by ``manage.py
 backfill_image_dimensions``. A queryset ``update()`` of the file bypasses
@@ -62,19 +63,20 @@ def _is_initialised(instance: Model) -> bool:
     return getattr(instance._state, _INITIALISED, False)
 
 
-def _is_own_stored_file(instance: Model, value: Any) -> bool:
-    """*value* is this row's stored file as another instance of the row read
-    it: what ``refresh_from_db`` and a deferred field's load assign."""
+def _other_instance(instance: Model, value: Any) -> Model | None:
+    """The other instance of *instance*'s model whose stored file *value*
+    is: a copy between instances, or what ``refresh_from_db`` and a
+    deferred field's load assign."""
     source = getattr(value, "instance", None)
-    return (
+    if (
         isinstance(value, FieldFile)
         and value._committed
         and source is not None
         and source is not instance
         and type(source) is type(instance)
-        and source.pk is not None
-        and source.pk == instance.pk
-    )
+    ):
+        return source
+    return None
 
 
 class DisplayedSizeDescriptor(ImageFileDescriptor):
@@ -87,10 +89,16 @@ class DisplayedSizeDescriptor(ImageFileDescriptor):
         FileDescriptor.__set__(self, instance, value)
         # Inside ``Model.__init__`` the row is being loaded, or built with
         # a file that its save measures.
-        if not _is_initialised(instance) or _is_own_stored_file(
-            instance, value
-        ):
+        if not _is_initialised(instance):
             return
+        source = _other_instance(instance, value)
+        if source is not None:
+            if self.field.copy_size(source, instance):
+                return
+            if source.pk is not None and source.pk == instance.pk:
+                # A deferred field's load: the row's own file, whose size
+                # this instance already holds.
+                return
         name = _stored_name(value)
         if name is not None and name == _stored_name(previous):
             return
@@ -154,6 +162,17 @@ class ImageAndSvgField(ImageField):
             setattr(instance, self.width_field, width)
         if self.height_field:
             setattr(instance, self.height_field, height)
+
+    def copy_size(self, source: Model, instance: Model) -> bool:
+        """Give *instance* the size *source* holds for the file it is given
+        from *source*, without reading it; ``False`` when *source* did not
+        load its size."""
+        names = [n for n in (self.width_field, self.height_field) if n]
+        if not names or not all(n in source.__dict__ for n in names):
+            return False
+        for name in names:
+            setattr(instance, name, source.__dict__[name])
+        return True
 
     @staticmethod
     def _measure(file: FieldFile) -> tuple[int, int] | None:

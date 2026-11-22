@@ -15,6 +15,7 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.forms import modelform_factory
 from PIL import Image, PngImagePlugin
 
 from blog.factories.post import BlogPostFactory
@@ -196,6 +197,87 @@ def test_a_later_save_of_a_row_without_a_size_never_reads_its_file():
         row.save()
 
     assert _sizes(row) == (None, None)
+
+
+class TestAStoredRow:
+    """A row loaded from the database, as the admin form and the API's
+    update serializer change it: the descriptor measures the file assigned
+    when its name differs from the loaded one, and nothing else reads it."""
+
+    def test_a_larger_replacement_updates_the_sizes(self):
+        post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+        row = BlogPost.objects.get(pk=post.pk)
+
+        row.image = _upload("cover-large.jpg", _jpeg((1600, 840)))
+        row.save()
+
+        assert _sizes(row) == (1600, 840)
+
+    def test_a_replacement_through_a_model_form_updates_the_sizes(self):
+        """The admin's path: ``ModelForm`` assigns the upload with
+        ``save_form_data``."""
+        post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+        row = BlogPost.objects.get(pk=post.pk)
+        form = modelform_factory(BlogPost, fields=["image"])(
+            data={},
+            files={"image": _upload("cover-large.jpg", _jpeg((1600, 840)))},
+            instance=row,
+        )
+
+        assert form.is_valid(), form.errors
+        form.save()
+
+        assert _sizes(row) == (1600, 840)
+
+    def test_another_stored_file_is_measured(self):
+        post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+        name = _image_field().storage.save(
+            "uploads/blog/other.jpg", ContentFile(_jpeg((1200, 630)))
+        )
+        row = BlogPost.objects.get(pk=post.pk)
+
+        row.image = name
+        row.save()
+
+        assert _sizes(row) == (1200, 630)
+
+    @pytest.mark.parametrize("content", ["jpeg", "svg"])
+    def test_a_save_without_a_file_change_reads_no_file(self, content):
+        upload = (
+            _upload("cover.jpg", _jpeg((300, 200)))
+            if content == "jpeg"
+            else _upload("icon.svg", SVG)
+        )
+        row = BlogPost.objects.get(pk=BlogPostFactory(image=upload).pk)
+        before = (row.image_width, row.image_height)
+        storage = _image_field().storage
+
+        with (
+            patch.object(storage, "open", side_effect=AssertionError("opened")),
+            patch.object(Image, "open", side_effect=AssertionError("decoded")),
+        ):
+            row.image = row.image.name
+            row.save()
+
+        assert _sizes(row) == before
+
+    def test_an_svg_replaced_by_a_raster_gets_its_size(self):
+        post = BlogPostFactory(image=_upload("icon.svg", SVG))
+        row = BlogPost.objects.get(pk=post.pk)
+
+        row.image = _upload("photo.jpg", _jpeg((640, 480)))
+        row.save()
+
+        assert _sizes(row) == (640, 480)
+
+    def test_a_raster_replaced_by_an_svg_has_no_size(self):
+        post = BlogPostFactory(image=_upload("photo.jpg", _jpeg((640, 480))))
+        row = BlogPost.objects.get(pk=post.pk)
+
+        row.image = _upload("icon.svg", SVG)
+        row.save()
+
+        assert _sizes(row) == (None, None)
 
 
 def test_a_file_saved_through_the_field_file_is_measured():

@@ -16,6 +16,7 @@ its category.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 
 from django.db import connection
@@ -39,38 +40,42 @@ class IconCheck(StrEnum):
 UNKNOWN_ICON_MESSAGE = _("Pick one of the icons the store offers.")
 
 
-def offered_icons() -> tuple[storefront.CatalogueIcon, ...]:
-    """The icons the current store's catalogue offers.
+def store_catalogue() -> storefront.Catalogue:
+    """The current store's catalogue.
 
     Raises :class:`core.storefront.StorefrontUnavailable`.
     """
-    return storefront.fetch_catalogue(connection.schema_name).icons
+    return storefront.fetch_catalogue(connection.schema_name)
 
 
-def check_icon(name: str, *, saved: str) -> IconCheck:
+def check_icon(
+    name: str,
+    *,
+    saved: str,
+    catalogue: Callable[[], storefront.Catalogue] = store_catalogue,
+) -> IconCheck:
     """Whether a category whose icon is *saved* may be written with
     *name*: an unchanged or cleared icon needs no catalogue, any other
     must be one the store's catalogue offers, and with no catalogue it
-    cannot be checked."""
+    cannot be checked. *catalogue* reads it, raising
+    :class:`core.storefront.StorefrontUnavailable` when there is none: a
+    caller that has already read it passes what it read."""
     if not name or name == saved:
         return IconCheck.VALID
     try:
-        catalogue = storefront.fetch_catalogue(connection.schema_name)
+        found = catalogue().icon(name)
     except StorefrontUnavailable:
         return IconCheck.UNAVAILABLE
-    if catalogue.icon(name) is None:
+    if found is None:
         return IconCheck.UNKNOWN
     return IconCheck.VALID
 
 
-def icon_choices() -> list[tuple[str, str]]:
-    """Every offered icon as ``(name, label)``, labelled in the active
-    language as ``settings.LANGUAGES`` names it (``active_language_code``:
-    ``en-us`` reads ``en``, no active language reads the store's), the
-    languages the catalogue labels every icon in
-    (``builder.storefront._parse_icon``).
-
-    Raises :class:`core.storefront.StorefrontUnavailable`.
-    """
+def icon_choices(catalogue: storefront.Catalogue) -> list[tuple[str, str]]:
+    """Every icon *catalogue* offers as ``(name, label)``, labelled in the
+    active language as ``settings.LANGUAGES`` names it
+    (``active_language_code``: ``en-us`` reads ``en``, no active language
+    reads the store's), the languages the catalogue labels every icon in
+    (``builder.storefront._parse_icon``)."""
     language = active_language_code()
-    return [(icon.name, icon.labels[language]) for icon in offered_icons()]
+    return [(icon.name, icon.labels[language]) for icon in catalogue.icons]

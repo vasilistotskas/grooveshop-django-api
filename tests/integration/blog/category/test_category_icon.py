@@ -268,3 +268,14 @@ class BlogCategoryAdminFormIconTestCase(APITestCase):
         assert form.errors.as_data()["icon"][0].code == "storefront_unavailable"
         category.refresh_from_db()
         assert category.icon == ""
+
+    def test_with_no_catalogue_a_post_asks_the_storefront_once(self):
+        # One timeout for the editor, not one for the choices and another
+        # for the check.
+        category = BlogCategoryFactory(slug="ai")
+        self.fake.failure = requests.ConnectionError("down")
+
+        form = self.submit(category, icon=ROBOT)
+        form.is_valid()
+
+        assert len(self.fake.calls) == 1

@@ -38,6 +38,7 @@ from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
 from builder.errors import STOREFRONT_UNAVAILABLE_MESSAGE
+from builder.storefront import Catalogue
 from core.storefront import StorefrontUnavailable
 
 # ── Local (single-app) variant maps ────────────────────────────────────
@@ -285,18 +286,26 @@ class BlogCategoryAdminForm(TranslatableModelForm):
         super().__init__(*args, **kwargs)
         field = self.fields["icon"]
         saved = self.instance.icon
+        # Read once: the choices and ``clean_icon`` share it, so with no
+        # storefront an editor waits through one timeout, not two.
+        self._catalogue: Catalogue | None
         try:
-            offered = icons.icon_choices()
+            self._catalogue = icons.store_catalogue()
         except StorefrontUnavailable:
-            if not self.is_bound:
-                field.disabled = True
-                field.choices = [(saved, saved or _("No icon"))]
-                field.help_text = _(
-                    "The storefront cannot be reached, so the icons cannot "
-                    "be listed. Try again in a moment."
-                )
-                return
-            offered = []
+            self._catalogue = None
+        if self._catalogue is None and not self.is_bound:
+            field.disabled = True
+            field.choices = [(saved, saved or _("No icon"))]
+            field.help_text = _(
+                "The storefront cannot be reached, so the icons cannot "
+                "be listed. Try again in a moment."
+            )
+            return
+        offered = (
+            icons.icon_choices(self._catalogue)
+            if self._catalogue is not None
+            else []
+        )
         names = {name for name, _label in offered}
         # The saved icon, and on a posted form the posted one, are choices
         # whatever the catalogue says: ``clean_icon`` decides on them.
@@ -312,9 +321,18 @@ class BlogCategoryAdminForm(TranslatableModelForm):
             ),
         ]
 
+    def _read_catalogue(self) -> Catalogue:
+        """The catalogue ``__init__`` read, or its failure again."""
+        if self._catalogue is None:
+            raise StorefrontUnavailable("unreachable when the form was built")
+        return self._catalogue
+
     def clean_icon(self) -> str:
         value = self.cleaned_data["icon"]
-        match icons.check_icon(value, saved=self.instance.icon):
+        check = icons.check_icon(
+            value, saved=self.instance.icon, catalogue=self._read_catalogue
+        )
+        match check:
             case icons.IconCheck.UNKNOWN:
                 raise forms.ValidationError(
                     icons.UNKNOWN_ICON_MESSAGE, code=icons.IconCheck.UNKNOWN

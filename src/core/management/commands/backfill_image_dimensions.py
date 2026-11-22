@@ -13,7 +13,8 @@ re-validates, records history and re-indexes for a change no reader of
 those sees. It then queues the purge of the cache surfaces that declare a
 model it changed (``invalidated_by``), as a save would, so the API serves
 the sizes at once. An SVG has no raster size and stays null (it is read again on
-the next run); a file missing from storage is reported and left alone.
+the next run); a file missing from storage, or one it cannot read, is
+reported and left alone.
 
 Fields come from the app registry, so a model that gains the fields is
 covered without touching this command.
@@ -27,8 +28,7 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.core.management.base import BaseCommand
 from django.db import models
 
-from core.cache.invalidation import mark_surface_stale
-from core.cache.registry import iter_surfaces
+from core.cache.invalidation import mark_surface_stale, surfaces_invalidated_by
 from core.fields.image import ImageAndSvgField
 from core.management.commands.media_reference_audit import tenant_models
 from core.management.tenant_mixin import TenantCommandMixin
@@ -66,6 +66,7 @@ def backfill_current_schema(
     can still be restored.
     """
     tallies: dict[str, Tally] = {}
+    changed: set[type[models.Model]] = set()
     for model, field in pairs:
         tally = tallies.setdefault(f"{model._meta.label}.{field.name}", Tally())
         rows = (
@@ -83,13 +84,15 @@ def backfill_current_schema(
             try:
                 with field.storage.open(name) as stored:
                     size = displayed_dimensions(stored)
-            except FileNotFoundError, SuspiciousFileOperation:
+            except OSError, SuspiciousFileOperation:
+                # Missing, or not readable (a directory, no permission).
                 tally.missing += 1
                 continue
             if size is None:
                 tally.unmeasurable += 1
                 continue
             tally.measured += 1
+            changed.add(model)
             if not dry_run:
                 model._base_manager.filter(**{model._meta.pk.name: pk}).update(
                     **{
@@ -98,22 +101,11 @@ def backfill_current_schema(
                     }
                 )
     if not dry_run:
-        _mark_surfaces_stale(
-            {
-                label.rsplit(".", 1)[0]
-                for label, tally in tallies.items()
-                if tally.measured
-            }
-        )
+        for code in {
+            code for model in changed for code in surfaces_invalidated_by(model)
+        }:
+            mark_surface_stale(code)
     return tallies
-
-
-def _mark_surfaces_stale(model_labels: set[str]) -> None:
-    """Queue the purge of every cache surface that renders one of
-    *model_labels* (``app.Model``)."""
-    for surface in iter_surfaces():
-        if model_labels & set(surface.invalidated_by):
-            mark_surface_stale(surface.code)
 
 
 class Command(TenantCommandMixin, BaseCommand):
@@ -146,13 +138,13 @@ class Command(TenantCommandMixin, BaseCommand):
                         f"    {label}: {tally.measured} of "
                         f"{tally.scanned} row(s) measured, "
                         f"{tally.unmeasurable} without a raster size, "
-                        f"{tally.missing} missing from storage"
+                        f"{tally.missing} missing from or unreadable in storage"
                     )
         verb = "would measure" if options["dry_run"] else "measured"
         self.stdout.write(self.style.SUCCESS(f"{verb} {measured} row(s)."))
         if missing:
             self.stdout.write(
                 self.style.WARNING(
-                    f"{missing} row(s) name a file that is not in storage."
+                    f"{missing} row(s) name a file that is not in storage or cannot be read."
                 )
             )

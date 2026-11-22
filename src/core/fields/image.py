@@ -121,7 +121,8 @@ class ImageAndSvgField(ImageField):
     @staticmethod
     def _measure(file: FieldFile) -> tuple[int, int] | None:
         """An upload not stored yet is read from its content; a stored file
-        from storage. A stored file that is not there has no size to record:
+        from storage. A stored file that is not there or cannot be read (a
+        directory, no permission) has no size to record:
         the row keeps none, and the save that names it still succeeds
         (``backfill_image_dimensions`` reports such rows)."""
         if not file._committed:
@@ -129,5 +130,5 @@ class ImageAndSvgField(ImageField):
         try:
             with file.storage.open(file.name) as stored:
                 return displayed_dimensions(stored)
-        except FileNotFoundError, SuspiciousFileOperation:
+        except OSError, SuspiciousFileOperation:
             return None

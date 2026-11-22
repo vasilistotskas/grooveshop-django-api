@@ -71,8 +71,9 @@ def natural_size(
     try:
         with storage.open(name) as stored:
             return displayed_dimensions(stored)
-    except OSError, SuspiciousFileOperation:
-        # Missing, or outside the store's directory: no size to record.
+    except OSError, ValueError, SuspiciousFileOperation:
+        # Missing, unreadable, outside the store's directory, or a name
+        # storage refuses (a NUL byte from ``%00``): no size to record.
         return None
 
 

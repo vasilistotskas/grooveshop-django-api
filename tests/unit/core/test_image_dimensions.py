@@ -9,6 +9,7 @@ sees: EXIF orientation applied, nothing for an SVG.
 from __future__ import annotations
 
 import io
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -290,6 +291,17 @@ def test_a_file_saved_through_the_field_file_is_measured():
     assert _sizes(row) == (480, 640)
 
 
+def test_a_save_naming_a_file_storage_cannot_read_keeps_no_size():
+    storage = _image_field().storage
+    Path(storage.path("uploads/blog/a-directory.jpg")).mkdir(
+        parents=True, exist_ok=True
+    )
+
+    post = BlogPostFactory(image="uploads/blog/a-directory.jpg")
+
+    assert _sizes(post) == (None, None)
+
+
 def test_loading_or_refreshing_a_row_never_opens_its_file():
     """Django's own ``ImageField`` opens the stored file of every row loaded
     with a null size, which an SVG row always has."""
@@ -339,6 +351,20 @@ class TestBackfill:
         assert (tally.scanned, tally.unmeasurable, tally.missing) == (2, 1, 1)
         assert _sizes(svg) == (None, None)
         assert _sizes(gone) == (None, None)
+
+    def test_a_file_it_cannot_read_is_counted_and_the_rest_measured(self):
+        unreadable = self._unmeasured(_jpeg((300, 200)), "dir.jpg")
+        storage = _image_field().storage
+        storage.delete(unreadable.image.name)
+        Path(storage.path(unreadable.image.name)).mkdir()
+        post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")
+
+        tally = backfill_current_schema(measured_fields())[
+            "blog.BlogPost.image"
+        ]
+
+        assert (tally.measured, tally.missing) == (1, 1)
+        assert _sizes(post) == (640, 480)
 
     def test_skips_measured_rows_and_a_dry_run_writes_nothing(self):
         BlogPostFactory(image=_upload("done.jpg", _jpeg((300, 200))))

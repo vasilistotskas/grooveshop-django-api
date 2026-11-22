@@ -65,6 +65,21 @@ def test_formats_the_editor_uploads_are_measured(media, fmt, name):
     assert 'data-natural-width="640" data-natural-height="480"' in result
 
 
+@pytest.mark.django_db
+def test_a_src_storage_refuses_saves_without_a_size(media):
+    """``%00`` decodes to a NUL byte, which ``FileSystemStorage.open``
+    refuses with ``ValueError``, not ``OSError``."""
+    post = BlogPostFactory(
+        slug="natural-size-nul",
+        body=f'<p><img src="{media.url}a%00b.png" width="100%"></p>',
+    )
+
+    post.refresh_from_db()
+
+    assert "a%00b.png" in post.body
+    assert "data-natural-width" not in post.body
+
+
 def test_avif_is_measured(media):
     media.add("a.avif", (320, 200), "AVIF")
 

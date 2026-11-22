@@ -790,6 +790,9 @@ msgstr "A breakdown shows sales before returns, biggest first. For a product or 
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 
+msgid "A charge that does not match its order: decide it"
+msgstr "A charge that does not match its order: decide it"
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
@@ -2047,6 +2050,9 @@ msgstr "Automatic promotions apply to every eligible cart; code promotions requi
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 
+msgid "Availability probability"
+msgstr "Availability probability"
+
 msgid "Available Locales"
 msgstr "Available Locales"
 
@@ -2091,6 +2097,9 @@ msgstr "BOX NOW carrier"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "BOX NOW parcel at the locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "BXGY promotions need both a buy quantity and a get quantity."
@@ -3125,6 +3134,9 @@ msgstr "Charge a Stripe SharedPaymentToken granted by an AI agent platform (ACP/
 msgid "Charge type"
 msgstr "Charge type"
 
+msgid "Charge waiting for a decision"
+msgstr "Charge waiting for a decision"
+
 msgid "Chargeback"
 msgstr "Chargeback"
 
@@ -3463,6 +3475,9 @@ msgstr "Compare with"
 msgid "Compartment Size"
 msgstr "Compartment Size"
 
+msgid "Compartment sizes"
+msgstr "Compartment sizes"
+
 msgid "Complete"
 msgstr "Complete"
 
@@ -3565,6 +3580,9 @@ msgstr "Confirmed by hand"
 
 msgid "Connection or timeout"
 msgstr "Connection or timeout"
+
+msgid "Consecutive absent syncs"
+msgstr "Consecutive absent syncs"
 
 msgid "Consent"
 msgstr "Consent"
@@ -4434,6 +4452,9 @@ msgstr "Discount: %(percent)s%%. You save %(value)s per item (%(total)s total)."
 msgid "Discounted price excluding VAT"
 msgstr "Discounted price excluding VAT"
 
+msgid "Dispatch key"
+msgstr "Dispatch key"
+
 #, python-format
 msgid "Dispatched tracking poll for %(count)d shipment(s)."
 msgstr "Dispatched tracking poll for %(count)d shipment(s)."
@@ -4937,6 +4958,9 @@ msgstr "Event Type ID"
 
 msgid "Event fingerprint"
 msgstr "Event fingerprint"
+
+msgid "Event key"
+msgstr "Event key"
 
 msgid "Event name"
 msgstr "Event name"
@@ -9224,6 +9248,9 @@ msgstr "No discounts applied"
 msgid "No email matches."
 msgstr "No email matches."
 
+msgid "No icon"
+msgstr "No icon"
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "No item in the cart qualifies for this promotion"
 
@@ -9523,6 +9550,9 @@ msgstr "Notified at"
 
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null until the enquiry that claims this upload is submitted."
+
+msgid "Null when the store ships nowhere, or no delivery it offers can take this product."
+msgstr "Null when the store ships nowhere, or no delivery it offers can take this product."
 
 msgid "Number"
 msgstr "Number"
@@ -10471,6 +10501,9 @@ msgstr "Partner shop (2)"
 msgid "Partner shop (3)"
 msgstr "Partner shop (3)"
 
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Password accepted. Confirm it is you with a code."
 
@@ -10721,6 +10754,9 @@ msgstr "Payment received for canceled order #%(order_id)s"
 msgid "Payment reference"
 msgstr "Payment reference"
 
+msgid "Payment review"
+msgstr "Payment review"
+
 msgid "Payment status"
 msgstr "Payment status"
 
@@ -10741,6 +10777,9 @@ msgstr "Payment-method list and detail responses, plus the checkout sidebar that
 
 msgid "Payments"
 msgstr "Payments"
+
+msgid "Payments to review"
+msgstr "Payments to review"
 
 msgid "Payout marked as reconciled."
 msgstr "Payout marked as reconciled."
@@ -10868,6 +10907,9 @@ msgstr "Phone number for BoxNow shipment notifications, sent as the sender's con
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
+
+msgid "Pick one of the icons the store offers."
+msgstr "Pick one of the icons the store offers."
 
 msgid "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
 msgstr "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
@@ -11631,6 +11673,9 @@ msgstr "Purged At"
 
 msgid "Purpose of movement"
 msgstr "Purpose of movement"
+
+msgid "Pushed at"
+msgstr "Pushed at"
 
 msgid "Put the returned units back in stock"
 msgstr "Put the returned units back in stock"
@@ -14704,12 +14749,18 @@ msgstr "The cart's lines at the prices the shopper pays."
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 
+msgid "The category's icon, one of the page builder's icons."
+msgstr "The category's icon, one of the page builder's icons."
+
 #, python-format
 msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 msgstr "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
+
+msgid "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+msgstr "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
 
 msgid "The closed gate's label, for a skipped feature."
 msgstr "The closed gate's label, for a skipped feature."
@@ -14727,11 +14778,17 @@ msgstr "The code has reached its usage limit"
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "The cost without VAT: this is what the profit report uses."
+
+msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
+msgstr "The country it was priced for: the store's first shipping country, the one checkout preselects."
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
@@ -14939,6 +14996,9 @@ msgstr "The link search is not valid."
 msgid "The locker's BOX NOW id, exactly."
 msgstr "The locker's BOX NOW id, exactly."
 
+msgid "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+msgstr "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 
@@ -15065,6 +15125,9 @@ msgstr "The previous payment could not be closed."
 
 msgid "The previous payment is still in progress."
 msgstr "The previous payment is still in progress."
+
+msgid "The product ships free on its own: ``price`` is 0."
+msgstr "The product ships free on its own: ``price`` is 0."
 
 msgid "The product the shopper is looking at."
 msgstr "The product the shopper is looking at."
@@ -15256,6 +15319,9 @@ msgstr "The store's terms of use or privacy policy cannot be shown right now, so
 
 msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
 msgstr "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
+
+msgid "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
+msgstr "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
 
 msgid "The storefront catalogue build the draft was last validated against."
 msgstr "The storefront catalogue build the draft was last validated against."

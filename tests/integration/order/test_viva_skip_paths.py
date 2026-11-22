@@ -27,9 +27,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.viva_webhook_event import VivaWebhookEvent
-from order.views.viva_webhook import (
-    _handle_payment_created,
-)
+from order.payments.viva_settlement import handle_payment_created
 from pay_way.enum.settlement import PaySettlement
 
 pytestmark = pytest.mark.django_db
@@ -55,7 +53,7 @@ def _order(total="50.00"):
 
 def _verified(status, amount, order_code=ORDER_CODE):
     return patch(
-        "order.views.viva_webhook._verify_transaction",
+        "order.payments.viva_settlement.verify_transaction",
         return_value=(
             status,
             {"amount": amount, "currency": "EUR", "order_code": order_code},
@@ -69,7 +67,7 @@ class TestSkipsAreReportedAsSkips:
         expected = order.calculate_order_total_amount().amount
 
         with _verified(PaymentStatus.COMPLETED, str(expected - Decimal(2))):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-mismatch"
             )
 
@@ -81,7 +79,7 @@ class TestSkipsAreReportedAsSkips:
         order = _order()
 
         with _verified(PaymentStatus.PENDING, "50.00"):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-pending"
             )
 
@@ -95,7 +93,7 @@ class TestSkipsAreReportedAsSkips:
         order = _order()
 
         with _verified(PaymentStatus.COMPLETED, "not-a-number"):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-garbage"
             )
 
@@ -111,7 +109,7 @@ class TestChargedOrderIsNotAutoCancelled:
         expected = order.calculate_order_total_amount().amount
 
         with _verified(PaymentStatus.COMPLETED, str(expected - Decimal(2))):
-            _handle_payment_created(order, {"StatusId": "F"}, "txn-1")
+            handle_payment_created(order, {"StatusId": "F"}, "txn-1")
 
         order.refresh_from_db()
         flag = order.metadata[AMOUNT_MISMATCH_FLAG]
@@ -177,7 +175,7 @@ class TestCurrencyIsCompared:
         expected = order.calculate_order_total_amount().amount
 
         provider = patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {
@@ -188,7 +186,7 @@ class TestCurrencyIsCompared:
             ),
         )
         with provider:
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-usd"
             )
 
@@ -202,7 +200,7 @@ class TestCurrencyIsCompared:
         expected = order.calculate_order_total_amount()
 
         provider = patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {
@@ -213,7 +211,7 @@ class TestCurrencyIsCompared:
             ),
         )
         with provider:
-            _handle_payment_created(order, {"StatusId": "F"}, "txn-eur")
+            handle_payment_created(order, {"StatusId": "F"}, "txn-eur")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
@@ -253,7 +251,7 @@ class TestTransactionMustBelongToTheOrder:
             str(expected.amount),
             order_code="9999999999999999",
         ):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-not-ours"
             )
 
@@ -277,7 +275,7 @@ class TestTransactionMustBelongToTheOrder:
             str(expected.amount),
             order_code="txn-earlier",
         ):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "txn-not-ours"
             )
 
@@ -293,12 +291,12 @@ class TestTransactionMustBelongToTheOrder:
 
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(PaymentStatus.COMPLETED, {"amount": "10.00"}),
             ),
             pytest.raises(RuntimeError, match="orderCode"),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "txn-no-code")
+            handle_payment_created(order, {"StatusId": "F"}, "txn-no-code")
 
     def test_an_earlier_session_code_still_settles(self):
         """A shopper may pay on a stale tab, so ANY code the order issued
@@ -315,7 +313,7 @@ class TestTransactionMustBelongToTheOrder:
             str(expected.amount),
             order_code="OLD-CODE",
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "txn-old")
+            handle_payment_created(order, {"StatusId": "F"}, "txn-old")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED

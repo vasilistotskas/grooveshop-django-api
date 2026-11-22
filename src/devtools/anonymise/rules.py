@@ -161,6 +161,8 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "address": Kind.STREET_LINE,
             "place": Kind.PLACE,
             "image": Kind.NULL,
+            "image_width": Kind.NULL,
+            "image_height": Kind.NULL,
             "birth_date": Kind.NULL,
             "twitter": Kind.BLANK,
             "linkedin": Kind.BLANK,

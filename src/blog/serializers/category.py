@@ -6,7 +6,10 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
+from blog import icons
 from blog.models.category import BlogCategory
+from builder.errors import StorefrontUnavailableError
+from core.api.image_field import MainImageSizeMixin
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 
@@ -17,7 +20,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 
 class BlogCategorySerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[BlogCategory]
+    MainImageSizeMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[BlogCategory],
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=BlogCategory)
     post_count = serializers.SerializerMethodField()
@@ -55,6 +60,9 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
+            "icon",
             "created_at",
             "updated_at",
         )
@@ -65,6 +73,9 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
+            "icon",
             "created_at",
             "updated_at",
         )
@@ -164,6 +175,19 @@ class BlogCategoryWriteSerializer(
                 )
         return value
 
+    def validate_icon(self, value: str) -> str:
+        """``blog.icons.check_icon``: a changed icon the catalogue does
+        not offer is a 400, one that cannot be checked a 503."""
+        saved = self.instance.icon if self.instance is not None else ""
+        match icons.check_icon(value, saved=saved):
+            case icons.IconCheck.UNKNOWN:
+                raise serializers.ValidationError(
+                    icons.UNKNOWN_ICON_MESSAGE, code=icons.IconCheck.UNKNOWN
+                )
+            case icons.IconCheck.UNAVAILABLE:
+                raise StorefrontUnavailableError()
+        return value
+
     def validate_slug(self, value: str) -> str:
         if not value:
             raise serializers.ValidationError(
@@ -189,6 +213,7 @@ class BlogCategoryWriteSerializer(
             "parent",
             "sort_order",
             "image",
+            "icon",
         )
         read_only_fields = ("sort_order",)
 

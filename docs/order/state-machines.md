@@ -5,7 +5,7 @@ and says which file holds each § number used here.
 
 ## 2. State machines
 
-### 2.1 OrderStatus transitions (the `allowed_transitions` map in `OrderService.update_order_status`)
+### 2.1 OrderStatus transitions (`ALLOWED_TRANSITIONS` in `src/order/lifecycle/service.py`, read by `OrderLifecycleService.update_order_status`)
 
 ```
 PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
@@ -16,11 +16,11 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
    └──► CANCELED               (cancel_order only)
 ```
 
-- `OrderService.update_order_status(order, new_status)` validates
+- `OrderLifecycleService.update_order_status(order, new_status)` validates
   every transition against this table.
 - **CANCELED is not in the table.** A cancel releases stock, settles or refunds
   the payment and records `metadata['cancellation']`, so the only way into
-  CANCELED is `OrderService.cancel_order` ([§7.1](cancel.md)).
+  CANCELED is `OrderLifecycleService.cancel_order` ([§7.1](cancel.md)).
   `update_order_status(order, CANCELED)` raises `InvalidStatusTransitionError`
   for every caller, and the staff endpoint
   `POST /api/v1/order/{id}/update_status` answers it with 400
@@ -49,7 +49,7 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     (`_apply_order_status_transition` in both services).
   - `SHIPPED → DELIVERED` from carrier events.
   - `DELIVERED → COMPLETED` for paid orders
-    (`OrderService.maybe_advance_to_completed`), applied inline by the carrier
+    (`OrderLifecycleService.maybe_advance_to_completed`), applied inline by the carrier
     poll and the COD reconcile and swept hourly by
     `order.tasks.complete_paid_delivered_orders` for everything that lands
     outside those two moments (a payment entered by hand, a webhook after
@@ -64,7 +64,7 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     a Smartpoint (prod order 284).
   - A CANCELED shipment state (only ever produced by the admin retire action or
     a voucher cancel, never by tracking) routes the order through
-    `OrderService.cancel_order` (`OrderService.cancel_for_dead_shipment`,
+    `OrderLifecycleService.cancel_order` (`OrderLifecycleService.cancel_for_dead_shipment`,
     `refund_payment=False`: a paid order logs a WARNING, shows in "Canceled
     orders to refund" (`OrderQuerySet.refund_owed`) and staff refund it) —
     stock back, payment settled, cancellation recorded — never a bare status
@@ -105,10 +105,10 @@ No explicit table — flips are direct assignments. Common paths:
 | `PENDING → COMPLETED` | `Order.mark_as_paid()` (called by Stripe + Viva success handlers, COD reconcile) |
 | `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`); a poll that reads the payment failed or canceled (`OrderService._apply_polled_payment_status`, [§4.1](payments.md)) |
 | `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. (continues under the table) |
-| `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Every refund path writes a `PaymentTransaction` REFUND row and `PaymentLedger.record_refund` derives the status from the ledger's sums in that one place ([§7.3](payment-ledger.md)): `RefundService.refund_order` (the in-app refund, the staff "Refund" action, a cancel), `handle_stripe_refund_made` ([§4.2](payments.md)) and the Viva reversal webhook (`_handle_reversal_created`, event 1797, [§4.3](payments.md)). (continues under the table) |
+| `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Every refund path writes a `PaymentTransaction` REFUND row and `PaymentLedger.record_refund` derives the status from the ledger's sums in that one place ([§7.3](payment-ledger.md)): `RefundService.refund_order` (the in-app refund, the staff "Refund" action, a cancel), `handle_stripe_refund_made` ([§4.2](payments.md)) and the Viva reversal webhook (`_handle_reversal_created`, event 1797, [§4.3](payments-viva.md)). (continues under the table) |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `src/order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). (continues under the table) |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
-| `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. (continues under the table) |
+| `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`viva_settlement.handle_payment_created`) charge for an order that is already canceled. (continues under the table) |
 
 **`FAILED / PENDING / CANCELED → PENDING`.** A CANCELED payment on a PENDING
 order (an intent canceled while the order waits) is retryable; no path writes

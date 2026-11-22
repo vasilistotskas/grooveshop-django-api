@@ -16,7 +16,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   works for `GUEST_ORDER_ACCESS_DAYS` after the order, see
   `Order.opens_for_guest`; on a store without customer accounts every order
   is a guest's, `Order.served_as_guest`): `POST /api/v1/order/{id}/cancel` →
-  `OrderService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`.
+  `OrderLifecycleService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`.
   The courier is asked first, see §7.1.1.
 - **Agent gateway:** `GET /api/v1/agent/internal/order/{uuid}`, with its shared
   secret in `X-Internal-Token`, reads an order an agent placed
@@ -53,7 +53,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   An order the agent gateway places has a second bound, per cart: none while
   an earlier order of that cart awaits its online payment
   (`cart_has_unpaid_order`, [§3.2](creation.md)).
-- **Carrier-driven (ACS only)**: `OrderService.cancel_for_dead_shipment`
+- **Carrier-driven (ACS only)**: `OrderLifecycleService.cancel_for_dead_shipment`
   (`customer_initiated=False`, `refund_payment=False`; the shipment is already
   canceled), called by the ACS status sync for a CANCELED shipment of an order
   not yet shipped ([§2.1](state-machines.md)). The courier is not asked to
@@ -113,7 +113,7 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    For a customer cancel the courier already confirmed in step 0, so the
    outcome is recorded up front, in step 3, and the cascade skips.
 5. After the cancel has COMMITTED, optional refund via `refund_order`
-   (`OrderService._refund_canceled_order`; `refund_payment=True`, and the order
+   (`OrderLifecycleService._refund_canceled_order`; `refund_payment=True`, and the order
    is paid or the ledger still holds refundable money, so an order a provider's
    dashboard already refunded in part gets the rest back, not nothing). The
    refund is its own claim, call and record ([§7.2](refund-execution.md)): no
@@ -152,7 +152,7 @@ Detail: [§7.4](fiscal-movement-receipts.md).
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record
 and the courier, and nothing catches it afterwards. Always go through
-`OrderService.cancel_order`.
+`OrderLifecycleService.cancel_order`.
 
 ### 7.1.0 The payment hold: stock is released when the payment link expires
 
@@ -189,8 +189,9 @@ locks stock.
   - Stripe PaymentIntent (the order-first `create_payment_intent` /
     `retry-payment` flow): a PaymentIntent has no expiry, so the sweep cancels
     it (`StripePaymentProvider.close_payment`, reason `abandoned`) before it
-    releases the stock. An intent Stripe will not cancel (processing,
-    succeeded) leaves the order open for its webhook; the sweep reports
+    releases the stock. A succeeded intent is settled first (the sweep reads it
+    before it cancels anything); one Stripe will not cancel (processing)
+    leaves the order open for its webhook, and the sweep reports
     `skipped_open`. A retry closes the intent it replaces the same way before
     it opens the new one (`PayWayService.process_payment`): otherwise the old
     intent's client secret could still be confirmed after the sweep released
@@ -226,8 +227,26 @@ locks stock.
   whose payment FAILED is swept too, `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`
   (default 30) after the failure: a failed attempt does not end the payment,
   the shopper may confirm the same PaymentIntent with another card or retry the
-  same Viva payment order. Both buckets ask the provider to close the payment
-  first (`close_payment(order)`): Stripe cancels the PaymentIntent and the
+  same Viva payment order. Both buckets first read the provider for a payment
+  it took whose webhook never landed (`order.payments.settlement`), and settle
+  one through the code that webhook runs: Viva's charges listed on the order's
+  payment orders (`GET /api/transactions/?ordercode=`) as Transaction Payment
+  Created events (`viva_settlement.apply_event`), a succeeded Stripe intent
+  through `handle_payment_succeeded` and a paid Checkout Session through the
+  `checkout.session.completed` code (`stripe_settlement`). An intent that did
+  not succeed still has the recorded session read: opening a hosted link
+  cancels the open intent and leaves its `payment_id`. The order is then
+  paid, never canceled unpaid, the webhook that arrives later is a no-op, and
+  the sweep reports it as `settled`. Money the provider took that settles
+  nothing (a Viva payment refunded or disputed before its webhook, one the
+  checks refuse without a flag) flags the order once for the store's review
+  (`flag_payment_mismatch`), also reported `settled`: a read-back settles,
+  flags, or finds nothing taken, and never leaves an order for every run to
+  repeat. Only a Stripe payment still in flight waits for its webhook
+  (`skipped_open`). A provider that cannot be read leaves the order for the
+  next run (`skipped_open`): a payment may have landed. Only then
+  is the provider asked to close the payment (`close_payment(order)`): Stripe
+  cancels the PaymentIntent and the
   order is canceled at once, whatever its hold says. A provider with nothing to
   cancel (Viva, whose payment order stays payable after a failed transaction
   until its own expiry; a hosted Stripe Checkout Session, which records no
@@ -235,8 +254,11 @@ locks stock.
   (`payment_hold_expires_at`, plus the grace window) has ended and not before.
   A provider that cannot be built (its credentials were removed) cannot close
   anything and takes the same wait. A payment that is not closed (that wait, or
-  a Stripe intent that succeeded or is processing) leaves the order open for
-  its webhook and counts `skipped_open`.
+  a Stripe intent that is processing) leaves the order open for its webhook and
+  counts `skipped_open`. The cancel itself is decided on the payment the order
+  recorded before the provider was read (`OpenPayment`): under the row lock it
+  is refused when another link or intent was recorded meanwhile, and the next
+  run reads that one.
 - **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's
@@ -295,7 +317,7 @@ locks stock.
   `paymentDecidedBy` as the checkout's `expires_at`, so a platform polls until
   Django has decided the order and keeps no window of its own.
 - **A payment that still arrives after the cancel** is not lost: Viva
-  `_handle_payment_created` and Stripe `handle_payment_succeeded` /
+  `viva_settlement.handle_payment_created` and Stripe `handle_payment_succeeded` /
   `checkout.session.completed` route it to
   `OrderService.record_payment_after_cancel` ([§2.2](state-machines.md)): the
   money is booked, the order stays CANCELED, ops is alerted and the order
@@ -326,7 +348,7 @@ tracking poll sees the parcel move (voucher creation stores the tracking number
 but does not advance the status). In that window the courier may already hold
 the parcel, so a customer cancel is only accepted once the courier agrees:
 
-1. `OrderService._ask_courier_to_cancel` re-reads the order's status (an order
+1. `OrderLifecycleService._ask_courier_to_cancel` re-reads the order's status (an order
    that no longer allows a cancel gets the usual status error and the courier
    is not asked), then calls `ShippingService.cancel_shipment` — the same
    carrier path a staff cancel uses (`AcsService.cancel_voucher`,
@@ -367,7 +389,7 @@ the parcel, so a customer cancel is only accepted once the courier agrees:
    usual status error. The shipment was already canceled by then (at the
    courier, or locally when no voucher had been issued), so the order is live
    with no voucher behind it; any other failure of the locked cancel ends the
-   same way. `OrderService._note_shipment_canceled_without_order` logs an ERROR
+   same way. `OrderLifecycleService._note_shipment_canceled_without_order` logs an ERROR
    (the logged-errors alert) and leaves a staff-only NOTE
    (`The customer asked to cancel this order and its shipment was canceled, but the order itself was not canceled (its status is …)`)
    telling staff to create a new voucher. An order another request canceled in

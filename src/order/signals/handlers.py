@@ -36,6 +36,7 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
 from order.models.item import OrderItem
@@ -49,9 +50,9 @@ from order.payments.payment_fees import (
     record_stripe_fee_for_intent,
 )
 from order.payments.payment_ledger import (
-    PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
+from order.payments.stripe_settlement import settle_paid_checkout_session
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -349,7 +350,7 @@ def handle_order_status_changed(
     )
 
     # Customer-notifications suppression flag (set by
-    # OrderService.suppress_customer_status_notifications for chained
+    # OrderLifecycleService.suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
     # email/toast and a second one ms later would feel like spam, e.g.
     # the DELIVERED → COMPLETED auto-advance). Gates both the email and
@@ -533,7 +534,7 @@ def handle_order_shipped(
     pre_shipped = (OrderStatus.PENDING.value, OrderStatus.PROCESSING.value)
     if order.status in pre_shipped:
         logger.info("Updating order %s status to shipped", order.id)
-        OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.SHIPPED)
     else:
         # Already at/past SHIPPED (e.g. a carrier same-poll
         # PROCESSING→DELIVERED bridge). Skipping the defensive re-bump is
@@ -1780,133 +1781,12 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         order.metadata[f"webhook_processed_{event_id}"] = True
 
         if payment_status == "paid" and payment_intent_id:
-            from order.payments.payment_events import publish_payment_status
-            from shipping.services import ShippingService
-
-            order.metadata["stripe_checkout_session_id"] = session_id
-            order.metadata["stripe_payment_intent_id"] = payment_intent_id
-
-            # The money is in whatever state the order is. The
-            # ``payment_intent.succeeded`` event that follows records the
-            # same charge under the same key and changes nothing.
-            if captured is not None:
-                PaymentLedger.record_charge(
-                    order,
-                    amount=captured,
-                    provider=StripePaymentProvider.code,
-                    reference=payment_intent_id,
-                )
-
-            # Before the settled guard: a canceled order's payment is
-            # already settled, and behind the guard a real charge on it
-            # was dropped with a WARNING. Never ships (G0281).
-            if OrderService.is_payment_after_cancel(order):
-                OrderService.record_payment_after_cancel(
-                    order,
-                    payment_id=payment_intent_id,
-                    payment_method="stripe",
-                )
-                publish_payment_status(order)
-                return
-
-            # A second payment on an order another PaymentIntent already
-            # paid: booked above, and ``PaymentLedger.sync_overcharge``
-            # told staff when it took the order past what it is for. The
-            # order keeps its first ``payment_id``.
-            if (
-                order.payment_status == PaymentStatus.COMPLETED
-                and order.payment_id
-                and order.payment_id != payment_intent_id
-            ):
-                logger.error(
-                    "PaymentIntent %s is a second payment on order %s, "
-                    "already paid by %s: recorded in the ledger, order "
-                    "left as it is",
-                    payment_intent_id,
-                    order.id,
-                    order.payment_id,
-                )
-                order.save(update_fields=["metadata"])
-                return
-
-            # Settled-state guard: Stripe does not guarantee event
-            # delivery order, so a delayed checkout.session.completed
-            # must never un-refund / un-cancel an order that already
-            # reached a settled financial state. Mirrors
-            # OrderService.handle_payment_succeeded.
-            # COMPLETED is excluded on purpose: a "paid" event landing on
-            # an already-completed order is a redelivery, and processing
-            # it again is a harmless no-op rather than a regression.
-            if order.payment_status in (
-                SETTLED_PAYMENT_STATUSES - {PaymentStatus.COMPLETED}
-            ):
-                logger.warning(
-                    "Ignoring checkout.session.completed for order %s: "
-                    "payment_status already %s",
-                    order.id,
-                    order.payment_status,
-                )
-                # Persist the webhook_processed flag set above so a
-                # Stripe redelivery short-circuits on the idempotency
-                # check instead of re-running this guard (harmless, but
-                # avoids duplicate warning logs on every retry).
-                order.save(update_fields=["metadata"])
-                return
-
-            # What Stripe collected must be what the order is for: a
-            # session paid for another amount settles nothing.
-            expected = order.calculate_order_total_amount()
-            if captured is not None and (
-                captured.currency != expected.currency
-                or abs(captured.amount - expected.amount)
-                > PAYMENT_AMOUNT_TOLERANCE
-            ):
-                OrderService.flag_payment_mismatch(
-                    order,
-                    payment_id=payment_intent_id,
-                    provider=StripePaymentProvider.code,
-                    observed=captured,
-                    expected=expected,
-                )
-                publish_payment_status(order)
-                return
-
-            previous_payment_status = order.payment_status
-            order.mark_as_paid(
-                payment_id=payment_intent_id, payment_method="stripe"
+            settle_paid_checkout_session(
+                order,
+                session_id=session_id,
+                payment_intent_id=payment_intent_id,
+                captured=captured,
             )
-            order.save(update_fields=["metadata"])
-
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": previous_payment_status},
-                new_value={
-                    "payment_status": PaymentStatus.COMPLETED,
-                    "payment_id": payment_intent_id,
-                    "checkout_session_id": session_id,
-                },
-            )
-
-            if order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
-
-            # Stripe's guidance is to fulfil hosted Checkout Sessions on
-            # checkout.session.completed (not payment_intent.succeeded).
-            # Dispatch the courier task here so a Stripe-Checkout order
-            # isn't left paid-but-never-shipped when the PaymentIntent
-            # event's payment_id lookup races/misses. Idempotent on the
-            # shipment row; wrapped in on_commit by ShippingService.
-            ShippingService.dispatch_create_shipment_task(order)
-
-            publish_payment_status(order)
-
-            logger.info(
-                "Order %s marked as paid via checkout session %s",
-                order_id,
-                session_id,
-            )
-
-            dispatch_on_commit(send_order_confirmation_email, [order.id])
 
         elif payment_status == "unpaid":
             # The same settled-state guard the "paid" arm carries, and

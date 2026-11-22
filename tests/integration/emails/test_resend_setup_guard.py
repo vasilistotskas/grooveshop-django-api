@@ -21,7 +21,7 @@ from django.utils import timezone, translation
 from admin.dashboard.platform import PlatformAlerts
 from admin.dashboard.store.widgets import StoreAlerts
 from emails import checks, setup
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import store_staff, store_tenant
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]

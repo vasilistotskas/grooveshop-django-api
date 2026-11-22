@@ -166,7 +166,7 @@ def test_its_owner_cancels_by_uuid_without_accounts(store):
     order = _account_order(status=OrderStatus.PENDING)
 
     with patch(
-        "order.services.OrderService.cancel_order",
+        "order.lifecycle.service.OrderLifecycleService.cancel_order",
         return_value=(order, None),
     ) as cancel:
         response = APIClient().post(

@@ -31,7 +31,7 @@ from recommendation.strategies.base import (
     RecommendationStrategy,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 _SAME = 0.8
 _SIBLING = 0.6

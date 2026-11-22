@@ -315,16 +315,19 @@ def payment_review_orders() -> QuerySet[Order]:
     The sweep never cancels one: it would close a CHARGED order without a
     refund. It needs a person.
 
-    Flagged and still undecided: PENDING, with a payment that is not final.
-    The flag is never cleared, so an order the store has since settled,
-    canceled or refunded leaves this set through its own state: its status
-    moves on from PENDING, or its payment reaches one of
-    ``SETTLED_PAYMENT_STATUSES``.
+    Flagged and still undecided: PENDING, and the charge not accepted
+    (``COMPLETED``), whatever else its payment says. A refund, in full or in
+    part, decides nothing on its own: the order is still PENDING and holds
+    its stock. The flag is never cleared, so an order the store has since
+    decided leaves this set through its own state: its status moves on
+    from PENDING (fulfilled, canceled), or its charge is accepted.
+    This set is the store's worklist (the admin's "Payment review"
+    filter and the dashboard's "Payments to review" count).
     """
     return (
         Order.objects.filter(metadata__has_key=AMOUNT_MISMATCH_FLAG)
         .filter(status=OrderStatus.PENDING)
-        .exclude(payment_status__in=SETTLED_PAYMENT_STATUSES)
+        .exclude(payment_status=PaymentStatus.COMPLETED)
     )
 
 

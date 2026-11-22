@@ -331,6 +331,16 @@ class StoreAttention(DashboardWidget):
             ),
             (
                 True,
+                "payments_to_review",
+                "price_check",
+                "danger",
+                _("Payments to review"),
+                _("A charge that does not match its order: decide it"),
+                "order.Order",
+                urlencode({"payment_review": "yes"}),
+            ),
+            (
+                True,
                 "canceled_still_paid",
                 "currency_exchange",
                 "danger",

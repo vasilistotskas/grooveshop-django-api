@@ -20,6 +20,7 @@ from country.factories import CountryFactory
 from order.accounting.taxation import ChargeKind, order_vat_lines
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models import Order, OrderHistory, OrderVatLine
 from order.services import OrderService
 from order.vat_snapshot import (
@@ -175,19 +176,19 @@ class TestShippedAt:
         order = OrderFactory(num_order_items=0, status=OrderStatus.PROCESSING)
         assert order.shipped_at is None
 
-        OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.SHIPPED)
 
         order.refresh_from_db()
         assert order.shipped_at == order.status_updated_at
 
     def test_a_later_status_never_moves_it(self):
         order = OrderFactory(num_order_items=0, status=OrderStatus.PROCESSING)
-        OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.SHIPPED)
         order.refresh_from_db()
         shipped = order.shipped_at
 
-        OrderService.update_order_status(order, OrderStatus.DELIVERED)
-        OrderService.update_order_status(order, OrderStatus.COMPLETED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.DELIVERED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.COMPLETED)
 
         order.refresh_from_db()
         assert order.shipped_at == shipped

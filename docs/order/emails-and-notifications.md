@@ -198,7 +198,7 @@ emails / toasts within ms:
 3. `OrderService.add_tracking_info` admin path → PENDING → PROCESSING →
    SHIPPED.
 
-`OrderService.suppress_customer_status_notifications(order, status)`
+`OrderLifecycleService.suppress_customer_status_notifications(order, status)`
 pre-stamps two metadata flags:
 - `status_update_email_sent_<status>` — short-circuits the email task's
   `_reserve_status_update_email`.
@@ -236,6 +236,22 @@ email fix.
 All WS notifications go through `notification.consumers.NotificationConsumer`
 and require auth; **guest orders silently get no live notification** (the email
 IS sent for guests since it goes to `order.email`).
+
+**Once per dispatch.** Each of these tasks can run more than once (a retry, a
+message delivered again, the sweep's copy of a publish, see
+`docs/deferred-dispatch.md`). `create_user_notification` writes the
+notification with a `dispatch_key` made of the task id, the user, the type,
+the link and `distinct_by`, unique among `Notification` rows, so a second
+copy gets the first copy's row back (or nothing, when the user has removed
+it since) and writes nothing, even when it words the notification
+differently. One task can write several notifications of one type and link
+to one user when the caller tells them apart with `distinct_by` (the liker
+of a comment, `blog.tasks.notify_comment_liked_task`). The push that a new row
+queues (`notification.tasks.send_notification_task`) claims the row first
+(`NotificationUser.pushed_at`, a compare-and-set) and gives the claim back
+when the push fails, so the storefront gets one toast per row. A worker that
+dies between the claim and the push loses that toast; the notification stays
+in the list.
 
 ### 6.5 Marketing email and the unsubscribe link
 

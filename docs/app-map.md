@@ -23,8 +23,8 @@ named here, and when a path named here does not exist.
 - **A module becomes a package at about 500 lines.** `services.py` turns
   into `services/` with one module per subject, and every import site
   moves in the same change (no re-export shim). The modules that are far
-  past that today (`src/order/services.py`, `src/shipping_acs/services.py`,
-  `src/tenant/models.py` and others) are being split by the architecture
+  past that today (`src/order/services.py`, `src/shipping_acs/services.py`
+  and others) are being split by the architecture
   programme, epic #558.
 - **Tasks live in `tasks`, receivers in `signals`.** A Celery task is
   defined in the app's `tasks` module (or package), a signal receiver in
@@ -76,8 +76,8 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
   permissions (`src/core/api/permissions.py`), Knox token authentication
   (`src/core/api/tokens.py`), the throttle bases and the shared throttles
   (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
-  the OpenAPI helpers (`src/core/utils/serializers.py`,
-  `src/core/api/schema.py`);
+  the per-action serializer and OpenAPI config (`src/core/api/action_config.py`)
+  and the OpenAPI helpers (`src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
 - the Celery app (`src/core/celery.py`) and the transport its publishing
@@ -103,7 +103,10 @@ The multi-tenancy control plane. Models: `Tenant` (the django-tenants
 `TenantMixin`, with branding, plan flags and every per-store credential
 field), `TenantDomain`, `UserTenantMembership` (staff roles),
 `PlatformStaffToken`, `TenantArchive`, `TenantStatsSnapshot` and
-`DeferredDispatch`. A domain is a bare lowercase host name:
+`DeferredDispatch`, one module each in `src/tenant/models/`; the choices
+(`TenantPlan`, `StoreVertical`, `SuspendedReason`, `TenantMembershipRole`,
+`StaffTokenScope`) are in `src/tenant/enum.py`, and the cross-field rules
+`Tenant.clean()` runs are in `src/tenant/models/tenant_rules.py`. A domain is a bare lowercase host name:
 `tenant.validators.validate_store_hostname` runs in the form and in
 `save()`, because routing matches the text exactly.
 
@@ -217,8 +220,10 @@ covers what you are changing. Models under `src/order/models/`: `Order`,
 `RetailCredit`, `CreditCounter`, `StockReservation`, `StockLog`, `Expense`
 and `VivaWebhookEvent`.
 
-Entry points: `src/order/services.py` (creation, the state machine,
-cancel), `src/order/refunds/service.py` (`RefundService`: claiming,
+Entry points: `src/order/services.py` (creation, payment settlement),
+`src/order/lifecycle/service.py` (`OrderLifecycleService`: the status
+machine, its `ALLOWED_TRANSITIONS`, reorder and cancel),
+`src/order/refunds/service.py` (`RefundService`: claiming,
 allocating, making, booking and declining a refund),
 `src/order/checkout/quote.py` (`OrderQuoteService`: the
 checkout quote, which is the one total, the free-shipping basis, the
@@ -246,7 +251,9 @@ Read `docs/cart-agent-token.md` for the token,
 `BlogPost`, `BlogCategory` (MPTT), `BlogAuthor`, `BlogComment` and
 `BlogTag` under `src/blog/models/`, views per model under
 `src/blog/views/`. Indexed in Meilisearch beside the products. Read
-`docs/blog-related-posts.md`.
+`docs/blog-related-posts.md`. A category's `icon` is one of the page
+builder's icons, checked against the store's catalogue (`src/blog/icons.py`,
+`docs/builder/documents.md`).
 
 ### `promotion/`, `giftcard/`, `b2b/`
 
@@ -353,7 +360,9 @@ the engine (`src/recommendation/engine.py`) and its strategies
 
 ### `notification/`
 
-`Notification` and `NotificationUser`, the Channels consumer
+`Notification` and `NotificationUser`, written once per dispatch by
+`src/notification/services.py` (`dispatch_key`) and pushed once
+(`pushed_at`, `src/notification/tasks.py`), the Channels consumer
 (`src/notification/consumers.py`), the per-user group names and the
 send to them, bounded by `NOTIFICATION_PUSH_TIMEOUT_SECONDS`
 (`src/notification/groups.py`), and the single-use WebSocket ticket
@@ -422,4 +431,5 @@ Stripe is dj-stripe (`djstripe` in `TENANT_APPS`, its webhook under
 `stripe/` in `src/core/urls.py`). Viva Wallet is
 `src/order/views/viva_webhook.py` and `src/order/payments/payment_events.py`. Both
 read their credentials from the `Tenant` row through
-`src/tenant/credentials.py`. Read `docs/order/payments.md`.
+`src/tenant/credentials.py`. Read `docs/order/payments.md`, and
+`docs/order/payments-viva.md` for Viva.

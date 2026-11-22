@@ -85,3 +85,51 @@ stored images in `MEDIA_ROOT` that the media service would not serve (over its
 cap or pixel limit, or not an image). It is read only: it deletes, moves and
 re-encodes nothing. What to do with a store's file is the store owner's call.
 Files stored before the rule are never rewritten.
+
+## The displayed size is stored
+
+The storefront states the size of the rendition the media service serves
+(`og:image:width`/`og:image:height`, the width and height of a schema.org
+`ImageObject`) from the upload's size, without fetching the image. So every
+image that feeds one stores the size a browser shows it at: EXIF orientation
+applied, as the media service applies it before resizing. An SVG has no raster
+size and stores none (null).
+
+| Model | Columns | API (beside `mainImagePath`) |
+|---|---|---|
+| `blog.BlogPost`, `blog.BlogCategory` | `image_width`, `image_height` | `mainImageWidth`, `mainImageHeight` on the post and category serializers |
+| `user.UserAccount` (a blog author's avatar) | `image_width`, `image_height` | the same, on `UserPublicSerializer` |
+| `product.ProductImage` | `image_width`, `image_height` | the same, on `ProductImageSerializer`; a product's card and detail carry its main image's (`Product.main_image`, prefetched) |
+
+Source: `src/core/utils/image_size.py` (`displayed_size`,
+`displayed_dimensions`: the one measurement, also used by an upload's validation
+and the sizes recorded in rich text), `src/core/fields/image.py`
+(`ImageAndSvgField` with `width_field` and `height_field`),
+`src/core/api/image_field.py`
+(`MainImageSizeMixin`), `src/core/management/commands/backfill_image_dimensions.py`.
+
+`ImageAndSvgField` measures when a different file is assigned (an upload, on
+save, or another stored file, `FieldFile.save` included) and on the save that
+adds a row built with a file (an upload, or a stored file's name). Only then: a
+later save of a row whose file has no size (an SVG, an unreadable or missing
+file) does not read it again, since the file has not changed. It never reads a
+file to load a row: Django's own `ImageField` opens the stored file of every row loaded with
+a null size, which an SVG row always has, and records the stored size, not the
+displayed one. A queryset `update()` of the file bypasses the field and writes
+the size itself (`devtools.demo_blog`).
+
+`uv run python manage.py backfill_image_dimensions --all-tenants [--dry-run]`
+measures the rows that have no size: the ones stored before a model gained the
+columns, and the ones a release that did not measure yet wrote during a deploy.
+Run it once after the rollout of a release that adds the columns. It reads the
+header of each file only (and a JPEG's or WebP's EXIF segment), writes the two columns directly (no save, history or
+reindex) and then queues the purge of the cache surfaces that render a model it
+changed, as a save would. It reaches suspended stores and reports SVGs and
+files missing from storage. Safe to run again.
+
+A file Pillow cannot read (corrupt, or cut inside its header) has no size, like
+an SVG: the row keeps null and its save still succeeds. A PNG's EXIF orientation
+counts only when its `eXIf` chunk comes before the pixel data, because libvips
+ignores one after it (checked against Sharp: a quarter-turn tag after `IDAT` is
+served unrotated). Pillow has read such a chunk once the file is open, so a PNG
+is measured without decoding its pixels.

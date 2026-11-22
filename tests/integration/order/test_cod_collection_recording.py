@@ -21,9 +21,9 @@ from djmoney.money import Money
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models import Order
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.services import AcsService
@@ -57,7 +57,7 @@ class TestAcsCodReconcile:
     def test_the_collection_is_recorded_under_the_voucher(self):
         shipment = self._shipment()
 
-        with patch.object(OrderService, "maybe_advance_to_completed"):
+        with patch.object(OrderLifecycleService, "maybe_advance_to_completed"):
             AcsService._mark_cod_order_paid_if_pending(shipment)
 
         [row] = shipment.order.payment_transactions.all()
@@ -73,7 +73,7 @@ class TestAcsCodReconcile:
     def test_a_second_reconcile_of_the_same_parcel_records_nothing_more(self):
         shipment = self._shipment()
 
-        with patch.object(OrderService, "maybe_advance_to_completed"):
+        with patch.object(OrderLifecycleService, "maybe_advance_to_completed"):
             AcsService._mark_cod_order_paid_if_pending(shipment)
             # The order is paid now, so the reconcile stops there; and had
             # it not, the ledger key would absorb the repeat.
@@ -182,7 +182,7 @@ class TestTheStatusAndTheLedgerRowAreOneStep:
         ):
             AcsService._mark_cod_order_paid_if_pending(shipment)
 
-        with patch.object(OrderService, "maybe_advance_to_completed"):
+        with patch.object(OrderLifecycleService, "maybe_advance_to_completed"):
             AcsService._mark_cod_order_paid_if_pending(shipment)
 
         order = self._saved(shipment.order)
@@ -222,7 +222,9 @@ class TestTheStatusAndTheLedgerRowAreOneStep:
 
         with (
             patch("order.signals.order_paid.send") as order_paid,
-            patch.object(OrderService, "maybe_advance_to_completed") as advance,
+            patch.object(
+                OrderLifecycleService, "maybe_advance_to_completed"
+            ) as advance,
         ):
             AcsService._mark_cod_order_paid_if_pending(shipment)
 
@@ -248,7 +250,9 @@ class TestTheStatusAndTheLedgerRowAreOneStep:
 
         with (
             patch("order.signals.order_paid.send") as order_paid,
-            patch.object(OrderService, "maybe_advance_to_completed") as advance,
+            patch.object(
+                OrderLifecycleService, "maybe_advance_to_completed"
+            ) as advance,
         ):
             AcsService._mark_cod_order_paid_if_pending(shipment)
 

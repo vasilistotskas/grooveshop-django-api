@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -700,7 +701,7 @@ class BoxNowService:
         creating its parcel.
 
         A staff or system order cancel goes on when the courier step is
-        refused (``OrderService.cancel_attached_shipment`` never raises):
+        refused (``OrderLifecycleService.cancel_attached_shipment`` never raises):
         while a creation of uncertain outcome settles, or one is in
         flight. The order is then CANCELED while its shipment still waits
         for a parcel, and a pending retry of the creation would create one,
@@ -806,7 +807,7 @@ class BoxNowService:
     def report_cancel_refused(order_id: int, error: str) -> None:
         """Tell staff that a canceled order's parcel was not canceled.
 
-        The record ``OrderService.cancel_attached_shipment`` leaves when
+        The record ``OrderLifecycleService.cancel_attached_shipment`` leaves when
         the courier refuses an order's cancel: an ERROR line (the
         logged-errors alert) and a staff note on the order. Not the
         creation-failed email: nothing is to be created, and its remedy
@@ -2775,8 +2776,11 @@ class BoxNowService:
         We collect all ``external_id`` values returned by BoxNow and
         process them in batches of 100 inside their own ``atomic``
         blocks.  After all batches are done, any locker whose
-        ``external_id`` is absent from the API response is marked
-        ``is_active=False``.
+        ``external_id`` is absent from the API response for
+        ``BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION`` syncs in a row
+        is marked ``is_active=False``; a list that is empty or smaller
+        than ``BOXNOW_LOCKER_SYNC_MIN_FRACTION`` of the active lockers
+        changes no counter and deactivates nothing.
 
         Returns:
             ``{"created": N, "updated": M, "deactivated": K,
@@ -2813,6 +2817,9 @@ class BoxNowService:
             },
         )
 
+        # The baseline of the guard below, taken before the upserts: the
+        # lockers this response adds must not raise the bar it is held to.
+        active_before = BoxNowLocker.objects.filter(is_active=True).count()
         seen_external_ids: set[str] = set()
         created_count = 0
         updated_count = 0
@@ -2888,42 +2895,71 @@ class BoxNowService:
                     else:
                         updated_count += 1
 
-        # --- Deactivate stale lockers ------------------------------------
+        # --- Withdraw lockers the partner stopped returning ----------------
+        # The partner list churns about 3% a day, so one absence withdraws
+        # nothing: an active locker it did not return counts an absence, and
+        # is deactivated at BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION
+        # in a row. A returned locker was reset and reactivated above.
         deactivated_count = 0
-        if seen_external_ids:
-            deactivated_count = BoxNowLocker.objects.exclude(
+        too_small = (
+            len(seen_external_ids)
+            < active_before * settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION
+        )
+        if not seen_external_ids or too_small:
+            # An empty or far smaller list is an error response, not a
+            # withdrawal of the rest: nothing moves, the counters included,
+            # so a bad answer cannot count towards a deactivation.
+            logger.error(
+                "sync_lockers: partner=%s returned %d destinations for %d "
+                "active lockers (minimum fraction %s) — no locker "
+                "deactivated and no absence counted",
+                client.partner_id,
+                len(seen_external_ids),
+                active_before,
+                settings.BOXNOW_LOCKER_SYNC_MIN_FRACTION,
+                extra={
+                    "boxnow_partner_id": client.partner_id,
+                    "boxnow_destinations": len(seen_external_ids),
+                    "boxnow_active": active_before,
+                },
+            )
+        else:
+            absent = BoxNowLocker.objects.filter(is_active=True).exclude(
                 external_id__in=seen_external_ids
+            )
+            absent_count = absent.update(
+                consecutive_absent_syncs=F("consecutive_absent_syncs") + 1
+            )
+            deactivated_count = BoxNowLocker.objects.filter(
+                is_active=True,
+                consecutive_absent_syncs__gte=(
+                    settings.BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION
+                ),
             ).update(is_active=False)
             if deactivated_count:
                 # ``update`` sends no ``post_save``: the cached locker
                 # list would keep serving the withdrawn lockers.
                 mark_surface_stale("shipping")
-            # Wholesale turnover means this catalogue belongs to a
+            # Wholesale absence means this catalogue belongs to a
             # DIFFERENT partner than the rows we already had — the exact
             # shape of a credentials/data mismatch, and the reason every
             # subsequent voucher would fail with "invalid locker".
-            if known_before and deactivated_count > known_before / 2:
+            if known_before and absent_count > known_before / 2:
                 logger.warning(
-                    "sync_lockers: partner=%s deactivated %d of %d existing "
-                    "lockers — the local catalogue likely belonged to a "
-                    "different BoxNow account. Vouchers minted against the "
-                    "old ids will be rejected as invalid lockers.",
+                    "sync_lockers: partner=%s did not return %d of %d "
+                    "existing lockers — the local catalogue likely belongs "
+                    "to a different BoxNow account. Vouchers minted "
+                    "against the old ids will be rejected as invalid "
+                    "lockers.",
                     client.partner_id,
-                    deactivated_count,
+                    absent_count,
                     known_before,
                     extra={
                         "boxnow_partner_id": client.partner_id,
-                        "boxnow_deactivated": deactivated_count,
+                        "boxnow_absent": absent_count,
                         "boxnow_known_before": known_before,
                     },
                 )
-        else:
-            # BoxNow returned an empty list — don't deactivate everything;
-            # that's almost certainly an API error.  Log a warning and bail.
-            logger.warning(
-                "sync_lockers: BoxNow returned zero destinations — "
-                "skipping deactivation to avoid wiping all lockers"
-            )
 
         logger.info(
             "sync_lockers: partner=%s created=%d updated=%d deactivated=%d "
@@ -3059,7 +3095,7 @@ class BoxNowService:
         """
         Advance the Order's status based on the BoxNow parcel event.
 
-        Uses ``OrderService.update_order_status`` so signals and history
+        Uses ``OrderLifecycleService.update_order_status`` so signals and history
         logging fire correctly.  Swallows ``InvalidStatusTransitionError``
         with a warning so that an out-of-order or duplicate webhook event
         cannot roll back the already-recorded ``BoxNowParcelEvent``.
@@ -3090,7 +3126,7 @@ class BoxNowService:
         """
         # Lazy imports avoid circular dependencies at startup.
         from order.exceptions import InvalidStatusTransitionError
-        from order.services import OrderService
+        from order.lifecycle.service import OrderLifecycleService
 
         order: Order = shipment.order
         current_status: str = order.status
@@ -3161,7 +3197,7 @@ class BoxNowService:
             and current_status in _PRE_SHIPPED_STATUSES
         ):
             try:
-                OrderService.update_order_status(
+                OrderLifecycleService.update_order_status(
                     order,
                     "SHIPPED",
                     silent_for_customer=new_status == "RETURNED",
@@ -3195,7 +3231,7 @@ class BoxNowService:
             mapped_state,
         )
         try:
-            OrderService.update_order_status(order, new_status)
+            OrderLifecycleService.update_order_status(order, new_status)
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "_apply_order_status_transition: invalid transition for "
@@ -3221,7 +3257,7 @@ class BoxNowService:
         if new_status == "DELIVERED":
             if shipment.payment_mode == BoxNowPaymentMode.COD:
                 cls._mark_cod_order_paid_on_delivery(shipment)
-            OrderService.maybe_advance_to_completed(
+            OrderLifecycleService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
 
@@ -3269,8 +3305,8 @@ class BoxNowService:
         path.
         """
         from order.exceptions import InvalidStatusTransitionError
+        from order.lifecycle.service import OrderLifecycleService
         from order.models.order import Order as _Order
-        from order.services import OrderService
 
         current_status = (
             _Order.objects.filter(pk=order.pk)
@@ -3281,7 +3317,7 @@ class BoxNowService:
             return
         order.status = current_status
         try:
-            OrderService.update_order_status(order, "PROCESSING")
+            OrderLifecycleService.update_order_status(order, "PROCESSING")
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "BoxNow voucher mint: could not advance order=%s PENDING -> "
@@ -3329,5 +3365,6 @@ class BoxNowService:
             "country_code": (dest.get("country") or "").strip().upper(),
             "note": dest.get("note", ""),
             "is_active": True,
+            "consecutive_absent_syncs": 0,
             "last_synced_at": timezone.now(),
         }

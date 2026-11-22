@@ -47,9 +47,9 @@ from agent.staff import (
 )
 from core.templatetags.store_brand import store_brand
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
+from tenant.enum import TenantMembershipRole
 from tenant.features import feature_on
 from tenant.membership import get_membership
-from tenant.models import TenantMembershipRole
 
 LOGIN_URL_NAME = "staff-connect-login"
 

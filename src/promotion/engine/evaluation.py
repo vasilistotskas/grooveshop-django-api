@@ -14,7 +14,11 @@ from promotion.engine.benefits import (
     benefit_amount,
     gift_entitlement,
 )
-from promotion.engine.eligibility import check_eligibility, collect_candidates
+from promotion.engine.eligibility import (
+    automatic_candidates,
+    check_eligibility,
+    collect_candidates,
+)
 from promotion.engine.results import (
     NEW_LINE_PK,
     AppliedPromotion,
@@ -179,6 +183,39 @@ class PromotionEngine:
             currency,
         )
         return sum((entry.amount.amount for entry in chosen), Decimal(0))
+
+    @classmethod
+    def evaluate_single_unit(cls, product) -> CartDiscountResult:
+        """What a cart holding one ``product`` and nothing else gets.
+
+        For a shopper not known yet and no code applied: the automatic
+        promotions only, through the classification, stacking and clamp
+        :meth:`evaluate` charges a cart with, over a one-line cart priced
+        as a cart line is (``product.final_price``). The discount, the
+        free shipping and the gifts it grants are the ones checkout
+        would grant that cart, so a product page can quote that cart's
+        shipping. ``first_order_only`` promotions are left out, as for
+        any anonymous cart (``check_eligibility``).
+        """
+        result = CartDiscountResult()
+        if not cls.is_enabled():
+            return result
+        line = SimulatedLine(NEW_LINE_PK, product, 1, product.final_price)
+        items = [line]
+        currency = settings.DEFAULT_CURRENCY
+        monetary, free_shipping = cls.classify(
+            automatic_candidates(),
+            cart_items=items,
+            items_total=line.total_price.amount,
+            currency=currency,
+            user=None,
+            email="",
+            result=result,
+        )
+        chosen = clamp(resolve_stacking(monetary, result), items, currency)
+        result.applied = [e for e in chosen if e.amount.amount > 0]
+        result.free_shipping = free_shipping
+        return result
 
     @classmethod
     def _teaser_holds(

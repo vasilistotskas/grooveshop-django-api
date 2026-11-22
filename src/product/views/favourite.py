@@ -7,13 +7,13 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from product.filters.favourite import ProductFavouriteFilter
 from product.models.favourite import ProductFavourite
 from product.serializers.favourite import (

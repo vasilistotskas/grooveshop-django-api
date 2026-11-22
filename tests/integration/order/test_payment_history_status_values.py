@@ -118,25 +118,25 @@ class TestVivaWebhookHistory:
         ).latest("id")
 
     def test_payment_created(self):
-        from order.views.viva_webhook import _handle_payment_created
+        from order.payments.viva_settlement import handle_payment_created
 
         order = _pending_order("viva_hist_created")
         order.metadata = {"viva_order_codes": ["OC1"]}
         order.save(update_fields=["metadata"])
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(
                     PaymentStatus.COMPLETED,
                     verified_payment(order, "OC1"),
                 ),
             ),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.payments.viva_settlement.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_c")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_c")
 
         assert (
             self._history(order).new_value["payment_status"]

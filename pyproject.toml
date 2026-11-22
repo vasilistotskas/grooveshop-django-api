@@ -1,5 +1,5 @@
 [project]
-version = "3.263.0"
+version = "3.265.1"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -770,9 +770,13 @@ protected_modules = ["order.signals.handlers"]
 allowed_importers = ["order.apps"]
 
 [[tool.importlinter.contracts]]
-name = "order.services imports neither the tasks nor the refund reconciliation"
+name = "order's services import neither the tasks nor the refund reconciliation"
 type = "forbidden"
-source_modules = ["order.services"]
+source_modules = [
+    "order.lifecycle.service",
+    "order.refunds.service",
+    "order.services",
+]
 forbidden_modules = ["order.refunds.refund_reconciliation", "order.tasks"]
 allow_indirect_imports = true
 
@@ -892,4 +896,14 @@ forbidden_modules = [
     "promotion.engine.bxgy",
     "promotion.engine.scope",
 ]
+allow_indirect_imports = true
+
+# Inside `tenant` (#584). The choices and the single-value validators are
+# leaves the models import, and migrations import the validators by path:
+# neither reaches back into the models.
+[[tool.importlinter.contracts]]
+name = "tenant choices and validators import no tenant model"
+type = "forbidden"
+source_modules = ["tenant.enum", "tenant.validators"]
+forbidden_modules = ["tenant.models"]
 allow_indirect_imports = true

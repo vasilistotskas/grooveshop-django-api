@@ -35,7 +35,7 @@ from core.api.tokens import BoundedTokenAuthentication
 # auth-backends module so the stamp is ONE symbol project-wide — the
 # role backend must not be able to drift from the authenticators.
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import StaffTokenScope
+from tenant.enum import StaffTokenScope
 
 #: The URL namespace of the page builder's routes (``builder.urls``).
 BUILDER_ROUTES = "builder"
@@ -103,7 +103,7 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
         knox 5.1.0 walks ``auth_token.user.auth_token_set``: the reverse
         accessor of the tenant-only ``knox.AuthToken``, which
         ``PlatformStaffToken`` gives up for ``platform_staff_tokens``
-        (``src/tenant/models.py``). Inherited, it queried ``knox_authtoken``
+        (``src/tenant/models/staff_token.py``). Inherited, it queried ``knox_authtoken``
         inside the public-schema block below, where that table does not
         exist, and every staff token request answered 500. Same contract
         as knox's: delete the user's other expired staff tokens, delete

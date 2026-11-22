@@ -15,7 +15,7 @@ Two responsibilities:
   row is hard-deleted.
 
 Both functions are side-effect pure in isolation: no emails, no
-Celery, no request-layer concerns. The tasks in ``user/tasks.py``
+Celery, no request-layer concerns. The tasks in ``src/user/tasks.py``
 orchestrate those.
 """
 

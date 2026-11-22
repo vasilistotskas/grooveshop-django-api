@@ -85,7 +85,7 @@ def _owner(notice: BillingNotice) -> list[Recipient]:
 
 
 def _notice(notice: BillingNotice, env: RenderEnv) -> dict[str, Any]:
-    from tenant.models import TenantPlan
+    from tenant.enum import TenantPlan
 
     tenant = notice.tenant
     store = _store_name(tenant)
@@ -122,7 +122,8 @@ def _staff_reset(reset: StaffPasswordReset, env: RenderEnv) -> dict[str, Any]:
 
 
 def _sample_notice(env: RenderEnv) -> BillingNotice:
-    from tenant.models import Tenant, TenantPlan
+    from tenant.enum import TenantPlan
+    from tenant.models import Tenant
 
     return BillingNotice(
         tenant=Tenant(

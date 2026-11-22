@@ -121,8 +121,8 @@ class TestSuspendedStores:
 
     @staticmethod
     def _suspended_store(schema_name: str):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         store = store_tenant(schema_name)
         with patch("tenant.tasks.flush_tenant_media_task.apply_async"):
@@ -414,6 +414,10 @@ class TestBeatScheduleTenantCoverage:
         # committed) live in public whatever the store; each row carries
         # its own schema header.
         "tenant.tasks.redispatch_deferred_tasks",
+        # BOX NOW's public locker catalogue is one file for every store:
+        # fetched once in public, then handed to each store's own task
+        # (``apply_boxnow_locker_catalogue``) through ``run_for_all_tenants``.
+        "shipping_boxnow.tasks.sync_boxnow_locker_catalogue",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):
@@ -427,7 +431,7 @@ class TestBeatScheduleTenantCoverage:
         ]
         assert not offenders, (
             "Beat entries dispatch tenant-scoped tasks directly — add a "
-            "fanout_* wrapper in tenant/tasks.py (or allowlist a genuinely "
+            "fanout_* wrapper in src/tenant/tasks.py (or allowlist a genuinely "
             f"public-schema task above): {offenders}"
         )
 

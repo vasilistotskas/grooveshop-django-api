@@ -208,12 +208,25 @@ outside a task.
   derived from the task id (`emails.log.delivery_id`); a second copy finds
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
+- **In-app notification**: every notification is written by
+  `notification.services.create_user_notification`, under a unique
+  `Notification.dispatch_key`; a second copy gets the first one's row back,
+  or nothing once the user has removed it.
+  Its live push claims `NotificationUser.pushed_at` before it sends
+  (`docs/order/emails-and-notifications.md`, section 6.4).
 - **Meta Conversions API**: each event's id is fixed before the task can run
   again (the order's or the account's number, a Refund's ledger row,
   `src/meta_capi/services.py`), and `MetaCapiEventLog` is checked and the
   event sent under an advisory lock on that id. A copy whose wait for the
   lock runs out (`core.db.locks.LockWaitRanOut`) retries, and finds the event
   sent; the request to Meta is bounded by `META_CAPI_TIMEOUT_SECONDS`.
+
+- **Recommendation events** (`recommendation.events.record_events`): each
+  row's `event_key` is `dispatch_key` over the task id, the kind, the
+  impression id, the product and the position, unique, so every copy of one
+  dispatch makes the same keys and a second copy inserts nothing. Two beacons
+  are two tasks and stay two rows even for one impression id: a cached strip
+  shows one id to every viewer.
 
 A task whose effect is a state of a row needs no id, and its state also covers
 two dispatches of it from different paths. When the effect is the row's own

@@ -181,7 +181,7 @@ and says which file holds each § number used here.
   rest.
 - **A canceled order never gets a live parcel.** A staff or system order
   cancel goes on when the courier step is refused
-  (`OrderService.cancel_attached_shipment` never raises): while a creation
+  (`OrderLifecycleService.cancel_attached_shipment` never raises): while a creation
   of uncertain outcome settles, or one is in flight, and while BoxNow gives
   no answer (the cancel stays pending and is asked again,
   [cancel §7.1.2](cancel.md)). The order's status is
@@ -331,6 +331,38 @@ and says which file holds each § number used here.
   the shipment row, the options flag, the locker search), because they become
   physical order lines. A gift the engine leaves out (sold out) adds nothing;
   one lost to a later stock race only makes the booked size larger.
+- **Each locker's compartment sizes and availability come from BOX NOW's
+  public locker catalogue**, not the partner API: its destinations carry
+  neither, and its `requiredSize` filter returns the same lockers for every
+  size (production, 2026-11-21). The catalogue is the file BOX NOW's own map
+  widget reads, `BOXNOW_LOCKER_CATALOGUE_URL` per country
+  (`BOXNOW_LOCKER_CATALOGUE_COUNTRIES`): a JSON object of locker id to
+  `address, id, lat, lng, postalCode, probability, sizes, title`. **BOX NOW
+  documents neither the file nor its shape**; they are the widget's
+  internals, the same data its official picker filters on, and the question
+  to BOX NOW is open. `shipping_boxnow.catalogue` therefore validates it
+  strictly (`CATALOGUE_SCHEMA`); on any fetch or shape failure it logs an
+  ERROR naming the country and keeps the stored sizes. The hourly
+  `sync-boxnow-locker-catalogue` task (`sync_boxnow_locker_catalogue`) sets
+  `BoxNowLocker.compartment_sizes` and `availability_probability` of the
+  active lockers: **a locker lists a size by exact membership**, as the
+  widget's `acceptLocker.js` does (a bigger compartment is not assumed to
+  take a smaller parcel), and one the catalogue lacks is **unknown**: empty
+  sizes, its ids logged at WARNING. Nothing reads the sizes yet: no API
+  field, filter or order check uses them. They are stored first so the
+  release that does can be checked against production's real sizes (how
+  many lockers the catalogue lacks shows in that WARNING) before it turns
+  a refusal on.
+- **A locker is withdrawn after N daily syncs without it**, not at the
+  first absence: the partner list churns about 3% a day (62 rows left and
+  48 joined in 14 hours, production 2026-11-21).
+  `BoxNowLocker.consecutive_absent_syncs` counts the absences, a locker the
+  partner returns is reactivated and reset, and
+  `BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION` (3: about 48 hours at the
+  daily 02:00 sync; derive it again when that cadence changes) deactivates
+  it. A partner list that is empty or smaller than
+  `BOXNOW_LOCKER_SYNC_MIN_FRACTION` of the active lockers is an error
+  response: ERROR logged, no counter moved, nothing deactivated.
 - **A cart that fits no compartment is refused at checkout**, next to the
   weight cap: `ShippingService.assert_available(items=...)` asks the
   adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by

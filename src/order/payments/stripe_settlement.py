@@ -220,12 +220,15 @@ def settle_landed_payment(order: Order) -> LandedPayment:
 
     A succeeded PaymentIntent is settled as a poll settles one
     (``OrderService.settle_polled_completion``: the
-    ``payment_intent.succeeded`` handler and its announcement). A paid
-    hosted Checkout Session is settled by its ``checkout.session.completed``
-    code (:func:`settle_checkout_session`). A complete session whose
-    payment is still in flight (a delayed method) settled nothing yet and
-    keeps the order (``UNSETTLED``), as does a payment the checks refused
-    without a flag.
+    ``payment_intent.succeeded`` handler and its announcement). Otherwise
+    the hosted Checkout Session the order recorded is read: opening one
+    cancels the order's open intent and leaves its ``payment_id``, so a
+    canceled intent does not mean nothing was paid. A paid session is
+    settled by its ``checkout.session.completed`` code
+    (:func:`settle_checkout_session`). A complete session whose payment is
+    still in flight (a delayed method) settled nothing yet and keeps the
+    order (``UNSETTLED``), as does a payment the checks refused without a
+    flag.
 
     Raises ``PaymentStatusUnavailableError`` when Stripe could not be read.
     """
@@ -239,18 +242,20 @@ def settle_landed_payment(order: Order) -> LandedPayment:
         except stripe.StripeError as e:
             logger.warning("PaymentIntent %s could not be read", payment_id)
             raise PaymentStatusUnavailableError(payment_id) from e
-        if intent.status != "succeeded":
-            return LandedPayment.NONE
-        from order.services import OrderService
+        if intent.status == "succeeded":
+            from order.services import OrderService
 
-        received = money_from_minor_units(
-            intent.amount_received, intent.currency
-        )
-        OrderService.settle_polled_completion(
-            order,
-            {"amount": received.amount, "currency": str(received.currency)},
-        )
-        return _what_settled(order)
+            received = money_from_minor_units(
+                intent.amount_received, intent.currency
+            )
+            OrderService.settle_polled_completion(
+                order,
+                {
+                    "amount": received.amount,
+                    "currency": str(received.currency),
+                },
+            )
+            return _what_settled(order)
 
     session_id = provider.recorded_checkout_session(order.metadata or {})
     if not session_id:

@@ -481,7 +481,11 @@ verified with Retrieve Transaction, booked, settled and confirmed exactly as
 the webhook would, and the `VivaWebhookEvent` row makes the webhook a no-op
 when it does land. A Viva that cannot be read raises
 `PaymentStatusUnavailableError`: the sweep keeps the order, `viva_return`
-answers with the order as it is.
+answers with the order as it is. An answer with no `Transactions` list, or a
+finished payment without a finite amount, is one that cannot be read; only an
+explicit empty list says nobody paid. Every Viva amount is parsed by
+`payment.provider_amount`, which refuses an absent value, `NaN` and
+`Infinity` (JSON tokens `requests` parses).
 
 **Settlement is bound to the thing paid for.** A 1796 settles an order only
 when the verified transaction carries one of the order's own codes, states its
@@ -524,9 +528,14 @@ unauthenticated body except `ParentId`:
    paid twice under two of its checkout codes holds two, and each refund goes
    against the one it reverses. Retrieve Transaction documents no parent id,
    so `ParentId` can only refuse, never grant: the payment it points at comes
-   from our own rows. For an order whose capture was never recorded, a
-   `ParentId` equal to the order's own `payment_id` is read from Viva once and
-   recorded (unreadable → 500, Viva retries); anything else is skipped.
+   from our own rows, or from Viva. A `ParentId` the ledger does not hold is
+   read from Viva once and recorded as a CHARGE when it is the order's own
+   `payment_id` (its capture was never recorded) or a captured transaction on
+   one of the order's codes (a payment whose 1796 is late, lost, or verified
+   and waiting for the order's lock); unreadable → 500, Viva retries. The
+   refund is then booked against it, so the payment's own 1796 that follows
+   finds the order refunded and neither settles nor ships it. Anything else
+   is skipped.
 3. `PaymentLedger.record_refund` keys the REFUND row on the refund
    transaction id. A refund already there is skipped: Viva notifies every
    refund, including the one `refund_order` has just made, and redelivers

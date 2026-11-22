@@ -336,7 +336,10 @@ class FakeVivaApi:
         if request.method == "GET" and path == "/api/transactions/":
             order_code = self.query(request)["ordercode"][0]
             return _response(
-                request, *self.by_order_code.get(order_code, (200, {}))
+                request,
+                *self.by_order_code.get(
+                    order_code, (200, {"Transactions": [], "Success": True})
+                ),
             )
         if request.method == "DELETE" and path.startswith("/api/transactions/"):
             return _response(request, *self.cancel)

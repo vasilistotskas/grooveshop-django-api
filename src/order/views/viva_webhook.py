@@ -3,7 +3,7 @@ import ipaddress
 import json
 import logging
 from base64 import b64encode
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import viva_settlement
 from order.payments.disputes import announce_chargeback
-from order.payments.payment import order_viva_codes
+from order.payments.payment import order_viva_codes, provider_amount
 from order.tasks import (
     send_payment_failed_email,
 )
@@ -493,13 +493,12 @@ def _verify_viva_reversal(
         )
         return None
 
-    try:
-        signed_amount = Decimal(str(data.get("amount")))
-    except InvalidOperation:
+    signed_amount = provider_amount(data.get("amount"))
+    if signed_amount is None:
         raise RuntimeError(
             f"Viva refund transaction {transaction_id} carries no readable "
             "amount"
-        ) from None
+        )
     if signed_amount >= 0:
         logger.warning(
             "Viva reversal event for %s: transaction %s has a non-negative "
@@ -548,8 +547,8 @@ def _handle_webhook_event(request):
 
     # Allowlisted log to avoid persisting PII (customer name, email,
     # transaction details, amounts) into structured log aggregation —
-    # GDPR Art. 32. ``transaction_id`` is hashed because it can be
-    # replayed against Viva's Retrieve Transaction API.
+    # GDPR Art. 32. The transaction is named by its hash here
+    # (``transaction_hash`` says why that is a name, not a secret).
     txn_hash = viva_settlement.transaction_hash(transaction_id)
     logger.info(
         "Viva webhook payload | event_type=%s | order_code=%s | "
@@ -1005,9 +1004,8 @@ def _gift_card_payment_problem(purchase, verified_data) -> str | None:
     currency = verified_data.get("currency")
     if currency != purchase.amount.currency.code:
         return f"its currency is {currency!r}"
-    try:
-        amount = Decimal(str(verified_data.get("amount")))
-    except InvalidOperation:
+    amount = provider_amount(verified_data.get("amount"))
+    if amount is None:
         return "it reports no readable amount"
     if abs(amount - purchase.amount.amount) > Decimal("0.01"):
         return f"its amount is {amount}, not {purchase.amount.amount}"
@@ -1070,10 +1068,7 @@ def _handle_transaction_price_calculated(order, event_data, transaction_id):
         "Viva transaction price calculated for order %s: %s", order.id, reported
     )
     currency = alpha_currency(event_data.get("CurrencyCode"))
-    try:
-        commission = Decimal(str(event_data.get("TotalCommission")))
-    except InvalidOperation:
-        commission = None
+    commission = provider_amount(event_data.get("TotalCommission"))
     if currency is None or commission is None or commission < 0:
         logger.error(
             "Viva transaction %s reports no usable commission for order %s: %s",
@@ -1219,8 +1214,8 @@ def _handle_reversal_created(order, event_data, transaction_id):
     # does not document a parent id, so this is the event's own
     # ``ParentId``; it can only refuse, never grant — the reversal itself was
     # verified above, and the payment it is attached to comes from our own
-    # ledger rows (or, for an order whose capture was never recorded, from
-    # the order's own ``payment_id``), never from the event.
+    # ledger rows, the order's own ``payment_id``, or Viva saying the parent
+    # was paid on one of the order's codes (:func:`_viva_charge_for`).
     parent_id = str(event_data.get("ParentId") or "")
     charge = _viva_charge_for(order, parent_id)
     if charge is None:
@@ -1275,10 +1270,16 @@ def _viva_charge_for(order, payment_id: str):
     """The ledger's CHARGE of *order* for Viva transaction *payment_id*, or
     ``None`` when it is none of the order's payments.
 
-    For an order whose capture was never recorded, *payment_id* may be the
-    order's own ``payment_id``: the capture is then read from Viva once and
-    recorded. Raises ``RuntimeError`` (→ 500, Viva retries) when it cannot
-    be read: retry rather than guess.
+    A payment of the order the ledger has not recorded is read from Viva
+    once and recorded: the order's own ``payment_id`` (an order paid while
+    the previous release was serving), or any transaction Viva says was
+    paid on one of the order's codes. The second is a payment no webhook
+    has booked yet (its 1796 is late, lost, or verified and waiting for
+    the order's lock): a refund or dispute of it is booked against it, and
+    the payment's own event that follows finds the order refunded and
+    neither settles nor ships it; one Viva reports uncaptured is none.
+    Raises ``RuntimeError`` (→ 500, Viva retries) when Viva cannot be
+    read: retry rather than guess.
     """
     from order.enum.payment_transaction import PaymentTransactionKind
     from order.models.payment_transaction import PaymentTransaction
@@ -1293,21 +1294,27 @@ def _viva_charge_for(order, payment_id: str):
         provider=VivaWalletPaymentProvider.code,
         provider_reference__iexact=payment_id,
     ).first()
-    if (
-        charge is None
-        and order.payment_id
-        and payment_id.lower() == order.payment_id.lower()
-    ):
-        charge = PaymentLedger.ensure_charge(
-            order,
-            provider_code=VivaWalletPaymentProvider.code,
-            payment_id=order.payment_id,
+    if charge is not None:
+        return charge
+    reported = None
+    if order.payment_id and payment_id.lower() == order.payment_id.lower():
+        payment_id = order.payment_id
+    else:
+        reported = viva_settlement.retrieve_transaction(payment_id)
+        if not viva_settlement.transaction_belongs_to_order(order, reported[1]):
+            return None
+    charge = PaymentLedger.ensure_charge(
+        order,
+        provider_code=VivaWalletPaymentProvider.code,
+        payment_id=payment_id,
+        reported=reported,
+    )
+    if charge is None and reported is None:
+        # The order's own payment could not be read: retry. A transaction
+        # read above that Viva reports uncaptured is no payment to refund.
+        raise RuntimeError(
+            f"Viva captured amount unavailable for payment {payment_id}"
         )
-        if charge is None:
-            raise RuntimeError(
-                f"Viva captured amount unavailable for payment "
-                f"{order.payment_id}"
-            )
     return charge
 
 
@@ -1561,12 +1568,12 @@ def _process_dispute_event_in_tenant(
                     order, charge.provider_reference, raw_status
                 )
             elif raw_status == VIVA_DISPUTE_LOST_STATUS_ID:
-                try:
-                    claimed = abs(Decimal(str(data.get("amount"))))
-                except InvalidOperation:
+                reported = provider_amount(data.get("amount"))
+                if reported is None:
                     raise RuntimeError(
                         f"Viva transaction {sale_id} carries no readable amount"
-                    ) from None
+                    )
+                claimed = abs(reported)
                 outcome = _record_viva_chargeback(
                     order,
                     charge,

@@ -25,7 +25,7 @@ import logging
 from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from django.db import transaction
 from django.db.models import (
@@ -1296,7 +1296,12 @@ class PaymentLedger:
 
     @classmethod
     def ensure_charge(
-        cls, order: Order, *, provider_code: str, payment_id: str
+        cls,
+        order: Order,
+        *,
+        provider_code: str,
+        payment_id: str,
+        reported: tuple[PaymentStatus, dict[str, Any]] | None = None,
     ) -> PaymentTransaction | None:
         """The ledger's CHARGE for *payment_id*, read from the provider and
         recorded when the ledger has none yet.
@@ -1307,11 +1312,16 @@ class PaymentLedger:
         order was created from an already-succeeded intent and its webhook
         never reached it. The first refund that needs the capture reads it
         from the provider once; from then on the ledger answers.
+        *reported* is the provider's ``get_payment_status`` answer when the
+        caller has read it already.
 
         ``None`` when the provider cannot confirm a capture (it has logged
         why): nothing is recorded and the caller refuses.
         """
-        from order.payments.payment import get_payment_provider
+        from order.payments.payment import (
+            get_payment_provider,
+            provider_amount,
+        )
 
         existing = PaymentTransaction.objects.filter(
             order=order,
@@ -1322,14 +1332,17 @@ class PaymentLedger:
         if existing is not None:
             return existing
 
-        try:
-            status, data = get_payment_provider(
-                provider_code
-            ).get_payment_status(payment_id)
-        except PaymentStatusUnavailableError:
-            # The provider logged why; nothing is known about the capture.
-            return None
-        captured = data.get("amount")
+        if reported is None:
+            try:
+                reported = get_payment_provider(
+                    provider_code
+                ).get_payment_status(payment_id)
+            except PaymentStatusUnavailableError:
+                # The provider logged why; nothing is known about the
+                # capture.
+                return None
+        status, data = reported
+        captured = provider_amount(data.get("amount"))
         if status not in _CAPTURED_STATUSES or captured is None:
             logger.error(
                 "Payment %s %s cannot be recorded as captured for order %s: "
@@ -1343,8 +1356,7 @@ class PaymentLedger:
         row, _created = cls.record_charge(
             order,
             amount=Money(
-                Decimal(str(captured)),
-                data.get("currency") or order.amount_due.currency,
+                captured, data.get("currency") or order.amount_due.currency
             ),
             provider=provider_code,
             reference=payment_id,

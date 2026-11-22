@@ -53,6 +53,9 @@ TXN = "e32827bb-03bf-43d1-abe9-593eb5d2cd43"
 INTENT = "pi_landed_without_webhook"
 SESSION = "cs_landed_without_webhook"
 
+#: A listing row with no ``Amount`` key at all.
+_ABSENT = object()
+
 
 @pytest.fixture(autouse=True)
 def _windows():
@@ -343,6 +346,70 @@ class TestStripeLostWebhook:
         _assert_settled_once(order, INTENT)
         assert confirmations.call_count == 1
 
+    def test_a_paid_session_behind_a_canceled_intent_is_settled(
+        self, django_capture_on_commit_callbacks, confirmations
+    ):
+        """Opening a hosted link cancels the order's open PaymentIntent and
+        leaves its ``payment_id``: the session recorded after it is still
+        read, and paid, it settles the order."""
+        order = _expired_unpaid(
+            "stripe",
+            payment_id="pi_closed_for_the_link",
+            metadata={"stripe_checkout_session_id": SESSION},
+        )
+
+        with (
+            _stripe_credentials(),
+            patch(
+                "stripe.PaymentIntent.retrieve",
+                return_value=self._intent(order, status="canceled"),
+            ),
+            patch(
+                "stripe.checkout.Session.retrieve",
+                return_value=self._session(order),
+            ),
+            patch("stripe.PaymentIntent.cancel") as cancel,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["settled"] == 1
+        assert result["canceled_pending"] == 0
+        cancel.assert_not_called()
+        _assert_settled_once(order, INTENT)
+        assert confirmations.call_count == 1
+
+    def test_a_payment_opened_during_the_sweep_is_not_canceled(self):
+        """The sweep reads the provider and closes the payment before it
+        locks the order. A link recorded meanwhile is a payment the read
+        did not see: the order is left for the next sweep."""
+        order = _expired_unpaid("stripe", payment_id=INTENT)
+
+        def _closed_while_a_link_opens(*_args, **_kwargs):
+            Order.objects.filter(pk=order.pk).update(
+                metadata={"stripe_checkout_session_id": "cs_opened_meanwhile"}
+            )
+            return self._intent(order, status="canceled")
+
+        with (
+            _stripe_credentials(),
+            patch(
+                "stripe.PaymentIntent.retrieve",
+                return_value=self._intent(
+                    order, status="requires_payment_method"
+                ),
+            ),
+            patch(
+                "stripe.PaymentIntent.cancel",
+                side_effect=_closed_while_a_link_opens,
+            ),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_pending"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
     def test_the_session_webhook_after_the_settle_changes_nothing(
         self, django_capture_on_commit_callbacks, confirmations
     ):
@@ -518,6 +585,85 @@ class TestAnUnreadableAmountIsAnUnreadableViva:
 
         assert result["skipped_open"] == 1
         assert result["canceled_pending"] == 0
+
+    @pytest.mark.parametrize(
+        "amount",
+        [_ABSENT, None, "", float("nan"), float("inf")],
+        ids=["absent", "null", "empty", "nan", "infinite"],
+    )
+    def test_a_finished_payment_with_no_finite_amount_keeps_the_order(
+        self, amount
+    ):
+        """A finished payment Viva lists without an amount we can read is
+        an answer that cannot be read, never "no payment": the sweep keeps
+        the order instead of canceling it unpaid."""
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        row = api.by_order_code[CODE][1]["Transactions"][0]
+        if amount is _ABSENT:
+            del row["Amount"]
+        else:
+            row["Amount"] = amount
+
+        with api:
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["errors"] == 0
+        assert result["skipped_open"] == 1
+        assert result["canceled_pending"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"ErrorCode": 0, "Success": True},
+            {"Transactions": None, "Success": True},
+            {"Transactions": {"TransactionId": TXN}, "Success": True},
+        ],
+        ids=["absent", "null", "not-a-list"],
+    )
+    def test_a_listing_without_its_transactions_keeps_the_order(self, body):
+        """Only an explicit empty ``Transactions`` says nobody paid."""
+        order = _viva_order()
+
+        with _paid_at_viva(order, answer=(200, body)):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["skipped_open"] == 1
+        assert result["canceled_pending"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    @pytest.mark.parametrize(
+        "amount", [float("nan"), float("inf")], ids=["nan", "infinite"]
+    )
+    def test_a_verified_amount_that_is_no_number_is_flagged_for_staff(
+        self, amount
+    ):
+        """Retrieve Transaction answering an amount that is not a finite
+        number is refused like a malformed one: the charge is flagged for
+        the store, the order kept, and nothing raises."""
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        api.transactions[TXN] = (
+            200,
+            retrieve_transaction(
+                orderCode=int(CODE),
+                amount=amount,
+                statusId="F",
+                currencyCode="978",
+            ),
+        )
+
+        with api:
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["errors"] == 0
+        assert result["canceled_pending"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert payment_hold.awaits_payment_review(order)
 
 
 class TestAViva:

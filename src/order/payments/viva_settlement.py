@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Callable
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
@@ -29,7 +29,7 @@ from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
-from order.payments.payment import order_viva_codes
+from order.payments.payment import order_viva_codes, provider_amount
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,10 @@ EventHandler = Callable[[Order, dict[str, Any], str], str | None]
 
 
 def transaction_hash(transaction_id: object) -> str:
-    """What the logs name a transaction by. Its id is not logged: it can be
-    replayed against Viva's Retrieve Transaction API."""
+    """A short, stable name for a transaction on the webhook's payload
+    summary and idempotency lines. The id is no credential (Retrieve
+    Transaction needs the store's own OAuth token), and the handlers log it
+    as it is: staff look it up in Viva's dashboard by it."""
     return (
         hashlib.sha256(str(transaction_id).encode()).hexdigest()[:16]
         if transaction_id
@@ -319,9 +321,8 @@ def handle_payment_created(
     # can read) cannot be told from one for a different sum, and status
     # alone settled the order. Refused like a mismatch: the charge is
     # flagged for staff rather than dropped.
-    try:
-        verified_amount = Decimal(str(verified_amount_raw))
-    except InvalidOperation:
+    verified_amount = provider_amount(verified_amount_raw)
+    if verified_amount is None:
         logger.error(
             "Viva transaction %s reports no readable amount (%r) for order "
             "%s — refusing to mark as paid",
@@ -395,22 +396,12 @@ def handle_payment_created(
     # The money is in, whatever state the order is in: a canceled order or
     # a second payment under another of its checkout codes is still a
     # charge, and the one a refund has to name.
-    try:
-        captured = Decimal(str(verified_amount_raw))
-    except InvalidOperation:
-        logger.error(
-            "Viva transaction %s carries no readable amount: not recorded "
-            "in the payment ledger of order %s",
-            transaction_id,
-            order.id,
-        )
-    else:
-        PaymentLedger.record_charge(
-            order,
-            amount=Money(captured, order_total.currency),
-            provider=VivaWalletPaymentProvider.code,
-            reference=transaction_id,
-        )
+    PaymentLedger.record_charge(
+        order,
+        amount=Money(verified_amount, order_total.currency),
+        provider=VivaWalletPaymentProvider.code,
+        reference=transaction_id,
+    )
 
     # Before the settled guard: a canceled order's payment is already
     # settled (``Order.save`` settles an unpaid one to CANCELED), so

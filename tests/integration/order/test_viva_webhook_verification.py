@@ -44,6 +44,7 @@ from tests.utils.viva import (
     retrieve_refund,
     retrieve_transaction,
     reversal_created_event,
+    verified_payment,
 )
 
 # The ids of Viva's documented 1797 sample: the refund, the payment it
@@ -455,18 +456,68 @@ class TestVivaReversalWebhook:
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
 
-    def test_reversal_skipped_when_the_ledger_holds_no_such_payment(
+    def test_a_refund_before_its_payment_was_booked_books_that_payment(
         self, refunded_signals
     ):
-        """No ledger payment matches ``ParentId`` and it is not the order's
-        own ``payment_id`` either: nothing to attach the refund to."""
-        order = _paid_order(ledger=False, payment_id="")
+        """A refund whose payment no webhook booked yet (its 1796 is late,
+        lost, or verified and waiting for the order's lock) is not dropped:
+        Viva says the payment is this order's, so it is booked first and
+        the refund against it. The payment's own event, arriving after,
+        neither marks the order paid nor ships it."""
+        order = _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
 
-        with _viva():
+        with _viva(refund_amount=CAPTURED) as fake:
+            response = _deliver()
+
+        assert response.status_code == 200
+        assert fake.retrieved == [REFUND_ID, PAYMENT_ID]
+        [refund] = _refund_rows(order)
+        assert refund.charge.provider_reference == PAYMENT_ID
+        assert refund.charge.amount == Money(Decimal(str(CAPTURED)), "EUR")
+        assert _outcome() == VivaWebhookEvent.OUTCOME_PROCESSED
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.REFUNDED
+
+        with patch(
+            "shipping.services.ShippingService.dispatch_create_shipment_task"
+        ) as dispatch:
+            handle_payment_created(
+                order,
+                {"StatusId": "F"},
+                PAYMENT_ID,
+                verified=(
+                    PaymentStatus.COMPLETED,
+                    verified_payment(order, str(ORDER_CODE)),
+                ),
+            )
+
+        dispatch.assert_not_called()
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert order.payment_status == PaymentStatus.REFUNDED
+
+    def test_reversal_skipped_when_its_parent_is_another_orders_payment(
+        self, refunded_signals
+    ):
+        """The parent the ledger does not hold is booked only when Viva
+        says it was paid on one of this order's codes."""
+        order = _paid_order(ledger=False, payment_id="")
+        viva = _viva()
+        viva.transactions[PAYMENT_ID] = _payment_answer(
+            orderCode=9999999999999999
+        )
+
+        with viva:
             response = _deliver()
 
         assert response.status_code == 200
         _assert_nothing_booked(order, refunded_signals, PaymentStatus.COMPLETED)
+        assert not order.payment_transactions.exists()
         assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
 
     def test_reversal_skipped_when_no_transaction_id(self, refunded_signals):

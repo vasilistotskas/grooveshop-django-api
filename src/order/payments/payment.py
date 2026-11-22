@@ -1173,6 +1173,23 @@ def money_from_minor_units(minor: int, currency: str) -> Money:
     return Money(Decimal(minor) / moneyed.get_currency(code).sub_unit, code)
 
 
+def provider_amount(reported: object) -> Decimal | None:
+    """An amount a provider reported, as a finite ``Decimal``; ``None``
+    when it is absent or no finite number.
+
+    Viva's JSON numbers reach us as ``float``, and ``requests`` parses the
+    ``NaN`` and ``Infinity`` tokens too, which ``Decimal`` accepts: they
+    are no amount, and comparing NaN raises ``InvalidOperation``.
+    """
+    if reported is None or reported == "":
+        return None
+    try:
+        amount = Decimal(str(reported))
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None
+
+
 #: Viva ``StatusId`` of a transaction that completed successfully. A
 #: refund is a transaction of its own and carries this status too; ``R``
 #: ("fully or partially refunded") belongs to the ORIGINAL payment.
@@ -1456,7 +1473,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
     ) -> list[dict[str, Any]]:
         """Every transaction Viva holds for the payment order *order_code*
         (``GET /api/transactions/?ordercode=``, Basic auth, the call Viva
-        documents for the ISV API). Raises what ``requests`` raises."""
+        documents for the ISV API). Raises what ``requests`` raises, and
+        ``TypeError`` for an answer with no ``Transactions`` list: only an
+        explicit empty list says the code holds none."""
         import requests
 
         response = requests.get(
@@ -1466,7 +1485,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
             timeout=timeout,
         )
         response.raise_for_status()
-        return response.json().get("Transactions") or []
+        body = response.json()
+        rows = body.get("Transactions") if isinstance(body, dict) else None
+        if not isinstance(rows, list):
+            raise TypeError(
+                f"Viva listed payment order {order_code} with no Transactions"
+            )
+        return rows
 
     def landed_charges(self, order: Order) -> list[tuple[str, str]]:
         """The payments Viva took on the order's payment orders, as
@@ -1505,16 +1530,15 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     and row.get("TransactionId")
                 ):
                     continue
-                try:
-                    amount = Decimal(str(row.get("Amount") or 0))
-                except InvalidOperation as e:
+                amount = provider_amount(row.get("Amount"))
+                if amount is None:
                     # A finished payment whose amount cannot be read is an
                     # answer that cannot be read, never "no payment".
                     logger.warning(
                         "Viva payment order %s lists an unreadable amount",
                         code,
                     )
-                    raise PaymentStatusUnavailableError(code) from e
+                    raise PaymentStatusUnavailableError(code)
                 if amount > 0:
                     landed.append((code, str(row["TransactionId"])))
         return landed
@@ -1991,10 +2015,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
         status_id = row.get("StatusId")
         if status_id not in {VIVA_STATUS_FINISHED, VIVA_STATUS_ERROR}:
             return None
-        try:
-            moved = abs(Decimal(str(row.get("Amount"))))
-        except ArithmeticError:
+        reported = provider_amount(row.get("Amount"))
+        if reported is None:
             return None
+        moved = abs(reported)
         if moved != amount.amount or not row.get("TransactionId"):
             return None
         return ProviderRefund(

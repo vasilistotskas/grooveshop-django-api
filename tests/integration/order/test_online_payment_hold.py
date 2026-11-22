@@ -38,7 +38,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
 from product.factories import ProductFactory
-from tests.utils.viva import verified_payment
+from tests.utils.viva import FakeVivaApi, verified_payment
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -818,7 +818,12 @@ class TestALatePaymentAfterTheHoldIsBookedSafely:
             provider="viva_wallet", metadata={"viva_order_codes": ["OC9"]}
         )
         _age(order, hold_expires=timezone.now() - timedelta(minutes=6))
-        auto_cancel_stuck_pending_orders()
+        # Viva is read before the sweep cancels, and lists no payment on OC9.
+        with FakeVivaApi(
+            by_order_code={"OC9": (200, {"Transactions": [], "Success": True})}
+        ) as viva:
+            auto_cancel_stuck_pending_orders()
+        assert [r.url for r in viva.sent if "ordercode=OC9" in r.url]
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
 

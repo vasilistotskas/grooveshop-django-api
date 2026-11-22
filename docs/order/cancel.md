@@ -233,7 +233,9 @@ locks stock.
   payment orders (`GET /api/transactions/?ordercode=`) as Transaction Payment
   Created events (`viva_settlement.apply_event`), a succeeded Stripe intent
   through `handle_payment_succeeded` and a paid Checkout Session through the
-  `checkout.session.completed` code (`stripe_settlement`). The order is then
+  `checkout.session.completed` code (`stripe_settlement`). An intent that did
+  not succeed still has the recorded session read: opening a hosted link
+  cancels the open intent and leaves its `payment_id`. The order is then
   paid, never canceled unpaid, the webhook that arrives later is a no-op, and
   the sweep reports it as `settled`. A provider that cannot be read leaves the
   order for the next run (`skipped_open`): a payment may have landed. Only then
@@ -247,7 +249,10 @@ locks stock.
   A provider that cannot be built (its credentials were removed) cannot close
   anything and takes the same wait. A payment that is not closed (that wait, or
   a Stripe intent that is processing) leaves the order open for its webhook and
-  counts `skipped_open`.
+  counts `skipped_open`. The cancel itself is decided on the payment the order
+  recorded before the provider was read (`OpenPayment`): under the row lock it
+  is refused when another link or intent was recorded meanwhile, and the next
+  run reads that one.
 - **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's

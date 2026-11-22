@@ -267,7 +267,7 @@ class TestVivaPaymentCreated:
             "viva_txn_b",
         ]
 
-    def test_a_repeat_is_absorbed_by_the_constraint(self):
+    def test_a_replay_of_the_settled_payment_books_it_once(self):
         order = self._order()
         amount = float(order.calculate_order_total_amount().amount)
 

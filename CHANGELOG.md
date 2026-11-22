@@ -3,6 +3,146 @@
 
 
 
+## v3.265.1 (2026-11-22)
+
+### Bug fixes
+
+* fix(order): a payment whose webhook never landed is settled, never canceled unpaid (#807) ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): a payment whose webhook never landed is settled, never canceled unpaid
+
+The provider's webhook is the only thing that marks an online order paid.
+When it is lost, the order stays PENDING while the money has moved, and
+auto_cancel_stuck_pending_orders cancelled it once its payment hold ended,
+with refund_payment=False: a charged buyer, a canceled order, the stock
+released and nobody told. Viva's close_payment was the base hold check and
+never asked Viva whether the payment order had been paid. Reproduced on a
+local stack against Viva's demo: an order paid with Viva's published test
+card read StateId 3 (Paid) and stayed PENDING with no webhook, and the
+sweep selected it for cancellation once its hold ended.
+
+- Before the sweep cancels an order it reads the provider
+  (order.payments.settlement). A payment the provider took is settled
+  through the code its own webhook runs, the sweep reports it as settled,
+  and a provider that cannot be read leaves the order for the next run.
+- Viva: the payment-created core moves out of the webhook view into
+  order.payments.viva_settlement (the view may be imported only by the
+  URL confs). landed_charges lists each payment order's transactions
+  (GET /api/transactions/?ordercode=) and each finished charge is applied
+  through apply_event as the 1796 its webhook carries: verified with
+  Retrieve Transaction, booked on the ledger, settled and confirmed once,
+  with the VivaWebhookEvent row making the later webhook a no-op.
+- viva_return settles an unpaid order the same way, so the buyer who
+  comes back from the hosted page sees it paid whether or not the webhook
+  has landed.
+- Stripe had the same gap: a paid hosted Checkout Session whose
+  checkout.session.completed was lost was canceled unpaid, and a
+  succeeded PaymentIntent stayed PENDING for ever. The session's paid
+  branch moves to order.payments.stripe_settlement, shared by the webhook
+  and the sweep; a succeeded intent settles through
+  handle_payment_succeeded as a poll does (settle_polled_completion). A
+  session event for an order its own PaymentIntent already settled now
+  changes nothing instead of logging, shipping and confirming it again.
+- find_refunds reads the same transaction listing (_order_transactions). ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): a read-back payment that settled nothing keeps the order, and Viva is verified before the row lock
+
+- The settlers answer LandedPayment: SETTLED only when the order is paid
+  or awaits the store's review. A charge the checks refused without a
+  flag, or a Stripe session still being paid, is UNSETTLED: logged and
+  kept (skipped_open), never counted settled for ever.
+- An unreadable Amount in Viva's transaction listing is an unreadable
+  Viva, not a 500 on viva_return.
+- Viva transaction ids are compared without regard to case for
+  idempotency and the second-payment guard; handle_payment_created skips
+  the payment that already settled the order before booking it again.
+- apply_event retrieves the transaction of a payment-created event before
+  it locks the order row. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): read every landed payment before the sweep cancels, and book a refund that lands first
+
+- A Viva listing without a Transactions list, and a finished payment
+  without a finite Amount, are unreadable answers, never "no payment":
+  the sweep keeps the order.
+- Every provider amount is parsed by payment.provider_amount, which
+  refuses absent, NaN and infinite values; a NaN from Retrieve
+  Transaction is flagged for the store instead of raising.
+- Stripe read-back reads the recorded Checkout Session when the order's
+  PaymentIntent did not succeed: opening a hosted link cancels the open
+  intent and leaves its payment_id, so a paid session was canceled.
+- The sweep cancels only while the order still records the payment it
+  read from the provider (OpenPayment, under the row lock).
+- A Viva refund (1797) whose parent the ledger has not booked books that
+  parent when Viva places it, captured, on one of the order's codes; the
+  payment's own 1796 then finds the order refunded and neither settles
+  nor ships it.
+- transaction_hash and the webhook summary no longer claim a transaction
+  id is a secret: Retrieve Transaction needs the store's OAuth token. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): settle a refund that lands first, and read Viva before the order lock
+
+- A Viva reversal that leaves a never-confirmed PENDING order holding
+  nothing cancels it (stock released); a part refund whose payment the
+  refund itself booked flags it through flag_payment_mismatch. Neither
+  is left PENDING with a settled payment that no sweep selects.
+- apply_event takes an EventRead that retrieves what each event needs
+  before the order row is locked (1796 the transaction; 1797 the refund
+  and the unbooked payment its ParentId names; 1798 and 1799 their
+  transaction); every handler judges that answer under the lock. A 2054
+  passes the sale it has read, so the sale is retrieved once.
+- The read-back keeps every payment Viva took money on (StatusId F, R
+  and the dispute statuses); only a finished one is applied as its 1796,
+  any other keeps the order for a person.
+- The 1796 books its charge under the spelling the ledger holds, so a
+  ParentId in other letters is one CHARGE; ensure_charge refuses a
+  capture that is not positive.
+docs/order/payments.md reached the doc size limit: the Viva section
+  moves to docs/order/payments-viva.md. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): a flagged charge stays on the store's worklist until the store decides it
+
+payment_review_orders is every order flagged by flag_payment_mismatch
+that is still PENDING with the charge not accepted, whatever else its
+payment says: a refund, in full or in part, decides nothing while the
+order holds its stock. The set now feeds the admin's "Payment review"
+filter and the dashboard's "Payments to review" count, so such an order
+shows where staff look, not only in an email. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): money a read-back cannot settle goes to review, and a forged parent is skipped
+
+- One rule for every provider read-back: settle a captured payment,
+  cancel when nothing was taken, otherwise flag the order for the
+  store's review (flag_payment_mismatch, under the order's lock). A Viva
+  payment refunded or disputed since, one the checks refuse without a
+  flag, and Stripe money that settled nothing are flagged; only a Stripe
+  payment in flight waits for its webhook.
+- flag_payment_mismatch flags a payment once while the order waits for
+  that review: no second flag or email for the same payment.
+- A refund on a never-confirmed order cancels it once the ledger holds
+  none of the provider's money (PaymentLedger.held); the cancel returns
+  gift cards and points. A part refund flags it.
+- A 1797's ParentId is read from Viva only once the refund is verified
+  as this order's and the id is a GUID; a parent Viva does not know
+  (ProviderTransactionUnknownError, its 404) is skipped, not a 500.
+  _viva_charge_for no longer reads Viva; Retrieve Transaction sends the
+  id as one quoted path segment.
+- Each provider says what a capture is (PaymentProvider.captured): a
+  Viva payment in an open dispute is a capture, so a 2054 for an order's
+  unbooked payment is booked instead of answering 500. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
+* fix(order): an unjudged reversal records nothing, and an order awaiting review is the store's to close
+
+- A 1797 whose parent cannot be read or is none of the order's payments
+  (no Viva transaction id, one Viva does not know, one on another order,
+  a refund) is answered 200 and recorded nowhere (OUTCOME_NOT_RECORDED),
+  so Viva's own event for that refund is still applied.
+- A refund on an order waiting for the store's review is booked and the
+  order is left on the worklist, never canceled automatically: a charge
+  for the wrong amount is never booked, so the ledger cannot say what is
+  still at Viva.
+- flag_payment_mismatch saves the order's metadata when it skips a
+  payment it flagged already, as the first flag did. ([`e604874`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e604874af193f69797158ca3932d412099022578))
+
 ## v3.265.0 (2026-11-22)
 
 ### Bug fixes

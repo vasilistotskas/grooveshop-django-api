@@ -6,7 +6,7 @@ save); this command measures the rows stored before a model gained
 measure yet wrote during a deploy, so run it once after the rollout of a
 release that adds the fields. Safe to run again: a row with both sizes is
 skipped, and only the header of each file is read
-(``core.fields.image.displayed_dimensions``).
+(``core.utils.image_size.displayed_dimensions``).
 
 It writes the two columns directly rather than saving the row: a save
 re-validates, records history and re-indexes for a change no reader of
@@ -29,9 +29,10 @@ from django.db import models
 
 from core.cache.invalidation import mark_surface_stale
 from core.cache.registry import iter_surfaces
-from core.fields.image import ImageAndSvgField, displayed_dimensions
+from core.fields.image import ImageAndSvgField
 from core.management.commands.media_reference_audit import tenant_models
 from core.management.tenant_mixin import TenantCommandMixin
+from core.utils.image_size import displayed_dimensions
 
 
 @dataclass

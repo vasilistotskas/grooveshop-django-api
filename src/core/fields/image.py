@@ -9,11 +9,13 @@ one Django's own ``ImageField`` records. An SVG has no raster size: both
 are null.
 
 The size is measured when a file is assigned that differs from the one the
-row holds (an upload, on save, or another stored file), and on a save of a
-row that has a file and no size yet (one created with a stored file's
-name). Never when a row is loaded (Django's ``ImageField`` opens the stored
-file of every row loaded with a null size, which an SVG always has) and
-never for a reassignment of the same file (``refresh_from_db``). Rows
+row holds (an upload, on save, or another stored file), and on the save
+that adds a row built with a file (an upload, or a stored file's name).
+Only then: never when a row is loaded (Django's ``ImageField`` opens the
+stored file of every row loaded with a null size, which an SVG always
+has), never for a reassignment of the same file (``refresh_from_db``), and
+never on a later save of a row whose file has no size (an SVG, an
+unreadable or missing file): the file it names has not changed. Rows
 stored before a model gained the fields are measured by ``manage.py
 backfill_image_dimensions``. A queryset ``update()`` of the file bypasses
 the field: it has to write the size itself.
@@ -21,7 +23,7 @@ the field: it has to write the size itself.
 
 from __future__ import annotations
 
-from typing import IO, Any
+from typing import Any
 
 from django.core.exceptions import SuspiciousFileOperation
 from django.db.models import Model
@@ -32,40 +34,9 @@ from django.db.models.fields.files import (
     ImageFileDescriptor,
 )
 from django.forms import Field
-from PIL import Image, UnidentifiedImageError
 
 from core.forms import image
-from core.utils.rich_text_images import displayed_size
-
-
-def displayed_dimensions(file: IO[bytes]) -> tuple[int, int] | None:
-    """``(width, height)`` the media service shows the raster *file* at, or
-    ``None`` for a file Pillow cannot read as an image (an SVG) or cannot
-    read at all (truncated, corrupt): no size is truer than a wrong one.
-
-    Reads the header only; the file's position is restored. A PNG's EXIF
-    orientation counts only when its ``eXIf`` chunk precedes the pixel data:
-    libvips (the media service's Sharp) ignores one after it, and finding
-    one there would make Pillow decode the whole image.
-    """
-    position = file.tell() if file.seekable() else None
-    try:
-        file.seek(0)
-        with Image.open(file) as opened:
-            if opened.format == "PNG" and "exif" not in opened.info:
-                return opened.size
-            return displayed_size(opened)
-    except (
-        UnidentifiedImageError,
-        Image.DecompressionBombError,
-        OSError,
-        SyntaxError,
-        ValueError,
-    ):
-        return None
-    finally:
-        if position is not None:
-            file.seek(position)
+from core.utils.image_size import displayed_dimensions
 
 
 def _stored_name(value: Any) -> str | None:
@@ -114,8 +85,11 @@ class ImageAndSvgField(ImageField):
 
     def pre_save(self, model_instance: Model, add: bool) -> Any:
         file = super().pre_save(model_instance, add)
+        # ``_state.adding``, not ``add``: Django first tries an UPDATE
+        # (``add=False``) for a new row whose primary key is set.
         if (
             file
+            and model_instance._state.adding
             and self.width_field
             and self.height_field
             and getattr(model_instance, self.width_field) is None

@@ -15,7 +15,7 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from PIL import Image
+from PIL import Image, PngImagePlugin
 
 from blog.factories.post import BlogPostFactory
 from blog.models.post import BlogPost
@@ -25,6 +25,7 @@ from core.management.commands.backfill_image_dimensions import (
     backfill_current_schema,
     measured_fields,
 )
+from core.utils.image_size import displayed_dimensions
 
 pytestmark = pytest.mark.django_db
 
@@ -155,6 +156,56 @@ def test_an_unreadable_file_has_no_size_and_its_save_succeeds():
     post.save()
 
     assert _sizes(post) == (None, None)
+
+
+@pytest.mark.parametrize("late", [False, True], ids=["no-exif", "late-exif"])
+def test_a_png_is_measured_without_decoding_its_pixels(late):
+    """Asking Pillow for EXIF it has not met before ``IDAT`` decodes the
+    whole image (64 ms and ~27 MB for 3000x3000)."""
+    content = (
+        _png((3000, 3000), ROTATE_90, late=True)
+        if late
+        else _png((3000, 3000), late=False)
+    )
+
+    with patch.object(
+        PngImagePlugin.PngImageFile,
+        "load",
+        side_effect=AssertionError("decoded"),
+    ):
+        size = displayed_dimensions(io.BytesIO(content))
+
+    assert size == (3000, 3000)
+
+
+def test_a_png_cut_inside_its_pixels_keeps_its_header_size():
+    content = _png((300, 200), late=False)
+
+    assert displayed_dimensions(io.BytesIO(content[:-40])) == (300, 200)
+
+
+def test_a_later_save_of_a_row_without_a_size_never_reads_its_file():
+    svg = BlogPostFactory(image=_upload("icon.svg", SVG))
+    row = BlogPost.objects.get(pk=svg.pk)
+    storage = _image_field().storage
+
+    with (
+        patch.object(storage, "open", side_effect=AssertionError("opened")),
+        patch.object(Image, "open", side_effect=AssertionError("decoded")),
+    ):
+        row.save()
+
+    assert _sizes(row) == (None, None)
+
+
+def test_a_file_saved_through_the_field_file_is_measured():
+    """``FieldFile.save``, the avatar import's path, on a stored row."""
+    post = BlogPostFactory(image=_upload("icon.svg", SVG))
+    row = BlogPost.objects.get(pk=post.pk)
+
+    row.image.save("photo.jpg", _upload("avatar", _jpeg((640, 480), ROTATE_90)))
+
+    assert _sizes(row) == (480, 640)
 
 
 def test_loading_or_refreshing_a_row_never_opens_its_file():

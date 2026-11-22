@@ -3,6 +3,50 @@
 
 
 
+## v3.265.0 (2026-11-22)
+
+### Bug fixes
+
+* fix(blog): hold the admin icon to the API's rule and label it in a served language
+
+A posted admin form with no catalogue kept the saved icon and dropped a
+changed one in silence; both writers now call blog.icons.check_icon,
+which refuses a changed icon it cannot check. The admin labels icons in
+active_language_code(), so en-us or no active language no longer raise.
+The field's help text describes the field, not a storefront rendering. ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
+### Chores
+
+* chore(builder): re-sync the storefront catalogues, which now list the builder's icons ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
+### Features
+
+* feat(blog): a blog category's icon, one of the page builder's icons (#811) ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
+* feat(blog): a blog category's icon, one of the page builder's icons
+
+BlogCategory.icon holds one of the icons the builder offers, by the name
+the storefront saves. The list is the store's catalogue: it now states
+icons, each with the editor's label per language (Catalogue.icons,
+required), so Django keeps no copy. The write serializer refuses an
+icon the catalogue does not offer (400 unknown_icon) and a changed icon
+when the storefront does not answer (503 storefront_unavailable); an
+unchanged icon is not checked again. The admin offers the icons by
+their label in the admin's language. The column is additive with
+db_default, and the API serves icon on every category. ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
+### Performance improvements
+
+* perf(blog): read the catalogue once per category form
+
+The admin form read the store's catalogue for its choices and again in
+clean_icon, so with the storefront down an editor waited through two
+timeouts. The form now passes what it read to check_icon. ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
+### Testing
+
+* test(blog): a category form opened with no catalogue keeps its icon when posted ([`b35a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35a27fe5976370ecfb56bdb72a84027b5d4055a))
+
 ## v3.264.0 (2026-11-22)
 
 ### Bug fixes

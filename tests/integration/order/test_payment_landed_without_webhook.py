@@ -614,6 +614,30 @@ class TestAnUnreadableAmountIsAnUnreadableViva:
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
 
+    @pytest.mark.parametrize("status_id", ["R", "M", "MA", "MI", "ML", "MS"])
+    def test_a_payment_refunded_or_disputed_since_keeps_the_order(
+        self, status_id, caplog
+    ):
+        """Viva writes ``R`` (refunded in full or in part) or a dispute
+        status on the ORIGINAL payment: the money was taken, so the order
+        is never canceled as unpaid. No webhook settles such a payment, so
+        nothing is applied or recorded for it: the order is kept for a
+        person, with an ERROR."""
+        order = _viva_order()
+        api = _paid_at_viva(order)
+        api.by_order_code[CODE][1]["Transactions"][0]["StatusId"] = status_id
+
+        with api, caplog.at_level("ERROR", logger="order.payments"):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["skipped_open"] == 1
+        assert result["canceled_pending"] == 0
+        assert not VivaWebhookEvent.objects.exists()
+        assert TXN not in api.retrieved
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert any(r.levelname == "ERROR" for r in caplog.records)
+
     @pytest.mark.parametrize(
         "body",
         [

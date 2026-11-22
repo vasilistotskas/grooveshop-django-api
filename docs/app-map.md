@@ -429,4 +429,5 @@ Stripe is dj-stripe (`djstripe` in `TENANT_APPS`, its webhook under
 `stripe/` in `src/core/urls.py`). Viva Wallet is
 `src/order/views/viva_webhook.py` and `src/order/payments/payment_events.py`. Both
 read their credentials from the `Tenant` row through
-`src/tenant/credentials.py`. Read `docs/order/payments.md`.
+`src/tenant/credentials.py`. Read `docs/order/payments.md`, and
+`docs/order/payments-viva.md` for Viva.

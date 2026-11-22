@@ -371,6 +371,30 @@ class TestEventsThatAreNotOurDisputes:
 
         assert not _chargebacks(order).exists()
 
+    def test_a_sale_the_ledger_never_booked_is_read_once(self):
+        """The sale is retrieved once, before the order is locked, and that
+        answer books it: a lost dispute of a payment no webhook booked is
+        recorded against it, with no second Retrieve under the lock."""
+        order = OrderFactory(
+            num_order_items=0,
+            pay_way=PayWayFactory.create_online_payment("viva_wallet"),
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            payment_id="",
+            amount_due=Money(Decimal(str(CAPTURED)), "EUR"),
+            metadata={"viva_order_codes": [str(ORDER_CODE)]},
+        )
+
+        with _viva("ML") as fake, patch(EMAIL):
+            response = _process_dispute_event_in_tenant(
+                sale_id=SALE, transaction_id="wallet-unbooked"
+            )
+
+        assert response.status_code == 200
+        assert fake.retrieved == [SALE]
+        [row] = _chargebacks(order)
+        assert row.charge.provider_reference == SALE
+
     def test_an_unverifiable_sale_answers_500_and_writes_nothing(self):
         order = _paid_order()
 

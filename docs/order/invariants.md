@@ -40,7 +40,7 @@ the linked section or the originating commit's message.
 | A pay way is accepted exactly when the quote lists it for the delivery: `OrderQuoteService.offered_pay_ways` is the one rule behind the quote's `payWays`, the selection of a quote or a payment intent, and `OrderViewSet._validate_pay_way_for_order` on both creation paths | [§3.0](creation.md) (#635) |
 | "Free above X" means one value for shipping and for the pay-way fee: the products after discounts, excluding shipping and fees (`OrderQuoteService.threshold_value`), passed by every caller of `shipping_cost` and `calculate_payment_method_fee` | [§5.0](shipping.md) |
 | A payment is bound to what it was made for: every PaymentIntent carries server-set `purpose` / `subject` / `tenant_schema` metadata, payment-first order creation refuses an intent that is not `cart` + this cart + this tenant (or that a gift-card purchase holds), and the polled status path settles only through `handle_payment_succeeded` | [§3.1](creation.md), [§4.1](payments.md) |
-| A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | [§4.1](payments.md), [§4.3](payments.md) |
+| A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | [§4.1](payments.md), [§4.3](payments-viva.md) |
 | A reversal of a gift-card purchase's payment (refund, claim, chargeback, Stripe or Viva) voids the unspent card and records the spent part | [§4.2.1](payments.md) |
 | `Order.payment_status` / `payment_id` are read-only in the admin, and the owner PATCH/PUT cannot change a priced order's country or region | [§7](cancel.md) |
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL, and a voucher request of unknown outcome (lost answer, unclassified error, expired claim) is never sent again: `voucher_request_unknown_at` holds every caller until staff adopt the voucher or request again | [§5.1](shipping-acs.md), `docs/acs-debugging.md` |
@@ -137,7 +137,7 @@ These invariants need more than a table row. Each ends with its anchor.
   reversed once, when `payment_status` is REFUNDED. A Viva 1797 is applied from
   the REFUND transaction (`F`, refund/void type, negative amount), not from a
   REFUNDED status that Viva never reports
-  - Anchor: [§4.3](payments.md), [§7.2](refunds.md)
+  - Anchor: [§4.3](payments-viva.md), [§7.2](refunds.md)
 - Money moved for an order is recorded on the append-only `PaymentTransaction`
   ledger, once, keyed on the provider's own id
   (`UNIQUE (provider, provider_reference, kind)`). What can still be refunded

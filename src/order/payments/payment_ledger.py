@@ -1343,7 +1343,13 @@ class PaymentLedger:
                 return None
         status, data = reported
         captured = provider_amount(data.get("amount"))
-        if status not in _CAPTURED_STATUSES or captured is None:
+        # A capture is a positive amount: a refund (negative) named as the
+        # payment is none.
+        if (
+            status not in _CAPTURED_STATUSES
+            or captured is None
+            or captured <= 0
+        ):
             logger.error(
                 "Payment %s %s cannot be recorded as captured for order %s: "
                 "provider says %s",

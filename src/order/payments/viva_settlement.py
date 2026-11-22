@@ -38,9 +38,17 @@ logger = logging.getLogger(__name__)
 VIVA_TRANSACTION_PAYMENT_CREATED = 1796
 
 #: What handles one event for a locked order: ``(order, event_data,
-#: transaction_id)``, answering the ``VivaWebhookEvent`` outcome to record
-#: (``None`` is a processed event).
-EventHandler = Callable[[Order, dict[str, Any], str], str | None]
+#: transaction_id, **read)``, answering the ``VivaWebhookEvent`` outcome to
+#: record (``None`` is a processed event). ``read`` is what the event's
+#: :data:`EventRead` took from Viva before the lock.
+EventHandler = Callable[..., str | None]
+
+#: What an event reads from Viva before its order row is locked: ``(order,
+#: event_data, transaction_id)``, answering the keyword arguments its
+#: handler judges under the lock. Retrieve Transaction is an HTTP call,
+#: and the row is never held across one. Raises ``RuntimeError`` when Viva
+#: cannot be read.
+EventRead = Callable[[Order, dict[str, Any], str], dict[str, Any]]
 
 
 def transaction_hash(transaction_id: object) -> str:
@@ -53,6 +61,24 @@ def transaction_hash(transaction_id: object) -> str:
         if transaction_id
         else ""
     )
+
+
+def ledger_charge(order: Order, transaction_id: str):
+    """The ledger's CHARGE of *order* for Viva transaction
+    *transaction_id*, or ``None``. Viva's ids are GUIDs, compared without
+    regard to case."""
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
+    from order.payments.payment import VivaWalletPaymentProvider
+
+    if not transaction_id:
+        return None
+    return PaymentTransaction.objects.filter(
+        order=order,
+        kind=PaymentTransactionKind.CHARGE,
+        provider=VivaWalletPaymentProvider.code,
+        provider_reference__iexact=transaction_id,
+    ).first()
 
 
 def verify_transaction(transaction_id):
@@ -395,12 +421,15 @@ def handle_payment_created(
 
     # The money is in, whatever state the order is in: a canceled order or
     # a second payment under another of its checkout codes is still a
-    # charge, and the one a refund has to name.
+    # charge, and the one a refund has to name. A charge the ledger holds
+    # already (booked by a refund of it that came first, under the
+    # spelling its ``ParentId`` used) keeps that row.
+    booked = ledger_charge(order, transaction_id)
     PaymentLedger.record_charge(
         order,
         amount=Money(verified_amount, order_total.currency),
         provider=VivaWalletPaymentProvider.code,
-        reference=transaction_id,
+        reference=booked.provider_reference if booked else transaction_id,
     )
 
     # Before the settled guard: a canceled order's payment is already
@@ -522,6 +551,18 @@ def handle_payment_created(
     ShippingService.dispatch_create_shipment_task(order)
 
 
+def read_payment_created(
+    order: Order, event_data: dict[str, Any], transaction_id: str
+) -> dict[str, Any]:
+    """:data:`EventRead` of a 1796: Retrieve Transaction for a payment the
+    event says finished, judged by :func:`handle_payment_created`. One
+    that names no transaction or another status reads nothing: the
+    handler refuses it as it is."""
+    if transaction_id and event_data.get("StatusId", "") in {"", "F"}:
+        return {"verified": verify_transaction(transaction_id)}
+    return {}
+
+
 def apply_event(
     order: Order,
     *,
@@ -531,8 +572,12 @@ def apply_event(
     order_code: str,
     status_id: str,
     handle: EventHandler | None,
+    read: EventRead | None = None,
 ) -> str | None:
     """Run *handle* for one Viva event of *order*, once per transaction.
+
+    *read* takes what the event needs from Viva before the order row is
+    locked (:data:`EventRead`); *handle* judges it under the lock.
 
     The ``VivaWebhookEvent`` row keyed on ``(transaction_id,
     event_type_id)`` is the idempotency record: written last, in the same
@@ -567,21 +612,11 @@ def apply_event(
         )
         return None
 
-    if (
-        handle is handle_payment_created
-        and transaction_id
-        and event_data.get("StatusId", "") in {"", "F"}
-    ):
-        # Retrieve Transaction is an HTTP call, reached from the webhook
-        # and the anonymous ``viva_return``: it is made before the order
-        # row is locked, so a slow Viva never holds the row, and what it
-        # answered is judged under the lock.
-        verified = verify_transaction(transaction_id)
-
-        def handle_verified(locked, data, txn):
-            return handle_payment_created(locked, data, txn, verified=verified)
-
-        handle = handle_verified
+    taken = (
+        read(order, event_data, transaction_id)
+        if read is not None and handle is not None
+        else {}
+    )
 
     with transaction.atomic():
         # Re-fetch with row lock to prevent race conditions
@@ -611,7 +646,7 @@ def apply_event(
             outcome = VivaWebhookEvent.OUTCOME_SKIPPED
         else:
             outcome = (
-                handle(order, event_data, transaction_id)
+                handle(order, event_data, transaction_id, **taken)
                 or VivaWebhookEvent.OUTCOME_PROCESSED
             )
 
@@ -645,15 +680,22 @@ def settle_landed_payment(order: Order) -> LandedPayment:
     verify, or that settles nothing (another amount, a canceled order),
     is left to those checks, which record and flag it as for the webhook;
     one they refused without a flag settled nothing, is logged as an
-    ERROR, and keeps the order (``UNSETTLED``) for a person.
+    ERROR, and keeps the order (``UNSETTLED``) for a person. So does a
+    payment refunded or disputed since (``R``, ``M``...): the money was
+    taken, and no webhook settles it, so nothing is applied for it.
 
     Raises ``PaymentStatusUnavailableError`` when Viva could not be read:
     a payment may have landed, so the caller must not act as if none did.
     """
-    from order.payments.payment import VivaWalletPaymentProvider
+    from order.payments.payment import (
+        VIVA_STATUS_FINISHED,
+        VivaWalletPaymentProvider,
+    )
 
     landed = VivaWalletPaymentProvider().landed_charges(order)
-    for order_code, transaction_id in landed:
+    for order_code, transaction_id, status_id in landed:
+        if status_id != VIVA_STATUS_FINISHED:
+            continue
         logger.info(
             "Viva holds payment txn_hash=%s for order %s: settling it as "
             "its webhook would",
@@ -669,6 +711,7 @@ def settle_landed_payment(order: Order) -> LandedPayment:
                 order_code=order_code,
                 status_id="F",
                 handle=handle_payment_created,
+                read=read_payment_created,
             )
         except RuntimeError as e:
             raise PaymentStatusUnavailableError(transaction_id) from e
@@ -680,9 +723,10 @@ def settle_landed_payment(order: Order) -> LandedPayment:
     ):
         return LandedPayment.SETTLED
     logger.error(
-        "Viva holds %s payment(s) for order %s that settled nothing: the "
-        "order is kept for a person",
+        "Viva holds %s payment(s) for order %s that settled nothing "
+        "(StatusId %s): the order is kept for a person",
         len(landed),
         order.id,
+        ", ".join(sorted({status_id for _, _, status_id in landed})),
     )
     return LandedPayment.UNSETTLED

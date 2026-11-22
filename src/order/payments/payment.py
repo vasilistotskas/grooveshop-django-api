@@ -1238,6 +1238,16 @@ VIVA_DISPUTE_OPEN_STATUS_IDS: frozenset[str] = frozenset({"M", "MA", "MI"})
 VIVA_DISPUTE_LOST_STATUS_ID = "ML"
 #: ``MW``: "Dispute Won".
 VIVA_DISPUTE_WON_STATUS_ID = "MW"
+#: ``StatusId`` of a payment that took the money, whatever happened to it
+#: since (developer.viva.com/integration-reference/response-codes/,
+#: StatusId table): finished, ``R`` refunded in full or in part (the
+#: original's status, not the refund's), or disputed at any stage, ``MS``
+#: (Suspected Dispute) included.
+VIVA_MONEY_TAKEN_STATUS_IDS: frozenset[str] = frozenset(
+    {VIVA_STATUS_FINISHED, "R", "MS"}
+    | VIVA_DISPUTE_OPEN_STATUS_IDS
+    | {VIVA_DISPUTE_LOST_STATUS_ID, VIVA_DISPUTE_WON_STATUS_ID}
+)
 # Why a Viva refund was refused before anything was sent (the order's
 # history shows it to staff).
 VIVA_REFUND_NEEDS_BASIC_PAIR = (
@@ -1493,13 +1503,15 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
         return rows
 
-    def landed_charges(self, order: Order) -> list[tuple[str, str]]:
+    def landed_charges(self, order: Order) -> list[tuple[str, str, str]]:
         """The payments Viva took on the order's payment orders, as
-        ``(order code, transaction id)``: finished (``StatusId`` ``F``),
-        for a positive amount and with no ``ParentId``, which a refund
-        carries (its amount is negative and its parent is the payment it
-        reverses; seen on a demo refund 2026-11-08). Every code is read:
-        a payment on any of them is the order's (``viva_order_code_q``).
+        ``(order code, transaction id, StatusId)``: in a status of money
+        taken (``VIVA_MONEY_TAKEN_STATUS_IDS``: finished, refunded since,
+        or disputed), for a positive amount and with no ``ParentId``,
+        which a refund carries (its amount is negative and its parent is
+        the payment it reverses; seen on a demo refund 2026-11-08). Every
+        code is read: a payment on any of them is the order's
+        (``viva_order_code_q``).
 
         Raises ``PaymentStatusUnavailableError`` when a code could not be
         read, or the store has no Merchant ID and API Key to read it with.
@@ -1511,7 +1523,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 order.id,
             )
             raise PaymentStatusUnavailableError(str(order.id))
-        landed: list[tuple[str, str]] = []
+        landed: list[tuple[str, str, str]] = []
         for code in order_viva_codes_in_order(order):
             try:
                 rows = self._order_transactions(
@@ -1524,8 +1536,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 )
                 raise PaymentStatusUnavailableError(code) from e
             for row in rows:
+                status_id = row.get("StatusId")
                 if not (
-                    row.get("StatusId") == "F"
+                    status_id in VIVA_MONEY_TAKEN_STATUS_IDS
                     and not row.get("ParentId")
                     and row.get("TransactionId")
                 ):
@@ -1540,7 +1553,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     )
                     raise PaymentStatusUnavailableError(code)
                 if amount > 0:
-                    landed.append((code, str(row["TransactionId"])))
+                    landed.append(
+                        (code, str(row["TransactionId"]), str(status_id))
+                    )
         return landed
 
     def __init__(self):

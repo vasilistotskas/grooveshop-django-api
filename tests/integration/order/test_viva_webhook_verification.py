@@ -27,6 +27,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments.viva_settlement import handle_payment_created
 from order.refunds.service import RefundService
@@ -462,8 +463,9 @@ class TestVivaReversalWebhook:
         """A refund whose payment no webhook booked yet (its 1796 is late,
         lost, or verified and waiting for the order's lock) is not dropped:
         Viva says the payment is this order's, so it is booked first and
-        the refund against it. The payment's own event, arriving after,
-        neither marks the order paid nor ships it."""
+        the refund against it. The order, never confirmed and now holding
+        nothing, is canceled and its stock released. The payment's own
+        event, arriving after, neither revives nor ships it."""
         order = _paid_order(
             ledger=False,
             payment_id="",
@@ -482,6 +484,7 @@ class TestVivaReversalWebhook:
         assert _outcome() == VivaWebhookEvent.OUTCOME_PROCESSED
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
+        assert order.status == OrderStatus.CANCELED
 
         with patch(
             "shipping.services.ShippingService.dispatch_create_shipment_task"
@@ -498,8 +501,191 @@ class TestVivaReversalWebhook:
 
         dispatch.assert_not_called()
         order.refresh_from_db()
-        assert order.status == OrderStatus.PENDING
+        assert order.status == OrderStatus.CANCELED
         assert order.payment_status == PaymentStatus.REFUNDED
+
+    def test_a_part_refund_before_its_payment_was_booked_is_flagged(
+        self, refunded_signals
+    ):
+        """What a part refund leaves held belongs to an order that was never
+        confirmed: it is flagged for the store as a charge that does not
+        match the order (``flag_payment_mismatch``: the flag, a history
+        note and the staff email), never left PENDING unnoticed."""
+        order = _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        with _viva(refund_amount=10.0), patch("emails.send.send_email") as sent:
+            _deliver()
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        flag = order.metadata[AMOUNT_MISMATCH_FLAG]
+        assert flag["transaction_id"] == PAYMENT_ID
+        assert flag["verified_amount"] == str(
+            Money(Decimal(str(CAPTURED - 10.0)), "EUR")
+        )
+        assert "ops.payment_mismatch" in [
+            c.args[0] for c in sent.call_args_list
+        ]
+
+    def test_a_parent_in_other_letter_case_is_one_charge(
+        self, refunded_signals
+    ):
+        """``ParentId`` comes from the unauthenticated body: a payment it
+        names in other letters is the same Viva payment, and the 1796 that
+        follows books no second CHARGE for it."""
+        order = _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        viva = _viva(refund_amount=10.0)
+        viva.transactions[PAYMENT_ID.upper()] = _payment_answer()
+
+        with viva, patch("emails.send.send_email"):
+            _deliver(parent_id=PAYMENT_ID.upper())
+            order.refresh_from_db()
+            handle_payment_created(
+                order,
+                {"StatusId": "F"},
+                PAYMENT_ID,
+                verified=(
+                    PaymentStatus.COMPLETED,
+                    verified_payment(order, str(ORDER_CODE)),
+                ),
+            )
+
+        assert (
+            order.payment_transactions.filter(
+                kind=PaymentTransactionKind.CHARGE
+            ).count()
+            == 1
+        )
+
+    def test_a_parent_that_is_itself_a_refund_books_nothing(
+        self, refunded_signals
+    ):
+        """A ``ParentId`` naming another refund of the order (a negative
+        amount) is no payment: the event is skipped, never a 500 from the
+        ledger's positive-amount constraint."""
+        order = _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        other_refund = "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d"
+        viva = _viva(refund_amount=10.0)
+        viva.transactions[other_refund] = (
+            200,
+            retrieve_refund(amount=5.0, order_code=ORDER_CODE),
+        )
+
+        with viva:
+            response = _deliver(parent_id=other_refund)
+
+        assert response.status_code == 200
+        assert not order.payment_transactions.exists()
+        assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
+
+    @pytest.mark.parametrize("event_type_id", [1796, 1797, 1798, 1799])
+    def test_viva_is_read_before_the_order_row_is_locked(
+        self, event_type_id, refunded_signals
+    ):
+        """Every Retrieve Transaction an event needs (the refund and the
+        payment it reverses, for a 1797) is made before the order row is
+        locked: a slow Viva never holds the row."""
+        from order.payments import viva_settlement
+
+        _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        body = reversal_created_event(
+            refund_id=REFUND_ID, parent_id=PAYMENT_ID, order_code=ORDER_CODE
+        )["EventData"]
+        calls: list[str] = []
+        retrieve = viva_settlement.retrieve_transaction
+        verify = viva_settlement.verify_transaction
+        lock = Order.objects.select_for_update
+
+        def _retrieve(transaction_id):
+            calls.append("read")
+            return retrieve(transaction_id)
+
+        def _verify(transaction_id):
+            calls.append("read")
+            return verify(transaction_id)
+
+        def _lock(*args, **kwargs):
+            calls.append("lock")
+            return lock(*args, **kwargs)
+
+        with (
+            _viva(refund_amount=10.0),
+            patch.object(viva_settlement, "retrieve_transaction", _retrieve),
+            patch.object(viva_settlement, "verify_transaction", _verify),
+            patch.object(Order.objects, "select_for_update", _lock),
+            patch("emails.send.send_email"),
+        ):
+            _process_event_in_tenant(
+                order_code=str(ORDER_CODE),
+                event_type_id=event_type_id,
+                event_data={**body, "StatusId": "F"},
+                transaction_id=REFUND_ID,
+                status_id="F",
+                txn_hash="deadbeef",
+            )
+
+        assert "read" in calls
+        assert "lock" in calls
+        assert "read" not in calls[calls.index("lock") :]
+
+    def test_a_full_refund_of_an_unconfirmed_order_cancels_it(
+        self, refunded_signals
+    ):
+        """A PENDING order whose booked charge the store refunds in full at
+        Viva (a charge held for review, for one) holds nothing any more:
+        it is canceled, never left PENDING with its stock held."""
+        order = _paid_order(
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        with _viva(refund_amount=CAPTURED):
+            _deliver()
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert order.payment_status == PaymentStatus.REFUNDED
+
+    def test_a_part_refund_of_a_booked_charge_leaves_the_order_to_staff(
+        self, refunded_signals
+    ):
+        """A part refund of a charge the order already held (the excess of
+        a charge held for review) is the store's own step: the order is
+        left as it is for staff to settle."""
+        order = _paid_order(
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        with _viva(refund_amount=10.0):
+            _deliver()
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
 
     def test_reversal_skipped_when_its_parent_is_another_orders_payment(
         self, refunded_signals

@@ -64,7 +64,11 @@ from order.enum.create_error import (
     TOTAL_CHANGED_CODE,
     OrderCreateErrorType,
 )
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.exceptions import (
     CartHasUnpaidOrderError,
     CartNotReadyError,
@@ -93,9 +97,10 @@ from order.filters import OrderFilter
 from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payments import payment_hold
+from order.payments import payment_hold, settlement
 from order.payments.payment import (
     OpenPayment,
+    VivaWalletPaymentProvider,
     get_payment_provider,
     provider_supports,
     registered_provider_codes,
@@ -2536,6 +2541,10 @@ class OrderViewSet(BaseModelViewSet):
            resolves during the webhook race window — and a shopper
            who pays on an earlier session still resolves.
 
+        An order still unpaid is then settled from Viva itself
+        (``_settle_viva_return``): the webhook may be late or lost, and
+        the buyer is back because they paid.
+
         ``eventId`` is deliberately NOT a lookup key — an earlier
         revision assumed it echoed ``merchantTrns`` (our order UUID),
         but Viva sends an integer event code there, so that fallback
@@ -2638,6 +2647,9 @@ class OrderViewSet(BaseModelViewSet):
                 code="order_not_found",
             )
 
+        if row["payment_status"] not in SETTLED_PAYMENT_STATUSES:
+            row = self._settle_viva_return(row, value_fields)
+
         logger.info(
             "Viva return lookup resolved order",
             extra={
@@ -2655,6 +2667,38 @@ class OrderViewSet(BaseModelViewSet):
                 "status": str(row["status"]),
                 "paymentStatus": str(row["payment_status"]),
             }
+        )
+
+    @staticmethod
+    def _settle_viva_return(
+        row: dict[str, Any], value_fields: tuple[str, ...]
+    ) -> dict[str, Any]:
+        """*row* once the payments Viva took for its order are settled.
+
+        The buyer is back from Viva's hosted page, which sends them here
+        after they paid: a payment Viva took is settled now, by the code
+        its webhook runs (``settle_landed_payment``), so the success page
+        shows the order paid whether or not that webhook has landed, and
+        the webhook changes nothing when it does. A store without Viva
+        credentials, or a Viva that cannot be read, leaves the order as it
+        is for the webhook or the sweep.
+        """
+        if not VivaWalletPaymentProvider.is_configured_for_tenant():
+            return row
+        order = Order.objects.get(pk=row["id"])
+        try:
+            settlement.settle_landed_payment(
+                order, VivaWalletPaymentProvider.code
+            )
+        except PaymentStatusUnavailableError:
+            logger.warning(
+                "Viva return could not read the payments of order %s",
+                order.id,
+            )
+            return row
+        return (
+            Order.objects.filter(pk=row["id"]).values(*value_fields).first()
+            or row
         )
 
     @action(detail=False, methods=["GET"])

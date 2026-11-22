@@ -435,7 +435,7 @@ def acs_voucher_hold_since() -> datetime | None:
 
 
 @dashboard_query(
-    "store:attention:v3",
+    "store:attention:v4",
     ttl=60,
     depends_on=(
         "order.Order",
@@ -462,6 +462,7 @@ def attention_counts() -> dict[str, int]:
     from emails import figures
     from order.enum.status import OrderStatus
     from order.models.invoice import MyDataStatus
+    from order.payments import payment_hold
     from product.enum.review import ReviewStatus
     from shipping_acs import attention as acs
 
@@ -489,6 +490,9 @@ def attention_counts() -> dict[str, int]:
         "acs_voucher_holds": acs.voucher_holds_holding_requests().count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
         "unattributed_cod_payouts": acs.unattributed_payouts().count(),
+        # A charge that did not match its order (``ops.payment_mismatch``),
+        # still PENDING and not accepted: only a person decides it.
+        "payments_to_review": payment_hold.payment_review_orders().count(),
         "canceled_still_paid": model("order.Order")
         .objects.refund_owed()
         .count(),

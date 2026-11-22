@@ -7,7 +7,7 @@ from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
 
 from blog.managers.post import BlogPostManager
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.fields.rich_text import RichTextField
 from core.models import (
     PublishableModel,
@@ -26,6 +26,7 @@ from search.transliteration import (
 
 
 class BlogPost(
+    ImageSizeModelMixin,
     TranslatableModel,
     TimeStampMixinModel,
     PublishableModel,

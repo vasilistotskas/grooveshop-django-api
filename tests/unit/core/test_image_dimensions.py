@@ -19,9 +19,11 @@ from django.core.management import call_command
 from django.forms import modelform_factory
 from PIL import Image, PngImagePlugin
 
+from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
 from blog.models.post import BlogPost
 from core.cache.registry import get_surface
+from core.fields.image import ImageSizeModelMixin
 from core.management.commands.backfill_image_dimensions import (
     Command,
     backfill_current_schema,
@@ -262,6 +264,58 @@ class TestAStoredRow:
 
         assert _sizes(row) == before
 
+    @pytest.mark.parametrize("load", ["null-image", "deferred-image"])
+    def test_a_stored_file_assigned_to_an_unknown_previous_is_measured(
+        self, load
+    ):
+        """Uploads are measured again when ``FieldFile.save`` stores them; a
+        stored file's name is measured only by the assignment, also when the
+        row's previous file is NULL or was not loaded."""
+        post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+        name = _image_field().storage.save(
+            "uploads/blog/stored.jpg", ContentFile(_jpeg((1200, 630)))
+        )
+        if load == "null-image":
+            BlogPost.objects.filter(pk=post.pk).update(
+                image=None, image_width=None, image_height=None
+            )
+            row = BlogPost.objects.get(pk=post.pk)
+        else:
+            row = BlogPost.objects.defer("image").get(pk=post.pk)
+
+        row.image = name
+        row.save()
+
+        assert _sizes(row) == (1200, 630)
+
+    def test_loading_a_deferred_image_reads_no_file(self):
+        post = BlogPostFactory(image=_upload("cover.jpg", _jpeg((300, 200))))
+        row = BlogPost.objects.defer("image").get(pk=post.pk)
+        storage = _image_field().storage
+
+        with (
+            patch.object(storage, "open", side_effect=AssertionError("opened")),
+            patch.object(Image, "open", side_effect=AssertionError("decoded")),
+        ):
+            assert row.image.name.endswith(".jpg")
+
+        assert (row.image_width, row.image_height) == (300, 200)
+
+    @pytest.mark.parametrize(
+        "factory",
+        [BlogPostFactory, BlogCategoryFactory],
+        ids=["post", "category"],
+    )
+    def test_a_save_naming_only_the_image_writes_its_size(self, factory):
+        instance = factory(image=_upload("cover.jpg", _jpeg((1080, 567))))
+        row = type(instance).objects.get(pk=instance.pk)
+
+        row.image = _upload("cover-large.jpg", _jpeg((1600, 840)))
+        row.save(update_fields=["image"])
+
+        row.refresh_from_db()
+        assert (row.image_width, row.image_height) == (1600, 840)
+
     def test_an_svg_replaced_by_a_raster_gets_its_size(self):
         post = BlogPostFactory(image=_upload("icon.svg", SVG))
         row = BlogPost.objects.get(pk=post.pk)
@@ -406,6 +460,59 @@ class TestBackfill:
 
         stale.assert_not_called()
 
+    def test_a_file_replaced_while_it_runs_keeps_the_replacements_size(self):
+        post = self._unmeasured(_jpeg((640, 480)), "old.jpg")
+
+        def replaced_meanwhile(stored):
+            BlogPost.objects.filter(pk=post.pk).update(
+                image="uploads/blog/new.jpg", image_width=1600, image_height=840
+            )
+            return displayed_dimensions(stored)
+
+        with patch(
+            "core.management.commands.backfill_image_dimensions."
+            "displayed_dimensions",
+            side_effect=replaced_meanwhile,
+        ):
+            tally = backfill_current_schema(measured_fields())[
+                "blog.BlogPost.image"
+            ]
+
+        assert _sizes(post) == (1600, 840)
+        assert tally.measured == 0
+
+    def test_an_interrupted_run_purges_what_it_wrote(self):
+        self._unmeasured(_jpeg((640, 480)), "a.jpg")
+        self._unmeasured(_jpeg((320, 240)), "b.jpg")
+        calls = []
+
+        def stop_on_the_second(stored):
+            calls.append(stored)
+            if len(calls) == 2:
+                raise KeyboardInterrupt
+            return displayed_dimensions(stored)
+
+        with (
+            patch(
+                "core.management.commands.backfill_image_dimensions."
+                "displayed_dimensions",
+                side_effect=stop_on_the_second,
+            ),
+            patch(
+                "core.management.commands.backfill_image_dimensions."
+                "mark_surface_stale"
+            ) as stale,
+            pytest.raises(KeyboardInterrupt),
+        ):
+            backfill_current_schema(measured_fields())
+
+        marked = {call.args[0] for call in stale.call_args_list}
+        assert marked
+        assert all(
+            "blog.BlogPost" in get_surface(code).invalidated_by
+            for code in marked
+        )
+
     def test_the_command_measures_the_current_store(self):
         post = self._unmeasured(_jpeg((640, 480)), "todo.jpg")
 
@@ -431,3 +538,11 @@ class TestBackfill:
             "user.UserAccount.image",
             "product.ProductImage.image",
         }
+
+    def test_every_model_that_records_a_size_writes_it_with_the_image(self):
+        """``ImageSizeModelMixin`` adds the size to a save's
+        ``update_fields`` that names the image."""
+        assert all(
+            issubclass(model, ImageSizeModelMixin)
+            for model, _field in measured_fields()
+        )

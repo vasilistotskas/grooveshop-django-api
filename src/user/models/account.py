@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from user.managers.account import UserAccountManager
@@ -21,7 +21,11 @@ from user.validators import ExtendedUnicodeUsernameValidator
 
 
 class UserAccount(
-    AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel
+    ImageSizeModelMixin,
+    AbstractBaseUser,
+    PermissionsMixin,
+    UUIDModel,
+    TimeStampMixinModel,
 ):
     username_validator = ExtendedUnicodeUsernameValidator()
 

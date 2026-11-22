@@ -67,45 +67,64 @@ def backfill_current_schema(
     """
     tallies: dict[str, Tally] = {}
     changed: set[type[models.Model]] = set()
-    for model, field in pairs:
-        tally = tallies.setdefault(f"{model._meta.label}.{field.name}", Tally())
-        rows = (
-            model._base_manager.order_by()
-            .exclude(**{f"{field.attname}__isnull": True})
-            .exclude(**{field.attname: ""})
-            .filter(
-                models.Q(**{f"{field.width_field}__isnull": True})
-                | models.Q(**{f"{field.height_field}__isnull": True})
+    try:
+        for model, field in pairs:
+            tally = tallies.setdefault(
+                f"{model._meta.label}.{field.name}", Tally()
             )
-            .values_list(model._meta.pk.name, field.attname)
-        )
-        for pk, name in rows.iterator(chunk_size=200):
-            tally.scanned += 1
-            try:
-                with field.storage.open(name) as stored:
-                    size = displayed_dimensions(stored)
-            except OSError, SuspiciousFileOperation:
-                # Missing, or not readable (a directory, no permission).
-                tally.missing += 1
-                continue
-            if size is None:
-                tally.unmeasurable += 1
-                continue
-            tally.measured += 1
-            changed.add(model)
-            if not dry_run:
-                model._base_manager.filter(**{model._meta.pk.name: pk}).update(
-                    **{
-                        field.width_field: size[0],
-                        field.height_field: size[1],
-                    }
-                )
-    if not dry_run:
+            _measure_rows(model, field, tally, changed, dry_run=dry_run)
+    finally:
+        # Also when the run stops early: a row it wrote is skipped by the
+        # next run, which would then purge nothing for it.
         for code in {
             code for model in changed for code in surfaces_invalidated_by(model)
         }:
             mark_surface_stale(code)
     return tallies
+
+
+def _measure_rows(
+    model: type[models.Model],
+    field: ImageAndSvgField,
+    tally: Tally,
+    changed: set[type[models.Model]],
+    *,
+    dry_run: bool,
+) -> None:
+    """Measure *field*'s unmeasured rows of *model*, adding *model* to
+    *changed* at its first write."""
+    rows = (
+        model._base_manager.order_by()
+        .exclude(**{f"{field.attname}__isnull": True})
+        .exclude(**{field.attname: ""})
+        .filter(
+            models.Q(**{f"{field.width_field}__isnull": True})
+            | models.Q(**{f"{field.height_field}__isnull": True})
+        )
+        .values_list(model._meta.pk.name, field.attname)
+    )
+    for pk, name in rows.iterator(chunk_size=200):
+        tally.scanned += 1
+        try:
+            with field.storage.open(name) as stored:
+                size = displayed_dimensions(stored)
+        except OSError, SuspiciousFileOperation:
+            # Missing, or not readable (a directory, no permission).
+            tally.missing += 1
+            continue
+        if size is None:
+            tally.unmeasurable += 1
+            continue
+        if dry_run:
+            tally.measured += 1
+            continue
+        # Only while the row still names the file measured: a save that
+        # replaced it meanwhile measured its own file.
+        if model._base_manager.filter(
+            **{model._meta.pk.name: pk, field.attname: name}
+        ).update(**{field.width_field: size[0], field.height_field: size[1]}):
+            tally.measured += 1
+            changed.add(model)
 
 
 class Command(TenantCommandMixin, BaseCommand):

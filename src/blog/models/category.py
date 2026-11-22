@@ -9,13 +9,18 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from blog.managers.category import BlogCategoryManager
 from blog.models.post import BlogPost
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 
 
 class BlogCategory(
-    TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel
+    ImageSizeModelMixin,
+    TranslatableModel,
+    TimeStampMixinModel,
+    SortableModel,
+    UUIDModel,
+    MPTTModel,
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)

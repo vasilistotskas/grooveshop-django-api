@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.fields.url import WebURLField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.image_paths import image_to_media_path
@@ -15,7 +15,11 @@ from product.managers.image import ProductImageManager
 
 
 class ProductImage(
-    TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel
+    ImageSizeModelMixin,
+    TranslatableModel,
+    TimeStampMixinModel,
+    SortableModel,
+    UUIDModel,
 ):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(

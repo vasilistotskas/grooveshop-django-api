@@ -9252,6 +9252,9 @@ msgstr "Δεν εφαρμόστηκαν εκπτώσεις"
 msgid "No email matches."
 msgstr "Κανένα email δεν ταιριάζει."
 
+msgid "No icon"
+msgstr "Χωρίς εικονίδιο"
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά"
 
@@ -10908,6 +10911,9 @@ msgstr "Τηλέφωνο για τις ειδοποιήσεις αποστολή
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Η μορφή επικύρωσης τηλεφώνου για αυτή τη χώρα, όπως προκύπτει από τη βιβλιοθήκη ``phonenumbers`` που χρησιμοποιεί το Django — δεν αποθηκεύεται ποτέ. Null μόνο για δεσμευμένο κωδικό alpha-2 για τον οποίο η ``phonenumbers`` δεν έχει δεδομένα."
+
+msgid "Pick one of the icons the store offers."
+msgstr "Διάλεξε ένα από τα εικονίδια που προσφέρει το κατάστημα."
 
 msgid "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
 msgstr "Επιλέξτε τις γραμμές που επιστράφηκαν, με τα τεμάχιά τους, και αν επιστρέφονται και τα μεταφορικά: επιστρέφονται με την αξία που πουλήθηκαν και το πιστωτικό τους παραστατικό φέρει τους δικούς τους συντελεστές ΦΠΑ. Ή δώστε αντί γι' αυτό ένα ποσό καλής θελήσεως. Επιστρέφει τα χρήματα μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι· μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες. Η κατάσταση της παραγγελίας δεν αλλάζει."
@@ -14739,6 +14745,9 @@ msgstr "Οι γραμμές του καλαθιού στις τιμές που �
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
 
+msgid "The category's icon, one of the page builder's icons."
+msgstr "Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού σελίδων."
+
 #, python-format
 msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 msgstr "Οι αλλαγές που είχαν προγραμματιστεί για τις %(scheduled_for)s δεν δημοσιεύτηκαν. Δεν δημοσιεύτηκε τίποτα και οι ζωντανές σελίδες σου δεν άλλαξαν."
@@ -15306,6 +15315,9 @@ msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου τ�
 
 msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
 msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα για τον έλεγχο της αλλαγής. Δοκίμασε ξανά σε λίγο."
+
+msgid "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα, οπότε δεν μπορούν να εμφανιστούν τα εικονίδια. Δοκίμασε ξανά σε λίγο."
 
 msgid "The storefront catalogue build the draft was last validated against."
 msgstr "Η έκδοση του καταλόγου του καταστήματος με την οποία ελέγχθηκε τελευταία φορά το πρόχειρο."
@@ -19141,9 +19153,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "No data available"
 #~ msgstr "Δεν υπάρχουν δεδομένα"
-
-#~ msgid "No icon"
-#~ msgstr "Χωρίς εικονίδιο"
 
 #~ msgid "No payment ID found for order"
 #~ msgstr "Δεν βρέθηκε ID πληρωμής για την παραγγελία"

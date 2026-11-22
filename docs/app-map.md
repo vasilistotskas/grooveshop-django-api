@@ -251,7 +251,9 @@ Read `docs/cart-agent-token.md` for the token,
 `BlogPost`, `BlogCategory` (MPTT), `BlogAuthor`, `BlogComment` and
 `BlogTag` under `src/blog/models/`, views per model under
 `src/blog/views/`. Indexed in Meilisearch beside the products. Read
-`docs/blog-related-posts.md`.
+`docs/blog-related-posts.md`. A category's `icon` is one of the page
+builder's icons, checked against the store's catalogue (`src/blog/icons.py`,
+`docs/builder/documents.md`).
 
 ### `promotion/`, `giftcard/`, `b2b/`
 

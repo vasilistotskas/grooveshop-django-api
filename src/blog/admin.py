@@ -1,5 +1,6 @@
 from html import unescape
 
+from django import forms
 from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Count
@@ -7,6 +8,7 @@ from django.utils import timezone
 from django.utils.html import format_html, strip_tags
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
+from parler.forms import TranslatableModelForm
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
@@ -17,6 +19,7 @@ from unfold.contrib.filters.admin import (
 )
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
+from unfold.widgets import UnfoldAdminSelectWidget
 
 from admin.base import BaseTranslatableAdmin
 from admin.bulk import update_each
@@ -28,11 +31,15 @@ from admin.filters import (
     RelatedDropdownFilter,
 )
 from admin.mixins import FeatureInline
+from blog import icons
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
+from builder.errors import STOREFRONT_UNAVAILABLE_MESSAGE
+from builder.storefront import Catalogue
+from core.storefront import StorefrontUnavailable
 
 # ── Local (single-app) variant maps ────────────────────────────────────
 # These states are derived (not backed by a TextChoices field), so they
@@ -257,8 +264,90 @@ class BlogTagAdmin(BaseTranslatableAdmin):
         return obj.posts_count
 
 
+class BlogCategoryAdminForm(TranslatableModelForm):
+    """The category form, with the icon as a choice of the icons the
+    store's catalogue offers, each by the editor's name for it in the
+    admin's language. A saved icon the builder no longer offers stays a
+    choice, so the form keeps it.
+
+    A posted icon is held to ``blog.icons.check_icon``, the API's rule:
+    with no catalogue an unchanged icon saves with the rest of the form
+    and a changed one is refused, never dropped. A form opened with no
+    catalogue shows the saved icon and cannot change it."""
+
+    icon = forms.ChoiceField(
+        label=_("Icon"),
+        required=False,
+        widget=UnfoldAdminSelectWidget,
+        help_text=BlogCategory._meta.get_field("icon").help_text,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["icon"]
+        saved = self.instance.icon
+        # Read once: the choices and ``clean_icon`` share it, so with no
+        # storefront an editor waits through one timeout, not two.
+        self._catalogue: Catalogue | None
+        try:
+            self._catalogue = icons.store_catalogue()
+        except StorefrontUnavailable:
+            self._catalogue = None
+        if self._catalogue is None and not self.is_bound:
+            field.disabled = True
+            field.choices = [(saved, saved or _("No icon"))]
+            field.help_text = _(
+                "The storefront cannot be reached, so the icons cannot "
+                "be listed. Try again in a moment."
+            )
+            return
+        offered = (
+            icons.icon_choices(self._catalogue)
+            if self._catalogue is not None
+            else []
+        )
+        names = {name for name, _label in offered}
+        # The saved icon, and on a posted form the posted one, are choices
+        # whatever the catalogue says: ``clean_icon`` decides on them.
+        posted = self.data.get(self.add_prefix("icon"), "")
+        others = [saved, posted] if self.is_bound else [saved]
+        field.choices = [
+            ("", _("No icon")),
+            *offered,
+            *(
+                (name, name)
+                for name in dict.fromkeys(others)
+                if name and name not in names
+            ),
+        ]
+
+    def _read_catalogue(self) -> Catalogue:
+        """The catalogue ``__init__`` read, or its failure again."""
+        if self._catalogue is None:
+            raise StorefrontUnavailable("unreachable when the form was built")
+        return self._catalogue
+
+    def clean_icon(self) -> str:
+        value = self.cleaned_data["icon"]
+        check = icons.check_icon(
+            value, saved=self.instance.icon, catalogue=self._read_catalogue
+        )
+        match check:
+            case icons.IconCheck.UNKNOWN:
+                raise forms.ValidationError(
+                    icons.UNKNOWN_ICON_MESSAGE, code=icons.IconCheck.UNKNOWN
+                )
+            case icons.IconCheck.UNAVAILABLE:
+                raise forms.ValidationError(
+                    STOREFRONT_UNAVAILABLE_MESSAGE,
+                    code=icons.IconCheck.UNAVAILABLE,
+                )
+        return value
+
+
 @admin.register(BlogCategory)
 class BlogCategoryAdmin(BaseTranslatableAdmin):
+    form = BlogCategoryAdminForm
     list_filter_sheet = False
 
     ordering_field = "sort_order"
@@ -295,7 +384,7 @@ class BlogCategoryAdmin(BaseTranslatableAdmin):
         (
             _("Media"),
             {
-                "fields": ("image",),
+                "fields": ("image", "icon"),
             },
         ),
         (

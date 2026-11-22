@@ -19,14 +19,14 @@ from rest_framework.response import Response
 
 from cart.services import cart_item_pairs
 from cart.views.cart import CART_TOKEN_HEADERS
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from core.utils.views import cache_methods
 from shipping.api_errors import CarrierUnavailable
 from shipping.exceptions import (

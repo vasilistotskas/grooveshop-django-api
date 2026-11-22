@@ -296,7 +296,7 @@ it read-only, because it is not in `TENANT_SELF_EDITABLE_FIELDS`. The field
 accepts only `STOREFRONT_LOCALES` (the storefront's routes, kept apart from
 `settings.LANGUAGES`, which names the content languages) and
 must contain `default_locale`. Adding a language also needs that language's
-legal documents to exist (`Tenant._validate_legal_documents_for_new_locales`).
+legal documents to exist (`tenant.models.tenant_rules.validate_legal_documents_for_new_locales`).
 
 A change purges what the storefront cached for the store: the language
 switcher and hreflang set of every page, and the sitemap

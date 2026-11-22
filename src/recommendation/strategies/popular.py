@@ -21,7 +21,7 @@ from recommendation.strategies.base import (
     RecommendationStrategy,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 _TOP = 0.5
 _DECAY = 0.005

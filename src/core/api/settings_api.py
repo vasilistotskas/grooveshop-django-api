@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # ``ty: ignore[invalid-argument-type]`` on each ``@extend_schema`` below: a
 # ty limitation with ``djangorestframework-stubs``' ``AsView``, explained in
-# ``core/api/health_api.py``.
+# ``src/core/api/health_api.py``.
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("List all available settings"),
     description=_("Retrieve all settings with their names, values, and types"),

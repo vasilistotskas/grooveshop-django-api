@@ -27,6 +27,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments.payment_ledger import PaymentLedger
@@ -218,7 +219,7 @@ class TestWhatItRefuses:
 
     def test_a_canceled_order(self, order_admin, staff_user):
         order = _transfer_order()
-        OrderService.cancel_order(order, customer_initiated=False)
+        OrderLifecycleService.cancel_order(order, customer_initiated=False)
 
         assert not order_admin.has_confirm_payment_permission(
             _post(staff_user, {}), object_id=order.pk

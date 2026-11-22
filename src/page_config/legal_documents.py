@@ -188,7 +188,7 @@ LEGAL_TEXT_UPDATES: tuple[LegalTextUpdate, ...] = (
 Adding one: change the document in ``LEGAL_DOCUMENTS``, append an entry
 with the next revision, and ship a data migration that rewrites and
 stamps the pages still carrying the previous platform text (see
-``page_config/migrations/0032_privacy_server_logs_section.py``).
+``src/page_config/migrations/0032_privacy_server_logs_section.py``).
 """
 
 LEGAL_TEXT_REVISION: int = max(update.revision for update in LEGAL_TEXT_UPDATES)

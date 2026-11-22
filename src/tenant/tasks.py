@@ -483,7 +483,7 @@ def fanout_clear_expired_sessions():
 # NOT a fanout: billing terms, dunning bookkeeping, and outbound
 # platform mail all live on the PUBLIC schema (Tenant rows), so the
 # whole estate is processed in one public-schema pass. Defined here —
-# not in tenant/billing.py — because Celery autodiscovery only scans
+# not in src/tenant/billing.py — because Celery autodiscovery only scans
 # ``tasks.py`` modules.
 @celery_app.task(
     base=MonitoredTask,

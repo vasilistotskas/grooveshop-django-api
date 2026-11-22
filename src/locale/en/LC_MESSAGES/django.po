@@ -4443,6 +4443,9 @@ msgstr "Discount: %(percent)s%%. You save %(value)s per item (%(total)s total)."
 msgid "Discounted price excluding VAT"
 msgstr "Discounted price excluding VAT"
 
+msgid "Dispatch key"
+msgstr "Dispatch key"
+
 #, python-format
 msgid "Dispatched tracking poll for %(count)d shipment(s)."
 msgstr "Dispatched tracking poll for %(count)d shipment(s)."
@@ -4946,6 +4949,9 @@ msgstr "Event Type ID"
 
 msgid "Event fingerprint"
 msgstr "Event fingerprint"
+
+msgid "Event key"
+msgstr "Event key"
 
 msgid "Event name"
 msgstr "Event name"
@@ -11646,6 +11652,9 @@ msgstr "Purged At"
 
 msgid "Purpose of movement"
 msgstr "Purpose of movement"
+
+msgid "Pushed at"
+msgstr "Pushed at"
 
 msgid "Put the returned units back in stock"
 msgstr "Put the returned units back in stock"

@@ -9,6 +9,7 @@ from cart.models import Cart, CartItem
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.inventory.stock import StockManager
+from order.lifecycle.service import OrderLifecycleService
 from order.models import Order, OrderItem
 from order.models.stock_log import StockLog
 from order.services import OrderService
@@ -291,7 +292,9 @@ class TestTransactionFailuresRollbackCompletely:
                 with pytest.raises(
                     Exception, match="Order status update failed"
                 ):
-                    OrderService.cancel_order(order, reason="Test cancellation")
+                    OrderLifecycleService.cancel_order(
+                        order, reason="Test cancellation"
+                    )
 
         # Verify complete rollback - no partial changes persisted
 
@@ -360,7 +363,7 @@ class TestTransactionFailuresRollbackCompletely:
             side_effect=Exception("Stock increment failed"),
         ):
             # Service should NOT raise - it logs the error and continues
-            _canceled_order, _refund_info = OrderService.cancel_order(
+            _canceled_order, _refund_info = OrderLifecycleService.cancel_order(
                 order, reason="Test cancellation", refund_payment=False
             )
 

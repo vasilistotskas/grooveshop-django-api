@@ -434,12 +434,12 @@ Differences from the Stripe path that are easy to miss:
   ``webhook_processed_{event_id}``.
 - **Inline status mutation**: ``order.status = OrderStatus.PROCESSING``
   + ``order.save(update_fields=[...])``, NOT
-  ``OrderService.update_order_status(...)``. The post-save signal
+  ``OrderLifecycleService.update_order_status(...)``. The post-save signal
   still fires, but the canonical state-machine validator is
   skipped — Viva trusts that ``status==PENDING`` before the
   payment landed.
 - **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
-  handler calls ``OrderService.suppress_customer_status_notifications(
+  handler calls ``OrderLifecycleService.suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
   so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without

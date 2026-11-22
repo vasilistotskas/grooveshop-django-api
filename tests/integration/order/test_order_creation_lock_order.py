@@ -34,6 +34,7 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from order.enum.status import PaymentStatus
 from order.inventory.stock import StockManager
+from order.lifecycle.service import OrderLifecycleService
 from order.models.stock_reservation import StockReservation
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -314,7 +315,7 @@ class TestOtherMultiProductTransactionsLockInPkOrder:
             )
 
         with CaptureQueriesContext(connection) as capture:
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order, refund_payment=False, customer_initiated=False
             )
 

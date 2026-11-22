@@ -1,7 +1,7 @@
 """An order cancel asks the courier with no row locked (#713), and a
 carrier sync and a staff cancel never wait on each other (#613).
 
-``OrderService._cancel_order_locked`` locked the order (and the products it
+``OrderLifecycleService._cancel_order_locked`` locked the order (and the products it
 restocks) and then called the courier inside that transaction: every row
 stayed locked across the carrier's HTTP round trip, and the shipment was
 locked after the order while a tracking sync took the two the other way
@@ -33,13 +33,13 @@ from django.utils import timezone, translation
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
 from order.inventory.stock import StockManager
-from order.models.history import OrderHistory
-from order.models.order import Order
-from order.services import (
+from order.lifecycle.service import (
     SHIPMENT_CANCEL_PENDING_FLAG,
     SHIPMENT_CANCEL_UNANSWERED_KEY,
-    OrderService,
+    OrderLifecycleService,
 )
+from order.models.history import OrderHistory
+from order.models.order import Order
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
     finish_pending_shipment_cancels,
@@ -188,7 +188,7 @@ def _courier(monkeypatch, shipment, **kwargs) -> Courier:
 
 
 def _staff_cancel(order: Order) -> Order:
-    canceled, _refund = OrderService.cancel_order(
+    canceled, _refund = OrderLifecycleService.cancel_order(
         order,
         reason="out of stock",
         refund_payment=False,
@@ -337,7 +337,7 @@ class TestACancelWhoseWorkerStopped:
         courier = _courier(monkeypatch, shipment)
         with monkeypatch.context() as stopped:
             stopped.setattr(
-                OrderService,
+                OrderLifecycleService,
                 "cancel_attached_shipment",
                 lambda *args, **kwargs: None,
             )

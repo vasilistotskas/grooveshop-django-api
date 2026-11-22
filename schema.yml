@@ -31494,7 +31494,7 @@ paths:
         authenticates against that tenant's OWN user table — where the same
         id belongs to a different person. Filtering by that id would list
         stores the caller has nothing to do with. Customers hold no
-        memberships at all (see ``tenant/membership.py``), so an empty list
+        memberships at all (see ``src/tenant/membership.py``), so an empty list
         is the correct answer for every shopper.
       tags:
       - Tenant
@@ -53767,7 +53767,7 @@ components:
       type: object
       description: |-
         Each optional feature's effective state for the store: its plan
-        flag AND its store settings (``tenant/features.py``), so a client reads
+        flag AND its store settings (``src/tenant/features.py``), so a client reads
         one answer instead of combining the two tiers and copying defaults.
       properties:
         customerAccounts:
@@ -53908,7 +53908,7 @@ components:
     StorePreferences:
       type: object
       description: |-
-        Each store preference's state (``tenant/features.py``): a switch the
+        Each store preference's state (``src/tenant/features.py``): a switch the
         API does not refuse on, served here so a client learns it from the
         tenant payload instead of a settings read that can fail.
       properties:

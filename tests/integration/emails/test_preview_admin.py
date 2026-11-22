@@ -18,7 +18,7 @@ from django.utils import translation
 from emails.registry import registry
 from emails.types import Owner
 from order.factories import OrderFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.texts.conftest import staff_client
 from tests.utils.staff import store_staff, store_tenant
 

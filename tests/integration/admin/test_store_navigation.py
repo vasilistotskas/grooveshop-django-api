@@ -16,7 +16,7 @@ from django.utils import translation
 from admin import navigation
 from admin.navigation import ops_site_dropdown, store_sidebar
 from shipping.models import ShippingProvider
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,

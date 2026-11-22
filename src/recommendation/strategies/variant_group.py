@@ -13,7 +13,7 @@ from recommendation.strategies.base import (
     RecommendationStrategy,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 _SCORE = 0.9
 

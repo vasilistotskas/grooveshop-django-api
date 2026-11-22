@@ -33,6 +33,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+)
 from core.api.permissions import (
     IsOwnerOrAdmin,
     IsOwnerOrAdminOrGuest,
@@ -45,13 +50,9 @@ from core.api.views import BaseModelViewSet
 from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-)
 from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
+from order.checkout.attribution_service import OrderAttributionService
 from order.checkout.quote import (
     ExpectedTotal,
     OrderQuoteService,
@@ -90,6 +91,7 @@ from order.exceptions import (
     UnpaidOrderLimitError,
 )
 from order.filters import OrderFilter
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
@@ -126,7 +128,6 @@ from order.serializers.order import (
 from order.serializers.quote import CheckoutQuoteSerializer
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
-    OrderAttributionService,
     OrderLegalAcceptanceService,
     OrderService,
 )
@@ -657,10 +658,10 @@ class OrderViewSet(BaseModelViewSet):
         order_id: str = self.kwargs[lookup_url_kwarg]
 
         try:
-            # No UUID branch: every route in order/urls.py binds
+            # No UUID branch: every route in src/order/urls.py binds
             # ``<int:pk>``, so a UUID string can never reach this lookup.
             # Guest access by UUID is its own route (retrieve_by_uuid).
-            obj = OrderService.get_order_by_id(int(order_id))
+            obj = OrderLifecycleService.get_order_by_id(int(order_id))
             self.check_object_permissions(self.request, obj)
             return obj
         except Order.DoesNotExist as e:
@@ -1349,7 +1350,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 2: route on what the pay way settles and what the
         # provider can do — never on a provider name. This carried
         # its own ``{"viva_wallet"}`` literal, a second copy of the
-        # one in order/services.py; both are now the provider's own
+        # one in src/order/services.py; both are now the provider's own
         # ``supports_payment_intent`` declaration.
 
         # An intent-less submission on a non-redirect online pay
@@ -2334,7 +2335,7 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         try:
-            order = OrderService.get_order_by_uuid(uuid_str)
+            order = OrderLifecycleService.get_order_by_uuid(uuid_str)
         except Order.DoesNotExist as e:
             raise NotFound(
                 _("Order with UUID {uuid} not found").format(uuid=uuid_str),
@@ -2379,7 +2380,7 @@ class OrderViewSet(BaseModelViewSet):
         should_refund = validated_data.get("refund_payment", True)
 
         try:
-            canceled_order, refund_info = OrderService.cancel_order(
+            canceled_order, refund_info = OrderLifecycleService.cancel_order(
                 order=order,
                 reason=cancellation_reason,
                 refund_payment=should_refund,
@@ -2672,7 +2673,7 @@ class OrderViewSet(BaseModelViewSet):
                 _("Authentication is required to view your orders")
             )
 
-        user_orders = OrderService.get_user_orders(request.user.id)
+        user_orders = OrderLifecycleService.get_user_orders(request.user.id)
 
         filtered_qs = self.filter_queryset(user_orders)
 
@@ -2777,7 +2778,7 @@ class OrderViewSet(BaseModelViewSet):
                 code="reorder_not_owner",
             )
 
-        result = OrderService.reorder_to_cart(
+        result = OrderLifecycleService.reorder_to_cart(
             order=order,
             user=user,
             attribution=OrderAttributionService.input_from_request(
@@ -2849,9 +2850,9 @@ class OrderViewSet(BaseModelViewSet):
         status_value = validated_data["status"]
 
         try:
-            OrderService.update_order_status(order, status_value)
+            OrderLifecycleService.update_order_status(order, status_value)
 
-            order = OrderService.get_order_by_id(order.id)
+            order = OrderLifecycleService.get_order_by_id(order.id)
 
             response_serializer_class = self.get_response_serializer()
             response_serializer = response_serializer_class(
@@ -3076,7 +3077,7 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        order = OrderService.get_order_by_id(order.id)
+        order = OrderLifecycleService.get_order_by_id(order.id)
         response_serializer_class = self.get_response_serializer()
         serializer = response_serializer_class(
             order, context=self.get_serializer_context()

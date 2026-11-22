@@ -565,7 +565,7 @@ class TestPollShipmentDeliveryTransitions:
     ):
         """An admin-set terminal order status (DELIVERED / COMPLETED /
         CANCELED) is never overwritten by polling — the state-machine
-        forward-only guard in OrderService.update_order_status filters
+        forward-only guard in OrderLifecycleService.update_order_status filters
         backwards moves and ``_apply_order_status_transition`` early-
         returns when ``current_status in TERMINAL_ORDER_STATUSES``."""
         from order.enum.status import OrderStatus, PaymentStatus

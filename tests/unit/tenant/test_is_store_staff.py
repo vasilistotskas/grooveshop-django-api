@@ -11,8 +11,9 @@ from __future__ import annotations
 import pytest
 from django.contrib.auth.models import AnonymousUser
 
+from tenant.enum import TenantMembershipRole
 from tenant.membership import is_store_staff
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.models import UserTenantMembership
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,

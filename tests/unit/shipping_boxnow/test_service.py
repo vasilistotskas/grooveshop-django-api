@@ -474,7 +474,7 @@ class TestApplyWebhookEvent:
     def test_delivered_transitions_order_to_completed_when_paid(self):
         """delivered event advances an already-paid order through DELIVERED
         and on to COMPLETED (PR #2 G — auto-advance via
-        OrderService.maybe_advance_to_completed)."""
+        OrderLifecycleService.maybe_advance_to_completed)."""
         order = OrderFactory(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,

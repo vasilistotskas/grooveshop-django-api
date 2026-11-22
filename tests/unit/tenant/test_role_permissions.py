@@ -21,10 +21,8 @@ from tenant.auth_backends import (
     PLATFORM_IDENTITY_ATTR,
     TenantRolePermissionBackend,
 )
-from tenant.models import (
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

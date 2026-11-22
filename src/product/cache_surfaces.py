@@ -12,6 +12,10 @@ from core.cache.surfaces import (
     nuxt_handlers,
     nuxt_routes,
 )
+from shipping.cache_surfaces import (
+    PRODUCT_SHIPPING_HANDLER,
+    PRODUCT_SHIPPING_VIEW,
+)
 
 SURFACES = (
     CacheSurface(
@@ -33,6 +37,9 @@ SURFACES = (
             "*AttributeViewSet_*",
             "*AttributeValueViewSet_*",
             "*BrandViewSet_*",
+            # A product's price, weight and size move what shipping it
+            # costs.
+            PRODUCT_SHIPPING_VIEW,
         ),
         nuxt_patterns=nuxt_handlers(
             "ProductViewSet",
@@ -50,6 +57,7 @@ SURFACES = (
             "ProductAttributeViewSet",
             "ProductAttributeValueViewSet",
             "SearchProductViewSet",
+            PRODUCT_SHIPPING_HANDLER,
         )
         + nuxt_functions("builderDataProduct", "builderDataSlug")
         # The rendered pages too, not just the JSON behind them:

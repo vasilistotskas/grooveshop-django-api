@@ -8,12 +8,18 @@ from shipping.serializers.option import (
     ShippingOptionsQuerySerializer,
 )
 from shipping.serializers.policy import ShippingPolicyEntrySerializer
+from shipping.serializers.product_estimate import (
+    ProductShippingEstimateSerializer,
+    ProductShippingSerializer,
+)
 from shipping.serializers.provider import ShippingProviderSerializer
 
 __all__ = [
     "FreeShippingInfoQuerySerializer",
     "FreeShippingInfoSerializer",
     "FreeShippingProviderEntrySerializer",
+    "ProductShippingEstimateSerializer",
+    "ProductShippingSerializer",
     "ShippingOptionSerializer",
     "ShippingOptionsQuerySerializer",
     "ShippingPolicyEntrySerializer",

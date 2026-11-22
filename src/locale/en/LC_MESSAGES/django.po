@@ -9527,6 +9527,9 @@ msgstr "Notified at"
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null until the enquiry that claims this upload is submitted."
 
+msgid "Null when the store ships nowhere, or no delivery it offers can take this product."
+msgstr "Null when the store ships nowhere, or no delivery it offers can take this product."
+
 msgid "Number"
 msgstr "Number"
 
@@ -14714,6 +14717,9 @@ msgstr "The changes scheduled for %(scheduled_for)s did not go live. Nothing was
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 
+msgid "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+msgstr "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+
 msgid "The closed gate's label, for a skipped feature."
 msgstr "The closed gate's label, for a skipped feature."
 
@@ -14735,6 +14741,9 @@ msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages tha
 
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "The cost without VAT: this is what the profit report uses."
+
+msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
+msgstr "The country it was priced for: the store's first shipping country, the one checkout preselects."
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
@@ -14942,6 +14951,9 @@ msgstr "The link search is not valid."
 msgid "The locker's BOX NOW id, exactly."
 msgstr "The locker's BOX NOW id, exactly."
 
+msgid "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+msgstr "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 
@@ -15068,6 +15080,9 @@ msgstr "The previous payment could not be closed."
 
 msgid "The previous payment is still in progress."
 msgstr "The previous payment is still in progress."
+
+msgid "The product ships free on its own: ``price`` is 0."
+msgstr "The product ships free on its own: ``price`` is 0."
 
 msgid "The product the shopper is looking at."
 msgstr "The product the shopper is looking at."

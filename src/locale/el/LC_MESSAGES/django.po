@@ -9533,6 +9533,9 @@ msgstr "Ειδοποιήθηκε στις"
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null μέχρι να υποβληθεί το μήνυμα επικοινωνίας που δεσμεύει αυτό το ανεβασμένο αρχείο."
 
+msgid "Null when the store ships nowhere, or no delivery it offers can take this product."
+msgstr "Null όταν το κατάστημα δεν αποστέλλει πουθενά ή όταν καμία αποστολή που προσφέρει δεν μπορεί να πάρει αυτό το προϊόν."
+
 msgid "Number"
 msgstr "Αριθμός"
 
@@ -14716,6 +14719,9 @@ msgstr "Οι αλλαγές που είχαν προγραμματιστεί γ�
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
 
+msgid "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+msgstr "Η φθηνότερη αποστολή που θα χρέωνε η ολοκλήρωση αγοράς σε ένα καλάθι μόνο με αυτό το προϊόν, μετά το όριο δωρεάν αποστολής και τις προωθήσεις δωρεάν αποστολής."
+
 msgid "The closed gate's label, for a skipped feature."
 msgstr "Η ετικέτα της κλειστής πύλης, για παραλειφθείσα λειτουργία."
 
@@ -14737,6 +14743,9 @@ msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχ
 
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "Το κόστος χωρίς ΦΠΑ: αυτό χρησιμοποιεί η αναφορά κέρδους."
+
+msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
+msgstr "Η χώρα για την οποία υπολογίστηκε η τιμή: η πρώτη χώρα αποστολής του καταστήματος, αυτή που προεπιλέγει η ολοκλήρωση αγοράς."
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
@@ -14944,6 +14953,9 @@ msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη.
 msgid "The locker's BOX NOW id, exactly."
 msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
 
+msgid "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+msgstr "Το χαμηλότερο υποσύνολο προϊόντων, μετά τις εκπτώσεις, από το οποίο μια μεταφορική που μπορεί να πάρει αυτό το προϊόν το αποστέλλει δωρεάν. Null όταν καμία δεν το κάνει ποτέ."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει."
 
@@ -15070,6 +15082,9 @@ msgstr "Η προηγούμενη πληρωμή δεν μπόρεσε να κλ
 
 msgid "The previous payment is still in progress."
 msgstr "Η προηγούμενη πληρωμή βρίσκεται ακόμη σε εξέλιξη."
+
+msgid "The product ships free on its own: ``price`` is 0."
+msgstr "Το προϊόν αποστέλλεται δωρεάν και μόνο του: το ``price`` είναι 0."
 
 msgid "The product the shopper is looking at."
 msgstr "Το προϊόν που βλέπει ο αγοραστής."

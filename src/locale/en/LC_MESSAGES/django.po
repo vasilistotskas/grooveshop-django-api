@@ -3645,9 +3645,6 @@ msgstr "Contact form message"
 msgid "Contact us"
 msgstr "Contact us"
 
-msgid "Contact us to complete the payment."
-msgstr "Contact us to complete the payment."
-
 msgid "Contacts"
 msgstr "Contacts"
 
@@ -9510,8 +9507,8 @@ msgstr "Nothing retained"
 msgid "Nothing to issue"
 msgstr "Nothing to issue"
 
-msgid "Nothing was charged. Your order is registered unpaid."
-msgstr "Nothing was charged. Your order is registered unpaid."
+msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+msgstr "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
 
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Nothing was saved. Fix the marked texts."
@@ -17487,13 +17484,6 @@ msgstr "You are receiving this email because you, or someone else, tried to sign
 
 msgid "You are signed in"
 msgstr "You are signed in"
-
-#, python-format
-msgid "You can complete the payment from your order page until %(deadline)s."
-msgstr "You can complete the payment from your order page until %(deadline)s."
-
-msgid "You can complete the payment from your order page."
-msgstr "You can complete the payment from your order page."
 
 msgid "You can only delete your own account."
 msgstr "You can only delete your own account."

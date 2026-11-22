@@ -8,8 +8,7 @@ Payment Status: Failed
 Total: €87.90
 
 COMPLETE YOUR PAYMENT
-Nothing was charged. Your order is registered unpaid.
-You can complete the payment from your order page.
+Nothing was charged. Your order is registered unpaid — contact us to complete the payment.
 View your order: https://shop.example/en/account/orders/900001
 
 Common reasons for failed payments:

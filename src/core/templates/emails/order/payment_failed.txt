@@ -8,8 +8,7 @@
 {% trans "Total" %}: {{ order.total_price }}
 
 {% trans "COMPLETE YOUR PAYMENT" %}
-{% trans "Nothing was charged. Your order is registered unpaid." %}
-{% if not order_url %}{% trans "Contact us to complete the payment." %}{% elif order.payment_hold_expires_at %}{% blocktrans with deadline=order.payment_hold_expires_at|date:"SHORT_DATETIME_FORMAT" %}You can complete the payment from your order page until {{ deadline }}.{% endblocktrans %}{% else %}{% trans "You can complete the payment from your order page." %}{% endif %}
+{% trans "Nothing was charged. Your order is registered unpaid — contact us to complete the payment." %}
 {% if order_url %}{% trans "View your order" %}: {{ order_url }}
 {% endif %}
 {% trans "Common reasons for failed payments:" %}

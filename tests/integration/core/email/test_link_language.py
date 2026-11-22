@@ -106,49 +106,6 @@ def _assert_links(body: str, url: str, language: str) -> None:
 @pytest.mark.django_db
 class TestOrderEmails:
     @LANGUAGES
-    def test_payment_failed_says_the_order_page_takes_the_payment(
-        self, language, prefix
-    ):
-        deadline = timezone.now() + timedelta(days=2)
-        order = OrderFactory(
-            num_order_items=0,
-            language_code=language,
-            payment_status=PaymentStatus.FAILED,
-            payment_hold_expires_at=deadline,
-        )
-
-        assert send_payment_failed_email(order.id) is True
-
-        message = mail.outbox[-1]
-        expected = (
-            "You can complete the payment from your order page until"
-            if language == "en"
-            else "Μπορείτε να ολοκληρώσετε την πληρωμή από τη σελίδα"
-        )
-        assert expected in message.body
-        assert expected in message.alternatives[0][0]
-
-    @LANGUAGES
-    def test_payment_failed_without_a_deadline_still_points_to_the_page(
-        self, language, prefix
-    ):
-        order = OrderFactory(
-            num_order_items=0,
-            language_code=language,
-            payment_status=PaymentStatus.FAILED,
-            payment_hold_expires_at=None,
-        )
-
-        assert send_payment_failed_email(order.id) is True
-
-        expected = (
-            "You can complete the payment from your order page."
-            if language == "en"
-            else "Μπορείτε να ολοκληρώσετε την πληρωμή από τη σελίδα της παραγγελίας σας."
-        )
-        assert expected in mail.outbox[-1].body
-
-    @LANGUAGES
     def test_payment_failed_order_link(self, language, prefix):
         order = OrderFactory(
             num_order_items=0,

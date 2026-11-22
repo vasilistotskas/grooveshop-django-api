@@ -40,6 +40,18 @@ class BlogCategory(
     image_height = models.PositiveIntegerField(
         _("Height"), null=True, blank=True, editable=False
     )
+    # One of the page builder's icons, by the name the storefront saves
+    # (``i-fa6-solid-robot``): the list is the store's catalogue, checked
+    # where the field is written (``blog.icons``). ``db_default``: the
+    # release still serving during a deploy inserts without it.
+    icon = models.CharField(
+        _("Icon"),
+        max_length=100,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("The category's icon, one of the page builder's icons."),
+    )
     parent = TreeForeignKey(
         "self",
         blank=True,

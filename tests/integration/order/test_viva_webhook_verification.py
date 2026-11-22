@@ -409,7 +409,9 @@ class TestVivaReversalWebhook:
 
         assert response.status_code == 200
         _assert_nothing_booked(order, refunded_signals, PaymentStatus.COMPLETED)
-        assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
+        # A parent that is none of the order's payments records nothing:
+        # Viva's own event for this refund is still applied.
+        assert not VivaWebhookEvent.objects.exists()
 
     def test_a_refund_is_attached_to_the_payment_its_parent_names(
         self, refunded_signals
@@ -594,7 +596,7 @@ class TestVivaReversalWebhook:
 
         assert response.status_code == 200
         assert not order.payment_transactions.exists()
-        assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
+        assert not VivaWebhookEvent.objects.exists()
 
     @pytest.mark.parametrize("event_type_id", [1796, 1797, 1798, 1799])
     def test_viva_is_read_before_the_order_row_is_locked(
@@ -638,6 +640,11 @@ class TestVivaReversalWebhook:
         assert sent_at_lock
         assert sent_at_lock[0] > 0
         assert len(viva.sent) == sent_at_lock[0]
+        if event_type_id == 1797:
+            assert viva.retrieved == [REFUND_ID, PAYMENT_ID]
+            assert _refund_rows(
+                Order.objects.get()
+            ).get().charge.provider_reference == (PAYMENT_ID)
 
     def test_a_parent_is_not_read_for_a_refund_of_another_order(
         self, refunded_signals
@@ -696,9 +703,16 @@ class TestVivaReversalWebhook:
             response = _deliver(parent_id=parent_id)
 
         assert response.status_code == 200
-        assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
         expected = [REFUND_ID] if answer is None else [REFUND_ID, parent_id]
         assert viva.retrieved == expected
+        # Nothing is recorded: Viva's own event for this refund, naming its
+        # real parent, is still applied.
+        assert not VivaWebhookEvent.objects.filter(
+            transaction_id=REFUND_ID
+        ).exists()
+        with _viva(), patch("emails.send.send_email"):
+            _deliver()
+        assert _refund_rows(Order.objects.get()).exists()
 
     def test_a_transaction_id_is_one_segment_of_the_retrieve_url(self):
         """A ``ParentId`` from the body is sent to Viva as one path segment:
@@ -714,30 +728,40 @@ class TestVivaReversalWebhook:
             "/checkout/v2/transactions/x%2F..%2Forders%3Fy%3D1"
         )
 
-    def test_a_full_refund_of_a_charge_held_for_review_cancels_the_order(
+    def test_a_full_refund_of_a_charge_held_for_review_is_left_to_staff(
         self, refunded_signals
     ):
-        """A charge that did not match the order is flagged and never booked
-        by its 1796. The store refunds it in full at Viva: the order holds
-        nothing any more, so it is canceled, never left PENDING holding its
-        stock."""
+        """A charge that did not match the order is flagged and waits for
+        the store. The store refunds it in full at Viva: the refund is
+        booked, and the order stays on the review worklist for staff to
+        close; an order awaiting review is never canceled automatically."""
         order = _paid_order(
             ledger=False,
             payment_id="",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
-            metadata={
-                "viva_order_codes": [str(ORDER_CODE)],
-                AMOUNT_MISMATCH_FLAG: {"transaction_id": PAYMENT_ID},
-            },
         )
-
-        with _viva(refund_amount=CAPTURED):
-            _deliver()
+        owed = order.calculate_order_total_amount().amount
+        with patch("emails.send.send_email"):
+            handle_payment_created(
+                order,
+                {"StatusId": "F"},
+                PAYMENT_ID,
+                verified=(
+                    PaymentStatus.COMPLETED,
+                    verified_payment(
+                        order, str(ORDER_CODE), amount=float(owed) + 10
+                    ),
+                ),
+            )
+            with _viva(refund_amount=CAPTURED):
+                _deliver()
 
         order.refresh_from_db()
-        assert order.status == OrderStatus.CANCELED
+        assert _refund_rows(order).exists()
+        assert order.status == OrderStatus.PENDING
         assert order.payment_status == PaymentStatus.REFUNDED
+        assert payment_hold.awaits_payment_review(order)
 
     def test_a_part_refund_of_a_charge_held_for_review_keeps_its_flag(
         self, refunded_signals
@@ -779,6 +803,46 @@ class TestVivaReversalWebhook:
         assert [c.args[0] for c in sent.call_args_list].count(
             "ops.payment_mismatch"
         ) == 1
+        assert payment_hold.awaits_payment_review(order)
+
+    def test_a_full_refund_leaves_an_order_flagged_for_another_payment(
+        self, refunded_signals
+    ):
+        """Paid twice: payment A for the wrong amount is flagged and never
+        booked, payment B's own event is lost. The store refunds B in full:
+        the ledger holds nothing, yet A is still at Viva, so the order is not
+        canceled and stays on the review worklist for A."""
+        order = _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        owed = order.calculate_order_total_amount().amount
+        second = "5d1f7b84-0b51-4d31-8f0e-6c9a3d2e7a10"
+        with patch("emails.send.send_email"):
+            handle_payment_created(
+                order,
+                {"StatusId": "F"},
+                PAYMENT_ID,
+                verified=(
+                    PaymentStatus.COMPLETED,
+                    verified_payment(
+                        order, str(ORDER_CODE), amount=float(owed) + 10
+                    ),
+                ),
+            )
+            viva = _viva(refund_amount=CAPTURED)
+            viva.transactions[second] = _payment_answer()
+
+            with viva:
+                _deliver(parent_id=second)
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+        assert order.metadata[AMOUNT_MISMATCH_FLAG]["transaction_id"] == (
+            PAYMENT_ID
+        )
         assert payment_hold.awaits_payment_review(order)
 
     def test_a_full_card_refund_of_an_order_also_paid_by_gift_card_cancels_it(
@@ -845,7 +909,9 @@ class TestVivaReversalWebhook:
         assert response.status_code == 200
         _assert_nothing_booked(order, refunded_signals, PaymentStatus.COMPLETED)
         assert not order.payment_transactions.exists()
-        assert _outcome() == VivaWebhookEvent.OUTCOME_SKIPPED
+        # A parent that is none of the order's payments records nothing:
+        # Viva's own event for this refund is still applied.
+        assert not VivaWebhookEvent.objects.exists()
 
     def test_reversal_skipped_when_no_transaction_id(self, refunded_signals):
         order = _paid_order()

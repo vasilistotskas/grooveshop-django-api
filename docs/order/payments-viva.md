@@ -126,8 +126,8 @@ unauthenticated body except `ParentId`:
    and waiting for the order's lock); unreadable → 500, Viva retries. The
    refund is then booked against it, so the payment's own 1796 that follows
    finds the order refunded and neither settles nor ships it. Anything else
-   is skipped, as is a "parent" that is no capture (a refund, a negative
-   amount). The 1796 that follows books its charge under the ledger's
+   is skipped without a record (see below), as is a "parent" that is no
+   capture (a refund, a negative amount). The 1796 that follows books its charge under the ledger's
    spelling of the id, so a `ParentId` in other letters is one CHARGE. A 2054
    passes the sale it has already read, so the sale is retrieved once.
 3. `PaymentLedger.record_refund` keys the REFUND row on the refund
@@ -152,9 +152,10 @@ unauthenticated body except `ParentId`:
    stock released). One that leaves part held flags it for the store
    (`OrderService.flag_payment_mismatch`: what is held against what the
    order is for), so it is on the "Payment review" worklist
-   (`payment_hold.payment_review_orders`); an order already flagged (a
-   charge held for review, whose excess the store refunded) keeps the flag
-   it has, and staff are not emailed again.
+   (`payment_hold.payment_review_orders`). An order already waiting for
+   that review is the store's to close: the refund is booked and nothing
+   is canceled (a charge for the wrong amount is never booked, so the
+   ledger cannot say what is still at Viva).
 
 The dispatcher stores the handler's real outcome in
 `VivaWebhookEvent.outcome`: every skip above (and a 1798 that changed
@@ -174,7 +175,12 @@ requires one of the order's own order codes, and writes
 disagree on its sign. A payment the ledger lacks, a missing or negative
 commission or an unknown currency is skipped (`outcome` `skipped`), never
 booked as zero. A store that does not subscribe 1799 simply shows its Viva
-payments as "fee not reported".
+payments as "fee not reported". A reversal whose parent
+cannot be read or is none of the order's payments (a `ParentId` that is no Viva
+transaction id, one Viva answers 404 for, one on another order, a refund) is
+answered 200 and recorded nowhere
+(`viva_settlement.OUTCOME_NOT_RECORDED`), so it cannot stand in for Viva's own
+event for that refund.
 
 **Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
 success/failure URLs are static strings configured on the source in

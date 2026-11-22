@@ -3139,7 +3139,8 @@ class OrderService:
         Once per payment: the same payment met again while the order still
         waits for that review (a read-back's next run, a refund of it, a
         redelivery) changes nothing and emails no one. Another payment is
-        news, and flags it again.
+        news, and flags it again. Either way the order's ``metadata`` is
+        saved, with what the caller wrote on it.
         """
         from emails.send import send_email
         from order.emails import PaymentMismatch
@@ -3154,6 +3155,7 @@ class OrderService:
             == str(payment_id).lower()
             and payment_hold.awaits_payment_review(order)
         ):
+            order.save(update_fields=["metadata"])
             return
 
         if not order.metadata:

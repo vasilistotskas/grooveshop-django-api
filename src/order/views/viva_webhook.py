@@ -32,7 +32,7 @@ from order.enum.status import (
 )
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payments import viva_settlement
+from order.payments import payment_hold, viva_settlement
 from order.payments.disputes import announce_chargeback
 from order.payments.payment import order_viva_codes, provider_amount
 from order.tasks import (
@@ -1253,7 +1253,10 @@ def _handle_reversal_created(
             parent_id,
             order.id,
         )
-        return VivaWebhookEvent.OUTCOME_SKIPPED
+        # The parent could not be read or is none of this order's: the
+        # event cannot be judged, and recording it would let it stand in
+        # for Viva's own event for this refund.
+        return viva_settlement.OUTCOME_NOT_RECORDED
 
     if type_id in VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS:
         # A refund claim is money the cardholder's bank took back: a
@@ -1297,9 +1300,15 @@ def _handle_reversal_created(
     # refund leaves holding none of the customer's money is canceled, its
     # stock released and anything paid by gift card or points given back.
     # One still holding part is flagged for the store as a charge that
-    # does not match the order (once per payment: a charge held for
-    # review whose excess the store refunded keeps the flag it has).
-    if order.status != OrderStatus.PENDING:
+    # does not match the order.
+    # An order waiting for the store's review is the store's to close: the
+    # refund is booked and the order stays on the worklist (a charge for the
+    # wrong amount is never booked, so the ledger cannot say what is still
+    # at Viva).
+    if (
+        order.status != OrderStatus.PENDING
+        or payment_hold.awaits_payment_review(order)
+    ):
         return None
     held = PaymentLedger.held(order)
     if held <= 0:

@@ -47,6 +47,11 @@ VIVA_TRANSACTION_PAYMENT_CREATED = 1796
 #: :data:`EventRead` took from Viva before the lock.
 EventHandler = Callable[..., str | None]
 
+#: What a handler answers for an event it could not judge from Viva's
+#: answers (a reversal whose parent payment could not be read): nothing is
+#: recorded for it, so the event Viva itself sends is still applied.
+OUTCOME_NOT_RECORDED = "not_recorded"
+
 #: What an event reads from Viva before its order row is locked: ``(order,
 #: event_data, transaction_id)``, answering the keyword arguments its
 #: handler judges under the lock. Retrieve Transaction is an HTTP call,
@@ -653,6 +658,8 @@ def apply_event(
                 handle(order, event_data, transaction_id, **taken)
                 or VivaWebhookEvent.OUTCOME_PROCESSED
             )
+        if outcome == OUTCOME_NOT_RECORDED:
+            return outcome
 
         # Persist the idempotency row last — if the handler raised the
         # row was never written, and the next attempt gets a fresh shot.

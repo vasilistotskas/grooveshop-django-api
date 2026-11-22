@@ -239,6 +239,24 @@ class BlogCategoryAdminFormIconTestCase(APITestCase):
         assert category.slug == "ai-renamed"
         assert category.icon == ROBOT
 
+    def test_a_form_opened_with_no_catalogue_posts_no_icon_and_keeps_it(
+        self,
+    ):
+        # The field was disabled, so the browser sends no ``icon`` at all.
+        category = BlogCategoryFactory(slug="ai", icon=ROBOT)
+        self.fake.failure = requests.ConnectionError("down")
+        form = self.submit(category, slug="ai-renamed")
+        data = form.data.copy()
+        del data["icon"]
+
+        form = self.form(category, data)
+
+        assert form.is_valid(), form.errors
+        form.save()
+        category.refresh_from_db()
+        assert category.slug == "ai-renamed"
+        assert category.icon == ROBOT
+
     def test_with_no_catalogue_a_changed_icon_is_refused_not_dropped(self):
         # Opened while the catalogue answered, posted once it does not.
         category = BlogCategoryFactory(slug="ai")

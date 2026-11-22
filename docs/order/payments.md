@@ -140,11 +140,14 @@ match is booked on the ledger (the money moved) but does not pay the order:
 also keeps `auto_cancel_stuck_pending_orders` away from it), notes the order
 and mails `ops.payment_mismatch`; the Viva amount/currency refusals
 use the same function. The flag is never cleared, so while the order is
-still undecided (PENDING, payment not in `SETTLED_PAYMENT_STATUSES`;
+still undecided (PENDING, and the charge not accepted: payment not
+`COMPLETED`, whatever else it says, a refund in full or in part included;
 `payment_hold.payment_review_orders`) the order detail serves
 `paymentAwaitsReview: true` and `paymentDecidedBy: null`: a client must not
-offer a new payment link. Once the store settles, cancels or refunds the
-order, `paymentAwaitsReview` reads false. A null `paymentDecidedBy` with
+offer a new payment link. The same set is the store's worklist: the admin's
+"Payment review" filter (`payment_review=yes`) and the dashboard's "Payments
+to review" count. Once the store accepts the charge or moves the order on
+from PENDING (fulfils or cancels it), `paymentAwaitsReview` reads false. A null `paymentDecidedBy` with
 `paymentAwaitsReview: false` is an order no sweep decides for another reason
 (the sweep switched off, a payment the provider is processing, an order that
 waits for no online payment).

@@ -103,6 +103,7 @@ from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments.payment import payment_provider_label
+from order.payments.payment_hold import payment_review_orders
 from order.payments.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
@@ -230,6 +231,24 @@ class WholesaleOrderFilter(DropdownFilter):
                 return queryset.exclude(metadata__has_key="b2b_pricing")
             case _:
                 return queryset
+
+
+class PaymentReviewFilter(DropdownFilter):
+    """Orders a provider charged for an amount that did not match, still
+    PENDING and with the charge not accepted: nothing but a person decides
+    them (``payment_hold.payment_review_orders``, the rule behind the
+    dashboard counter)."""
+
+    title = _("Payment review")
+    parameter_name = "payment_review"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Charge waiting for a decision"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(pk__in=payment_review_orders().values("pk"))
+        return queryset
 
 
 class RefundOwedFilter(DropdownFilter):
@@ -1351,6 +1370,7 @@ class OrderAdmin(BaseModelAdmin):
         ("payment_status", MultipleChoicesDropdownFilter),
         "document_type",
         WholesaleOrderFilter,
+        PaymentReviewFilter,
         RefundOwedFilter,
         OverchargedFilter,
         BooksFilter,

@@ -29,6 +29,7 @@ from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.payments import payment_hold
 from order.payments.viva_settlement import handle_payment_created
 from order.refunds.service import RefundService
 from order.signals import order_refunded
@@ -532,6 +533,7 @@ class TestVivaReversalWebhook:
         assert "ops.payment_mismatch" in [
             c.args[0] for c in sent.call_args_list
         ]
+        assert payment_hold.awaits_payment_review(order)
 
     def test_a_parent_in_other_letter_case_is_one_charge(
         self, refunded_signals

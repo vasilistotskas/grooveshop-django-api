@@ -795,6 +795,9 @@ msgstr "Η ανάλυση δείχνει τις πωλήσεις πριν από
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "Η ανάλυση δείχνει μόνο τα προϊόντα, πριν τις επιστροφές, με τις μεγαλύτερες ομάδες πρώτες. Το κέρδος και το περιθώριο αφορούν τις πωλήσεις που έχουν τιμή κόστους. Οι προμήθειες πληρωμών και τα έξοδα ανήκουν στο κατάστημα, όχι σε ένα προϊόν ή μια παραγγελία. Η εξαγωγή απαριθμεί κάθε ομάδα, περίοδο προς περίοδο."
 
+msgid "A charge that does not match its order: decide it"
+msgstr "Χρέωση που δεν ταιριάζει με την παραγγελία της: αποφασίστε"
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι πιστότητας ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
 
@@ -3131,6 +3134,9 @@ msgstr "Χρέωση ενός Stripe SharedPaymentToken που παραχωρή�
 
 msgid "Charge type"
 msgstr "Τύπος χρέωσης"
+
+msgid "Charge waiting for a decision"
+msgstr "Χρέωση που περιμένει απόφαση"
 
 msgid "Chargeback"
 msgstr "Αμφισβήτηση χρέωσης (chargeback)"
@@ -10731,6 +10737,9 @@ msgstr "Πληρωμή για ακυρωμένη παραγγελία #%(order_i
 msgid "Payment reference"
 msgstr "Αναφορά πληρωμής"
 
+msgid "Payment review"
+msgstr "Έλεγχος πληρωμής"
+
 msgid "Payment status"
 msgstr "Κατάσταση πληρωμής"
 
@@ -10751,6 +10760,9 @@ msgstr "Αποκρίσεις λίστας και λεπτομερειών μεθ
 
 msgid "Payments"
 msgstr "Πληρωμές"
+
+msgid "Payments to review"
+msgstr "Πληρωμές προς έλεγχο"
 
 msgid "Payout marked as reconciled."
 msgstr "Η απόδοση σημάνθηκε ως συμφωνημένη."

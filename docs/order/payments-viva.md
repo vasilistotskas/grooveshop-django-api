@@ -145,8 +145,11 @@ unauthenticated body except `ParentId`:
    (`cancel_order(refund_payment=False)`, stock released). A part refund
    whose payment this very refund booked flags it for the store
    (`OrderService.flag_payment_mismatch`: what is held against what the
-   order is for). A part refund of a charge it already held (the excess of
-   one waiting for review, flagged then) is the store's own step.
+   order is for), so it is on the "Payment review" worklist
+   (`payment_hold.payment_review_orders`). A part refund of a charge it
+   already held (the excess of one waiting for review, flagged then) is the
+   store's own step, and the order stays on that worklist until the store
+   decides it.
 
 The dispatcher stores the handler's real outcome in
 `VivaWebhookEvent.outcome`: every skip above (and a 1798 that changed

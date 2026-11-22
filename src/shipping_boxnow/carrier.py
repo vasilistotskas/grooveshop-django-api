@@ -15,13 +15,16 @@ from django.db.models import Q
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
+from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import (
     PickupPointInAnotherCountry,
+    PickupPointTooSmall,
     PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     register_provider,
 )
+from shipping_boxnow.catalogue import sizes_exist
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
@@ -361,6 +364,48 @@ class BoxNowCarrier(ShippingCarrierInterface):
         if kind != ShippingKind.PICKUP_POINT:
             return
         derive_compartment(items)
+
+    def parcel_size(
+        self,
+        *,
+        kind: ShippingKind,
+        items: Iterable[tuple[Any, int]],
+    ) -> int | None:
+        """The compartment size the cart packs into: what
+        ``resolve_compartment_size`` derives, the store default where the
+        products carry no dimensions."""
+        if kind != ShippingKind.PICKUP_POINT or not sizes_exist():
+            return None
+        try:
+            return int(resolve_compartment_size(items))
+        except ShippingParcelTooLargeError:
+            return None
+
+    def assert_pickup_point_fits(
+        self,
+        location: Mapping[str, str],
+        *,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Refuse a locker that does not list the cart's size. A locker
+        whose sizes are not known (empty, or missing from BOX NOW's
+        catalogue) lists none, so it never fits. BOX NOW's own picker
+        shows a locker for a size only when its sizes contain it
+        (``shipping_boxnow.catalogue``); a bigger compartment is not
+        assumed to take a smaller parcel."""
+        if not sizes_exist():
+            return
+        locker = self._locker(location)
+        if locker is None:
+            # A point the catalogue does not hold is refused as unknown
+            # by the point's own resolution (``PickupPointUnknown``).
+            return
+        size = resolve_compartment_size(items)
+        if int(size) not in locker.compartment_sizes:
+            raise PickupPointTooSmall(
+                f"BOX NOW locker {location.get('boxnow_locker_id') or ''} "
+                f"has no size {int(size)} compartment."
+            )
 
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)

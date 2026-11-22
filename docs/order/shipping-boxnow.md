@@ -348,11 +348,28 @@ and says which file holds each § number used here.
   active lockers: **a locker lists a size by exact membership**, as the
   widget's `acceptLocker.js` does (a bigger compartment is not assumed to
   take a smaller parcel), and one the catalogue lacks is **unknown**: empty
-  sizes, its ids logged at WARNING. Nothing reads the sizes yet: no API
-  field, filter or order check uses them. They are stored first so the
-  release that does can be checked against production's real sizes (how
-  many lockers the catalogue lacks shows in that WARNING) before it turns
-  a refusal on.
+  sizes, its ids logged at WARNING. `limitedAvailability` is
+  `probability < BOXNOW_LIMITED_AVAILABILITY_BELOW` (0.87, the widget's
+  threshold), false when unknown.
+  **Sizes exist only for BOX NOW's live network.** The catalogue describes
+  production lockers; a store on BOX NOW's stage environment
+  (`Tenant.box_now_live_mode` off, read through `box_now_credentials()`)
+  holds stage ids, a different id space whose numbers collide with
+  production's (stage 5 and production 5 are different lockers, found on
+  the demo store on 2026-11-22). So `shipping_boxnow.catalogue.sizes_exist()`
+  gates everything below: the sync resets a stage store's lockers to
+  unknown instead of applying the file, and the `compartmentSize` filter,
+  the quote's size and the order refusal do not apply to it (its lockers
+  list no sizes and no locker is refused for one). A live store still
+  refuses a locker whose sizes are unknown.
+  `GET /shipping/boxnow/lockers` takes `compartmentSize` (1 to 3) and
+  returns `compartmentSizes` and `limitedAvailability` per locker;
+  `POST /cart/quote` names the cart's `compartmentSize` on a BOX NOW pickup
+  option (null elsewhere, and on a store that is not live). **Order
+  creation on a live store refuses a locker that does not list the cart's
+  size** (or whose sizes are unknown) with 400 `pickup_point_too_small` on
+  `boxnowLockerId` (`ShippingCarrierInterface.assert_pickup_point_fits`,
+  run in the locked quote).
 - **A locker is withdrawn after N daily syncs without it**, not at the
   first absence: the partner list churns about 3% a day (62 rows left and
   48 joined in 14 hours, production 2026-11-21).

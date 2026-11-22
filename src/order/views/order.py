@@ -85,6 +85,7 @@ from order.exceptions import (
     PaymentNotFoundError,
     PaymentStatusUnavailableError,
     PaymentVerificationError,
+    PickupPointTooSmallError,
     RefundOutstandingError,
     StockReservationError,
     UnpaidOrderLimitError,
@@ -1051,6 +1052,13 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        except PickupPointTooSmallError as e:
+            # Before InvalidOrderDataError, which it subclasses: the
+            # locker is the shopper's choice to change, on its own field.
+            raise ValidationError(
+                {e.field: [e.message]}, code="pickup_point_too_small"
+            ) from e
 
         except CartHasUnpaidOrderError as e:
             # Before InvalidOrderDataError, which it subclasses. Answered

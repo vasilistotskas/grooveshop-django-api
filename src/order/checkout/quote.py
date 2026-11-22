@@ -25,6 +25,7 @@ from order.exceptions import (
     InvalidCouponError,
     InvalidGiftCardError,
     LoyaltyRedemptionError,
+    PickupPointTooSmallError,
     ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
@@ -328,6 +329,7 @@ class OrderQuoteService:
                 # price was resolved before (``resolve_live_shipping``).
                 cached_only=lock,
             )
+            cls._assert_pickup_point_fits(shipping, parcel_items)
         payment_fee = None
         if pay_way is not None:
             payment_fee = PaymentFee(
@@ -789,6 +791,38 @@ class OrderQuoteService:
         if not routes:
             return None
         return min(routes, key=lambda route: (route[0], route[1]))[2]
+
+    @staticmethod
+    def _assert_pickup_point_fits(
+        shipping: ShippingChoice, parcel_items: Iterable[tuple[Any, int]]
+    ) -> None:
+        """Refuse a chosen pickup point that cannot take the cart's parcel
+        (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import (
+            PICKUP_POINT_TOO_SMALL,
+            PickupPointTooSmall,
+            get_provider,
+        )
+        from shipping.services import ShippingService
+
+        if (
+            shipping.kind != ShippingKind.PICKUP_POINT
+            or not shipping.provider_code
+            or not shipping.location
+        ):
+            return
+        try:
+            ShippingService.assert_pickup_point_fits(
+                shipping.provider_code,
+                dict(shipping.location),
+                items=parcel_items,
+            )
+        except PickupPointTooSmall as exc:
+            raise PickupPointTooSmallError(
+                get_provider(shipping.provider_code).location_keys[0],
+                str(PICKUP_POINT_TOO_SMALL),
+            ) from exc
 
     @classmethod
     def shipping_cost(

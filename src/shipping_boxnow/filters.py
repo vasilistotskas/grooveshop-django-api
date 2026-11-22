@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from django import forms
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseFilterMixin
+from shipping_boxnow.catalogue import sizes_exist
+from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.models import BoxNowLocker
+
+
+class CompartmentSizeFilter(filters.NumberFilter):
+    """A compartment size as the integer the API speaks (1 to 3)."""
+
+    field_class = forms.IntegerField
 
 
 class BoxNowLockerFilter(CamelCaseFilterMixin, filters.FilterSet):
@@ -24,6 +33,24 @@ class BoxNowLockerFilter(CamelCaseFilterMixin, filters.FilterSet):
         help_text=_("ISO 3166-1 alpha-2 country of the locker."),
     )
 
+    compartment_size = CompartmentSizeFilter(
+        min_value=min(BoxNowCompartmentSize),
+        max_value=max(BoxNowCompartmentSize),
+        method="filter_compartment_size",
+        help_text=_(
+            "Only lockers that have a compartment of this size (1 small, "
+            "2 medium, 3 large), by exact membership as BOX NOW's own "
+            "picker does. A locker whose sizes are not known never matches. "
+            "Ignored on a store that is not on BOX NOW's live network, where "
+            "no locker has a size."
+        ),
+    )
+
+    def filter_compartment_size(self, queryset, name, value):
+        if not sizes_exist():
+            return queryset
+        return queryset.filter(compartment_sizes__contains=[value])
+
     class Meta:
         model = BoxNowLocker
-        fields = ("external_id", "country_code")
+        fields = ("external_id", "country_code", "compartment_size")

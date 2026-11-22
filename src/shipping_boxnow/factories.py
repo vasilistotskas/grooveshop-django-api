@@ -39,8 +39,6 @@ class BoxNowLockerFactory(CustomDjangoModelFactory):
     country_code = "GR"
     note = ""
     is_active = True
-    # A locker that takes every size: what a sized order needs of it.
-    compartment_sizes = [1, 2, 3]
     last_synced_at = factory.LazyFunction(timezone.now)
 
     class Meta:

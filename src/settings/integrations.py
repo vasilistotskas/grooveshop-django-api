@@ -158,12 +158,6 @@ BOXNOW_LOCKER_CATALOGUE_COUNTRIES = {
 BOXNOW_LOCKER_CATALOGUE_MAX_BYTES = int(
     getenv("BOXNOW_LOCKER_CATALOGUE_MAX_BYTES", str(8 * 1024 * 1024))
 )
-# A locker whose catalogue ``probability`` is below this is shown with the
-# "limited availability" marker. Source: BOX NOW's widget, which marks a
-# locker available from 0.87 (its ``acceptLocker.js``).
-BOXNOW_LIMITED_AVAILABILITY_BELOW = float(
-    getenv("BOXNOW_LIMITED_AVAILABILITY_BELOW", "0.87")
-)
 # The partner list churns about 3% a day (62 rows left and 48 joined in
 # 14 hours, production 2026-11-21), so one absence withdraws nothing. A
 # locker is deactivated after this many daily syncs in a row without it:

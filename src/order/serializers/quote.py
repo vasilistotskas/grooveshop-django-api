@@ -147,15 +147,6 @@ class QuoteShippingOptionSerializer(serializers.Serializer):
             "choosing it is refused."
         ),
     )
-    compartment_size = serializers.IntegerField(
-        allow_null=True,
-        help_text=_(
-            "The locker compartment size the cart packs into (1 small, 2 "
-            "medium, 3 large) on a BOX NOW pickup option; null elsewhere "
-            "and when the cart fits none. Pass it as ``compartmentSize`` "
-            "to list the lockers that take this cart."
-        ),
-    )
 
 
 class QuotePayWayOptionSerializer(serializers.Serializer):

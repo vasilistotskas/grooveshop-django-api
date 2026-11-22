@@ -35,7 +35,6 @@ from shipping_acs import config as acs_config
 from shipping_acs.factories import AcsStationFactory
 from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.factories import BoxNowLockerFactory
-from shipping_boxnow.models import BoxNowLocker
 from tests.integration.order.test_checkout_quote import _checkout
 from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.redis import private_cache, stopped_default_cache
@@ -553,27 +552,23 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         )
         resync.assert_not_called()
 
-    def test_is_found_by_a_resync_but_refused_until_its_sizes_are_known(
+    def test_is_found_by_a_resync_and_ordered_at_its_address(
         self, locker_checkout, resync
     ):
-        """The resync brings the locker's address, not its compartment
-        sizes (BOX NOW's public catalogue holds those, hourly): until
-        then it lists no size and takes no order."""
         resync.return_value.append(
             _destination("77", locker_checkout.country.alpha_2)
         )
 
         response = _post_locker_order(locker_checkout, boxnow_locker_id="77")
 
-        assert response.status_code == 400, response.content
-        assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
-            "pickup_point_too_small"
-        )
+        assert response.status_code == 201, response.content
         resync.assert_called_once()
-        assert (
-            BoxNowLocker.objects.get(external_id="77").compartment_sizes == []
+        order = Order.objects.get()
+        assert (order.street, order.street_number, order.city) == (
+            "Ermou",
+            "40",
+            "Athens",
         )
-        assert not Order.objects.exists()
 
     def test_is_refused_when_the_resync_does_not_hold_it_either(
         self, locker_checkout, resync

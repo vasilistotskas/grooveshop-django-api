@@ -8,7 +8,7 @@ by exact membership of the parcel's size in ``sizes``
 the rule: they are the widget's internals, so the file is validated
 strictly (:data:`CATALOGUE_SCHEMA`), and anything else keeps what the
 lockers hold and logs an ERROR. A locker the catalogue lacks stays
-unknown, never fitting.
+unknown (empty sizes).
 """
 
 from __future__ import annotations

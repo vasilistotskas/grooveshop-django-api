@@ -348,19 +348,11 @@ and says which file holds each § number used here.
   active lockers: **a locker lists a size by exact membership**, as the
   widget's `acceptLocker.js` does (a bigger compartment is not assumed to
   take a smaller parcel), and one the catalogue lacks is **unknown**: empty
-  sizes, never fitting, its ids logged at WARNING. `limitedAvailability`
-  is `probability < BOXNOW_LIMITED_AVAILABILITY_BELOW` (0.87, the widget's
-  threshold), false when unknown. After the migration the sizes are empty
-  until the first catalogue sync: run `sync_boxnow_locker_catalogue` once
-  right after the deploy, before the storefront release.
-  `GET /shipping/boxnow/lockers` takes `compartmentSize` (1 to 3) and
-  returns `compartmentSizes` and `limitedAvailability` per locker;
-  `POST /cart/quote` names the cart's `compartmentSize` on a BOX NOW pickup
-  option (null elsewhere). **Order creation refuses a locker that does not
-  list the cart's size** (or whose sizes are unknown) with 400
-  `pickup_point_too_small` on `boxnowLockerId`
-  (`ShippingCarrierInterface.assert_pickup_point_fits`, run in the locked
-  quote).
+  sizes, its ids logged at WARNING. Nothing reads the sizes yet: no API
+  field, filter or order check uses them. They are stored first so the
+  release that does can be checked against production's real sizes (how
+  many lockers the catalogue lacks shows in that WARNING) before it turns
+  a refusal on.
 - **A locker is withdrawn after N daily syncs without it**, not at the
   first absence: the partner list churns about 3% a day (62 rows left and
   48 joined in 14 hours, production 2026-11-21).

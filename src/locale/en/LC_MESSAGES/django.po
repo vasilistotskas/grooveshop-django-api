@@ -9707,9 +9707,6 @@ msgstr "Only for goods that are fit to sell again. Recorded on the stock log wit
 msgid "Only images of this store can be imported, not other sites."
 msgstr "Only images of this store can be imported, not other sites."
 
-msgid "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches."
-msgstr "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches."
-
 msgid "Only one active newsletter topic can be the default."
 msgstr "Only one active newsletter topic can be the default."
 
@@ -14748,9 +14745,6 @@ msgstr "The code has reached its usage limit"
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 
-msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
-msgstr "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
-
 msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 msgstr "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 
@@ -14962,9 +14956,6 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 
 msgid "The link search is not valid."
 msgstr "The link search is not valid."
-
-msgid "The locker compartment size the cart packs into (1 small, 2 medium, 3 large) on a BOX NOW pickup option; null elsewhere and when the cart fits none. Pass it as ``compartmentSize`` to list the lockers that take this cart."
-msgstr "The locker compartment size the cart packs into (1 small, 2 medium, 3 large) on a BOX NOW pickup option; null elsewhere and when the cart fits none. Pass it as ``compartmentSize`` to list the lockers that take this cart."
 
 msgid "The locker's BOX NOW id, exactly."
 msgstr "The locker's BOX NOW id, exactly."
@@ -15549,9 +15540,6 @@ msgstr "This link is no longer valid: it was already used, it expired, or it is 
 msgid "This list does not take that filter."
 msgstr "This list does not take that filter."
 
-msgid "This locker has no compartment for your order's size. Choose another one."
-msgstr "This locker has no compartment for your order's size. Choose another one."
-
 msgid "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
 msgstr "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
 
@@ -16025,9 +16013,6 @@ msgstr "True if reservation was converted to actual stock decrement"
 
 msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr "True if the customer has been emailed about this abandoned reservation"
-
-msgid "True when BOX NOW rates the chance of a free compartment below BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
-msgstr "True when BOX NOW rates the chance of a free compartment below BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
 
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."

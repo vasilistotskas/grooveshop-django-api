@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface
 from core.cache.surfaces import (
+    ACCOUNT_BOOKKEEPING_FIELDS,
     SALE_UPDATE_FIELDS,
     nuxt_functions,
     nuxt_handlers,
@@ -91,13 +92,17 @@ SURFACES = (
             # is pending, so it costs one batched purge, no more.
             "product.ProductReview",
             "product.ProductReviewTranslation",
+            # A reviewer's public identity: name and avatar with its size
+            # (``UserPublicSerializer``).
+            "user.UserAccount",
         ),
         # Each order's stock decrement; the product pages show stock,
         # but checkout re-validates it and the page TTL bounds it. A
         # sale that sells the product out is not ignored
         # (``product.availability``): the listing puts sold-out
         # products last and the builder's lists read this surface's data.
-        ignored_update_fields=SALE_UPDATE_FIELDS,
+        # A reviewer's sign-in or loyalty update changes no public identity.
+        ignored_update_fields=SALE_UPDATE_FIELDS | ACCOUNT_BOOKKEEPING_FIELDS,
         icon="inventory_2",
         group="catalog",
     ),

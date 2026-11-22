@@ -97,6 +97,7 @@ def test_index_settings_reach_only_the_active_stores(stores):
 #: catalogue and its static images, nothing on the store's behalf.
 INCLUDE_SUSPENDED_STORES = {
     "backfill_extra_settings_defaults": True,
+    "backfill_image_dimensions": True,
     "backfill_line_snapshots": True,
     "backfill_recommendation_slots": True,
     "backfill_turnover_snapshots": True,

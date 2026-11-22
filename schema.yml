@@ -37008,6 +37008,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -37023,7 +37031,9 @@ components:
       - hasChildren
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - slug
       - sortOrder
@@ -37086,6 +37096,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -37134,7 +37152,9 @@ components:
       - hasChildren
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - recursivePostCount
       - siblingsCount
@@ -37599,6 +37619,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37613,7 +37641,9 @@ components:
       - createdAt
       - id
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -37725,6 +37755,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37748,7 +37786,9 @@ components:
       - id
       - likes
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -48147,6 +48187,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -48208,7 +48256,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -48489,6 +48539,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         reviewAverage:
           type: number
           format: double
@@ -48522,7 +48580,9 @@ components:
       - finalPrice
       - id
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - potentialPoints
       - priorPrice
       - reviewAverage
@@ -49135,6 +49195,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49204,7 +49272,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49397,6 +49467,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49466,7 +49544,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49785,6 +49865,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49852,7 +49940,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49922,6 +50012,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -49932,7 +50030,9 @@ components:
       - createdAt
       - id
       - image
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -49988,21 +50088,19 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
           readOnly: true
           title: Δημιουργήθηκε στις
-        imageDimensions:
-          type: object
-          properties:
-            width:
-              type: number
-            height:
-              type: number
-            aspectRatio:
-              type: number
-          readOnly: true
         imageFormat:
           type: string
           readOnly: true
@@ -50028,9 +50126,10 @@ components:
       - createdAt
       - id
       - image
-      - imageDimensions
       - imageFormat
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -50653,6 +50752,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -50727,7 +50834,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -55408,11 +55517,21 @@ components:
           type: string
           description: Διαδρομή avatar ή κενή συμβολοσειρά
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
       required:
       - firstName
       - id
       - lastName
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - username
     UserSubscription:
       type: object

@@ -23,6 +23,15 @@ SITEMAP_SEO_SURFACE = "sitemap_seo"
 #: product that sells out or comes back (``product.availability``).
 SALE_UPDATE_FIELDS = frozenset({"stock", "updated_at"})
 
+#: The fields an account's bookkeeping saves: a sign-in's ``last_login``, the
+#: locale sync (``user.adapter``), loyalty XP and tier (``loyalty.services``).
+#: None is part of the public identity the blog and the product reviews show
+#: (``user.serializers.account.UserPublicSerializer``: name, username, avatar
+#: and its size), so the surfaces that render it ignore a save of these alone.
+ACCOUNT_BOOKKEEPING_FIELDS = frozenset(
+    {"last_login", "language_code", "total_xp", "loyalty_tier"}
+)
+
 
 def nuxt_handlers(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.

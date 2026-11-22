@@ -9,6 +9,8 @@ from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
+from core.api.image_field import MainImageSizeMixin
+
 if TYPE_CHECKING:
     from user.models.account import UserAccount as User
 else:
@@ -277,7 +279,7 @@ class UserDetailsSerializer(UserSerializer):
 # This exposes only what a byline needs. The storefront reads exactly
 # `id`, `username`, `firstName` and `lastName` on these surfaces, so
 # nothing here is a display regression.
-class UserPublicSerializer(serializers.ModelSerializer):
+class UserPublicSerializer(MainImageSizeMixin, serializers.ModelSerializer):
     """The author identity shown to anyone, including anonymous callers."""
 
     main_image_path = serializers.SerializerMethodField()
@@ -296,6 +298,8 @@ class UserPublicSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
         )
         read_only_fields = fields
 

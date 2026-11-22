@@ -7,6 +7,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
 from blog.models.category import BlogCategory
+from core.api.image_field import MainImageSizeMixin
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 
@@ -17,7 +18,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 
 class BlogCategorySerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[BlogCategory]
+    MainImageSizeMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[BlogCategory],
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=BlogCategory)
     post_count = serializers.SerializerMethodField()
@@ -55,6 +58,8 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "created_at",
             "updated_at",
         )
@@ -65,6 +70,8 @@ class BlogCategorySerializer(
             "post_count",
             "has_children",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "created_at",
             "updated_at",
         )

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('blog', '0044_web_url_fields'),
+        ('blog', '0045_image_dimensions'),
     ]
 
     operations = [

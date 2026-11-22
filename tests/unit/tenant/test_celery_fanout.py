@@ -414,6 +414,10 @@ class TestBeatScheduleTenantCoverage:
         # committed) live in public whatever the store; each row carries
         # its own schema header.
         "tenant.tasks.redispatch_deferred_tasks",
+        # BOX NOW's public locker catalogue is one file for every store:
+        # fetched once in public, then handed to each store's own task
+        # (``apply_boxnow_locker_catalogue``) through ``run_for_all_tenants``.
+        "shipping_boxnow.tasks.sync_boxnow_locker_catalogue",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):

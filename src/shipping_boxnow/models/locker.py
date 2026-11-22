@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -5,6 +6,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
+from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.enum.locker_type import BoxNowLockerType
 
 
@@ -16,7 +18,7 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
     Rows are upserted by the ``sync_boxnow_lockers`` Celery task.
     ``external_id`` is BoxNow's own opaque APM ID (returned as a
     string by their API).  ``is_active`` is set to ``False`` for
-    any locker absent from the most recent sync response.
+    any locker the partner stopped returning (see ``sync_lockers``).
     """
 
     id = models.BigAutoField(primary_key=True)
@@ -79,6 +81,38 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
         null=True,
         blank=True,
         help_text=_("Timestamp of the most recent sync from BoxNow API"),
+    )
+
+    compartment_sizes = ArrayField(
+        models.PositiveSmallIntegerField(choices=BoxNowCompartmentSize.choices),
+        verbose_name=_("Compartment sizes"),
+        blank=True,
+        default=list,
+        db_default=[],
+        help_text=_(
+            "The compartment sizes the locker has, from BOX NOW's public "
+            "locker catalogue. Empty means not known: never that it takes "
+            "every size."
+        ),
+    )
+    availability_probability = models.FloatField(
+        _("Availability probability"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "BOX NOW's chance, from 0 to 1, that the locker has a free "
+            "compartment. Empty means not known."
+        ),
+    )
+    consecutive_absent_syncs = models.PositiveSmallIntegerField(
+        _("Consecutive absent syncs"),
+        default=0,
+        db_default=0,
+        help_text=_(
+            "Partner syncs in a row that did not return the locker. It is "
+            "withdrawn when this reaches the setting "
+            "BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+        ),
     )
 
     class Meta(TypedModelMeta):

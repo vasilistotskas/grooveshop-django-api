@@ -62,7 +62,10 @@ def test_replacing_most_of_the_catalogue_warns_about_the_account(caplog):
         BoxNowLockerFactory(external_id=external_id, is_active=True)
 
     with caplog.at_level(logging.WARNING, logger="shipping_boxnow.services"):
-        _run_sync([_destination("9001")], partner_id="10391")
+        _run_sync(
+            [_destination(i) for i in ("9001", "9002", "9003", "9004")],
+            partner_id="10391",
+        )
 
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert warnings, "a wholesale catalogue swap must warn"

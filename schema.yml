@@ -30207,6 +30207,43 @@ paths:
                 items:
                   $ref: '#/components/schemas/ShippingPolicyEntry'
           description: ''
+  /api/v1/shipping/product/{product_id}:
+    get:
+      operationId: getProductShipping
+      description: 'The cheapest delivery checkout would charge a cart holding this
+        product alone, to the store''s first shipping country: after the free-shipping
+        threshold and the automatic promotions such a cart gets, leaving out every
+        delivery that cannot carry the product (weight cap, parcel size). ``estimate``
+        is null when the store ships nowhere or no delivery can take the product.
+        Returns 404 when the product does not exist or is not active.'
+      summary: What shipping one product costs
+      parameters:
+      - in: path
+        name: productId
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Shipping
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductShipping'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/shipping/providers:
     get:
       operationId: api_v1_shipping_providers_list
@@ -36971,6 +37008,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         icon:
           type: string
           readOnly: true
@@ -36993,7 +37038,9 @@ components:
       - icon
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - slug
       - sortOrder
@@ -37056,6 +37103,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         icon:
           type: string
           readOnly: true
@@ -37111,7 +37166,9 @@ components:
       - icon
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - recursivePostCount
       - siblingsCount
@@ -37582,6 +37639,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37596,7 +37661,9 @@ components:
       - createdAt
       - id
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -37708,6 +37775,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37731,7 +37806,9 @@ components:
       - id
       - likes
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -48136,6 +48213,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -48197,7 +48282,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -48478,6 +48565,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         reviewAverage:
           type: number
           format: double
@@ -48511,7 +48606,9 @@ components:
       - finalPrice
       - id
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - potentialPoints
       - priorPrice
       - reviewAverage
@@ -49124,6 +49221,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49193,7 +49298,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49386,6 +49493,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49455,7 +49570,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49774,6 +49891,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49841,7 +49966,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49911,6 +50038,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -49921,7 +50056,9 @@ components:
       - createdAt
       - id
       - image
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -49977,21 +50114,19 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
           readOnly: true
           title: Δημιουργήθηκε στις
-        imageDimensions:
-          type: object
-          properties:
-            width:
-              type: number
-            height:
-              type: number
-            aspectRatio:
-              type: number
-          readOnly: true
         imageFormat:
           type: string
           readOnly: true
@@ -50017,9 +50152,10 @@ components:
       - createdAt
       - id
       - image
-      - imageDimensions
       - imageFormat
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -50642,6 +50778,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -50716,7 +50860,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -50918,6 +51064,62 @@ components:
       - product
       - rate
       - translations
+    ProductShipping:
+      type: object
+      description: Response payload of the product shipping endpoint.
+      properties:
+        estimate:
+          allOf:
+          - $ref: '#/components/schemas/ProductShippingEstimate'
+          nullable: true
+          description: Null όταν το κατάστημα δεν αποστέλλει πουθενά ή όταν καμία
+            αποστολή που προσφέρει δεν μπορεί να πάρει αυτό το προϊόν.
+      required:
+      - estimate
+    ProductShippingEstimate:
+      type: object
+      description: The cheapest delivery of one product bought on its own.
+      properties:
+        countryCode:
+          type: string
+          description: 'Η χώρα για την οποία υπολογίστηκε η τιμή: η πρώτη χώρα αποστολής
+            του καταστήματος, αυτή που προεπιλέγει η ολοκλήρωση αγοράς.'
+          maxLength: 2
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Η φθηνότερη αποστολή που θα χρέωνε η ολοκλήρωση αγοράς σε ένα
+            καλάθι μόνο με αυτό το προϊόν, μετά το όριο δωρεάν αποστολής και τις προωθήσεις
+            δωρεάν αποστολής.
+        currency:
+          type: string
+          description: Νόμισμα των ``price`` και ``free_shipping_threshold``.
+          maxLength: 3
+        free:
+          type: boolean
+          description: 'Το προϊόν αποστέλλεται δωρεάν και μόνο του: το ``price`` είναι
+            0.'
+        freeShippingThreshold:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Το χαμηλότερο υποσύνολο προϊόντων, μετά τις εκπτώσεις, από
+            το οποίο μια μεταφορική που μπορεί να πάρει αυτό το προϊόν το αποστέλλει
+            δωρεάν. Null όταν καμία δεν το κάνει ποτέ.
+      required:
+      - countryCode
+      - currency
+      - free
+      - freeShippingThreshold
+      - price
     ProductVariant:
       type: object
       description: |-
@@ -55341,11 +55543,21 @@ components:
           type: string
           description: Διαδρομή avatar ή κενή συμβολοσειρά
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
       required:
       - firstName
       - id
       - lastName
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - username
     UserSubscription:
       type: object

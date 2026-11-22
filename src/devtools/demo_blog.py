@@ -1587,10 +1587,16 @@ def _seed_authors(
         user = users[row.email]
         # The avatar is a photograph the store already carries. ``update()``
         # leaves the account's other signals alone: it is a fixture's
-        # picture, not a profile edit.
+        # picture, not a profile edit. Assigning it first measures it
+        # (``ImageAndSvgField``), which ``update()`` alone would not.
         avatar = ensure_asset(row.avatar)
         if user.image.name != avatar:
-            type(user).objects.filter(pk=user.pk).update(image=avatar)
+            user.image = avatar
+            type(user).objects.filter(pk=user.pk).update(
+                image=avatar,
+                image_width=user.image_width,
+                image_height=user.image_height,
+            )
             report["avatars_set"] = report.get("avatars_set", 0) + 1
         author, created = BlogAuthor.objects.get_or_create(user=user)
         # Rich text, as the admin's editor stores it: one <p> each.

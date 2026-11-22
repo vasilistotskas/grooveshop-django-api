@@ -7,6 +7,10 @@ from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface
 from core.cache.surfaces import nuxt_functions, nuxt_handlers, nuxt_routes
+from shipping.cache_surfaces import (
+    PRODUCT_SHIPPING_HANDLER,
+    PRODUCT_SHIPPING_VIEW,
+)
 
 SURFACES = (
     CacheSurface(
@@ -20,10 +24,11 @@ SURFACES = (
             " its codes, its scope or its schedule."
         ),
         # Both promotion views are plain APIViews with no
-        # ``@cache_methods`` decorator, so there is no Django-side
-        # response cache to purge — only the Nuxt handlers and the
-        # rendered pages.
-        django_patterns=(),
+        # ``@cache_methods`` decorator. The one Django response cache
+        # here is the product page's shipping price, which a
+        # free-shipping promotion (or a discount moving the product
+        # past a threshold) changes.
+        django_patterns=(PRODUCT_SHIPPING_VIEW,),
         # ``/products`` is here, not only in the ``products``
         # surface: the product page now RENDERS the offers that
         # apply to it, so a promotion edit that changes which
@@ -32,7 +37,9 @@ SURFACES = (
         # rarely; a stale offer panel would survive the whole
         # SWR window.
         nuxt_patterns=nuxt_handlers(
-            "PublicPromotionList", "ProductPromotionList"
+            "PublicPromotionList",
+            "ProductPromotionList",
+            PRODUCT_SHIPPING_HANDLER,
         )
         + nuxt_functions("builderDataPromotion", "builderDataProduct")
         + nuxt_routes("/offers", "/products"),

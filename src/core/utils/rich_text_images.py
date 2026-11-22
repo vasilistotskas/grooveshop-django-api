@@ -26,15 +26,10 @@ from urllib.parse import unquote, urlsplit
 from django.conf import settings
 from django.core.exceptions import SuspiciousFileOperation
 from django.db import connection
-from PIL import Image, UnidentifiedImageError
 
+from core.utils.image_size import displayed_dimensions
 from core.utils.sanitize import NATURAL_HEIGHT_ATTR, NATURAL_WIDTH_ATTR
 from tenant.storage import TenantFileSystemStorage
-
-# EXIF orientations that turn the picture a quarter turn: a browser
-# shows such a file with its width and height swapped.
-_EXIF_ORIENTATION_TAG = 0x0112
-_QUARTER_TURNS = frozenset({5, 6, 7, 8})
 
 
 class _ImgTags(HTMLParser):
@@ -66,15 +61,6 @@ def _media_name(src: str) -> str | None:
     return path[len(prefix) :]
 
 
-def displayed_size(image: Image.Image) -> tuple[int, int]:
-    """The size a browser shows an opened image at: its stored size, with
-    width and height swapped when its EXIF orientation is a quarter turn."""
-    width, height = image.size
-    if image.getexif().get(_EXIF_ORIENTATION_TAG) in _QUARTER_TURNS:
-        width, height = height, width
-    return width, height
-
-
 def natural_size(
     src: str, storage: TenantFileSystemStorage
 ) -> tuple[int, int] | None:
@@ -83,17 +69,11 @@ def natural_size(
     if name is None:
         return None
     try:
-        with storage.open(name) as stored, Image.open(stored) as image:
-            return displayed_size(image)
-    except (
-        OSError,
-        ValueError,
-        SuspiciousFileOperation,
-        UnidentifiedImageError,
-        Image.DecompressionBombError,
-    ):
-        # Missing, not an image (an SVG, a truncated upload) or outside
-        # the store's directory: no size to record.
+        with storage.open(name) as stored:
+            return displayed_dimensions(stored)
+    except OSError, ValueError, SuspiciousFileOperation:
+        # Missing, unreadable, outside the store's directory, or a name
+        # storage refuses (a NUL byte from ``%00``): no size to record.
         return None
 
 

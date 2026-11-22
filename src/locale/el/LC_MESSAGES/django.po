@@ -2052,6 +2052,9 @@ msgstr "Οι αυτόματες προσφορές εφαρμόζονται σε
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Αυτόματες προσφορές στις οποίες λείπει ακριβώς μία ελάχιστη προϋπόθεση (ποσό, τεμάχια ή προϊόν-ανταμοιβή) — 'πρόσθεσε X ακόμα για να την ξεκλειδώσεις'"
 
+msgid "Availability probability"
+msgstr "Πιθανότητα διαθεσιμότητας"
+
 msgid "Available Locales"
 msgstr "Διαθέσιμες Γλώσσες"
 
@@ -2096,6 +2099,9 @@ msgstr "Μεταφορέας BOX NOW"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "Δέμα BOX NOW στο locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "Η εκτίμηση της BOX NOW, από 0 έως 1, ότι το locker έχει ελεύθερη θυρίδα. Κενό σημαίνει άγνωστη."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "Οι προσφορές BXGY απαιτούν τόσο ποσότητα αγοράς όσο και ποσότητα λήψης."
@@ -3470,6 +3476,9 @@ msgstr "Σύγκριση με"
 msgid "Compartment Size"
 msgstr "Μέγεθος θυρίδας"
 
+msgid "Compartment sizes"
+msgstr "Μεγέθη θυρίδων"
+
 msgid "Complete"
 msgstr "Πλήρες"
 
@@ -3569,6 +3578,9 @@ msgstr "Επιβεβαιώθηκε χειροκίνητα"
 
 msgid "Connection or timeout"
 msgstr "Σύνδεση ή χρονικό όριο"
+
+msgid "Consecutive absent syncs"
+msgstr "Συνεχόμενοι συγχρονισμοί χωρίς το locker"
 
 msgid "Consent"
 msgstr "Συγκατάθεση"
@@ -9536,6 +9548,9 @@ msgstr "Ειδοποιήθηκε στις"
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null μέχρι να υποβληθεί το μήνυμα επικοινωνίας που δεσμεύει αυτό το ανεβασμένο αρχείο."
 
+msgid "Null when the store ships nowhere, or no delivery it offers can take this product."
+msgstr "Null όταν το κατάστημα δεν αποστέλλει πουθενά ή όταν καμία αποστολή που προσφέρει δεν μπορεί να πάρει αυτό το προϊόν."
+
 msgid "Number"
 msgstr "Αριθμός"
 
@@ -10483,6 +10498,9 @@ msgstr "Συνεργαζόμενο κατάστημα (2)"
 
 msgid "Partner shop (3)"
 msgstr "Συνεργαζόμενο κατάστημα (3)"
+
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Συνεχόμενοι συγχρονισμοί με τον συνεργάτη που δεν επέστρεψαν το locker. Αποσύρεται όταν φτάσει τη ρύθμιση BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
 
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Ο κωδικός πρόσβασης έγινε δεκτός. Επιβεβαιώστε ότι είστε εσείς με έναν κωδικό."
@@ -14725,6 +14743,9 @@ msgstr "Οι αλλαγές που είχαν προγραμματιστεί γ�
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
 
+msgid "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+msgstr "Η φθηνότερη αποστολή που θα χρέωνε η ολοκλήρωση αγοράς σε ένα καλάθι μόνο με αυτό το προϊόν, μετά το όριο δωρεάν αποστολής και τις προωθήσεις δωρεάν αποστολής."
+
 msgid "The closed gate's label, for a skipped feature."
 msgstr "Η ετικέτα της κλειστής πύλης, για παραλειφθείσα λειτουργία."
 
@@ -14741,11 +14762,17 @@ msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης το�
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
 
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker, από τον δημόσιο κατάλογο lockers της BOX NOW. Κενό σημαίνει άγνωστα: ποτέ ότι δέχεται κάθε μέγεθος."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."
 
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "Το κόστος χωρίς ΦΠΑ: αυτό χρησιμοποιεί η αναφορά κέρδους."
+
+msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
+msgstr "Η χώρα για την οποία υπολογίστηκε η τιμή: η πρώτη χώρα αποστολής του καταστήματος, αυτή που προεπιλέγει η ολοκλήρωση αγοράς."
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
@@ -14953,6 +14980,9 @@ msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη.
 msgid "The locker's BOX NOW id, exactly."
 msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
 
+msgid "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+msgstr "Το χαμηλότερο υποσύνολο προϊόντων, μετά τις εκπτώσεις, από το οποίο μια μεταφορική που μπορεί να πάρει αυτό το προϊόν το αποστέλλει δωρεάν. Null όταν καμία δεν το κάνει ποτέ."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει."
 
@@ -15079,6 +15109,9 @@ msgstr "Η προηγούμενη πληρωμή δεν μπόρεσε να κλ
 
 msgid "The previous payment is still in progress."
 msgstr "Η προηγούμενη πληρωμή βρίσκεται ακόμη σε εξέλιξη."
+
+msgid "The product ships free on its own: ``price`` is 0."
+msgstr "Το προϊόν αποστέλλεται δωρεάν και μόνο του: το ``price`` είναι 0."
 
 msgid "The product the shopper is looking at."
 msgstr "Το προϊόν που βλέπει ο αγοραστής."

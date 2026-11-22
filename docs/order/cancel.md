@@ -189,8 +189,9 @@ locks stock.
   - Stripe PaymentIntent (the order-first `create_payment_intent` /
     `retry-payment` flow): a PaymentIntent has no expiry, so the sweep cancels
     it (`StripePaymentProvider.close_payment`, reason `abandoned`) before it
-    releases the stock. An intent Stripe will not cancel (processing,
-    succeeded) leaves the order open for its webhook; the sweep reports
+    releases the stock. A succeeded intent is settled first (the sweep reads it
+    before it cancels anything); one Stripe will not cancel (processing)
+    leaves the order open for its webhook, and the sweep reports
     `skipped_open`. A retry closes the intent it replaces the same way before
     it opens the new one (`PayWayService.process_payment`): otherwise the old
     intent's client secret could still be confirmed after the sweep released
@@ -226,8 +227,26 @@ locks stock.
   whose payment FAILED is swept too, `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`
   (default 30) after the failure: a failed attempt does not end the payment,
   the shopper may confirm the same PaymentIntent with another card or retry the
-  same Viva payment order. Both buckets ask the provider to close the payment
-  first (`close_payment(order)`): Stripe cancels the PaymentIntent and the
+  same Viva payment order. Both buckets first read the provider for a payment
+  it took whose webhook never landed (`order.payments.settlement`), and settle
+  one through the code that webhook runs: Viva's charges listed on the order's
+  payment orders (`GET /api/transactions/?ordercode=`) as Transaction Payment
+  Created events (`viva_settlement.apply_event`), a succeeded Stripe intent
+  through `handle_payment_succeeded` and a paid Checkout Session through the
+  `checkout.session.completed` code (`stripe_settlement`). An intent that did
+  not succeed still has the recorded session read: opening a hosted link
+  cancels the open intent and leaves its `payment_id`. The order is then
+  paid, never canceled unpaid, the webhook that arrives later is a no-op, and
+  the sweep reports it as `settled`. Money the provider took that settles
+  nothing (a Viva payment refunded or disputed before its webhook, one the
+  checks refuse without a flag) flags the order once for the store's review
+  (`flag_payment_mismatch`), also reported `settled`: a read-back settles,
+  flags, or finds nothing taken, and never leaves an order for every run to
+  repeat. Only a Stripe payment still in flight waits for its webhook
+  (`skipped_open`). A provider that cannot be read leaves the order for the
+  next run (`skipped_open`): a payment may have landed. Only then
+  is the provider asked to close the payment (`close_payment(order)`): Stripe
+  cancels the PaymentIntent and the
   order is canceled at once, whatever its hold says. A provider with nothing to
   cancel (Viva, whose payment order stays payable after a failed transaction
   until its own expiry; a hosted Stripe Checkout Session, which records no
@@ -235,8 +254,11 @@ locks stock.
   (`payment_hold_expires_at`, plus the grace window) has ended and not before.
   A provider that cannot be built (its credentials were removed) cannot close
   anything and takes the same wait. A payment that is not closed (that wait, or
-  a Stripe intent that succeeded or is processing) leaves the order open for
-  its webhook and counts `skipped_open`.
+  a Stripe intent that is processing) leaves the order open for its webhook and
+  counts `skipped_open`. The cancel itself is decided on the payment the order
+  recorded before the provider was read (`OpenPayment`): under the row lock it
+  is refused when another link or intent was recorded meanwhile, and the next
+  run reads that one.
 - **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's
@@ -295,7 +317,7 @@ locks stock.
   `paymentDecidedBy` as the checkout's `expires_at`, so a platform polls until
   Django has decided the order and keeps no window of its own.
 - **A payment that still arrives after the cancel** is not lost: Viva
-  `_handle_payment_created` and Stripe `handle_payment_succeeded` /
+  `viva_settlement.handle_payment_created` and Stripe `handle_payment_succeeded` /
   `checkout.session.completed` route it to
   `OrderService.record_payment_after_cancel` ([§2.2](state-machines.md)): the
   money is booked, the order stays CANCELED, ops is alerted and the order

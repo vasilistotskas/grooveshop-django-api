@@ -93,3 +93,36 @@ def test_refund_owed_lists_cancelled_orders_still_paid(client):
     )
 
     assert _listed(client, "refund_owed=yes") == {owed.pk, partly_returned.pk}
+
+
+def test_payment_review_lists_flagged_orders_the_store_has_not_decided(
+    client,
+):
+    """A charge that did not match its order, refunded in part or not at
+    all, while the order is still PENDING: staff decide it from here."""
+    from order.models.order import AMOUNT_MISMATCH_FLAG
+
+    def flagged(**fields):
+        return OrderFactory(
+            num_order_items=0, metadata={AMOUNT_MISMATCH_FLAG: True}, **fields
+        )
+
+    waiting = flagged(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
+    partly_refunded = flagged(
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PARTIALLY_REFUNDED,
+    )
+    flagged(status=OrderStatus.PENDING, payment_status=PaymentStatus.COMPLETED)
+    flagged(status=OrderStatus.CANCELED, payment_status=PaymentStatus.REFUNDED)
+    OrderFactory(
+        num_order_items=0,
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+    )
+
+    assert _listed(client, "payment_review=yes") == {
+        waiting.pk,
+        partly_refunded.pk,
+    }

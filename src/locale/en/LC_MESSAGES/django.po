@@ -790,6 +790,9 @@ msgstr "A breakdown shows sales before returns, biggest first. For a product or 
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 
+msgid "A charge that does not match its order: decide it"
+msgstr "A charge that does not match its order: decide it"
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
@@ -3130,6 +3133,9 @@ msgstr "Charge a Stripe SharedPaymentToken granted by an AI agent platform (ACP/
 
 msgid "Charge type"
 msgstr "Charge type"
+
+msgid "Charge waiting for a decision"
+msgstr "Charge waiting for a decision"
 
 msgid "Chargeback"
 msgstr "Chargeback"
@@ -10745,6 +10751,9 @@ msgstr "Payment received for canceled order #%(order_id)s"
 msgid "Payment reference"
 msgstr "Payment reference"
 
+msgid "Payment review"
+msgstr "Payment review"
+
 msgid "Payment status"
 msgstr "Payment status"
 
@@ -10765,6 +10774,9 @@ msgstr "Payment-method list and detail responses, plus the checkout sidebar that
 
 msgid "Payments"
 msgstr "Payments"
+
+msgid "Payments to review"
+msgstr "Payments to review"
 
 msgid "Payout marked as reconciled."
 msgstr "Payout marked as reconciled."

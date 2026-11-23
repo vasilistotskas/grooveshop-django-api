@@ -765,11 +765,11 @@ class AcsShipmentAdmin(BaseModelAdmin):
         ),
     )
     def repoll_tracking(
-        self, request: HttpRequest, form, object_id, **kwargs
+        self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
         from shipping_acs.tasks import poll_acs_tracking_one
 
-        poll_acs_tracking_one.delay(int(object_id))
+        poll_acs_tracking_one.delay(AcsShipment.objects.get(pk=object_id).pk)
         messages.info(request, _("Tracking poll dispatched."))
         return _back_to_changelist(self)
 

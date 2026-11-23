@@ -3,6 +3,144 @@
 
 
 
+## v3.266.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): a retried payment keeps the status its provider reported, and a canceled order is never confirmed
+
+- retry_payment no longer resets the order to PENDING over what the
+  payment service recorded under its own lock: a retried payment that
+  is processing stays PROCESSING, and one taken at once stays COMPLETED
+  and confirms the order. The history row records the saved status.
+- OrderLifecycleService.confirm never claims a canceled order; an agent
+  delegated charge that lands on an order canceled meanwhile is booked
+  as a payment after the cancel instead of marking it paid.
+- Migration 0115 carries its backfill rule itself; the command
+  documents when to run it. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): a payment taken at once is confirmed in the transaction that records it paid
+
+PayWayService.process_payment takes the caller's on_paid and, when the
+provider took the payment at once, marks the order paid and calls it in
+the transaction that records the payment. The views pass
+OrderLifecycleService.confirm, so no order is ever stored paid and
+unconfirmed, and backfill_confirmed_at cannot stamp one whose
+confirmation is still to come. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): backfill_confirmed_at stamps only orders created before the rollout finished
+
+A required --created-before (an ISO time with its offset: when the
+release that confirms orders finished rolling out) limits the backfill
+to orders the previous release created; every order created since is
+confirmed by the new release, so none can be stamped before its
+confirmation runs. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): on_paid is a reserved payment_data key
+
+payment_data is splatted into PayWayService.process_payment next to the
+caller's own on_paid, so a client key of that name raised TypeError and
+answered 500 on create_payment_intent and retry-payment. It is refused
+by name with the other reserved keys.
+
+* Revert "fix(order): on_paid is a reserved payment_data key"
+
+This reverts commit ba3dfdb6cafead279056270bf77d8ba252cd4064.
+
+* Revert "fix(order): a payment taken at once is confirmed in the transaction that records it paid"
+
+This reverts commit 7c03b66a196b7ca045d2252da2d3b2ea583bf125. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): a paid order left unconfirmed is confirmed by the next sight of its payment
+
+OrderLifecycleService.confirm claims confirmed_at only for an order that
+is due (nothing left to pay online, or its online payment COMPLETED;
+confirmation.due_for_confirmation) and not canceled, and runs the claim
+and order_confirmed in one atomic block: an announcement that fails rolls
+the claim back. Every sight of a settled payment then calls confirm, also
+when it applies nothing: a repeated or stale Stripe payment_intent.succeeded
+or checkout.session.completed, a checkout session settled again, a Viva
+1796 already applied (apply_event), and a poll that finds the payment
+completed. The receivers get the order as the claim found it.
+
+retry_payment answers success with the recorded status when the new
+intent's own webhook moved it to PROCESSING or COMPLETED between the
+service recording it and the view noting the retry; any other change
+still answers 409.
+
+The webhook test that enqueues the confirmation email no longer depends
+on the random pay way OrderFactory picks. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): backfill_confirmed_at stamps only what the previous release announced
+
+The backfill now stamps an offline order placed before the rollout
+finished, and an online paid order whose payment the ledger booked before
+then: a CHARGE PaymentTransaction with created_at before
+--rollout-finished-at (it replaces --created-before; the order has no
+paid-at of its own). A card order placed during the rollout and paid after
+it is left for the new release to confirm: stamping it before its
+confirmation ran silenced its announcement and the recommendation attach
+for good. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): backfill_confirmed_at stamps an online order only when its confirmation went out
+
+An online order is stamped only when its metadata carries
+confirmation_email_sent_at. The new release sends that email only after a
+committed confirmation, so on an unconfirmed order the key is the previous
+release's announcement. A new-release charge booked before the rollout
+finished, whose confirmation failed, is no longer stamped: the next sight
+of its payment confirms it. The key moves to order.lifecycle.confirmation,
+which order.tasks imports. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* fix(order): backfill_confirmed_at stamps only orders whose confirmation went out
+
+One rule for every order: the backfill stamps an unconfirmed order only
+when its metadata carries confirmation_email_sent_at, which the previous
+release wrote when it announced an order, offline or online, and the new
+release writes only after a committed confirmation. An order without it
+is never touched, so a new-release order the backfill meets before its
+commit hook confirms it is still announced once. --rollout-finished-at and
+the offline branch are gone. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+### Chores
+
+* chore(api-contract): drop the accepted imageDimensions break, storefront v3.353.0 no longer requires it (#815)
+
+Storefront v3.353.0 parses product images without imageDimensions, so
+the four overrides for its removal from the product image responses are
+no longer needed; check-ignore.py would fail them once that release is
+live. ([`43e683a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43e683a3726e443e7e4ae9ac3f8646a1c91cbbbf))
+
+### Features
+
+* feat(order): confirm a card order when its payment settles (#816) ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
+* feat(order): confirm a card order when its payment settles
+
+- Order.confirmed_at, claimed once by OrderLifecycleService.confirm
+  (UPDATE ... WHERE confirmed_at IS NULL), which sends order_confirmed.
+  Its receiver queues the customer's confirmation email, the staff "New
+  order" email and one in-app note (payment confirmed for an order paid
+  online, order placed otherwise).
+- An order with nothing left to pay online (cash or card on delivery,
+  BOX NOW pay on the go, bank transfer, an online payment already taken)
+  is confirmed at creation. A card order is confirmed by the path that
+  settles its payment: the Stripe intent and session webhooks and polls,
+  the Viva 1796, its return page and the sweep's read-back, and a
+  payment taken at once (process_payment, the agent SPT charge). Until
+  then nobody is told; the history note, the holds, Meta's
+  InitiateCheckout and the agent outbox still follow creation.
+- A cancel of an order never confirmed is silent to the customer;
+  stock and reservations are released as for any cancel.
+- Recommendation attach is recorded at confirmation.
+- The payment-failed email and in-app note are removed with their task,
+  claim helpers, email type, templates and golden files; a failure is
+  recorded and tells no one. NotificationTypeEnum.PAYMENT_FAILED stays
+  for stored rows.
+- Migration order 0115 adds the column and stamps created_at on every
+  order that is not an online order never paid;
+  manage.py backfill_confirmed_at applies the same rule after rollout. ([`8ee3a04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ee3a045725ca8d9fb4576ca3fc479457beec146))
+
 ## v3.265.1 (2026-11-22)
 
 ### Bug fixes

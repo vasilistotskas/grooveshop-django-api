@@ -32,6 +32,7 @@ from order.models.order import Order
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 from order.payments.payment_ledger import PaymentLedger
 from order.payments.viva_settlement import handle_payment_created
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
@@ -481,7 +482,7 @@ class TestTheFlagFollowsTheLedger:
             kind=PaymentTransactionKind.CHARGE, provider_reference=of
         )
         with patch("emails.send.send_email"):
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=Money(amount, "EUR"),
@@ -514,7 +515,7 @@ class TestTheFlagFollowsTheLedger:
 
         charge = order.payment_transactions.get(provider_reference="viva_txn_b")
         with patch("emails.send.send_email"):
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order,
                 charge=charge,
                 amount=Money(OWED, "EUR"),
@@ -532,7 +533,7 @@ class TestNormalOrdersAreNeverFlagged:
         _viva(order, "viva_txn_a", "OC1")
         charge = order.payment_transactions.get()
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal(refunded), "EUR"),

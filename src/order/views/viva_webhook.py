@@ -1209,6 +1209,7 @@ def _handle_reversal_created(
         VIVA_REFUND_TRANSACTION_TYPE_IDS,
     )
     from order.payments.payment_ledger import PaymentLedger
+    from order.refunds.service import RefundService
     from order.signals import order_refunded
 
     logger.info(
@@ -1262,7 +1263,7 @@ def _handle_reversal_created(
 
     previous_payment_status = order.payment_status
     refund = Money(refunded, charge.amount.currency)
-    refund_row, created = PaymentLedger.record_refund(
+    refund_row, created = RefundService.book_refund(
         order, charge=charge, amount=refund, reference=transaction_id
     )
     if not created:

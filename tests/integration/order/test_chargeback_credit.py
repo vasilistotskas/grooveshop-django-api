@@ -47,6 +47,7 @@ from order.models import (
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from tests.integration.order.test_mydata_lifecycle import (
     _credits,
     _eur,
@@ -153,7 +154,7 @@ class TestGoodsReturnedCreditsTheReceipt:
             charge = order.payment_transactions.get(
                 kind=PaymentTransactionKind.CHARGE
             )
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("40.00"), reference="re_1"
             )
             create_pending_credits(order.id)
@@ -175,7 +176,7 @@ class TestGoodsReturnedCreditsTheReceipt:
             charge = order.payment_transactions.get(
                 kind=PaymentTransactionKind.CHARGE
             )
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("100.00"), reference="re_1"
             )
             create_pending_credits(order.id)

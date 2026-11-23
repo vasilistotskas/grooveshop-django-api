@@ -1,9 +1,10 @@
 """``POST /api/v1/order/{id}/retry-payment`` (``OrderViewSet.retry_payment``,
 ``src/order/views/order.py``).
 
-The view mints a fresh PaymentIntent for an unpaid order, swaps the new
-intent id onto the order, resets ``payment_status`` to PENDING, re-arms
-the confirmation / failure email flags and returns the client secret.
+The view mints a fresh PaymentIntent for an unpaid order, which the
+service records with the status the provider reported (PENDING, or
+PROCESSING, or COMPLETED for a payment taken at once, which confirms the
+order), notes the retry and returns the client secret.
 Only the PSP is mocked: ``PayWayService.get_provider_for_pay_way`` hands
 back a stand-in provider, so ``PayWayService.process_payment`` and the
 view's own bookkeeping run for real.
@@ -119,6 +120,45 @@ class TestRetryPaymentSuccess:
         [retry] = order.metadata["payment_retries"]
         assert retry["previous_payment_id"] == "pi_old_failed"
         assert retry["new_payment_id"] == "pi_new_retry"
+
+    @pytest.mark.parametrize(
+        "status", [PaymentStatus.PROCESSING, PaymentStatus.COMPLETED]
+    )
+    def test_keeps_the_status_the_new_payment_has(
+        self, status, django_capture_on_commit_callbacks
+    ):
+        """The retried payment can be processing, or taken at once: the
+        order keeps the status the provider reported, never reset to
+        PENDING, and a payment taken at once confirms the order."""
+        user = UserAccountFactory()
+        order = _stripe_order(user=user)
+        Order.objects.filter(pk=order.pk).update(confirmed_at=None)
+
+        with (
+            _patch_provider(
+                _provider((True, {**NEW_INTENT, "status": status}))
+            ),
+            patch(
+                "order.tasks.send_order_confirmation_email.apply_async"
+            ) as confirmation,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            response = _client(user).post(
+                _url(order),
+                {"payment_method_id": "pm_card_visa"},
+                format="json",
+            )
+
+        assert response.status_code == 200, response.data
+        order.refresh_from_db()
+        assert order.payment_status == status
+        assert order.payment_id == "pi_new_retry"
+        assert (order.confirmed_at is not None) == (
+            status == PaymentStatus.COMPLETED
+        )
+        assert confirmation.call_count == (
+            1 if status == PaymentStatus.COMPLETED else 0
+        )
 
     def test_logs_the_swap_in_order_history(self):
         user = UserAccountFactory()

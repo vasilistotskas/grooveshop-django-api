@@ -42,7 +42,8 @@ suppresses the CANCELED email and toast when `confirmed_at` is empty), while
 its stock and reservations are released as for any cancel. The history note
 "Order created", the stock holds, Meta's InitiateCheckout and the agent
 outbox still follow creation. A payment that lands after the cancel still
-pages staff (`record_payment_after_cancel`). Orders confirmed before the
+pages staff (`record_payment_after_cancel`), and `confirm` never announces a
+canceled order, whichever path reports the payment. Orders confirmed before the
 column existed carry `created_at` (migration `order` 0115); orders the
 previous release created during a rollout are stamped by
 `manage.py backfill_confirmed_at`, run once after it.

@@ -245,6 +245,20 @@ class TestConfirmedWhenThePaymentSettles:
         assert _calls(published, "paid_note") == 1
 
 
+class TestACanceledOrderIsNeverConfirmed:
+    def test_confirm_refuses_a_canceled_order(self, published):
+        order = _created(_order(PayWayFactory.create_online_payment("stripe")))
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+
+        assert not OrderLifecycleService.confirm(Order.objects.get(pk=order.pk))
+        order.refresh_from_db()
+        assert order.confirmed_at is None
+        assert _calls(published, "confirmation") == 0
+
+
 class TestCancelOfAnUnconfirmedOrder:
     def test_the_sweep_cancels_an_unpaid_card_order_silently(self, published):
         order = _created(_order(PayWayFactory.create_online_payment("stripe")))

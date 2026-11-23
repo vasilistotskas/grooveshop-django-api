@@ -6,16 +6,27 @@ the previous releases confirmed (an offline order at creation, an online
 one when its payment went through) is stamped with its ``created_at``; an
 online order never paid stays empty. Orders that release creates or settles
 while this one rolls out are stamped afterwards by
-``manage.py backfill_confirmed_at``, the same rule (idempotent).
+``manage.py backfill_confirmed_at`` (``order.lifecycle.confirmation``), the
+same rule (idempotent).
 """
 
 from django.db import migrations, models
+from django.db.models import F, Q
 
-from order.lifecycle.confirmation import backfill_confirmed_at
+# The rule as it stood when this migration was written, kept here so a
+# replay never depends on runtime code: an online pay way's settlement, and
+# the payment statuses in which the customer's money was taken.
+ONLINE_SETTLEMENT = "online"
+CHARGED_PAYMENT_STATUSES = ("COMPLETED", "REFUNDED", "PARTIALLY_REFUNDED")
 
 
 def stamp(apps, schema_editor):
-    backfill_confirmed_at(apps)
+    never_paid_online = Q(pay_way__settlement=ONLINE_SETTLEMENT) & ~Q(
+        payment_status__in=CHARGED_PAYMENT_STATUSES
+    )
+    apps.get_model("order", "Order").objects.filter(
+        confirmed_at__isnull=True
+    ).exclude(never_paid_online).update(confirmed_at=F("created_at"))
 
 
 class Migration(migrations.Migration):

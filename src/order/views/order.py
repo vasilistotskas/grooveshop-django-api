@@ -1863,9 +1863,10 @@ class OrderViewSet(BaseModelViewSet):
 
         The customer retains the same order, the same items, and the
         same reserved stock (already decremented at order creation).
-        We just mint a new PaymentIntent, store its id on the order,
-        reset the payment status to PENDING, and return the client
-        secret so the frontend can re-mount Stripe Elements.
+        We just mint a new PaymentIntent, which the service records with
+        the status the provider reported (a payment taken at once
+        confirms the order), and return the client secret so the
+        frontend can re-mount Stripe Elements.
         """
         order = self.get_object()
 
@@ -1935,17 +1936,13 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if order.payment_status == PaymentStatus.COMPLETED:
-            # The provider took the payment at once: the order is confirmed
-            # now, as its webhook, which may not come, would confirm it.
-            OrderLifecycleService.confirm(order)
-
         new_payment_id = payment_response.get("payment_id")
 
-        # Lock the order row while we swap in the new payment intent.
-        # A late `payment_intent.payment_failed` webhook for the OLD
-        # intent could otherwise land between read and save and flip
-        # payment_status to FAILED under this retry.
+        # The service recorded the new payment under its own lock, with
+        # the status the provider reported (pending, processing, or taken
+        # at once): it is kept, never reset. Here only the retry is noted,
+        # under the row lock, and a change landing since the service wrote
+        # wins as it does there.
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk)
             # The service stored the new intent under its own lock; a
@@ -1956,9 +1953,6 @@ class OrderViewSet(BaseModelViewSet):
                 locked_order.payment_id,
             ) != (order.status, order.payment_status, order.payment_id):
                 return self._order_changed_during_payment(order)
-            if new_payment_id:
-                locked_order.payment_id = new_payment_id
-            locked_order.payment_status = PaymentStatus.PENDING
             if not locked_order.metadata:
                 locked_order.metadata = {}
             retry_history = locked_order.metadata.setdefault(
@@ -1971,10 +1965,12 @@ class OrderViewSet(BaseModelViewSet):
                     "new_payment_id": new_payment_id or "",
                 }
             )
-            locked_order.save(
-                update_fields=["payment_id", "payment_status", "metadata"]
-            )
+            locked_order.save(update_fields=["metadata"])
         order = locked_order
+        if order.payment_status == PaymentStatus.COMPLETED:
+            # The provider took the payment at once: the order is confirmed
+            # now, as its webhook, which may not come, would confirm it.
+            OrderLifecycleService.confirm(order)
 
         OrderHistory.log_payment_update(
             order=order,
@@ -1983,8 +1979,8 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_id": previous_payment_id or "",
             },
             new_value={
-                "payment_status": PaymentStatus.PENDING,
-                "payment_id": new_payment_id or "",
+                "payment_status": str(order.payment_status),
+                "payment_id": order.payment_id or "",
                 "retry": True,
             },
         )
@@ -2297,7 +2293,16 @@ class OrderViewSet(BaseModelViewSet):
         # webhook remains the idempotent backstop.
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
-            if payment_response["status"] == PaymentStatus.COMPLETED:
+            paid = payment_response["status"] == PaymentStatus.COMPLETED
+            if paid and OrderService.is_payment_after_cancel(locked):
+                # Canceled while the token was charged: the money is
+                # booked and staff are paged; the order stays canceled.
+                OrderService.record_payment_after_cancel(
+                    locked,
+                    payment_id=payment_response["payment_id"],
+                    payment_method="stripe_agent_spt",
+                )
+            elif paid:
                 locked.mark_as_paid(
                     payment_id=payment_response["payment_id"],
                     payment_method="stripe_agent_spt",

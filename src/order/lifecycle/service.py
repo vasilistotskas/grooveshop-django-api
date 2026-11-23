@@ -249,15 +249,19 @@ class OrderLifecycleService:
         ``confirmed_at`` is claimed with one ``UPDATE ... WHERE
         confirmed_at IS NULL``: whichever path reports the payment first
         confirms it, and every other answers ``False`` and announces
-        nothing. In the caller's transaction, so a rollback takes the claim
+        nothing, as does a canceled order. In the caller's transaction, so a rollback takes the claim
         and the queued messages with it.
         """
         from order.signals import order_confirmed
 
         now = timezone.now()
-        claimed = Order.objects.filter(
-            pk=order.pk, confirmed_at__isnull=True
-        ).update(confirmed_at=now)
+        # A canceled order is never announced: a payment that lands on one
+        # is booked and pages staff (``record_payment_after_cancel``).
+        claimed = (
+            Order.objects.filter(pk=order.pk, confirmed_at__isnull=True)
+            .exclude(status=OrderStatus.CANCELED)
+            .update(confirmed_at=now)
+        )
         if not claimed:
             return False
         order.confirmed_at = now

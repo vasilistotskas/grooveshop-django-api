@@ -845,6 +845,12 @@ def _process_gift_card_purchase_event(
         return JsonResponse({"status": "ok"})
 
     try:
+        # Retrieve Transaction is an HTTP call: it is answered before the
+        # purchase row is locked, never under it. The branch below judges
+        # the answer under the lock.
+        reported = _read_gift_card_event(
+            purchase, event_type_id, event_data, transaction_id
+        )
         with transaction.atomic():
             purchase = (
                 type(purchase).objects.select_for_update().get(pk=purchase.pk)
@@ -863,17 +869,7 @@ def _process_gift_card_purchase_event(
                     )
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
                 else:
-                    verified_status, verified_data = (
-                        viva_settlement.verify_transaction(transaction_id)
-                    )
-                    if verified_status is None:
-                        # Unverifiable ≠ failed: raise so the outer
-                        # candidate loop tries the next tenant / Viva
-                        # redelivers (same contract as the order path).
-                        raise RuntimeError(
-                            "Viva transaction verification unavailable "
-                            f"for gift-card purchase txn {transaction_id}"
-                        )
+                    verified_status, verified_data = reported
                     problem = _gift_card_payment_problem(
                         purchase, verified_data
                     )
@@ -913,6 +909,7 @@ def _process_gift_card_purchase_event(
                         transaction_id,
                         {PaymentStatus.FAILED, PaymentStatus.CANCELED},
                         "payment_failed",
+                        reported=reported,
                     )
                 ):
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
@@ -937,6 +934,7 @@ def _process_gift_card_purchase_event(
                     {str(purchase.payment_id)},
                     VIVA_REFUND_TRANSACTION_TYPE_IDS
                     | VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
+                    reported=reported,
                 )
                 refunded = None if verified is None else verified[0]
                 if verified is None:
@@ -995,6 +993,32 @@ def _process_gift_card_purchase_event(
         return JsonResponse({"error": "processing failed"}, status=500)
 
     return JsonResponse({"status": "ok"})
+
+
+def _read_gift_card_event(
+    purchase, event_type_id, event_data: dict, transaction_id: str
+):
+    """What a gift-card purchase event reads from Viva before the purchase
+    row is locked: Retrieve Transaction for the events that verify one
+    (the answer the branch judges under the lock), or ``None`` when the
+    branch will refuse the event without reading it.
+
+    Raises ``RuntimeError`` when Viva cannot be read, as the branch did.
+    """
+    from giftcard.enum import GiftCardPurchaseStatus
+
+    if not transaction_id:
+        return None
+    if event_type_id == 1796:
+        status_id = event_data.get("StatusId", "")
+        if status_id and status_id != "F":
+            return None
+    elif event_type_id == 1798:
+        if purchase.status != GiftCardPurchaseStatus.PENDING:
+            return None
+    elif event_type_id != 1797:
+        return None
+    return viva_settlement.retrieve_transaction(transaction_id)
 
 
 def _gift_card_payment_problem(purchase, verified_data) -> str | None:

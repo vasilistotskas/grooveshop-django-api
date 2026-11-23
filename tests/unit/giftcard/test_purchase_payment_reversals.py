@@ -22,7 +22,7 @@ from giftcard.enum import (
     GiftCardTransactionKind,
 )
 from giftcard.factories import GiftCardPurchaseFactory
-from giftcard.models import GiftCardTransaction
+from giftcard.models import GiftCardPurchase, GiftCardTransaction
 from giftcard.services import GiftCardService
 from order.enum.status import PaymentStatus
 from order.signals.handlers import (
@@ -469,3 +469,48 @@ class TestCompletionIsBoundToThePurchase:
         assert response.status_code == 500
         purchase.refresh_from_db()
         assert purchase.status == GiftCardPurchaseStatus.PENDING
+
+
+class TestVivaIsReadBeforeThePurchaseIsLocked:
+    @pytest.mark.parametrize("event_type_id", [1796, 1797, 1798])
+    def test_every_request_is_sent_before_the_purchase_row_is_locked(
+        self, event_type_id
+    ):
+        """A slow Viva never holds the purchase row: every request an event
+        sends is sent before the lock. Counted on the HTTP boundary, so a
+        call by any path is seen."""
+        purchase = _viva_purchase()
+        viva = FakeVivaApi(
+            retrieve=(
+                200,
+                retrieve_refund(amount=40.0, order_code=int(ORDER_CODE))
+                if event_type_id == 1797
+                else retrieve_transaction(
+                    orderCode=int(ORDER_CODE), amount=40.0
+                ),
+            )
+        )
+        sent_at_lock: list[int] = []
+        lock = GiftCardPurchase.objects.select_for_update
+
+        def _lock(*args, **kwargs):
+            sent_at_lock.append(len(viva.sent))
+            return lock(*args, **kwargs)
+
+        with (
+            viva,
+            patch.object(GiftCardPurchase.objects, "select_for_update", _lock),
+        ):
+            response = _process_gift_card_purchase_event(
+                purchase=purchase,
+                event_type_id=event_type_id,
+                event_data={"StatusId": "F"},
+                transaction_id="txn-lock",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        assert response.status_code == 200
+        assert sent_at_lock
+        assert sent_at_lock[0] > 0
+        assert len(viva.sent) == sent_at_lock[0]

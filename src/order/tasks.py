@@ -2764,3 +2764,34 @@ def purge_expired_pending_payment_fees() -> dict[str, int]:
     if deleted:
         logger.info("Purged %s pending payment fees", deleted)
     return {"deleted": deleted}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def alert_payment_without_order_task(
+    payment_id: str, amount: str, currency: str
+) -> bool:
+    """Alert staff to a payment-first Stripe intent that succeeded and that
+    no order carries once the grace has passed
+    (``OrderService.report_payment_without_order``). Returns whether an
+    order carries it, so nothing was sent.
+
+    Removed with the payment-first path (#818, R3).
+    """
+    from decimal import Decimal
+
+    from djmoney.money import Money
+
+    from order.services import OrderService
+
+    if Order.objects.all_with_deleted().filter(payment_id=payment_id).exists():
+        return True
+    OrderService.alert_payment_without_order(
+        payment_id, captured=Money(Decimal(amount), currency)
+    )
+    return False

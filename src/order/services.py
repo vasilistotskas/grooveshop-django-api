@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any, ClassVar, NoReturn
 from uuid import UUID
@@ -73,6 +74,7 @@ from order.payments.payment import (
     StripePaymentProvider,
 )
 from order.payments.payment_binding import (
+    PURPOSE_KEY,
     SUBJECT_KEY,
     PaymentPurpose,
     binding_mismatch,
@@ -92,6 +94,7 @@ from pay_way.enum.settlement import PaySettlement
 from promotion.coupons import CouponService
 from promotion.engine.redemptions import record_redemptions
 from shipping.enum import ShippingKind
+from tenant.celery import dispatch_on_commit
 from tenant.internal import is_internal_caller
 
 logger = logging.getLogger(__name__)
@@ -99,6 +102,7 @@ logger = logging.getLogger(__name__)
 #: The claim that makes the payment-without-order alert once per payment
 #: (``OrderService.alert_payment_without_order``). Stripe redelivers an
 #: event for three days at most; the claim outlives that.
+PAYMENT_WITHOUT_ORDER_GRACE = "PAYMENT_WITHOUT_ORDER_GRACE_MINUTES"
 PAYMENT_WITHOUT_ORDER_CLAIM_KEY = "order:payment_without_order:{payment_id}"
 PAYMENT_WITHOUT_ORDER_CLAIM_TTL = 7 * 24 * 60 * 60
 
@@ -3191,6 +3195,44 @@ class OrderService:
             )
 
     @classmethod
+    def report_payment_without_order(
+        cls,
+        payment_id: str,
+        *,
+        captured: Money,
+        metadata: Mapping[str, str] | None,
+    ) -> None:
+        """Alert about a succeeded intent no order carries: at once, or,
+        for a payment-first intent (``PaymentPurpose.CART``), after
+        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES``.
+
+        A payment-first intent can succeed while ``POST /order`` that
+        carries it is still creating its order, so the webhook finds none
+        for a valid payment. The delayed check
+        (``order.tasks.alert_payment_without_order``) alerts only when no
+        order carries the intent by then. It goes with the payment-first
+        path (#818, R3).
+        """
+        if (metadata or {}).get(PURPOSE_KEY) != PaymentPurpose.CART:
+            cls.alert_payment_without_order(payment_id, captured=captured)
+            return
+        from order.tasks import alert_payment_without_order_task
+
+        dispatch_on_commit(
+            alert_payment_without_order_task,
+            kwargs={
+                "payment_id": payment_id,
+                "amount": str(captured.amount),
+                "currency": str(captured.currency),
+            },
+            countdown=int(
+                timedelta(
+                    minutes=int(store_setting(PAYMENT_WITHOUT_ORDER_GRACE))
+                ).total_seconds()
+            ),
+        )
+
+    @classmethod
     def alert_payment_without_order(
         cls, payment_id: str, *, captured: Money
     ) -> None:
@@ -3331,8 +3373,8 @@ class OrderService:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
             )
-            cls.alert_payment_without_order(
-                payment_intent_id, captured=captured
+            cls.report_payment_without_order(
+                payment_intent_id, captured=captured, metadata=metadata
             )
             return None
 

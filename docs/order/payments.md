@@ -148,8 +148,14 @@ delivery that raised after the mail rolls back, and the polled path is no
 event), so the alert claims the intent id with `cache.add` before sending
 (`PAYMENT_WITHOUT_ORDER_CLAIM_KEY`, a week, longer than Stripe redelivers)
 and gives the claim back when the send fails. A payment-first intent
-(`cart/create-payment-intent`) whose webhook lands before its order is
-created alerts too; the order that follows settles the payment itself.
+(`cart/create-payment-intent`, binding purpose `cart`) is the exception: its
+webhook can land while `POST /order` is still creating the order, so
+`OrderService.report_payment_without_order` queues
+`order.tasks.alert_payment_without_order_task` (`dispatch_on_commit`, a
+countdown of `PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`, default 15) and the task
+alerts only if no order carries the intent by then. An intent with no binding
+alerts at once. The delayed check is removed with the payment-first path
+(R3 of #818).
 
 **The collected amount must be the order's total.** `handle_payment_succeeded`
 (and the `checkout.session.completed` handler) compare what Stripe collected

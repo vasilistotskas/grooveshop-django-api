@@ -13,7 +13,7 @@ from unittest import mock
 import pytest
 import requests
 from django.core import mail
-from django.db import OperationalError
+from django.db import OperationalError, connection, transaction
 from django.test import override_settings
 from django.utils import timezone
 from extra_settings.models import Setting
@@ -151,6 +151,26 @@ class TestWrites:
             deliveries = send_email("probe.notice", probe_object())
 
         assert deliveries[0].status is Status.SENT
+        assert len(mail.outbox) == 1
+
+    def test_a_failed_lookup_does_not_poison_the_enclosing_transaction(
+        self, catalogue
+    ):
+        """An alert sent inside a transaction (a webhook's atomic block) must
+        leave it usable when the log's own read fails."""
+        catalogue(probe("order.shipped"))
+
+        def broken_read(*args, **kwargs):
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 / 0")
+
+        with transaction.atomic():
+            with mock.patch.object(
+                EmailLog.objects, "filter", side_effect=broken_read
+            ):
+                send_email("order.shipped", probe_object(language="el"))
+            assert EmailLog.objects.count() >= 0
+
         assert len(mail.outbox) == 1
 
     def test_a_row_that_cannot_be_written_never_stops_the_send(

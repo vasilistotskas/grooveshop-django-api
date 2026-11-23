@@ -16,10 +16,12 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 import stripe
+from django.db import connection
 from django.urls import reverse
 from djmoney.money import Money
 from djstripe.models import Event
@@ -34,10 +36,12 @@ from order.payments.payment import StripePaymentProvider
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_payment_succeeded
+from order.tasks import alert_payment_without_order_task
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.checkout import priced
+from tests.utils.dispatch import apply_in
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -368,3 +372,80 @@ class TestPaymentWithoutOrderAlert:
         send = _deliver(_succeeded(payment_id))
 
         assert not _orphan_alerts(send)
+
+
+#: The schema the test runs in, which is what a dispatch pins.
+CURRENT_STORE = SimpleNamespace(schema_name=connection.schema_name)
+
+
+class TestAPaymentFirstIntentWaitsForItsOrder:
+    """A payment-first intent can succeed before ``POST /order`` has created
+    its order, so staff hear of it only when none carries it after the
+    grace. Removed with the payment-first path (#818, R3)."""
+
+    def _deliver_cart_bound(
+        self, payment_id, django_capture_on_commit_callbacks
+    ):
+        metadata = binding_metadata(PaymentPurpose.CART, uuid.uuid4())
+        with (
+            patch.object(
+                alert_payment_without_order_task, "apply_async"
+            ) as published,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            send = _deliver(_succeeded(payment_id, metadata=metadata))
+        return send, published
+
+    def test_the_alert_is_deferred_by_the_grace(
+        self, django_capture_on_commit_callbacks
+    ):
+        payment_id = _payment_id()
+
+        send, published = self._deliver_cart_bound(
+            payment_id, django_capture_on_commit_callbacks
+        )
+
+        send.assert_not_called()
+        published.assert_called_once()
+        call = published.call_args.kwargs
+        assert call["kwargs"]["payment_id"] == payment_id
+        assert call["countdown"] == 15 * 60
+
+    def test_an_order_created_meanwhile_sends_nothing(self):
+        payment_id = _payment_id()
+        OrderFactory(
+            num_order_items=0,
+            payment_id=payment_id,
+            pay_way=PayWayFactory.create_online_payment("stripe"),
+        )
+
+        with patch("emails.send.send_email") as send:
+            apply_in(
+                CURRENT_STORE,
+                alert_payment_without_order_task,
+                [],
+                {"payment_id": payment_id, "amount": "50", "currency": "EUR"},
+                task_id=str(uuid.uuid4()),
+            )
+
+        send.assert_not_called()
+
+    def test_no_order_after_the_grace_alerts_once(self):
+        payment_id = _payment_id()
+        kwargs = {"payment_id": payment_id, "amount": "50", "currency": "EUR"}
+
+        with patch("emails.send.send_email") as send:
+            for _ in range(2):
+                apply_in(
+                    CURRENT_STORE,
+                    alert_payment_without_order_task,
+                    [],
+                    kwargs,
+                    task_id=str(uuid.uuid4()),
+                )
+
+        send.assert_called_once()
+        key, alert = send.call_args.args
+        assert key == "ops.payment_without_order"
+        assert alert.payment_id == payment_id
+        assert alert.amount == Money(Decimal(50), "EUR")

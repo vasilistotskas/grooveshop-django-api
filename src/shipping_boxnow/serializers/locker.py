@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -16,6 +17,30 @@ class BoxNowLockerSerializer(serializers.ModelSerializer[BoxNowLocker]):
     image_url = serializers.SerializerMethodField(
         help_text=_("Locker photo, or null when BoxNow supplies none"),
     )
+
+    compartment_sizes = serializers.ListField(
+        child=serializers.IntegerField(),
+        read_only=True,
+        help_text=_(
+            "The compartment sizes the locker has (1 small, 2 medium, 3 "
+            "large). Empty when they are not known: on a store on BOX NOW's "
+            "live network the locker then takes no order; a store on BOX "
+            "NOW's stage network has no sizes and checks none."
+        ),
+    )
+    limited_availability = serializers.SerializerMethodField(
+        help_text=_(
+            "True when BOX NOW rates the chance of a free compartment below "
+            "BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
+        ),
+    )
+
+    def get_limited_availability(self, obj: BoxNowLocker) -> bool:
+        probability = obj.availability_probability
+        return (
+            probability is not None
+            and probability < settings.BOXNOW_LIMITED_AVAILABILITY_BELOW
+        )
 
     @extend_schema_field({"type": "string", "format": "uri", "nullable": True})
     def get_image_url(self, obj: BoxNowLocker) -> str | None:
@@ -50,6 +75,8 @@ class BoxNowLockerSerializer(serializers.ModelSerializer[BoxNowLocker]):
             "postal_code",
             "country_code",
             "note",
+            "compartment_sizes",
+            "limited_availability",
             "is_active",
             "last_synced_at",
             "created_at",

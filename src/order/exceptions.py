@@ -335,6 +335,19 @@ class ShippingRefusedError(InvalidOrderDataError):
         )
 
 
+class PickupPointUnfitError(InvalidOrderDataError):
+    """Raised when the chosen pickup point cannot be confirmed to take the
+    cart's parcel (``shipping.interfaces.PickupPointUnfit``). Answered as
+    the field error ``code`` (``pickup_point_too_small``,
+    ``pickup_point_size_unknown``) on the carrier's location field."""
+
+    def __init__(self, field: str, message: str, code: str):
+        self.field = field
+        self.message = message
+        self.code = code
+        super().__init__(message, field_errors={field: [message]})
+
+
 class ShippingPriceUnresolvedError(InvalidOrderDataError):
     """Raised by the locked quote of order creation when the carrier's
     live price for the delivery was not resolved before the locks were

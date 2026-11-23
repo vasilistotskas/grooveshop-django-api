@@ -746,6 +746,21 @@ def boxnow_configured_tenant(bind_tenant):
 
 
 @pytest.fixture
+def boxnow_live_network(bind_tenant):
+    """Bind a fake tenant on BOX NOW's live network
+    (``Tenant.box_now_live_mode``): the only network whose lockers have
+    sizes (``shipping_boxnow.catalogue.sizes_exist``). A tenant without the
+    flag is on BOX NOW's stage network."""
+    tenant = SimpleNamespace(
+        schema_name="test-boxnow-live",
+        box_now_live_mode=True,
+        **_BOXNOW_TENANT_FIELDS,
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
 def acs_and_boxnow_configured_tenant(bind_tenant):
     """Bind a single fake tenant with BOTH ACS and BoxNow credentials.
 

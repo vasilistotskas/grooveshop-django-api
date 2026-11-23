@@ -252,6 +252,7 @@ class TestPartialQuote:
         assert _money(option["price"]) == SHIPPING
         assert option["waivedBy"] is None
         assert option["exceedsMaxWeight"] is False
+        assert option["compartmentSize"] is None
 
     def test_a_delivery_without_a_pay_way(self):
         checkout = _checkout()
@@ -439,6 +440,26 @@ class TestQuoteRefusals:
         assert body["code"] == body["reason"] == "shipping_parcel_too_large"
         # The carrier's own wording stays in the log.
         assert "too big" not in body["detail"]
+
+    def test_a_locker_without_the_carts_size_is_named(self):
+        from order.exceptions import PickupPointUnfitError
+
+        checkout = _checkout()
+
+        with patch.object(
+            OrderQuoteService,
+            "_assert_pickup_point_fits",
+            side_effect=PickupPointUnfitError(
+                "boxnow_locker_id",
+                "Choose another one.",
+                "pickup_point_too_small",
+            ),
+        ):
+            response = _post_quote(checkout, **_choices(checkout))
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["code"] == body["reason"] == "pickup_point_too_small"
 
     def test_the_payment_intent_keeps_its_own_answer(self):
         """Only the quote names the refusal: the payment intent and order

@@ -62,6 +62,43 @@ PICKUP_POINT_IN_ANOTHER_COUNTRY = _(
 )
 
 
+PICKUP_POINT_TOO_SMALL = _(
+    "This locker has no compartment for your order's size. Choose another one."
+)
+
+
+PICKUP_POINT_SIZE_UNKNOWN = _(
+    "We cannot confirm yet that this locker takes your order's size. "
+    "Choose another one."
+)
+
+
+class PickupPointUnfit(ValueError):
+    """The pickup point cannot be confirmed to take the order's parcel: no
+    order is sent there (``assert_pickup_point_fits``). ``code`` is the
+    stable code the API answers with, ``message`` what the shopper reads."""
+
+    code: str
+    message: Any
+
+
+class PickupPointTooSmall(PickupPointUnfit):
+    """The pickup point lists the compartment sizes it has, and not the
+    order's."""
+
+    code = "pickup_point_too_small"
+    message = PICKUP_POINT_TOO_SMALL
+
+
+class PickupPointSizeUnknown(PickupPointUnfit):
+    """The pickup point's compartment sizes are not known yet (a locker the
+    carrier's size list does not hold yet): whether it takes the order
+    cannot be told."""
+
+    code = "pickup_point_size_unknown"
+    message = PICKUP_POINT_SIZE_UNKNOWN
+
+
 class PickupPointInAnotherCountry(ValueError):
     """The pickup point is in another country than the order's: no order
     is sent there under the order's country (``deliverable_pickup_point``).
@@ -310,6 +347,29 @@ class ShippingCarrierInterface(ABC):
         locker) refuses at checkout rather than at the courier.
         Default: no size limit.
         """
+        return
+
+    def parcel_size(
+        self,
+        *,
+        kind: ShippingKind,
+        items: Iterable[tuple[Any, int]],
+    ) -> int | None:
+        """The compartment size ``items`` pack into for this carrier and
+        kind, or ``None`` when the carrier has no sizes or they fit none.
+        Default: none."""
+        return None
+
+    def assert_pickup_point_fits(
+        self,
+        location: Mapping[str, str],
+        *,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Raise :class:`PickupPointUnfit` when the pickup point
+        *location* names cannot take ``items`` packed as the carrier
+        packs them. Called once the point is known to exist
+        (:meth:`deliverable_pickup_point`). Default: every point fits."""
         return
 
     def live_quote(

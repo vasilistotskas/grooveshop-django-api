@@ -29759,6 +29759,18 @@ paths:
       summary: Λίστα Lockers BoxNow
       parameters:
       - in: query
+        name: compartmentSize
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2
+          μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας
+          της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ. Αγνοείται
+          σε κατάστημα που δεν είναι στο live δίκτυο της BOX NOW, όπου κανένα locker
+          δεν έχει μέγεθος.
+      - in: query
         name: countryCode
         schema:
           type: string
@@ -38277,6 +38289,20 @@ components:
           type: string
           readOnly: true
           title: Σημείωση
+        compartmentSizes:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+          description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
+        limitedAvailability:
+          type: boolean
+          readOnly: true
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true
@@ -38306,6 +38332,7 @@ components:
       required:
       - addressLine1
       - addressLine2
+      - compartmentSizes
       - countryCode
       - createdAt
       - externalId
@@ -38314,6 +38341,7 @@ components:
       - isActive
       - lastSyncedAt
       - lat
+      - limitedAvailability
       - lng
       - name
       - note
@@ -38396,6 +38424,20 @@ components:
           type: string
           readOnly: true
           title: Σημείωση
+        compartmentSizes:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+          description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
+        limitedAvailability:
+          type: boolean
+          readOnly: true
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true
@@ -38425,6 +38467,7 @@ components:
       required:
       - addressLine1
       - addressLine2
+      - compartmentSizes
       - countryCode
       - createdAt
       - externalId
@@ -38433,6 +38476,7 @@ components:
       - isActive
       - lastSyncedAt
       - lat
+      - limitedAvailability
       - lng
       - name
       - note
@@ -51972,7 +52016,15 @@ components:
           type: boolean
           description: Αληθές όταν το καλάθι δεν χωρά στα δέματα αυτού του μεταφορέα·
             η επιλογή του απορρίπτεται.
+        compartmentSize:
+          type: integer
+          nullable: true
+          description: Το μέγεθος θυρίδας locker στο οποίο χωράει το καλάθι (1 μικρό,
+            2 μεσαίο, 3 μεγάλο) σε μια επιλογή παραλαβής BOX NOW· null αλλού και όταν
+            το καλάθι δεν χωράει σε κανένα. Στείλτε το ως ``compartmentSize`` για
+            να δείτε τα lockers που δέχονται αυτό το καλάθι.
       required:
+      - compartmentSize
       - exceedsMaxWeight
       - exceedsParcelSize
       - kind

@@ -353,7 +353,7 @@ def apply_boxnow_locker_catalogue(
 
     from shipping_boxnow.catalogue import apply_catalogues
 
-    return apply_catalogues(catalogue)
+    return apply_catalogues(catalogue, keep=True)
 
 
 @shared_task(

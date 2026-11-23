@@ -16,6 +16,7 @@ from unfold.decorators import display
 
 from admin.base import BaseModelAdmin
 from admin.mixins import (
+    ActionLocationModelAdmin,
     IsSuperuserOnlyModelAdmin,
     StripeMirrorModelAdmin,
     WithheldOnTenantHostModelAdmin,
@@ -101,7 +102,12 @@ def override_third_party_admins():
         )
         new_admin_class = type(
             f"{model.__name__}AdminOverride",
-            (*guards, model_admin.__class__, ModelAdmin),
+            (
+                ActionLocationModelAdmin,
+                *guards,
+                model_admin.__class__,
+                ModelAdmin,
+            ),
             {},
         )
 

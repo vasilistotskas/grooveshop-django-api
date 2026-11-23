@@ -3,6 +3,65 @@
 
 
 
+## v3.266.2 (2026-11-23)
+
+### Bug fixes
+
+* fix(admin): keep action_location through Unfold's and dj-stripe's admin actions (#763) ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): keep action_location through Unfold's action choices
+
+Unfold's get_action_choices drops Django 6's action_location parameter,
+raising RemovedInDjango2028Warning on every changelist. A mixin ahead of
+Unfold's ModelAdmin restores it for BaseModelAdmin and the re-registered
+third-party admins. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): type the action-location mixin and translate its blank choice ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(order): tell the payment-failed email the order page takes the payment
+
+The email says the shopper can complete the payment from the order page
+until the payment hold expires, or without a deadline when none is set.
+
+* revert(email): leave the payment-failed email to the change that removes it
+
+The payment-failed email is removed with card orders confirmed on
+payment; this branch keeps only the Unfold action_location fix. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): take action_location in dj-stripe's admins
+
+dj-stripe overrides get_actions with Django 5's signature, which Django 6 reported on every dj-stripe changelist. StripeMirrorModelAdmin, which precedes those admins, accepts action_location and gives the change form no actions, as Django does for an old-signature override. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): run a dj-stripe action refused by its form without indexing the action tuple
+
+dj-stripe's confirm view runs the action again on an invalid form with get_action(name)[0], which Django 6 reports as deprecated; the project's subclass calls the action's func. The tests check every admin of both sites through Django's own wrappers, and each dj-stripe admin's own set of actions. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+### Testing
+
+* test(admin): type the action choices test helper ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+## v3.266.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(product): a product description is NOT NULL (release 2 of 2) (#805) ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): a product description is NOT NULL (release 2 of 2)
+
+0074 made "" the description's empty value and backfilled; the release
+that shipped it writes "" everywhere. This backfills what the release
+before it wrote during that rollout and adds the NOT NULL constraint the
+state already declares, as a contract of 0074. The backfill's test goes
+with the NULLs it seeded; a test pins the constraint.
+
+Refs #684 ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): number the description NOT NULL contract after the image dimensions migration ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+### Testing
+
+* test(product): run the description contract's backfill and its reverse ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
 ## v3.266.0 (2026-11-23)
 
 ### Bug fixes

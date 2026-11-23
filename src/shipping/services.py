@@ -634,11 +634,16 @@ class ShippingService:
                 and weight_grams > rate.max_weight_grams
             )
             exceeds_parcel_size = False
+            compartment_size = None
             if items is not None:
                 try:
                     adapter.assert_parcel_fits(kind=kind, items=items)
                 except ShippingParcelTooLargeError:
                     exceeds_parcel_size = True
+                else:
+                    compartment_size = adapter.parcel_size(
+                        kind=kind, items=items
+                    )
             charge = cls._priced(
                 rate,
                 country_code=country_code,
@@ -674,6 +679,7 @@ class ShippingService:
                     "max_weight_grams": rate.max_weight_grams,
                     "exceeds_max_weight": exceeds_max_weight,
                     "exceeds_parcel_size": exceeds_parcel_size,
+                    "compartment_size": compartment_size,
                     "delivery_days_min": rate.delivery_days_min,
                     "delivery_days_max": rate.delivery_days_max,
                 }
@@ -1206,6 +1212,20 @@ class ShippingService:
                 country_code=country_code,
             )
         return rate
+
+    @staticmethod
+    def assert_pickup_point_fits(
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Raise ``PickupPointUnfit`` when the carrier's pickup point
+        *location* names cannot take ``items``
+        (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
+        get_provider(provider_code).assert_pickup_point_fits(
+            location, items=items
+        )
 
     @classmethod
     def assert_available(

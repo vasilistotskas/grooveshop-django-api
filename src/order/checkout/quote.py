@@ -433,7 +433,10 @@ class OrderQuoteService:
             lines=lines,
             items_subtotal=items_subtotal,
             promotion=promotion,
-            coupons=promotion.coupon_verdicts(cls._attached_codes(cart)),
+            # The codes the promotions were evaluated with, never a
+            # second read: a coupon swapped meanwhile would be reported
+            # with the other's discount.
+            coupons=promotion.coupon_verdicts(promotion.codes),
             parcel_items=parcel_items,
             weight_grams=weight_grams,
             shipping=shipping_charge,
@@ -464,14 +467,6 @@ class OrderQuoteService:
             )
             for item in items
         )
-
-    @staticmethod
-    def _attached_codes(cart: Cart) -> list[str]:
-        """The coupon codes attached to ``cart``; none while promotions
-        are off, as the cart lists them."""
-        if not PromotionEngine.is_enabled():
-            return []
-        return list(cart.applied_codes.values_list("code__code", flat=True))
 
     @staticmethod
     def cart_digest(

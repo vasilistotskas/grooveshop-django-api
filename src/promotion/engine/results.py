@@ -119,6 +119,10 @@ class CartDiscountResult:
     gift_items: list[GiftEntitlement] = field(default_factory=list)
     near_miss: list[NearMissEntry] = field(default_factory=list)
     rejected: list[tuple[str, str]] = field(default_factory=list)
+    # The codes attached to the cart as this evaluation read them, the
+    # ones it decided on; none when it read none (promotions off, an
+    # empty cart).
+    codes: list[str] = field(default_factory=list)
     # FREE_SHIPPING / FREE_GIFT promotions that applied — recorded as
     # zero-amount redemption rows so their usage limits are enforced
     # exactly like monetary promotions.
@@ -181,7 +185,8 @@ class CartDiscountResult:
         self, codes: Iterable[str]
     ) -> tuple[CouponVerdict, ...]:
         """The verdict on each of ``codes``, the codes attached to the
-        evaluated cart, in their order.
+        evaluated cart, in their order. A caller with no read of its own
+        passes ``self.codes``: the codes this evaluation decided on.
 
         A coupon row that only knows its own money cannot tell "free
         shipping" from "a better offer applies" (demo store: SHIPFREE

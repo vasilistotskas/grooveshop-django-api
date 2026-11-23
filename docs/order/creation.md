@@ -34,7 +34,8 @@ caller:
 - **The rows** (`CheckoutQuote`): the products (`items_subtotal`, the
   lines' sum), the promotions (`promotion`, `discount_total`, and
   `coupons`: `CartDiscountResult.coupon_verdicts` on each attached code,
-  the verdict the cart's `appliedCoupons` gives too), `free_threshold_value`
+  the verdict the cart's `appliedCoupons` gives too, on the codes the
+  evaluation itself read, `CartDiscountResult.codes`, never a second read), `free_threshold_value`
   ([§5.0](shipping.md)), the delivery (`shipping`: price and `waived_by`,
   a `ShippingCharge`), the pay-way fee (`payment_fee`: amount and
   `waived`), the loyalty discount, the gift-card plan, `grand_total`

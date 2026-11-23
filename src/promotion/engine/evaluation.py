@@ -106,11 +106,12 @@ class PromotionEngine:
             B2BPricingService.cart_pricing_active(cart)
             and not B2BService.promotions_allowed()
         ):
+            result.codes = list(
+                cart.applied_codes.values_list("code__code", flat=True)
+            )
             result.rejected.extend(
                 (code, str(CouponRejectionReason.COMBINATION_DISALLOWED))
-                for code in cart.applied_codes.values_list(
-                    "code__code", flat=True
-                )
+                for code in result.codes
             )
             return result
 
@@ -127,7 +128,7 @@ class PromotionEngine:
             (item.total_price.amount for item in cart_items), Decimal(0)
         )
 
-        candidates, rejected = collect_candidates(cart, lock=lock)
+        candidates, rejected, result.codes = collect_candidates(cart, lock=lock)
         result.rejected.extend(rejected)
 
         monetary, applicable_free_shipping = cls.classify(

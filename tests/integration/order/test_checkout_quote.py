@@ -55,6 +55,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory, PayWayShippingExclusionFactory
 from product.factories import ProductFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode, PromotionRedemption
@@ -460,6 +461,42 @@ class TestQuoteLines:
             sum(line.promotion_discount for line in quote.lines)
             == quote.discount_total.amount
         )
+
+    def test_the_verdicts_are_on_the_codes_the_promotions_judged(self):
+        """A coupon swapped after the promotions were evaluated is not
+        reported with the discount of the one they judged."""
+        checkout = _checkout()
+        judged = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FIXED_AMOUNT,
+                benefit_value=Decimal("5.00"),
+            )
+        )
+        swapped_in = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FREE_SHIPPING,
+            )
+        )
+        CartPromotionCode.objects.create(cart=checkout.cart, code=judged)
+        evaluate = PromotionEngine.evaluate
+
+        def evaluate_then_swap(*args, **kwargs):
+            result = evaluate(*args, **kwargs)
+            CartPromotionCode.objects.filter(cart=checkout.cart).update(
+                code=swapped_in
+            )
+            return result
+
+        with patch.object(
+            PromotionEngine, "evaluate", side_effect=evaluate_then_swap
+        ):
+            quote = OrderQuoteService.quote(checkout.cart, user=checkout.user)
+
+        [verdict] = quote.coupons
+        assert verdict.code == judged.code
+        assert verdict.amount == quote.discount_total.amount == Decimal("5.00")
 
     def test_a_changed_line_changes_the_lines_and_the_digest_together(self):
         checkout = _checkout()

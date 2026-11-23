@@ -23,7 +23,11 @@ def collect_candidates(
 ) -> tuple[
     list[tuple[Promotion, PromotionCode | None]],
     list[tuple[str, str]],
+    list[str],
 ]:
+    """The promotions that may apply to ``cart``, the attached codes
+    refused before any is judged, and every attached code as read here:
+    the codes this evaluation decided on."""
     rejected: list[tuple[str, str]] = []
     cart_codes = list(
         CartPromotionCode.objects.filter(cart=cart).select_related(
@@ -71,7 +75,7 @@ def collect_candidates(
 
     attach_category_scopes([promotion for promotion, _code in candidates])
 
-    return candidates, rejected
+    return candidates, rejected, [cc.code.code for cc in cart_codes]
 
 
 def automatic_candidates() -> list[tuple[Promotion, PromotionCode | None]]:

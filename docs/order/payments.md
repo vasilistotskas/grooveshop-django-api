@@ -132,6 +132,38 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                            payment-confirmed note (on_commit, emails-and-notifications.md)
 ```
 
+**A payment no order carries pages staff** (#818). When
+`handle_payment_succeeded` finds no order for the intent (by `payment_id`,
+then by the order its server-set binding metadata names, `_bound_order_uuid`),
+it books nothing and calls `OrderService.report_payment_without_order`.
+
+- **Only the store's own payments alert.** An intent whose metadata does not
+  carry our binding for this tenant (`payment_binding.own_purpose`: a Payment
+  Link, a Stripe Invoice, Terminal, a charge made in the Stripe dashboard, or
+  another store's) is logged at WARNING and nothing more.
+- **The mail is a task, not a call in the webhook.** The service sends
+  `payment_without_order_found` (the order services import no task), and its
+  receiver queues `order.tasks.alert_payment_without_order_task` with
+  `dispatch_on_commit`: a webhook that rolls back queues nothing, and the
+  mail no longer runs inside dj-stripe's `transaction.atomic`. Stripe has its
+  answer by then and redelivers nothing, so the task retries a transient mail
+  error itself (`MAIL_TRANSIENT_ERRORS`). It re-checks that no order carries
+  the intent, takes the claim on the intent id (`cache.add`,
+  `PAYMENT_WITHOUT_ORDER_CLAIM_KEY`, a week), sends
+  `ops.payment_without_order` (declared in `src/order/emails.py`, listed in
+  [the email types](../emails/types.md)), and gives the claim back when the
+  send fails, so the retry sends. Alerts once per intent however many copies
+  run (a redelivery, the polled path, a retry).
+- **Never for** a gift-card purchase's intent (the handler resolves those
+  first and stops), nor one an order carries or is bound to (Checkout
+  Session, agent).
+- **A payment-first intent waits** (binding purpose `cart`, until R3 of
+  #818): its webhook can land while `POST /order` is still creating the
+  order, so its task runs `PAYMENT_WITHOUT_ORDER_GRACE_MINUTES` later
+  (default 15) and sends only if no order carries the intent by then. An
+  intent bound to an order that does not exist alerts at once. The wait is
+  removed with the payment-first path.
+
 **The collected amount must be the order's total.** `handle_payment_succeeded`
 (and the `checkout.session.completed` handler) compare what Stripe collected
 with `order.calculate_order_total_amount()` (currency, and amount within

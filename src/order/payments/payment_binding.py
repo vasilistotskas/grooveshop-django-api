@@ -65,3 +65,17 @@ def binding_mismatch(
         if metadata.get(key) != value:
             return f"the payment intent's {key} does not match this checkout"
     return None
+
+
+def own_purpose(metadata: Mapping[str, str] | None) -> PaymentPurpose | None:
+    """What an intent of this store's own was created for, read from its
+    server-set metadata; ``None`` for any other payment: one with no
+    binding (a Payment Link, a Stripe Invoice, Terminal, a charge made in
+    the Stripe dashboard) or one bound to another tenant."""
+    metadata = metadata or {}
+    if metadata.get(TENANT_KEY) != getattr(connection, "schema_name", "public"):
+        return None
+    try:
+        return PaymentPurpose(metadata.get(PURPOSE_KEY))
+    except ValueError:
+        return None

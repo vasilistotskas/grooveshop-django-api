@@ -799,6 +799,10 @@ msgid "A completed payment needs an amount due, unless discounts, loyalty points
 msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι πιστότητας ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
 
 #, python-format
+msgid "A confirmed %(provider)s payment arrived and no order of the store carries it. The customer has been charged and nothing will ship."
+msgstr "Έφτασε επιβεβαιωμένη πληρωμή %(provider)s και καμία παραγγελία του καταστήματος δεν την περιλαμβάνει. Ο πελάτης έχει χρεωθεί και τίποτα δεν θα αποσταλεί."
+
+#, python-format
 msgid "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 msgstr "Επιβεβαιωμένη πληρωμή %(provider)s έφτασε για την παραγγελία #%(order_id)s, που είχε ήδη ακυρωθεί. Τίποτα δεν θα αποσταλεί."
 
@@ -877,9 +881,6 @@ msgstr "Ορίστηκε κωδικός πρόσβασης στον λογαρι
 
 msgid "A payment for this order was received and is being confirmed. Do not pay again."
 msgstr "Μια πληρωμή για αυτή την παραγγελία ελήφθη και επιβεβαιώνεται. Μην πληρώσετε ξανά."
-
-msgid "A payment intent is required — the applied discounts do not cover the order total."
-msgstr "Απαιτείται payment intent — οι εφαρμοσμένες εκπτώσεις δεν καλύπτουν το σύνολο της παραγγελίας."
 
 msgid "A pickup-point order is delivered to its point's address, which can't be changed."
 msgstr "Μια παραγγελία σε σημείο παραλαβής παραδίδεται στη διεύθυνση του σημείου, η οποία δεν μπορεί να αλλάξει."
@@ -8432,6 +8433,10 @@ msgstr "Αναζητήστε στην πύλη της ACS voucher της παρ�
 msgid "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
 msgstr "Αναζητήστε στην πύλη της ACS τα voucher της παραγγελίας #%(order_id)s (κλειδί αναφοράς τους είναι ο αριθμός της παραγγελίας). Διαγράψτε εκεί όποιο voucher δεν χρησιμοποιεί η αποστολή ACS της παραγγελίας."
 
+#, python-format
+msgid "Look the payment up in the %(provider)s dashboard. Refund the customer, or find their order and attach the payment to it."
+msgstr "Αναζητήστε την πληρωμή στον πίνακα ελέγχου του %(provider)s. Επιστρέψτε τα χρήματα στον πελάτη ή βρείτε την παραγγελία του και συνδέστε την πληρωμή με αυτήν."
+
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Αναζήτηση παραγγελίας από τις παραμέτρους ανακατεύθυνσης μετά την πληρωμή του Viva Wallet"
 
@@ -10592,6 +10597,10 @@ msgstr "Payload"
 msgid "Payment"
 msgstr "Πληρωμή"
 
+#, python-format
+msgid "Payment %(payment_id)s has no order"
+msgstr "Η πληρωμή %(payment_id)s δεν έχει παραγγελία"
+
 msgid "Payment & Returns"
 msgstr "Πληρωμή & Επιστροφές"
 
@@ -10755,6 +10764,9 @@ msgstr "Κατάσταση πληρωμής"
 
 msgid "Payment that does not match its order"
 msgstr "Πληρωμή που δεν ταιριάζει με την παραγγελία της"
+
+msgid "Payment that no order accounts for"
+msgstr "Πληρωμή που καμία παραγγελία δεν την περιλαμβάνει"
 
 msgid "Payment verification failed"
 msgstr "Η επαλήθευση πληρωμής απέτυχε"
@@ -14462,6 +14474,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια επιβεβαιωμένη πληρωμή εισέπραξε διαφορετικό ποσό από αυτό της παραγγελίας της."
 
+msgid "Tells the store's staff that a confirmed payment has no order behind it, so the customer must be refunded or the order found."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια επιβεβαιωμένη πληρωμή δεν έχει παραγγελία, οπότε ο πελάτης πρέπει να πάρει πίσω τα χρήματά του ή να βρεθεί η παραγγελία."
+
 msgid "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι η κριτική ενός πελάτη περιμένει έγκριση πριν εμφανιστεί στους επισκέπτες."
 
@@ -17904,6 +17919,10 @@ msgstr "[{site}] Η πληρωμή δεν ταιριάζει με την παρ�
 #, python-brace-format
 msgid "[{site}] Payment received for canceled order {order_id}"
 msgstr "[{site}] Πληρωμή για ακυρωμένη παραγγελία {order_id}"
+
+#, python-brace-format
+msgid "[{site}] Payment {payment_id} has no order"
+msgstr "[{site}] Η πληρωμή {payment_id} δεν έχει παραγγελία"
 
 #, python-brace-format
 msgid "[{site}] Price drop: {name} is now at your target"

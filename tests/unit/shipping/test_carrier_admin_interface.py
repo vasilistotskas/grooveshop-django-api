@@ -250,3 +250,53 @@ class TestAttention:
         assert keys_depending_on("shipping_acs.AcsVoucherHold") == [
             "admin:dashboard:store:attention:v4"
         ]
+
+
+class TestCachedCountsAfterTheRealStartup:
+    """The admin's ``ready()`` runs before the carrier apps register, so
+    the built-in carriers' models are wired to the cached counts only by
+    the ``carrier_registered`` receiver. No fake carrier here: the
+    registry is what startup filled."""
+
+    @pytest.fixture(autouse=True)
+    def _fresh_cache(self):
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def _cached(self) -> bool:
+        from django.core.cache import cache
+
+        return cache.get(queries.attention_counts.key()) is not None
+
+    def test_an_acs_write_clears_the_cached_counts(
+        self, django_capture_on_commit_callbacks
+    ):
+        from shipping_acs.models import AcsVoucherHold
+
+        queries.attention_counts.get()
+        assert self._cached()
+
+        with django_capture_on_commit_callbacks(execute=True):
+            now = timezone.now()
+            AcsVoucherHold.objects.create(
+                started_at=now, last_failure_at=now, reason="ACS 502"
+            )
+
+        assert not self._cached()
+
+    def test_a_boxnow_write_clears_the_cached_counts(
+        self, django_capture_on_commit_callbacks
+    ):
+        from shipping_boxnow.factories import BoxNowShipmentFactory
+
+        # The factory writes an order too; only the shipment's own write
+        # is under test, so it is made before the counts are cached.
+        shipment = BoxNowShipmentFactory()
+        queries.attention_counts.get()
+        assert self._cached()
+
+        with django_capture_on_commit_callbacks(execute=True):
+            shipment.save()
+
+        assert not self._cached()

@@ -6,6 +6,7 @@ from typing import Any, ClassVar, NoReturn
 from uuid import UUID
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -70,12 +71,12 @@ from order.models.order import (
 from order.models.stock_reservation import StockReservation
 from order.payments.payment import (
     StripePaymentProvider,
-    provider_supports,
 )
 from order.payments.payment_binding import (
     SUBJECT_KEY,
     PaymentPurpose,
     binding_mismatch,
+    own_purpose,
 )
 from order.payments.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
@@ -84,6 +85,7 @@ from order.payments.payment_ledger import (
 )
 from order.signals import (
     order_stripe_payment_polled,
+    payment_without_order_found,
 )
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
@@ -95,6 +97,12 @@ from shipping.enum import ShippingKind
 from tenant.internal import is_internal_caller
 
 logger = logging.getLogger(__name__)
+
+#: The claim that makes the payment-without-order alert once per payment
+#: (``OrderService.alert_payment_without_order``). Stripe redelivers an
+#: event for three days at most; the claim outlives that.
+PAYMENT_WITHOUT_ORDER_CLAIM_KEY = "order:payment_without_order:{payment_id}"
+PAYMENT_WITHOUT_ORDER_CLAIM_TTL = 7 * 24 * 60 * 60
 
 # Payment statuses that represent a financially settled (terminal) state.
 # A stale or out-of-order webhook event MUST NOT overwrite any of these.
@@ -1608,8 +1616,10 @@ class OrderService:
         """
         Create order from cart using the order-first flow.
 
-        Used for offline payments (COD, Bank Transfer) and redirect-based
-        online providers (Viva Wallet). It performs the following steps:
+        Used for offline payments (COD, Bank Transfer) and online
+        providers (Viva Wallet, Stripe): an online order is created
+        PENDING with no payment, and the shopper pays it afterwards. It
+        performs the following steps:
         0. Locks the cart; returns the order this agent checkout already
            created, if any (idempotent)
         1. Validates cart items still exist and prices match
@@ -2130,10 +2140,10 @@ class OrderService:
             # Gift cards are the usual cause; a 100% promotion or a
             # full loyalty redemption produces the same zero
             # remainder and settles identically. Anything LESS than
-            # full coverage on a non-redirect online pay way is a
-            # client error: this path only runs without a payment
-            # intent, so there is nothing to charge the remainder
-            # with.
+            # full coverage on an online pay way leaves the order
+            # PENDING for the remainder: the payment is opened later
+            # (``create_checkout_session`` or ``create_payment_intent``),
+            # for every provider alike.
             deductions_present = (
                 order.gift_card_amount.amount > 0
                 or order.discount_amount.amount > 0
@@ -2150,30 +2160,6 @@ class OrderService:
                 order.mark_as_paid(
                     payment_id=settle_id,
                     payment_method=settle_method,
-                )
-            elif PaySettlement(
-                pay_way.settlement
-            ) == PaySettlement.ONLINE and provider_supports(
-                pay_way.provider_code, "supports_payment_intent"
-            ):
-                if gift_card_codes:
-                    raise InvalidGiftCardError(
-                        reason="gift_card_insufficient",
-                        message=(
-                            "Gift cards do not cover the order total; "
-                            "an online payment intent is required for "
-                            "the remainder."
-                        ),
-                    )
-                message = str(
-                    _(
-                        "A payment intent is required — the applied "
-                        "discounts do not cover the order total."
-                    )
-                )
-                raise InvalidOrderDataError(
-                    message,
-                    field_errors={"payment_intent_id": [message]},
                 )
 
             # Step 7: Clear cart
@@ -3206,6 +3192,84 @@ class OrderService:
                 order.id,
             )
 
+    @classmethod
+    def report_payment_without_order(
+        cls,
+        payment_id: str,
+        *,
+        captured: Money,
+        metadata: Mapping[str, str] | None,
+    ) -> None:
+        """Queue the alert about a succeeded intent no order carries.
+
+        Only the store's own payments alert: an intent whose server-set
+        metadata binds it to this tenant (``own_purpose``). Any other
+        (a Payment Link, a Stripe Invoice, Terminal, a charge made in the
+        Stripe dashboard) is logged at WARNING and nothing more.
+
+        The mail is sent by ``order.tasks.alert_payment_without_order_task``,
+        queued after the webhook's transaction commits (a rolled-back
+        webhook queues nothing) and retried when the mail is. The
+        services import no task, so the receiver of
+        ``payment_without_order_found`` queues it. A payment-first intent
+        (``PaymentPurpose.CART``) can succeed while the ``POST /order``
+        that carries it is still creating its order, so its alert waits
+        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` and is sent only if no
+        order carries it by then. That wait goes with the payment-first
+        path (#818, R3).
+        """
+        purpose = own_purpose(metadata)
+        if purpose is None:
+            logger.warning(
+                "Payment %s is not bound to this store's orders: no alert",
+                payment_id,
+            )
+            return
+        payment_without_order_found.send(
+            sender=cls,
+            payment_id=payment_id,
+            captured=captured,
+            grace=purpose == PaymentPurpose.CART,
+        )
+
+    @classmethod
+    def alert_payment_without_order(
+        cls, payment_id: str, *, captured: Money
+    ) -> None:
+        """Page staff once about a confirmed Stripe payment no order
+        carries: the customer was charged for nothing that will ship.
+
+        Once per payment: the claim on ``payment_id`` is taken before the
+        send (``cache.add`` is atomic), so a repeat of the task alerts
+        once. A send that fails gives the claim back and raises, so the
+        task's retry sends. Run by the task, never inside a webhook.
+        """
+        from emails.send import send_email
+        from order.emails import PaymentWithoutOrder
+
+        claim = PAYMENT_WITHOUT_ORDER_CLAIM_KEY.format(payment_id=payment_id)
+        if not cache.add(claim, 1, PAYMENT_WITHOUT_ORDER_CLAIM_TTL):
+            return
+        try:
+            send_email(
+                "ops.payment_without_order",
+                PaymentWithoutOrder(
+                    payment_id=payment_id,
+                    provider=StripePaymentProvider.code,
+                    amount=captured,
+                ),
+            )
+        except BaseException:
+            try:
+                cache.delete(claim)
+            except Exception:
+                # The send's error is the one the task retries on.
+                logger.exception(
+                    "Could not release the payment-without-order claim for %s",
+                    payment_id,
+                )
+            raise
+
     @staticmethod
     def _bound_order_uuid(metadata: Mapping[str, str] | None) -> UUID | None:
         """The order an intent was created for, when its own metadata (set
@@ -3296,6 +3360,9 @@ class OrderService:
         if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
+            )
+            cls.report_payment_without_order(
+                payment_intent_id, captured=captured, metadata=metadata
             )
             return None
 

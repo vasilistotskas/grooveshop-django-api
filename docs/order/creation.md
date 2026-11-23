@@ -219,6 +219,8 @@ caller:
   whose request carries `payment_intent_id`. Every client reaches it through
   `POST /api/v1/order`: the storefront, and the agent gateway's UCP/ACP
   checkout (which sends no intent, so it takes §3.2). Nothing else calls it.
+  A Stripe request with no `payment_intent_id` takes §3.2 instead; this
+  path is being retired for it (#818).
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
@@ -352,8 +354,22 @@ caller:
 
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
-  agent gateway's UCP/ACP checkout.
+  agent gateway's UCP/ACP checkout; `OrderViewSet.create` for every request
+  that carries no `payment_intent_id`, an intent-capable online pay way
+  (Stripe) included.
 - Sets `status=PENDING`, `payment_status=PENDING`.
+- **Every online pay way is order-first** (#818). An order for Stripe with no
+  intent is created like Viva's: PENDING with nothing charged and no
+  `payment_id`, the cart kept (`Order.awaits_online_payment`; it clears on
+  `order_paid`), the courier voucher deferred to the payment, and the
+  payment opened afterwards by `create_checkout_session` or
+  `create_payment_intent`, which charge `calculate_order_total_amount()`,
+  what is left after the gift cards, points and promotions. The quote's
+  locked refusals (stock, total, cart digest) therefore all run before any
+  payment exists. Deductions covering the whole total settle the order here
+  (step 6.8: `GIFTCARD_<uuid>` or `DISCOUNT_<uuid>`, the voucher dispatched,
+  the cart cleared), whatever the pay way. There is no refusal of a partial
+  cover: the remainder is what the payment is opened for.
 - Same lock order as §3.1: the cart row, then what the quote locks (§3.0:
   promotions, the customer's row when points are redeemed, the gift
   cards), then the cart lines, then the products in pk order before any

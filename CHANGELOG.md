@@ -3,6 +3,65 @@
 
 
 
+## v3.268.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): wait for a payment-first intent's order before alerting, and isolate the email log's lookup
+
+A payment-first intent can succeed while POST /order is still creating its
+order, so the payment-without-order alert now waits
+PAYMENT_WITHOUT_ORDER_GRACE_MINUTES for a cart-bound intent and sends only if
+no order carries it by then. An unbound intent still alerts at once.
+
+emails.log._claim reads EmailLog inside a savepoint, so a failed read no longer
+poisons the transaction the send runs in, a webhook's atomic block included.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): queue the delayed payment-without-order check through a signal
+
+The order services may not import order.tasks, so report_payment_without_order
+sends payment_awaits_order and a receiver in order.signals.handlers queues the
+task. The task name joins the locked list of Celery task names.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): send the payment-without-order alert from a retried task, for the store's own payments only
+
+The alert is always queued as order.tasks.alert_payment_without_order_task
+through payment_without_order_found, after the webhook commits, so a rolled
+back webhook queues nothing and a transient mail error is retried instead of
+lost. Only an intent carrying this store's binding alerts; any other payment
+on the account is logged at WARNING. A payment-first intent still waits the
+grace, an order-bound one alerts at once.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): keep the send error when releasing the alert's claim fails
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+### Features
+
+* feat(order): create a Stripe order before its payment and alert staff to a payment no order carries (#819) ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* feat(order): create a Stripe order before its payment and alert staff to a payment no order carries
+
+An online pay way whose provider mints a client-confirmed intent no longer
+needs a payment_intent_id at order creation. Such an order is created PENDING
+like a Viva one: the cart is kept, the courier voucher waits for the payment,
+and create_checkout_session or create_payment_intent open the payment for what
+is left after the deductions. Deductions covering the whole total still settle
+the order at creation.
+
+handle_payment_succeeded now sends ops.payment_without_order when no order
+carries or is bound to a succeeded PaymentIntent. The alert claims the intent
+id before it sends, never raises inside dj-stripe's webhook transaction, and
+gives the claim back when the send fails.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
 ## v3.267.4 (2026-11-23)
 
 ### Refactoring

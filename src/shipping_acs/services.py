@@ -863,6 +863,8 @@ class AcsService:
                 shipment.voucher_request_unknown_at = None
                 shipment.voucher_request_held_at = None
                 shipment.metadata = metadata
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
                 shipment.save(
                     update_fields=[
                         "voucher_no",
@@ -870,6 +872,7 @@ class AcsService:
                         "voucher_request_unknown_at",
                         "voucher_request_held_at",
                         "metadata",
+                        "updated_at",
                     ]
                 )
                 cls._settle_unrecognised_vouchers(
@@ -1049,7 +1052,9 @@ class AcsService:
                     "response": getattr(exc, "raw", None),
                 }
                 fresh.metadata = metadata
-                fresh.save(update_fields=["metadata"])
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
+                fresh.save(update_fields=["metadata", "updated_at"])
         except Exception:
             logger.warning(
                 "Failed to persist last_error for shipment=%s",
@@ -1597,7 +1602,7 @@ class AcsService:
         cancelled the voucher, leaving local state inconsistent. That
         only holds with no transaction open around this call: an order
         cancel asks after its own has committed
-        (``OrderService.cancel_attached_shipment``).
+        (``OrderLifecycleService.cancel_attached_shipment``).
 
         It locks the shipment alone and never writes the order
         (``shipping.locks``).
@@ -1704,11 +1709,14 @@ class AcsService:
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment.cancel_requested_at = timezone.now()
             shipment.metadata = metadata
+            # ``updated_at`` too: the erasure sweep reads a write to the
+            # row by it (``AcsCarrier.orders_written_since``).
             shipment.save(
                 update_fields=[
                     "shipment_state",
                     "cancel_requested_at",
                     "metadata",
+                    "updated_at",
                 ]
             )
 
@@ -4057,6 +4065,7 @@ class AcsService:
         flip, attempts the DELIVERED → COMPLETED auto-advance so
         accounting matches the lifecycle.
         """
+        from order.lifecycle.service import OrderLifecycleService
         from order.services import OrderService
         from order.signals import order_paid
 
@@ -4086,7 +4095,7 @@ class AcsService:
         # double-fire (e.g. a payout being upserted twice) results in
         # one Meta event, not two.
         order_paid.send(sender=type(order), order=order)
-        OrderService.maybe_advance_to_completed(
+        OrderLifecycleService.maybe_advance_to_completed(
             order, silent_for_customer=silent_for_customer
         )
 
@@ -4180,7 +4189,7 @@ class AcsService:
         ``False`` and behaves exactly as before.
         """
         from order.exceptions import InvalidStatusTransitionError
-        from order.services import OrderService
+        from order.lifecycle.service import OrderLifecycleService
 
         current_status: str = order.status
         new_status = cls.order_status_for_shipment_state(
@@ -4193,7 +4202,7 @@ class AcsService:
             # Never produced by ACS tracking: the admin retire action or
             # a voucher cancel, i.e. a parcel that never left (the
             # mapping returns it only for an order not yet shipped).
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=silent_for_customer
             )
             return
@@ -4225,7 +4234,7 @@ class AcsService:
             and current_status in _PRE_SHIPPED_ORDER_STATUSES
         ):
             try:
-                OrderService.update_order_status(
+                OrderLifecycleService.update_order_status(
                     order,
                     "SHIPPED",
                     silent_for_customer=(
@@ -4253,7 +4262,7 @@ class AcsService:
             )
 
         try:
-            OrderService.update_order_status(
+            OrderLifecycleService.update_order_status(
                 order, new_status, silent_for_customer=silent_for_customer
             )
         except InvalidStatusTransitionError as exc:
@@ -4280,7 +4289,7 @@ class AcsService:
         # advance — only the user-visible email/WS dispatches are
         # skipped.
         if new_status == "DELIVERED":
-            OrderService.maybe_advance_to_completed(
+            OrderLifecycleService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
 
@@ -4304,8 +4313,8 @@ class AcsService:
         recurses through the manager.
         """
         from order.exceptions import InvalidStatusTransitionError
+        from order.lifecycle.service import OrderLifecycleService
         from order.models.order import Order as _Order
-        from order.services import OrderService
 
         current_status = (
             _Order.objects.filter(pk=order.pk)
@@ -4316,7 +4325,7 @@ class AcsService:
             return
         order.status = current_status
         try:
-            OrderService.update_order_status(order, "PROCESSING")
+            OrderLifecycleService.update_order_status(order, "PROCESSING")
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "ACS voucher mint: could not advance order=%s PENDING -> "

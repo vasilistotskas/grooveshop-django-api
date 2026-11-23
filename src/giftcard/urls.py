@@ -17,6 +17,11 @@ urlpatterns = [
         name="giftcard-purchase",
     ),
     path(
+        "giftcard/mine/all",
+        GiftCardViewSet.as_view({"get": "mine_all"}),
+        name="giftcard-mine-all",
+    ),
+    path(
         "giftcard/mine",
         GiftCardViewSet.as_view({"get": "mine"}),
         name="giftcard-mine",

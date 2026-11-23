@@ -25,8 +25,18 @@ from rest_framework.test import APIClient
 
 pytestmark = pytest.mark.django_db
 
-# Rendered on a public byline: identity, not contact details.
-ALLOWED = {"id", "username", "firstName", "lastName", "mainImagePath"}
+# Rendered on a public byline: identity, not contact details. The avatar's
+# pixel size says nothing the public avatar does not (the storefront states
+# it as the author page's og:image size).
+ALLOWED = {
+    "id",
+    "username",
+    "firstName",
+    "lastName",
+    "mainImagePath",
+    "mainImageWidth",
+    "mainImageHeight",
+}
 
 # Any of these reaching an anonymous caller is the defect.
 FORBIDDEN = {

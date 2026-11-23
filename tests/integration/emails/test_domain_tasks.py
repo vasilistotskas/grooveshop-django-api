@@ -99,6 +99,7 @@ class TestProductAlerts:
         assert result["status"] == "skipped"
         alert.refresh_from_db()
         assert alert.is_active is True
+        assert alert.notified_at is None
 
     def test_an_opt_out_settles_the_alert_without_a_mail(self, alert):
         optout.opt_out(

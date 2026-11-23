@@ -12,14 +12,14 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from order.filters import OrderItemFilter
 from order.models.item import OrderItem
 from order.serializers.item import (
@@ -124,7 +124,7 @@ class OrderItemViewSet(BaseModelViewSet):
     def restock(self, request, pk=None):
         # Restocking puts returned units back on the shelf and records them
         # on the line; it moves NO money. What the customer is paid back is
-        # the order's refund (``OrderService.refund_order``, the staff
+        # the order's refund (``RefundService.refund_order``, the staff
         # "Refund" admin action), decided at order level because a line's
         # snapshot price is not what the customer paid for it (tax, shared
         # discounts, shipping). It is a staff/merchant operation, never

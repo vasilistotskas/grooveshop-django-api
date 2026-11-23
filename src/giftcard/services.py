@@ -188,8 +188,8 @@ class GiftCardService:
         """Whether *user* may put more than the staff limit on gift cards:
         a platform superuser, or the OWNER of this store. An admin or staff
         role may not: gift-card value is spendable money."""
+        from tenant.enum import TenantMembershipRole
         from tenant.membership import get_membership, is_platform_superuser
-        from tenant.models import TenantMembershipRole
 
         if is_platform_superuser(user):
             return True
@@ -580,7 +580,7 @@ class GiftCardService:
         *amount* of it, or everything not back yet when ``amount`` is
         ``None`` (a cancel). Returns what was credited.
 
-        An order is refunded onto its cards in parts (``OrderService.
+        An order is refunded onto its cards in parts (``RefundService.
         refund_order`` pays the provider first, then what the order paid
         with gift cards), so a card can be credited more than once for one
         order. What a card is owed is what it gave (REDEEM) less what has

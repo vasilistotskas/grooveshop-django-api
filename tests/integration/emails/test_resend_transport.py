@@ -14,7 +14,6 @@ import pytest
 import requests
 from django.core import mail
 
-from core import celery_app
 from core.retry import MAIL_TRANSIENT_ERRORS, is_permanent_failure
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
@@ -22,6 +21,7 @@ from emails.resend import API_URL, LOG_TAG, SCHEMA_TAG, ResendNotConfigured
 from emails.send import Status, send_email
 from emails.transport import Attachment
 from emails.types import Audience, Owner
+from tests.utils.email_tasks import send_retrying
 from tests.utils.emails import probe, probe_object
 
 pytestmark = pytest.mark.django_db
@@ -395,24 +395,14 @@ class TestRetryAfterALostResponse:
     ):
         catalogue(probe())
 
-        @celery_app.task(bind=True, max_retries=2, name="tests.resend_retry")
-        def task(self):
-            try:
-                send_email("probe.notice", probe_object())
-            except OSError as error:
-                raise self.retry(exc=error, countdown=0) from error
-
-        try:
-            with mock.patch(
-                "emails.resend.requests.post",
-                side_effect=[
-                    requests.Timeout("response lost"),
-                    _response(200, {"id": RESEND_ID}),
-                ],
-            ) as post:
-                task.apply(throw=False)
-        finally:
-            celery_app.tasks.pop("tests.resend_retry", None)
+        with mock.patch(
+            "emails.resend.requests.post",
+            side_effect=[
+                requests.Timeout("response lost"),
+                _response(200, {"id": RESEND_ID}),
+            ],
+        ) as post:
+            send_retrying.apply(throw=False)
 
         keys = [
             call.kwargs["headers"]["Idempotency-Key"]

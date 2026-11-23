@@ -12,7 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.urls import reverse
 from django.utils import translation
 
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.texts.conftest import staff_client
 from tests.utils.staff import store_staff
 from tests.utils.texts import FOOTER

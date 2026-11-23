@@ -31,6 +31,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 from order.payments.payment_ledger import PaymentLedger
+from order.payments.viva_settlement import handle_payment_created
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
@@ -39,7 +40,6 @@ from order.signals.handlers import (
     handle_stripe_refund_failed,
     handle_stripe_refund_made,
 )
-from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
 from tests.utils.stripe_refunds import refund_event
 from tests.utils.viva import verified_payment
@@ -81,18 +81,18 @@ def _viva(order, transaction_id, order_code="OC1"):
     """Deliver a verified Viva payment-created event for *order*."""
     with (
         patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 verified_payment(order, order_code),
             ),
         ),
-        patch("order.views.viva_webhook.dispatch_on_commit"),
+        patch("order.signals.handlers.dispatch_on_commit"),
         patch(
             "shipping.services.ShippingService.dispatch_create_shipment_task"
         ),
     ):
-        _handle_payment_created(order, {"StatusId": "F"}, transaction_id)
+        handle_payment_created(order, {"StatusId": "F"}, transaction_id)
     order.refresh_from_db()
 
 

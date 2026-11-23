@@ -7,7 +7,7 @@ from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
 
 from blog.managers.post import BlogPostManager
-from core.fields.image import ImageAndSvgField
+from core.fields.image import ImageAndSvgField, ImageSizeModelMixin
 from core.fields.rich_text import RichTextField
 from core.models import (
     PublishableModel,
@@ -26,6 +26,7 @@ from search.transliteration import (
 
 
 class BlogPost(
+    ImageSizeModelMixin,
     TranslatableModel,
     TimeStampMixinModel,
     PublishableModel,
@@ -34,7 +35,20 @@ class BlogPost(
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     image = ImageAndSvgField(
-        _("Image"), upload_to="uploads/blog/", blank=True, null=True
+        _("Image"),
+        upload_to="uploads/blog/",
+        blank=True,
+        null=True,
+        width_field="image_width",
+        height_field="image_height",
+    )
+    # The size a browser shows the image at (EXIF orientation applied),
+    # measured by ``ImageAndSvgField``; null for an SVG.
+    image_width = models.PositiveIntegerField(
+        _("Width"), null=True, blank=True, editable=False
+    )
+    image_height = models.PositiveIntegerField(
+        _("Height"), null=True, blank=True, editable=False
     )
     likes = models.ManyToManyField(
         "user.UserAccount",

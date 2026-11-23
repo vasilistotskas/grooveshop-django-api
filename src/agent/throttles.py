@@ -9,7 +9,7 @@ from core.api.throttling import (
 
 
 class StaffAgentThrottle(UserOrIpRateThrottle):
-    """The store-admin agent surface (``agent/staff_views.py``).
+    """The store-admin agent surface (``src/agent/staff_views.py``).
 
     Keyed by the staff member, and per store, since the cache key carries
     the schema (``tenant.cache.make_tenant_key``): one AI app's burst of

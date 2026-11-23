@@ -144,6 +144,25 @@ class ShippingCharge:
     waived_by: FreeShippingSource | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProductShippingEstimate:
+    """What shipping one product on its own costs, at the cheapest.
+
+    ``price`` is the cheapest delivery checkout would charge a cart
+    holding that product alone, to ``country_code``; ``free_shipping_
+    threshold`` the lowest products subtotal from which a carrier that
+    can take it ships free, ``None`` when none ever does.
+    """
+
+    country_code: str
+    price: Money
+    free_shipping_threshold: Decimal | None
+
+    @property
+    def free(self) -> bool:
+        return self.price.amount == 0
+
+
 class ShippingService:
     """Provider-agnostic dispatcher used by the rest of the codebase."""
 
@@ -662,6 +681,69 @@ class ShippingService:
 
         options.sort(key=lambda opt: (opt["priority"], opt["provider_code"]))
         return options
+
+    @classmethod
+    def product_shipping_from(cls, product) -> ProductShippingEstimate | None:
+        """The cheapest delivery of ``product`` bought on its own.
+
+        Priced as checkout prices a cart holding one unit of it and
+        nothing else (:meth:`available_options`), for a shopper not known
+        yet: to the store's first shipping country, the one checkout
+        preselects (:meth:`initial_country_code`); at the products value
+        every "free above X" rule is judged on, after the automatic
+        promotions such a cart gets
+        (``PromotionEngine.evaluate_single_unit``), whose free shipping
+        waives every carrier; weighed and sized with the gifts those
+        promotions add, so a delivery that cannot carry the parcel
+        (``exceeds_max_weight`` / ``exceeds_parcel_size``) does not
+        count. A carrier priced live is asked as checkout asks it.
+
+        ``None`` when the store ships nowhere, or no delivery it offers
+        to that country can take the product.
+        """
+        from order.checkout.quote import OrderQuoteService
+        from promotion.engine.benefits import gift_pairs
+        from promotion.engine.evaluation import PromotionEngine
+        from shipping.utils import compute_total_weight_grams
+
+        country_code = cls.initial_country_code()
+        if country_code is None:
+            return None
+
+        promotion = PromotionEngine.evaluate_single_unit(product)
+        items = [(product, 1), *gift_pairs(promotion)]
+        weight_grams = compute_total_weight_grams(items)
+        order_value = OrderQuoteService.threshold_value(
+            product.final_price, promotion.discount_total
+        )
+        prices = [
+            option["price"]
+            for option in cls.available_options(
+                country_code=country_code,
+                order_value_amount=order_value.amount,
+                currency=str(order_value.currency),
+                weight_grams=weight_grams,
+                items=items,
+                free=promotion.free_shipping,
+            )
+            if not option["exceeds_max_weight"]
+            and not option["exceeds_parcel_size"]
+        ]
+        if not prices:
+            return None
+
+        free_rates = cls.free_threshold_rates(
+            country_code, weight_grams=weight_grams, items=items
+        )
+        return ProductShippingEstimate(
+            country_code=country_code,
+            price=Money(min(prices), order_value.currency),
+            free_shipping_threshold=(
+                free_rates[0].free_shipping_threshold.amount
+                if free_rates
+                else None
+            ),
+        )
 
     @classmethod
     def offered_rates(

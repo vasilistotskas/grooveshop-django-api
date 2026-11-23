@@ -48,7 +48,7 @@ class TenantShippingCarrierSerializer(serializers.Serializer):
 
 class StoreFeaturesSerializer(serializers.Serializer):
     """Each optional feature's effective state for the store: its plan
-    flag AND its store settings (``tenant/features.py``), so a client reads
+    flag AND its store settings (``src/tenant/features.py``), so a client reads
     one answer instead of combining the two tiers and copying defaults."""
 
     customer_accounts = serializers.BooleanField(read_only=True)
@@ -80,7 +80,7 @@ class StoreFeaturesSerializer(serializers.Serializer):
 
 
 class StorePreferencesSerializer(serializers.Serializer):
-    """Each store preference's state (``tenant/features.py``): a switch the
+    """Each store preference's state (``src/tenant/features.py``): a switch the
     API does not refuse on, served here so a client learns it from the
     tenant payload instead of a settings read that can fail."""
 

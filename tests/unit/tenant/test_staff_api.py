@@ -21,11 +21,8 @@ from core.api.permissions import (
 )
 from tenant.api_tokens import PlatformStaffTokenAuthentication
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import (
-    PlatformStaffToken,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import PlatformStaffToken, UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount

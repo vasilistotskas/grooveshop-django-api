@@ -268,7 +268,7 @@ class ViewCountThrottle(UserOrIpRateThrottle):
 
 class StaffLoginThrottle(ResilientThrottleMixin, ScopedRateThrottle):
     """The platform staff token endpoint — a credential-guessing surface
-    (``tenant/staff_api.py``). Scoped by the view's ``throttle_scope``,
+    (``src/tenant/staff_api.py``). Scoped by the view's ``throttle_scope``,
     and keyed like every throttle here on the proven caller, so one
     caller behind a shared edge node cannot spend everyone's budget."""
 

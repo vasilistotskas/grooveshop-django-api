@@ -21,12 +21,8 @@ from django_tenants.utils import get_public_schema_name, schema_context
 from builder import services
 from builder.storefront import clear_catalogue_cache
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import (
-    PlatformStaffToken,
-    StaffTokenScope,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import StaffTokenScope, TenantMembershipRole
+from tenant.models import PlatformStaffToken, UserTenantMembership
 from tests.utils.builder import FakeCatalogue, document, hero, section
 
 pytestmark = pytest.mark.django_db

@@ -35,12 +35,12 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.models.history import OrderHistory
-from order.services import (
+from order.lifecycle.service import (
     SHIPMENT_CANCEL_PENDING_FLAG,
     SHIPMENT_CANCEL_UNANSWERED_KEY,
-    OrderService,
+    OrderLifecycleService,
 )
+from order.models.history import OrderHistory
 from shipping.models import ShippingProvider
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
@@ -1144,7 +1144,7 @@ class TestStaffAreToldWhenBoxNowCannotBeAsked:
         shipment = _after_a_lost_answer(order)
         http.answer(_LOOKUP, _response(503, text="busy"))
 
-        canceled, _ = OrderService.cancel_order(
+        canceled, _ = OrderLifecycleService.cancel_order(
             order,
             reason="staff",
             refund_payment=False,
@@ -1769,7 +1769,7 @@ def _locked_tables(queries) -> list[str]:
 
 class TestTheSweepLocksTheOrderFirst:
     """An order cancel locks the order, then the shipment
-    (``OrderService._cancel_order_locked`` → ``cancel_shipment``). The
+    (``OrderLifecycleService._cancel_order_locked`` → ``cancel_shipment``). The
     sweep takes them in that order too, and decides on a live order's
     empty lookup and clears its stamp in one locked step, so a cancel
     cannot slip in between."""

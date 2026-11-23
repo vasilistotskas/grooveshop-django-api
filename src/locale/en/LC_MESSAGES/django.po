@@ -752,9 +752,6 @@ msgstr "15-digit registration number assigned by AADE. This is the legally-autho
 msgid "30 days"
 msgstr "30 days"
 
-msgid "3D Secure verification was not completed"
-msgstr "3D Secure verification was not completed"
-
 msgid "7 days"
 msgstr "7 days"
 
@@ -789,6 +786,9 @@ msgstr "A breakdown shows sales before returns, biggest first. For a product or 
 
 msgid "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
 msgstr "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period."
+
+msgid "A charge that does not match its order: decide it"
+msgstr "A charge that does not match its order: decide it"
 
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
@@ -2047,6 +2047,9 @@ msgstr "Automatic promotions apply to every eligible cart; code promotions requi
 msgid "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 msgstr "Automatic promotions short of exactly one minimum (subtotal, units, or a reward product) — 'add X more to unlock'"
 
+msgid "Availability probability"
+msgstr "Availability probability"
+
 msgid "Available Locales"
 msgstr "Available Locales"
 
@@ -2091,6 +2094,9 @@ msgstr "BOX NOW carrier"
 
 msgid "BOX NOW parcel at the locker"
 msgstr "BOX NOW parcel at the locker"
+
+msgid "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
+msgstr "BOX NOW's chance, from 0 to 1, that the locker has a free compartment. Empty means not known."
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "BXGY promotions need both a buy quantity and a get quantity."
@@ -2671,9 +2677,6 @@ msgstr "COD reconciliation task dispatched."
 msgid "COD recorded as received outside ACS."
 msgstr "COD recorded as received outside ACS."
 
-msgid "COMPLETE YOUR PAYMENT"
-msgstr "COMPLETE YOUR PAYMENT"
-
 msgid "CONFIRM HERE"
 msgstr "CONFIRM HERE"
 
@@ -2871,9 +2874,6 @@ msgstr "Card"
 
 msgid "Card disabled."
 msgstr "Card disabled."
-
-msgid "Card not authorized for online payments"
-msgstr "Card not authorized for online payments"
 
 msgid "Card value in EUR — bounded by GIFT_CARD_MIN_AMOUNT / GIFT_CARD_MAX_AMOUNT"
 msgstr "Card value in EUR — bounded by GIFT_CARD_MIN_AMOUNT / GIFT_CARD_MAX_AMOUNT"
@@ -3124,6 +3124,9 @@ msgstr "Charge a Stripe SharedPaymentToken granted by an AI agent platform (ACP/
 
 msgid "Charge type"
 msgstr "Charge type"
+
+msgid "Charge waiting for a decision"
+msgstr "Charge waiting for a decision"
 
 msgid "Chargeback"
 msgstr "Chargeback"
@@ -3425,9 +3428,6 @@ msgstr "Commerce"
 msgid "Common"
 msgstr "Common"
 
-msgid "Common reasons for failed payments:"
-msgstr "Common reasons for failed payments:"
-
 msgid "Company"
 msgstr "Company"
 
@@ -3463,6 +3463,9 @@ msgstr "Compare with"
 msgid "Compartment Size"
 msgstr "Compartment Size"
 
+msgid "Compartment sizes"
+msgstr "Compartment sizes"
+
 msgid "Complete"
 msgstr "Complete"
 
@@ -3471,9 +3474,6 @@ msgstr "Complete Profile"
 
 msgid "Complete payment with an agent-granted Stripe token"
 msgstr "Complete payment with an agent-granted Stripe token"
-
-msgid "Complete your payment"
-msgstr "Complete your payment"
 
 msgid "Completed"
 msgstr "Completed"
@@ -3565,6 +3565,9 @@ msgstr "Confirmed by hand"
 
 msgid "Connection or timeout"
 msgstr "Connection or timeout"
+
+msgid "Consecutive absent syncs"
+msgstr "Consecutive absent syncs"
 
 msgid "Consent"
 msgstr "Consent"
@@ -4431,6 +4434,9 @@ msgstr "Discount: %(percent)s%%. You save %(value)s per item (%(total)s total)."
 msgid "Discounted price excluding VAT"
 msgstr "Discounted price excluding VAT"
 
+msgid "Dispatch key"
+msgstr "Dispatch key"
+
 #, python-format
 msgid "Dispatched tracking poll for %(count)d shipment(s)."
 msgstr "Dispatched tracking poll for %(count)d shipment(s)."
@@ -4935,6 +4941,9 @@ msgstr "Event Type ID"
 msgid "Event fingerprint"
 msgstr "Event fingerprint"
 
+msgid "Event key"
+msgstr "Event key"
+
 msgid "Event name"
 msgstr "Event name"
 
@@ -4950,6 +4959,9 @@ msgstr "Events"
 msgid "Events received"
 msgstr "Events received"
 
+msgid "Every country, in one list"
+msgstr "Every country, in one list"
+
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 
@@ -4958,6 +4970,9 @@ msgstr "Every delivery the store offers to the request's country, priced as an o
 
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
+
+msgid "Every gift card linked to my account, in one list"
+msgstr "Every gift card linked to my account, in one list"
 
 msgid "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
 msgstr "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
@@ -7664,9 +7679,6 @@ msgstr "Incomplete"
 msgid "Incomplete (Missing Data)"
 msgstr "Incomplete (Missing Data)"
 
-msgid "Incorrect card details"
-msgstr "Incorrect card details"
-
 msgid "Increase quantity by 1"
 msgstr "Increase quantity by 1"
 
@@ -7732,9 +7744,6 @@ msgstr "Instagram profile URL. Must use https://. Empty → link hidden in store
 
 msgid "Instructions for the customer on how to complete payment (e.g., bank transfer details)"
 msgstr "Instructions for the customer on how to complete payment (e.g., bank transfer details)"
-
-msgid "Insufficient funds"
-msgstr "Insufficient funds"
 
 #, python-format
 msgid "Insufficient points balance. Available: %(balance)s, Requested: %(amount)s"
@@ -9215,6 +9224,9 @@ msgstr "No discounts applied"
 msgid "No email matches."
 msgstr "No email matches."
 
+msgid "No icon"
+msgstr "No icon"
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "No item in the cart qualifies for this promotion"
 
@@ -9474,9 +9486,6 @@ msgstr "Nothing retained"
 msgid "Nothing to issue"
 msgstr "Nothing to issue"
 
-msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
-msgstr "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
-
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Nothing was saved. Fix the marked texts."
 
@@ -9514,6 +9523,9 @@ msgstr "Notified at"
 
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null until the enquiry that claims this upload is submitted."
+
+msgid "Null when the store ships nowhere, or no delivery it offers can take this product."
+msgstr "Null when the store ships nowhere, or no delivery it offers can take this product."
 
 msgid "Number"
 msgstr "Number"
@@ -10286,9 +10298,6 @@ msgstr "Owner Email"
 msgid "PAYMENT CONFIRMED"
 msgstr "PAYMENT CONFIRMED"
 
-msgid "PAYMENT FAILED"
-msgstr "PAYMENT FAILED"
-
 msgid "PENDING / PAID / FAILED / CANCELED"
 msgstr "PENDING / PAID / FAILED / CANCELED"
 
@@ -10466,6 +10475,9 @@ msgstr "Partner shop (2)"
 msgid "Partner shop (3)"
 msgstr "Partner shop (3)"
 
+msgid "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+msgstr "Partner syncs in a row that did not return the locker. It is withdrawn when this reaches the setting BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION."
+
 msgid "Password accepted. Confirm it is you with a code."
 msgstr "Password accepted. Confirm it is you with a code."
 
@@ -10560,13 +10572,6 @@ msgstr "Payment Confirmed"
 msgid "Payment Confirmed - Order #{order_id}"
 msgstr "Payment Confirmed - Order #{order_id}"
 
-msgid "Payment Failed"
-msgstr "Payment Failed"
-
-#, python-brace-format
-msgid "Payment Failed - Order #{order_id}"
-msgstr "Payment Failed - Order #{order_id}"
-
 msgid "Payment Gateway"
 msgstr "Payment Gateway"
 
@@ -10650,10 +10655,6 @@ msgstr "Payment does not match order #%(order_id)s"
 msgid "Payment failed"
 msgstr "Payment failed"
 
-#, python-brace-format
-msgid "Payment failed for order #{order_id}"
-msgstr "Payment failed for order #{order_id}"
-
 msgid "Payment fee"
 msgstr "Payment fee"
 
@@ -10716,6 +10717,9 @@ msgstr "Payment received for canceled order #%(order_id)s"
 msgid "Payment reference"
 msgstr "Payment reference"
 
+msgid "Payment review"
+msgstr "Payment review"
+
 msgid "Payment status"
 msgstr "Payment status"
 
@@ -10736,6 +10740,9 @@ msgstr "Payment-method list and detail responses, plus the checkout sidebar that
 
 msgid "Payments"
 msgstr "Payments"
+
+msgid "Payments to review"
+msgstr "Payments to review"
 
 msgid "Payout marked as reconciled."
 msgstr "Payout marked as reconciled."
@@ -10843,6 +10850,9 @@ msgstr "Permanently destroyed %(count)d tenant(s): %(names)s"
 msgid "Permissions"
 msgstr "Permissions"
 
+msgid "Personal data erased at"
+msgstr "Personal data erased at"
+
 msgid "Phone"
 msgstr "Phone"
 
@@ -10860,6 +10870,9 @@ msgstr "Phone number for BoxNow shipment notifications, sent as the sender's con
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
+
+msgid "Pick one of the icons the store offers."
+msgstr "Pick one of the icons the store offers."
 
 msgid "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
 msgstr "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
@@ -11623,6 +11636,9 @@ msgstr "Purged At"
 
 msgid "Purpose of movement"
 msgstr "Purpose of movement"
+
+msgid "Pushed at"
+msgstr "Pushed at"
 
 msgid "Put the returned units back in stock"
 msgstr "Put the returned units back in stock"
@@ -13208,9 +13224,6 @@ msgstr "Sent when an order is placed with its payment captured."
 msgid "Sent when an order is returned to the store."
 msgstr "Sent when an order is returned to the store."
 
-msgid "Sent when an order's payment fails, with a link to the order."
-msgstr "Sent when an order's payment fails, with a link to the order."
-
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Sent when someone signs up with an address that already has an account."
 
@@ -14693,12 +14706,18 @@ msgstr "The cart's lines at the prices the shopper pays."
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 
+msgid "The category's icon, one of the page builder's icons."
+msgstr "The category's icon, one of the page builder's icons."
+
 #, python-format
 msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 msgstr "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
+
+msgid "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
+msgstr "The cheapest delivery checkout would charge a cart holding this product alone, after its free-shipping threshold and free-shipping promotions."
 
 msgid "The closed gate's label, for a skipped feature."
 msgstr "The closed gate's label, for a skipped feature."
@@ -14716,11 +14735,17 @@ msgstr "The code has reached its usage limit"
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 
+msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+msgstr "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "The cost without VAT: this is what the profit report uses."
+
+msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
+msgstr "The country it was priced for: the store's first shipping country, the one checkout preselects."
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
@@ -14928,6 +14953,9 @@ msgstr "The link search is not valid."
 msgid "The locker's BOX NOW id, exactly."
 msgstr "The locker's BOX NOW id, exactly."
 
+msgid "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+msgstr "The lowest products subtotal, after discounts, from which a carrier that can take this product ships free. Null when none ever does."
+
 msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
 
@@ -15054,6 +15082,9 @@ msgstr "The previous payment could not be closed."
 
 msgid "The previous payment is still in progress."
 msgstr "The previous payment is still in progress."
+
+msgid "The product ships free on its own: ``price`` is 0."
+msgstr "The product ships free on its own: ``price`` is 0."
 
 msgid "The product the shopper is looking at."
 msgstr "The product the shopper is looking at."
@@ -15246,6 +15277,9 @@ msgstr "The store's terms of use or privacy policy cannot be shown right now, so
 msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
 msgstr "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
 
+msgid "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
+msgstr "The storefront cannot be reached, so the icons cannot be listed. Try again in a moment."
+
 msgid "The storefront catalogue build the draft was last validated against."
 msgstr "The storefront catalogue build the draft was last validated against."
 
@@ -15338,6 +15372,9 @@ msgstr "The voucher request that has the turn: the shipment and the request's ow
 
 msgid "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
 msgstr "The voucher's pickup date: the pickup list run that first named it, or the date its voucher request carried."
+
+msgid "The whole country list as one array, filtered and ordered as the paginated list is: for a picker that needs every row."
+msgstr "The whole country list as one array, filtered and ordered as the paginated list is: for a picker that needs every row."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "The wholesale pricing tier this business gets"
@@ -16872,9 +16909,6 @@ msgstr "We Miss You!"
 msgid "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 msgstr "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 
-msgid "We couldn't process your payment. Tap to retry with a different method."
-msgstr "We couldn't process your payment. Tap to retry with a different method."
-
 msgid "We hope to see you again soon!"
 msgstr "We hope to see you again soon!"
 
@@ -16889,9 +16923,6 @@ msgstr "We miss you!"
 
 msgid "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!"
 msgstr "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!"
-
-msgid "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
-msgstr "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
 
 msgid "We will email you as your order progresses."
 msgstr "We will email you as your order progresses."
@@ -17078,6 +17109,9 @@ msgstr "When staff recorded that this payout was accounted for. A payout matchin
 msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
 
+msgid "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+msgstr "When the buyer's personal data was erased (GDPR). Carrier data that arrives later is erased too."
+
 msgid "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
 msgstr "When the cancel of this receipt stopped for staff: myDATA shows it neither to the cancel (error 301) nor in the list of the store's documents, so its state there is unknown. Staff cancel it in myDATA or issue its credit documents."
 
@@ -17107,6 +17141,9 @@ msgstr "When the order first left the store. The sale is counted in the month of
 
 msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
 msgstr "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
+
+msgid "When the order was confirmed and the customer and the store were told about it: when it was placed, or, for a card payment, when the payment went through. Empty for a card order that was never paid."
+msgstr "When the order was confirmed and the customer and the store were told about it: when it was placed, or, for a card payment, when the payment went through. Empty for a card order that was never paid."
 
 msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
 msgstr "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
@@ -17669,9 +17706,6 @@ msgstr "Your password was changed. Log in with the new password; if your account
 msgid "Your password was reset"
 msgstr "Your password was reset"
 
-msgid "Your payment could not be processed"
-msgstr "Your payment could not be processed"
-
 msgid "Your payment has been confirmed and we're preparing your order."
 msgstr "Your payment has been confirmed and we're preparing your order."
 
@@ -18212,6 +18246,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "%(slot)s navigation"
 #~ msgstr "%(slot)s navigation"
 
+#~ msgid "3D Secure verification was not completed"
+#~ msgstr "3D Secure verification was not completed"
+
 #~ msgid "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
 #~ msgstr "A courier or locker order's receipt names the place its parcel leaves from, and is refused until it is set. Fill in MYDATA_LOADING_POSTAL_CODE and MYDATA_LOADING_CITY (and the street), then send the refused receipts again from their orders."
 
@@ -18325,6 +18362,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Business Hours"
 #~ msgstr "Business Hours"
 
+#~ msgid "COMPLETE YOUR PAYMENT"
+#~ msgstr "COMPLETE YOUR PAYMENT"
+
 #~ msgid "Call to Action Banner"
 #~ msgstr "Call to Action Banner"
 
@@ -18333,6 +18373,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Cancel the BoxNow shipment for an order"
+
+#~ msgid "Card not authorized for online payments"
+#~ msgstr "Card not authorized for online payments"
 
 #~ msgid "City name"
 #~ msgstr "City name"
@@ -18356,11 +18399,17 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Comma-separated facet fields for counts and stats"
 
+#~ msgid "Common reasons for failed payments:"
+#~ msgstr "Common reasons for failed payments:"
+
 #~ msgid "Comparison Table"
 #~ msgstr "Comparison Table"
 
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"
+
+#~ msgid "Complete your payment"
+#~ msgstr "Complete your payment"
 
 #~ msgid "Component Type"
 #~ msgstr "Component Type"
@@ -18526,8 +18575,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Inactive user notification"
 #~ msgstr "Inactive user notification"
 
+#~ msgid "Incorrect card details"
+#~ msgstr "Incorrect card details"
+
 #~ msgid "Info Hex"
 #~ msgstr "Info Hex"
+
+#~ msgid "Insufficient funds"
+#~ msgstr "Insufficient funds"
 
 #~ msgid "Interval Schedules"
 #~ msgstr "Interval Schedules"
@@ -18660,6 +18715,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
 
+#~ msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+#~ msgstr "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+
 #~ msgid "Number of pending-order reminder emails sent."
 #~ msgstr "Number of pending-order reminder emails sent."
 
@@ -18689,6 +18747,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Out of Stock (0)"
 #~ msgstr "Out of Stock (0)"
+
+#~ msgid "PAYMENT FAILED"
+#~ msgstr "PAYMENT FAILED"
 
 #~ msgid "Page Hero"
 #~ msgstr "Page Hero"
@@ -18729,6 +18790,17 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Partner Strip"
 #~ msgstr "Partner Strip"
+
+#~ msgid "Payment Failed"
+#~ msgstr "Payment Failed"
+
+#, python-brace-format
+#~ msgid "Payment Failed - Order #{order_id}"
+#~ msgstr "Payment Failed - Order #{order_id}"
+
+#, python-brace-format
+#~ msgid "Payment failed for order #{order_id}"
+#~ msgstr "Payment failed for order #{order_id}"
 
 #~ msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
 #~ msgstr "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
@@ -18837,6 +18909,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Select an email to preview"
 #~ msgstr "Select an email to preview"
+
+#~ msgid "Sent when an order's payment fails, with a link to the order."
+#~ msgstr "Sent when an order's payment fails, with a link to the order."
 
 #~ msgid "Sent when order is canceled"
 #~ msgstr "Sent when order is canceled"
@@ -19024,9 +19099,15 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Warning Hex"
 #~ msgstr "Warning Hex"
 
+#~ msgid "We couldn't process your payment. Tap to retry with a different method."
+#~ msgstr "We couldn't process your payment. Tap to retry with a different method."
+
 #, python-format
 #~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
 #~ msgstr "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
+
+#~ msgid "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
+#~ msgstr "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
 
 #~ msgid "What Is Microlearning"
 #~ msgstr "What Is Microlearning"
@@ -19043,6 +19124,9 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
 #~ msgstr "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+
+#~ msgid "Your payment could not be processed"
+#~ msgstr "Your payment could not be processed"
 
 #~ msgid "admin/email-templates/"
 #~ msgstr "admin/email-templates/"

@@ -85,7 +85,17 @@ def _stripe_order(payment_status=PaymentStatus.PENDING):
     )
     order.payment_status = payment_status
     order.payment_id = "pi_test_123"
-    order.save(update_fields=["pay_way", "payment_status", "payment_id"])
+    # A card order is not confirmed until its payment settles; the
+    # factory's own save confirmed it under its default pay way.
+    order.confirmed_at = None
+    order.save(
+        update_fields=[
+            "pay_way",
+            "payment_status",
+            "payment_id",
+            "confirmed_at",
+        ]
+    )
     return order
 
 

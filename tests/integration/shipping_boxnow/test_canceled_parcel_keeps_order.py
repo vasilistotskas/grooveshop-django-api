@@ -5,7 +5,7 @@ BoxNow defines the state as "Parcel has been canceled by the sender"
 §6.5.3, p. 49). The sender is the store, so the event reports a decision
 the store already made: a staff member replacing the parcel (a wrong
 locker, a re-issue), or the cancel of the order itself, which already ran
-``OrderService.cancel_order``. The event therefore never cancels the
+``OrderLifecycleService.cancel_order``. The event therefore never cancels the
 order (#600). It marks the shipment canceled, leaves the order, its stock
 and its payment alone, and an order still open behind a canceled parcel
 needs follow-up: staff re-issue the parcel or cancel the order.
@@ -29,9 +29,9 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.inventory.stock import StockManager
+from order.lifecycle.service import OrderLifecycleService
 from order.models import OrderItem, PaymentTransaction
 from order.models.order import Order
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from shipping.models import ShippingProvider
@@ -178,7 +178,7 @@ class TestAnOpenOrder:
         deliver(shipment)
 
         with patch("shipping_boxnow.services.BoxNowClient") as client:
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order, reason="changed my mind", customer_initiated=True
             )
 
@@ -213,7 +213,7 @@ class TestAPaidOrderCanceledByItsCustomer:
             patch("shipping_boxnow.services.BoxNowClient") as client,
             FakeStripeRefunds() as stripe_api,
         ):
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order, reason="changed my mind", customer_initiated=True
             )
 
@@ -235,7 +235,7 @@ class TestAnOrderAlreadyCanceled:
     def test_the_event_changes_nothing(self, deliver):
         order, product, shipment = _paid_order_holding_stock()
         with patch("shipping_boxnow.services.BoxNowClient"):
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order,
                 reason="staff cancel",
                 refund_payment=False,

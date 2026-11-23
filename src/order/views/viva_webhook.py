@@ -856,6 +856,22 @@ def _process_gift_card_purchase_event(
                 type(purchase).objects.select_for_update().get(pk=purchase.pk)
             )
 
+            # The read above judged the event from an unlocked purchase. A
+            # purchase that moved since needs an answer it does not have:
+            # refuse (500, Viva redelivers and the next delivery reads
+            # first) rather than send a request under the lock.
+            if (
+                reported is None
+                and transaction_id
+                and _gift_card_event_needs_viva(
+                    purchase, event_type_id, event_data
+                )
+            ):
+                raise RuntimeError(
+                    "Gift-card purchase changed between the Viva read and "
+                    f"the lock for txn {transaction_id}"
+                )
+
             outcome = VivaWebhookEvent.OUTCOME_PROCESSED
             if event_type_id == 1796:
                 status_id = event_data.get("StatusId", "")
@@ -995,6 +1011,20 @@ def _process_gift_card_purchase_event(
     return JsonResponse({"status": "ok"})
 
 
+def _gift_card_event_needs_viva(
+    purchase, event_type_id, event_data: dict
+) -> bool:
+    """Whether the branch for *event_type_id* judges a Retrieve Transaction
+    answer for *purchase* as it is now (the event carrying a transaction)."""
+    from giftcard.enum import GiftCardPurchaseStatus
+
+    if event_type_id == 1796:
+        return event_data.get("StatusId", "") in {"", "F"}
+    if event_type_id == 1798:
+        return purchase.status == GiftCardPurchaseStatus.PENDING
+    return event_type_id == 1797
+
+
 def _read_gift_card_event(
     purchase, event_type_id, event_data: dict, transaction_id: str
 ):
@@ -1005,18 +1035,9 @@ def _read_gift_card_event(
 
     Raises ``RuntimeError`` when Viva cannot be read, as the branch did.
     """
-    from giftcard.enum import GiftCardPurchaseStatus
-
-    if not transaction_id:
-        return None
-    if event_type_id == 1796:
-        status_id = event_data.get("StatusId", "")
-        if status_id and status_id != "F":
-            return None
-    elif event_type_id == 1798:
-        if purchase.status != GiftCardPurchaseStatus.PENDING:
-            return None
-    elif event_type_id != 1797:
+    if not transaction_id or not _gift_card_event_needs_viva(
+        purchase, event_type_id, event_data
+    ):
         return None
     return viva_settlement.retrieve_transaction(transaction_id)
 

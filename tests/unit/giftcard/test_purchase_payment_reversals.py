@@ -514,3 +514,29 @@ class TestVivaIsReadBeforeThePurchaseIsLocked:
         assert sent_at_lock
         assert sent_at_lock[0] > 0
         assert len(viva.sent) == sent_at_lock[0]
+
+    def test_a_purchase_that_moved_since_the_read_sends_nothing_under_the_lock(
+        self,
+    ):
+        """The read skipped a 1798 because the purchase was not pending; the
+        row is pending under the lock. The event is refused with a retryable
+        500, and no request is sent under the lock."""
+        purchase = _viva_purchase()
+        stale = GiftCardPurchase.objects.get(pk=purchase.pk)
+        stale.status = GiftCardPurchaseStatus.FAILED
+        viva = FakeVivaApi()
+
+        with viva:
+            response = _process_gift_card_purchase_event(
+                purchase=stale,
+                event_type_id=1798,
+                event_data={},
+                transaction_id="txn-moved",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        purchase.refresh_from_db()
+        assert response.status_code == 500
+        assert not viva.sent
+        assert purchase.status == GiftCardPurchaseStatus.PENDING

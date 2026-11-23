@@ -41,16 +41,16 @@ from cart.throttles import (
     CartQuoteThrottle,
     CouponApplyThrottle,
 )
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+)
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.i18n import active_language_code
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-)
 from giftcard.throttles import gift_card_code_throttles
 from order.checkout.quote import (
     CheckoutQuote,
@@ -577,7 +577,7 @@ class CartViewSet(BaseModelViewSet):
         url_path="coupons",
         # A bare array, not a page: ``pagination_class=None`` is the
         # project's convention for saying so to the schema generator
-        # (core/api/schema.py), and ``filter_backends=[]`` stops the
+        # (src/core/api/schema.py), and ``filter_backends=[]`` stops the
         # cart's admin FilterSet documenting query params this action
         # never reads.
         pagination_class=None,
@@ -1291,7 +1291,7 @@ class CartViewSet(BaseModelViewSet):
             # cancel on that PaymentIntent. Anyone able to read the log
             # stream could cancel a customer's in-flight payment or
             # confirm it with their own payment method.
-            # `order/payments/payment.py` is already careful to log only the
+            # `src/order/payments/payment.py` is already careful to log only the
             # id and status.
             logger.info(
                 "Payment intent creation result: success=%s, intent=%s, "

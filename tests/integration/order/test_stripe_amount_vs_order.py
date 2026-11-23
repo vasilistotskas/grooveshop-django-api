@@ -126,3 +126,41 @@ class TestCheckoutSessionCompleted:
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
+
+
+@pytest.mark.django_db
+def test_a_payment_flagged_again_still_saves_the_callers_metadata():
+    """Flagging the same payment again changes nothing and emails no one,
+    but what the caller wrote on the order (a webhook's processed key, the
+    session it read) is still saved, as the first flag saved it."""
+    from order.models.order import AMOUNT_MISMATCH_FLAG
+    from order.services import OrderService
+
+    order = OrderFactory(
+        num_order_items=0,
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+    )
+    expected = order.calculate_order_total_amount()
+    observed = Money(expected.amount + 5, expected.currency)
+    with patch("emails.send.send_email") as sent:
+        OrderService.flag_payment_mismatch(
+            order,
+            payment_id="pi_twice",
+            provider="stripe",
+            observed=observed,
+            expected=expected,
+        )
+        order.metadata["webhook_processed_evt_2"] = True
+        OrderService.flag_payment_mismatch(
+            order,
+            payment_id="pi_twice",
+            provider="stripe",
+            observed=observed,
+            expected=expected,
+        )
+
+    order.refresh_from_db()
+    assert order.metadata["webhook_processed_evt_2"] is True
+    assert order.metadata[AMOUNT_MISMATCH_FLAG]["transaction_id"] == "pi_twice"
+    assert [c.args[0] for c in sent.call_args_list] == ["ops.payment_mismatch"]

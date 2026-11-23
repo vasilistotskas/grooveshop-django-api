@@ -9,8 +9,8 @@ import pytest
 from django.db import connection
 from django_tenants.utils import schema_context
 
+from tenant.enum import StoreVertical
 from tenant.membership import get_current_tenant, resolve_current_tenant
-from tenant.models import StoreVertical
 from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db

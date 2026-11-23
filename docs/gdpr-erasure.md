@@ -137,7 +137,7 @@ found.
 
 `tests/integration/user/test_gdpr_erasure_completeness.py::test_no_value_of_the_subject_survives_on_what_erasure_keeps`
 puts the subject's data where the code puts it: two orders are canceled
-through `OrderService.cancel_order` with a typed reason (a restock, a refund,
+through `OrderLifecycleService.cancel_order` with a typed reason (a restock, a refund,
 both parcels canceled), the carriers' records are filled, and a third order is
 soft-deleted. After the erasure, the test searches every text and JSON column
 of every table in the schema for each value.

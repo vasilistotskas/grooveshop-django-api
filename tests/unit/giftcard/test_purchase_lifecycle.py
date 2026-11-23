@@ -169,7 +169,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.save(update_fields=["payment_id"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {
@@ -198,7 +198,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.save(update_fields=["payment_id"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 {"amount": "5.00", "order_code": purchase.payment_id},
@@ -222,7 +222,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.save(update_fields=["payment_id"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(None, {}),
         ):
             response = self._event(purchase, 1796)
@@ -453,7 +453,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.save(update_fields=["payment_id"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(PaymentStatus.COMPLETED, {}),
         ):
             response = self._event(purchase, 1798, status_id="")
@@ -470,7 +470,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.save(update_fields=["payment_id"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(PaymentStatus.FAILED, {}),
         ):
             response = self._event(purchase, 1798, status_id="")

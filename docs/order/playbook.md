@@ -17,7 +17,8 @@ and says which file holds each § number used here.
    (`required`), the gates and the `list_id`. Run `makemessages` and
    translate the new msgids (title, description, subject).
 3. Add a Celery task in `src/order/tasks.py` mirroring
-   `send_payment_failed_email`:
+   `send_admin_new_order_email` or, for a claim per object,
+   `send_refund_confirmation_email`:
    - Idempotency reservation helper (`_reserve_<task>_email`).
    - `send_email("<type key>", obj)`, mapping the returned `Delivery` list
      with `was_sent`: no subject, context, recipient, headers or
@@ -33,7 +34,7 @@ and says which file holds each § number used here.
 ### 9.2 Adding a new order status
 
 1. Add the value to `OrderStatus` in `src/order/enum/status.py`.
-2. Update the transition table in `OrderService.update_order_status`. A status
+2. Update the transition table, `ALLOWED_TRANSITIONS` in `src/order/lifecycle/service.py`. A status
    that has to do more than change the label (as CANCELED does) gets its own
    service method instead of a row.
 3. Add a Greek translation in `src/locale/el/LC_MESSAGES/django.po`, run
@@ -60,7 +61,7 @@ A status written by hand skips the service that owns the transition.
 on CANCELED / RETURNED and sends `order_status_changed`, so the customer's
 status email and toast can go out; `Order.objects.filter(...).update(...)`
 does none of that. Neither checks the transition table
-(`OrderService.update_order_status`), and a hand-written CANCELED releases
+(`OrderLifecycleService.update_order_status`), and a hand-written CANCELED releases
 no stock, refunds nothing, cancels no voucher and records no
 cancellation ([§7.1](cancel.md)).
 
@@ -74,7 +75,7 @@ edit and on what really happened to the parcel, the stock and the money:
 3. Then, by the status the order had BEFORE the edit:
    - **PENDING or PROCESSING, and the order is to be canceled.** Put the
      old status back and call
-     `OrderService.cancel_order(order, reason, customer_initiated=False)`.
+     `OrderLifecycleService.cancel_order(order, reason, customer_initiated=False)`.
      It accepts only PENDING and PROCESSING, releases what the order still
      holds, records the cancel, asks the courier afterwards and refunds a
      paid order. This is the only case in which to call it.

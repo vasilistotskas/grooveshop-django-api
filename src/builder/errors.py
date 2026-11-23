@@ -41,15 +41,20 @@ class BuilderError(APIException):
         }
 
 
+#: Why a change is refused while the storefront does not answer: the API's
+#: 503 below and an admin form's field error say the same.
+STOREFRONT_UNAVAILABLE_MESSAGE = _(
+    "The storefront cannot be reached, so the change cannot be checked. "
+    "Try again in a moment."
+)
+
+
 class StorefrontUnavailableError(BuilderError):
     """No catalogue to check the save against, so nothing is saved."""
 
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_code = "storefront_unavailable"
-    default_detail = _(
-        "The storefront cannot be reached, so the change cannot be checked. "
-        "Try again in a moment."
-    )
+    default_detail = STOREFRONT_UNAVAILABLE_MESSAGE
 
 
 class InvalidCatalogueError(BuilderError):

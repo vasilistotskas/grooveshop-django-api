@@ -5,8 +5,8 @@ from rest_framework import serializers
 
 from cart.models import CartItem
 from cart.services import CartAttributionService
+from order.checkout.attribution_service import OrderAttributionService
 from order.serializers.order import OrderAttributionInputSerializer
-from order.services import OrderAttributionService
 from product.serializers.product import ProductSerializer
 
 

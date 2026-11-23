@@ -7,17 +7,17 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from core.api.permissions import IsOwnerOrAdmin
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.filters.camel_case_ordering import ActionOrdering
-from core.store_settings import store_setting
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import IsOwnerOrAdmin
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
+from core.store_settings import store_setting
 from product.filters.review import ProductReviewFilter
 from product.managers.review import purchase_items
 from product.models.review import ProductReview

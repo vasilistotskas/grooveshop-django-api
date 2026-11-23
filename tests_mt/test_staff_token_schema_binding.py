@@ -60,7 +60,7 @@ def test_the_layout_this_lane_runs_on_has_no_knox_table_in_public():
 
 
 def test_a_builder_token_reads_the_store_documents(mt_tenant, operator):
-    from tenant.models import StaffTokenScope
+    from tenant.enum import StaffTokenScope
 
     _instance, token = _staff_token(
         operator, scope=StaffTokenScope.BUILDER, expiry=timedelta(hours=1)
@@ -77,7 +77,8 @@ def test_a_builder_token_reads_the_store_documents(mt_tenant, operator):
 def test_authenticating_purges_the_staff_members_expired_tokens(
     mt_tenant, operator
 ):
-    from tenant.models import PlatformStaffToken, StaffTokenScope
+    from tenant.enum import StaffTokenScope
+    from tenant.models import PlatformStaffToken
 
     expired, _old = _staff_token(
         operator, scope=StaffTokenScope.BUILDER, expiry=timedelta(hours=1)
@@ -106,7 +107,8 @@ def test_authenticating_purges_the_staff_members_expired_tokens(
 
 
 def test_an_expired_token_is_refused_and_deleted(mt_tenant, operator):
-    from tenant.models import PlatformStaffToken, StaffTokenScope
+    from tenant.enum import StaffTokenScope
+    from tenant.models import PlatformStaffToken
 
     instance, token = _staff_token(
         operator, scope=StaffTokenScope.BUILDER, expiry=timedelta(hours=1)
@@ -127,7 +129,8 @@ def test_an_expired_token_is_refused_and_deleted(mt_tenant, operator):
 
 
 def test_signing_out_of_the_editor_ends_the_token(mt_tenant, operator):
-    from tenant.models import PlatformStaffToken, StaffTokenScope
+    from tenant.enum import StaffTokenScope
+    from tenant.models import PlatformStaffToken
 
     instance, token = _staff_token(
         operator, scope=StaffTokenScope.BUILDER, expiry=timedelta(hours=1)

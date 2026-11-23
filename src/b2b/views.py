@@ -18,14 +18,14 @@ from b2b.serializers import (
 )
 from b2b.services import B2BPricingService, B2BService
 from b2b.throttles import B2BProfileSubmitThrottle
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import UserBudgetThrottle
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import UserBudgetThrottle
+from core.api.views import BaseModelViewSet
 from tenant.features import feature_gates
 
 logger = logging.getLogger(__name__)

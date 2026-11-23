@@ -1,4 +1,4 @@
-"""``OrderService.cancel_order`` restores the stock an order HOLDS.
+"""``OrderLifecycleService.cancel_order`` restores the stock an order HOLDS.
 
 The restore sums the order's own ``StockLog`` movements rather than its
 listed quantities, so an item that never took stock gets none back and a
@@ -12,7 +12,7 @@ import pytest
 from django.utils import timezone
 
 from order.enum.status import OrderStatus
-from order.services import OrderService
+from order.lifecycle.service import OrderLifecycleService
 
 pytestmark = pytest.mark.assert_english
 
@@ -48,7 +48,7 @@ class TestCancelOrderWithStockManager:
         product.refresh_from_db()
         assert product.stock == 10
 
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="Customer request", refund_payment=False
         )
 
@@ -81,7 +81,7 @@ class TestCancelOrderWithStockManager:
             reason="test: order created",
         )
 
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="Customer request", refund_payment=False
         )
 
@@ -114,7 +114,7 @@ class TestCancelOrderWithStockManager:
             reason="test: order created",
         )
 
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="first", refund_payment=False
         )
         product.refresh_from_db()
@@ -122,7 +122,7 @@ class TestCancelOrderWithStockManager:
 
         order.status = OrderStatus.PENDING
         order.save(update_fields=["status"])
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="second", refund_payment=False
         )
 
@@ -162,7 +162,7 @@ class TestCancelOrderWithStockManager:
         product.refresh_from_db()
         assert product.stock == 2
 
-        canceled_order, _refund_info = OrderService.cancel_order(
+        canceled_order, _refund_info = OrderLifecycleService.cancel_order(
             order=order, reason="Customer request", refund_payment=False
         )
 
@@ -239,7 +239,7 @@ class TestAdjustStockAuditRow:
         product.refresh_from_db()
         assert product.stock == 0
 
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="Customer request", refund_payment=False
         )
 

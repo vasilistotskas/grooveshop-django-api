@@ -351,7 +351,7 @@ class TestBuilderAlerts:
         from builder import scheduling, services
         from builder.models import BuilderScheduledPublish
         from builder.storefront import clear_catalogue_cache
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
         from tests.utils.builder import FakeCatalogue, document, hero
         from tests.utils.staff import store_staff
 

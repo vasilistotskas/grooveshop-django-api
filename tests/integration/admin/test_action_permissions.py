@@ -54,7 +54,7 @@ from giftcard.factories import GiftCardFactory
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsCodPayout, AcsUnrecognisedVoucher
 from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     store_staff,

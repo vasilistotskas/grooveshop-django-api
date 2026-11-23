@@ -25,12 +25,8 @@ from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
 from product.models.product import Product
-from tenant.models import (
-    Tenant,
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 

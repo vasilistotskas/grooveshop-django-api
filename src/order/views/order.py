@@ -33,6 +33,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+)
 from core.api.permissions import (
     IsOwnerOrAdmin,
     IsOwnerOrAdminOrGuest,
@@ -45,13 +50,9 @@ from core.api.views import BaseModelViewSet
 from core.cache_backend import REDIS_UNAVAILABLE
 from core.client_ip import edge_client_ip
 from core.filters.camel_case_ordering import ActionOrdering
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-)
 from giftcard.throttles import gift_card_code_throttles
 from order.accounting.invoicing import SpecimenNotAvailable, render_specimen_pdf
+from order.checkout.attribution_service import OrderAttributionService
 from order.checkout.quote import (
     ExpectedTotal,
     OrderQuoteService,
@@ -63,7 +64,11 @@ from order.enum.create_error import (
     TOTAL_CHANGED_CODE,
     OrderCreateErrorType,
 )
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.exceptions import (
     CartHasUnpaidOrderError,
     CartNotReadyError,
@@ -89,11 +94,13 @@ from order.exceptions import (
     UnpaidOrderLimitError,
 )
 from order.filters import OrderFilter
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payments import payment_hold
+from order.payments import payment_hold, settlement
 from order.payments.payment import (
     OpenPayment,
+    VivaWalletPaymentProvider,
     get_payment_provider,
     provider_supports,
     registered_provider_codes,
@@ -125,7 +132,6 @@ from order.serializers.order import (
 from order.serializers.quote import CheckoutQuoteSerializer
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
-    OrderAttributionService,
     OrderLegalAcceptanceService,
     OrderService,
 )
@@ -656,10 +662,10 @@ class OrderViewSet(BaseModelViewSet):
         order_id: str = self.kwargs[lookup_url_kwarg]
 
         try:
-            # No UUID branch: every route in order/urls.py binds
+            # No UUID branch: every route in src/order/urls.py binds
             # ``<int:pk>``, so a UUID string can never reach this lookup.
             # Guest access by UUID is its own route (retrieve_by_uuid).
-            obj = OrderService.get_order_by_id(int(order_id))
+            obj = OrderLifecycleService.get_order_by_id(int(order_id))
             self.check_object_permissions(self.request, obj)
             return obj
         except Order.DoesNotExist as e:
@@ -868,6 +874,19 @@ class OrderViewSet(BaseModelViewSet):
                 "code": "payment_window_expired",
             },
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @staticmethod
+    def _new_payment_went_ahead(order, locked_order) -> bool:
+        """Whether what changed on *locked_order* since the service recorded
+        *order*'s new payment is that payment's own webhook moving it to
+        PROCESSING or COMPLETED (and the order with it), not a cancel or
+        another payment."""
+        return (
+            locked_order.payment_id == order.payment_id
+            and locked_order.status != OrderStatus.CANCELED
+            and locked_order.payment_status
+            in (PaymentStatus.PROCESSING, PaymentStatus.COMPLETED)
         )
 
     @staticmethod
@@ -1341,7 +1360,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 2: route on what the pay way settles and what the
         # provider can do — never on a provider name. This carried
         # its own ``{"viva_wallet"}`` literal, a second copy of the
-        # one in order/services.py; both are now the provider's own
+        # one in src/order/services.py; both are now the provider's own
         # ``supports_payment_intent`` declaration.
 
         # An intent-less submission on a non-redirect online pay
@@ -1830,6 +1849,10 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if order.payment_status == PaymentStatus.COMPLETED:
+            # The provider took the payment at once: the order is confirmed
+            # now, as its webhook, which may not come, would confirm it.
+            OrderLifecycleService.confirm(order)
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=payment_response)
@@ -1853,9 +1876,10 @@ class OrderViewSet(BaseModelViewSet):
 
         The customer retains the same order, the same items, and the
         same reserved stock (already decremented at order creation).
-        We just mint a new PaymentIntent, store its id on the order,
-        reset the payment status to PENDING, and return the client
-        secret so the frontend can re-mount Stripe Elements.
+        We just mint a new PaymentIntent, which the service records with
+        the status the provider reported (a payment taken at once
+        confirms the order), and return the client secret so the
+        frontend can re-mount Stripe Elements.
         """
         order = self.get_object()
 
@@ -1925,27 +1949,29 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         new_payment_id = payment_response.get("payment_id")
 
-        # Lock the order row while we swap in the new payment intent.
-        # A late `payment_intent.payment_failed` webhook for the OLD
-        # intent could otherwise land between read and save, flip
-        # payment_status to FAILED, and enqueue a duplicate failure
-        # email concurrently with this retry flow.
+        # The service recorded the new payment under its own lock, with
+        # the status the provider reported (pending, processing, or taken
+        # at once): it is kept, never reset. Here only the retry is noted,
+        # under the row lock, and a change landing since the service wrote
+        # wins as it does there.
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk)
             # The service stored the new intent under its own lock; a
-            # change landing since then wins in the same way.
+            # change landing since then wins in the same way, except the
+            # new payment's own webhook moving it ahead: that payment is
+            # going through, and the answer is its recorded status.
             if (
                 locked_order.status,
                 locked_order.payment_status,
                 locked_order.payment_id,
-            ) != (order.status, order.payment_status, order.payment_id):
+            ) != (
+                order.status,
+                order.payment_status,
+                order.payment_id,
+            ) and not self._new_payment_went_ahead(order, locked_order):
                 return self._order_changed_during_payment(order)
-            if new_payment_id:
-                locked_order.payment_id = new_payment_id
-            locked_order.payment_status = PaymentStatus.PENDING
             if not locked_order.metadata:
                 locked_order.metadata = {}
             retry_history = locked_order.metadata.setdefault(
@@ -1958,17 +1984,12 @@ class OrderViewSet(BaseModelViewSet):
                     "new_payment_id": new_payment_id or "",
                 }
             )
-            # Reset per-flow idempotency flags so the confirmation
-            # email can fire again on the (expected) new
-            # payment_intent.succeeded, and the customer can be
-            # re-notified of any new failure, so the sent-at stamp is
-            # cleared and the confirmation re-arms.
-            locked_order.metadata.pop("confirmation_email_sent_at", None)
-            locked_order.metadata.pop("payment_failed_email_sent", None)
-            locked_order.save(
-                update_fields=["payment_id", "payment_status", "metadata"]
-            )
+            locked_order.save(update_fields=["metadata"])
         order = locked_order
+        if order.payment_status == PaymentStatus.COMPLETED:
+            # The provider took the payment at once: the order is confirmed
+            # now, as its webhook, which may not come, would confirm it.
+            OrderLifecycleService.confirm(order)
 
         OrderHistory.log_payment_update(
             order=order,
@@ -1977,14 +1998,18 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_id": previous_payment_id or "",
             },
             new_value={
-                "payment_status": PaymentStatus.PENDING,
-                "payment_id": new_payment_id or "",
+                "payment_status": str(order.payment_status),
+                "payment_id": order.payment_id or "",
                 "retry": True,
             },
         )
 
         response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(data=payment_response)
+        # The status the order records, which a webhook may have moved
+        # ahead of what the provider answered.
+        response_serializer = response_serializer_class(
+            data={**payment_response, "status": order.payment_status}
+        )
         response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 
@@ -2291,11 +2316,23 @@ class OrderViewSet(BaseModelViewSet):
         # webhook remains the idempotent backstop.
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
-            if payment_response["status"] == PaymentStatus.COMPLETED:
+            paid = payment_response["status"] == PaymentStatus.COMPLETED
+            if paid and OrderService.is_payment_after_cancel(locked):
+                # Canceled while the token was charged: the money is
+                # booked and staff are paged; the order stays canceled.
+                OrderService.record_payment_after_cancel(
+                    locked,
+                    payment_id=payment_response["payment_id"],
+                    payment_method="stripe_agent_spt",
+                )
+            elif paid:
                 locked.mark_as_paid(
                     payment_id=payment_response["payment_id"],
                     payment_method="stripe_agent_spt",
                 )
+                # The webhook that follows is a backstop that may not
+                # come: confirmed now, once.
+                OrderLifecycleService.confirm(locked)
             else:
                 locked.payment_id = payment_response["payment_id"]
                 locked.save(update_fields=["payment_id"])
@@ -2326,7 +2363,7 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         try:
-            order = OrderService.get_order_by_uuid(uuid_str)
+            order = OrderLifecycleService.get_order_by_uuid(uuid_str)
         except Order.DoesNotExist as e:
             raise NotFound(
                 _("Order with UUID {uuid} not found").format(uuid=uuid_str),
@@ -2371,7 +2408,7 @@ class OrderViewSet(BaseModelViewSet):
         should_refund = validated_data.get("refund_payment", True)
 
         try:
-            canceled_order, refund_info = OrderService.cancel_order(
+            canceled_order, refund_info = OrderLifecycleService.cancel_order(
                 order=order,
                 reason=cancellation_reason,
                 refund_payment=should_refund,
@@ -2535,6 +2572,10 @@ class OrderViewSet(BaseModelViewSet):
            resolves during the webhook race window — and a shopper
            who pays on an earlier session still resolves.
 
+        An order still unpaid is then settled from Viva itself
+        (``_settle_viva_return``): the webhook may be late or lost, and
+        the buyer is back because they paid.
+
         ``eventId`` is deliberately NOT a lookup key — an earlier
         revision assumed it echoed ``merchantTrns`` (our order UUID),
         but Viva sends an integer event code there, so that fallback
@@ -2637,6 +2678,9 @@ class OrderViewSet(BaseModelViewSet):
                 code="order_not_found",
             )
 
+        if row["payment_status"] not in SETTLED_PAYMENT_STATUSES:
+            row = self._settle_viva_return(row, value_fields)
+
         logger.info(
             "Viva return lookup resolved order",
             extra={
@@ -2656,6 +2700,38 @@ class OrderViewSet(BaseModelViewSet):
             }
         )
 
+    @staticmethod
+    def _settle_viva_return(
+        row: dict[str, Any], value_fields: tuple[str, ...]
+    ) -> dict[str, Any]:
+        """*row* once the payments Viva took for its order are settled.
+
+        The buyer is back from Viva's hosted page, which sends them here
+        after they paid: a payment Viva took is settled now, by the code
+        its webhook runs (``settle_landed_payment``), so the success page
+        shows the order paid whether or not that webhook has landed, and
+        the webhook changes nothing when it does. A store without Viva
+        credentials, or a Viva that cannot be read, leaves the order as it
+        is for the webhook or the sweep.
+        """
+        if not VivaWalletPaymentProvider.is_configured_for_tenant():
+            return row
+        order = Order.objects.get(pk=row["id"])
+        try:
+            settlement.settle_landed_payment(
+                order, VivaWalletPaymentProvider.code
+            )
+        except PaymentStatusUnavailableError:
+            logger.warning(
+                "Viva return could not read the payments of order %s",
+                order.id,
+            )
+            return row
+        return (
+            Order.objects.filter(pk=row["id"]).values(*value_fields).first()
+            or row
+        )
+
     @action(detail=False, methods=["GET"])
     def my_orders(self, request, *args, **kwargs):
         """List current user's orders."""
@@ -2664,7 +2740,7 @@ class OrderViewSet(BaseModelViewSet):
                 _("Authentication is required to view your orders")
             )
 
-        user_orders = OrderService.get_user_orders(request.user.id)
+        user_orders = OrderLifecycleService.get_user_orders(request.user.id)
 
         filtered_qs = self.filter_queryset(user_orders)
 
@@ -2769,7 +2845,7 @@ class OrderViewSet(BaseModelViewSet):
                 code="reorder_not_owner",
             )
 
-        result = OrderService.reorder_to_cart(
+        result = OrderLifecycleService.reorder_to_cart(
             order=order,
             user=user,
             attribution=OrderAttributionService.input_from_request(
@@ -2841,9 +2917,9 @@ class OrderViewSet(BaseModelViewSet):
         status_value = validated_data["status"]
 
         try:
-            OrderService.update_order_status(order, status_value)
+            OrderLifecycleService.update_order_status(order, status_value)
 
-            order = OrderService.get_order_by_id(order.id)
+            order = OrderLifecycleService.get_order_by_id(order.id)
 
             response_serializer_class = self.get_response_serializer()
             response_serializer = response_serializer_class(
@@ -3068,7 +3144,7 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        order = OrderService.get_order_by_id(order.id)
+        order = OrderLifecycleService.get_order_by_id(order.id)
         response_serializer_class = self.get_response_serializer()
         serializer = response_serializer_class(
             order, context=self.get_serializer_context()

@@ -32,7 +32,7 @@ from product.serializers.product import (
     ProductSerializer,
     ProductWriteSerializer,
 )
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.texts.conftest import staff_client
 from tests.utils.staff import (
     bind_store_tenant,

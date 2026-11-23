@@ -19,7 +19,7 @@ SURFACES = (
         ),
         # NOTHING in page_config is ``@cache_methods``-decorated:
         # ContentPageViewSet — despite being a BaseModelViewSet —
-        # carries no decorator (checked against page_config/views.py,
+        # carries no decorator (checked against src/page_config/views.py,
         # which does not import cache_methods at all). A
         # ``*ContentPageViewSet_*`` pattern
         # here would match zero keys and report success, which is

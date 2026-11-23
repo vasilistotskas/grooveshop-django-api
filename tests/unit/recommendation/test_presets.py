@@ -14,7 +14,7 @@ from recommendation.presets import (
     seed_recommendation_slots,
     slot_defaults,
 )
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 
 
 def test_presets_and_verticals_are_the_same_set():

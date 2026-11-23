@@ -15,6 +15,7 @@ from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
 from blog.utils import calculate_reading_time
+from core.api.image_field import MainImageSizeMixin
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 
@@ -40,7 +41,9 @@ class ListTranslatedFieldsField(TranslatedFieldExtended):
 
 
 class BlogPostSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
+    MainImageSizeMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[BlogPost],
 ):
     category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
     tags = PrimaryKeyRelatedField(queryset=BlogTag.objects.all(), many=True)
@@ -77,6 +80,8 @@ class BlogPostSerializer(
             "created_at",
             "updated_at",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "reading_time",
             "content_preview",
         )
@@ -91,6 +96,8 @@ class BlogPostSerializer(
             "created_at",
             "updated_at",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
         )
 
     def get_reading_time(self, obj: BlogPost) -> int:

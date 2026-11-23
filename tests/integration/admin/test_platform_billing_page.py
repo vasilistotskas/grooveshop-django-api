@@ -106,10 +106,8 @@ class TestPlanBillingRouting(SimpleTestCase):
 class TestPlanBillingPage(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from tenant.models import (
-            TenantMembershipRole,
-            UserTenantMembership,
-        )
+        from tenant.enum import TenantMembershipRole
+        from tenant.models import UserTenantMembership
         from user.models import UserAccount
 
         cls.operator = UserAccount.objects.create_superuser(

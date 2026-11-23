@@ -411,9 +411,6 @@ class TenantConfigSerializer(serializers.Serializer):
     socials_twitter = serializers.CharField(read_only=True, allow_blank=True)
     socials_youtube = serializers.CharField(read_only=True, allow_blank=True)
 
-    # --- Shipping (public partner ID) ---
-    box_now_partner_id = serializers.CharField(read_only=True)
-
     # NOTE: ``plan`` is intentionally excluded — it is billing-sensitive
     # and must not be exposed to unauthenticated callers via tenant/resolve.
     # Platform admins can read it via TenantAdminSerializer.

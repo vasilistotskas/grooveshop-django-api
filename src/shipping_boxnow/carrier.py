@@ -12,11 +12,14 @@ from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import (
+    AdminPage,
+    AdminPages,
     PickupPointInAnotherCountry,
     PickupPointSizeUnknown,
     PickupPointTooSmall,
@@ -38,10 +41,32 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The admin's colour of each parcel state (an Unfold label variant).
+SHIPMENT_STATE_VARIANT: dict[str, str] = {
+    BoxNowParcelState.PENDING_CREATION: "default",
+    BoxNowParcelState.NEW: "info",
+    BoxNowParcelState.IN_DEPOT: "info",
+    BoxNowParcelState.FINAL_DESTINATION: "info",
+    BoxNowParcelState.DELIVERED: "success",
+    BoxNowParcelState.RETURNED: "warning",
+    BoxNowParcelState.EXPIRED: "warning",
+    BoxNowParcelState.CANCELED: "danger",
+    BoxNowParcelState.ACCEPTED_FOR_RETURN: "warning",
+    BoxNowParcelState.ACCEPTED_TO_LOCKER: "info",
+    BoxNowParcelState.MISSING: "danger",
+    BoxNowParcelState.LOST: "danger",
+}
+
 
 @register_provider
 class BoxNowCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "boxnow"
+    app_label: ClassVar[str | None] = "shipping_boxnow"
+    # BoxNow counts no work of its own; a canceled or re-issued parcel
+    # moves the follow-up count (``canceled_shipment_q``).
+    attention_models: ClassVar[tuple[str, ...]] = (
+        "shipping_boxnow.BoxNowShipment",
+    )
 
     # Carrier-specific request-body keys popped before Order.create().
     payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
@@ -331,8 +356,6 @@ class BoxNowCarrier(ShippingCarrierInterface):
         field-coded and after one resync of the catalogue
         (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
         """
-        from django.utils.translation import gettext_lazy as _
-
         if kind != ShippingKind.PICKUP_POINT:
             return {}
 
@@ -416,6 +439,29 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)
     # ------------------------------------------------------------------
+
+    def admin_pages(self) -> AdminPages:
+        return AdminPages(
+            shipments=(
+                AdminPage(
+                    "shipping_boxnow.BoxNowShipment",
+                    _("BoxNow Shipments"),
+                    "package_2",
+                    rank=1,
+                ),
+            ),
+            pickup_points=(
+                AdminPage("shipping_boxnow.BoxNowLocker", _("BoxNow Lockers")),
+            ),
+            audit=(
+                AdminPage(
+                    "shipping_boxnow.BoxNowParcelEvent", _("BoxNow Events")
+                ),
+            ),
+        )
+
+    def shipment_state_variants(self) -> Mapping[str, str]:
+        return SHIPMENT_STATE_VARIANT
 
     def create_shipment_row(
         self,

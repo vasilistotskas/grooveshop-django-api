@@ -27,6 +27,7 @@ from django.utils import timezone
 
 from admin.dashboard.cache import dashboard_query
 from order.reporting.turnover import Bucket, figures_between
+from shipping.interfaces import registered_providers
 
 
 @dataclass(frozen=True)
@@ -419,22 +420,6 @@ def recent_orders() -> list[dict[str, Any]]:
 
 
 @dashboard_query(
-    "store:acs-voucher-hold:v1",
-    ttl=60,
-    depends_on=("shipping_acs.AcsVoucherHold", "shipping_acs.AcsShipment"),
-)
-def acs_voucher_hold_since() -> datetime | None:
-    """Since when the store's ACS voucher requests are held, or None."""
-    from shipping_acs import attention as acs
-
-    return (
-        acs.voucher_holds_holding_requests()
-        .values_list("started_at", flat=True)
-        .first()
-    )
-
-
-@dashboard_query(
     "store:attention:v4",
     ttl=60,
     depends_on=(
@@ -445,15 +430,11 @@ def acs_voucher_hold_since() -> datetime | None:
         "blog.BlogComment",
         "contact.Contact",
         "b2b.BusinessProfile",
-        "shipping_acs.AcsShipment",
-        "shipping_acs.AcsCodPayout",
-        "shipping_acs.AcsUnrecognisedVoucher",
-        "shipping_acs.AcsVoucherHold",
-        # A canceled or re-issued parcel moves the follow-up count.
-        "shipping_boxnow.BoxNowShipment",
         # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
         "extra_settings.Setting",
     ),
+    # The carriers' own work, and the parcels that move the follow-up count.
+    carriers=True,
 )
 def attention_counts() -> dict[str, int]:
     """Work that is waiting, in one cache entry: the sidebar badges and
@@ -464,13 +445,12 @@ def attention_counts() -> dict[str, int]:
     from order.models.invoice import MyDataStatus
     from order.payments import payment_hold
     from product.enum.review import ReviewStatus
-    from shipping_acs import attention as acs
 
     def model(label: str):
         return apps.get_model(label)
 
     now = timezone.now()
-    return {
+    counts = {
         "pending_orders": model("order.Order")
         .objects.filter(status=OrderStatus.PENDING)
         .count(),
@@ -479,17 +459,6 @@ def attention_counts() -> dict[str, int]:
         "follow_up_orders": model("order.Order")
         .objects.needing_follow_up(now)
         .count(),
-        # The operational alert emails (``ops.*`` email types) as work: a
-        # store may switch an email off, so each kind that carries money or
-        # a stuck parcel is counted here by the very rule the email uses.
-        "stale_shipments": acs.stale_shipments(now).count(),
-        "acs_voucher_requests_unknown": acs.voucher_requests_unknown().count(),
-        "acs_unrecognised_vouchers": acs.unrecognised_vouchers().count(),
-        # One state, however many orders wait behind it: voucher requests
-        # held while ACS is failing (``shipping_acs.voucher_hold``).
-        "acs_voucher_holds": acs.voucher_holds_holding_requests().count(),
-        "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
-        "unattributed_cod_payouts": acs.unattributed_payouts().count(),
         # A charge that did not match its order (``ops.payment_mismatch``),
         # still PENDING and not accepted: only a person decides it.
         "payments_to_review": payment_hold.payment_review_orders().count(),
@@ -536,3 +505,9 @@ def attention_counts() -> dict[str, int]:
         .objects.filter(mydata_status=MyDataStatus.REJECTED)
         .count(),
     }
+    # The operational alert emails (``ops.*`` email types) as work: a store
+    # may switch an email off, so each kind that carries money or a stuck
+    # parcel is counted by the very rule the email uses.
+    for carrier in registered_providers():
+        counts.update(carrier.attention_counts(now))
+    return counts

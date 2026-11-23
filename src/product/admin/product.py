@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib import admin, messages
 from django.db.models import Count, Prefetch, Sum
-from django.shortcuts import redirect
+from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
@@ -16,6 +16,7 @@ from unfold.contrib.filters.admin import (
     RangeNumericFilter,
     SliderNumericFilter,
 )
+from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
@@ -35,6 +36,7 @@ from admin.filters import (
     LikesCountFilter,
     RelatedDropdownFilter,
 )
+from admin.responses import hx_redirect
 from core.forms.measurement import MeasurementWidget
 from core.measurement import DistanceUnits, WeightUnits
 from product.admin.filters import (
@@ -699,8 +701,17 @@ class ProductAdmin(
         permissions=["add"],
         icon="content_copy",
         variant=ActionVariant.INFO,
+        dialog=ActionDialog(
+            title=_("Duplicate as draft"),
+            description=_(
+                "Creates an inactive draft copy of this product and opens it for "
+                "editing."
+            ),
+        ),
     )
-    def duplicate_product_row(self, request, object_id):
+    def duplicate_product_row(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Clone the row into an inactive draft and open it for editing
         (``ProductService.duplicate_as_draft`` holds the rules)."""
 
@@ -708,7 +719,7 @@ class ProductAdmin(
             original = Product.objects.get(pk=object_id)
         except Product.DoesNotExist:
             messages.error(request, _("Product not found."))
-            return redirect("admin:product_product_changelist")
+            return hx_redirect(reverse("admin:product_product_changelist"))
 
         try:
             clone = ProductService.duplicate_as_draft(original)
@@ -717,7 +728,9 @@ class ProductAdmin(
                 request,
                 _("Couldn't find a free slug — try renaming the source."),
             )
-            return redirect("admin:product_product_change", object_id=object_id)
+            return hx_redirect(
+                reverse("admin:product_product_change", args=[object_id])
+            )
 
         messages.success(
             request,
@@ -727,7 +740,9 @@ class ProductAdmin(
             )
             % {"orig": original.id, "clone": clone.id},
         )
-        return redirect("admin:product_product_change", object_id=clone.id)
+        return hx_redirect(
+            reverse("admin:product_product_change", args=[clone.id])
+        )
 
     def get_urls(self):
         urls = super().get_urls()

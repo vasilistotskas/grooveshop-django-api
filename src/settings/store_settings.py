@@ -119,6 +119,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PAYMENT_WITHOUT_ORDER_GRACE_MINUTES",
+        "type": "int",
+        "value": 15,
+        "description": (
+            "How long a card payment made before its order exists waits "
+            "for that order before staff are told no order carries it. "
+            "The order is created right after the payment, so a payment "
+            "no order has claimed after this long is a payment to look "
+            "into."
+        ),
+    },
+    {
         "name": "ORDER_ONLINE_PAYMENT_GRACE_MINUTES",
         "type": "int",
         "value": 5,

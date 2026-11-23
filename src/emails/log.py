@@ -135,7 +135,10 @@ def delivering(
 
 def _claim(entry: EmailLog) -> EmailLog:
     try:
-        earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
+        # A savepoint: a failed read must not poison the transaction the
+        # send runs in (a webhook's atomic block), as ``_write`` does not.
+        with transaction.atomic():
+            earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
     except Error:
         earlier = None
     if earlier is None:

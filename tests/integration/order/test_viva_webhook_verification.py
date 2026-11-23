@@ -646,6 +646,47 @@ class TestVivaReversalWebhook:
                 Order.objects.get()
             ).get().charge.provider_reference == (PAYMENT_ID)
 
+    def test_a_null_status_is_read_before_the_order_row_is_locked(
+        self, refunded_signals
+    ):
+        """A 1796 whose ``StatusId`` is JSON ``null`` names no status, as
+        an absent one: it is read before the lock like one that says ``F``,
+        never from under the lock."""
+        _paid_order(
+            ledger=False,
+            payment_id="",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        body = reversal_created_event(
+            refund_id=REFUND_ID, parent_id=PAYMENT_ID, order_code=ORDER_CODE
+        )["EventData"]
+        sent_at_lock: list[int] = []
+        lock = Order.objects.select_for_update
+        viva = _viva(refund_amount=10.0)
+
+        def _lock(*args, **kwargs):
+            sent_at_lock.append(len(viva.sent))
+            return lock(*args, **kwargs)
+
+        with (
+            viva,
+            patch.object(Order.objects, "select_for_update", _lock),
+            patch("emails.send.send_email"),
+        ):
+            _process_event_in_tenant(
+                order_code=str(ORDER_CODE),
+                event_type_id=1796,
+                event_data={**body, "StatusId": None},
+                transaction_id=REFUND_ID,
+                status_id="",
+                txn_hash="deadbeef",
+            )
+
+        assert sent_at_lock
+        assert sent_at_lock[0] > 0
+        assert len(viva.sent) == sent_at_lock[0]
+
     def test_a_parent_is_not_read_for_a_refund_of_another_order(
         self, refunded_signals
     ):

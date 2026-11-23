@@ -22,7 +22,7 @@ from giftcard.enum import (
     GiftCardTransactionKind,
 )
 from giftcard.factories import GiftCardPurchaseFactory
-from giftcard.models import GiftCardTransaction
+from giftcard.models import GiftCardPurchase, GiftCardTransaction
 from giftcard.services import GiftCardService
 from order.enum.status import PaymentStatus
 from order.signals.handlers import (
@@ -468,4 +468,112 @@ class TestCompletionIsBoundToThePurchase:
 
         assert response.status_code == 500
         purchase.refresh_from_db()
+        assert purchase.status == GiftCardPurchaseStatus.PENDING
+
+
+class TestVivaIsReadBeforeThePurchaseIsLocked:
+    def test_a_null_status_completes_the_purchase_read_before_the_lock(self):
+        """A 1796 whose ``StatusId`` is JSON ``null`` is a finished payment
+        as an absent status is: read before the lock, judged under it."""
+        purchase = _viva_purchase()
+        viva = FakeVivaApi(
+            retrieve=(
+                200,
+                retrieve_transaction(orderCode=int(ORDER_CODE), amount=40.0),
+            )
+        )
+        sent_at_lock: list[int] = []
+        lock = GiftCardPurchase.objects.select_for_update
+
+        def _lock(*args, **kwargs):
+            sent_at_lock.append(len(viva.sent))
+            return lock(*args, **kwargs)
+
+        with (
+            viva,
+            patch.object(GiftCardPurchase.objects, "select_for_update", _lock),
+        ):
+            response = _process_gift_card_purchase_event(
+                purchase=purchase,
+                event_type_id=1796,
+                event_data={"StatusId": None},
+                transaction_id="txn-null",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        purchase.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert sent_at_lock
+        assert sent_at_lock[0] > 0
+        assert len(viva.sent) == sent_at_lock[0]
+
+    @pytest.mark.parametrize("event_type_id", [1796, 1797, 1798])
+    def test_every_request_is_sent_before_the_purchase_row_is_locked(
+        self, event_type_id
+    ):
+        """A slow Viva never holds the purchase row: every request an event
+        sends is sent before the lock. Counted on the HTTP boundary, so a
+        call by any path is seen."""
+        purchase = _viva_purchase()
+        viva = FakeVivaApi(
+            retrieve=(
+                200,
+                retrieve_refund(amount=40.0, order_code=int(ORDER_CODE))
+                if event_type_id == 1797
+                else retrieve_transaction(
+                    orderCode=int(ORDER_CODE), amount=40.0
+                ),
+            )
+        )
+        sent_at_lock: list[int] = []
+        lock = GiftCardPurchase.objects.select_for_update
+
+        def _lock(*args, **kwargs):
+            sent_at_lock.append(len(viva.sent))
+            return lock(*args, **kwargs)
+
+        with (
+            viva,
+            patch.object(GiftCardPurchase.objects, "select_for_update", _lock),
+        ):
+            response = _process_gift_card_purchase_event(
+                purchase=purchase,
+                event_type_id=event_type_id,
+                event_data={"StatusId": "F"},
+                transaction_id="txn-lock",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        assert response.status_code == 200
+        assert sent_at_lock
+        assert sent_at_lock[0] > 0
+        assert len(viva.sent) == sent_at_lock[0]
+
+    def test_a_purchase_that_moved_since_the_read_sends_nothing_under_the_lock(
+        self,
+    ):
+        """The read skipped a 1798 because the purchase was not pending; the
+        row is pending under the lock. The event is refused with a retryable
+        500, and no request is sent under the lock."""
+        purchase = _viva_purchase()
+        stale = GiftCardPurchase.objects.get(pk=purchase.pk)
+        stale.status = GiftCardPurchaseStatus.FAILED
+        viva = FakeVivaApi()
+
+        with viva:
+            response = _process_gift_card_purchase_event(
+                purchase=stale,
+                event_type_id=1798,
+                event_data={},
+                transaction_id="txn-moved",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        purchase.refresh_from_db()
+        assert response.status_code == 500
+        assert not viva.sent
         assert purchase.status == GiftCardPurchaseStatus.PENDING

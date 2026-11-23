@@ -24,6 +24,9 @@ Rules:
   read in between cannot re-cache the old answer. The TTL bounds
   everything a dependency does not name (new customers, carts, search
   logs).
+- A query that counts what carriers leave waiting sets ``carriers``: the
+  models they list (``attention_models``) join ``depends_on``, and are
+  connected as each carrier registers.
 - Bump the ``:vN`` suffix in a query's name when its data shape changes.
 """
 
@@ -38,7 +41,10 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from django.utils.translation import get_language
+
+from shipping.interfaces import carrier_registered, registered_providers
 
 KEY_PREFIX = "admin:dashboard"
 
@@ -51,6 +57,18 @@ class DashboardQuery:
     per_language: bool
     compute: Callable[..., Any]
     variants: tuple[str, ...] = ()
+    carriers: bool = False
+
+    def dependencies(self) -> tuple[str, ...]:
+        """The models whose writes clear this query: ``depends_on``, and
+        the ones the registered carriers list when ``carriers`` is set."""
+        if not self.carriers:
+            return self.depends_on
+        return self.depends_on + tuple(
+            label
+            for carrier in registered_providers()
+            for label in carrier.attention_models
+        )
 
     def key(
         self, variant: str | None = None, language: str | None = None
@@ -99,6 +117,7 @@ def dashboard_query(
     depends_on: tuple[str, ...] = (),
     per_language: bool = False,
     variants: tuple[str, ...] = (),
+    carriers: bool = False,
 ) -> Callable[[Callable[..., Any]], DashboardQuery]:
     def register(compute: Callable[..., Any]) -> DashboardQuery:
         query = DashboardQuery(
@@ -108,6 +127,7 @@ def dashboard_query(
             per_language=per_language,
             compute=compute,
             variants=variants,
+            carriers=carriers,
         )
         _QUERIES.append(query)
         return query
@@ -119,15 +139,17 @@ def keys_depending_on(label: str) -> list[str]:
     return [
         key
         for query in _QUERIES
-        if label in query.depends_on
+        if label in query.dependencies()
         for key in query.all_keys()
     ]
 
 
 def _invalidator(label: str) -> Callable[..., None]:
-    keys = keys_depending_on(label)
-
     def invalidate(*args: Any, **kwargs: Any) -> None:
+        # Read when a write happens, so a query that came to depend on
+        # the model after it was connected (a carrier registering) is
+        # cleared too.
+        keys = keys_depending_on(label)
         transaction.on_commit(lambda: cache.delete_many(keys))
 
     return invalidate
@@ -135,7 +157,9 @@ def _invalidator(label: str) -> Callable[..., None]:
 
 def connect_invalidation() -> None:
     """Connect every registered query's dependencies; idempotent."""
-    labels = sorted({label for query in _QUERIES for label in query.depends_on})
+    labels = sorted(
+        {label for query in _QUERIES for label in query.dependencies()}
+    )
     for label in labels:
         model = apps.get_model(label)
         receiver = _invalidator(label)
@@ -146,3 +170,10 @@ def connect_invalidation() -> None:
                 dispatch_uid=f"admin.dashboard:{label}:{event}",
                 weak=False,
             )
+
+
+@receiver(carrier_registered, dispatch_uid="admin.dashboard:carriers")
+def _connect_carrier_models(sender: Any, **kwargs: Any) -> None:
+    """A carrier registers after the admin's ``ready()``: connect the
+    models it lists."""
+    connect_invalidation()

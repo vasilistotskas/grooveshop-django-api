@@ -199,6 +199,15 @@ def flag_amount_mismatch(
     )
 
 
+def event_reports_finished_payment(event_data: dict[str, Any]) -> bool:
+    """Whether a Transaction Payment Created body does not say its payment
+    is anything but finished: ``StatusId`` ``F``, absent, empty or null
+    (JSON ``null`` is no status). The one test every 1796 path shares: what
+    is read from Viva before a lock is exactly what is judged under it."""
+    status_id = event_data.get("StatusId")
+    return not status_id or status_id == "F"
+
+
 def handle_payment_created(
     order,
     event_data,
@@ -230,13 +239,13 @@ def handle_payment_created(
     # Per Viva docs: check StatusId from the webhook payload first.
     # "F" = Finished (successful). Any other value means the payment
     # is not yet complete.
-    status_id = event_data.get("StatusId", "")
+    status_id = event_data.get("StatusId")
     logger.info(
         "Viva webhook StatusId for order %s: '%s'",
         order.id,
         status_id,
     )
-    if status_id and status_id != "F":
+    if not event_reports_finished_payment(event_data):
         logger.warning(
             "Viva webhook StatusId is '%s' (not 'F') for order %s — "
             "skipping payment update",
@@ -565,7 +574,7 @@ def read_payment_created(
     event says finished, judged by :func:`handle_payment_created`. One
     that names no transaction or another status reads nothing: the
     handler refuses it as it is."""
-    if transaction_id and event_data.get("StatusId", "") in {"", "F"}:
+    if transaction_id and event_reports_finished_payment(event_data):
         return {"verified": verify_transaction(transaction_id)}
     return {}
 

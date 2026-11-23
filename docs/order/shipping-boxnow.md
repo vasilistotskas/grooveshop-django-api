@@ -420,8 +420,10 @@ and says which file holds each § number used here.
   (`shipping.api_errors.CarrierUnavailable`) whose `detail` is written for
   a client; the error text goes to the log (#650). The agent gateway reads
   only the status, so an outage is no longer "no locker nearby". The
-  storefront's locker picker is BoxNow's own iframe widget, which this API
-  does not drive. The same 503 answers an outage on ACS address
+  storefront's locker picker is its own, filtered by the quote's
+  `compartmentSize`; it no longer needs the partner id, which the store
+  config (`tenant/resolve`) therefore does not carry. The partner id stays
+  on the tenant for this API's own BoxNow calls. The same 503 answers an outage on ACS address
   validation and on every staff cancel endpoint: the carriers' own
   (`cancelBoxNowShipment`, `cancelAcsShipment`) and the order's
   provider-agnostic `shipment_cancel` (`src/order/views/order.py`), all

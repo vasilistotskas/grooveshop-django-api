@@ -62,7 +62,7 @@ def staff_user():
 
 
 def _request(staff_user):
-    request = RequestFactory().post("/admin/order/order/")
+    request = RequestFactory().post("/admin/order/order/", CONFIRMED)
     request.user = staff_user
     request.session = {}
     request._messages = FallbackStorage(request)

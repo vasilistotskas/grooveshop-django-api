@@ -2764,3 +2764,35 @@ def purge_expired_pending_payment_fees() -> dict[str, int]:
     if deleted:
         logger.info("Purged %s pending payment fees", deleted)
     return {"deleted": deleted}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def alert_payment_without_order_task(
+    payment_id: str, amount: str, currency: str
+) -> bool:
+    """Alert staff to a succeeded Stripe payment of the store that no order
+    carries (``OrderService.report_payment_without_order``). Returns whether
+    an order carries it, so nothing was sent.
+
+    Queued after the webhook committed, so a mail that fails is retried
+    here: Stripe has had its answer and sends nothing again. A payment-first
+    intent is checked after a grace, when its order should exist.
+    """
+    from decimal import Decimal
+
+    from djmoney.money import Money
+
+    from order.services import OrderService
+
+    if Order.objects.all_with_deleted().filter(payment_id=payment_id).exists():
+        return True
+    OrderService.alert_payment_without_order(
+        payment_id, captured=Money(Decimal(amount), currency)
+    )
+    return False

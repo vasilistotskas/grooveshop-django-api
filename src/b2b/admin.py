@@ -17,6 +17,7 @@ from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextareaWidget
 from admin.base import BaseModelAdmin
 from admin.export import ExportActionMixin
 from admin.filters import RelatedDropdownFilter
+from admin.responses import hx_redirect
 from b2b.enum import BusinessProfileStatus, ViesStatus
 from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
 from b2b.services import B2BService
@@ -238,30 +239,50 @@ class BusinessProfileAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=_("Suspend"), icon="pause_circle", permissions=["change"]
+        description=_("Suspend"),
+        icon="pause_circle",
+        permissions=["change"],
+        dialog=ActionDialog(
+            title=_("Suspend the business profile"),
+            description=_(
+                "Ends the customer's wholesale pricing until you approve the "
+                "profile again."
+            ),
+        ),
     )
-    def suspend(self, request: HttpRequest, object_id: int) -> HttpResponse:
-        from django.shortcuts import redirect
+    def suspend(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
 
         profile = BusinessProfile.objects.get(pk=object_id)
         B2BService.suspend(profile, reviewed_by=request.user)
         self.message_user(
             request, _("Business profile suspended."), messages.SUCCESS
         )
-        return redirect(
+        return hx_redirect(
             reverse("admin:b2b_businessprofile_change", args=[object_id])
         )
 
-    @action(description=_("Re-check VIES"), icon="sync", permissions=["change"])
+    @action(
+        description=_("Re-check VIES"),
+        icon="sync",
+        permissions=["change"],
+        dialog=ActionDialog(
+            title=_("Re-check VIES"),
+            description=_(
+                "Asks VIES again whether this business's VAT number is valid and "
+                "records the answer."
+            ),
+        ),
+    )
     def recheck_vies(
-        self, request: HttpRequest, object_id: int
+        self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
-        from django.shortcuts import redirect
 
         profile = BusinessProfile.objects.get(pk=object_id)
         B2BService.recheck_vies(profile)
         self.message_user(request, _("VIES re-checked."), messages.SUCCESS)
-        return redirect(
+        return hx_redirect(
             reverse("admin:b2b_businessprofile_change", args=[object_id])
         )
 

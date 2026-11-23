@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.db.models import Prefetch
-from django.shortcuts import redirect
+from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
@@ -9,6 +9,7 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
     SliderNumericFilter,
 )
+from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
@@ -22,6 +23,7 @@ from admin.displays import (
     format_dt,
     header_two_line,
 )
+from admin.responses import hx_redirect
 from product.admin.filters import ReviewStatusFilter
 from product.enum.review import ReviewStatus
 from product.models.image import ProductImage
@@ -232,7 +234,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         )
 
     def _back_to(self, object_id):
-        return redirect(
+        return hx_redirect(
             reverse(
                 f"{self.admin_site.name}:product_productreview_change",
                 args=[object_id],
@@ -244,8 +246,14 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         permissions=["change"],
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
+        dialog=ActionDialog(
+            title=_("Approve the review"),
+            description=_("Publishes the review on the product page."),
+        ),
     )
-    def approve_review(self, request, object_id):
+    def approve_review(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         ProductReview.objects.filter(pk=object_id).moderate(ReviewStatus.TRUE)
         self.message_user(
             request, _("The review was approved."), messages.SUCCESS
@@ -257,8 +265,14 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
+        dialog=ActionDialog(
+            title=_("Reject the review"),
+            description=_("Hides the review from the product page."),
+        ),
     )
-    def reject_review(self, request, object_id):
+    def reject_review(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         ProductReview.objects.filter(pk=object_id).moderate(ReviewStatus.FALSE)
         self.message_user(
             request, _("The review was rejected."), messages.SUCCESS

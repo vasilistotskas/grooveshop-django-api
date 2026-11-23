@@ -67,6 +67,7 @@ notify_order_created_live
 notify_order_refunded_live
 notify_order_status_changed_live
 notify_payment_confirmed_live
+order.tasks.alert_payment_without_order_task
 order.tasks.allocate_credit_sources
 order.tasks.auto_cancel_stuck_pending_orders
 order.tasks.cancel_mydata_credit

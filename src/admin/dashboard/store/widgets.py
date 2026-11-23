@@ -45,6 +45,7 @@ from admin.features import RETAIL_DOCUMENTS, store_features
 from admin.navigation import changelist_link
 from order.enum.status import OrderStatus
 from product.enum.stock import StockState
+from shipping.interfaces import registered_providers
 
 PERIOD_LABELS = {
     "7d": (_("7 days"), _("Last 7 days")),
@@ -303,11 +304,20 @@ class StoreAttention(DashboardWidget):
         from order.models.invoice import MyDataStatus
 
         features = store_features(self.request)
-        held_since = (
-            queries.acs_voucher_hold_since.get()
-            if data["acs_voucher_holds"]
-            else None
-        )
+        carrier_rows = [
+            (
+                True,
+                row.count_key,
+                row.icon,
+                row.tone,
+                row.title,
+                row.description,
+                row.model,
+                row.query,
+            )
+            for carrier in registered_providers()
+            for row in carrier.attention_rows(data)
+        ]
         candidates = [
             (
                 True,
@@ -371,76 +381,7 @@ class StoreAttention(DashboardWidget):
                 "order.Order",
                 urlencode({"chargeback": "undecided"}),
             ),
-            (
-                True,
-                "unremitted_cod",
-                "payments",
-                "danger",
-                _("COD cash ACS has not paid out"),
-                _("Delivered, and ACS reports no payout"),
-                "shipping_acs.AcsShipment",
-                urlencode({"attention": "unremitted_cod"}),
-            ),
-            (
-                True,
-                "unattributed_cod_payouts",
-                "help_center",
-                "danger",
-                _("ACS payouts matching no shipment"),
-                _("Money ACS paid out that no shipment explains"),
-                "shipping_acs.AcsCodPayout",
-                urlencode({"unattributed": "yes"}),
-            ),
-            (
-                True,
-                "acs_voucher_requests_unknown",
-                "help",
-                "danger",
-                _("ACS voucher requests to check"),
-                _("ACS may hold a voucher: adopt it or request again"),
-                "shipping_acs.AcsShipment",
-                urlencode({"attention": "voucher_unknown"}),
-            ),
-            (
-                held_since is not None,
-                "acs_voucher_holds",
-                "pause_circle",
-                "danger",
-                _("ACS voucher requests are held"),
-                _(
-                    "Since %(since)s, because ACS is failing. They are sent "
-                    "when it answers again"
-                )
-                % {
-                    "since": formats.date_format(
-                        timezone.localtime(held_since), "SHORT_DATETIME_FORMAT"
-                    )
-                    if held_since
-                    else ""
-                },
-                "shipping_acs.AcsVoucherHold",
-                urlencode({"in_force": "yes"}),
-            ),
-            (
-                True,
-                "acs_unrecognised_vouchers",
-                "qr_code",
-                "warning",
-                _("ACS vouchers matching no order"),
-                _("Named by ACS on a refused pickup list"),
-                "shipping_acs.AcsUnrecognisedVoucher",
-                urlencode({"resolved": "no"}),
-            ),
-            (
-                True,
-                "stale_shipments",
-                "local_shipping",
-                "warning",
-                _("Stale ACS shipments"),
-                _("No tracking movement, or the voucher was never created"),
-                "shipping_acs.AcsShipment",
-                urlencode({"attention": "stale"}),
-            ),
+            *carrier_rows,
             (
                 True,
                 "failing_emails",
@@ -1334,10 +1275,7 @@ class StoreAlerts(DashboardWidget):
             )
         # Only a store whose parcels a carrier integration takes owes a
         # movement receipt (``order.accounting.movement``).
-        carrier_apps = {"shipping_acs", "shipping_boxnow"}
-        uses_a_carrier = bool(
-            carrier_apps - store_features(self.request).inactive_carrier_apps()
-        )
+        uses_a_carrier = store_features(self.request).uses_a_carrier_app()
         if uses_a_carrier and loading_address() is None:
             alerts.append(
                 _alert(

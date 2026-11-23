@@ -96,6 +96,7 @@ def test_index_settings_reach_only_the_active_stores(stores):
 #: data: the builder commands read the storefront's tenant-free block
 #: catalogue and its static images, nothing on the store's behalf.
 INCLUDE_SUSPENDED_STORES = {
+    "backfill_confirmed_at": True,
     "backfill_extra_settings_defaults": True,
     "backfill_image_dimensions": True,
     "backfill_line_snapshots": True,

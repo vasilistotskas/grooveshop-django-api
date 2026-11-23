@@ -222,7 +222,10 @@ locks stock.
   accepts 0 to 60, `payment_hold.MAX_GRACE`) is added to
   the stored instant, and the 15 minute beat adds its own slack, so a
   confirmation already on its way reaches an open order. Only unpaid (`PENDING`
-  / `PENDING`) orders of an `ONLINE` pay way are swept; COD and
+  / `PENDING`) orders of an `ONLINE` pay way are swept, and such an order was
+  never confirmed, so its cancel is silent to the customer (no CANCELED email
+  or toast, [§6](emails-and-notifications.md)) while its stock and holds are
+  released; COD and
   carrier-collected orders are not ([§4.4](payments.md)). A `PENDING` order
   whose payment FAILED is swept too, `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`
   (default 30) after the failure: a failed attempt does not end the payment,

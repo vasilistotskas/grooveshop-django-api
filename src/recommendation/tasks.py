@@ -173,9 +173,9 @@ def record_recommendation_event(
     retry_backoff=True,
 )
 def record_recommendation_attach(order_id: int) -> dict[str, int]:
-    """Write ``attach`` rows for a newly created order.
+    """Write ``attach`` rows for a newly confirmed order.
 
-    Dispatched from ``recommendation.signals.on_order_created`` through
+    Dispatched from ``recommendation.signals.on_order_confirmed`` through
     ``dispatch_on_commit`` so the schema travels with the message. Safe
     to retry: the attach rows are unique per (order, product,
     impression).

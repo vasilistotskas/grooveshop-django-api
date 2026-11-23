@@ -87,7 +87,7 @@ def _viva(order, transaction_id, order_code="OC1"):
                 verified_payment(order, order_code),
             ),
         ),
-        patch("order.payments.viva_settlement.dispatch_on_commit"),
+        patch("order.signals.handlers.dispatch_on_commit"),
         patch(
             "shipping.services.ShippingService.dispatch_create_shipment_task"
         ),

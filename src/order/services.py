@@ -2607,6 +2607,10 @@ class OrderService:
                 cls.settle_polled_completion(order, status_data)
             else:
                 cls._apply_polled_payment_status(order, payment_status_enum)
+        if update_order and payment_status_enum == PaymentStatus.COMPLETED:
+            # An order paid already may still be unconfirmed: the sight of
+            # its payment confirms it (a no-op otherwise).
+            OrderLifecycleService.confirm(order)
 
         return payment_status_enum, status_data
 

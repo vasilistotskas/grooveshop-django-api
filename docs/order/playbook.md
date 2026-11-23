@@ -17,7 +17,8 @@ and says which file holds each § number used here.
    (`required`), the gates and the `list_id`. Run `makemessages` and
    translate the new msgids (title, description, subject).
 3. Add a Celery task in `src/order/tasks.py` mirroring
-   `send_payment_failed_email`:
+   `send_admin_new_order_email` or, for a claim per object,
+   `send_refund_confirmation_email`:
    - Idempotency reservation helper (`_reserve_<task>_email`).
    - `send_email("<type key>", obj)`, mapping the returned `Delivery` list
      with `was_sent`: no subject, context, recipient, headers or

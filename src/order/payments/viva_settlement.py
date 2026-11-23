@@ -34,7 +34,6 @@ from order.payments.payment import (
     order_viva_codes,
     provider_amount,
 )
-from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -543,11 +542,10 @@ def handle_payment_created(
     )
 
     from order.payments.payment_events import publish_payment_status
-    from order.tasks import send_order_confirmation_email
 
     publish_payment_status(order)
 
-    dispatch_on_commit(send_order_confirmation_email, [order.id])
+    OrderLifecycleService.confirm(order)
 
     # Enqueue the carrier's delivery-request creation. Provider-agnostic
     # dispatch through the registry — Stripe's ``handle_payment_succeeded``
@@ -595,9 +593,42 @@ def apply_event(
     redelivery, or :func:`settle_landed_payment`). Answers the outcome
     recorded, or ``None`` when the event had been applied already.
 
+    A Transaction Payment Created event then confirms the order, applied
+    or seen before: one paid but not yet confirmed is confirmed by the next
+    sight of its payment, and ``OrderLifecycleService.confirm`` leaves a
+    confirmed, unpaid or canceled order as it is.
+
     Raises ``RuntimeError`` when the transaction could not be verified
     with Viva: nothing is written and the event can be applied later.
     """
+    from order.lifecycle.service import OrderLifecycleService
+
+    outcome = _apply_event(
+        order,
+        event_type_id=event_type_id,
+        event_data=event_data,
+        transaction_id=transaction_id,
+        order_code=order_code,
+        status_id=status_id,
+        handle=handle,
+        read=read,
+    )
+    if event_type_id == VIVA_TRANSACTION_PAYMENT_CREATED:
+        OrderLifecycleService.confirm(order)
+    return outcome
+
+
+def _apply_event(
+    order: Order,
+    *,
+    event_type_id: int | None,
+    event_data: dict[str, Any],
+    transaction_id: str,
+    order_code: str,
+    status_id: str,
+    handle: EventHandler | None,
+    read: EventRead | None,
+) -> str | None:
     from order.models.viva_webhook_event import VivaWebhookEvent
 
     txn_hash = transaction_hash(transaction_id)

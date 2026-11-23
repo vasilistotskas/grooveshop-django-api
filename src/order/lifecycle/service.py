@@ -41,6 +41,7 @@ from order.exceptions import (
     StockReservationError,
 )
 from order.inventory.stock import StockManager
+from order.lifecycle.confirmation import due_for_confirmation
 from order.models.order import (
     Order,
     status_update_reservation_key,
@@ -232,6 +233,56 @@ class OrderLifecycleService:
         )
 
         return order
+
+    @classmethod
+    def confirm(cls, order: Order) -> bool:
+        """Confirm *order*, once, when it is due, and send
+        ``order_confirmed``.
+
+        The one way an order is announced: its receiver
+        (``order.signals.handlers.handle_order_confirmed``) sends the
+        customer's confirmation email, the staff "New order" email and one
+        in-app note, and the recommendation engine records what the order
+        bought from its suggestions.
+
+        An order is due when nothing is left to pay online, or its online
+        payment is COMPLETED (``confirmation.due_for_confirmation``), and it
+        is not canceled. ``confirmed_at`` is claimed with one ``UPDATE ...
+        WHERE confirmed_at IS NULL`` on those terms, so any path may call
+        this whenever it sees the order: its creation, and every
+        observation of a settled payment (a webhook, applied or a repeat,
+        the buyer's return, a poll, the sweep's read-back, a retry). The
+        first to find it due confirms it; every other answers ``False``
+        and announces nothing.
+
+        The claim and the announcement commit together: when sending
+        ``order_confirmed`` fails, the claim is rolled back with it, and the
+        next observation of the payment confirms the order.
+        """
+        from order.signals import order_confirmed
+
+        now = timezone.now()
+        with transaction.atomic():
+            claimed = (
+                Order.objects.filter(
+                    due_for_confirmation(),
+                    pk=order.pk,
+                    confirmed_at__isnull=True,
+                )
+                .exclude(status=OrderStatus.CANCELED)
+                .update(confirmed_at=now)
+            )
+            if not claimed:
+                return False
+            order.confirmed_at = now
+            # The receivers read the order as the claim found it: the
+            # caller's copy may predate the payment that made it due.
+            order_confirmed.send(
+                sender=Order,
+                order=Order.objects.select_related("pay_way").get(pk=order.pk),
+            )
+        logger.info("Order %s confirmed", order.id)
+        return True
 
     @classmethod
     def suppress_customer_status_notifications(
@@ -900,6 +951,16 @@ class OrderLifecycleService:
                 # committed. The flag is the durable half of that: it
                 # commits with the cancel and goes with the answer.
                 order.metadata[SHIPMENT_CANCEL_PENDING_FLAG] = True
+
+            # An order never confirmed was never announced (a card order
+            # nobody paid): its customer was told nothing about it, so its
+            # cancel is not announced either, whoever cancels it. The
+            # stock, the reservations and the payment are settled as for
+            # any cancel.
+            if order.confirmed_at is None:
+                cls.suppress_customer_status_notifications(
+                    order, OrderStatus.CANCELED.value
+                )
 
             # A courier order's receipt not yet handed to the customer is
             # set aside to be canceled in myDATA, here, under this lock and

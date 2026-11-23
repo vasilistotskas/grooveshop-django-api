@@ -877,6 +877,19 @@ class OrderViewSet(BaseModelViewSet):
         )
 
     @staticmethod
+    def _new_payment_went_ahead(order, locked_order) -> bool:
+        """Whether what changed on *locked_order* since the service recorded
+        *order*'s new payment is that payment's own webhook moving it to
+        PROCESSING or COMPLETED (and the order with it), not a cancel or
+        another payment."""
+        return (
+            locked_order.payment_id == order.payment_id
+            and locked_order.status != OrderStatus.CANCELED
+            and locked_order.payment_status
+            in (PaymentStatus.PROCESSING, PaymentStatus.COMPLETED)
+        )
+
+    @staticmethod
     def _order_changed_during_payment(order) -> Response:
         """409 for a payment whose order changed during the provider call.
 
@@ -1836,6 +1849,10 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if order.payment_status == PaymentStatus.COMPLETED:
+            # The provider took the payment at once: the order is confirmed
+            # now, as its webhook, which may not come, would confirm it.
+            OrderLifecycleService.confirm(order)
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=payment_response)
@@ -1859,9 +1876,10 @@ class OrderViewSet(BaseModelViewSet):
 
         The customer retains the same order, the same items, and the
         same reserved stock (already decremented at order creation).
-        We just mint a new PaymentIntent, store its id on the order,
-        reset the payment status to PENDING, and return the client
-        secret so the frontend can re-mount Stripe Elements.
+        We just mint a new PaymentIntent, which the service records with
+        the status the provider reported (a payment taken at once
+        confirms the order), and return the client secret so the
+        frontend can re-mount Stripe Elements.
         """
         order = self.get_object()
 
@@ -1931,27 +1949,29 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         new_payment_id = payment_response.get("payment_id")
 
-        # Lock the order row while we swap in the new payment intent.
-        # A late `payment_intent.payment_failed` webhook for the OLD
-        # intent could otherwise land between read and save, flip
-        # payment_status to FAILED, and enqueue a duplicate failure
-        # email concurrently with this retry flow.
+        # The service recorded the new payment under its own lock, with
+        # the status the provider reported (pending, processing, or taken
+        # at once): it is kept, never reset. Here only the retry is noted,
+        # under the row lock, and a change landing since the service wrote
+        # wins as it does there.
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk)
             # The service stored the new intent under its own lock; a
-            # change landing since then wins in the same way.
+            # change landing since then wins in the same way, except the
+            # new payment's own webhook moving it ahead: that payment is
+            # going through, and the answer is its recorded status.
             if (
                 locked_order.status,
                 locked_order.payment_status,
                 locked_order.payment_id,
-            ) != (order.status, order.payment_status, order.payment_id):
+            ) != (
+                order.status,
+                order.payment_status,
+                order.payment_id,
+            ) and not self._new_payment_went_ahead(order, locked_order):
                 return self._order_changed_during_payment(order)
-            if new_payment_id:
-                locked_order.payment_id = new_payment_id
-            locked_order.payment_status = PaymentStatus.PENDING
             if not locked_order.metadata:
                 locked_order.metadata = {}
             retry_history = locked_order.metadata.setdefault(
@@ -1964,17 +1984,12 @@ class OrderViewSet(BaseModelViewSet):
                     "new_payment_id": new_payment_id or "",
                 }
             )
-            # Reset per-flow idempotency flags so the confirmation
-            # email can fire again on the (expected) new
-            # payment_intent.succeeded, and the customer can be
-            # re-notified of any new failure, so the sent-at stamp is
-            # cleared and the confirmation re-arms.
-            locked_order.metadata.pop("confirmation_email_sent_at", None)
-            locked_order.metadata.pop("payment_failed_email_sent", None)
-            locked_order.save(
-                update_fields=["payment_id", "payment_status", "metadata"]
-            )
+            locked_order.save(update_fields=["metadata"])
         order = locked_order
+        if order.payment_status == PaymentStatus.COMPLETED:
+            # The provider took the payment at once: the order is confirmed
+            # now, as its webhook, which may not come, would confirm it.
+            OrderLifecycleService.confirm(order)
 
         OrderHistory.log_payment_update(
             order=order,
@@ -1983,14 +1998,18 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_id": previous_payment_id or "",
             },
             new_value={
-                "payment_status": PaymentStatus.PENDING,
-                "payment_id": new_payment_id or "",
+                "payment_status": str(order.payment_status),
+                "payment_id": order.payment_id or "",
                 "retry": True,
             },
         )
 
         response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(data=payment_response)
+        # The status the order records, which a webhook may have moved
+        # ahead of what the provider answered.
+        response_serializer = response_serializer_class(
+            data={**payment_response, "status": order.payment_status}
+        )
         response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 
@@ -2297,11 +2316,23 @@ class OrderViewSet(BaseModelViewSet):
         # webhook remains the idempotent backstop.
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
-            if payment_response["status"] == PaymentStatus.COMPLETED:
+            paid = payment_response["status"] == PaymentStatus.COMPLETED
+            if paid and OrderService.is_payment_after_cancel(locked):
+                # Canceled while the token was charged: the money is
+                # booked and staff are paged; the order stays canceled.
+                OrderService.record_payment_after_cancel(
+                    locked,
+                    payment_id=payment_response["payment_id"],
+                    payment_method="stripe_agent_spt",
+                )
+            elif paid:
                 locked.mark_as_paid(
                     payment_id=payment_response["payment_id"],
                     payment_method="stripe_agent_spt",
                 )
+                # The webhook that follows is a backstop that may not
+                # come: confirmed now, once.
+                OrderLifecycleService.confirm(locked)
             else:
                 locked.payment_id = payment_response["payment_id"]
                 locked.save(update_fields=["payment_id"])

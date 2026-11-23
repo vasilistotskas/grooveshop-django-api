@@ -76,7 +76,7 @@ Declared in `src/order/emails.py`, next to the builders that read the order:
 | Key | About | Requirement / gates |
 |---|---|---|
 | `order.received`, `order.payment_confirmed` | the `Order` | required; `FeatureGate("cart")` |
-| `order.payment_failed`, `order.shipped` | the `Order` | required |
+| `order.shipped` | the `Order` | required |
 | `order.delivered`, `order.completed` | the `Order` | switchable |
 | `order.review_request` | the `Order`, `REVIEW_REQUEST_DELAY_DAYS` days after its delivery | **marketing**; `FeatureGate("product_reviews")` |
 | `order.canceled`, `order.returned` | the `Order` | required |

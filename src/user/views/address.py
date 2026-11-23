@@ -5,15 +5,15 @@ from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from core.api.permissions import IsOwnerOrAdmin
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import IsOwnerOrAdmin
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from user.filters.address import UserAddressFilter
 from user.models.address import UserAddress
 from user.serializers.address import (

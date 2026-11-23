@@ -33,7 +33,7 @@ from order.models.order import Order
 from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.payments.payment_ledger import PaymentLedger
 from order.refunds.refund_reconciliation import record_outcome
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.tasks import reconcile_pending_refunds
 from pay_way.factories import PayWayFactory
 from tests.integration.order.test_refund_attempts import (
@@ -77,7 +77,7 @@ def _stripe_unknown(order, amount="40.00", **fake):
     """A refund Stripe made whose answer was lost: its attempt is PENDING."""
     stripe_api = FakeStripeRefunds(lose_answer=True, **fake)
     with stripe_api:
-        result = OrderService.refund_order(order, amount=_eur(amount))
+        result = RefundService.refund_order(order, amount=_eur(amount))
     assert result.declined["outcome_unknown"] is True
     return stripe_api
 
@@ -87,7 +87,7 @@ def _viva_unknown(order, amount="40.00"):
     order.metadata = {"viva_order_codes": [ORDER_CODE]}
     order.save(update_fields=["metadata"])
     with FakeVivaApi(captured=100.0, cancel=(500, "boom")):
-        result = OrderService.refund_order(order, amount=_eur(amount))
+        result = RefundService.refund_order(order, amount=_eur(amount))
     assert result.declined["outcome_unknown"] is True
 
 
@@ -129,7 +129,7 @@ class TestPendingHoldsUntilResolved:
 
         assert PaymentLedger.refundable(order) == Decimal("20.00")
         with FakeStripeRefunds() as stripe_api, pytest.raises(PaymentError):
-            OrderService.refund_order(order, amount=_eur("30.00"))
+            RefundService.refund_order(order, amount=_eur("30.00"))
         assert stripe_api.calls == []
 
     def test_a_webhook_refund_settles_an_old_pending_attempt(self):
@@ -160,7 +160,7 @@ class TestPendingHoldsUntilResolved:
             FakeStripeRefunds() as stripe_api,
             pytest.raises(PaymentError) as e,
         ):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         assert "still not known" in str(e.value)
         assert stripe_api.calls == []
@@ -201,7 +201,7 @@ class TestStripeLookup:
     def test_nothing_found_stays_pending(self):
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         _age(order)
 
         with FakeStripeRefunds():
@@ -397,7 +397,7 @@ class TestRecordRefundOutcomeAction:
     def _overdue_order(self):
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         _age(order)
         _looked_up(order)
         return order, _only_attempt(order)
@@ -633,7 +633,7 @@ class TestRecordRefundOutcomeAction:
     ):
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         attempt = _only_attempt(order)
 
         # Not offered, and a forged request for it is refused outright.
@@ -655,7 +655,7 @@ class TestRecordRefundOutcomeAction:
         bug) decided nothing: staff are told, as for an empty answer."""
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         _age(order, hours=1.5)
 
         with mock.patch(
@@ -677,7 +677,7 @@ class TestRecordRefundOutcomeAction:
         attempt is overdue for a second window, staff are told anyway."""
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
 
         _age(order, hours=1.5)
         assert not order_admin.has_record_refund_outcome_permission(
@@ -696,7 +696,7 @@ class TestRecordRefundOutcomeAction:
         answer, so staff are not asked."""
         order = _order()
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
-            OrderService.refund_order(order, amount=_eur("40.00"))
+            RefundService.refund_order(order, amount=_eur("40.00"))
         # Overdue, but not yet for a second window.
         _age(order, hours=1.5)
         attempt = _only_attempt(order)
@@ -830,8 +830,8 @@ class TestASuspendedStore:
         from extra_settings.models import Setting
 
         from meta_capi.client import MetaCapiResponse
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
         from tests.utils.staff import store_tenant
 
         store = store_tenant(

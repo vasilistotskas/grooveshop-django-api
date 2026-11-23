@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 from django.test import Client
 
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     store_staff,

@@ -17,7 +17,8 @@ from django.test import RequestFactory
 from django.utils.translation import gettext
 
 from tenant.admin import StoreTeamMemberForm, UserTenantMembershipAdmin
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

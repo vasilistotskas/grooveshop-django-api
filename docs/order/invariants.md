@@ -10,16 +10,16 @@ the linked section or the originating commit's message.
 
 | Invariant | Anchor |
 |---|---|
-| No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | [§5](shipping.md) |
+| No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`), nor for an order that ships nothing (`Order.ships_nothing`, `ShipmentNotNeededError`) | [§5](shipping.md) |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | [§2.2](state-machines.md) |
 | A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | [§7.3](payment-ledger.md) |
 | A placed order's lines (product, quantity, price) are read-only in every admin surface; the name and SKU on an invoice, email or API line are the line's own snapshot | [§3.7](creation-records.md) |
-| Order `status` changes only through admin actions / `OrderService`, never the change form; CANCELED only through `OrderService.cancel_order`, never `update_order_status` or the `update_status` endpoint | [§2.1](state-machines.md), [§7.1](cancel.md) |
+| Order `status` changes only through admin actions / `OrderLifecycleService`, never the change form; CANCELED only through `OrderLifecycleService.cancel_order`, never `update_order_status` or the `update_status` endpoint | [§2.1](state-machines.md), [§7.1](cancel.md) |
 | A BoxNow `canceled` parcel event never changes the order (status, stock, payment): it records the shipment CANCELED, and an open order behind it is "follow up" until staff re-issue the parcel or cancel the order. Only ACS routes a canceled shipment to `cancel_for_dead_shipment` | [§2.1](state-machines.md), [§2.3](state-machines.md), [§7.1](cancel.md) (#600) |
 | An order cancel never calls the courier inside its transaction: `_cancel_order_locked` commits the cancel with `metadata['shipment_cancel_pending']`, `cancel_attached_shipment` asks the courier after the commit (`transaction.on_commit`, so after the caller's own transaction too) and removes the flag with the answer, and `finish_pending_shipment_cancels` asks for a cancel whose worker stopped in between, and again for one whose courier gave no answer, until `ORDER_SHIPMENT_CANCEL_RETRY_HOURS` after the cancel | [§7.1.2](cancel.md) (#713) |
 | An order row and its carrier shipment row are locked order first, through `shipping.locks.lock_with_order` alone; a joined `select_for_update().select_related("order")` locks them the other way round | [§5](shipping.md) (#613) |
 | Operational mail to a store's operators is an `ops.*` email type sent through `send_email` only (the store's `EmailSwitch` is the one gate); an alert a store may switch off has a dashboard counter by the same rule as its email | [§5.4](shipping.md) |
-| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment`; its canceled-parcel part asks each carrier through `ShippingService.canceled_shipment_q`, never a carrier import in `order` | [§2.3](state-machines.md) |
+| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses; `Order.awaits_online_payment` is the same rule for one row); its canceled-parcel part asks each carrier through `ShippingService.canceled_shipment_q`, never a carrier import in `order` | [§2.3](state-machines.md) |
 | One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found before the provider is asked, and again under the cart lock, both before cart validation) and refuses an intent of another cart or of a canceled / deleted order, a unique-index race between two carts included, all as `payment_verification` | [§3.1](creation.md) |
 | One order per agent checkout: `Order.agent_checkout` is unique when set (`order_agent_checkout_unique`), it is believed only beside the gateway's secret, and order creation answers a repeat with that checkout's order (looked up before anything is judged, again under the cart lock, and after a refusal that a racing call caused), a unique-index race between two carts included | [§3.2](creation.md) |
 | An order the agent gateway places (`AttributionInput.from_agent`) is refused, `cart_has_unpaid_order`, while an order of the same cart is in `OrderQuerySet.awaiting_online_payment()`: one helper, called under the cart row lock by the order-first path alone. The payment-first path is not checked (its payment is already taken, and a refusal would keep money for no order). An order without a believed agent protocol is never checked, and the refusal names no order | [§3.2](creation.md) (#692) |
@@ -40,12 +40,12 @@ the linked section or the originating commit's message.
 | A pay way is accepted exactly when the quote lists it for the delivery: `OrderQuoteService.offered_pay_ways` is the one rule behind the quote's `payWays`, the selection of a quote or a payment intent, and `OrderViewSet._validate_pay_way_for_order` on both creation paths | [§3.0](creation.md) (#635) |
 | "Free above X" means one value for shipping and for the pay-way fee: the products after discounts, excluding shipping and fees (`OrderQuoteService.threshold_value`), passed by every caller of `shipping_cost` and `calculate_payment_method_fee` | [§5.0](shipping.md) |
 | A payment is bound to what it was made for: every PaymentIntent carries server-set `purpose` / `subject` / `tenant_schema` metadata, payment-first order creation refuses an intent that is not `cart` + this cart + this tenant (or that a gift-card purchase holds), and the polled status path settles only through `handle_payment_succeeded` | [§3.1](creation.md), [§4.1](payments.md) |
-| A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | [§4.1](payments.md), [§4.3](payments.md) |
+| A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | [§4.1](payments.md), [§4.3](payments-viva.md) |
 | A reversal of a gift-card purchase's payment (refund, claim, chargeback, Stripe or Viva) voids the unspent card and records the spent part | [§4.2.1](payments.md) |
 | `Order.payment_status` / `payment_id` are read-only in the admin, and the owner PATCH/PUT cannot change a priced order's country or region | [§7](cancel.md) |
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL, and a voucher request of unknown outcome (lost answer, unclassified error, expired claim) is never sent again: `voucher_request_unknown_at` holds every caller until staff adopt the voucher or request again | [§5.1](shipping-acs.md), `docs/acs-debugging.md` |
 | While an `AcsVoucherHold` is in force no `ACS_Create_Voucher` is sent for the store, and a held request is never a request of unknown outcome: it is stamped `voucher_request_held_at`, keeps no claim, and only `issue_held_acs_vouchers` sends it, one request first | [§5.1](shipping-acs.md), `src/shipping_acs/voucher_hold.py` |
-| Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `src/order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
+| Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`viva_settlement.handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `src/order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
 | A poll of the provider writes only an open payment's state: a canceled attempt is recorded FAILED (never CANCELED on an open order), a refunded state never. A provider that could not be asked raises `PaymentStatusUnavailableError` and nothing is written, never FAILED | [§4.1](payments.md) (#697, #698) |
 | A Stripe refund carries `idempotency_key=order-<id>-refund-<n>`, `n` counted from the ledger under the order lock. A refund the provider did not take on (`requires_action`, `failed`, `canceled`) records nothing and never moves the order to PROCESSING | [§7.2](refund-execution.md) |
 | `refund_order` returns a `RefundResult` (what actually moved), never a yes/no: a split refund declined part-way keeps the shares already made and reports them, and every caller (the staff action, `cancel_order`) says so instead of "nothing was refunded" | [§7.2](refund-execution.md) |
@@ -78,7 +78,7 @@ These invariants need more than a table row. Each ends with its anchor.
   `_original_status`, `_original_tracking_number` and the rest, which recurses
   through the manager without end
   - Anchor: commit `6521f8f2a` (2026-05-01), the docstring of
-    `OrderService.maybe_advance_to_completed`
+    `OrderLifecycleService.maybe_advance_to_completed`
 - `suppress_customer_status_notifications` on chained transitions. A carrier
   DELIVERED that completes the order, a payment that moves it to PROCESSING
   (the confirmation email follows at once) and tracking added from PENDING
@@ -95,7 +95,7 @@ These invariants need more than a table row. Each ends with its anchor.
   - Anchor: commits `61dd09854` (2026-04-29, the amount) and `ffe1718e4`
     (2026-04-30, the weight)
 - The default cache fails open on a Redis outage (reads miss, writes no-op —
-  `src/core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
+  `src/core/cache_backend.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
   the IdP's single-use codes and WebSocket tickets. The checkout, payment,
   coupon and gift-card throttles (`src/order/throttles.py`,
@@ -137,7 +137,7 @@ These invariants need more than a table row. Each ends with its anchor.
   reversed once, when `payment_status` is REFUNDED. A Viva 1797 is applied from
   the REFUND transaction (`F`, refund/void type, negative amount), not from a
   REFUNDED status that Viva never reports
-  - Anchor: [§4.3](payments.md), [§7.2](refunds.md)
+  - Anchor: [§4.3](payments-viva.md), [§7.2](refunds.md)
 - Money moved for an order is recorded on the append-only `PaymentTransaction`
   ledger, once, keyed on the provider's own id
   (`UNIQUE (provider, provider_reference, kind)`). What can still be refunded

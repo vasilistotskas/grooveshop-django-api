@@ -18,6 +18,7 @@ from tests.utils.builder import (
     HASH,
     default_blocks,
     default_document_kinds,
+    default_icons,
     document,
     hero,
     section,
@@ -26,6 +27,7 @@ from tests.utils.builder import (
 CATALOGUE = parse_catalogue(
     {
         "hash": HASH,
+        "icons": default_icons(),
         "blocks": default_blocks(),
         "documentKinds": default_document_kinds(),
         "templates": ["home", "about", "contact", "product"],
@@ -465,7 +467,12 @@ def test_an_older_version_is_outdated_even_when_accepts_names_only_the_current()
     blocks = default_blocks()
     blocks[0]["accepts"] = [blocks[0]["version"]]
     catalogue = parse_catalogue(
-        {"hash": HASH, "blocks": blocks, "templates": ["home"]}
+        {
+            "hash": HASH,
+            "icons": default_icons(),
+            "blocks": blocks,
+            "templates": ["home"],
+        }
     )
 
     issues, _ = validate_document(
@@ -559,6 +566,7 @@ class TestDocumentRootSettings:
         catalogue = parse_catalogue(
             {
                 "hash": HASH,
+                "icons": default_icons(),
                 "blocks": default_blocks(),
                 "documentKinds": kinds,
                 "templates": ["home"],
@@ -581,6 +589,7 @@ class TestDocumentRootSettings:
         catalogue = parse_catalogue(
             {
                 "hash": HASH,
+                "icons": default_icons(),
                 "blocks": default_blocks(),
                 "documentKinds": kinds,
                 "templates": ["home"],
@@ -612,7 +621,12 @@ class TestDocumentRootSettings:
         kinds = default_document_kinds()
         kinds["page"]["translatable"] = ["/seoTitle"]
         catalogue = parse_catalogue(
-            {"hash": HASH, "blocks": blocks, "documentKinds": kinds}
+            {
+                "hash": HASH,
+                "icons": default_icons(),
+                "blocks": blocks,
+                "documentKinds": kinds,
+            }
         )
 
         issues, _ = validate_document(
@@ -764,6 +778,7 @@ class TestLinkReferences:
         catalogue = parse_catalogue(
             {
                 "hash": HASH,
+                "icons": default_icons(),
                 "blocks": blocks,
                 "documentKinds": default_document_kinds(),
                 "templates": ["home"],
@@ -799,6 +814,7 @@ class TestNestedTranslatablesBesideALink:
     CATALOGUE = parse_catalogue(
         {
             "hash": HASH,
+            "icons": default_icons(),
             "blocks": [
                 {
                     "type": "grid",
@@ -888,6 +904,7 @@ class TestTheCatalogueReadsLinks:
     def block(self, **extra):
         return {
             "hash": HASH,
+            "icons": default_icons(),
             "blocks": [
                 {
                     "type": "cta",
@@ -922,7 +939,12 @@ class TestTheCatalogueReadsLinks:
 
         with pytest.raises(StorefrontUnavailable):
             parse_catalogue(
-                {"hash": HASH, "blocks": [], "documentKinds": kinds}
+                {
+                    "hash": HASH,
+                    "icons": default_icons(),
+                    "blocks": [],
+                    "documentKinds": kinds,
+                }
             )
 
     @pytest.mark.parametrize(

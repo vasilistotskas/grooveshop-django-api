@@ -208,10 +208,43 @@ outside a task.
   derived from the task id (`emails.log.delivery_id`); a second copy finds
   the delivery sent, and copies that run at the same moment send under an
   advisory lock on it (`docs/emails/delivery.md`).
+- **In-app notification**: every notification is written by
+  `notification.services.create_user_notification`, under a unique
+  `Notification.dispatch_key`; a second copy gets the first one's row back,
+  or nothing once the user has removed it.
+  Its live push claims `NotificationUser.pushed_at` before it sends
+  (`docs/order/emails-and-notifications.md`, section 6.4).
+- **Meta Conversions API**: each event's id is fixed before the task can run
+  again (the order's or the account's number, a Refund's ledger row,
+  `src/meta_capi/services.py`), and `MetaCapiEventLog` is checked and the
+  event sent under an advisory lock on that id. A copy whose wait for the
+  lock runs out (`core.db.locks.LockWaitRanOut`) retries, and finds the event
+  sent; the request to Meta is bounded by `META_CAPI_TIMEOUT_SECONDS`.
 
-A task whose effect is a state of a row needs no id: it claims the state (a
-compare-and-set, a unique row). A dispatch made inside a task (a chain's next
-link) is a dispatch of its own, with an id of its own.
+- **Recommendation events** (`recommendation.events.record_events`): each
+  row's `event_key` is `dispatch_key` over the task id, the kind, the
+  impression id, the product and the position, unique, so every copy of one
+  dispatch makes the same keys and a second copy inserts nothing. Two beacons
+  are two tasks and stay two rows even for one impression id: a cached strip
+  shows one id to every viewer.
+
+A task whose effect is a state of a row needs no id, and its state also covers
+two dispatches of it from different paths. When the effect is the row's own
+state, the task claims it (a compare-and-set, a unique row). When the state
+records a call to another service (a mail), the task reads the row, calls and
+marks it under an advisory lock on the row (`core.db.locks.held_across_calls`)
+instead: a mark set before the call would lose the call with a worker that
+dies mid-call, and the lock goes with that worker's session, so the run after
+it calls again. A dispatch made inside a task (a chain's next link) is a
+dispatch of its own, with an id of its own.
+
+- **A product alert** (`product.tasks._notify_alerts`) is read, mailed and
+  marked (`is_active` off, `notified_at` set) under a lock on the alert, so a
+  second run (another stock or price update) waits and finds it marked. A type
+  that is switched off leaves every alert armed.
+- **A gift card's delivery** (`giftcard.tasks.deliver_gift_card_email`), queued
+  by the purchase, the admin's resend and the daily sweep, reads
+  `delivered_at` and sends under a lock on the card.
 
 ## One sweep at a time
 

@@ -210,7 +210,7 @@ def my_memberships(request: Request) -> Response:
     authenticates against that tenant's OWN user table — where the same
     id belongs to a different person. Filtering by that id would list
     stores the caller has nothing to do with. Customers hold no
-    memberships at all (see ``tenant/membership.py``), so an empty list
+    memberships at all (see ``src/tenant/membership.py``), so an empty list
     is the correct answer for every shopper.
     """
     if get_current_tenant() is not None:

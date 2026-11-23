@@ -67,7 +67,6 @@ notify_order_created_live
 notify_order_refunded_live
 notify_order_status_changed_live
 notify_payment_confirmed_live
-notify_payment_failed_live
 order.tasks.allocate_credit_sources
 order.tasks.auto_cancel_stuck_pending_orders
 order.tasks.cancel_mydata_credit
@@ -89,7 +88,6 @@ order.tasks.send_invoice_email
 order.tasks.send_invoice_to_mydata
 order.tasks.send_order_confirmation_email
 order.tasks.send_order_status_update_email
-order.tasks.send_payment_failed_email
 order.tasks.send_refund_confirmation_email
 order.tasks.send_review_request_emails
 order.tasks.send_shipping_notification_email
@@ -131,6 +129,7 @@ shipping_acs.tasks.purge_expired_acs_api_calls
 shipping_acs.tasks.purge_expired_acs_tracking_events
 shipping_acs.tasks.reconcile_acs_cod_payouts
 shipping_acs.tasks.sync_acs_stations
+shipping_boxnow.tasks.apply_boxnow_locker_catalogue
 shipping_boxnow.tasks.boxnow_send_arrival_notification
 shipping_boxnow.tasks.create_boxnow_shipment_for_order
 shipping_boxnow.tasks.poll_boxnow_tracking_batch
@@ -138,6 +137,7 @@ shipping_boxnow.tasks.poll_boxnow_tracking_one
 shipping_boxnow.tasks.process_boxnow_webhook_event
 shipping_boxnow.tasks.purge_expired_boxnow_parcel_events
 shipping_boxnow.tasks.settle_uncertain_boxnow_creations
+shipping_boxnow.tasks.sync_boxnow_locker_catalogue
 shipping_boxnow.tasks.sync_boxnow_lockers
 tenant.tasks.fanout_alert_unremitted_cod_payouts
 tenant.tasks.fanout_allocate_credit_sources
@@ -156,6 +156,7 @@ tenant.tasks.fanout_clear_old_history
 tenant.tasks.fanout_complete_paid_delivered_orders
 tenant.tasks.fanout_deliver_due_agent_order_events
 tenant.tasks.fanout_deliver_scheduled_gift_cards
+tenant.tasks.fanout_erase_late_carrier_data
 tenant.tasks.fanout_expire_gift_cards
 tenant.tasks.fanout_finish_pending_shipment_cancels
 tenant.tasks.fanout_issue_daily_acs_pickup_list
@@ -207,6 +208,7 @@ tenant.tasks.redispatch_deferred_tasks
 tenant.tasks.refresh_stats_snapshot
 tenant.tasks.send_staff_password_reset_email
 user.tasks.cleanup_expired_data_exports
+user.tasks.erase_late_carrier_data
 user.tasks.purge_unconfirmed_guest_subscriptions
 user.tasks.send_allauth_email_task
 user.tasks.send_newsletter_already_subscribed_email_task

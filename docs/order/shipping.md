@@ -18,13 +18,33 @@ Rules both carriers share:
   `BoxNowService.create_shipment_for_order`) raise
   `shipping.exceptions.ShipmentAwaitingPaymentError` while
   `Order.awaits_online_payment` holds — checked on the order row loaded
-  under the shipment lock. An online-paid voucher carries no COD amount,
+  under the shipment lock. That is an online pay way whose payment is not
+  settled (`SETTLED_PAYMENT_STATUSES`): an order paid and then partly
+  refunded still gets its voucher (#649). An online-paid voucher carries no COD amount,
   so a voucher minted for an unpaid card order would hand the goods over
   for free (prod order 304 was one admin click away, 2026-09-24). The
   tasks return `{"status": "awaiting_payment"}` with no retry and no
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **No shipment for an order that ships nothing.** `Order.ships_nothing`
+  (`order.managers.order.ships_nothing_q`): the order is CANCELED or
+  REFUNDED, or it was paid online and the store keeps nothing of the
+  payment (`PAYMENT_STATUSES_KEEPING_NOTHING`: a full refund leaves the
+  order PROCESSING). Both mint choke points raise
+  `shipping.exceptions.ShipmentNotNeededError` for it (ACS also for a
+  shipment it retired, `shipping_acs.attention.needs_no_voucher`; BOX NOW
+  first finishes a canceled order's cancel), the tasks return
+  `{"status": "not_needed"}` with no retry and no alert, and both admin
+  buttons refuse with a message. A retry that waited out a cancel in its
+  backoff therefore mints nothing. ACS asks for the store's credentials
+  only after that refusal, so an unconfigured store still answers
+  `not_needed`. Where BOX NOW may already hold a parcel (a creation of
+  uncertain outcome settled by the sweep, or one whose answer arrives
+  after the order stopped shipping), the parcel is cancelled at BoxNow and
+  the shipment recorded CANCELED, as for a canceled order
+  ([BOX NOW](shipping-boxnow.md)). No receipt with movement indication is
+  issued for such an order (`receipt_issuable`).
 - **The receipt follows the voucher, never the other way round.** Every
   path that makes a voucher or parcel live records it with
   `Order.add_tracking_info`, and recording it issues the receipt with
@@ -228,6 +248,37 @@ accepting Cyprus orders at the Greek flat rate.
   carrier's credentials live on the `Tenant` row, which no surface watches,
   so connecting or removing one shows after the TTL or a manual purge of
   the `shipping` surface.
+- **`GET /shipping/product/<product_id>`** is the product page's
+  "shipping from X": `ShippingService.product_shipping_from(product)`
+  prices a cart holding that one product and nothing else, as checkout
+  would, for a shopper not known yet:
+  - to `initial_country_code()`, the country checkout preselects;
+  - at `OrderQuoteService.threshold_value` of the product's
+    `final_price` after the automatic promotions such a cart gets
+    (`PromotionEngine.evaluate_single_unit`: the cart's own
+    classification, stacking and clamp over a one-line cart; no code,
+    and no `first_order_only` promotion, as for any anonymous cart), so a
+    free-shipping promotion covering the product waives every carrier and
+    a carrier's threshold is judged after the discount;
+  - through `available_options` with the parcel the cart would ship (the
+    product plus the promotions' gifts, `gift_pairs`): a row flagged
+    `exceeds_max_weight` or `exceeds_parcel_size` cannot carry it and does
+    not count, and a live-priced carrier (ACS) is asked for the parcel's
+    weight bracket as checkout asks it.
+
+  The response is `{estimate}`: the cheapest row's `price` and `currency`,
+  `free` (`price` is 0), `countryCode`, and `freeShippingThreshold`, the
+  lowest threshold of `free_threshold_rates(country, weight_grams, items)`
+  (the carriers that can take it). `estimate` is `null` when the store
+  ships nowhere or no delivery it offers can take the product; 404 for a
+  product that is missing or inactive. Retail only: a wholesale price
+  never reaches it (no shopper). Not on the product serializer, which
+  would tie the product cache to every rate. Anonymous, cached by
+  `@cache_methods` (`ProductShippingView`); the `shipping`, `products`
+  (the product's price, weight and size) and `promotions` surfaces all
+  purge it (`PRODUCT_SHIPPING_VIEW` / `PRODUCT_SHIPPING_HANDLER` in
+  `src/shipping/cache_surfaces.py`). A live ACS price can move within
+  the TTL.
 - **`?shippable=true` on `/country`** filters to
   `shippable_country_codes()`; always empty on the platform host,
   which has no tenant schema of its own to hold a rate.

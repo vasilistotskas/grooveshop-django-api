@@ -6,7 +6,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from builder.storefront import clear_catalogue_cache
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.builder import FakeCatalogue
 from tests.utils.staff import (
     bind_store_tenant,

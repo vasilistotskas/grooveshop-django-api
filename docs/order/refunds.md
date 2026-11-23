@@ -10,7 +10,7 @@ carries it out and settles an attempt of unknown outcome is the second half
 of §7.2, in [`refund-execution.md`](refund-execution.md).
 
 - **In-app**:
-  `OrderService.refund_order(order, amount=None|Money, reason, *, lines=(), include_shipping=False, reason_code="")`.
+  `RefundService.refund_order(order, amount=None|Money, reason, *, lines=(), include_shipping=False, reason_code="")`.
   Reached from `cancel_order(refund_payment=True)` on a paid order (always
   `amount=None`, everything still refundable) and from the staff **"Return and
   refund"** dialog on an order (below). A refund is as many calls as it takes:
@@ -18,7 +18,7 @@ of §7.2, in [`refund-execution.md`](refund-execution.md).
 - **Stripe dashboard**: webhooks `refund.created` / `refund.updated` →
   `handle_stripe_refund_made` ([§4.2](payments.md)).
 - **Viva dashboard**: webhook 1797 → `_handle_reversal_created`
-  ([§4.3](payments.md)). The same webhook also reports the refunds the in-app
+  ([§4.3](payments-viva.md)). The same webhook also reports the refunds the in-app
   path makes; they are already on the ledger and add nothing.
 
 Every path ends in `PaymentLedger.record_refund` ([§7.3](payment-ledger.md)),
@@ -57,7 +57,7 @@ and stored value, in the goodwill field's help text. In code: step 1 of the
 claim splits `amount` into the provider shares and ONE `RefundAttempt` of kind
 `STORED_VALUE` (no charge, no provider); the provider shares run first and the
 stored share only runs when every one of them was made (a declined card refund
-leaves the cards and points alone); `OrderService._return_stored_value` then,
+leaves the cards and points alone); `RefundService._return_stored_value` then,
 in one transaction under the order lock, credits the cards
 (`GiftCardService.credit_refund(order, amount, refund_attempt=...)`) and
 restores the points (`LoyaltyService.restore_spent_points`), settles the
@@ -158,7 +158,7 @@ it). An `amount` with lines is refused. Under the order lock the lines are
 locked in pk order.
 
 **The lines write their own allocation** ([§7.4](fiscal-mydata.md),
-`OrderService._allocate_lines_claim`): the pieces (order line, kind goods or
+`RefundService._allocate_lines_claim`): the pieces (order line, kind goods or
 shipping, VAT rate, units, exact gross) are laid over the refund's shares in
 order, the provider's charges first, then gift cards and points
 (`credit_allocation.split_over_shares`; a piece cut at a share becomes two rows
@@ -222,10 +222,10 @@ or a cash share (past `REFUND_RECONCILE_AFTER_MINUTES`: the provider may have
 forgotten the key, so the reconciliation looks it up or staff record its
 outcome); a bare retry (an amount) never resumes a lines refund (`request_id`
 is set on its shares).
-`OrderService.resumes_a_refund(order, amount, retry_request_id=..., by_lines=...)`
+`RefundService.resumes_a_refund(order, amount, retry_request_id=..., by_lines=...)`
 answers the same way without the lock (a request by lines that is no retry
 never resumes anything), so the dialog asks no cash-payback reference of a
-retry, and `OrderService.unresumable_reason` is the one rule the dialog uses to
+retry, and `RefundService.unresumable_reason` is the one rule the dialog uses to
 offer the retry at all: for a provider that forgets keys, an overdue or a cash
 share it shows the reason and points to Record refund outcome instead. It
 judges only the request's shares still PENDING, the ones a retry would call: a

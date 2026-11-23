@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from builder import staff_session
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 
 
 def test_role_is_an_enum_of_every_role_a_session_can_carry(openapi_schema):

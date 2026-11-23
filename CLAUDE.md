@@ -121,7 +121,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Pagination** (`src/core/pagination/`): `PageNumberPaginator`, `CursorPaginator`, `LimitOffsetPaginator` — all return consistent envelope: `{links, count, total_pages, page_size, page_total_results, page, results}`
 
-**Serializer utilities** (`src/core/utils/serializers.py`):
+**Action config** (`src/core/api/action_config.py`; the shared serializer field `TranslatedFieldExtended` is in `src/core/utils/serializers.py`):
 - `ActionConfig` dataclass — per-action request/response serializer + OpenAPI metadata
 - `crud_config()` — shorthand for standard CRUD serializer mapping
 - `create_schema_view_config()` — auto-generates `@extend_schema` decorators from model verbose names
@@ -196,7 +196,7 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `src/dev
 - `auto_translations` flag for parler models
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
-- `get_or_create_instance()` helper in `src/core/helpers/factory.py` for dynamic model/factory resolution
+- `get_or_create_instance()` in `src/tag/factories/tagged_item.py`, its only caller, for dynamic model/factory resolution
 - `UserNameGenerator` in `src/user/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration

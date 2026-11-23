@@ -17,7 +17,7 @@ import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory
 
-from core.caches import STRICT_NAMESPACE
+from core.cache_backend import STRICT_NAMESPACE
 from core.middleware import allauth_ratelimit, strict_cache
 from core.middleware.allauth_ratelimit import AllAuthRateLimitMiddleware
 from tests.utils.redis import stopped_cache

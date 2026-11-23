@@ -33,7 +33,7 @@ from django.utils.translation import gettext as _
 from PIL import Image, UnidentifiedImageError
 
 from core.image_normalise import Rules, normalise
-from core.utils.rich_text_images import displayed_size
+from core.utils.image_size import displayed_size
 
 if TYPE_CHECKING:  # pragma: no cover
     from django.core.files import File

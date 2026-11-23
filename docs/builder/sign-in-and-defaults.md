@@ -37,7 +37,7 @@ Security properties, each with a test:
   ticket minted on store A finds nothing on store B
   (`tests_mt/test_builder_staff_ticket.py`).
 - **A token that stays small.** It is a `PlatformStaffToken` with
-  `scope = builder` (`tenant.models.StaffTokenScope`): knox's auto-refresh
+  `scope = builder` (`tenant.enum.StaffTokenScope`): knox's auto-refresh
   would push any token to its seven-day lifetime, so
   `PlatformStaffTokenAuthentication` does not renew a builder token (it ends
   at `BUILDER_STAFF_SESSION_TTL_SECONDS`, a working day) and refuses it on

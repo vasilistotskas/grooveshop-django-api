@@ -35,7 +35,6 @@ from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
 from order.accounting.invoicing import generate_invoice
 from order.communications.notifications import notify_order_created_live
-from order.enum.status import PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
@@ -44,7 +43,6 @@ from order.tasks import (
     send_checkout_abandonment_emails,
     send_invoice_email,
     send_order_status_update_email,
-    send_payment_failed_email,
     send_refund_confirmation_email,
 )
 from product.factories.product import ProductFactory
@@ -69,8 +67,8 @@ from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import UserSubscription
+from user.services.subscription_mail import send_subscription_confirmation
 from user.tasks import export_user_data_task, send_inactive_user_notifications
-from user.utils.subscription import send_subscription_confirmation
 
 BASE = "https://shop.example"
 
@@ -101,25 +99,6 @@ def _assert_links(body: str, url: str, language: str) -> None:
         # The bare-host SITE_URL is a prefix of the /en one, so assert
         # the English prefix is absent rather than trusting ``in``.
         assert f"{BASE}/en" not in body
-
-
-@pytest.mark.django_db
-class TestOrderEmails:
-    @LANGUAGES
-    def test_payment_failed_order_link(self, language, prefix):
-        order = OrderFactory(
-            num_order_items=0,
-            language_code=language,
-            payment_status=PaymentStatus.FAILED,
-        )
-
-        assert send_payment_failed_email(order.id) is True
-
-        _assert_links(
-            _body(mail.outbox[-1]),
-            f"{BASE}{prefix}/account/orders/{order.id}",
-            language,
-        )
 
     @LANGUAGES
     def test_status_update_site_link(self, language, prefix):

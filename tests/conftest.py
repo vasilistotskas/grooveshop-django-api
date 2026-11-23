@@ -684,7 +684,7 @@ def acs_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable ACS credentials.
 
     ACS credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
+    ``src/tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
     is_kind_enabled()``, the ACS fanout Celery tasks, and any test
     exercising ACS availability need an active tenant with
     ``Tenant.acs_*`` fields set. A ``SimpleNamespace`` is enough — the
@@ -733,13 +733,28 @@ def boxnow_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable BoxNow credentials.
 
     BoxNow credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
+    ``src/tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
     is_kind_enabled()``, the BoxNow fanout Celery tasks, and any test
     exercising BoxNow availability need an active tenant with
     ``Tenant.box_now_*`` fields set.
     """
     tenant = SimpleNamespace(
         schema_name="test-boxnow-tenant", **_BOXNOW_TENANT_FIELDS
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
+def boxnow_live_network(bind_tenant):
+    """Bind a fake tenant on BOX NOW's live network
+    (``Tenant.box_now_live_mode``): the only network whose lockers have
+    sizes (``shipping_boxnow.catalogue.sizes_exist``). A tenant without the
+    flag is on BOX NOW's stage network."""
+    tenant = SimpleNamespace(
+        schema_name="test-boxnow-live",
+        box_now_live_mode=True,
+        **_BOXNOW_TENANT_FIELDS,
     )
     bind_tenant(tenant)
     return tenant

@@ -15,7 +15,7 @@ from recommendation.strategies.base import (
     plan_allows,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 
 def _context(plan: str) -> TenantContext:

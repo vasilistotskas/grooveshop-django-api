@@ -29,6 +29,7 @@ Exception Hierarchy:
     └── PaymentError
         ├── PaymentNotFoundError
         ├── PaymentStatusUnavailableError
+        │   └── ProviderTransactionUnknownError
         ├── PaymentVerificationError
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
@@ -332,6 +333,19 @@ class ShippingRefusedError(InvalidOrderDataError):
         super().__init__(
             message, field_errors={"shipping_provider_code": [message]}
         )
+
+
+class PickupPointUnfitError(InvalidOrderDataError):
+    """Raised when the chosen pickup point cannot be confirmed to take the
+    cart's parcel (``shipping.interfaces.PickupPointUnfit``). Answered as
+    the field error ``code`` (``pickup_point_too_small``,
+    ``pickup_point_size_unknown``) on the carrier's location field."""
+
+    def __init__(self, field: str, message: str, code: str):
+        self.field = field
+        self.message = message
+        self.code = code
+        super().__init__(message, field_errors={field: [message]})
 
 
 class ShippingPriceUnresolvedError(InvalidOrderDataError):
@@ -646,6 +660,18 @@ class PaymentStatusUnavailableError(PaymentError):
         super().__init__(
             f"The provider could not be asked about payment {payment_id}"
         )
+
+
+class ProviderTransactionUnknownError(PaymentStatusUnavailableError):
+    """
+    Raised when the provider answers that the transaction does not exist
+    (Viva's Retrieve Transaction: 404, "Transaction Id does not exist").
+
+    Unavailable to a caller that knows no more: under another store's
+    credentials a real transaction reads the same, so a webhook that names
+    it is retried and tried against the next store. A caller that already
+    verified the rest skips it (a reversal's ``ParentId``).
+    """
 
 
 class OrderChangedDuringPaymentError(PaymentError):

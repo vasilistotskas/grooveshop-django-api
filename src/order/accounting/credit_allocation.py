@@ -13,7 +13,7 @@ is left on the receipt:
 * :func:`allocate_pro_rata` spreads an amount over that headroom, to the
   cent, capped to it; a claim that does not fit is refused by its caller
   before any money moves.
-* A refund claim is allocated by ``OrderService._claim_refund`` when it is
+* A refund claim is allocated by ``RefundService._claim_refund`` when it is
   made: a bare amount pro rata over the headroom, a refund by lines (see
   :mod:`order.refunds.refund_lines`) as its own pieces, each at its line's rate,
   which must fit their rates (:func:`first_short_rate`). Every other source (a refund nobody claimed, a returned chargeback)

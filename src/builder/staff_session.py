@@ -37,12 +37,9 @@ from builder.errors import BuilderError
 from builder.services import VIEW_PERMISSION
 from core import tickets
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
+from tenant.enum import StaffTokenScope, TenantMembershipRole
 from tenant.membership import get_current_tenant, get_membership
-from tenant.models import (
-    PlatformStaffToken,
-    StaffTokenScope,
-    TenantMembershipRole,
-)
+from tenant.models import PlatformStaffToken
 from tenant.staff_actors import resolve_staff, staff_id
 
 #: ``role`` in the session answer for a platform superuser, who holds no

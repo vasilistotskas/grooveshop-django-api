@@ -15,7 +15,7 @@ from PIL import ExifTags, Image, ImageCms, features
 
 from core import uploads
 from core.uploads import prepare_servable_image
-from core.utils.rich_text_images import displayed_size
+from core.utils.image_size import displayed_size
 
 GPS = {
     1: "N",

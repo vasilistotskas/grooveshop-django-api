@@ -75,11 +75,26 @@ RETURN_HANDLING_STATUSES: frozenset[str] = frozenset(
 """The order statuses in which staff handle what a customer sent back.
 
 A delivered order is where a return (the EU 14-day right of withdrawal)
-starts; staff refund its payment (``OrderService.refund_order``, the admin
+starts; staff refund its payment (``RefundService.refund_order``, the admin
 "Refund" action) and restock the returned units
 (``OrderItemViewSet.restock``) from DELIVERED, COMPLETED or RETURNED.
 Before delivery a customer cancels instead.
 """
+
+ORDER_STATUSES_SHIPPING_NOTHING: frozenset[str] = frozenset(
+    {OrderStatus.CANCELED, OrderStatus.REFUNDED}
+)
+"""The order statuses in which no parcel is to leave: the order was
+canceled, or it came back and was refunded. ``Order.ships_nothing``."""
+
+PAYMENT_STATUSES_KEEPING_NOTHING: frozenset[str] = frozenset(
+    {PaymentStatus.REFUNDED, PaymentStatus.CANCELED}
+)
+"""The payment states in which the store keeps nothing of the payment: all
+of it went back, or none was ever collected. An order in one of them ships
+nothing, whatever its own status: a full refund does not move the order
+(``PaymentLedger.refund_status``), so a refunded order can still read
+PROCESSING. ``Order.ships_nothing``."""
 
 SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
     {

@@ -142,7 +142,7 @@ def test_a_cache_outage_during_creation_is_the_coded_503():
     (a 503 ``temporarily_unavailable``), never answer it as a 500."""
     from redis.exceptions import ConnectionError as RedisConnectionError
 
-    from core.caches import STRICT_CACHE_UNAVAILABLE_CODE
+    from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
     from order.views.order import OrderViewSet
 
     cart = CartFactory()

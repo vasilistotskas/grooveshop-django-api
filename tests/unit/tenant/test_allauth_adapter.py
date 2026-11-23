@@ -24,11 +24,8 @@ from tenant.allauth_adapter import (
     TenantHeadlessAdapter,
     TenantSocialAccountAdapter,
 )
-from tenant.models import (
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 User = get_user_model()

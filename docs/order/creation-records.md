@@ -8,7 +8,7 @@ and says which file holds each § number used here.
 Every order created by either checkout path gets exactly one
 `OrderAttribution` row (`src/order/models/attribution.py`, one-to-one,
 `related_name="attribution"`), written by `OrderAttributionService.record`
-(`src/order/services.py`) right after `Order.objects.create` inside the
+(`src/order/checkout/attribution_service.py`) right after `Order.objects.create` inside the
 creation transaction. A checkout order with no signal at all gets a
 `direct` row, so for checkout orders **no row** means placed before the
 table existed (`0059_orderattribution`, no backfill), never "direct".
@@ -20,7 +20,7 @@ Orders made outside checkout — the demo seed (`src/devtools/demo_account.py`,
   `utm_medium`, `utm_campaign`, `click_ids` (parameter NAMES from
   `CLICK_ID_PARAMS`, never values), `referrer`, `landing_path`, and
   `agent_protocol` (`ucp`/`acp`/`mcp`). The agent gateway sets it, and
-  `OrderAttributionService.input_from_request` (`src/order/services.py`)
+  `OrderAttributionService.input_from_request` (`src/order/checkout/attribution_service.py`)
   believes it only when the request also carries the
   gateway's shared secret, which it sends as `X-Internal-Gateway` on
   every cart and order call (`is_internal_caller`, `src/tenant/internal.py`);
@@ -74,7 +74,7 @@ Orders made outside checkout — the demo seed (`src/devtools/demo_account.py`,
   secret). `CartAttributionService.capture` (`src/cart/services.py`) is the
   one entry point, called BEFORE the line is written, by every path that
   can take a cart from no lines to some: the add itself (a new cart, or a
-  refill after the shopper emptied it), `OrderService.reorder_to_cart`
+  refill after the shopper emptied it), `OrderLifecycleService.reorder_to_cart`
   (the request's own signals: a reorder carries no capture) and the
   guest-to-account `merge_carts`. An empty cart takes the touch,
   replacing an earlier fill's; a cart holding lines keeps its own, so a

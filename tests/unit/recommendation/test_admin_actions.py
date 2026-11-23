@@ -17,7 +17,7 @@ from recommendation.admin import RecommendationSlotAdmin
 from recommendation.enum import StrategyCode, Surface
 from recommendation.models import RecommendationSlot
 from recommendation.presets import PRESETS, seed_recommendation_slots
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,

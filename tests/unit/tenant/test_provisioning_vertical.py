@@ -9,7 +9,7 @@ import pytest
 from recommendation.enum import Surface
 from recommendation.models import RecommendationSlot
 from recommendation.presets import PRESETS
-from tenant.models import StoreVertical
+from tenant.enum import StoreVertical
 from tenant.provisioning import _seed_recommendation_slots
 from tests.utils.staff import store_tenant
 

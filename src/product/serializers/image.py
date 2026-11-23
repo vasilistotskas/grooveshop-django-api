@@ -6,7 +6,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from core.api.image_field import ServableImageField
+from core.api.image_field import MainImageSizeMixin, ServableImageField
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.image import ProductImage
@@ -20,7 +20,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 
 class ProductImageSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[ProductImage]
+    MainImageSizeMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[ProductImage],
 ):
     product = PrimaryKeyRelatedField(read_only=True)
     translations = TranslatedFieldsFieldExtend(shared_model=ProductImage)
@@ -39,6 +41,8 @@ class ProductImageSerializer(
             "sort_order",
             "translations",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "created_at",
         )
         read_only_fields = (
@@ -48,6 +52,8 @@ class ProductImageSerializer(
             "sort_order",
             "alt_text",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "created_at",
         )
 
@@ -62,21 +68,18 @@ class ProductImageSerializer(
 
 class ProductImageDetailSerializer(ProductImageSerializer):
     product = serializers.SerializerMethodField()
-    image_dimensions = serializers.SerializerMethodField()
     image_format = serializers.SerializerMethodField()
     usage_context = serializers.SerializerMethodField()
 
     class Meta(ProductImageSerializer.Meta):
         fields = (
             *ProductImageSerializer.Meta.fields,
-            "image_dimensions",
             "image_format",
             "usage_context",
             "updated_at",
         )
         read_only_fields = (
             *ProductImageSerializer.Meta.read_only_fields,
-            "image_dimensions",
             "image_format",
             "usage_context",
             "updated_at",
@@ -85,31 +88,6 @@ class ProductImageDetailSerializer(ProductImageSerializer):
     @extend_schema_field(ProductSerializer)
     def get_product(self, obj: ProductImage):
         return ProductSerializer(obj.product, context=self.context).data
-
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "width": {"type": "number"},
-                "height": {"type": "number"},
-                "aspect_ratio": {"type": "number"},
-            },
-        }
-    )
-    def get_image_dimensions(self, obj: ProductImage):
-        if (
-            obj.image
-            and hasattr(obj.image, "width")
-            and hasattr(obj.image, "height")
-        ):
-            return {
-                "width": obj.image.width,
-                "height": obj.image.height,
-                "aspect_ratio": round(obj.image.width / obj.image.height, 2)
-                if obj.image.height > 0
-                else 0,
-            }
-        return {"width": 0, "height": 0, "aspect_ratio": 0}
 
     def get_image_format(self, obj: ProductImage) -> str:
         if obj.image and hasattr(obj.image, "name"):

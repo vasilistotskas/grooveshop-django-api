@@ -84,7 +84,7 @@ additive. A gift card return booked without an allocation (the previous release
 serving after the migration) is found by `owing_sources` like any other source,
 valued from the gift-card ledger and moved when it put value back; one that
 moved before an existing receipt is left alone. `RefundAttempt` resolution
-books a refund only for an attempt still PENDING (`OrderService.book_share`
+books a refund only for an attempt still PENDING (`RefundService.book_share`
 re-reads it under the order lock): a refund the provider made for an attempt
 staff declined meanwhile is booked as a refund nobody claimed, never reviving
 the attempt. `receipt_deferred` means "waiting for undecided sources" and

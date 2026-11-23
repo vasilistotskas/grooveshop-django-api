@@ -125,8 +125,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (`src/devtools/anonymise/rules.py`, `order.Invoice`), like the receipt's
   `buyer_snapshot`.
 - **When it is issued.** The order is issuable before it ships
-  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, and the
-  carrier holds the parcel, `ShippingService.carrier_holds_the_parcel`:
+  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, the
+  order still ships (not `Order.ships_nothing`: a full refund leaves it
+  PROCESSING with a voucher that is not to leave), and the carrier holds
+  the parcel, `ShippingService.carrier_holds_the_parcel`:
   ACS's voucher, BOX NOW's parcel; neither the shipment row checkout
   writes nor a tracking number staff type on the order is one). Every
   path that makes a shipment live records it through `Order.add_tracking_info`
@@ -303,7 +305,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   *without* value be canceled merely because the movement had not started,
   so the 11.1 rests on that rule).
   - **Set aside.** The one path that cancels an order
-    (`OrderService._cancel_order_locked`) sets the receipt aside under its
+    (`OrderLifecycleService._cancel_order_locked`) sets the receipt aside under its
     lock on the order row, before the save that asks for the credits
     (`invoicing.hold_receipt_for_cancel`: `Invoice.cancel_requested_at`, for
     a carrier order that has not shipped, only while the platform issues

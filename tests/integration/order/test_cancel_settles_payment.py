@@ -25,8 +25,8 @@ from django.db.migrations.executor import MigrationExecutor
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
-from order.services import OrderService
 from order.signals import order_status_changed
 
 
@@ -43,7 +43,9 @@ class TestServicePath:
     def test_an_unpaid_order_is_settled_as_canceled(self, unpaid):
         order = OrderFactory(status=OrderStatus.PENDING, payment_status=unpaid)
 
-        canceled, refund_info = OrderService.cancel_order(order, reason="test")
+        canceled, refund_info = OrderLifecycleService.cancel_order(
+            order, reason="test"
+        )
 
         assert canceled.status == OrderStatus.CANCELED
         assert canceled.payment_status == PaymentStatus.CANCELED
@@ -62,7 +64,7 @@ class TestServicePath:
             payment_id="",
         )
 
-        canceled, _ = OrderService.cancel_order(
+        canceled, _ = OrderLifecycleService.cancel_order(
             order, reason="test", refund_payment=False
         )
 
@@ -77,7 +79,9 @@ class TestAdminFormSavePath:
         )
 
         order.status = OrderStatus.CANCELED
-        with mock.patch("order.services.OrderService.cancel_attached_shipment"):
+        with mock.patch(
+            "order.lifecycle.service.OrderLifecycleService.cancel_attached_shipment"
+        ):
             order.save(update_fields=["status"])
 
         assert (
@@ -97,7 +101,7 @@ class TestAdminFormSavePath:
         try:
             order.status = OrderStatus.CANCELED
             with mock.patch(
-                "order.services.OrderService.cancel_attached_shipment"
+                "order.lifecycle.service.OrderLifecycleService.cancel_attached_shipment"
             ):
                 order.save()
         finally:
@@ -127,7 +131,7 @@ class TestReturnedPath:
             status=OrderStatus.SHIPPED, payment_status=PaymentStatus.PENDING
         )
 
-        OrderService.update_order_status(order, OrderStatus.RETURNED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.RETURNED)
 
         assert (
             Order.objects.get(pk=order.pk).payment_status
@@ -141,7 +145,7 @@ class TestReturnedPath:
             payment_status=PaymentStatus.COMPLETED,
         )
 
-        OrderService.update_order_status(order, OrderStatus.RETURNED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.RETURNED)
 
         assert (
             Order.objects.get(pk=order.pk).payment_status

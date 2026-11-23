@@ -19,7 +19,8 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 | 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds |
 | 3.3 | [`creation-address.md`](creation-address.md) | delivery-address rules: the country's postcode and street rules, regions, pickup-point orders delivered to the point's address |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
-| 4 | [`payments.md`](payments.md) | Stripe, Viva Wallet or cash on delivery: per-tenant credentials, webhooks, fees, provider refunds, disputes |
+| 4 | [`payments.md`](payments.md) | Stripe or cash on delivery, and what every provider shares: per-tenant credentials, webhooks, fees, provider refunds, disputes |
+| 4.3 | [`payments-viva.md`](payments-viva.md) | Viva Wallet: settlement and its checks, the webhook events (payment, refund, failure, fee), the return page, a lost webhook read back from Viva |
 | 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares (the lock order included), shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
 | 5.1 | [`shipping-acs.md`](shipping-acs.md) | `src/shipping_acs/`: vouchers, the voucher hold, pickup lists, tracking polls, COD payouts, the concurrency cap |
 | 5.2 | [`shipping-boxnow.md`](shipping-boxnow.md) | `src/shipping_boxnow/`: parcels, the webhook, the cancel rule, compartment sizes |

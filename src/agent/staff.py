@@ -78,14 +78,6 @@ STAFF_SCOPE_DISPLAY: dict[str, StrOrPromise] = {
     SCOPE_OFFLINE_ACCESS: _("Stay connected until you disconnect"),
 }
 
-# Grant types a client of the platform's issuer may register. The device
-# flow is left out: its verification page signs people in through
-# allauth's account login, which knows neither the staff lockouts nor the
-# superuser's second factor.
-STAFF_CLIENT_GRANT_TYPES: frozenset[str] = frozenset(
-    {"authorization_code", "refresh_token"}
-)
-
 
 def on_platform_issuer() -> bool:
     """True while the request is served by the platform's (staff) issuer."""

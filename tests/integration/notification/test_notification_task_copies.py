@@ -28,7 +28,6 @@ from order.communications.notifications import (
     notify_order_refunded_live,
     notify_order_status_changed_live,
     notify_payment_confirmed_live,
-    notify_payment_failed_live,
 )
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
@@ -95,10 +94,6 @@ def _payment_confirmed() -> Dispatch:
     return Dispatch(notify_payment_confirmed_live, [_customer_order().id])
 
 
-def _payment_failed() -> Dispatch:
-    return Dispatch(notify_payment_failed_live, [_customer_order().id])
-
-
 def _order_refunded() -> Dispatch:
     return Dispatch(notify_order_refunded_live, [_customer_order().id])
 
@@ -158,7 +153,6 @@ DISPATCHES: dict[str, Callable[[], Dispatch]] = {
     "order created": _order_created,
     "order shipped": _order_shipped,
     "payment confirmed": _payment_confirmed,
-    "payment failed": _payment_failed,
     "order refunded": _order_refunded,
     "loyalty tier up": _loyalty_tier_up,
     "comment liked": _comment_liked,

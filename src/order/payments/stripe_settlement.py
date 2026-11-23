@@ -31,7 +31,6 @@ from order.payments.payment_ledger import (
     PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
-from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,30 @@ def settle_paid_checkout_session(
     *session_id*: book the charge, then mark the order paid unless it was
     canceled, paid by another intent, already settled, or paid another
     amount. Saves the order's ``metadata`` the caller filled.
+
+    Then the order is confirmed whichever way it went: a session seen
+    again (a redelivery, a read-back) confirms an order paid but not yet
+    confirmed, and ``OrderLifecycleService.confirm`` leaves a confirmed,
+    unpaid or canceled one as it is.
     """
+    from order.lifecycle.service import OrderLifecycleService
+
+    _settle_paid_checkout_session(
+        order,
+        session_id=session_id,
+        payment_intent_id=payment_intent_id,
+        captured=captured,
+    )
+    OrderLifecycleService.confirm(order)
+
+
+def _settle_paid_checkout_session(
+    order: Order,
+    *,
+    session_id: str,
+    payment_intent_id: str,
+    captured: Money | None,
+) -> None:
     from order.lifecycle.service import OrderLifecycleService
     from order.payments.payment_events import publish_payment_status
     from order.services import OrderService
@@ -187,10 +209,6 @@ def settle_paid_checkout_session(
         order.id,
         session_id,
     )
-
-    from order.tasks import send_order_confirmation_email
-
-    dispatch_on_commit(send_order_confirmation_email, [order.id])
 
 
 def settle_checkout_session(

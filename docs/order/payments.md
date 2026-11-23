@@ -127,8 +127,9 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  │
                  │   only when outcome.applied:
                  ├── OrderHistory PAYMENT row (previous = the real prior status)
-                 ├── send_order_confirmation_email (on_commit)  ← order_payment_confirmed template
-                 └── notify_payment_confirmed_live (on_commit, logged-in users only)
+                 └── OrderLifecycleService.confirm (claims confirmed_at once)
+                       └── order_confirmed → confirmation email, staff email,
+                           payment-confirmed note (on_commit, emails-and-notifications.md)
 ```
 
 **The collected amount must be the order's total.** `handle_payment_succeeded`
@@ -192,8 +193,8 @@ redelivers.
 repeat of one already applied, and a charge on a canceled order
 (`record_payment_after_cancel` books it and alerts ops): none of them
 gets a history row or a customer email. `handle_payment_failed` returns
-the same outcome, so a late failure never tells a customer who paid
-that their payment failed.
+the same outcome; an applied failure is recorded (`FAILED`, a history row)
+and tells no one: a card order is announced only when it is confirmed.
 
 The `suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an

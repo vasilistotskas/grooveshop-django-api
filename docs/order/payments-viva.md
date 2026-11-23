@@ -40,10 +40,11 @@ Differences from the Stripe path that are easy to miss:
   so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without
   this, the post-save handler would dispatch both.
-- **No ``notify_payment_confirmed_live`` toast** — that's a Stripe-
-  specific dispatch. Viva customers see the payment-confirmed email
-  + the WS toasts that fire on later state changes (SHIPPED,
-  DELIVERED).
+- **Confirmation** is the same as Stripe's: the handler confirms the
+  order (``OrderLifecycleService.confirm``, ``Order.confirmed_at`` claimed
+  once), and ``order_confirmed`` queues the payment-confirmed email, the
+  staff "New order" email and the payment-confirmed toast. A 1798 records
+  the failure and tells no one.
 - **The charge is recorded on the payment ledger** ([§7.3](payment-ledger.md))
   once the
   transaction is verified (it belongs to the order, the currency and

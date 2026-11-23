@@ -757,9 +757,6 @@ msgstr "15ψήφιος αριθμός καταχώρισης που αποδίδ
 msgid "30 days"
 msgstr "30 ημέρες"
 
-msgid "3D Secure verification was not completed"
-msgstr "Η επαλήθευση 3D Secure δεν ολοκληρώθηκε"
-
 msgid "7 days"
 msgstr "7 ημέρες"
 
@@ -2686,9 +2683,6 @@ msgstr "Στάλθηκε η εργασία συμφωνίας αντικαταβ
 msgid "COD recorded as received outside ACS."
 msgstr "Η αντικαταβολή καταγράφηκε ως εισπραγμένη εκτός ACS."
 
-msgid "COMPLETE YOUR PAYMENT"
-msgstr "ΟΛΟΚΛΗΡΩΣΤΕ ΤΗΝ ΠΛΗΡΩΜΗ ΣΑΣ"
-
 msgid "CONFIRM HERE"
 msgstr "ΕΠΙΒΕΒΑΙΩΣΗ ΕΔΩ"
 
@@ -2886,9 +2880,6 @@ msgstr "Κάρτα"
 
 msgid "Card disabled."
 msgstr "Η κάρτα απενεργοποιήθηκε."
-
-msgid "Card not authorized for online payments"
-msgstr "Η κάρτα δεν είναι εξουσιοδοτημένη για online πληρωμές"
 
 msgid "Card value in EUR — bounded by GIFT_CARD_MIN_AMOUNT / GIFT_CARD_MAX_AMOUNT"
 msgstr "Αξία κάρτας σε EUR — εντός των ορίων GIFT_CARD_MIN_AMOUNT / GIFT_CARD_MAX_AMOUNT"
@@ -3444,9 +3435,6 @@ msgstr "Εμπόριο"
 msgid "Common"
 msgstr "Κοινά"
 
-msgid "Common reasons for failed payments:"
-msgstr "Συνήθεις λόγοι αποτυχημένων πληρωμών:"
-
 msgid "Company"
 msgstr "Επωνυμία"
 
@@ -3493,9 +3481,6 @@ msgstr "Συμπλήρωση προφίλ"
 
 msgid "Complete payment with an agent-granted Stripe token"
 msgstr "Ολοκλήρωση πληρωμής με token Stripe που παραχωρήθηκε από AI πράκτορα"
-
-msgid "Complete your payment"
-msgstr "Ολοκληρώστε την πληρωμή σας"
 
 msgid "Completed"
 msgstr "Ολοκληρώθηκε"
@@ -7701,9 +7686,6 @@ msgstr "Ελλιπές"
 msgid "Incomplete (Missing Data)"
 msgstr "Ατελές (λείπουν δεδομένα)"
 
-msgid "Incorrect card details"
-msgstr "Λανθασμένα στοιχεία κάρτας"
-
 msgid "Increase quantity by 1"
 msgstr "Αύξηση ποσότητας κατά 1"
 
@@ -7769,9 +7751,6 @@ msgstr "URL προφίλ Instagram. Πρέπει να χρησιμοποιεί h
 
 msgid "Instructions for the customer on how to complete payment (e.g., bank transfer details)"
 msgstr "Οδηγίες προς τον πελάτη για την ολοκλήρωση της πληρωμής (π.χ. στοιχεία τραπεζικής κατάθεσης)"
-
-msgid "Insufficient funds"
-msgstr "Ανεπαρκή κεφάλαια"
 
 #, python-format
 msgid "Insufficient points balance. Available: %(balance)s, Requested: %(amount)s"
@@ -9513,9 +9492,6 @@ msgstr "Δεν διατηρήθηκε τίποτα"
 msgid "Nothing to issue"
 msgstr "Τίποτα προς έκδοση"
 
-msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
-msgstr "Δεν έγινε καμία χρέωση. Η παραγγελία σας καταχωρήθηκε απλήρωτη — επικοινωνήστε μαζί μας για να ολοκληρώσετε την πληρωμή."
-
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Δεν αποθηκεύτηκε τίποτα. Διορθώστε τα κείμενα που επισημαίνονται."
 
@@ -10325,9 +10301,6 @@ msgstr "Email Ιδιοκτήτη"
 msgid "PAYMENT CONFIRMED"
 msgstr "Η ΠΛΗΡΩΜΗ ΕΠΙΒΕΒΑΙΩΘΗΚΕ"
 
-msgid "PAYMENT FAILED"
-msgstr "Η ΠΛΗΡΩΜΗ ΑΠΕΤΥΧΕ"
-
 msgid "PENDING / PAID / FAILED / CANCELED"
 msgstr "PENDING / PAID / FAILED / CANCELED"
 
@@ -10602,13 +10575,6 @@ msgstr "Η πληρωμή επιβεβαιώθηκε"
 msgid "Payment Confirmed - Order #{order_id}"
 msgstr "Η πληρωμή επιβεβαιώθηκε — Παραγγελία #{order_id}"
 
-msgid "Payment Failed"
-msgstr "Η πληρωμή απέτυχε"
-
-#, python-brace-format
-msgid "Payment Failed - Order #{order_id}"
-msgstr "Η πληρωμή απέτυχε — Παραγγελία #{order_id}"
-
 msgid "Payment Gateway"
 msgstr "Πύλη πληρωμής"
 
@@ -10691,10 +10657,6 @@ msgstr "Η πληρωμή δεν ταιριάζει με την παραγγελ
 
 msgid "Payment failed"
 msgstr "Η πληρωμή απέτυχε"
-
-#, python-brace-format
-msgid "Payment failed for order #{order_id}"
-msgstr "Η πληρωμή απέτυχε για την παραγγελία #{order_id}"
 
 msgid "Payment fee"
 msgstr "Χρέωση πληρωμής"
@@ -13266,9 +13228,6 @@ msgstr "Αποστέλλεται όταν καταχωρίζεται μια πα
 
 msgid "Sent when an order is returned to the store."
 msgstr "Αποστέλλεται όταν μια παραγγελία επιστρέφεται στο κατάστημα."
-
-msgid "Sent when an order's payment fails, with a link to the order."
-msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο στην παραγγελία."
 
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Αποστέλλεται όταν κάποιος κάνει εγγραφή με διεύθυνση που έχει ήδη λογαριασμό."
@@ -16951,9 +16910,6 @@ msgstr "Μας λείπετε!"
 msgid "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 msgstr "Δεν μπορέσαμε να επικοινωνήσουμε με τον courier για να ακυρώσουμε το δέμα σας. Δοκιμάστε ξανά σε λίγα λεπτά."
 
-msgid "We couldn't process your payment. Tap to retry with a different method."
-msgstr "Δεν μπορέσαμε να επεξεργαστούμε την πληρωμή σου. Δοκίμασε ξανά με άλλο τρόπο πληρωμής."
-
 msgid "We hope to see you again soon!"
 msgstr "Ελπίζουμε να σας δούμε ξανά σύντομα!"
 
@@ -16968,9 +16924,6 @@ msgstr "Μας λείπετε!"
 
 msgid "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!"
 msgstr "Παρατηρήσαμε ότι δεν μας έχετε επισκεφθεί εδώ και καιρό, και θέλαμε να επικοινωνήσουμε γιατί μας λείπετε!"
-
-msgid "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
-msgstr "Δεν καταφέραμε να ολοκληρώσουμε την πληρωμή για την παραγγελία σας. Μην ανησυχείτε — τα είδη σας παραμένουν δεσμευμένα για εσάς."
 
 msgid "We will email you as your order progresses."
 msgstr "Θα ενημερωθείτε με νέο μήνυμα σχετικά με την πορεία της παραγγελίας σας."
@@ -17189,6 +17142,9 @@ msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία �
 
 msgid "When the order was canceled before its parcel left the store: the receipt, never handed to the customer, is canceled in myDATA instead of credited, unless the courier could not stop the parcel."
 msgstr "Πότε ακυρώθηκε η παραγγελία πριν φύγει το δέμα της από το κατάστημα: η απόδειξη, που δεν παραδόθηκε ποτέ στον πελάτη, ακυρώνεται στο myDATA αντί να πιστωθεί, εκτός αν ο μεταφορέας δεν μπόρεσε να σταματήσει το δέμα."
+
+msgid "When the order was confirmed and the customer and the store were told about it: when it was placed, or, for a card payment, when the payment went through. Empty for a card order that was never paid."
+msgstr "Πότε επιβεβαιώθηκε η παραγγελία και ενημερώθηκαν ο πελάτης και το κατάστημα: όταν καταχωρήθηκε ή, για πληρωμή με κάρτα, όταν πέρασε η πληρωμή. Κενό για παραγγελία με κάρτα που δεν πληρώθηκε ποτέ."
 
 msgid "When the parcel left while the receipt, which carries a movement indication, was not registered because myDATA did not answer. From then on it is sent with AADE's loss-of-connection indication (transmissionFailure 3) until it is registered."
 msgstr "Πότε το δέμα έφυγε ενώ η απόδειξη, που φέρει ένδειξη διακίνησης, δεν είχε καταχωριστεί επειδή το myDATA δεν απάντησε. Από τότε στέλνεται με την ένδειξη απώλειας διασύνδεσης της ΑΑΔΕ (transmissionFailure 3) μέχρι να καταχωριστεί."
@@ -17750,9 +17706,6 @@ msgstr "Ο κωδικός πρόσβασής σας άλλαξε. Συνδεθε
 
 msgid "Your password was reset"
 msgstr "Έγινε επαναφορά του κωδικού πρόσβασής σας"
-
-msgid "Your payment could not be processed"
-msgstr "Η πληρωμή σας δεν ήταν δυνατό να ολοκληρωθεί"
 
 msgid "Your payment has been confirmed and we're preparing your order."
 msgstr "Η πληρωμή σας έχει επιβεβαιωθεί και ετοιμάζουμε την παραγγελία σας."
@@ -18372,6 +18325,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "365 days"
 #~ msgstr "365 ημέρες"
 
+#~ msgid "3D Secure verification was not completed"
+#~ msgstr "Η επαλήθευση 3D Secure δεν ολοκληρώθηκε"
+
 #~ msgid "60 days"
 #~ msgstr "60 ημέρες"
 
@@ -18563,6 +18519,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "COD"
 #~ msgstr "Αντικαταβολή"
 
+#~ msgid "COMPLETE YOUR PAYMENT"
+#~ msgstr "ΟΛΟΚΛΗΡΩΣΤΕ ΤΗΝ ΠΛΗΡΩΜΗ ΣΑΣ"
+
 #~ msgid "Calculation Examples"
 #~ msgstr "Παραδείγματα υπολογισμών"
 
@@ -18574,6 +18533,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Cancel the BoxNow shipment for an order"
 #~ msgstr "Ακύρωση της αποστολής BoxNow για παραγγελία"
+
+#~ msgid "Card not authorized for online payments"
+#~ msgstr "Η κάρτα δεν είναι εξουσιοδοτημένη για online πληρωμές"
 
 #, python-brace-format
 #~ msgid "Cart validation failed: {errors}"
@@ -18611,11 +18573,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά"
 
+#~ msgid "Common reasons for failed payments:"
+#~ msgstr "Συνήθεις λόγοι αποτυχημένων πληρωμών:"
+
 #~ msgid "Comparison Table"
 #~ msgstr "Πίνακας σύγκρισης"
 
 #~ msgid "Complete Your Order"
 #~ msgstr "Ολοκληρώστε την Παραγγελία σας"
+
+#~ msgid "Complete your payment"
+#~ msgstr "Ολοκληρώστε την πληρωμή σας"
 
 #~ msgid "Completed Orders"
 #~ msgstr "Ολοκληρωμένες παραγγελίες"
@@ -18937,11 +18905,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Include deleted items in results (staff only)"
 #~ msgstr "Συμπερίληψη διαγραμμένων αντικειμένων στα αποτελέσματα (μόνο για προσωπικό)"
 
+#~ msgid "Incorrect card details"
+#~ msgstr "Λανθασμένα στοιχεία κάρτας"
+
 #~ msgid "Increment view count by 100"
 #~ msgstr "Αύξηση προβολών κατά 100"
 
 #~ msgid "Info Hex"
 #~ msgstr "Χρώμα Πληροφορίας (Hex)"
+
+#~ msgid "Insufficient funds"
+#~ msgstr "Ανεπαρκή κεφάλαια"
 
 #~ msgid "Interval Schedules"
 #~ msgstr "Προγραμματισμοί Διαστημάτων"
@@ -19181,6 +19155,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Not Set"
 #~ msgstr "Δεν έχει οριστεί"
 
+#~ msgid "Nothing was charged. Your order is registered unpaid — contact us to complete the payment."
+#~ msgstr "Δεν έγινε καμία χρέωση. Η παραγγελία σας καταχωρήθηκε απλήρωτη — επικοινωνήστε μαζί μας για να ολοκληρώσετε την πληρωμή."
+
 #~ msgid "Null when the provider defers to the global flat rate."
 #~ msgstr "Null όταν ο πάροχος παραπέμπει στη γενική πάγια χρέωση."
 
@@ -19282,6 +19259,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Output file path (default: analytics_export.json)"
 #~ msgstr "Διαδρομή αρχείου εξόδου (προεπιλογή: analytics_export.json)"
 
+#~ msgid "PAYMENT FAILED"
+#~ msgstr "Η ΠΛΗΡΩΜΗ ΑΠΕΤΥΧΕ"
+
 #~ msgid "Page Hero"
 #~ msgstr "Κεντρική ενότητα σελίδας"
 
@@ -19327,6 +19307,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Payment Configuration"
 #~ msgstr "Διαμόρφωση Πληρωμής"
+
+#~ msgid "Payment Failed"
+#~ msgstr "Η πληρωμή απέτυχε"
+
+#, python-brace-format
+#~ msgid "Payment Failed - Order #{order_id}"
+#~ msgstr "Η πληρωμή απέτυχε — Παραγγελία #{order_id}"
+
+#, python-brace-format
+#~ msgid "Payment failed for order #{order_id}"
+#~ msgstr "Η πληρωμή απέτυχε για την παραγγελία #{order_id}"
 
 #~ msgid "Payments — Stripe"
 #~ msgstr "Πληρωμές — Stripe"
@@ -19545,6 +19536,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Sender address for outbound email from this tenant (e.g. 'no-reply@myshop.com'). Empty falls back to settings.DEFAULT_FROM_EMAIL."
 #~ msgstr "Διεύθυνση αποστολέα για εξερχόμενα email από αυτό το κατάστημα (π.χ. 'no-reply@myshop.com'). Κενό → χρησιμοποιείται η τιμή settings.DEFAULT_FROM_EMAIL."
+
+#~ msgid "Sent when an order's payment fails, with a link to the order."
+#~ msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο στην παραγγελία."
 
 #~ msgid "Sent when order is canceled"
 #~ msgstr "Αποστέλλεται όταν η παραγγελία ακυρωθεί"
@@ -19883,9 +19877,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Warning Hex"
 #~ msgstr "Χρώμα Προειδοποίησης (Hex)"
 
+#~ msgid "We couldn't process your payment. Tap to retry with a different method."
+#~ msgstr "Δεν μπορέσαμε να επεξεργαστούμε την πληρωμή σου. Δοκίμασε ξανά με άλλο τρόπο πληρωμής."
+
 #, python-format
 #~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
 #~ msgstr "Παρατηρήσαμε ότι η παραγγελία σας #%(order_id)s που τοποθετήθηκε στις %(order_date)s είναι ακόμα σε κατάσταση αναμονής."
+
+#~ msgid "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you."
+#~ msgstr "Δεν καταφέραμε να ολοκληρώσουμε την πληρωμή για την παραγγελία σας. Μην ανησυχείτε — τα είδη σας παραμένουν δεσμευμένα για εσάς."
 
 #~ msgid "We're getting your items ready — you'll hear from us again once they're on the way."
 #~ msgstr "Ετοιμάζουμε τα προϊόντα σου — θα σε ειδοποιήσουμε ξανά μόλις ξεκινήσουν το ταξίδι τους."
@@ -19932,6 +19932,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-brace-format
 #~ msgid "Your package is being handled by {carrier}. Tracking number: {tracking_number}."
 #~ msgstr "Το δέμα σου διαχειρίζεται η {carrier}. Αριθμός παρακολούθησης: {tracking_number}."
+
+#~ msgid "Your payment could not be processed"
+#~ msgstr "Η πληρωμή σας δεν ήταν δυνατό να ολοκληρωθεί"
 
 #~ msgid "Zero VAT (0%)"
 #~ msgstr "Μηδενικός ΦΠΑ (0%)"

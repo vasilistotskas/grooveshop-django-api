@@ -90,9 +90,7 @@ class TestVivaChargeOnACanceledOrder:
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,
-            patch(
-                "order.payments.viva_settlement.dispatch_on_commit"
-            ) as confirmation,
+            patch("order.signals.handlers.dispatch_on_commit") as confirmation,
         ):
             outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "viva_txn_9"

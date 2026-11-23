@@ -85,14 +85,11 @@ def test_payment_succeeded_history_uses_enum_values():
 def test_payment_failed_history_uses_enum_values():
     order = _pending_order("pi_hist_fail")
 
-    with (
-        patch(
-            "order.signals.handlers.OrderService.handle_payment_failed",
-            return_value=PaymentEventOutcome(
-                order, PaymentStatus.PENDING, applied=True
-            ),
+    with patch(
+        "order.signals.handlers.OrderService.handle_payment_failed",
+        return_value=PaymentEventOutcome(
+            order, PaymentStatus.PENDING, applied=True
         ),
-        patch("order.signals.handlers.send_payment_failed_email.apply_async"),
     ):
         handle_stripe_payment_failed(
             sender=None, event=_event("evt_hist_fail", "pi_hist_fail")
@@ -131,7 +128,7 @@ class TestVivaWebhookHistory:
                     verified_payment(order, "OC1"),
                 ),
             ),
-            patch("order.payments.viva_settlement.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),

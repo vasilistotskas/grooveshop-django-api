@@ -36,11 +36,11 @@ from order.emails import (
 from order.enum.landed_payment import LandedPayment
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
-    CHARGED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
 from order.exceptions import PaymentStatusUnavailableError
+from order.lifecycle.confirmation import CONFIRMATION_EMAIL_SENT_AT_KEY
 from order.lifecycle.service import (
     SHIPMENT_CANCEL_PENDING_FLAG,
     OrderLifecycleService,
@@ -88,7 +88,6 @@ logger = logging.getLogger(__name__)
 #   New: lock acquired → worker killed → lock expires in 60 s →
 #         next retry claims lock → send succeeds → DB flag written.
 # ──────────────────────────────────────────────────────────────
-CONFIRMATION_EMAIL_SENT_AT_KEY = "confirmation_email_sent_at"
 CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
 # TTL for the execution lock. Long enough for a slow SMTP send; short
 # enough that a dead worker's lock expires quickly so a retry can proceed.
@@ -423,140 +422,10 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
         return False
 
 
-PAYMENT_FAILED_EMAIL_SENT_FLAG = "payment_failed_email_sent"
-
-
-def _reserve_payment_failed_email(order_id: int) -> bool:
-    """Atomically claim the payment-failed-email slot for an order.
-
-    Reserve-before-send, so concurrent webhook
-    deliveries (Stripe + Viva, or retries) cannot both send the email.
-    Returns True if this caller won the race and should proceed,
-    False if another caller already claimed it. Raises
-    Order.DoesNotExist if the order is missing.
-    """
-    with transaction.atomic():
-        order = Order.objects.select_for_update().get(id=order_id)
-        if order.metadata and order.metadata.get(
-            PAYMENT_FAILED_EMAIL_SENT_FLAG
-        ):
-            return False
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata[PAYMENT_FAILED_EMAIL_SENT_FLAG] = True
-        order.save(update_fields=["metadata"])
-    return True
-
-
-def _release_payment_failed_email(order_id: int) -> None:
-    """Release the payment-failed-email reservation on permanent send failure."""
-    with transaction.atomic():
-        order = Order.objects.select_for_update().filter(id=order_id).first()
-        if order is None or not order.metadata:
-            return
-        if order.metadata.pop(PAYMENT_FAILED_EMAIL_SENT_FLAG, None) is not None:
-            order.save(update_fields=["metadata"])
-
-
-@celery_app.task(
-    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
-)
-def send_payment_failed_email(self, order_id: int) -> bool:
-    """Notify the customer that their payment failed.
-
-    Idempotent via metadata flag (reserve-before-send). Includes a
-    retry URL so the customer can attempt the payment again without
-    starting a new order.
-    """
-    email_sent = False
-    try:
-        if (self.request.retries == 0) and (
-            not _reserve_payment_failed_email(order_id)
-        ):
-            logger.info(
-                "Payment failed email already sent for order #%s, skipping",
-                order_id,
-            )
-            return True
-
-        # No item prefetch: this email neither passes ``items`` into the
-        # context nor renders a line table.
-        order = Order.objects.select_related("user", "pay_way").get(id=order_id)
-
-        # A provider can charge the order between the failure and this run
-        # (a Viva retry that succeeds), and the email says nothing was
-        # charged. A canceled payment took nothing, so it still sends.
-        if order.payment_status in CHARGED_PAYMENT_STATUSES:
-            logger.info(
-                "Payment failed email for order #%s not sent: payment %s",
-                order_id,
-                order.payment_status,
-            )
-            return True
-
-        if not was_sent(send_email("order.payment_failed", order)):
-            logger.info(
-                "Payment failed email for order #%s not sent: turned off",
-                order_id,
-            )
-            return True
-        email_sent = True
-
-        OrderHistory.log_note(
-            order=order,
-            note=f"Payment failed email sent to {order.email}",
-        )
-
-        logger.info(
-            "Payment failed email sent for order #%s",
-            order.id,
-            extra={"order_id": order.id, "email": order.email},
-        )
-        return True
-
-    except Order.DoesNotExist:
-        logger.error(
-            f"Could not send payment-failed email - Order #{order_id} not found",
-            extra={"order_id": order_id},
-        )
-        return False
-
-    except Exception as e:
-        logger.error(
-            f"Error sending payment-failed email for order #{order_id}: {e!s}",
-            extra={"order_id": order_id, "error": str(e)},
-        )
-        if email_sent:
-            # The message is already with the relay. Whatever failed
-            # after it (the history note, the logging call) must not put
-            # the customer through a second payment-failed email — the
-            # reservation is only consulted on the first attempt, so a
-            # retry here would send again, up to max_retries times.
-            logger.error(
-                "payment-failed email for order #%s was sent but the bookkeeping "
-                "after it failed: %s",
-                order_id,
-                e,
-                extra={"order_id": order_id, "error": str(e)},
-            )
-            return True
-
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=e) from e
-        # Unconditionally, NOT "if this attempt reserved": the slot is
-        # claimed on attempt 0, which always retries while attempts
-        # remain, so by the time control reaches here the claim was made
-        # by an earlier attempt of this same run and a per-attempt flag
-        # is always False. Guarding on one made the release dead code and
-        # left the flag standing for a send that never happened.
-        _release_payment_failed_email(order_id)
-        return False
-
-
 def _claim_refund_email(refund: PaymentTransaction) -> bool:
     """Claim the confirmation email of *refund*, once.
 
-    Reserve-before-send, like the payment-failed email: the claim is the
+    Reserve-before-send: the claim is the
     insert of a ``RefundNotification`` row, whose one-to-one on the refund
     makes the database decide between two tasks handed the same refund (a
     delivery repeated by the broker, a retry racing its original). Only the

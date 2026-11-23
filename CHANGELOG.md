@@ -3,6 +3,32 @@
 
 
 
+## v3.267.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(shipping): name a BOX NOW locker of unknown sizes as such, and size the lockers a sync creates from the store's last catalogue
+
+A live store refused a locker the catalogue had not sized yet as too small: the daily sync, the admin button and the resync an order runs create lockers with no sizes until the next hourly run. Each store now keeps the catalogue it applied (BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS) and a sync that creates lockers applies it again at once. A locker still unknown is refused as pickup_point_size_unknown, with its own message; one without the cart's size stays pickup_point_too_small. Both come from shipping.interfaces.PickupPointUnfit and its code. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* fix(shipping): keep only the BOX NOW catalogue countries a store accepted, and size reactivated lockers too
+
+A refused (truncated) country no longer replaces the store's kept copy of it, and every successful partner sync applies the kept copy, so a locker it reactivates is sized as one it creates. The locker's compartmentSizes description says the refusal of unknown sizes is the live network's. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+### Features
+
+* feat(shipping): filter BOX NOW lockers by compartment size and refuse a locker that cannot take the order (#817) ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* feat(shipping): filter BOX NOW lockers by compartment size and refuse a locker too small for the order
+
+Sizes exist only for BOX NOW's live network: the catalogue sync, the compartmentSize filter, the quote's size and the order refusal apply to a store whose BOX NOW is live, and a stage store's lockers are reset to unknown.
+
+Work in progress: the tests do not yet bind a live store, the locale entries and schema.yml additions are still to be regenerated. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* feat(shipping): bind BOX NOW's live network in the size tests and cover a stage store
+
+A stage store takes no size from a colliding catalogue id and is reset to unknown, ignores the compartmentSize filter, names no size on the quote and checks none at order creation. The filter value is typed as an integer in the schema. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
 ## v3.266.2 (2026-11-23)
 
 ### Bug fixes

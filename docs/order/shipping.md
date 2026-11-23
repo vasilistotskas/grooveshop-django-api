@@ -317,6 +317,17 @@ accepting Cyprus orders at the Greek flat rate.
      (`headers={"_schema_name": ...}`), or the
      worker runs under the wrong tenant. The default is a no-op for carriers
      with no async step.
+   - The admin hooks, so no admin module names the carrier (all default to
+     nothing). A carrier that is an app of its own sets `app_label` (the
+     sidebar and the ⌘K palette drop its pages while the store has no active
+     `ShippingProvider` row for it) and returns its pages from `admin_pages()`
+     (`AdminPages`: the Shipping group, the Pickup Points menu, the System
+     section's Audit and Reconciliation menus). `shipment_state_variants()`
+     colours its shipment states (`admin.displays.SHIPMENT_STATE_VARIANT`
+     merges every carrier's). `attention_counts(now)` and `attention_rows(counts)`
+     put the work it leaves waiting on the dashboard's "Needs attention" list
+     (the same rules as its alert emails, §5.4);
+     `attention_models` lists the models whose writes clear the cached counts.
    - Webhook-based carriers handle events in their own service (BoxNow:
      `BoxNowService.apply_webhook_event`); it is not part of the interface.
 3. Decorate the adapter with `@register_provider` and import it in the app's

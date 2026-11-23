@@ -7,16 +7,24 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
+from urllib.parse import urlencode
+
+from django.utils import formats, timezone
+from django.utils.translation import gettext_lazy as _
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import (
+    AdminPage,
+    AdminPages,
+    AttentionRow,
     PickupPointInAnotherCountry,
     PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     register_provider,
 )
+from shipping_acs.enum.shipment_state import AcsShipmentState
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -27,10 +35,31 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The admin's colour of each shipment state (an Unfold label variant).
+SHIPMENT_STATE_VARIANT: dict[str, str] = {
+    AcsShipmentState.PENDING_CREATION: "default",
+    AcsShipmentState.NEW: "info",
+    AcsShipmentState.IN_TRANSIT: "info",
+    AcsShipmentState.AT_DESTINATION: "info",
+    AcsShipmentState.OUT_FOR_DELIVERY: "info",
+    AcsShipmentState.DELIVERED: "success",
+    AcsShipmentState.ATTEMPTED: "warning",
+    AcsShipmentState.RETURNED: "warning",
+    AcsShipmentState.CANCELED: "danger",
+    AcsShipmentState.LOST: "danger",
+}
+
 
 @register_provider
 class AcsCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "acs"
+    app_label: ClassVar[str | None] = "shipping_acs"
+    attention_models: ClassVar[tuple[str, ...]] = (
+        "shipping_acs.AcsShipment",
+        "shipping_acs.AcsCodPayout",
+        "shipping_acs.AcsUnrecognisedVoucher",
+        "shipping_acs.AcsVoucherHold",
+    )
 
     # Carrier-specific request-body keys popped before Order.create().
     # Add a new key here when ACS introduces a new per-order field
@@ -396,8 +425,6 @@ class AcsCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         payload: dict[str, Any],
     ) -> dict[str, list[str]]:
-        from django.utils.translation import gettext_lazy as _
-
         if kind != ShippingKind.PICKUP_POINT:
             return {}
         if not payload.get("acs_station_external_id"):
@@ -496,6 +523,157 @@ class AcsCarrier(ShippingCarrierInterface):
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)
     # ------------------------------------------------------------------
+
+    def admin_pages(self) -> AdminPages:
+        return AdminPages(
+            shipments=(
+                AdminPage(
+                    "shipping_acs.AcsShipment",
+                    _("ACS Shipments"),
+                    "local_shipping",
+                ),
+                AdminPage(
+                    "shipping_acs.AcsUnrecognisedVoucher",
+                    _("ACS vouchers matching no order"),
+                    "qr_code",
+                ),
+                AdminPage(
+                    "shipping_acs.AcsVoucherHold",
+                    _("ACS voucher holds"),
+                    "pause_circle",
+                ),
+            ),
+            pickup_points=(
+                AdminPage("shipping_acs.AcsStation", _("ACS Stations")),
+            ),
+            audit=(
+                AdminPage(
+                    "shipping_acs.AcsTrackingEvent", _("ACS Tracking Events")
+                ),
+                AdminPage("shipping_acs.AcsApiCall", _("ACS API Calls")),
+            ),
+            reconciliation=(
+                AdminPage("shipping_acs.AcsPickupList", _("ACS Pickup Lists")),
+                AdminPage(
+                    "shipping_acs.AcsPickupListRun", _("ACS Pickup List Runs")
+                ),
+                AdminPage("shipping_acs.AcsCodPayout", _("ACS COD Payouts")),
+            ),
+        )
+
+    def shipment_state_variants(self) -> Mapping[str, str]:
+        return SHIPMENT_STATE_VARIANT
+
+    def attention_counts(self, now: datetime) -> dict[str, int]:
+        from shipping_acs import attention
+
+        return {
+            "stale_shipments": attention.stale_shipments(now).count(),
+            "acs_voucher_requests_unknown": (
+                attention.voucher_requests_unknown().count()
+            ),
+            "acs_unrecognised_vouchers": (
+                attention.unrecognised_vouchers().count()
+            ),
+            # One state, however many orders wait behind it: voucher
+            # requests held while ACS is failing (``voucher_hold``).
+            "acs_voucher_holds": (
+                attention.voucher_holds_holding_requests().count()
+            ),
+            "unremitted_cod": attention.unremitted_cod_shipments(
+                now=now
+            ).count(),
+            "unattributed_cod_payouts": attention.unattributed_payouts().count(),
+        }
+
+    def attention_rows(
+        self, counts: Mapping[str, int]
+    ) -> tuple[AttentionRow, ...]:
+        rows = [
+            AttentionRow(
+                "unremitted_cod",
+                "payments",
+                "danger",
+                _("COD cash ACS has not paid out"),
+                _("Delivered, and ACS reports no payout"),
+                "shipping_acs.AcsShipment",
+                urlencode({"attention": "unremitted_cod"}),
+            ),
+            AttentionRow(
+                "unattributed_cod_payouts",
+                "help_center",
+                "danger",
+                _("ACS payouts matching no shipment"),
+                _("Money ACS paid out that no shipment explains"),
+                "shipping_acs.AcsCodPayout",
+                urlencode({"unattributed": "yes"}),
+            ),
+            AttentionRow(
+                "acs_voucher_requests_unknown",
+                "help",
+                "danger",
+                _("ACS voucher requests to check"),
+                _("ACS may hold a voucher: adopt it or request again"),
+                "shipping_acs.AcsShipment",
+                urlencode({"attention": "voucher_unknown"}),
+            ),
+        ]
+        held_since = (
+            self._voucher_held_since() if counts["acs_voucher_holds"] else None
+        )
+        if held_since is not None:
+            rows.append(
+                AttentionRow(
+                    "acs_voucher_holds",
+                    "pause_circle",
+                    "danger",
+                    _("ACS voucher requests are held"),
+                    _(
+                        "Since %(since)s, because ACS is failing. They are "
+                        "sent when it answers again"
+                    )
+                    % {
+                        "since": formats.date_format(
+                            timezone.localtime(held_since),
+                            "SHORT_DATETIME_FORMAT",
+                        )
+                    },
+                    "shipping_acs.AcsVoucherHold",
+                    urlencode({"in_force": "yes"}),
+                )
+            )
+        rows += [
+            AttentionRow(
+                "acs_unrecognised_vouchers",
+                "qr_code",
+                "warning",
+                _("ACS vouchers matching no order"),
+                _("Named by ACS on a refused pickup list"),
+                "shipping_acs.AcsUnrecognisedVoucher",
+                urlencode({"resolved": "no"}),
+            ),
+            AttentionRow(
+                "stale_shipments",
+                "local_shipping",
+                "warning",
+                _("Stale ACS shipments"),
+                _("No tracking movement, or the voucher was never created"),
+                "shipping_acs.AcsShipment",
+                urlencode({"attention": "stale"}),
+            ),
+        ]
+        return tuple(rows)
+
+    @staticmethod
+    def _voucher_held_since() -> datetime | None:
+        """Since when the store's ACS voucher requests are held, or None."""
+        from shipping_acs import attention
+
+        return (
+            attention.voucher_holds_holding_requests()
+            .values_list("started_at", flat=True)
+            .first()
+        )
 
     def create_shipment_row(
         self,

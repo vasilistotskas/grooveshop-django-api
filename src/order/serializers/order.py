@@ -2078,7 +2078,7 @@ class CreatePaymentIntentRequestSerializer(serializers.Serializer):
     # parameters raised TypeError and surfaced as a 500 on a payment
     # endpoint. Reject those by name instead.
     RESERVED_PAYMENT_DATA_KEYS = frozenset(
-        {"pay_way", "order", "amount", "order_id"}
+        {"pay_way", "order", "amount", "order_id", "on_paid"}
     )
 
     def validate_payment_data(self, value):

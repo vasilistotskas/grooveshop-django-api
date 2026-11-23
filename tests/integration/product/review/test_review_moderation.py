@@ -77,7 +77,7 @@ def product():
 
 @pytest.fixture
 def staff_api():
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
     from tests.utils.staff import (
         bind_store_tenant,
         store_staff,

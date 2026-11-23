@@ -193,6 +193,49 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
 
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     @mock.patch("order.views.order.get_payment_provider")
+    def test_a_charge_on_an_order_canceled_meanwhile_is_booked_not_confirmed(
+        self, mock_get
+    ) -> None:
+        """The order is canceled while the token is charged: the money is
+        booked as a payment after the cancel (staff are paged) and the
+        order is neither revived nor announced."""
+        order = self._guest_stripe_order()
+
+        def _charge_while_canceled(**_kwargs):
+            Order.objects.filter(pk=order.pk).update(
+                status=OrderStatus.CANCELED,
+                payment_status=PaymentStatus.CANCELED,
+                confirmed_at=None,
+            )
+            return (
+                True,
+                {
+                    "payment_id": "pi_agent_late",
+                    "status": PaymentStatus.COMPLETED,
+                    "amount": "47.50",
+                    "currency": str(settings.DEFAULT_CURRENCY),
+                    "provider": "stripe",
+                },
+            )
+
+        mock_get.return_value.confirm_delegated_payment.side_effect = (
+            _charge_while_canceled
+        )
+        with mock.patch("emails.send.send_email"):
+            self.client.post(
+                self._url(order), {"sharedPaymentToken": SPT}, format="json"
+            )
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, OrderStatus.CANCELED)
+        self.assertIsNone(order.confirmed_at)
+        self.assertEqual(
+            order.metadata["payment_after_cancel"]["payment_id"],
+            "pi_agent_late",
+        )
+
+    @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
+    @mock.patch("order.views.order.get_payment_provider")
     def test_unsettled_charge_records_the_intent_without_paying(
         self, mock_get
     ) -> None:

@@ -1498,7 +1498,7 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
     because the demo store has no carrier to advance it and the
     auto-cancel only closes online payments.
 
-    Not through ``OrderService.cancel_order``: that is a customer-facing
+    Not through ``OrderLifecycleService.cancel_order``: that is a customer-facing
     cancellation — it emails the guest "your order was canceled",
     cascades to the carrier and pushes the change to the agent gateway —
     for an order that is about to stop existing. What a cancel must

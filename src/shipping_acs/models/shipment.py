@@ -49,7 +49,7 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     # null=True (not blank=""): Postgres treats NULL as distinct in
     # UNIQUE constraints, so multiple "pending creation" rows can
     # coexist before the ACS API assigns real numbers (matches the
-    # BoxNow pattern at shipping_boxnow/models/shipment.py).
+    # BoxNow pattern at src/shipping_boxnow/models/shipment.py).
     voucher_no = models.CharField(
         _("Voucher number"),
         max_length=20,

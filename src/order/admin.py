@@ -84,6 +84,12 @@ from order.lifecycle.follow_up import (
     has_canceled_shipment,
     last_carrier_event_at,
 )
+from order.lifecycle.service import (
+    SHIPMENT_CANCEL_PENDING_FLAG,
+    SHIPMENT_CANCEL_UNANSWERED_KEY,
+    OrderLifecycleService,
+    shipment_cancel_wait_minutes,
+)
 from order.models.attribution import OrderAttribution
 from order.models.expense import Expense
 from order.models.history import OrderHistory, OrderItemHistory
@@ -97,6 +103,7 @@ from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments.payment import payment_provider_label
+from order.payments.payment_hold import payment_review_orders
 from order.payments.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
@@ -110,12 +117,7 @@ from order.refunds.refund_lines import (
     plan_pieces,
 )
 from order.refunds.service import RefundService
-from order.services import (
-    SHIPMENT_CANCEL_PENDING_FLAG,
-    SHIPMENT_CANCEL_UNANSWERED_KEY,
-    OrderService,
-    shipment_cancel_wait_minutes,
-)
+from order.services import OrderService
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
@@ -229,6 +231,24 @@ class WholesaleOrderFilter(DropdownFilter):
                 return queryset.exclude(metadata__has_key="b2b_pricing")
             case _:
                 return queryset
+
+
+class PaymentReviewFilter(DropdownFilter):
+    """Orders a provider charged for an amount that did not match, still
+    PENDING and with the charge not accepted: nothing but a person decides
+    them (``payment_hold.payment_review_orders``, the rule behind the
+    dashboard counter)."""
+
+    title = _("Payment review")
+    parameter_name = "payment_review"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Charge waiting for a decision"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(pk__in=payment_review_orders().values("pk"))
+        return queryset
 
 
 class RefundOwedFilter(DropdownFilter):
@@ -1350,6 +1370,7 @@ class OrderAdmin(BaseModelAdmin):
         ("payment_status", MultipleChoicesDropdownFilter),
         "document_type",
         WholesaleOrderFilter,
+        PaymentReviewFilter,
         RefundOwedFilter,
         OverchargedFilter,
         BooksFilter,
@@ -1400,8 +1421,8 @@ class OrderAdmin(BaseModelAdmin):
         "uuid",
         # Changed only through the actions below, never the form. A form
         # save wrote ``status`` straight to the row, skipping both the
-        # transition table in ``OrderService.update_order_status`` and
-        # ``OrderService.cancel_order`` — so a CANCELED picked from the
+        # transition table in ``OrderLifecycleService.update_order_status`` and
+        # ``OrderLifecycleService.cancel_order`` — so a CANCELED picked from the
         # dropdown never restored stock (prod orders 242 and 213,
         # 2026-09-08). Every action routes through the service.
         "status",
@@ -2658,7 +2679,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                OrderService.update_order_status(order, target_status)
+                OrderLifecycleService.update_order_status(order, target_status)
                 self.message_user(
                     request,
                     success_message % {"order_id": order.id},
@@ -2694,7 +2715,7 @@ class OrderAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def mark_as_canceled(self, request, queryset):
-        # No outer ``transaction.atomic`` here: ``OrderService.cancel_order``
+        # No outer ``transaction.atomic`` here: ``OrderLifecycleService.cancel_order``
         # is already wrapped in its own atomic, and a batch-wide
         # rollback would undo successful cancels just because one
         # selected row is in a terminal state. Verified by prod admin
@@ -2706,7 +2727,7 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                canceled, refund_info = OrderService.cancel_order(
+                canceled, refund_info = OrderLifecycleService.cancel_order(
                     order, customer_initiated=False
                 )
                 self.message_user(

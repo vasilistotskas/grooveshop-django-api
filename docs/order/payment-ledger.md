@@ -33,7 +33,7 @@ report reads it (`docs/profit-report.md`)
 writer: a delivery repeated by the provider records nothing the second time
 (`record_*` return `created=False`). Writers (all under the order row lock):
 `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`,
-`_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached
+`viva_settlement.handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached
 from `AcsService._mark_cod_order_paid_if_pending` and
 `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in
 the same atomic step as the payment status, [§4.4](payments.md));
@@ -83,7 +83,7 @@ longer does. On the change from clear to set it logs ERROR, notes the order and
 sends `ops.overcharged` once; a row the provider redelivers is not new and
 never reaches it, and a figure that stays over changes nothing. Both CHARGE
 rows stay (the money moved), the order keeps its FIRST `payment_id` (Viva
-`_handle_payment_created` and Stripe `checkout.session.completed` stop after
+`viva_settlement.handle_payment_created` and Stripe `checkout.session.completed` stop after
 booking a second payment on an order another one already paid, so there is no
 second confirmation email either), and nothing is refunded automatically: which
 payment to give back is a person's call. A partial refund of a normal order

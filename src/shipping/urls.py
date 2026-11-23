@@ -11,6 +11,7 @@ from django.urls import path
 
 from shipping.views import (
     FreeShippingInfoView,
+    ProductShippingView,
     ShippingOptionsView,
     ShippingPolicyView,
     ShippingProviderListView,
@@ -31,6 +32,11 @@ urlpatterns = [
         "shipping/policy",
         ShippingPolicyView.as_view(),
         name="shipping-policy",
+    ),
+    path(
+        "shipping/product/<int:product_id>",
+        ProductShippingView.as_view(),
+        name="shipping-product",
     ),
     path(
         "shipping/providers",

@@ -21,12 +21,8 @@ from django.core.management.base import CommandError
 from django.db import connection
 from django.db.utils import IntegrityError
 
-from tenant.models import (
-    Tenant,
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]

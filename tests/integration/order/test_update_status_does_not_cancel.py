@@ -1,4 +1,4 @@
-"""A cancel is ``OrderService.cancel_order``, never a status change.
+"""A cancel is ``OrderLifecycleService.cancel_order``, never a status change.
 
 ``POST /order/{id}/update_status`` accepted CANCELED and wrote the label
 through ``update_order_status``: the stock stayed held, a paid order kept
@@ -26,8 +26,8 @@ from order.exceptions import (
 )
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.inventory.stock import StockManager
+from order.lifecycle.service import OrderLifecycleService
 from order.models import OrderItem, PaymentTransaction
-from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.staff import stamp_platform_identity
@@ -160,7 +160,9 @@ class TestUpdateStatusRefusesCanceled:
         status_before = order.status
 
         with pytest.raises(InvalidStatusTransitionError) as refused:
-            OrderService.update_order_status(order, OrderStatus.CANCELED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.CANCELED
+            )
 
         assert OrderStatus.CANCELED not in refused.value.allowed
         order.refresh_from_db()
@@ -222,7 +224,7 @@ class TestCancelForDeadShipment:
         with patch(
             "shipping.services.ShippingService.cancel_shipment"
         ) as cancel_shipment:
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=False
             )
 
@@ -238,7 +240,7 @@ class TestCancelForDeadShipment:
         order = OrderFactory(status=OrderStatus.SHIPPED)
 
         with pytest.raises(OrderNotCancelableError):
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=False
             )
 
@@ -256,7 +258,7 @@ class TestCancelForDeadShipment:
             ),
             pytest.raises(OrderCancellationError) as raised,
         ):
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=False
             )
 
@@ -280,11 +282,11 @@ class TestCancelForDeadShipment:
                 side_effect=RuntimeError("lock timeout"),
             ),
             patch.object(
-                OrderService, "_note_shipment_canceled_without_order"
+                OrderLifecycleService, "_note_shipment_canceled_without_order"
             ) as note,
             pytest.raises(OrderCancellationError),
         ):
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=False
             )
 

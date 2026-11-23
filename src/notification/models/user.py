@@ -29,6 +29,11 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     )
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
+    # When the live push claimed this row (``send_notification_task``): the
+    # push goes out once however many copies of its task run.
+    pushed_at = models.DateTimeField(
+        _("Pushed at"), null=True, blank=True, editable=False
+    )
 
     objects: NotificationUserManager = NotificationUserManager()
     unseen_objects: UnseenNotificationUserManager = (

@@ -91,9 +91,7 @@ def build_catalogue(vat, *, marker=None):
         if marker is not None:
             # One instance per product: a translation has one master.
             kwargs["translations"] = [
-                ProductTranslation(
-                    language_code="en", name=marker, description=""
-                )
+                ProductTranslation(language_code="en", name=marker)
             ]
         return make_product(vat, category, **kwargs)
 

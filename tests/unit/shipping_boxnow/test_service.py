@@ -474,7 +474,7 @@ class TestApplyWebhookEvent:
     def test_delivered_transitions_order_to_completed_when_paid(self):
         """delivered event advances an already-paid order through DELIVERED
         and on to COMPLETED (PR #2 G — auto-advance via
-        OrderService.maybe_advance_to_completed)."""
+        OrderLifecycleService.maybe_advance_to_completed)."""
         order = OrderFactory(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
@@ -790,8 +790,9 @@ class TestCanCancelShipment:
 
 @pytest.mark.django_db
 class TestSyncLockers:
-    def test_creates_new_and_deactivates_stale_lockers(self):
-        """sync_lockers creates new rows and marks absent rows inactive."""
+    def test_creates_new_and_counts_an_absence_of_a_stale_locker(self):
+        """sync_lockers creates new rows and counts the absence of a row
+        the partner did not return, without withdrawing it yet."""
         # Pre-create lockers: 'a' (will be updated) and 'c' (will be stale).
         BoxNowLockerFactory(external_id="a", is_active=True)
         BoxNowLockerFactory(external_id="c", is_active=True)
@@ -841,12 +842,12 @@ class TestSyncLockers:
             external_id="b", is_active=True
         ).exists()
         assert BoxNowLocker.objects.filter(
-            external_id="c", is_active=False
+            external_id="c", is_active=True, consecutive_absent_syncs=1
         ).exists()
 
         assert stats["created"] == 1  # 'b'
         assert stats["updated"] == 1  # 'a'
-        assert stats["deactivated"] == 1  # 'c'
+        assert stats["deactivated"] == 0  # 'c' is absent once
 
 
 # ---------------------------------------------------------------------------

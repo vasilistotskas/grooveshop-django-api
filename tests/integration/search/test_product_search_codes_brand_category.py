@@ -38,9 +38,7 @@ def make_product(name, **fields):
     return ProductFactory(
         stock=5,
         active=True,
-        translations=[
-            ProductTranslation(language_code="el", name=name, description="")
-        ],
+        translations=[ProductTranslation(language_code="el", name=name)],
         **fields,
     )
 
@@ -167,12 +165,8 @@ class TestBrandAndCategorySearch:
             active=True,
             category=category,
             translations=[
-                ProductTranslation(
-                    language_code="el", name="Plain", description=""
-                ),
-                ProductTranslation(
-                    language_code="en", name="Plain", description=""
-                ),
+                ProductTranslation(language_code="el", name="Plain"),
+                ProductTranslation(language_code="en", name="Plain"),
             ],
         )
         live_index.add(

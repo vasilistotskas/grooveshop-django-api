@@ -320,6 +320,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     status_updated_at = models.DateTimeField(
         _("Status Updated At"), auto_now=False, null=True, blank=True
     )
+    confirmed_at = models.DateTimeField(
+        _("Confirmed At"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the order was confirmed and the customer and the store "
+            "were told about it: when it was placed, or, for a card "
+            "payment, when the payment went through. Empty for a card "
+            "order that was never paid."
+        ),
+    )
     shipped_at = models.DateTimeField(
         _("Shipped At"),
         null=True,
@@ -783,7 +795,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # reported ``updated_at`` equal to its ``created_at``.
         #
         # That is not cosmetic. ``updated_at`` is a documented API filter
-        # (order/filters.py exposes gte/lte/date), so "orders changed
+        # (src/order/filters.py exposes gte/lte/date), so "orders changed
         # since X" silently omitted every status change. Worse,
         # ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
         # bucket with ``updated_at__lt=now - GRACE``, intending a retry
@@ -792,7 +804,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # cancellable on the very next run, with no grace at all.
         #
         # Fixed here rather than at ~35 call sites so it cannot be missed
-        # again — order/inventory/stock.py and the shipping services already
+        # again — src/order/inventory/stock.py and the shipping services already
         # pass "updated_at" by hand, which is the convention Order's own saves
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing
@@ -1155,7 +1167,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """Whether the customer's cancel button should be on offer.
 
         A customer cancel asks the courier to take the parcel back
-        before the order changes (``OrderService.cancel_order``), so on
+        before the order changes (``OrderLifecycleService.cancel_order``), so on
         top of the status rule the offer ends once local data shows the
         courier would refuse: an ACS voucher already on an issued pickup
         list, a BoxNow parcel past ``NEW``. Read from local rows only —

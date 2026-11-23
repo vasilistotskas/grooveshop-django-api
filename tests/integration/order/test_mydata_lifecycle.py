@@ -37,11 +37,11 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
 from order.refunds.service import RefundService
-from order.services import OrderService
 from order.signals.handlers import handle_stripe_refund_made
 from order.tasks import generate_order_invoice, send_invoice_to_mydata
 from order.views.viva_webhook import _handle_reversal_created
@@ -161,10 +161,16 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order(lines=(("24", "124.00"),))
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
             # Later moves, and a repeat, never issue a second receipt.
-            OrderService.update_order_status(order, OrderStatus.DELIVERED)
-            OrderService.update_order_status(order, OrderStatus.COMPLETED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.DELIVERED
+            )
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.COMPLETED
+            )
             generate_order_invoice(order.id)
 
         [receipt] = aade.receipts
@@ -179,7 +185,9 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order(language_code="en")
 
         with mydata_enabled(), FakeAade():
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [message] = [m for m in mail.outbox if "Receipt" in m.subject]
         assert message.subject == (
@@ -195,7 +203,9 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order(language_code="el")
 
         with mydata_enabled(), FakeAade():
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [message] = [
             m for m in mail.outbox if m.subject.startswith("Απόδειξη ")
@@ -213,7 +223,9 @@ class TestReceiptIssuedWhenTheOrderShips:
         )
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [receipt] = aade.receipts
         assert receipt.gross == Decimal("87.00")
@@ -236,7 +248,7 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order()
 
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order,
                 "changed my mind",
                 customer_initiated=False,
@@ -254,7 +266,9 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order()
 
         with mydata_enabled(auto_submit=False), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
             assert aade.sent == []
             # The staff action runs the same task.
             generate_order_invoice(order.id)
@@ -265,7 +279,9 @@ class TestReceiptIssuedWhenTheOrderShips:
         order = _order()
 
         with mydata_enabled(ready=False), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
             generate_order_invoice(order.id)
 
         assert aade.sent == []
@@ -281,9 +297,15 @@ class TestReceiptIssuedWhenTheOrderShips:
         )
 
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
-            OrderService.update_order_status(order, OrderStatus.DELIVERED)
-            OrderService.update_order_status(order, OrderStatus.COMPLETED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.DELIVERED
+            )
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.COMPLETED
+            )
             generate_order_invoice(order.id)
             RefundService.refund_order(order, amount=_eur("10.00"))
 
@@ -558,7 +580,9 @@ class TestOrderClosedWithoutASale:
             invoice = _receipt(order)
             # The courier brings the refused parcel back: the unpaid payment
             # settles to CANCELED and the sale never happened.
-            OrderService.update_order_status(order, OrderStatus.RETURNED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.RETURNED
+            )
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.CANCELED
@@ -610,7 +634,9 @@ class TestOrderClosedWithoutASale:
         order = _order(lines=(("24", "100.00"),))
         with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
             invoice = _receipt(order)
-            OrderService.update_order_status(order, OrderStatus.RETURNED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.RETURNED
+            )
             RefundService.refund_order(order, reason="returned")
 
         assert sum(c.gross for c in aade.credits) == invoice.total.amount
@@ -769,7 +795,9 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         self._refund(order, "30.00")
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [receipt] = aade.receipts
         assert receipt.gross == Decimal("70.00")
@@ -792,7 +820,9 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         self._refund(order, "59.25")
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         invoice = Invoice.objects.get(order=order)
         rows = {Decimal(r["rate"]): r for r in invoice.vat_breakdown}
@@ -861,7 +891,9 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
 
         assert refunded_before_receipt(order) == Decimal("70.00")
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
         [receipt] = aade.receipts
         assert receipt.gross == Decimal("30.00")
 
@@ -877,7 +909,9 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         )
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [receipt] = aade.receipts
         assert receipt.gross == Decimal("100.00")
@@ -895,7 +929,9 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
         )
 
         with mydata_enabled(), FakeAade() as aade:
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [receipt] = aade.receipts
         assert receipt.gross == Decimal("100.00")

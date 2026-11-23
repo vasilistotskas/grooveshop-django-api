@@ -18,7 +18,7 @@ from django.core.cache import cache
 from django.db.models import Count
 
 from recommendation.strategies.base import TenantContext
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 from tenant.permissions import IsCatalogueEnabled
 
 # The field names are part of the key: the value is rebuilt as
@@ -51,8 +51,8 @@ def current_vertical() -> str:
     schema without a row; otherwise the real ``Tenant`` row's value,
     resolved even under a bare ``FakeTenant``.
     """
+    from tenant.enum import StoreVertical
     from tenant.membership import resolve_current_tenant
-    from tenant.models import StoreVertical
 
     tenant = resolve_current_tenant()
     return str(tenant.vertical) if tenant is not None else StoreVertical.GENERAL

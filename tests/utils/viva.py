@@ -336,7 +336,10 @@ class FakeVivaApi:
         if request.method == "GET" and path == "/api/transactions/":
             order_code = self.query(request)["ordercode"][0]
             return _response(
-                request, *self.by_order_code.get(order_code, (200, {}))
+                request,
+                *self.by_order_code.get(
+                    order_code, (200, {"Transactions": [], "Success": True})
+                ),
             )
         if request.method == "DELETE" and path.startswith("/api/transactions/"):
             return _response(request, *self.cancel)
@@ -366,7 +369,7 @@ class FakeVivaApi:
 def verified_payment(
     order, order_code: str, **overrides: Any
 ) -> dict[str, Any]:
-    """What ``_verify_transaction`` reports for a payment of *order*: its
+    """What ``verify_transaction`` reports for a payment of *order*: its
     order code, and its amount and currency (a payment-created event settles
     an order only when the transaction states both, and both are right)."""
     owed = order.calculate_order_total_amount()

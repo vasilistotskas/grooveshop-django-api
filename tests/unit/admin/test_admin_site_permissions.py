@@ -17,10 +17,8 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.test import RequestFactory
 
 from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
-from tenant.models import (
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

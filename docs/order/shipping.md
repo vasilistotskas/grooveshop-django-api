@@ -228,6 +228,37 @@ accepting Cyprus orders at the Greek flat rate.
   carrier's credentials live on the `Tenant` row, which no surface watches,
   so connecting or removing one shows after the TTL or a manual purge of
   the `shipping` surface.
+- **`GET /shipping/product/<product_id>`** is the product page's
+  "shipping from X": `ShippingService.product_shipping_from(product)`
+  prices a cart holding that one product and nothing else, as checkout
+  would, for a shopper not known yet:
+  - to `initial_country_code()`, the country checkout preselects;
+  - at `OrderQuoteService.threshold_value` of the product's
+    `final_price` after the automatic promotions such a cart gets
+    (`PromotionEngine.evaluate_single_unit`: the cart's own
+    classification, stacking and clamp over a one-line cart; no code,
+    and no `first_order_only` promotion, as for any anonymous cart), so a
+    free-shipping promotion covering the product waives every carrier and
+    a carrier's threshold is judged after the discount;
+  - through `available_options` with the parcel the cart would ship (the
+    product plus the promotions' gifts, `gift_pairs`): a row flagged
+    `exceeds_max_weight` or `exceeds_parcel_size` cannot carry it and does
+    not count, and a live-priced carrier (ACS) is asked for the parcel's
+    weight bracket as checkout asks it.
+
+  The response is `{estimate}`: the cheapest row's `price` and `currency`,
+  `free` (`price` is 0), `countryCode`, and `freeShippingThreshold`, the
+  lowest threshold of `free_threshold_rates(country, weight_grams, items)`
+  (the carriers that can take it). `estimate` is `null` when the store
+  ships nowhere or no delivery it offers can take the product; 404 for a
+  product that is missing or inactive. Retail only: a wholesale price
+  never reaches it (no shopper). Not on the product serializer, which
+  would tie the product cache to every rate. Anonymous, cached by
+  `@cache_methods` (`ProductShippingView`); the `shipping`, `products`
+  (the product's price, weight and size) and `promotions` surfaces all
+  purge it (`PRODUCT_SHIPPING_VIEW` / `PRODUCT_SHIPPING_HANDLER` in
+  `src/shipping/cache_surfaces.py`). A live ACS price can move within
+  the TTL.
 - **`?shippable=true` on `/country`** filters to
   `shippable_country_codes()`; always empty on the platform host,
   which has no tenant schema of its own to hold a rate.

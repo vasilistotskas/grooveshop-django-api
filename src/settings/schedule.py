@@ -34,7 +34,7 @@ SCHEDULE_PRESETS = {
 
 # Minutes between two runs of ``finish-pending-shipment-cancels``. A name,
 # because staff are told how long a cancel left pending waits at most
-# (``order.services.shipment_cancel_wait_minutes``). It must divide 60.
+# (``order.lifecycle.service.shipment_cancel_wait_minutes``). It must divide 60.
 ORDER_SHIPMENT_CANCEL_SWEEP_EVERY_MINUTES = 15
 
 # The nightly pg_dump (and the pruning of its output) is production's
@@ -154,7 +154,7 @@ def get_celery_beat_schedule():
             # per-tenant; beat fires in public. A row dated in the future
             # goes live with no save, so no signal purges the surfaces
             # that render it or announces it to IndexNow; this sweep
-            # does, per tenant, every minute (core/publication.py).
+            # does, per tenant, every minute (src/core/publication.py).
             "task": "tenant.tasks.fanout_release_due_publications",
             "schedule": SCHEDULE_PRESETS["every_minute"],
             "options": {"queue": "celery", "expires": 50},
@@ -477,6 +477,14 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_sync_boxnow_lockers",
             "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_2am"]),
             "options": {"queue": "celery"},
+        },
+        "sync-boxnow-locker-catalogue": {
+            # The sizes and availability of the lockers, from BOX NOW's
+            # public catalogue (``shipping_boxnow.catalogue``): fetched once
+            # here, applied by each store's own task.
+            "task": "shipping_boxnow.tasks.sync_boxnow_locker_catalogue",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 1800},
         },
         # Poll BoxNow's REST API every 15 min for non-terminal
         # shipments. Defence-in-depth against a missed webhook

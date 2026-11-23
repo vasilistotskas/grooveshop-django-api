@@ -47,6 +47,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models import (
     CreditAllocation,
     Invoice,
@@ -63,7 +64,6 @@ from order.models.refund_attempt import (
 from order.payments.payment_ledger import PaymentLedger
 from order.refunds.refund_lines import held_values, plan_pieces
 from order.refunds.service import RefundService
-from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -1580,7 +1580,9 @@ class TestTheDialogAnswersAsTheLockedPathDoes:
             _request(staff, {}), object_id=order.pk
         )
         with pytest.raises(RefundOutstandingError) as excinfo:
-            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.REFUNDED
+            )
         assert excinfo.value.refundable == Decimal("100.00")
 
     def test_the_retry_is_offered_while_the_locked_path_would_resume_it(

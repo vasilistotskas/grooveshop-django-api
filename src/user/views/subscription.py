@@ -11,6 +11,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.action_config import (
+    ActionConfig,
+    SerializersConfig,
+    create_schema_view_config,
+    crud_config,
+)
 from core.api.permissions import (
     IsOwnerOrAdmin,
     StoreStaffModelPermissions,
@@ -20,12 +26,6 @@ from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.api.views import BaseModelViewSet
 from core.client_ip import edge_client_ip
 from core.utils.i18n import resolve_request_language
-from core.utils.serializers import (
-    ActionConfig,
-    SerializersConfig,
-    create_schema_view_config,
-    crud_config,
-)
 from user.filters.subscription import (
     SubscriptionTopicFilter,
     UserSubscriptionFilter,

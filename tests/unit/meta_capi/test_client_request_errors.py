@@ -13,6 +13,7 @@ import time
 from unittest import mock
 
 import pytest
+import requests
 from facebook_business.adobjects.adspixel import AdsPixel
 from facebook_business.adobjects.serverside.action_source import (
     ActionSource,
@@ -110,3 +111,29 @@ def test_a_payload_the_sdk_cannot_normalise_is_permanent_and_unsent():
     )
     assert isinstance(caught.value.__cause__, ValueError)
     create_event.assert_not_called()
+
+
+def test_a_request_is_bounded_and_running_out_of_time_is_transient(settings):
+    """The SDK sends with no timeout of its own. The event's lock is held
+    across the request, so the request is bounded by
+    ``META_CAPI_TIMEOUT_SECONDS``, and a timeout is retried like a 5xx."""
+    settings.META_CAPI_TIMEOUT_SECONDS = 4.0
+    event = Event(
+        event_name="Purchase",
+        event_time=int(time.time()),
+        user_data=UserData(email="shopper@example.com"),
+        action_source=ActionSource.WEBSITE,
+    )
+    # A token of its own: the api, and the session's timeout, are cached
+    # per token.
+    client = MetaCapiClient(
+        pixel_id="123", access_token="token-bounded", test_event_code=""
+    )
+
+    with mock.patch(
+        "requests.Session.request", side_effect=requests.Timeout
+    ) as request:
+        with pytest.raises(MetaCapiTransientError):
+            client.send([event])
+
+    assert request.call_args.kwargs["timeout"] == 4.0

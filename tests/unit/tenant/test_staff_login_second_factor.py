@@ -171,10 +171,8 @@ class TestSuperuserNeedsASecondFactor:
         assert not cache.get(staff_mfa._failures_key(user))
 
     def test_store_staff_who_is_not_a_superuser_stays_password_only(self):
-        from tenant.models import (
-            TenantMembershipRole,
-            UserTenantMembership,
-        )
+        from tenant.enum import TenantMembershipRole
+        from tenant.models import UserTenantMembership
         from tests.utils.staff import store_tenant
 
         user = UserAccountFactory(

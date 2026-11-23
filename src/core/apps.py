@@ -38,7 +38,7 @@ class CoreConfig(AppConfig):
             ImageAndSvgField
         ] = ServableImageField
         # Every URL a ModelSerializer takes is one the storefront's
-        # ``z.url()`` can parse (``core/fields/url.py``).
+        # ``z.url()`` can parse (``src/core/fields/url.py``).
         serializers.ModelSerializer.serializer_field_mapping[WebURLField] = (
             WebURLSerializerField
         )
@@ -68,12 +68,12 @@ class CoreConfig(AppConfig):
 
         # Intentionally no apply_db_overlay() here: ready() runs during
         # Django setup, which can be triggered at import time by
-        # asgi/__init__.py's get_asgi_application() call. In pytest
+        # src/asgi/__init__.py's get_asgi_application() call. In pytest
         # collection the DB is blocked for tests without the django_db
         # mark (RuntimeError), and even with try/except guards the
         # error was surfacing through the import chain. The overlay now
         # fires on the first request via TranslationReloadMiddleware —
-        # see core/middleware/translation_reload.py.
+        # see src/core/middleware/translation_reload.py.
 
 
 def _keep_translations_on_a_partial_refresh() -> None:

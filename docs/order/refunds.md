@@ -18,7 +18,7 @@ of §7.2, in [`refund-execution.md`](refund-execution.md).
 - **Stripe dashboard**: webhooks `refund.created` / `refund.updated` →
   `handle_stripe_refund_made` ([§4.2](payments.md)).
 - **Viva dashboard**: webhook 1797 → `_handle_reversal_created`
-  ([§4.3](payments.md)). The same webhook also reports the refunds the in-app
+  ([§4.3](payments-viva.md)). The same webhook also reports the refunds the in-app
   path makes; they are already on the ledger and add nothing.
 
 Every path ends in `RefundService.book_refund`, which writes the row through

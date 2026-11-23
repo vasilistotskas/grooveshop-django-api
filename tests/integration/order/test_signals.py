@@ -39,6 +39,10 @@ class OrderSignalsTestCase(TestCase):
 
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
+        # The factory's own save already announced the order; each test
+        # sends ``order_created`` itself, as for a new order.
+        Order.objects.filter(pk=self.order.pk).update(confirmed_at=None)
+        self.order.refresh_from_db()
 
     @patch("order.signals.handlers.send_admin_new_order_email.apply_async")
     @patch("order.signals.handlers.send_order_confirmation_email.apply_async")
@@ -69,10 +73,8 @@ class OrderSignalsTestCase(TestCase):
     def test_order_created_online_payment_defers_email(
         self, mock_email_task, mock_admin_task
     ):
-        # Online payments (Stripe, Viva) must defer the confirmation
-        # email to the payment-success webhook — the customer should
-        # only get the email once the payment actually clears. The
-        # admin notification still fires on creation regardless.
+        # A card order (Stripe, Viva) is confirmed only when its payment
+        # settles: until then neither the customer nor the store is told.
         self.order.pay_way = PayWayFactory.create_online_payment(
             provider_code="stripe"
         )
@@ -82,7 +84,9 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_not_called()
-        assert_published_once(mock_admin_task, [self.order.id])
+        mock_admin_task.assert_not_called()
+        self.order.refresh_from_db()
+        self.assertIsNone(self.order.confirmed_at)
 
         self.assertTrue(
             OrderHistory.objects.filter(

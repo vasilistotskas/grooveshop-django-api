@@ -13043,6 +13043,9 @@ msgstr "Επιλέξτε έγκυρη χώρα."
 msgid "Select a valid region."
 msgstr "Επιλέξτε έγκυρη περιοχή."
 
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
+
 msgid "Select all"
 msgstr "Επιλογή όλων"
 

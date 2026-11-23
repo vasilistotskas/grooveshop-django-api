@@ -3,6 +3,28 @@
 
 
 
+## v3.266.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(product): a product description is NOT NULL (release 2 of 2) (#805) ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): a product description is NOT NULL (release 2 of 2)
+
+0074 made "" the description's empty value and backfilled; the release
+that shipped it writes "" everywhere. This backfills what the release
+before it wrote during that rollout and adds the NOT NULL constraint the
+state already declares, as a contract of 0074. The backfill's test goes
+with the NULLs it seeded; a test pins the constraint.
+
+Refs #684 ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): number the description NOT NULL contract after the image dimensions migration ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+### Testing
+
+* test(product): run the description contract's backfill and its reverse ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
 ## v3.266.0 (2026-11-23)
 
 ### Bug fixes

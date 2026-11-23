@@ -1189,6 +1189,12 @@ def _invoice_download_url(invoice: Invoice) -> str | None:
     return reverse("admin:order_invoice_download", args=[invoice.pk])
 
 
+def _hx_redirect(url: str) -> HttpResponse:
+    """What a dialog action answers: its form is posted through htmx, which
+    follows this header to the page the staff member came from."""
+    return HttpResponse(headers={"HX-Redirect": url})
+
+
 def _credit_download_url(credit: RetailCredit) -> str | None:
     """Admin-only URL to stream a credit document's PDF."""
     if not credit.pk:
@@ -2910,8 +2916,12 @@ class OrderAdmin(BaseModelAdmin):
             filename=f"{credit.credit_number}.pdf",
         )
 
+    @staticmethod
+    def _order_change_url(object_id) -> str:
+        return reverse("admin:order_order_change", args=[object_id])
+
     def _redirect_to_order_change(self, object_id):
-        return redirect(reverse("admin:order_order_change", args=[object_id]))
+        return redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Issue receipt (myDATA)"),
@@ -3128,8 +3138,18 @@ class OrderAdmin(BaseModelAdmin):
         variant=ActionVariant.DANGER,
         icon="cancel",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Cancel the receipt in myDATA"),
+            description=_(
+                "Cancels this receipt at AADE. It cannot be undone. Only "
+                "for a receipt issued in error and never used: a sale that "
+                "did not happen is undone by a credit document instead."
+            ),
+        ),
     )
-    def cancel_mydata_invoice_now(self, request, object_id):
+    def cancel_mydata_invoice_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Schedule a ``CancelInvoice`` call for this order's MARK.
 
         Only for a receipt issued in error, and only once it has been
@@ -3140,7 +3160,7 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.select_related("invoice").get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return _hx_redirect(self._order_change_url(object_id))
 
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.mydata_mark:
@@ -3152,7 +3172,7 @@ class OrderAdmin(BaseModelAdmin):
                 )
                 % {"order_id": order.id},
             )
-            return self._redirect_to_order_change(object_id)
+            return _hx_redirect(self._order_change_url(object_id))
 
         from order.tasks import cancel_mydata_invoice
 
@@ -3165,7 +3185,7 @@ class OrderAdmin(BaseModelAdmin):
             )
             % {"mark": invoice.mydata_mark, "order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return _hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Download shipping voucher (PDF)"),
@@ -4080,8 +4100,18 @@ class RetailCreditAdmin(BaseModelAdmin):
         variant=ActionVariant.DANGER,
         icon="cancel",
         permissions=["cancel_in_mydata"],
+        dialog=ActionDialog(
+            title=_("Cancel the credit document in myDATA"),
+            description=_(
+                "Cancels this credit document at AADE. It cannot be "
+                "undone. Only for a document issued in error and never "
+                "used."
+            ),
+        ),
     )
-    def cancel_in_mydata(self, request, object_id):
+    def cancel_in_mydata(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Schedule a ``CancelInvoice`` for this credit's MARK. One credit
         at a time: a cancellation at AADE cannot be undone, so no filter
         or selection can ever cancel a batch."""
@@ -4091,7 +4121,7 @@ class RetailCreditAdmin(BaseModelAdmin):
         credit = RetailCredit.objects.filter(pk=object_id).first()
         if credit is None:
             messages.error(request, _("Credit document not found."))
-            return redirect(change_url)
+            return _hx_redirect(change_url)
         if not credit.mydata_mark:
             messages.warning(
                 request,
@@ -4101,14 +4131,14 @@ class RetailCreditAdmin(BaseModelAdmin):
                 )
                 % {"number": credit.credit_number},
             )
-            return redirect(change_url)
+            return _hx_redirect(change_url)
         if credit.mydata_status == MyDataStatus.CANCELED:
             messages.warning(
                 request,
                 _("Credit document %(number)s is already canceled in myDATA.")
                 % {"number": credit.credit_number},
             )
-            return redirect(change_url)
+            return _hx_redirect(change_url)
 
         from order.tasks import cancel_mydata_credit
 
@@ -4121,7 +4151,7 @@ class RetailCreditAdmin(BaseModelAdmin):
             )
             % {"number": credit.credit_number, "mark": credit.mydata_mark},
         )
-        return redirect(change_url)
+        return _hx_redirect(change_url)
 
 
 @admin.register(InvoiceCounter)

@@ -45,6 +45,12 @@ RETAIL_DOCUMENT_ACTIONS = (
 )
 
 
+#: What the confirmation dialog posts besides the CSRF token a browser adds
+#: (Unfold's ``BaseDialogForm`` requires it); a POST without it shows the
+#: dialog again.
+CONFIRMED = {"_form_submitted": "on"}
+
+
 @pytest.fixture
 def order_admin():
     return OrderAdmin(Order, AdminSite())
@@ -236,7 +242,7 @@ class TestCancelACreditInMyData:
             mydata_enabled(ready=ready),
             patch("order.tasks.cancel_mydata_credit.delay") as cancel,
         ):
-            response = client.post(self._url(credit))
+            response = client.post(self._url(credit), CONFIRMED)
         return response, cancel
 
     @pytest.mark.parametrize(
@@ -249,7 +255,7 @@ class TestCancelACreditInMyData:
 
         response, cancel = self._post(tenant, role, credit)
 
-        assert response.status_code == 302
+        assert response.status_code == 200
         cancel.assert_called_once_with(credit.pk)
 
     def test_the_success_message_names_the_credit(self, tenant):
@@ -260,7 +266,10 @@ class TestCancelACreditInMyData:
         from unittest.mock import patch
 
         with mydata_enabled(), patch("order.tasks.cancel_mydata_credit.delay"):
-            response = client.post(self._url(credit), follow=True)
+            client.post(self._url(credit), CONFIRMED)
+            response = client.get(
+                reverse("admin:order_retailcredit_change", args=[credit.pk])
+            )
 
         assert [str(m) for m in response.context["messages"]] == [
             (
@@ -308,25 +317,31 @@ class TestCancelACreditInMyData:
         assert response.status_code == 403
         cancel.assert_not_called()
 
-    def test_a_credit_with_no_mark_is_refused_with_a_message(self, tenant):
-        from order.admin import RetailCreditAdmin
-        from order.models.retail_credit import RetailCredit
-
-        credit = self._credit(mark=None)
-        request = _request(store_staff(tenant, role=TenantMembershipRole.STAFF))
-
+    def _refusal(self, tenant, credit) -> tuple[list[str], object]:
+        """The messages a confirmed POST for *credit* leaves, and the task
+        mock."""
         from unittest.mock import patch
 
+        client = self._client(
+            store_staff(tenant, role=TenantMembershipRole.STAFF)
+        )
         with (
             mydata_enabled(),
             patch("order.tasks.cancel_mydata_credit.delay") as cancel,
         ):
-            RetailCreditAdmin(RetailCredit, AdminSite()).cancel_in_mydata(
-                request, object_id=credit.pk
+            client.post(self._url(credit), CONFIRMED)
+            page = client.get(
+                reverse("admin:order_retailcredit_change", args=[credit.pk])
             )
+        return [str(m) for m in page.context["messages"]], cancel
+
+    def test_a_credit_with_no_mark_is_refused_with_a_message(self, tenant):
+        credit = self._credit(mark=None)
+
+        messages, cancel = self._refusal(tenant, credit)
 
         cancel.assert_not_called()
-        assert _messages(request) == [
+        assert messages == [
             (
                 f"Credit document {credit.credit_number} has no myDATA MARK "
                 "- nothing to cancel."
@@ -334,27 +349,143 @@ class TestCancelACreditInMyData:
         ]
 
     def test_an_already_canceled_credit_is_refused_with_a_message(self, tenant):
-        from order.admin import RetailCreditAdmin
         from order.models.invoice import MyDataStatus
-        from order.models.retail_credit import RetailCredit
 
         credit = self._credit(status=MyDataStatus.CANCELED)
-        request = _request(store_staff(tenant, role=TenantMembershipRole.STAFF))
 
-        from unittest.mock import patch
-
-        with (
-            mydata_enabled(),
-            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
-        ):
-            RetailCreditAdmin(RetailCredit, AdminSite()).cancel_in_mydata(
-                request, object_id=credit.pk
-            )
+        messages, cancel = self._refusal(tenant, credit)
 
         cancel.assert_not_called()
-        assert _messages(request) == [
+        assert messages == [
             (
                 f"Credit document {credit.credit_number} is already "
                 "canceled in myDATA."
             )
         ]
+
+    def test_a_get_shows_the_confirmation_and_queues_nothing(self, tenant):
+        from unittest.mock import patch
+
+        credit = self._credit()
+        client = self._client(
+            store_staff(tenant, role=TenantMembershipRole.STAFF)
+        )
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
+        ):
+            response = client.get(self._url(credit))
+
+        assert response.status_code == 200
+        assert "It cannot be undone" in response.content.decode()
+        cancel.assert_not_called()
+
+    def test_a_post_without_the_csrf_token_is_refused(self, tenant):
+        from unittest.mock import patch
+
+        from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
+
+        credit = self._credit()
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(
+            store_staff(tenant, role=TenantMembershipRole.STAFF),
+            backend=PLATFORM_STAFF_BACKEND_PATH,
+        )
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
+        ):
+            response = client.post(self._url(credit), CONFIRMED)
+
+        assert response.status_code == 403
+        cancel.assert_not_called()
+
+
+class TestCancelAReceiptInMyData:
+    """The order's "Cancel receipt in myDATA" confirms through a dialog
+    too: a link that cancelled at AADE on a plain GET could not be undone
+    and had no CSRF check."""
+
+    @pytest.fixture
+    def tenant(self):
+        tenant = store_tenant("receipt_cancel")
+        previous = bind_store_tenant(tenant)
+        yield tenant
+        unbind_store_tenant(previous)
+
+    @staticmethod
+    def _order():
+        from order.accounting.invoicing import generate_invoice
+        from tests.utils.mydata import registered
+
+        order = _shipped_order()
+        with mydata_enabled(auto_submit=False):
+            registered(generate_invoice(order))
+        return order
+
+    @staticmethod
+    def _client(tenant, *, csrf=False) -> Client:
+        from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
+
+        client = Client(enforce_csrf_checks=csrf)
+        client.force_login(
+            store_staff(tenant, role=TenantMembershipRole.STAFF),
+            backend=PLATFORM_STAFF_BACKEND_PATH,
+        )
+        return client
+
+    @staticmethod
+    def _url(order) -> str:
+        return reverse(
+            "admin:order_order_cancel_mydata_invoice_now", args=[order.pk]
+        )
+
+    def test_a_get_shows_the_confirmation_and_queues_nothing(self, tenant):
+        from unittest.mock import patch
+
+        order = self._order()
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_invoice.delay") as cancel,
+        ):
+            response = self._client(tenant).get(self._url(order))
+
+        assert response.status_code == 200
+        assert "It cannot be undone" in response.content.decode()
+        cancel.assert_not_called()
+
+    def test_the_confirmed_post_queues_exactly_one_cancel(self, tenant):
+        from unittest.mock import patch
+
+        order = self._order()
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_invoice.delay") as cancel,
+        ):
+            response = self._client(tenant).post(self._url(order), CONFIRMED)
+
+        assert response.status_code == 200
+        assert response["HX-Redirect"] == reverse(
+            "admin:order_order_change", args=[order.pk]
+        )
+        cancel.assert_called_once_with(order.pk)
+
+    def test_a_post_without_the_csrf_token_is_refused(self, tenant):
+        from unittest.mock import patch
+
+        order = self._order()
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_invoice.delay") as cancel,
+        ):
+            response = self._client(tenant, csrf=True).post(
+                self._url(order), CONFIRMED
+            )
+
+        assert response.status_code == 403
+        cancel.assert_not_called()

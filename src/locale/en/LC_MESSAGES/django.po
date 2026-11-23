@@ -2793,6 +2793,12 @@ msgstr "Cancel the ACS voucher"
 msgid "Cancel the carrier shipment for an order"
 msgstr "Cancel the carrier shipment for an order"
 
+msgid "Cancel the credit document in myDATA"
+msgstr "Cancel the credit document in myDATA"
+
+msgid "Cancel the receipt in myDATA"
+msgstr "Cancel the receipt in myDATA"
+
 msgid "Canceled"
 msgstr "Canceled"
 
@@ -2816,6 +2822,12 @@ msgstr "Cancelled shipment reset — minting a fresh voucher."
 
 msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
 msgstr "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
+
+msgid "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
+msgstr "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
+
+msgid "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
+msgstr "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
 
 msgid "Candidate"
 msgstr "Candidate"

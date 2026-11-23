@@ -2799,6 +2799,12 @@ msgstr "Ακύρωση του voucher ACS"
 msgid "Cancel the carrier shipment for an order"
 msgstr "Ακύρωση της αποστολής μεταφορέα για παραγγελία"
 
+msgid "Cancel the credit document in myDATA"
+msgstr "Ακύρωση πιστωτικού παραστατικού στο myDATA"
+
+msgid "Cancel the receipt in myDATA"
+msgstr "Ακύρωση απόδειξης στο myDATA"
+
 msgid "Canceled"
 msgstr "Ακυρώθηκε"
 
@@ -2822,6 +2828,12 @@ msgstr "Η ακυρωμένη αποστολή επαναφέρθηκε — εκ
 
 msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
 msgstr "Ακυρώνει μόνο το voucher στην ACS· η παραγγελία μένει ως έχει. Χρησιμοποιήστε το όταν άλλαξαν τα στοιχεία του δέματος (π.χ. νέα διεύθυνση) και μετά πατήστε «Έκδοση voucher ACS τώρα» για νέο. Η ACS αρνείται voucher που βρίσκεται ήδη σε εκδοθείσα λίστα παραλαβής."
+
+msgid "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
+msgstr "Ακυρώνει αυτό το πιστωτικό παραστατικό στην ΑΑΔΕ. Δεν αναιρείται. Μόνο για παραστατικό που εκδόθηκε κατά λάθος και δεν έχει χρησιμοποιηθεί ποτέ."
+
+msgid "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
+msgstr "Ακυρώνει αυτή την απόδειξη στην ΑΑΔΕ. Δεν αναιρείται. Μόνο για απόδειξη που εκδόθηκε κατά λάθος και δεν έχει χρησιμοποιηθεί ποτέ: μια πώληση που δεν έγινε αναιρείται με πιστωτικό παραστατικό."
 
 msgid "Candidate"
 msgstr "Υποψήφιο"

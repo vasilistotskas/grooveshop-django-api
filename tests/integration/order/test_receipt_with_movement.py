@@ -3322,8 +3322,8 @@ def _out_of_sight(order) -> list[str]:
     return [note for note in _notes(order) if "cannot see receipt" in note]
 
 
-def _admin_request():
-    request = RequestFactory().post("/admin/order/order/")
+def _admin_request(data=None):
+    request = RequestFactory().post("/admin/order/order/", data)
     request.user = UserAccountFactory(is_staff=True, is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)
@@ -3437,7 +3437,9 @@ class TestAReceiptMyDataCannotSee:
             order, invoice = self._held(django_capture_on_commit_callbacks)
             with django_capture_on_commit_callbacks(execute=True):
                 OrderAdmin(Order, AdminSite()).cancel_mydata_invoice_now(
-                    _admin_request(), object_id=order.pk
+                    # The confirmation dialog's POST.
+                    _admin_request({"_form_submitted": "on"}),
+                    object_id=order.pk,
                 )
 
         invoice.refresh_from_db()

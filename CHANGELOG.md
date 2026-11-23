@@ -3,6 +3,63 @@
 
 
 
+## v3.268.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(admin): side-effect actions confirm first and act only on a POST (#824) ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* fix(admin): side-effect actions confirm first and act only on a POST
+
+Every list, row or detail admin action either confirms through an Unfold
+dialog before it acts, or is declared a read; any other answers 405 to a
+non-POST request. The receipt, credit-document, parcel, voucher, gift card,
+business profile, review, duplicate and acknowledge actions now confirm. ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* fix(giftcard): read Viva before locking the gift-card purchase, one finished-payment test for every path (#821) ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(giftcard): read Viva before locking the purchase row on webhook events ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(giftcard): refuse a purchase event whose state moved since the Viva read ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(order): treat a null StatusId of a payment event as no status in one place ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+### Refactoring
+
+* refactor(admin): give the tracking re-poll the signature of the other confirmed actions ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* refactor(shipping): the admin pages ask the carrier interface instead of branching per carrier (#822) ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+* refactor(shipping): ask the carrier registry for admin pages, state colours and waiting work
+
+The sidebar, the shipment-state display, the dashboard's attention counts
+and the dispatch-point alert named the ACS and BoxNow apps. They now read
+admin_pages, shipment_state_variants, attention_counts, attention_rows,
+app_label and attention_models from ShippingCarrierInterface, so a carrier
+adds its admin by implementing the interface in its own app.
+
+The dashboard clears its cached counts for the models each carrier lists as
+it registers. Five ignore_imports lines of the carrier-apps contract go. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+* refactor(shipping): let a carrier's admin pages declare their rank
+
+The sidebar lists the carriers' pages in the order the pages declare,
+so the Shipping, Pickup Points, Audit and Reconciliation menus keep the
+order they had. A test pins all four. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+### Testing
+
+* test(admin): assert the confirmed actions' redirect, walk every admin site
+
+The confirmed action tests now assert the HX-Redirect target, not just the
+status; the walker covers every registered admin site. The voucher download's
+docstring states that it also stamps the ACS label as printed. ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* test(shipping): pin that carrier writes clear the cached attention counts
+
+Through the real startup order, a write to an ACS or BoxNow model clears the
+dashboard's cached counts; it fails without the carrier_registered receiver. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
 ## v3.268.0 (2026-11-23)
 
 ### Bug fixes

@@ -333,8 +333,9 @@ class TestTheAcsPayoutLedgerIsThePlatforms:
     ):
         client = _signed_in(store_staff(store, role=role))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acscodpayout_run_reconciliation")
+        response = client.post(
+            reverse("admin:shipping_acs_acscodpayout_run_reconciliation"),
+            DIALOG,
         )
 
         assert response.status_code == 403
@@ -362,11 +363,12 @@ class TestTheAcsPayoutLedgerIsThePlatforms:
     ):
         client = _signed_in(UserAccountFactory(admin=True))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acscodpayout_run_reconciliation")
+        response = client.post(
+            reverse("admin:shipping_acs_acscodpayout_run_reconciliation"),
+            DIALOG,
         )
 
-        assert response.status_code == 302
+        assert response.status_code == 200
         assert acs_http.call_count == 1
 
     def test_a_platform_superuser_reconciles_a_payout(self, store):
@@ -393,11 +395,12 @@ class TestStoreStaffStillWorkTheirShipments:
     def test_staff_issue_the_pickup_list(self, store, acs_http):
         client = _signed_in(store_staff(store))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acsshipment_issue_pickup_list_now")
+        response = client.post(
+            reverse("admin:shipping_acs_acsshipment_issue_pickup_list_now"),
+            DIALOG,
         )
 
-        assert response.status_code == 302
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     @pytest.mark.parametrize(
         "name",

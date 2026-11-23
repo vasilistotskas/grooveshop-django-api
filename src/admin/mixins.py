@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import functools
+from typing import ClassVar
 
 from django.contrib.admin.options import ActionLocation
 from django.forms.models import _get_foreign_key
+from django.http import HttpResponseNotAllowed
 from django.utils.translation import gettext as _
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
@@ -16,6 +18,48 @@ from admin.features import (
     Placement,
     store_features,
 )
+
+
+class PostOnlyActionsModelAdmin(UnfoldModelAdmin):
+    """A list, row or detail action acts only on a POST, unless it reads.
+
+    Unfold serves each of those actions at a URL of its own and renders its
+    button as a link, so a plain GET of that URL would run the action's
+    body. An action with a ``dialog`` is safe: Unfold shows the form on a
+    GET and calls the body only with the form posted back. Any other
+    action answers 405 to a non-POST request, unless the admin names it in
+    ``read_actions``: a download or a redirect to a filtered list (the ACS
+    voucher download also stamps the label as printed, and stays a GET so
+    the browser can download the file).
+    ``tests/unit/admin/test_actions_confirm.py`` fails for an action that is
+    neither.
+    """
+
+    read_actions: ClassVar[frozenset[str]] = frozenset()
+
+    def get_unfold_action(self, action):
+        unfold_action = super().get_unfold_action(action)
+        routed = (
+            *self._extract_action_names(self.actions_list),
+            *self._extract_action_names(self.actions_row),
+            *self._extract_action_names(self.actions_detail),
+        )
+        if (
+            action not in routed
+            or action in self.read_actions
+            or unfold_action.dialog
+        ):
+            return unfold_action
+        method = unfold_action.method
+
+        @functools.wraps(method)
+        def post_only(request, *args, **kwargs):
+            if request.method != "POST":
+                return HttpResponseNotAllowed(["POST"])
+            return method(request, *args, **kwargs)
+
+        unfold_action.method = post_only
+        return unfold_action
 
 
 class ActionLocationModelAdmin(UnfoldModelAdmin):

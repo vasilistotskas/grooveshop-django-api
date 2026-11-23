@@ -1870,6 +1870,9 @@ msgstr "Έγκριση επιλεγμένων σχολίων"
 msgid "Approve selected reviews"
 msgstr "Έγκριση επιλεγμένων κριτικών"
 
+msgid "Approve the review"
+msgstr "Έγκριση της κριτικής"
+
 msgid "Approved"
 msgstr "Εγκεκριμένο"
 
@@ -1896,6 +1899,12 @@ msgstr "Ζητήστε νέο σύνδεσμο"
 
 msgid "Ask the store's owner to add you to the team, or sign in with another account."
 msgstr "Ζητήστε από τον ιδιοκτήτη του καταστήματος να σας προσθέσει στην ομάδα ή συνδεθείτε με άλλον λογαριασμό."
+
+msgid "Asks ACS for this parcel's latest tracking checkpoints now."
+msgstr "Ζητά τώρα από την ACS τα τελευταία σημεία παρακολούθησης αυτού του δέματος."
+
+msgid "Asks VIES again whether this business's VAT number is valid and records the answer."
+msgstr "Ρωτά ξανά το VIES αν το ΑΦΜ αυτής της επιχείρησης είναι έγκυρο και καταγράφει την απάντηση."
 
 msgid "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
 msgstr "Αναθέστε μια ομάδα παραλλαγών για να συνδέσετε αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ. άλλα χρώματα). Επισημάνετε τα σχετικά χαρακτηριστικά (Χρώμα, Μνήμη) ως άξονες παραλλαγής στα Χαρακτηριστικά ώστε να εμφανίζονται ως επιλογείς στο κατάστημα."
@@ -2797,6 +2806,9 @@ msgstr "Ακύρωση επιλεγμένων παραγγελιών και επ
 msgid "Cancel the ACS voucher"
 msgstr "Ακύρωση του voucher ACS"
 
+msgid "Cancel the BOX NOW parcel"
+msgstr "Ακύρωση του δέματος BOX NOW"
+
 msgid "Cancel the carrier shipment for an order"
 msgstr "Ακύρωση της αποστολής μεταφορέα για παραγγελία"
 
@@ -2832,6 +2844,9 @@ msgstr "Ακυρώνει μόνο το voucher στην ACS· η παραγγε�
 
 msgid "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
 msgstr "Ακυρώνει αυτό το πιστωτικό παραστατικό στην ΑΑΔΕ. Δεν αναιρείται. Μόνο για παραστατικό που εκδόθηκε κατά λάθος και δεν έχει χρησιμοποιηθεί ποτέ."
+
+msgid "Cancels this parcel at BOX NOW. Only a parcel that is still new can be cancelled."
+msgstr "Ακυρώνει αυτό το δέμα στο BOX NOW. Ακυρώνεται μόνο δέμα που είναι ακόμη νέο."
 
 msgid "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
 msgstr "Ακυρώνει αυτή την απόδειξη στην ΑΑΔΕ. Δεν αναιρείται. Μόνο για απόδειξη που εκδόθηκε κατά λάθος και δεν έχει χρησιμοποιηθεί ποτέ: μια πώληση που δεν έγινε αναιρείται με πιστωτικό παραστατικό."
@@ -3336,6 +3351,9 @@ msgstr "Αφαίρεση έκπτωσης από τα επιλεγμένα πρ�
 
 msgid "Clearance (>50%)"
 msgstr "Εκποίηση (>50%)"
+
+msgid "Clears the dashboard alerts for money refunded past the receipt and for goods the customer kept that the receipt lacks. It is recorded in the order's history with your name. Use it once you have settled the difference with your accountant."
+msgstr "Καθαρίζει τις ειδοποιήσεις του πίνακα ελέγχου για χρήματα που επιστράφηκαν πέρα από την απόδειξη και για αγαθά που κράτησε ο πελάτης και δεν υπάρχουν στην απόδειξη. Καταγράφεται στο ιστορικό της παραγγελίας με το όνομά σας. Χρησιμοποιήστε το αφού τακτοποιήσετε τη διαφορά με τον λογιστή σας."
 
 msgid "Click"
 msgstr "Κλικ"
@@ -3867,6 +3885,9 @@ msgstr "Δημιουργία καλαθιού"
 msgid "Create payment intent from cart"
 msgstr "Δημιουργία payment intent από καλάθι"
 
+msgid "Create the BOX NOW parcel"
+msgstr "Δημιουργία του δέματος BOX NOW"
+
 msgid "Created"
 msgstr "Δημιουργήθηκε"
 
@@ -3885,6 +3906,18 @@ msgstr "Δημιουργήθηκε στις"
 
 msgid "Created by (staff)"
 msgstr "Δημιουργήθηκε από (προσωπικό)"
+
+msgid "Creates a BOX NOW parcel for this shipment now. A cancelled parcel is reset and a new one is created."
+msgstr "Δημιουργεί τώρα ένα δέμα BOX NOW για αυτή την αποστολή. Ένα ακυρωμένο δέμα επαναφέρεται και δημιουργείται νέο."
+
+msgid "Creates an ACS voucher for this shipment now. A cancelled voucher is reset and a new one is issued."
+msgstr "Δημιουργεί τώρα ένα voucher ACS για αυτή την αποστολή. Ένα ακυρωμένο voucher επαναφέρεται και εκδίδεται νέο."
+
+msgid "Creates an inactive copy of this promotion, with its translations, products and categories, and opens it."
+msgstr "Δημιουργεί μια ανενεργή αντιγραφή αυτής της προσφοράς, με τις μεταφράσεις, τα προϊόντα και τις κατηγορίες της, και την ανοίγει."
+
+msgid "Creates an inactive draft copy of this product and opens it for editing."
+msgstr "Δημιουργεί ένα ανενεργό πρόχειρο αντίγραφο αυτού του προϊόντος και το ανοίγει για επεξεργασία."
 
 msgid "Creates unique random codes attached to this promotion."
 msgstr "Δημιουργεί μοναδικούς τυχαίους κωδικούς συνδεδεμένους με αυτή την προσφορά."
@@ -4405,6 +4438,9 @@ msgstr "Άμεσα εγκεκριμένα θυγατρικά σχόλια (απ�
 msgid "Disable card"
 msgstr "Απενεργοποίηση κάρτας"
 
+msgid "Disable the card"
+msgstr "Απενεργοποίηση της κάρτας"
+
 msgid "Disable the feature instead of enabling it"
 msgstr "Απενεργοποίηση της λειτουργίας αντί για ενεργοποίηση"
 
@@ -4603,6 +4639,9 @@ msgstr "Διπλότυπο συνημμένο."
 
 msgid "Duplicate category IDs are not allowed."
 msgstr "Δεν επιτρέπονται διπλότυπα ID κατηγοριών."
+
+msgid "Duplicate the promotion"
+msgstr "Αντιγραφή της προσφοράς"
 
 msgid "Duration (ms)"
 msgstr "Διάρκεια (ms)"
@@ -4807,6 +4846,9 @@ msgstr "Έληξε: η ACS απάντησε"
 
 msgid "Ends At"
 msgstr "Λήξη"
+
+msgid "Ends the customer's wholesale pricing until you approve the profile again."
+msgstr "Τερματίζει τις χονδρικές τιμές του πελάτη μέχρι να εγκρίνετε ξανά το προφίλ."
 
 msgid "Engagement"
 msgstr "Συμμετοχή"
@@ -5257,6 +5299,9 @@ msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Περάστ�
 
 msgid "Fees"
 msgstr "Χρεώσεις"
+
+msgid "Fetches every active locker from BOX NOW and updates the list: new ones are added and removed ones are deactivated."
+msgstr "Φέρνει όλα τα ενεργά lockers από το BOX NOW και ενημερώνει τη λίστα: τα νέα προστίθενται και όσα αφαιρέθηκαν απενεργοποιούνται."
 
 msgid "Fifth Floor"
 msgstr "5ος όροφος"
@@ -6631,6 +6676,9 @@ msgstr "Γενικά"
 msgid "Generate codes"
 msgstr "Δημιουργία κωδικών"
 
+msgid "Generates the order's retail receipt, registers it with AADE and emails it to the customer. Only for an order that has shipped and has no receipt yet."
+msgstr "Δημιουργεί την απόδειξη λιανικής της παραγγελίας, την καταχωρίζει στην ΑΑΔΕ και την στέλνει με email στον πελάτη. Μόνο για παραγγελία που έχει αποσταλεί και δεν έχει ακόμη απόδειξη."
+
 msgid "Generic Tag list/detail and the M2M-through TaggedItem cache. Tags are shared by Products and Blog posts so this surface lives outside both."
 msgstr "Λίστα/λεπτομέρειες γενικών ετικετών και η cache M2M-through TaggedItem. Οι ετικέτες μοιράζονται μεταξύ Προϊόντων και Άρθρων, γι' αυτό αυτή η περιοχή βρίσκεται εκτός και των δύο."
 
@@ -7340,6 +7388,9 @@ msgstr "Κρυφά από τους αναγνώστες μέχρι να εγκρ
 msgid "Hidden from shoppers until approved"
 msgstr "Κρυφές από τους πελάτες μέχρι να εγκριθούν"
 
+msgid "Hides the review from the product page."
+msgstr "Κρύβει την κριτική από τη σελίδα του προϊόντος."
+
 msgid "High"
 msgstr "Υψηλό"
 
@@ -7924,6 +7975,18 @@ msgstr "Ημερομηνία έκδοσης"
 msgid "Issue receipt (myDATA)"
 msgstr "Έκδοση απόδειξης (myDATA)"
 
+msgid "Issue the ACS pickup list"
+msgstr "Έκδοση της λίστας παραλαβής ACS"
+
+msgid "Issue the ACS voucher"
+msgstr "Έκδοση του voucher ACS"
+
+msgid "Issue the credit documents"
+msgstr "Έκδοση των πιστωτικών παραστατικών"
+
+msgid "Issue the receipt"
+msgstr "Έκδοση της απόδειξης"
+
 msgid "Issued To"
 msgstr "Εκδόθηκε σε"
 
@@ -7947,6 +8010,12 @@ msgstr "Εκδόθηκε από τη διαχείριση"
 
 msgid "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 msgstr "Όνομα εκδότη που εμφανίζεται στις εφαρμογές authenticator όταν ο χρήστης σαρώνει τον κωδικό QR του TOTP (π.χ. 'MyShop'). Αν μείνει κενό, χρησιμοποιείται το όνομα του καταστήματος."
+
+msgid "Issues the retail credit documents this order owes and sends to AADE any that it has not registered. Nothing is issued before the receipt is registered."
+msgstr "Εκδίδει τα πιστωτικά παραστατικά λιανικής που οφείλει η παραγγελία και στέλνει στην ΑΑΔΕ όσα δεν έχει καταχωρίσει. Τίποτα δεν εκδίδεται πριν η απόδειξη καταχωριστεί."
+
+msgid "Issues today's ACS pickup list now, without waiting for the daily run. ACS refuses it while a voucher on it is unprinted."
+msgstr "Εκδίδει τώρα τη σημερινή λίστα παραλαβής ACS, χωρίς να περιμένει την ημερήσια εκτέλεση. Η ACS την αρνείται όσο ένα voucher της δεν έχει εκτυπωθεί."
 
 msgid "Issuing receipts through myDATA"
 msgstr "Έκδοση αποδείξεων μέσω myDATA"
@@ -8697,6 +8766,9 @@ msgstr "Κύριος διακόπτης — όταν είναι False, ο πάρ
 
 msgid "Matched by"
 msgstr "Αντιστοίχιση μέσω"
+
+msgid "Matches ACS's cash-on-delivery payouts with the orders now, without waiting for the scheduled run."
+msgstr "Αντιστοιχίζει τώρα τις αποδόσεις αντικαταβολής της ACS με τις παραγγελίες, χωρίς να περιμένει την προγραμματισμένη εκτέλεση."
 
 msgid "Matches no shipment, not reconciled"
 msgstr "Δεν αντιστοιχεί σε αποστολή και δεν έχει συμφωνηθεί"
@@ -11642,6 +11714,9 @@ msgstr "Δημοσιεύθηκε από (προσωπικό)"
 msgid "Published revision"
 msgstr "Δημοσιευμένη αναθεώρηση"
 
+msgid "Publishes the review on the product page."
+msgstr "Δημοσιεύει την κριτική στη σελίδα του προϊόντος."
+
 msgid "Publishing"
 msgstr "Δημοσίευση"
 
@@ -12192,6 +12267,9 @@ msgstr "Αρ. Γ.Ε.ΜΗ."
 msgid "Regenerate receipt (same number)"
 msgstr "Αναδημιουργία απόδειξης (ίδιος αριθμός)"
 
+msgid "Regenerate the receipt"
+msgstr "Νέα δημιουργία της απόδειξης"
+
 msgid "Region"
 msgstr "Περιοχή"
 
@@ -12238,6 +12316,9 @@ msgstr "Απόρριψη εταιρικού προφίλ"
 
 msgid "Reject selected reviews"
 msgstr "Απόρριψη επιλεγμένων κριτικών"
+
+msgid "Reject the review"
+msgstr "Απόρριψη της κριτικής"
 
 msgid "Rejected"
 msgstr "Απορρίφθηκε"
@@ -12319,6 +12400,9 @@ msgstr "Δημιουργήθηκε"
 msgid "Rendered as the storefront's author/creator/publisher meta tags. Empty → the tags are not emitted."
 msgstr "Εμφανίζεται στα meta tags author/creator/publisher του storefront. Κενό → τα tags δεν προστίθενται."
 
+msgid "Renders the receipt PDF again under the same number and date. Use it to fix a damaged PDF or to apply an updated seller address or VAT number."
+msgstr "Δημιουργεί ξανά το PDF της απόδειξης με τον ίδιο αριθμό και ημερομηνία. Χρησιμοποιήστε το για να διορθώσετε ένα κατεστραμμένο PDF ή για να εφαρμόσετε νέα διεύθυνση ή ΑΦΜ του πωλητή."
+
 msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
 msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ανοιχτό στον ιδιοκτήτη της παραγγελίας, στο προσωπικό του καταστήματος και στον επισκέπτη που έχει το UUID της παραγγελίας (``?uuid=``)."
 
@@ -12390,6 +12474,9 @@ msgstr "Επαναποστολή επιβεβαίωσης"
 
 msgid "Resend delivery email"
 msgstr "Επαναποστολή email παράδοσης"
+
+msgid "Resend the delivery email"
+msgstr "Επαναποστολή του email παράδοσης"
 
 msgid "Resend webhook signing secret"
 msgstr "Μυστικό υπογραφής webhook του Resend"
@@ -12737,6 +12824,9 @@ msgstr "Αποτύπωμα γραμμής"
 
 msgid "Run"
 msgstr "Εκτελέστε"
+
+msgid "Run COD reconciliation"
+msgstr "Εκτέλεση συμφωνίας αντικαταβολής"
 
 msgid "Run COD reconciliation now"
 msgstr "Εκτέλεση συμφωνίας αντικαταβολής τώρα"
@@ -13139,11 +13229,17 @@ msgstr "Η αποστολή δοκιμής γίνεται μόνο στη διε
 msgid "Send the link"
 msgstr "Αποστολή συνδέσμου"
 
+msgid "Send the receipt to myDATA"
+msgstr "Αποστολή της απόδειξης στο myDATA"
+
 msgid "Send the revision you are changing in If-Match."
 msgstr "Στείλε στο If-Match την αναθεώρηση που αλλάζεις."
 
 msgid "Sender Name"
 msgstr "Όνομα αποστολέα"
+
+msgid "Sends the gift card's delivery email to its recipient again."
+msgstr "Στέλνει ξανά στον παραλήπτη το email παράδοσης της δωροκάρτας."
 
 msgid "Sent"
 msgstr "Απεστάλη"
@@ -14176,6 +14272,9 @@ msgstr "Υποβολή ή ενημέρωση του εταιρικού μου π
 msgid "Submit storefront feedback (rating, category, message)."
 msgstr "Υποβολή feedback για το κατάστημα (βαθμολογία, κατηγορία, μήνυμα)."
 
+msgid "Submits this order's receipt to AADE now. Its status and MARK appear on the receipt once AADE answers."
+msgstr "Υποβάλλει τώρα την απόδειξη αυτής της παραγγελίας στην ΑΑΔΕ. Η κατάσταση και το MARK εμφανίζονται στην απόδειξη μόλις απαντήσει η ΑΑΔΕ."
+
 msgid "Submitted"
 msgstr "Υποβλήθηκε"
 
@@ -14307,6 +14406,9 @@ msgstr "Αναστολή"
 msgid "Suspend selected tenants"
 msgstr "Αναστολή επιλεγμένων καταστημάτων"
 
+msgid "Suspend the business profile"
+msgstr "Αναστολή του επαγγελματικού προφίλ"
+
 msgid "Suspended"
 msgstr "Σε αναστολή"
 
@@ -14352,6 +14454,9 @@ msgstr "Απενεργοποιημένο"
 
 msgid "Switched on at"
 msgstr "Ενεργοποιήθηκε στις"
+
+msgid "Sync lockers from BOX NOW"
+msgstr "Συγχρονισμός lockers από το BOX NOW"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Συγχρονισμός lockers από BoxNow API"
@@ -14718,6 +14823,9 @@ msgstr "Ο τύπος και ο υποτύπος της αποτυχίας πα�
 
 msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
 msgstr "Ο αγοραστής αποδέχεται τους όρους χρήσης και την πολιτική απορρήτου του καταστήματος. Πρέπει να είναι true."
+
+msgid "The card can no longer be used to pay. Its balance is kept."
+msgstr "Η κάρτα δεν μπορεί πια να χρησιμοποιηθεί για πληρωμή. Το υπόλοιπό της διατηρείται."
 
 msgid "The carrier rejected the cancellation."
 msgstr "Ο μεταφορέας απέρριψε την ακύρωση."
@@ -19535,9 +19643,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Refund order"
 #~ msgstr "Επιστροφή χρημάτων παραγγελίας"
-
-#~ msgid "Refunded beyond the receipt"
-#~ msgstr "Επιστροφή πέρα από την απόδειξη"
 
 #~ msgid "Reminder Count"
 #~ msgstr "Πλήθος υπενθυμίσεων"

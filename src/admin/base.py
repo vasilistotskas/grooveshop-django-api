@@ -40,6 +40,7 @@ from admin.filters import RelatedDropdownFilter
 from admin.mixins import (
     ActionLocationModelAdmin,
     FeatureGatedModelAdmin,
+    PostOnlyActionsModelAdmin,
     WithheldOnTenantHostModelAdmin,
 )
 from core.json_schema import schema_validator
@@ -69,6 +70,7 @@ def unfold_filter_for(field: models.Field) -> type:
 
 
 class BaseModelAdmin(
+    PostOnlyActionsModelAdmin,
     ActionLocationModelAdmin,
     FeatureGatedModelAdmin,
     WithheldOnTenantHostModelAdmin,

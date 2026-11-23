@@ -398,7 +398,7 @@ class TestWhileHeldNothingIsSent:
         ):
             response = admin.issue_voucher_now(request, waiting.pk)
 
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
         assert "held" in str(warned.call_args.args[1])
         informed.assert_not_called()
         waiting.refresh_from_db()

@@ -72,7 +72,7 @@ class TestIssuePickupListNowAction:
         assert "3" in text
         # A view MUST return a response — the neighbouring row actions
         # return None, which Django rejects outright.
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     def test_says_so_when_nothing_is_waiting(self, admin_and_request):
         admin, request = admin_and_request
@@ -80,7 +80,7 @@ class TestIssuePickupListNowAction:
         response, _, mock_message = _issue(admin, request, return_value=None)
 
         assert "No vouchers" in str(mock_message.call_args[0][1])
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     def test_surfaces_acs_own_refusal_text(self, admin_and_request):
         admin, request = admin_and_request
@@ -94,7 +94,7 @@ class TestIssuePickupListNowAction:
 
         # ACS names what has to be printed; paraphrasing loses that.
         assert "ατύπωτες" in str(mock_message.call_args[0][1])
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     def test_a_refusal_never_escapes_as_a_500(self, admin_and_request):
         admin, request = admin_and_request
@@ -104,4 +104,4 @@ class TestIssuePickupListNowAction:
             admin, request, side_effect=AcsError("ACS unreachable")
         )
 
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")

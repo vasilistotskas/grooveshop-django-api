@@ -400,7 +400,7 @@ class TestStoreStaffStillWorkTheirShipments:
             DIALOG,
         )
 
-        assert response.status_code == 200
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     @pytest.mark.parametrize(
         "name",

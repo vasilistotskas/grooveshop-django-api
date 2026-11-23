@@ -28,9 +28,11 @@ class PostOnlyActionsModelAdmin(UnfoldModelAdmin):
     body. An action with a ``dialog`` is safe: Unfold shows the form on a
     GET and calls the body only with the form posted back. Any other
     action answers 405 to a non-POST request, unless the admin names it in
-    ``read_actions``: an action that only reads (a download, a redirect to
-    a filtered list). ``tests/unit/admin/test_actions_confirm.py`` fails
-    for an action that is neither.
+    ``read_actions``: a download or a redirect to a filtered list (the ACS
+    voucher download also stamps the label as printed, and stays a GET so
+    the browser can download the file).
+    ``tests/unit/admin/test_actions_confirm.py`` fails for an action that is
+    neither.
     """
 
     read_actions: ClassVar[frozenset[str]] = frozenset()

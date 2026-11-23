@@ -1318,7 +1318,11 @@ TIMOLOGIO_FIELDS = (
 
 @admin.register(Order)
 class OrderAdmin(BaseModelAdmin):
-    # Actions that only read: a GET may run them.
+    # Actions a GET may run: downloads and a redirect. The voucher
+    # download is not a pure read for ACS: on a cache miss
+    # ``AcsService.fetch_label_bytes`` asks ACS to print the voucher and
+    # stamps ``label_printed_at``. It stays a GET so the browser can
+    # download the file.
     read_actions = frozenset(
         {"download_shipping_voucher", "view_customer_orders_row"}
     )

@@ -7,14 +7,15 @@ form posted back; an action that only reads is named in its admin's
 ``read_actions``. Every other action answers 405 to a non-POST request
 (``admin.mixins.PostOnlyActionsModelAdmin``).
 
-The walk covers the store admin site and the platform's, and the actions a
-class only inherits.
+The walk covers every registered admin site (``all_sites``) and the actions
+a class only inherits.
 """
 
 from __future__ import annotations
 
 import pytest
 from django.contrib import admin as django_admin
+from django.contrib.admin.sites import all_sites
 from django.http import HttpResponseNotAllowed
 from django.test import RequestFactory
 
@@ -33,7 +34,7 @@ def _flat(items):
 
 def _routed_actions():
     seen = set()
-    for site in (django_admin.site, platform_admin_site):
+    for site in all_sites:
         for model_admin in site._registry.values():
             for slot in SLOTS:
                 for name in _flat(getattr(model_admin, slot, ())):
@@ -48,7 +49,8 @@ ROUTED = list(_routed_actions())
 IDS = [f"{type(ma).__name__}.{name}" for ma, name in ROUTED]
 
 
-def test_the_walk_sees_the_actions():
+def test_the_walk_sees_both_sites_and_their_actions():
+    assert {django_admin.site, platform_admin_site} <= set(all_sites)
     names = {f"{type(ma).__name__}.{name}" for ma, name in ROUTED}
     assert "OrderAdmin.cancel_mydata_invoice_now" in names
     assert "BoxNowShipmentAdmin.create_parcel_action" in names
@@ -66,7 +68,7 @@ def test_an_action_confirms_or_only_reads(model_admin, name):
 
 
 def test_read_actions_name_real_actions():
-    for site in (django_admin.site, platform_admin_site):
+    for site in all_sites:
         for model_admin in site._registry.values():
             routed = {
                 name

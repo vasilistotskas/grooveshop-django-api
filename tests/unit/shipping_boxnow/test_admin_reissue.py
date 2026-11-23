@@ -130,7 +130,9 @@ def test_a_broker_failure_after_the_reset_keeps_the_request():
         response, _messages = _press(shipment)
 
     task.assert_called_once()
-    assert response.status_code == 200
+    assert response["HX-Redirect"].endswith(
+        f"/shipping_boxnow/boxnowshipment/{shipment.pk}/change/"
+    )
     shipment.refresh_from_db()
     assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
     row = DeferredDispatch.objects.get()

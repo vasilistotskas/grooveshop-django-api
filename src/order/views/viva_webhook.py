@@ -874,8 +874,9 @@ def _process_gift_card_purchase_event(
 
             outcome = VivaWebhookEvent.OUTCOME_PROCESSED
             if event_type_id == 1796:
-                status_id = event_data.get("StatusId", "")
-                if status_id and status_id != "F":
+                if not viva_settlement.event_reports_finished_payment(
+                    event_data
+                ):
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
                 elif not transaction_id:
                     logger.error(
@@ -1019,7 +1020,7 @@ def _gift_card_event_needs_viva(
     from giftcard.enum import GiftCardPurchaseStatus
 
     if event_type_id == 1796:
-        return event_data.get("StatusId", "") in {"", "F"}
+        return viva_settlement.event_reports_finished_payment(event_data)
     if event_type_id == 1798:
         return purchase.status == GiftCardPurchaseStatus.PENDING
     return event_type_id == 1797

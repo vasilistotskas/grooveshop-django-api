@@ -472,6 +472,43 @@ class TestCompletionIsBoundToThePurchase:
 
 
 class TestVivaIsReadBeforeThePurchaseIsLocked:
+    def test_a_null_status_completes_the_purchase_read_before_the_lock(self):
+        """A 1796 whose ``StatusId`` is JSON ``null`` is a finished payment
+        as an absent status is: read before the lock, judged under it."""
+        purchase = _viva_purchase()
+        viva = FakeVivaApi(
+            retrieve=(
+                200,
+                retrieve_transaction(orderCode=int(ORDER_CODE), amount=40.0),
+            )
+        )
+        sent_at_lock: list[int] = []
+        lock = GiftCardPurchase.objects.select_for_update
+
+        def _lock(*args, **kwargs):
+            sent_at_lock.append(len(viva.sent))
+            return lock(*args, **kwargs)
+
+        with (
+            viva,
+            patch.object(GiftCardPurchase.objects, "select_for_update", _lock),
+        ):
+            response = _process_gift_card_purchase_event(
+                purchase=purchase,
+                event_type_id=1796,
+                event_data={"StatusId": None},
+                transaction_id="txn-null",
+                txn_hash="deadbeef",
+                order_code=purchase.payment_id,
+            )
+
+        purchase.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert sent_at_lock
+        assert sent_at_lock[0] > 0
+        assert len(viva.sent) == sent_at_lock[0]
+
     @pytest.mark.parametrize("event_type_id", [1796, 1797, 1798])
     def test_every_request_is_sent_before_the_purchase_row_is_locked(
         self, event_type_id

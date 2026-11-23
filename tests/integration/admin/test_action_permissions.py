@@ -71,15 +71,6 @@ pytestmark = pytest.mark.django_db
 
 MODEL_PERMISSIONS = frozenset({"view", "add", "change", "delete"})
 
-# Declared, and offered to nobody: the permission it would need is one
-# its admin refuses to everyone. Each names the issue that decides it.
-OFFERED_TO_NOBODY = {
-    # The ledger is read-only (``has_change_permission`` is False), so
-    # since the September default of ``change`` nobody has been offered
-    # "Cancel in myDATA": #653.
-    "RetailCreditAdmin.cancel_in_mydata",
-}
-
 
 def _signed_in(user) -> Client:
     client = Client()
@@ -228,9 +219,7 @@ class TestEveryAction:
         model_admin, name, _method = BULK_ACTIONS[label]
         request = _request(UserAccountFactory(admin=True))
 
-        offered = name in model_admin.get_actions(request)
-
-        assert offered is (label not in OFFERED_TO_NOBODY)
+        assert name in model_admin.get_actions(request)
 
     @pytest.mark.parametrize(
         "label",

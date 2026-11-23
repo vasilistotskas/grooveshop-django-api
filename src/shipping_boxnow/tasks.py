@@ -11,7 +11,10 @@ from django.utils import timezone
 from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
 from order.storefront_links import account_order_path
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowAuthError,
@@ -128,6 +131,16 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             extra={"order_id": order_id},
         )
         return {"status": "awaiting_payment", "order_id": order_id}
+    except ShipmentNotNeededError as exc:
+        # Not a failure: the order's payment all went back while the
+        # creation waited. Nothing is to ship: no retry, no alert.
+        logger.warning(
+            "BoxNow shipment not created for order %s: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {"status": "not_needed", "order_id": order_id}
     except BoxNowConfigError as exc:
         # The tenant has no BoxNow credentials. BoxNowConfigError is a
         # SIBLING of BoxNowAPIError, not a subclass, so it matched
@@ -340,7 +353,7 @@ def apply_boxnow_locker_catalogue(
 
     from shipping_boxnow.catalogue import apply_catalogues
 
-    return apply_catalogues(catalogue)
+    return apply_catalogues(catalogue, keep=True)
 
 
 @shared_task(

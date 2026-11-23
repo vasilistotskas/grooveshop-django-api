@@ -993,12 +993,23 @@ class AcsShipmentAdmin(BaseModelAdmin):
             messages.error(request, _("Shipment not found."))
             return _back_to_changelist(self)
 
-        # The mint itself refuses an unpaid online order
-        # (``ShipmentAwaitingPaymentError`` in
-        # ``AcsService.create_voucher_for_order``), but it runs in a
+        # The mint itself refuses an order that ships nothing
+        # (``ShipmentNotNeededError``) and an unpaid online order
+        # (``ShipmentAwaitingPaymentError``) in
+        # ``AcsService.create_voucher_for_order``, but it runs in a
         # Celery task, so its refusal never reaches this page. Say so
         # here, before resetting anything, instead of reporting a
         # dispatch that is bound to be refused.
+        if shipment.order.ships_nothing:
+            messages.error(
+                request,
+                _(
+                    "Order #%(order)s is canceled or its payment was refunded "
+                    "in full — a voucher would ship an order nobody pays for."
+                )
+                % {"order": shipment.order_id},
+            )
+            return _back_to_changelist(self)
         if shipment.order.awaits_online_payment:
             messages.error(
                 request,

@@ -3,6 +3,153 @@
 
 
 
+## v3.267.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): an online order paid and then partly refunded gets its courier voucher (#798) ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): an online order paid and then partly refunded gets its courier voucher
+
+Order.awaits_online_payment was 'not is_paid' behind an online pay way,
+so it held for every settled payment status but COMPLETED. A card order
+partly refunded before its voucher existed was refused by both carriers'
+mint as unpaid (ShipmentAwaitingPaymentError, no retry), the admin's
+'Issue ACS voucher now' and 'Create BoxNow parcel now' said it had not
+been paid, and the stale-shipment digest kept listing it as stranded with
+that same button as the remedy. Its receipt with movement waited for the
+same reason.
+
+The property is now the one-row form of awaiting_online_payment_q: an
+online pay way whose payment is not in SETTLED_PAYMENT_STATUSES. At order
+creation, where the cart readers ask, a payment is only PENDING or
+COMPLETED, so they answer as before; the payment hold's restatement of
+the settled check goes. A test holds the property to the queryset rule for
+every payment status, and both carriers mint for a partly refunded order.
+
+Closes #649 ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): no courier shipment for an order that ships nothing
+
+Review of the voucher fix: awaits_online_payment had also, by accident,
+refused a voucher for a canceled online order and for one refunded in
+full while still PROCESSING (a full refund does not move the order).
+Read as the settled statuses, it let both through, and ACS had nothing
+else refusing a canceled order: a retry that waited out a cancel in its
+backoff, or 'Issue ACS voucher now' on a retired shipment, minted a
+prepaid voucher for an order nobody pays for.
+
+Order.ships_nothing (and ships_nothing_q) is the one rule: CANCELED or
+REFUNDED as an order, or paid online and the store keeps nothing of the
+payment (PAYMENT_STATUSES_KEEPING_NOTHING). shipping_acs's
+needs_no_voucher reads it instead of its own order-status set. Both mint
+choke points raise ShipmentNotNeededError for it under the shipment lock
+(ACS also for a retired shipment; BOX NOW still finishes a canceled
+order's cancel first), the tasks report not_needed with no retry and no
+alert, and both admin buttons refuse with a message, the BOX NOW one for
+a first parcel as much as a reissue.
+
+The courier test helpers default to a PROCESSING order: the factory's
+random status was CANCELED or REFUNDED often enough to make a mint test
+refused at random. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): an order that ships nothing gets no receipt, and BOX NOW cancels a parcel it may hold for one
+
+receipt_issuable's pre-shipment branch refuses an order that ships nothing (a full refund leaves it PROCESSING with a voucher that is not to leave). The BOX NOW sweep of uncertain creations and the persist of a parcel created in flight treat such an order like a canceled one: the parcel is cancelled at BoxNow and the shipment recorded CANCELED. ACS builds its client only for an order it sends, so one that ships nothing is refused as not needed on a store without ACS credentials. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(shipping): tell staff when a refund in full cancels a BOX NOW shipment, and name why in its notes
+
+A refund that fails or is reversed makes the order payable again, and nothing but staff create its parcel then: the cancel leaves a note saying so. A refund reversed before the sweep's cancel leaves the shipment to the next run. The cancel-refused note, the log line and the recorded reason say refunded in full for such an order instead of canceled. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+### Code style
+
+* style(order): drop an import the merge left unused ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+## v3.267.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(shipping): name a BOX NOW locker of unknown sizes as such, and size the lockers a sync creates from the store's last catalogue
+
+A live store refused a locker the catalogue had not sized yet as too small: the daily sync, the admin button and the resync an order runs create lockers with no sizes until the next hourly run. Each store now keeps the catalogue it applied (BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS) and a sync that creates lockers applies it again at once. A locker still unknown is refused as pickup_point_size_unknown, with its own message; one without the cart's size stays pickup_point_too_small. Both come from shipping.interfaces.PickupPointUnfit and its code. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* fix(shipping): keep only the BOX NOW catalogue countries a store accepted, and size reactivated lockers too
+
+A refused (truncated) country no longer replaces the store's kept copy of it, and every successful partner sync applies the kept copy, so a locker it reactivates is sized as one it creates. The locker's compartmentSizes description says the refusal of unknown sizes is the live network's. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+### Features
+
+* feat(shipping): filter BOX NOW lockers by compartment size and refuse a locker that cannot take the order (#817) ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* feat(shipping): filter BOX NOW lockers by compartment size and refuse a locker too small for the order
+
+Sizes exist only for BOX NOW's live network: the catalogue sync, the compartmentSize filter, the quote's size and the order refusal apply to a store whose BOX NOW is live, and a stage store's lockers are reset to unknown.
+
+Work in progress: the tests do not yet bind a live store, the locale entries and schema.yml additions are still to be regenerated. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+* feat(shipping): bind BOX NOW's live network in the size tests and cover a stage store
+
+A stage store takes no size from a colliding catalogue id and is reset to unknown, ignores the compartmentSize filter, names no size on the quote and checks none at order creation. The filter value is typed as an integer in the schema. ([`99723b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99723b7f89cce5239ff8db8a29da2ca2a5d341a9))
+
+## v3.266.2 (2026-11-23)
+
+### Bug fixes
+
+* fix(admin): keep action_location through Unfold's and dj-stripe's admin actions (#763) ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): keep action_location through Unfold's action choices
+
+Unfold's get_action_choices drops Django 6's action_location parameter,
+raising RemovedInDjango2028Warning on every changelist. A mixin ahead of
+Unfold's ModelAdmin restores it for BaseModelAdmin and the re-registered
+third-party admins. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): type the action-location mixin and translate its blank choice ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(order): tell the payment-failed email the order page takes the payment
+
+The email says the shopper can complete the payment from the order page
+until the payment hold expires, or without a deadline when none is set.
+
+* revert(email): leave the payment-failed email to the change that removes it
+
+The payment-failed email is removed with card orders confirmed on
+payment; this branch keeps only the Unfold action_location fix. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): take action_location in dj-stripe's admins
+
+dj-stripe overrides get_actions with Django 5's signature, which Django 6 reported on every dj-stripe changelist. StripeMirrorModelAdmin, which precedes those admins, accepts action_location and gives the change form no actions, as Django does for an old-signature override. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+* fix(admin): run a dj-stripe action refused by its form without indexing the action tuple
+
+dj-stripe's confirm view runs the action again on an invalid form with get_action(name)[0], which Django 6 reports as deprecated; the project's subclass calls the action's func. The tests check every admin of both sites through Django's own wrappers, and each dj-stripe admin's own set of actions. ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+### Testing
+
+* test(admin): type the action choices test helper ([`6482704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6482704a8a06f9a50df5d3407d0a7a9284f8b274))
+
+## v3.266.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(product): a product description is NOT NULL (release 2 of 2) (#805) ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): a product description is NOT NULL (release 2 of 2)
+
+0074 made "" the description's empty value and backfilled; the release
+that shipped it writes "" everywhere. This backfills what the release
+before it wrote during that rollout and adds the NOT NULL constraint the
+state already declares, as a contract of 0074. The backfill's test goes
+with the NULLs it seeded; a test pins the constraint.
+
+Refs #684 ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+* fix(product): number the description NOT NULL contract after the image dimensions migration ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
+### Testing
+
+* test(product): run the description contract's backfill and its reverse ([`fa9fcc5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa9fcc5dad7a0ea7aac72df8f5a5fd38c9a221b5))
+
 ## v3.266.0 (2026-11-23)
 
 ### Bug fixes

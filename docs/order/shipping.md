@@ -18,13 +18,33 @@ Rules both carriers share:
   `BoxNowService.create_shipment_for_order`) raise
   `shipping.exceptions.ShipmentAwaitingPaymentError` while
   `Order.awaits_online_payment` holds — checked on the order row loaded
-  under the shipment lock. An online-paid voucher carries no COD amount,
+  under the shipment lock. That is an online pay way whose payment is not
+  settled (`SETTLED_PAYMENT_STATUSES`): an order paid and then partly
+  refunded still gets its voucher (#649). An online-paid voucher carries no COD amount,
   so a voucher minted for an unpaid card order would hand the goods over
   for free (prod order 304 was one admin click away, 2026-09-24). The
   tasks return `{"status": "awaiting_payment"}` with no retry and no
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **No shipment for an order that ships nothing.** `Order.ships_nothing`
+  (`order.managers.order.ships_nothing_q`): the order is CANCELED or
+  REFUNDED, or it was paid online and the store keeps nothing of the
+  payment (`PAYMENT_STATUSES_KEEPING_NOTHING`: a full refund leaves the
+  order PROCESSING). Both mint choke points raise
+  `shipping.exceptions.ShipmentNotNeededError` for it (ACS also for a
+  shipment it retired, `shipping_acs.attention.needs_no_voucher`; BOX NOW
+  first finishes a canceled order's cancel), the tasks return
+  `{"status": "not_needed"}` with no retry and no alert, and both admin
+  buttons refuse with a message. A retry that waited out a cancel in its
+  backoff therefore mints nothing. ACS asks for the store's credentials
+  only after that refusal, so an unconfigured store still answers
+  `not_needed`. Where BOX NOW may already hold a parcel (a creation of
+  uncertain outcome settled by the sweep, or one whose answer arrives
+  after the order stopped shipping), the parcel is cancelled at BoxNow and
+  the shipment recorded CANCELED, as for a canceled order
+  ([BOX NOW](shipping-boxnow.md)). No receipt with movement indication is
+  issued for such an order (`receipt_issuable`).
 - **The receipt follows the voucher, never the other way round.** Every
   path that makes a voucher or parcel live records it with
   `Order.add_tracking_info`, and recording it issues the receipt with

@@ -32,7 +32,10 @@ from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping.locks import lock_with_order
 from shipping.services import DELIVERY_NOTES_MAX_LEN, CourierNotes
 from shipping_acs import voucher_hold
@@ -514,7 +517,6 @@ class AcsService:
         outcome does to the hold is the table in
         ``shipping_acs.voucher_hold``.
         """
-        client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
         with transaction.atomic():
             try:
@@ -536,6 +538,16 @@ class AcsService:
                 )
                 return shipment
 
+            # Never mint for an order that ships nothing: canceled, refunded,
+            # or its payment all went back (a full refund leaves the order
+            # PROCESSING), or a shipment ACS retired. The voucher would
+            # hand over goods nobody pays for, and only this lock sees a
+            # cancel that landed during a retry's backoff. Like an unpaid
+            # order below, it no longer waits for ACS either.
+            from shipping_acs.attention import needs_no_voucher
+
+            ships_nothing = needs_no_voucher(shipment)
+
             # Never mint for an order the shopper still owes online: the
             # voucher would carry Cod_Ammount 0 and hand the parcel over
             # for free. ``shipment.order`` was loaded under this lock, so
@@ -547,12 +559,21 @@ class AcsService:
             # like any other while a hold is in force. Left stamped, the
             # sweep would send it tick after tick to be refused here.
             awaits_payment = shipment.order.awaits_online_payment
-            if awaits_payment:
+            if ships_nothing or awaits_payment:
                 stale_claim, hold = "", None
                 cls._voucher_request_no_longer_held(
-                    shipment, "Held voucher request: order awaits payment"
+                    shipment,
+                    "Held voucher request: order ships nothing"
+                    if ships_nothing
+                    else "Held voucher request: order awaits payment",
                 )
             else:
+                # Only an order that is sent needs the store's ACS
+                # credentials (``AcsConfigError``): one that ships nothing
+                # or awaits payment is refused above whatever they are.
+                # Nothing is written before this, so a failure leaves no
+                # claim.
+                client = AcsClient()
                 # A voucher request whose answer was lost: ACS may hold a
                 # voucher for this order, and ``ACS_Create_Voucher`` has no
                 # idempotency key, so nothing sends another one until staff
@@ -603,6 +624,8 @@ class AcsService:
                     else:
                         cls._mark_voucher_request_held(shipment)
 
+        if ships_nothing:
+            raise ShipmentNotNeededError(order.id)
         if awaits_payment:
             raise ShipmentAwaitingPaymentError(order.id)
         if stale_claim:

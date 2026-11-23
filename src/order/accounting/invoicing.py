@@ -105,9 +105,11 @@ def receipt_issuable(order: Order) -> bool:
     receipt order (an invoice order never gets one) whose goods have
     shipped, or whose parcel waits for its carrier: a courier or locker
     sale's receipt is issued with movement indication before the movement
-    starts (``order.accounting.movement``), once nothing is owed online,
-    the store has set its dispatch point (``movement_receipts_on``) and the
-    carrier has accepted the parcel
+    starts (``order.accounting.movement``), once nothing is owed online and
+    the order still ships (``Order.ships_nothing``: a full refund leaves it
+    PROCESSING with a voucher that is not to leave), the store has set its
+    dispatch point (``movement_receipts_on``) and the carrier has accepted
+    the parcel
     (``ShippingService.carrier_holds_the_parcel``: ACS's voucher, BOX NOW's
     parcel). Neither a shipment row (ACS's is written at checkout, before
     the voucher is asked for) nor a tracking number typed on the order is
@@ -119,6 +121,7 @@ def receipt_issuable(order: Order) -> bool:
     return (
         order.status in PRE_SHIPMENT_STATUSES
         and not order.awaits_online_payment
+        and not order.ships_nothing
         and movement_receipts_on(order)
         and ShippingService.carrier_holds_the_parcel(order)
     )

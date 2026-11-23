@@ -9701,6 +9701,9 @@ msgstr "Μόνο για προϊόντα που μπορούν να πουληθ
 msgid "Only images of this store can be imported, not other sites."
 msgstr "Εισάγονται μόνο εικόνες αυτού του καταστήματος, όχι άλλων ιστότοπων."
 
+msgid "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches. Ignored on a store that is not on BOX NOW's live network, where no locker has a size."
+msgstr "Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2 μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ. Αγνοείται σε κατάστημα που δεν είναι στο live δίκτυο της BOX NOW, όπου κανένα locker δεν έχει μέγεθος."
+
 msgid "Only one active newsletter topic can be the default."
 msgstr "Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
 
@@ -9860,8 +9863,12 @@ msgid "Order #%(order)s has not been paid yet — the voucher is issued automati
 msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακόμη — το voucher εκδίδεται αυτόματα μόλις επιβεβαιωθεί η online πληρωμή."
 
 #, python-format
-msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
-msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη — ένα νέο δέμα θα έστελνε παραγγελία που κανείς δεν θέλει."
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a parcel would ship an order nobody pays for."
+msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη ή η πληρωμή της επιστράφηκε ολόκληρη — ένα δέμα θα έστελνε παραγγελία που δεν πληρώνει κανείς."
+
+#, python-format
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a voucher would ship an order nobody pays for."
+msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη ή η πληρωμή της επιστράφηκε ολόκληρη — ένα voucher θα έστελνε παραγγελία που δεν πληρώνει κανείς."
 
 #, python-format
 msgid "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."
@@ -13040,6 +13047,9 @@ msgstr "Επιλέξτε έγκυρη χώρα."
 msgid "Select a valid region."
 msgstr "Επιλέξτε έγκυρη περιοχή."
 
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
+
 msgid "Select all"
 msgstr "Επιλογή όλων"
 
@@ -14733,6 +14743,9 @@ msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης το�
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
 
+msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: on a store on BOX NOW's live network the locker then takes no order; a store on BOX NOW's stage network has no sizes and checks none."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3 μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα."
+
 msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 msgstr "Τα μεγέθη θυρίδων που έχει το locker, από τον δημόσιο κατάλογο lockers της BOX NOW. Κενό σημαίνει άγνωστα: ποτέ ότι δέχεται κάθε μέγεθος."
 
@@ -14947,6 +14960,9 @@ msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από �
 
 msgid "The link search is not valid."
 msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη."
+
+msgid "The locker compartment size the cart packs into (1 small, 2 medium, 3 large) on a BOX NOW pickup option; null elsewhere and when the cart fits none. Pass it as ``compartmentSize`` to list the lockers that take this cart."
+msgstr "Το μέγεθος θυρίδας locker στο οποίο χωράει το καλάθι (1 μικρό, 2 μεσαίο, 3 μεγάλο) σε μια επιλογή παραλαβής BOX NOW· null αλλού και όταν το καλάθι δεν χωράει σε κανένα. Στείλτε το ως ``compartmentSize`` για να δείτε τα lockers που δέχονται αυτό το καλάθι."
 
 msgid "The locker's BOX NOW id, exactly."
 msgstr "Ο κωδικός BOX NOW του locker, ακριβώς."
@@ -15540,6 +15556,9 @@ msgstr "Αυτός ο σύνδεσμος δεν ισχύει πια: χρησι�
 msgid "This list does not take that filter."
 msgstr "Αυτή η λίστα δεν δέχεται αυτό το φίλτρο."
 
+msgid "This locker has no compartment for your order's size. Choose another one."
+msgstr "Αυτό το locker δεν έχει θυρίδα για το μέγεθος της παραγγελίας σας. Διαλέξτε άλλο."
+
 msgid "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
 msgstr "Αυτό μοιάζει με ταχυδρομικό κώδικα. Εισαγάγετε εδώ τον αριθμό οδού και τον ταχυδρομικό κώδικα στο αντίστοιχο πεδίο."
 
@@ -16013,6 +16032,9 @@ msgstr "True αν η δέσμευση μετατράπηκε σε πραγματ
 
 msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr "True αν έχει σταλεί email στον πελάτη για αυτή την εγκαταλελειμμένη δέσμευση"
+
+msgid "True when BOX NOW rates the chance of a free compartment below BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
+msgstr "True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή."
 
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True όταν το ``weight_grams`` του αιτήματος ξεπερνά το ``max_weight_grams``. Η επιλογή επιστρέφεται κανονικά αντί να κρύβεται — το κατάστημα τη δείχνει απενεργοποιημένη με την αιτία, ώστε ένα βαρύ καλάθι να μη βλέπει ποτέ μια επιλογή λιγότερη χωρίς εξήγηση."
@@ -16903,6 +16925,9 @@ msgstr "Προειδοποίηση"
 
 msgid "We Miss You!"
 msgstr "Μας λείπετε!"
+
+msgid "We cannot confirm yet that this locker takes your order's size. Choose another one."
+msgstr "Δεν μπορούμε ακόμη να επιβεβαιώσουμε ότι αυτό το locker δέχεται το μέγεθος της παραγγελίας σας. Διαλέξτε άλλο."
 
 msgid "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 msgstr "Δεν μπορέσαμε να επικοινωνήσουμε με τον courier για να ακυρώσουμε το δέμα σας. Δοκιμάστε ξανά σε λίγα λεπτά."

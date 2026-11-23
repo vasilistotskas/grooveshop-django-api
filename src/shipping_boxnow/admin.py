@@ -569,7 +569,6 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         """
         from django.shortcuts import redirect
 
-        from order.enum.status import OrderStatus
         from shipping_boxnow.services import BoxNowService
         from shipping_boxnow.tasks import create_boxnow_shipment_for_order
         from tenant.celery import dispatch_on_commit
@@ -608,12 +607,15 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
             return redirect(change_url)
 
-        if reissue and shipment.order.status == OrderStatus.CANCELED:
+        # The service refuses these too (it finishes a canceled order's
+        # cancel, and refuses one whose payment all went back), inside the
+        # task: a first parcel as much as a reissue.
+        if shipment.order.ships_nothing:
             messages.error(
                 request,
                 _(
-                    "Order #%(order)s is canceled — a new parcel would "
-                    "ship an order nobody wants."
+                    "Order #%(order)s is canceled or its payment was refunded "
+                    "in full — a parcel would ship an order nobody pays for."
                 )
                 % {"order": shipment.order_id},
             )

@@ -8,7 +8,7 @@ by exact membership of the parcel's size in ``sizes``
 the rule: they are the widget's internals, so the file is validated
 strictly (:data:`CATALOGUE_SCHEMA`), and anything else keeps what the
 lockers hold and logs an ERROR. A locker the catalogue lacks stays
-unknown (empty sizes).
+unknown, never fitting.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from core.cache.invalidation import mark_surface_stale
 from core.net.safe_fetch import FetchError, safe_fetch
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.models import BoxNowLocker
+from tenant.credentials import box_now_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -145,19 +146,43 @@ def fetch_catalogues() -> dict[str, dict[str, list]]:
     return catalogues
 
 
+def sizes_exist() -> bool:
+    """Sizes exist only for BOX NOW's live network.
+
+    The public catalogue describes BOX NOW's production lockers. A store on
+    BOX NOW's stage environment (``Tenant.box_now_live_mode`` off) holds
+    stage locker ids, a different id space whose numbers collide with
+    production's (stage 5 and production 5 are different lockers), so the
+    catalogue cannot size them and nothing about a stage locker's size is
+    known, applied or checked. A live store still treats a locker the
+    catalogue lacks as unknown.
+    """
+    return box_now_credentials()["live_mode"]
+
+
 def apply_catalogues(
     catalogues: dict[str, dict[str, list]],
+    *,
+    keep: bool = False,
 ) -> dict[str, int]:
     """Set the sizes and availability of this store's active lockers from
-    ``catalogues`` (:func:`fetch_catalogues`).
+    ``catalogues`` (:func:`fetch_catalogues`). A store that is not on BOX
+    NOW's live network (:func:`sizes_exist`) gets none of it: its lockers
+    are reset to unknown.
 
     A locker of a country in ``catalogues`` that the catalogue lacks gets
     empty sizes and no probability (unknown), and the count and ids are
     logged at WARNING. Lockers of a country that is not in ``catalogues``
-    keep what they hold. Returns ``{"updated": N, "unknown": M}``.
+    keep what they hold. With ``keep``, the countries it accepts are kept
+    for this store (:func:`remember_catalogues`); a refused one leaves the
+    kept copy of that country as it was. Returns
+    ``{"updated": N, "unknown": M}``.
     """
+    if not sizes_exist():
+        return _forget_stage_sizes()
     updated = unknown = 0
     changed_any = False
+    accepted: dict[str, dict[str, list]] = {}
     for country_code, facts in sorted(catalogues.items()):
         lockers = list(
             BoxNowLocker.objects.filter(
@@ -178,6 +203,7 @@ def apply_catalogues(
                 extra={"boxnow_country": country_code},
             )
             continue
+        accepted[country_code] = facts
         missing = [
             locker.external_id
             for locker in lockers
@@ -215,6 +241,8 @@ def apply_catalogues(
             )
     if changed_any:
         mark_surface_stale("shipping")
+    if keep and accepted:
+        remember_catalogues(accepted)
     logger.info(
         "BOX NOW catalogue applied: updated=%d unknown=%d at %s",
         updated,
@@ -222,3 +250,54 @@ def apply_catalogues(
         timezone.now().isoformat(),
     )
     return {"updated": updated, "unknown": unknown}
+
+
+def _forget_stage_sizes() -> dict[str, int]:
+    """Reset what the catalogue once set on a stage store's lockers: it
+    matched them by id, and a stage id is not a production locker."""
+    stale = BoxNowLocker.objects.filter(is_active=True).exclude(
+        compartment_sizes=[], availability_probability=None
+    )
+    reset = stale.update(compartment_sizes=[], availability_probability=None)
+    if reset:
+        mark_surface_stale("shipping")
+        logger.warning(
+            "BOX NOW store is not live: reset the sizes of %d lockers, the "
+            "public catalogue describes the live network only",
+            reset,
+        )
+    return {"updated": 0, "unknown": 0}
+
+
+# This store's last applied catalogue (the cache is keyed per store
+# schema): what a partner sync sizes the lockers it creates from.
+_REMEMBERED_CATALOGUES = "shipping_boxnow:catalogues"
+
+
+def remember_catalogues(catalogues: dict[str, dict[str, list]]) -> None:
+    """Keep ``catalogues`` for this store for
+    ``BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS``
+    (:func:`apply_remembered_catalogues`), over the copy kept of each
+    country they name; the other countries keep theirs."""
+    from django.core.cache import cache
+
+    cache.set(
+        _REMEMBERED_CATALOGUES,
+        {**(cache.get(_REMEMBERED_CATALOGUES) or {}), **catalogues},
+        timeout=settings.BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS,
+    )
+
+
+def apply_remembered_catalogues() -> dict[str, int] | None:
+    """Apply this store's last catalogue again (:func:`apply_catalogues`),
+    so the lockers a partner sync just created get their sizes now rather
+    than at the next hourly run: the daily sync, and the resync an order
+    for a locker the table lacks runs. ``None`` when none is kept (none
+    read yet, expired, or the cache unreachable): those lockers stay
+    unknown until the next run."""
+    from django.core.cache import cache
+
+    catalogues = cache.get(_REMEMBERED_CATALOGUES)
+    if not catalogues:
+        return None
+    return apply_catalogues(catalogues)

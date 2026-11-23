@@ -63,6 +63,7 @@ from order.exceptions import (
     InvalidGiftCardError,
     InvalidOrderDataError,
     LoyaltyRedemptionError,
+    PickupPointUnfitError,
     ShippingRefusedError,
     StockReservationError,
 )
@@ -1000,6 +1001,19 @@ class CartViewSet(BaseModelViewSet):
                     "detail": exc.message,
                     "reason": exc.reason,
                     "code": exc.reason,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except PickupPointUnfitError as exc:
+            if not name_shipping_refusal:
+                return self._invalid_order_data(exc)
+            # Before InvalidOrderDataError, which it subclasses: the client
+            # drops the locker and picks another one.
+            return Response(
+                {
+                    "detail": exc.message,
+                    "reason": exc.code,
+                    "code": exc.code,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

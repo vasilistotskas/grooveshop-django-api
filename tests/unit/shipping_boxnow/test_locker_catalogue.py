@@ -85,6 +85,7 @@ def test_a_key_that_differs_from_the_id_is_refused():
         parse_catalogue(body)
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_sizes_are_set_by_exact_membership():
     BoxNowLockerFactory(external_id="1", compartment_sizes=[])
     BoxNowLockerFactory(external_id="2", compartment_sizes=[])
@@ -100,6 +101,7 @@ def test_sizes_are_set_by_exact_membership():
     assert two.availability_probability == 0.4
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_locker_missing_from_the_catalogue_is_unknown(caplog):
     BoxNowLockerFactory(external_id="1")
     BoxNowLockerFactory(external_id="gone")
@@ -115,6 +117,7 @@ def test_a_locker_missing_from_the_catalogue_is_unknown(caplog):
     assert "gone" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_changed_catalogue_keeps_the_stored_sizes_and_logs_an_error(caplog):
     BoxNowLockerFactory(external_id="1", compartment_sizes=[2])
 
@@ -127,6 +130,7 @@ def test_a_changed_catalogue_keeps_the_stored_sizes_and_logs_an_error(caplog):
     assert "GR" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_failed_fetch_keeps_the_stored_sizes(caplog):
     BoxNowLockerFactory(external_id="1", compartment_sizes=[2])
 
@@ -202,6 +206,7 @@ def test_a_store_without_boxnow_skips_the_application():
         }
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 @pytest.mark.parametrize("rows", [[], ["1"]])
 def test_an_empty_or_truncated_catalogue_keeps_the_sizes(rows, caplog):
     for external_id in ("1", "2", "3", "4"):
@@ -218,6 +223,7 @@ def test_an_empty_or_truncated_catalogue_keeps_the_sizes(rows, caplog):
     assert "minimum fraction" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
     BoxNowLockerFactory(
         external_id="1",
@@ -232,3 +238,112 @@ def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
         sync_catalogue_facts()
 
     purge.assert_not_called()
+
+
+def test_a_stage_store_takes_no_size_from_a_colliding_id(
+    boxnow_configured_tenant,
+):
+    """Stage locker 5 is not production locker 5: the catalogue's row 5
+    sizes nothing on a stage store, and what an earlier sync set there is
+    reset to unknown."""
+    BoxNowLockerFactory(
+        external_id="5",
+        compartment_sizes=[1, 2],
+        availability_probability=0.9,
+    )
+    BoxNowLockerFactory(external_id="6", compartment_sizes=[])
+
+    with (
+        _serve(_body([_row("5", ("3",), 0.4), _row("6")])),
+        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+    ):
+        result = sync_catalogue_facts()
+
+    for locker in BoxNowLocker.objects.all():
+        assert locker.compartment_sizes == []
+        assert locker.availability_probability is None
+    assert result == {"updated": 0, "unknown": 0}
+    purge.assert_called_once_with("shipping")
+
+
+def test_a_stage_store_with_nothing_sized_writes_nothing(
+    boxnow_configured_tenant,
+):
+    BoxNowLockerFactory(
+        external_id="5", compartment_sizes=[], availability_probability=None
+    )
+
+    with (
+        _serve(_body([_row("5")])),
+        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+    ):
+        sync_catalogue_facts()
+
+    assert BoxNowLocker.objects.get(external_id="5").compartment_sizes == []
+    purge.assert_not_called()
+
+
+@pytest.fixture
+def store_cache():
+    from tests.utils.redis import private_cache
+
+    with patch("django.core.cache.cache", private_cache()):
+        yield
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_a_locker_the_partner_sync_creates_is_sized_from_the_kept_catalogue():
+    """The hourly task keeps what it applied; a locker the daily sync or
+    an order's resync creates later is sized from it at once."""
+    from shipping_boxnow import tasks
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    catalogue = {"GR": {"1": [[1, 2], 0.9], "new": [[3], 0.5]}}
+    # The task runs under its store's schema, where production reads the
+    # store's row; the stand-in tenant is bound on this connection only.
+    with (
+        patch(
+            "shipping_boxnow.tasks._skip_if_boxnow_unconfigured",
+            return_value=False,
+        ),
+        patch(
+            "shipping_boxnow.catalogue.box_now_credentials",
+            return_value={"live_mode": True},
+        ),
+    ):
+        tasks.apply_boxnow_locker_catalogue(catalogue)
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    assert apply_remembered_catalogues() == {"updated": 1, "unknown": 0}
+    new = BoxNowLocker.objects.get(external_id="new")
+    assert new.compartment_sizes == [3]
+    assert new.availability_probability == 0.5
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_nothing_is_applied_when_no_catalogue_is_kept():
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    assert apply_remembered_catalogues() is None
+    assert BoxNowLocker.objects.get(external_id="new").compartment_sizes == []
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_a_refused_catalogue_leaves_the_kept_copy_as_it_was():
+    """A truncated file is refused for the sizes (minimum fraction), and
+    for the kept copy too: a locker a later sync creates is still sized
+    from the last good one."""
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    for external_id in ("1", "2", "3"):
+        BoxNowLockerFactory(external_id=external_id, compartment_sizes=[])
+    good = {"GR": {i: [[2], 1.0] for i in ("1", "2", "3", "new")}}
+    apply_catalogues(good, keep=True)
+    apply_catalogues({"GR": {"1": [[1], 1.0]}}, keep=True)
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    apply_remembered_catalogues()
+
+    assert BoxNowLocker.objects.get(external_id="new").compartment_sizes == [2]

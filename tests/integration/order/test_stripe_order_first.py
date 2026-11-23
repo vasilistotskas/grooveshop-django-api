@@ -13,6 +13,7 @@ PaymentIntent no order carries pages the store's staff, once.
 
 from __future__ import annotations
 
+import smtplib
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -21,7 +22,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 import stripe
-from django.db import connection
+from celery.exceptions import Retry
+from django.db import connection, transaction
 from django.urls import reverse
 from djmoney.money import Money
 from djstripe.models import Event
@@ -277,31 +279,65 @@ def _succeeded(payment_id, *, metadata=None):
     return event
 
 
-def _deliver(event):
-    with patch("emails.send.send_email") as send:
-        handle_stripe_payment_succeeded(sender=None, event=event)
-    return send
-
-
-def _orphan_alerts(send):
-    """The payment-without-order alerts among what was sent: a payment of
-    another amount than its order's sends the mismatch alert too."""
-    return [
-        call
-        for call in send.call_args_list
-        if call.args[0] == "ops.payment_without_order"
-    ]
-
-
 def _payment_id():
     return f"pi_{uuid.uuid4().hex}"
 
 
+#: The schema the test runs in, which is what a dispatch pins.
+CURRENT_STORE = SimpleNamespace(schema_name=connection.schema_name)
+
+
+def _bound(purpose):
+    return binding_metadata(purpose, uuid.uuid4())
+
+
+def _webhook(payment_id, capture, metadata=None):
+    """Deliver the event inside the webhook's transaction; return the
+    ``apply_async`` of the alert task."""
+    with (
+        patch.object(alert_payment_without_order_task, "apply_async") as queued,
+        capture(execute=True),
+    ):
+        with transaction.atomic():
+            handle_stripe_payment_succeeded(
+                sender=None, event=_succeeded(payment_id, metadata=metadata)
+            )
+    return queued
+
+
+def _run_task(payment_id, *, throw=True):
+    return apply_in(
+        CURRENT_STORE,
+        alert_payment_without_order_task,
+        [],
+        {"payment_id": payment_id, "amount": "50", "currency": "EUR"},
+        task_id=str(uuid.uuid4()),
+        throw=throw,
+    )
+
+
 class TestPaymentWithoutOrderAlert:
-    def test_an_orphan_intent_pages_staff_once(self):
+    def test_an_order_bound_payment_without_an_order_is_queued_at_once(
+        self, django_capture_on_commit_callbacks
+    ):
         payment_id = _payment_id()
 
-        send = _deliver(_succeeded(payment_id))
+        queued = _webhook(
+            payment_id,
+            django_capture_on_commit_callbacks,
+            _bound(PaymentPurpose.ORDER),
+        )
+
+        queued.assert_called_once()
+        assert queued.call_args.kwargs["countdown"] == 0
+        assert queued.call_args.kwargs["kwargs"]["payment_id"] == payment_id
+
+    def test_the_task_alerts_once_however_often_it_runs(self):
+        payment_id = _payment_id()
+
+        with patch("emails.send.send_email") as send:
+            _run_task(payment_id)
+            _run_task(payment_id)
 
         send.assert_called_once()
         key, alert = send.call_args.args
@@ -309,38 +345,105 @@ class TestPaymentWithoutOrderAlert:
         assert alert.payment_id == payment_id
         assert alert.amount == Money(Decimal(50), "EUR")
 
-    def test_a_redelivery_sends_nothing_more(self):
+    def test_a_failed_send_is_retried_and_the_claim_is_free(self):
         payment_id = _payment_id()
 
-        first = _deliver(_succeeded(payment_id))
-        again = _deliver(_succeeded(payment_id))
-
-        first.assert_called_once()
-        again.assert_not_called()
-
-    def test_a_failed_send_does_not_raise_and_is_tried_again(self):
-        payment_id = _payment_id()
-
-        with patch(
-            "emails.send.send_email", side_effect=RuntimeError("smtp down")
+        with (
+            patch(
+                "emails.send.send_email",
+                side_effect=smtplib.SMTPServerDisconnected("gone"),
+            ),
+            pytest.raises(Retry),
         ):
-            handle_stripe_payment_succeeded(
-                sender=None, event=_succeeded(payment_id)
-            )
-        retried = _deliver(_succeeded(payment_id))
+            _run_task(payment_id)
+        with patch("emails.send.send_email") as send:
+            _run_task(payment_id)
 
-        retried.assert_called_once()
+        send.assert_called_once()
 
-    def test_a_gift_card_intent_is_not_an_orphan(self):
+    def test_an_unbound_payment_is_logged_and_queues_nothing(
+        self, django_capture_on_commit_callbacks, caplog
+    ):
+        with caplog.at_level("WARNING"):
+            queued = _webhook(_payment_id(), django_capture_on_commit_callbacks)
+
+        queued.assert_not_called()
+        assert "is not bound to this store's orders" in caplog.text
+
+    def test_a_payment_bound_to_another_store_queues_nothing(
+        self, django_capture_on_commit_callbacks
+    ):
+        metadata = {
+            **_bound(PaymentPurpose.ORDER),
+            "tenant_schema": "elsewhere",
+        }
+
+        queued = _webhook(
+            _payment_id(), django_capture_on_commit_callbacks, metadata
+        )
+
+        queued.assert_not_called()
+
+    def test_a_rolled_back_webhook_queues_nothing(
+        self, django_capture_on_commit_callbacks, monkeypatch
+    ):
+        # The suite runs on_commit callbacks at once; this test observes
+        # the deferral, so it puts Django's own back.
+        monkeypatch.setattr(
+            transaction,
+            "on_commit",
+            lambda func, using=None, robust=False: connection.on_commit(
+                func, robust=robust
+            ),
+        )
+        metadata = _bound(PaymentPurpose.ORDER)
+
+        with (
+            patch.object(
+                alert_payment_without_order_task, "apply_async"
+            ) as queued,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            with pytest.raises(RuntimeError), transaction.atomic():
+                handle_stripe_payment_succeeded(
+                    sender=None,
+                    event=_succeeded(_payment_id(), metadata=metadata),
+                )
+                raise RuntimeError("the webhook failed after the handler")
+        queued.assert_not_called()
+
+        with (
+            patch.object(
+                alert_payment_without_order_task, "apply_async"
+            ) as queued,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            with transaction.atomic():
+                handle_stripe_payment_succeeded(
+                    sender=None,
+                    event=_succeeded(_payment_id(), metadata=metadata),
+                )
+            queued.assert_not_called()  # nothing before the commit
+        queued.assert_called_once()
+
+    def test_a_gift_card_intent_is_not_an_orphan(
+        self, django_capture_on_commit_callbacks
+    ):
         payment_id = _payment_id()
         GiftCardPurchaseFactory(payment_id=payment_id)
 
         with patch("giftcard.services.GiftCardService.complete_purchase"):
-            send = _deliver(_succeeded(payment_id))
+            queued = _webhook(
+                payment_id,
+                django_capture_on_commit_callbacks,
+                _bound(PaymentPurpose.GIFT_CARD),
+            )
 
-        send.assert_not_called()
+        queued.assert_not_called()
 
-    def test_an_intent_bound_to_an_order_is_not_an_orphan(self):
+    def test_an_intent_bound_to_an_order_finds_it(
+        self, django_capture_on_commit_callbacks
+    ):
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -348,18 +451,18 @@ class TestPaymentWithoutOrderAlert:
             payment_id="pi_the_newer_one",
             pay_way=PayWayFactory.create_online_payment("stripe"),
         )
-        older = _payment_id()
 
-        send = _deliver(
-            _succeeded(
-                older,
-                metadata=binding_metadata(PaymentPurpose.ORDER, order.uuid),
-            )
+        queued = _webhook(
+            _payment_id(),
+            django_capture_on_commit_callbacks,
+            binding_metadata(PaymentPurpose.ORDER, order.uuid),
         )
 
-        assert not _orphan_alerts(send)
+        queued.assert_not_called()
 
-    def test_an_intent_an_order_carries_is_not_an_orphan(self):
+    def test_an_intent_an_order_carries_is_not_an_orphan(
+        self, django_capture_on_commit_callbacks
+    ):
         payment_id = _payment_id()
         OrderFactory(
             num_order_items=0,
@@ -369,47 +472,33 @@ class TestPaymentWithoutOrderAlert:
             pay_way=PayWayFactory.create_online_payment("stripe"),
         )
 
-        send = _deliver(_succeeded(payment_id))
+        queued = _webhook(
+            payment_id,
+            django_capture_on_commit_callbacks,
+            _bound(PaymentPurpose.ORDER),
+        )
 
-        assert not _orphan_alerts(send)
-
-
-#: The schema the test runs in, which is what a dispatch pins.
-CURRENT_STORE = SimpleNamespace(schema_name=connection.schema_name)
+        queued.assert_not_called()
 
 
 class TestAPaymentFirstIntentWaitsForItsOrder:
     """A payment-first intent can succeed before ``POST /order`` has created
-    its order, so staff hear of it only when none carries it after the
-    grace. Removed with the payment-first path (#818, R3)."""
-
-    def _deliver_cart_bound(
-        self, payment_id, django_capture_on_commit_callbacks
-    ):
-        metadata = binding_metadata(PaymentPurpose.CART, uuid.uuid4())
-        with (
-            patch.object(
-                alert_payment_without_order_task, "apply_async"
-            ) as published,
-            django_capture_on_commit_callbacks(execute=True),
-        ):
-            send = _deliver(_succeeded(payment_id, metadata=metadata))
-        return send, published
+    its order, so its alert waits the grace and is sent only if no order
+    carries it by then. Removed with the payment-first path (#818, R3)."""
 
     def test_the_alert_is_deferred_by_the_grace(
         self, django_capture_on_commit_callbacks
     ):
         payment_id = _payment_id()
 
-        send, published = self._deliver_cart_bound(
-            payment_id, django_capture_on_commit_callbacks
+        queued = _webhook(
+            payment_id,
+            django_capture_on_commit_callbacks,
+            _bound(PaymentPurpose.CART),
         )
 
-        send.assert_not_called()
-        published.assert_called_once()
-        call = published.call_args.kwargs
-        assert call["kwargs"]["payment_id"] == payment_id
-        assert call["countdown"] == 15 * 60
+        queued.assert_called_once()
+        assert queued.call_args.kwargs["countdown"] == 15 * 60
 
     def test_an_order_created_meanwhile_sends_nothing(self):
         payment_id = _payment_id()
@@ -420,32 +509,15 @@ class TestAPaymentFirstIntentWaitsForItsOrder:
         )
 
         with patch("emails.send.send_email") as send:
-            apply_in(
-                CURRENT_STORE,
-                alert_payment_without_order_task,
-                [],
-                {"payment_id": payment_id, "amount": "50", "currency": "EUR"},
-                task_id=str(uuid.uuid4()),
-            )
+            _run_task(payment_id)
 
         send.assert_not_called()
 
     def test_no_order_after_the_grace_alerts_once(self):
         payment_id = _payment_id()
-        kwargs = {"payment_id": payment_id, "amount": "50", "currency": "EUR"}
 
         with patch("emails.send.send_email") as send:
-            for _ in range(2):
-                apply_in(
-                    CURRENT_STORE,
-                    alert_payment_without_order_task,
-                    [],
-                    kwargs,
-                    task_id=str(uuid.uuid4()),
-                )
+            _run_task(payment_id)
+            _run_task(payment_id)
 
         send.assert_called_once()
-        key, alert = send.call_args.args
-        assert key == "ops.payment_without_order"
-        assert alert.payment_id == payment_id
-        assert alert.amount == Money(Decimal(50), "EUR")

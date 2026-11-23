@@ -51,14 +51,14 @@ order_charged_back = Signal()
 # it as the webhook announces its own (``announce_stripe_payment_applied``).
 # A signal and not a call, because the receivers import the service.
 order_stripe_payment_polled = Signal()
-# Dispatched when a succeeded Stripe intent from the payment-first path
-# (binding purpose ``cart``) has no order yet
-# (``OrderService.report_payment_without_order``): its order may still be
-# being created. Keyword arguments: ``payment_id`` and ``captured``
-# (``Money``). The receiver queues the delayed check. A signal and not a
-# call, because the order services import no task. Removed with the
+# Dispatched when a succeeded Stripe intent of the store's own has no order
+# (``OrderService.report_payment_without_order``). Keyword arguments:
+# ``payment_id``, ``captured`` (``Money``) and ``grace`` (``True`` for a
+# payment-first intent, whose order may still be being created). The
+# receiver queues the alert, after the grace when asked. A signal and not a
+# call, because the order services import no task. ``grace`` goes with the
 # payment-first path (#818, R3).
-payment_awaits_order = Signal()
+payment_without_order_found = Signal()
 # Dispatched the first time an order gets a tracking number / carrier.
 # Kept distinct from ``order_shipped`` (which fires on status transition
 # to SHIPPED) because admins sometimes add tracking before flipping

@@ -73,10 +73,10 @@ from order.payments.payment import (
     StripePaymentProvider,
 )
 from order.payments.payment_binding import (
-    PURPOSE_KEY,
     SUBJECT_KEY,
     PaymentPurpose,
     binding_mismatch,
+    own_purpose,
 )
 from order.payments.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
@@ -85,7 +85,7 @@ from order.payments.payment_ledger import (
 )
 from order.signals import (
     order_stripe_payment_polled,
-    payment_awaits_order,
+    payment_without_order_found,
 )
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
@@ -3200,23 +3200,36 @@ class OrderService:
         captured: Money,
         metadata: Mapping[str, str] | None,
     ) -> None:
-        """Alert about a succeeded intent no order carries: at once, or,
-        for a payment-first intent (``PaymentPurpose.CART``), after
-        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` (``payment_awaits_order``,
-        a signal because the service imports no task).
+        """Queue the alert about a succeeded intent no order carries.
 
-        A payment-first intent can succeed while ``POST /order`` that
-        carries it is still creating its order, so the webhook finds none
-        for a valid payment. The delayed check
-        (``order.tasks.alert_payment_without_order``) alerts only when no
-        order carries the intent by then. It goes with the payment-first
+        Only the store's own payments alert: an intent whose server-set
+        metadata binds it to this tenant (``own_purpose``). Any other
+        (a Payment Link, a Stripe Invoice, Terminal, a charge made in the
+        Stripe dashboard) is logged at WARNING and nothing more.
+
+        The mail is sent by ``order.tasks.alert_payment_without_order_task``,
+        queued after the webhook's transaction commits (a rolled-back
+        webhook queues nothing) and retried when the mail is. The
+        services import no task, so the receiver of
+        ``payment_without_order_found`` queues it. A payment-first intent
+        (``PaymentPurpose.CART``) can succeed while the ``POST /order``
+        that carries it is still creating its order, so its alert waits
+        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` and is sent only if no
+        order carries it by then. That wait goes with the payment-first
         path (#818, R3).
         """
-        if (metadata or {}).get(PURPOSE_KEY) != PaymentPurpose.CART:
-            cls.alert_payment_without_order(payment_id, captured=captured)
+        purpose = own_purpose(metadata)
+        if purpose is None:
+            logger.warning(
+                "Payment %s is not bound to this store's orders: no alert",
+                payment_id,
+            )
             return
-        payment_awaits_order.send(
-            sender=cls, payment_id=payment_id, captured=captured
+        payment_without_order_found.send(
+            sender=cls,
+            payment_id=payment_id,
+            captured=captured,
+            grace=purpose == PaymentPurpose.CART,
         )
 
     @classmethod
@@ -3226,26 +3239,16 @@ class OrderService:
         """Page staff once about a confirmed Stripe payment no order
         carries: the customer was charged for nothing that will ship.
 
-        Never raises: the caller runs inside dj-stripe's webhook
-        ``transaction.atomic`` block, and a failed mail must neither roll
-        back the event nor stop Stripe's redelivery from settling. Once per
-        payment: the claim on ``payment_id`` is taken before the send
-        (``cache.add`` is atomic), so a redelivery, a retry after a
-        rollback and the polled path alert once; a send that failed gives
-        the claim back, so the next delivery tries again.
+        Once per payment: the claim on ``payment_id`` is taken before the
+        send (``cache.add`` is atomic), so a repeat of the task alerts
+        once. A send that fails gives the claim back and raises, so the
+        task's retry sends. Run by the task, never inside a webhook.
         """
         from emails.send import send_email
         from order.emails import PaymentWithoutOrder
 
         claim = PAYMENT_WITHOUT_ORDER_CLAIM_KEY.format(payment_id=payment_id)
-        try:
-            if not cache.add(claim, 1, PAYMENT_WITHOUT_ORDER_CLAIM_TTL):
-                return
-        except Exception:
-            logger.exception(
-                "Could not claim the payment-without-order alert for %s",
-                payment_id,
-            )
+        if not cache.add(claim, 1, PAYMENT_WITHOUT_ORDER_CLAIM_TTL):
             return
         try:
             send_email(
@@ -3256,18 +3259,9 @@ class OrderService:
                     amount=captured,
                 ),
             )
-        except Exception:
-            logger.exception(
-                "Could not send the payment-without-order alert for %s",
-                payment_id,
-            )
-            try:
-                cache.delete(claim)
-            except Exception:
-                logger.exception(
-                    "Could not release the payment-without-order claim for %s",
-                    payment_id,
-                )
+        except BaseException:
+            cache.delete(claim)
+            raise
 
     @staticmethod
     def _bound_order_uuid(metadata: Mapping[str, str] | None) -> UUID | None:

@@ -2769,19 +2769,20 @@ def purge_expired_pending_payment_fees() -> dict[str, int]:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=TRANSIENT_DB_ERRORS,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
 def alert_payment_without_order_task(
     payment_id: str, amount: str, currency: str
 ) -> bool:
-    """Alert staff to a payment-first Stripe intent that succeeded and that
-    no order carries once the grace has passed
-    (``OrderService.report_payment_without_order``). Returns whether an
-    order carries it, so nothing was sent.
+    """Alert staff to a succeeded Stripe payment of the store that no order
+    carries (``OrderService.report_payment_without_order``). Returns whether
+    an order carries it, so nothing was sent.
 
-    Removed with the payment-first path (#818, R3).
+    Queued after the webhook committed, so a mail that fails is retried
+    here: Stripe has had its answer and sends nothing again. A payment-first
+    intent is checked after a grace, when its order should exist.
     """
     from decimal import Decimal
 

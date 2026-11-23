@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.utils.crypto import salted_hmac
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -39,7 +40,8 @@ if TYPE_CHECKING:
     from cart.models import Cart
     from giftcard.services import RedemptionPlan
     from pay_way.models import PayWay
-    from promotion.engine.results import CartDiscountResult
+    from product.models.product import Product
+    from promotion.engine.results import CartDiscountResult, CouponVerdict
     from shipping.services import ShippingCharge
 
 logger = logging.getLogger(__name__)
@@ -164,6 +166,30 @@ class BlockedCoupon:
 
 
 @dataclass(frozen=True, slots=True)
+class QuoteLine:
+    """One cart line as the quote priced it.
+
+    ``product``, ``quantity``, ``unit_price`` (the price the shopper
+    pays per unit, wholesale prices bound) and ``promotion_discount``
+    (the promotion money the line carries) are what ``cart_digest``
+    covers of it; ``total_price`` is ``quantity`` units at
+    ``unit_price``, before promotions.
+    """
+
+    item_id: int
+    product: Product
+    quantity: int
+    unit_price: Money
+    promotion_discount: Decimal
+
+    @property
+    def total_price(self) -> Money:
+        return Money(
+            self.quantity * self.unit_price.amount, self.unit_price.currency
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OrderCharges:
     """The rows an order is created from: those of a quote whose
     delivery and pay way are both chosen."""
@@ -184,6 +210,11 @@ class CheckoutQuote:
     ``gift_cards`` (planned against what is left to pay) and
     ``amount_due``. A row is never guessed.
 
+    ``lines`` are the cart's lines the quote priced: ``items_subtotal``
+    is their sum, the parcel is weighed from them and ``cart_digest``
+    covers them, all from one read of the cart. ``coupons`` is the
+    promotions' verdict on each code attached to the cart.
+
     ``grand_total`` is the products after promotions, plus shipping and
     the pay-way fee. ``amount_due`` is what is left of it after the
     loyalty redemption and the gift cards: the amount the order stores
@@ -191,8 +222,10 @@ class CheckoutQuote:
     ``loyalty_discount`` was priced for, 0 when none are redeemed.
     """
 
+    lines: tuple[QuoteLine, ...]
     items_subtotal: Money
     promotion: CartDiscountResult
+    coupons: tuple[CouponVerdict, ...]
     parcel_items: tuple[tuple[Any, int], ...]
     weight_grams: int
     shipping: ShippingCharge | None
@@ -307,9 +340,13 @@ class OrderQuoteService:
                 code, reason = blocking[0]
                 raise InvalidCouponError(code=code, reason=reason)
 
-        items_subtotal = cart.total_price
+        lines = cls.priced_lines(cart, promotion)
+        items_subtotal = Money(
+            sum((line.total_price.amount for line in lines), Decimal(0)),
+            settings.DEFAULT_CURRENCY,
+        )
         currency = items_subtotal.currency
-        parcel_items, weight_grams = cls._parcel(cart, promotion)
+        parcel_items, weight_grams = cls._parcel(lines, promotion)
         threshold_value = cls.threshold_value(
             items_subtotal, promotion.discount_total
         )
@@ -364,7 +401,7 @@ class OrderQuoteService:
         # way is not part of it; its fee is in ``expected_total``.
         cart_digest = (
             cls.cart_digest(
-                cart,
+                lines,
                 promotion,
                 shipping=shipping,
                 weight_grams=weight_grams,
@@ -390,8 +427,10 @@ class OrderQuoteService:
             amount_due = Money(due.amount - gift_cards.amount.amount, currency)
 
         return CheckoutQuote(
+            lines=lines,
             items_subtotal=items_subtotal,
             promotion=promotion,
+            coupons=promotion.coupon_verdicts(cls._attached_codes(cart)),
             parcel_items=parcel_items,
             weight_grams=weight_grams,
             shipping=shipping_charge,
@@ -405,14 +444,41 @@ class OrderQuoteService:
         )
 
     @staticmethod
+    def priced_lines(
+        cart: Cart, promotion: CartDiscountResult
+    ) -> tuple[QuoteLine, ...]:
+        """The cart's lines at the prices checkout charges, each with
+        the promotion money ``promotion`` puts on it: one read of the
+        cart, which the quote's subtotal, parcel and digest all take."""
+        line_discounts = promotion.line_discounts
+        return tuple(
+            QuoteLine(
+                item_id=item.pk,
+                product=item.product,
+                quantity=item.quantity,
+                unit_price=item.final_price,
+                promotion_discount=line_discounts.get(item.pk, Decimal(0)),
+            )
+            for item in cart.get_items()
+        )
+
+    @staticmethod
+    def _attached_codes(cart: Cart) -> list[str]:
+        """The coupon codes attached to ``cart``; none while promotions
+        are off, as the cart lists them."""
+        if not PromotionEngine.is_enabled():
+            return []
+        return list(cart.applied_codes.values_list("code__code", flat=True))
+
+    @staticmethod
     def cart_digest(
-        cart: Cart,
+        lines: Iterable[QuoteLine],
         promotion: CartDiscountResult,
         *,
         shipping: ShippingChoice,
         weight_grams: int,
     ) -> str:
-        """What an order of ``cart`` is made of, as one opaque value.
+        """What an order of these ``lines`` is made of, as one opaque value.
 
         Each line (product, quantity, unit price as priced, the promotion
         money it carries), the promotions that apply with their codes,
@@ -429,15 +495,14 @@ class OrderQuoteService:
         An HMAC over a canonical form, keyed by the ``SECRET_KEY``: it
         reveals nothing of the cart, and no client can compute it.
         """
-        line_discounts = promotion.line_discounts
-        lines = sorted(
+        canonical_lines = sorted(
             [
-                item.product_id,
-                item.quantity,
-                str(item.final_price.amount),
-                str(line_discounts.get(item.pk, Decimal(0))),
+                line.product.pk,
+                line.quantity,
+                str(line.unit_price.amount),
+                str(line.promotion_discount),
             ]
-            for item in cart.items.all()
+            for line in lines
         )
         promotions = sorted(
             [
@@ -469,7 +534,7 @@ class OrderQuoteService:
         ]
         canonical = json.dumps(
             {
-                "lines": lines,
+                "lines": canonical_lines,
                 "promotions": promotions,
                 "gifts": gifts,
                 "delivery": delivery,
@@ -482,7 +547,7 @@ class OrderQuoteService:
         ).hexdigest()
 
     @staticmethod
-    def _parcel(cart: Cart, promotion: CartDiscountResult):
+    def _parcel(lines: Iterable[QuoteLine], promotion: CartDiscountResult):
         """What ships and what it weighs: the cart's lines and the gifts
         the promotions add. Gifts ride in the parcel, so they count for
         the weight bracket, the weight cap and the carrier's parcel size.
@@ -490,7 +555,7 @@ class OrderQuoteService:
         from shipping.utils import compute_total_weight_grams
 
         parcel_items = (
-            *((item.product, item.quantity) for item in cart.items.all()),
+            *((line.product, line.quantity) for line in lines),
             *gift_pairs(promotion),
         )
         return parcel_items, compute_total_weight_grams(parcel_items)
@@ -562,8 +627,9 @@ class OrderQuoteService:
         """
         from shipping.services import ShippingService
 
+        promotion = PromotionEngine.evaluate(cart, user=user, email=email)
         _parcel_items, weight_grams = cls._parcel(
-            cart, PromotionEngine.evaluate(cart, user=user, email=email)
+            cls.priced_lines(cart, promotion), promotion
         )
         kind, provider_code = cls._carrier(
             shipping.kind,

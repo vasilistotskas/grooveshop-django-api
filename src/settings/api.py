@@ -229,6 +229,9 @@ SPECTACULAR_SETTINGS = {
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",
+        # A quote's coupon verdict names its rejection by this vocabulary;
+        # named, it is not a bare ``RejectionEnum`` in the frontend types.
+        "CouponRejectionReasonEnum": "promotion.enum.CouponRejectionReason",
         # ``ProductAlert.kind`` and the alert confirmation's ``kind``
         # share one vocabulary: one ``ProductAlertKindEnum``, not a hashed
         # second name for the same choice set.

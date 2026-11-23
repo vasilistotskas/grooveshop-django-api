@@ -8927,6 +8927,9 @@ msgstr "Έλεγχος"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Χρήματα που απέδωσε η ACS και καμία αποστολή δεν εξηγεί"
 
+msgid "Money this code takes off; 0 when its benefit is not money, or it is refused."
+msgstr "Τα χρήματα που αφαιρεί αυτός ο κωδικός· 0 όταν το όφελός του δεν είναι χρήματα ή όταν απορρίπτεται."
+
 msgid "Month"
 msgstr "Μήνας"
 
@@ -13990,6 +13993,9 @@ msgstr "Η δέσμευση αποθέματος δεν ισχύει πλέον"
 msgid "Stock set by a catalogue import"
 msgstr "Απόθεμα που ορίστηκε από εισαγωγή καταλόγου"
 
+msgid "Storage path of the product's main image; empty without one."
+msgstr "Η διαδρομή αποθήκευσης της κύριας εικόνας του προϊόντος· κενή χωρίς εικόνα."
+
 msgid "Store"
 msgstr "Κατάστημα"
 
@@ -14719,6 +14725,9 @@ msgstr "Το καλάθι είναι πολύ βαρύ για την επιλε�
 msgid "The cart is too large for the selected shipping method."
 msgstr "Το καλάθι είναι πολύ μεγάλο για την επιλεγμένη μέθοδο αποστολής."
 
+msgid "The cart item the line is."
+msgstr "Το στοιχείο του καλαθιού που είναι η γραμμή."
+
 msgid "The cart token is invalid or has expired."
 msgstr "Το διακριτικό καλαθιού δεν είναι έγκυρο ή έχει λήξει."
 
@@ -14730,6 +14739,9 @@ msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα
 
 msgid "The cart's lines at the prices the shopper pays."
 msgstr "Οι γραμμές του καλαθιού στις τιμές που πληρώνει ο αγοραστής."
+
+msgid "The cart's lines the quote priced, from the same read as itemsSubtotal and cartDigest: what the digest covers of each (product, quantity, unit price, promotion money), with the product's name and image."
+msgstr "Οι γραμμές του καλαθιού που τιμολόγησε η προσφορά τιμής, από την ίδια ανάγνωση με το itemsSubtotal και το cartDigest: ό,τι καλύπτει το digest από την καθεμία (προϊόν, ποσότητα, τιμή μονάδας, χρήματα προωθήσεων), με το όνομα και την εικόνα του προϊόντος."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
@@ -15037,6 +15049,9 @@ msgstr "Οι σελίδες, το θέμα και οι ενότητες που �
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "Η τιμή paid_until στην οποία αναφέρεται το στάδιο ειδοποίησης. Ασυμφωνία με το τρέχον paid_until σημαίνει ότι το στάδιο είναι παρωχημένο και μηδενίζεται στην επόμενη εκτέλεση χρέωσης."
 
+msgid "The part of discountTotal this line carries; the lines' amounts sum to it."
+msgstr "Το μέρος του discountTotal που φέρει αυτή η γραμμή· τα ποσά των γραμμών αθροίζουν σε αυτό."
+
 msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 msgstr "Το μέρος των χρημάτων της πηγής που κινήθηκε αλλά που η απόδειξη δεν είχε περιθώριο να πιστώσει· ορίζεται σε μία γραμμή της πηγής."
 
@@ -15117,6 +15132,9 @@ msgstr "Η προηγούμενη πληρωμή δεν μπόρεσε να κλ
 msgid "The previous payment is still in progress."
 msgstr "Η προηγούμενη πληρωμή βρίσκεται ακόμη σε εξέλιξη."
 
+msgid "The price per unit the shopper pays, before promotions."
+msgstr "Η τιμή ανά μονάδα που πληρώνει ο αγοραστής, πριν από τις προωθήσεις."
+
 msgid "The product ships free on its own: ``price`` is 0."
 msgstr "Το προϊόν αποστέλλεται δωρεάν και μόνο του: το ``price`` είναι 0."
 
@@ -15131,6 +15149,9 @@ msgstr "Ο κωδικός SKU του προϊόντος όταν δημιουρ�
 
 msgid "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
 msgstr "Το αναγνωριστικό του προϊόντος σε άλλο σύστημα, που χρησιμοποιείται για την αντιστοίχισή του όταν εισάγεται αρχείο καταλόγου. Αφήστε το κενό αν δεν έχει."
+
+msgid "The product's name in the request's language."
+msgstr "Το όνομα του προϊόντος στη γλώσσα του αιτήματος."
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ το τρέχον όνομα του προϊόντος."
@@ -15389,6 +15410,9 @@ msgstr "Η αξία με την οποία κρίνεται κάθε όριο «
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Η αξία με την οποία κρίνονται τα δωρεάν μεταφορικά και το δωρεάν τέλος πληρωμής: τα προϊόντα μετά τις εκπτώσεις προωθήσεων και κουπονιών, χωρίς μεταφορικά και τέλη. Συγκρίνετε ένα όριο «δωρεάν πάνω από» με αυτήν, ποτέ με το total_price."
 
+msgid "The verdict on each coupon code attached to the cart, as the promotions in this quote decided it."
+msgstr "Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής."
+
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "Ο επισκέπτης επέλεξε το πλαίσιο συγκατάθεσης. Πρέπει να είναι true."
 
@@ -15510,6 +15534,12 @@ msgstr "Αυτό το συνημμένο παρακρατείται μέχρι �
 
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "Αυτό δεν μπορεί να αλλάξει μετά την υποβολή της παραγγελίας: τα μεταφορικά και ο ΦΠΑ έχουν υπολογιστεί γι' αυτό."
+
+msgid "This code earns a gift the order ships with."
+msgstr "Αυτός ο κωδικός κερδίζει ένα δώρο που αποστέλλεται με την παραγγελία."
+
+msgid "This code waives shipping."
+msgstr "Αυτός ο κωδικός καταργεί τα μεταφορικά."
 
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "Η παρούσα επιβεβαίωση δεν αποτελεί φορολογικό παραστατικό. Ο ΦΠΑ χρεώνεται όταν η δωροκάρτα εξαργυρώνεται για αγορά προϊόντων."
@@ -17350,6 +17380,9 @@ msgstr "Γιατί απορρίπτεται ο κωδικός, από το λε�
 msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 msgstr "Γιατί απορρίπτεται ο κωδικός, στο λεξιλόγιο απόρριψης κουπονιών (``discount_code_expired``, ...)."
 
+msgid "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
+msgstr "Γιατί οι προωθήσεις απορρίπτουν τώρα τον συνδεδεμένο κωδικό· null όσο ισχύει. Μόνο το blockingCoupon σταματά μια παραγγελία."
+
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Γιατί ακυρώνεται το voucher (π.χ. διορθωμένη διεύθυνση). Αποθηκεύεται στην αποστολή."
 
@@ -18172,6 +18205,9 @@ msgstr "το payment intent βρίσκεται σε μη έγκυρη κατάσ
 
 msgid "payment provider"
 msgstr "πάροχος πληρωμών"
+
+msgid "quantity units at unitPrice, before promotions."
+msgstr "quantity μονάδες στην unitPrice, πριν από τις προωθήσεις."
 
 msgid "sha256 of data+i18n"
 msgstr "sha256 των data+i18n"

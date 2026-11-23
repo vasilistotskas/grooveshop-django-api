@@ -185,7 +185,7 @@ class TestTheDigest:
         with patch(resolve, return_value="acs"):
             promotion = PromotionEngine.evaluate(checkout.cart, user=None)
             acs = OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(checkout.cart, promotion),
                 promotion,
                 shipping=ShippingChoice.of(_choices(checkout)),
                 weight_grams=0,
@@ -471,7 +471,7 @@ class TestTheShippingChoice:
 
         def digest(shipping):
             return OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(checkout.cart, promotion),
                 promotion,
                 shipping=shipping,
                 weight_grams=0,
@@ -486,7 +486,7 @@ class TestTheShippingChoice:
 
         def digest(kind):
             return OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(checkout.cart, promotion),
                 promotion,
                 shipping=ShippingChoice(
                     kind=kind, provider_code=None, country_id="GR"

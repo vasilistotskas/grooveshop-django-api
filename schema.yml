@@ -40161,6 +40161,15 @@ components:
         The body of ``POST /cart/quote``: the quote, and what each
         delivery and pay way on offer would cost this cart.
       properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteLine'
+          readOnly: true
+          description: 'Οι γραμμές του καλαθιού που τιμολόγησε η προσφορά τιμής, από
+            την ίδια ανάγνωση με το itemsSubtotal και το cartDigest: ό,τι καλύπτει
+            το digest από την καθεμία (προϊόν, ποσότητα, τιμή μονάδας, χρήματα προωθήσεων),
+            με το όνομα και την εικόνα του προϊόντος.'
         itemsSubtotal:
           type: number
           format: double
@@ -40183,6 +40192,12 @@ components:
             $ref: '#/components/schemas/QuoteAppliedPromotion'
           description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
             στο discountTotal.
+        appliedCoupons:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteAppliedCoupon'
+          description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
+            το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
           allOf:
           - $ref: '#/components/schemas/QuoteBlockingCoupon'
@@ -40283,6 +40298,7 @@ components:
             μια παραγγελία.
       required:
       - amountDue
+      - appliedCoupons
       - appliedPromotions
       - blockingCoupon
       - cartDigest
@@ -40293,6 +40309,7 @@ components:
       - giftCardAmount
       - grandTotal
       - itemsSubtotal
+      - lines
       - loyaltyDiscount
       - payWays
       - paymentMethodFee
@@ -40395,6 +40412,15 @@ components:
         without a pay way, and ``giftCardAmount``, ``grandTotal``,
         ``amountDue`` and ``expectedTotal`` without both.
       properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteLine'
+          readOnly: true
+          description: 'Οι γραμμές του καλαθιού που τιμολόγησε η προσφορά τιμής, από
+            την ίδια ανάγνωση με το itemsSubtotal και το cartDigest: ό,τι καλύπτει
+            το digest από την καθεμία (προϊόν, ποσότητα, τιμή μονάδας, χρήματα προωθήσεων),
+            με το όνομα και την εικόνα του προϊόντος.'
         itemsSubtotal:
           type: number
           format: double
@@ -40417,6 +40443,12 @@ components:
             $ref: '#/components/schemas/QuoteAppliedPromotion'
           description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
             στο discountTotal.
+        appliedCoupons:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteAppliedCoupon'
+          description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
+            το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
           allOf:
           - $ref: '#/components/schemas/QuoteBlockingCoupon'
@@ -40501,6 +40533,7 @@ components:
             δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό.'
       required:
       - amountDue
+      - appliedCoupons
       - appliedPromotions
       - blockingCoupon
       - cartDigest
@@ -40511,6 +40544,7 @@ components:
       - giftCardAmount
       - grandTotal
       - itemsSubtotal
+      - lines
       - loyaltyDiscount
       - paymentMethodFee
       - shipping
@@ -41255,6 +41289,28 @@ components:
       required:
       - detail
       - reason
+    CouponRejectionReasonEnum:
+      enum:
+      - discount_code_invalid
+      - discount_code_expired
+      - discount_code_not_started
+      - discount_code_minimum_not_met
+      - discount_code_usage_limit_reached
+      - discount_code_combination_disallowed
+      - discount_code_user_ineligible
+      - discount_code_not_applicable
+      - discount_code_gift_unavailable
+      type: string
+      description: |-
+        * `discount_code_invalid` - Ο κωδικός δεν υπάρχει
+        * `discount_code_expired` - Η προσφορά έχει λήξει
+        * `discount_code_not_started` - Η προσφορά δεν έχει ξεκινήσει ακόμα
+        * `discount_code_minimum_not_met` - Το καλάθι δεν καλύπτει ακόμη την ελάχιστη προϋπόθεση της προσφοράς
+        * `discount_code_usage_limit_reached` - Ο κωδικός έχει φτάσει το όριο χρήσης του
+        * `discount_code_combination_disallowed` - Ο κωδικός δεν μπορεί να συνδυαστεί με τις εφαρμοσμένες προσφορές
+        * `discount_code_user_ineligible` - Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά
+        * `discount_code_not_applicable` - Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά
+        * `discount_code_gift_unavailable` - Το δώρο αυτού του κωδικού δεν είναι διαθέσιμο αυτή τη στιγμή
     CreateCheckoutSessionRequestRequest:
       type: object
       properties:
@@ -51875,6 +51931,53 @@ components:
       - key
       - kind
       - updatedAt
+    QuoteAppliedCoupon:
+      type: object
+      description: |-
+        What one attached coupon code does for the quoted cart
+        (``CouponVerdict``): exactly one of ``amount``, ``freeShipping``,
+        ``gift`` and ``rejection`` holds.
+      properties:
+        code:
+          type: string
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Τα χρήματα που αφαιρεί αυτός ο κωδικός· 0 όταν το όφελός του
+            δεν είναι χρήματα ή όταν απορρίπτεται.
+        freeShipping:
+          type: boolean
+          description: Αυτός ο κωδικός καταργεί τα μεταφορικά.
+        gift:
+          type: boolean
+          description: Αυτός ο κωδικός κερδίζει ένα δώρο που αποστέλλεται με την παραγγελία.
+        rejection:
+          nullable: true
+          description: |-
+            Γιατί οι προωθήσεις απορρίπτουν τώρα τον συνδεδεμένο κωδικό· null όσο ισχύει. Μόνο το blockingCoupon σταματά μια παραγγελία.
+
+            * `discount_code_invalid` - Ο κωδικός δεν υπάρχει
+            * `discount_code_expired` - Η προσφορά έχει λήξει
+            * `discount_code_not_started` - Η προσφορά δεν έχει ξεκινήσει ακόμα
+            * `discount_code_minimum_not_met` - Το καλάθι δεν καλύπτει ακόμη την ελάχιστη προϋπόθεση της προσφοράς
+            * `discount_code_usage_limit_reached` - Ο κωδικός έχει φτάσει το όριο χρήσης του
+            * `discount_code_combination_disallowed` - Ο κωδικός δεν μπορεί να συνδυαστεί με τις εφαρμοσμένες προσφορές
+            * `discount_code_user_ineligible` - Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά
+            * `discount_code_not_applicable` - Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά
+            * `discount_code_gift_unavailable` - Το δώρο αυτού του κωδικού δεν είναι διαθέσιμο αυτή τη στιγμή
+          oneOf:
+          - $ref: '#/components/schemas/CouponRejectionReasonEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - amount
+      - code
+      - freeShipping
+      - gift
+      - rejection
     QuoteAppliedPromotion:
       type: object
       properties:
@@ -51911,6 +52014,59 @@ components:
       required:
       - code
       - reason
+    QuoteLine:
+      type: object
+      description: One cart line as the quote priced it (``QuoteLine``).
+      properties:
+        id:
+          type: integer
+          description: Το στοιχείο του καλαθιού που είναι η γραμμή.
+        productId:
+          type: integer
+        productName:
+          type: string
+          readOnly: true
+          description: Το όνομα του προϊόντος στη γλώσσα του αιτήματος.
+        mainImagePath:
+          type: string
+          description: Η διαδρομή αποθήκευσης της κύριας εικόνας του προϊόντος· κενή
+            χωρίς εικόνα.
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Η τιμή ανά μονάδα που πληρώνει ο αγοραστής, πριν από τις προωθήσεις.
+        totalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: quantity μονάδες στην unitPrice, πριν από τις προωθήσεις.
+        promotionDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Το μέρος του discountTotal που φέρει αυτή η γραμμή· τα ποσά
+            των γραμμών αθροίζουν σε αυτό.
+      required:
+      - id
+      - mainImagePath
+      - productId
+      - productName
+      - promotionDiscount
+      - quantity
+      - totalPrice
+      - unitPrice
     QuotePayWayOption:
       type: object
       description: |-

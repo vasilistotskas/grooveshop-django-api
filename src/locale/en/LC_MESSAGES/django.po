@@ -8919,6 +8919,9 @@ msgstr "Moderation"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Money ACS paid out that no shipment explains"
 
+msgid "Money this code takes off; 0 when its benefit is not money, or it is refused."
+msgstr "Money this code takes off; 0 when its benefit is not money, or it is refused."
+
 msgid "Month"
 msgstr "Month"
 
@@ -13984,6 +13987,9 @@ msgstr "Stock reservation no longer valid"
 msgid "Stock set by a catalogue import"
 msgstr "Stock set by a catalogue import"
 
+msgid "Storage path of the product's main image; empty without one."
+msgstr "Storage path of the product's main image; empty without one."
+
 msgid "Store"
 msgstr "Store"
 
@@ -14717,6 +14723,9 @@ msgstr "The cart is too heavy for the selected shipping method."
 msgid "The cart is too large for the selected shipping method."
 msgstr "The cart is too large for the selected shipping method."
 
+msgid "The cart item the line is."
+msgstr "The cart item the line is."
+
 msgid "The cart token is invalid or has expired."
 msgstr "The cart token is invalid or has expired."
 
@@ -14728,6 +14737,9 @@ msgstr "The cart's free_threshold_value: the products after discounts, excluding
 
 msgid "The cart's lines at the prices the shopper pays."
 msgstr "The cart's lines at the prices the shopper pays."
+
+msgid "The cart's lines the quote priced, from the same read as itemsSubtotal and cartDigest: what the digest covers of each (product, quantity, unit price, promotion money), with the product's name and image."
+msgstr "The cart's lines the quote priced, from the same read as itemsSubtotal and cartDigest: what the digest covers of each (product, quantity, unit price, promotion money), with the product's name and image."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
@@ -15035,6 +15047,9 @@ msgstr "The pages, theme and sections a store published with the page builder, a
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 
+msgid "The part of discountTotal this line carries; the lines' amounts sum to it."
+msgstr "The part of discountTotal this line carries; the lines' amounts sum to it."
+
 msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 msgstr "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 
@@ -15115,6 +15130,9 @@ msgstr "The previous payment could not be closed."
 msgid "The previous payment is still in progress."
 msgstr "The previous payment is still in progress."
 
+msgid "The price per unit the shopper pays, before promotions."
+msgstr "The price per unit the shopper pays, before promotions."
+
 msgid "The product ships free on its own: ``price`` is 0."
 msgstr "The product ships free on its own: ``price`` is 0."
 
@@ -15129,6 +15147,9 @@ msgstr "The product's SKU when the line was created. Invoices use it, never the 
 
 msgid "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
 msgstr "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
+
+msgid "The product's name in the request's language."
+msgstr "The product's name in the request's language."
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
@@ -15387,6 +15408,9 @@ msgstr "The value every free-above threshold is judged on: the products after di
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 
+msgid "The verdict on each coupon code attached to the cart, as the promotions in this quote decided it."
+msgstr "The verdict on each coupon code attached to the cart, as the promotions in this quote decided it."
+
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "The visitor ticked the consent box. Must be true."
 
@@ -15508,6 +15532,12 @@ msgstr "This attachment is withheld pending its scan result."
 
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "This can't change once the order is placed: the shipping cost and VAT were priced for it."
+
+msgid "This code earns a gift the order ships with."
+msgstr "This code earns a gift the order ships with."
+
+msgid "This code waives shipping."
+msgstr "This code waives shipping."
 
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
@@ -17348,6 +17378,9 @@ msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code
 msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 msgstr "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 
+msgid "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
+msgstr "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
+
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 
@@ -18170,6 +18203,9 @@ msgstr "payment intent is in an invalid state: {status}"
 
 msgid "payment provider"
 msgstr "payment provider"
+
+msgid "quantity units at unitPrice, before promotions."
+msgstr "quantity units at unitPrice, before promotions."
 
 msgid "sha256 of data+i18n"
 msgstr "sha256 of data+i18n"

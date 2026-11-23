@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.conf import settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
@@ -353,44 +351,21 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         }
     )
     def get_applied_coupons(self, obj: Cart) -> list[dict]:
-        # A coupon row that only knows its own money cannot tell "free
-        # shipping" from "a better offer applies" (demo store: SHIPFREE
-        # read "a better offer applies" while it was waiving shipping),
-        # nor say why a code that stopped applying is idle. The engine
-        # already decided all of it; this hands its verdict over.
         if not self._codes_apply():
             return []
-        result = self._promotion_result(obj)
-        rejections: dict[str, str] = {}
-        for code, reason in result.rejected:
-            rejections.setdefault(code, reason)
-        benefits = {
-            code.code: promotion.benefit_type
-            for promotion, code in result.non_monetary
-            if code is not None
-        }
-        entries = []
-        for row in obj.applied_codes.all():
-            code = row.code.code
-            entries.append(
-                {
-                    "code": code,
-                    "amount": sum(
-                        (
-                            entry.amount.amount
-                            for entry in result.applied
-                            if entry.code is not None
-                            and entry.code.code == code
-                        ),
-                        Decimal(0),
-                    ),
-                    "freeShipping": benefits.get(code)
-                    == BenefitType.FREE_SHIPPING,
-                    "gift": benefits.get(code) == BenefitType.FREE_GIFT,
-                    "rejection": rejections.get(code),
-                }
-            )
-        return entries
+        verdicts = self._promotion_result(obj).coupon_verdicts(
+            row.code.code for row in obj.applied_codes.all()
+        )
+        return [
+            {
+                "code": verdict.code,
+                "amount": verdict.amount,
+                "freeShipping": verdict.free_shipping,
+                "gift": verdict.gift,
+                "rejection": verdict.rejection,
+            }
+            for verdict in verdicts
+        ]
 
     @extend_schema_field(
         {

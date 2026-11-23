@@ -10,10 +10,13 @@ the pickup point both the quote and the order take.
 
 from __future__ import annotations
 
+from django.db.models import prefetch_related_objects
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from product.managers.product import main_image_prefetch
+from promotion.enum import CouponRejectionReason
 from shipping.enum import FreeShippingSource, ShippingKind
 
 
@@ -83,6 +86,81 @@ class QuoteAppliedPromotionSerializer(serializers.Serializer):
             entry.promotion.safe_translation_getter("name", any_language=True)
             or ""
         )
+
+
+class QuoteLineSerializer(serializers.Serializer):
+    """One cart line as the quote priced it (``QuoteLine``)."""
+
+    id = serializers.IntegerField(
+        source="item_id", help_text=_("The cart item the line is.")
+    )
+    product_id = serializers.IntegerField(source="product.pk")
+    product_name = serializers.SerializerMethodField(
+        help_text=_("The product's name in the request's language.")
+    )
+    main_image_path = serializers.CharField(
+        source="product.main_image_path",
+        help_text=_(
+            "Storage path of the product's main image; empty without one."
+        ),
+    )
+    quantity = serializers.IntegerField()
+    unit_price = serializers.DecimalField(
+        source="unit_price.amount",
+        help_text=_("The price per unit the shopper pays, before promotions."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    total_price = serializers.DecimalField(
+        source="total_price.amount",
+        help_text=_("quantity units at unitPrice, before promotions."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    promotion_discount = serializers.DecimalField(
+        help_text=_(
+            "The part of discountTotal this line carries; the lines' "
+            "amounts sum to it."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+
+    def get_product_name(self, line) -> str:
+        return (
+            line.product.safe_translation_getter("name", any_language=True)
+            or ""
+        )
+
+
+class QuoteAppliedCouponSerializer(serializers.Serializer):
+    """What one attached coupon code does for the quoted cart
+    (``CouponVerdict``): exactly one of ``amount``, ``freeShipping``,
+    ``gift`` and ``rejection`` holds."""
+
+    code = serializers.CharField()
+    amount = serializers.DecimalField(
+        help_text=_(
+            "Money this code takes off; 0 when its benefit is not money, "
+            "or it is refused."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+    free_shipping = serializers.BooleanField(
+        help_text=_("This code waives shipping.")
+    )
+    gift = serializers.BooleanField(
+        help_text=_("This code earns a gift the order ships with.")
+    )
+    rejection = serializers.ChoiceField(
+        choices=CouponRejectionReason.choices,
+        allow_null=True,
+        help_text=_(
+            "Why the promotions refuse the attached code now; null while "
+            "it applies. Only blockingCoupon stops an order."
+        ),
+    )
 
 
 class QuoteBlockingCouponSerializer(serializers.Serializer):
@@ -184,6 +262,14 @@ class CheckoutQuoteSerializer(serializers.Serializer):
     ``amountDue`` and ``expectedTotal`` without both.
     """
 
+    lines = serializers.SerializerMethodField(
+        help_text=_(
+            "The cart's lines the quote priced, from the same read as "
+            "itemsSubtotal and cartDigest: what the digest covers of each "
+            "(product, quantity, unit price, promotion money), with the "
+            "product's name and image."
+        ),
+    )
     items_subtotal = serializers.DecimalField(
         source="items_subtotal.amount",
         help_text=_("The cart's lines at the prices the shopper pays."),
@@ -202,6 +288,14 @@ class CheckoutQuoteSerializer(serializers.Serializer):
         help_text=_(
             "One entry per promotion that took money off; the amounts "
             "sum to discountTotal."
+        ),
+    )
+    applied_coupons = QuoteAppliedCouponSerializer(
+        source="coupons",
+        many=True,
+        help_text=_(
+            "The verdict on each coupon code attached to the cart, as "
+            "the promotions in this quote decided it."
         ),
     )
     blocking_coupon = QuoteBlockingCouponSerializer(
@@ -283,6 +377,15 @@ class CheckoutQuoteSerializer(serializers.Serializer):
             "one."
         ),
     )
+
+    @extend_schema_field(QuoteLineSerializer(many=True))
+    def get_lines(self, quote) -> list:
+        # Each line shows its product's main image: one query for all
+        # of them, not one per line.
+        prefetch_related_objects(
+            [line.product for line in quote.lines], main_image_prefetch()
+        )
+        return list(QuoteLineSerializer(quote.lines, many=True).data)
 
 
 class CartQuoteSerializer(CheckoutQuoteSerializer):

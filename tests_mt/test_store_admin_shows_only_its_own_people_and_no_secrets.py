@@ -14,11 +14,8 @@ from django_tenants.test.client import TenantClient
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
 
 pytestmark = pytest.mark.django_db
 

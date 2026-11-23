@@ -1,7 +1,7 @@
 """HTTP-level tests for the Viva Wallet webhook money path (G0400).
 
 The payment-created (1796) webhook is a money path that previously had zero
-test coverage. These POST to the real endpoint with ``_verify_transaction``
+test coverage. These POST to the real endpoint with ``verify_transaction``
 mocked, asserting a verified payment marks the order paid and an unverifiable
 one does NOT.
 """
@@ -104,7 +104,7 @@ class VivaWebhookMoneyPathTestCase(TestCase):
 
     def test_verified_payment_marks_order_paid(self):
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 verified_payment(self.order, "OC123"),
@@ -121,7 +121,7 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         # A spoofed 1796 whose transaction can't be verified must 500
         # (Viva retries) and never flip payment state.
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(None, {}),
         ):
             response = self._post(self._event(TransactionId="forged"))
@@ -134,7 +134,7 @@ class VivaWebhookMoneyPathTestCase(TestCase):
     def test_non_final_status_id_skips_payment(self):
         # StatusId != 'F' means the payment isn't finished — no state change.
         with patch(
-            "order.views.viva_webhook._verify_transaction"
+            "order.payments.viva_settlement.verify_transaction"
         ) as mock_verify:
             response = self._post(self._event(StatusId="E"))
 
@@ -161,7 +161,7 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         self.order.save(update_fields=["metadata"])
 
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 verified_payment(self.order, "OC_OLD"),

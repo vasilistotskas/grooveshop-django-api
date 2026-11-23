@@ -15,7 +15,7 @@ from extra_settings.models import Setting
 from admin.dashboard.store import queries, widgets
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]

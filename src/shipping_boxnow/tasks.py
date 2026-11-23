@@ -11,7 +11,10 @@ from django.utils import timezone
 from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
 from order.storefront_links import account_order_path
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowAuthError,
@@ -128,6 +131,16 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             extra={"order_id": order_id},
         )
         return {"status": "awaiting_payment", "order_id": order_id}
+    except ShipmentNotNeededError as exc:
+        # Not a failure: the order's payment all went back while the
+        # creation waited. Nothing is to ship: no retry, no alert.
+        logger.warning(
+            "BoxNow shipment not created for order %s: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {"status": "not_needed", "order_id": order_id}
     except BoxNowConfigError as exc:
         # The tenant has no BoxNow credentials. BoxNowConfigError is a
         # SIBLING of BoxNowAPIError, not a subclass, so it matched
@@ -307,6 +320,40 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
         extra={"counters": result},
     )
     return result
+
+
+@shared_task
+def sync_boxnow_locker_catalogue() -> list[dict[str, str]]:
+    """BOX NOW's public locker catalogue is one file for every store: fetch
+    it once here, in the public schema, and have each store with BOX NOW on
+    apply it (``apply_boxnow_locker_catalogue``). Scheduled hourly
+    (``sync-boxnow-locker-catalogue``): availability moves during the day
+    and the files are static and small."""
+    from shipping_boxnow.catalogue import fetch_catalogues
+    from tenant.celery import run_for_all_tenants
+
+    catalogue = fetch_catalogues()
+    if not catalogue:
+        return []
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.apply_boxnow_locker_catalogue",
+        catalogue=catalogue,
+    )
+
+
+@shared_task(base=BoxNowTask)
+def apply_boxnow_locker_catalogue(
+    catalogue: dict[str, dict[str, list]],
+) -> dict[str, int]:
+    """Set this store's locker sizes and availability from the public
+    catalogue the fan-out fetched once for every store
+    (``shipping_boxnow.catalogue``). A store without BOX NOW is skipped."""
+    if _skip_if_boxnow_unconfigured("apply_boxnow_locker_catalogue"):
+        return {"updated": 0, "unknown": 0}
+
+    from shipping_boxnow.catalogue import apply_catalogues
+
+    return apply_catalogues(catalogue, keep=True)
 
 
 @shared_task(

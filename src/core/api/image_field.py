@@ -38,3 +38,21 @@ class ServableImageField(serializers.ImageField):
                 exc.messages[0], code=exc.code
             ) from exc
         return upload
+
+
+# ``main_image_width``/``main_image_height``: the size a browser shows the
+# image ``main_image_path`` names at (EXIF orientation applied), as
+# ``ImageAndSvgField`` stored it; null for an SVG, no image, or a row not
+# measured yet. The storefront states the media service's rendition size
+# from it (og:image:width/height, a schema.org ImageObject). Read from the
+# row's own ``image_width``/``image_height``; a serializer whose image is on
+# another row declares the two fields itself. A comment, not a docstring:
+# drf-spectacular would publish a docstring as the description of every
+# serializer that mixes this in.
+class MainImageSizeMixin(serializers.Serializer):
+    main_image_width = serializers.IntegerField(
+        source="image_width", read_only=True, allow_null=True
+    )
+    main_image_height = serializers.IntegerField(
+        source="image_height", read_only=True, allow_null=True
+    )

@@ -181,7 +181,7 @@ and says which file holds each § number used here.
   rest.
 - **A canceled order never gets a live parcel.** A staff or system order
   cancel goes on when the courier step is refused
-  (`OrderService.cancel_attached_shipment` never raises): while a creation
+  (`OrderLifecycleService.cancel_attached_shipment` never raises): while a creation
   of uncertain outcome settles, or one is in flight, and while BoxNow gives
   no answer (the cancel stays pending and is asked again,
   [cancel §7.1.2](cancel.md)). The order's status is
@@ -191,8 +191,9 @@ and says which file holds each § number used here.
   (`_cancel_for_a_canceled_order`), which cancels a parcel BoxNow lists,
   refuses with a `BoxNowBusyError` while the creation settles (the task
   retries) and cancels locally once the lookup is authoritative or when no
-  creation was sent. In phase 3, `_persist_parcel` treats an order canceled
-  meanwhile like a shipment canceled meanwhile: the row is recorded
+  creation was sent. In phase 3, `_persist_parcel` treats an order that
+  stopped shipping meanwhile (`Order.ships_nothing`: canceled, or its
+  payment refunded in full) like a shipment canceled meanwhile: the row is recorded
   CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
   cancelled at BoxNow. It locks the order row first
   (`shipping.locks.lock_with_order`), so an order cancel still in its
@@ -207,12 +208,18 @@ and says which file holds each § number used here.
   `BoxNowService.settle_uncertain_creation` for each shipment with no
   parcel whose `creation_uncertain_at` is older than the settle time and
   whose creation is not in flight:
-  - a canceled order: its cancel is finished as the creation would
-    (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
-    there and recorded, none is a local cancel. A refusal is reported
+  - an order that ships nothing (`Order.ships_nothing`: canceled, or its
+    payment refunded in full, which leaves it PROCESSING): its shipment is
+    cancelled as a canceled order's creation would
+    (`_cancel_unsent_shipment`): a parcel BoxNow lists is cancelled there
+    and recorded, none is a local cancel. A refund's cancel leaves a staff
+    note on the order: a refund that fails or is reversed makes it payable
+    again, and only "Create BoxNow parcel now" creates its parcel then. An
+    order whose refund was reversed before the cancel is left for the next
+    run, which settles it as a live order's creation. A refusal is reported
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
     and ends the uncertainty wherever it is met, by the sweep or by the
-    creation task (`_cancel_for_a_canceled_order` ends it), so it is
+    creation task (`_cancel_unsent_shipment` ends it), so it is
     reported once;
   - a live order: under the creation's own claim, the order is looked up by
     `orderNumber`. One live `new` parcel created for this shipment's terms
@@ -331,6 +338,64 @@ and says which file holds each § number used here.
   the shipment row, the options flag, the locker search), because they become
   physical order lines. A gift the engine leaves out (sold out) adds nothing;
   one lost to a later stock race only makes the booked size larger.
+- **Each locker's compartment sizes and availability come from BOX NOW's
+  public locker catalogue**, not the partner API: its destinations carry
+  neither, and its `requiredSize` filter returns the same lockers for every
+  size (production, 2026-11-21). The catalogue is the file BOX NOW's own map
+  widget reads, `BOXNOW_LOCKER_CATALOGUE_URL` per country
+  (`BOXNOW_LOCKER_CATALOGUE_COUNTRIES`): a JSON object of locker id to
+  `address, id, lat, lng, postalCode, probability, sizes, title`. **BOX NOW
+  documents neither the file nor its shape**; they are the widget's
+  internals, the same data its official picker filters on, and the question
+  to BOX NOW is open. `shipping_boxnow.catalogue` therefore validates it
+  strictly (`CATALOGUE_SCHEMA`); on any fetch or shape failure it logs an
+  ERROR naming the country and keeps the stored sizes. The hourly
+  `sync-boxnow-locker-catalogue` task (`sync_boxnow_locker_catalogue`) sets
+  `BoxNowLocker.compartment_sizes` and `availability_probability` of the
+  active lockers: **a locker lists a size by exact membership**, as the
+  widget's `acceptLocker.js` does (a bigger compartment is not assumed to
+  take a smaller parcel), and one the catalogue lacks is **unknown**: empty
+  sizes, its ids logged at WARNING. `limitedAvailability` is
+  `probability < BOXNOW_LIMITED_AVAILABILITY_BELOW` (0.87, the widget's
+  threshold), false when unknown.
+  **Sizes exist only for BOX NOW's live network.** The catalogue describes
+  production lockers; a store on BOX NOW's stage environment
+  (`Tenant.box_now_live_mode` off, read through `box_now_credentials()`)
+  holds stage ids, a different id space whose numbers collide with
+  production's (stage 5 and production 5 are different lockers, found on
+  the demo store on 2026-11-22). So `shipping_boxnow.catalogue.sizes_exist()`
+  gates everything below: the sync resets a stage store's lockers to
+  unknown instead of applying the file, and the `compartmentSize` filter,
+  the quote's size and the order refusal do not apply to it (its lockers
+  list no sizes and no locker is refused for one). A live store still
+  refuses a locker whose sizes are unknown.
+  `GET /shipping/boxnow/lockers` takes `compartmentSize` (1 to 3) and
+  returns `compartmentSizes` and `limitedAvailability` per locker;
+  `POST /cart/quote` names the cart's `compartmentSize` on a BOX NOW pickup
+  option (null elsewhere, and on a store that is not live). **Order
+  creation on a live store refuses a locker that does not list the cart's
+  size** with 400 `pickup_point_too_small` on `boxnowLockerId`, and one
+  whose sizes are not known with `pickup_point_size_unknown`
+  (`ShippingCarrierInterface.assert_pickup_point_fits` raising a
+  `shipping.interfaces.PickupPointUnfit`, run in the locked quote; the
+  quote answers the same codes, the payment intent `invalid_order_data`).
+  A locker is unknown only until the catalogue names it: each store keeps
+  the last catalogue it applied for `BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS`
+  (3 hours, `remember_catalogues`), and a partner sync that creates lockers
+  (the daily one, the admin button, the resync an order for a locker the
+  table lacks runs) applies it again at once
+  (`apply_remembered_catalogues`), so a locker BOX NOW added is sized
+  before the next hourly run when the catalogue already lists it.
+- **A locker is withdrawn after N daily syncs without it**, not at the
+  first absence: the partner list churns about 3% a day (62 rows left and
+  48 joined in 14 hours, production 2026-11-21).
+  `BoxNowLocker.consecutive_absent_syncs` counts the absences, a locker the
+  partner returns is reactivated and reset, and
+  `BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION` (3: about 48 hours at the
+  daily 02:00 sync; derive it again when that cadence changes) deactivates
+  it. A partner list that is empty or smaller than
+  `BOXNOW_LOCKER_SYNC_MIN_FRACTION` of the active lockers is an error
+  response: ERROR logged, no counter moved, nothing deactivated.
 - **A cart that fits no compartment is refused at checkout**, next to the
   weight cap: `ShippingService.assert_available(items=...)` asks the
   adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by

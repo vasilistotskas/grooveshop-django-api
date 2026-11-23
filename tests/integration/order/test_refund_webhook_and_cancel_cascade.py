@@ -16,8 +16,9 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
-from order.services import OrderService
+from order.refunds.service import RefundService
 from pay_way.factories import PayWayFactory
 
 # ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ from pay_way.factories import PayWayFactory
 
 @pytest.mark.django_db
 class TestCancelOrderCascadesToShipment:
-    """``OrderService.cancel_order`` calls ``ShippingService.cancel_shipment``.
+    """``OrderLifecycleService.cancel_order`` calls ``ShippingService.cancel_shipment``.
 
     The cancel-shipment path itself is provider-specific (ACS guard
     rejects post-pickup-list, BoxNow has its own rules) — the
@@ -45,7 +46,7 @@ class TestCancelOrderCascadesToShipment:
             "shipping.services.ShippingService.cancel_shipment",
             return_value=True,
         ) as mock_cancel:
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order, reason="cascade test", refund_payment=False
             )
         mock_cancel.assert_called_once()
@@ -64,7 +65,9 @@ class TestCancelOrderCascadesToShipment:
             "shipping.services.ShippingService.cancel_shipment",
             return_value=True,
         ):
-            OrderService.cancel_order(order, reason="m", refund_payment=False)
+            OrderLifecycleService.cancel_order(
+                order, reason="m", refund_payment=False
+            )
         order.refresh_from_db()
         cancellation = order.metadata.get("cancellation", {})
         shipment_cancel = cancellation.get("shipment_cancel", {})
@@ -86,7 +89,7 @@ class TestCancelOrderCascadesToShipment:
                 "carrier rejected — already in pickup list"
             ),
         ):
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order,
                 reason="m",
                 refund_payment=False,
@@ -109,7 +112,9 @@ class TestCancelOrderCascadesToShipment:
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
-        OrderService.cancel_order(order, reason="m", refund_payment=False)
+        OrderLifecycleService.cancel_order(
+            order, reason="m", refund_payment=False
+        )
         order.refresh_from_db()
         cancellation = order.metadata.get("cancellation", {})
         shipment_cancel = cancellation.get("shipment_cancel", {})
@@ -159,7 +164,7 @@ class TestRefundOrderConcurrencyGuard:
             "order.payments.payment.get_payment_provider"
         ) as mock_provider:
             with pytest.raises(PaymentError):
-                OrderService.refund_order(order, reason="dup")
+                RefundService.refund_order(order, reason="dup")
 
             # The locked ledger blocked it: no second provider refund.
             mock_provider.assert_not_called()
@@ -178,7 +183,7 @@ class TestRefundOrderConcurrencyGuard:
             "order.payments.payment.get_payment_provider"
         ) as mock_provider:
             with pytest.raises(PaymentError, match=r"\(20\.00\)"):
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, amount=Money("30.00", "EUR"), reason="dup"
                 )
 

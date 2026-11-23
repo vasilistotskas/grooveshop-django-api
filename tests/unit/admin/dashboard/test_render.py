@@ -34,9 +34,10 @@ pytestmark = pytest.mark.django_db
 # three queries each for this period, the one before and the chart's
 # buckets; 81 cold on 2026-11-10: the ACS voucher requests to check and
 # the ACS vouchers matching no order are a count each; 82 cold the same
-# day: the ACS voucher hold is one more count); re-measure before raising.
+# day: the ACS voucher hold is one more count; 83 cold on 2026-11-22: the
+# payments to review are one more count); re-measure before raising.
 WARM_BUDGET = 39
-COLD_BUDGET = 82
+COLD_BUDGET = 83
 
 
 @pytest.fixture

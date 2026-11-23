@@ -349,6 +349,15 @@ def fanout_purge_expired_acs_api_calls():
     )
 
 
+# Erasure is owed by every store, so it reaches SUSPENDED tenants too.
+@celery_app.task(base=TenantTask)
+def fanout_erase_late_carrier_data():
+    return run_for_all_tenants(
+        "user.tasks.erase_late_carrier_data",
+        include_suspended=True,
+    )
+
+
 # A retention sweep like the ones above, so it reaches SUSPENDED tenants
 # too: an unconfirmed signup past its window is personal data kept
 # without consent, whatever the store's billing state.
@@ -474,7 +483,7 @@ def fanout_clear_expired_sessions():
 # NOT a fanout: billing terms, dunning bookkeeping, and outbound
 # platform mail all live on the PUBLIC schema (Tenant rows), so the
 # whole estate is processed in one public-schema pass. Defined here —
-# not in tenant/billing.py — because Celery autodiscovery only scans
+# not in src/tenant/billing.py — because Celery autodiscovery only scans
 # ``tasks.py`` modules.
 @celery_app.task(
     base=MonitoredTask,

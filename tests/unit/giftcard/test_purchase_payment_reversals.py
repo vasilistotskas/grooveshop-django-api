@@ -404,7 +404,7 @@ class TestVivaReversals:
 class TestCompletionIsBoundToThePurchase:
     def _complete(self, purchase, data):
         with patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(PaymentStatus.COMPLETED, data),
         ):
             return _process_gift_card_purchase_event(

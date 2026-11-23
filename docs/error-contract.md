@@ -110,7 +110,11 @@ stable discriminator already existed, `code` now repeats it:
   answers a delivery it cannot price this way, with
   `shipping_unavailable`, `shipping_parcel_too_large` or
   `shipping_weight_exceeded` (`shipping.enum.ShippingRefusal`), so a
-  client can drop the selection and go on. A loyalty refusal there and on
+  client can drop the selection and go on, and a pickup point that cannot
+  be confirmed to take the cart with `pickup_point_too_small` or
+  `pickup_point_size_unknown` (`shipping.interfaces.PickupPointUnfit`;
+  order creation answers those two as field errors on the carrier's
+  location field, the payment intent as `invalid_order_data`). A loyalty refusal there and on
   the payment intent carries the loyalty program's code when it has one
   (`loyalty_redemption_too_small`), else `loyalty_redemption_invalid`. The payment intent and order
   creation keep `invalid_order_data` with the message under

@@ -268,7 +268,7 @@ class TestOrderAttributionOnCreate(APITestCase):
 
     def test_a_referrer_on_the_store_own_domain_is_ignored(self, *_mocks):
         with patch(
-            "order.services.tenant_domain_set",
+            "order.checkout.attribution_service.tenant_domain_set",
             return_value={"webside.gr"},
         ):
             response = self._post(

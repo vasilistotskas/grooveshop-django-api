@@ -3,7 +3,7 @@
 The money of a cash-on-delivery order enters the ledger as a
 ``COD_COLLECTION`` row, and there is no provider to refund it through: the
 merchant pays the customer back (a bank transfer, cash) and says how. That
-refund goes through the same ``OrderService.refund_order`` and the same
+refund goes through the same ``RefundService.refund_order`` and the same
 staff action as any other, is one REFUND row and one ``order_refunded``, so
 the myDATA 11.4 credit note, the email and the rest follow as they do for a
 Stripe or Viva refund.
@@ -38,6 +38,7 @@ from order.payments.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
 )
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
 from product.factories.product import ProductFactory
@@ -104,7 +105,7 @@ class TestRefundingCollectedCash:
     ):
         order = _cod_order("100.00")
 
-        result = OrderService.refund_order(
+        result = RefundService.refund_order(
             order, reason="returned", repayment_reference="TRX-1"
         )
 
@@ -130,11 +131,11 @@ class TestRefundingCollectedCash:
     def test_two_part_refunds_then_nothing_is_left(self, refunded_signals):
         order = _cod_order("100.00")
 
-        first = OrderService.refund_order(
+        first = RefundService.refund_order(
             order, amount=_eur("30.00"), repayment_reference="TRX-A"
         )
         assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
-        second = OrderService.refund_order(
+        second = RefundService.refund_order(
             order, amount=_eur("70.00"), repayment_reference="TRX-B"
         )
 
@@ -150,19 +151,19 @@ class TestRefundingCollectedCash:
         assert len(refunded_signals) == 2
 
         with pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(order, repayment_reference="TRX-C")
+            RefundService.refund_order(order, repayment_reference="TRX-C")
         assert str(excinfo.value) == "This order has already been refunded."
 
     def test_more_than_the_remainder_is_refused_and_records_nothing(
         self, refunded_signals
     ):
         order = _cod_order("100.00")
-        OrderService.refund_order(
+        RefundService.refund_order(
             order, amount=_eur("60.00"), repayment_reference="TRX-A"
         )
 
         with pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, amount=_eur("40.01"), repayment_reference="TRX-B"
             )
 
@@ -177,7 +178,7 @@ class TestRefundingCollectedCash:
 
         for blank in ("", "   "):
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, amount=_eur("10.00"), repayment_reference=blank
                 )
             assert str(excinfo.value).startswith("Say how the cash was paid")
@@ -190,7 +191,7 @@ class TestRefundingCollectedCash:
         order = _cod_order("100.00")
 
         with pytest.raises(PaymentError):
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order,
                 amount=_eur("10.00"),
                 repayment_reference="x" * (REPAYMENT_REFERENCE_MAX_LENGTH + 1),
@@ -200,12 +201,12 @@ class TestRefundingCollectedCash:
 
     def test_a_double_submit_does_not_book_two_refunds(self, refunded_signals):
         order = _cod_order("100.00")
-        OrderService.refund_order(
+        RefundService.refund_order(
             order, amount=_eur("30.00"), repayment_reference="TRX-1"
         )
 
         with pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, amount=_eur("30.00"), repayment_reference="TRX-1"
             )
 
@@ -220,7 +221,7 @@ class TestRefundingCollectedCash:
         first, second = _cod_order("20.00"), _cod_order("20.00")
 
         for order in (first, second):
-            OrderService.refund_order(order, repayment_reference="TRX-1")
+            RefundService.refund_order(order, repayment_reference="TRX-1")
 
         assert _refund_rows(first).count() == _refund_rows(second).count() == 1
 
@@ -236,7 +237,7 @@ class TestRefundingCollectedCash:
         )
 
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, amount=_eur("10.00"), repayment_reference="unused"
             )
 
@@ -255,7 +256,7 @@ class TestUncollectedCash:
 
         assert PaymentLedger.refundable(order) == 0
         with pytest.raises(PaymentError) as excinfo:
-            OrderService.refund_order(order, repayment_reference="TRX-1")
+            RefundService.refund_order(order, repayment_reference="TRX-1")
 
         assert str(excinfo.value) == (
             "The payment on delivery has not been collected yet, so there "
@@ -288,7 +289,7 @@ class TestMixedProviderAndCash:
         order = self._mixed()
 
         with FakeStripeRefunds() as stripe_api:
-            result = OrderService.refund_order(
+            result = RefundService.refund_order(
                 order, repayment_reference="TRX-MIX"
             )
 
@@ -307,7 +308,7 @@ class TestMixedProviderAndCash:
 
         with FakeStripeRefunds() as stripe_api:
             with pytest.raises(PaymentError):
-                OrderService.refund_order(order)
+                RefundService.refund_order(order)
 
         assert stripe_api.calls == []
         assert not _refund_rows(order).exists()
@@ -316,7 +317,7 @@ class TestMixedProviderAndCash:
         order = self._mixed()
 
         with FakeStripeRefunds() as stripe_api:
-            OrderService.refund_order(order, amount=_eur("25.00"))
+            RefundService.refund_order(order, amount=_eur("25.00"))
 
         assert stripe_api.amounts == [2500]
         assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
@@ -374,13 +375,13 @@ class TestTheCreditNote:
             FakeAade() as aade,
         ):
             order = self._shipped_cod_order()
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order,
                 amount=_eur("24.00"),
                 reason="one item back",
                 repayment_reference="IBAN-TRX-1",
             )
-            OrderService.refund_order(
+            RefundService.refund_order(
                 order, reason="the rest", repayment_reference="IBAN-TRX-2"
             )
 

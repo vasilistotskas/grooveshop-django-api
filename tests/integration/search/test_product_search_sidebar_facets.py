@@ -186,9 +186,7 @@ def shop(db):
                 vat=vat,
                 view_count=views,
                 translations=[
-                    ProductTranslation(
-                        language_code="en", name=marker, description=""
-                    )
+                    ProductTranslation(language_code="en", name=marker)
                 ],
             )
             assign_values(product, key, values)

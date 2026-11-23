@@ -24,15 +24,15 @@ from blog.serializers.category import (
 )
 from blog.serializers.post import BlogPostSerializer
 from blog.views.post import BLOG_POST_ORDERING
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from core.utils.views import cache_methods
 from tenant.permissions import IsBlogEnabled
 

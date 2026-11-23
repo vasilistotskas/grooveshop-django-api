@@ -331,7 +331,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_owner_cannot_delete_own_order(self):
         # ``destroy`` is admin-only: DRF's default destroy soft-deletes
         # the row without releasing stock, refunding, or cancelling the
-        # courier voucher — bypassing OrderService.cancel_order. A
+        # courier voucher — bypassing OrderLifecycleService.cancel_order. A
         # non-staff owner must not reach it (customers cancel, not
         # delete). Regression for the owner-reachable destroy hole.
         self.client.force_authenticate(user=self.user)

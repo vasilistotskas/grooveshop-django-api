@@ -14,7 +14,8 @@ markdown; it discounts the already-marked-down cart line totals.
 One module per seam, each importing only the ones below it:
 
 - ``evaluation``: ``PromotionEngine``, the entry point (``evaluate``,
-  ``single_unit_discount``) and the classification every caller shares.
+  ``evaluate_single_unit``, ``single_unit_discount``) and the
+  classification every caller shares.
 - ``teasers``: near-miss entries and the cart a teaser's advice builds.
 - ``redemptions``: the redemption rows an order records.
 - ``eligibility``: candidate collection and the per-promotion checks.

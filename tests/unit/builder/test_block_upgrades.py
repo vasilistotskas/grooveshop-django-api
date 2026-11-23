@@ -27,6 +27,7 @@ from builder.block_upgrades import (
 )
 from builder.published import localised
 from builder.storefront import parse_catalogue
+from tests.utils.builder import default_icons
 from tests.utils.real_catalogues import block
 
 CASES: list[dict[str, Any]] = json.loads(
@@ -43,6 +44,7 @@ def catalogue(*, translatable: tuple[str, ...] = (), **versions: int):
     return parse_catalogue(
         {
             "hash": "h",
+            "icons": default_icons(),
             "blocks": [
                 {
                     "type": name,
@@ -290,6 +292,7 @@ def icon_block(
     return parse_catalogue(
         {
             "hash": "h",
+            "icons": default_icons(),
             "blocks": [
                 {
                     "type": name,

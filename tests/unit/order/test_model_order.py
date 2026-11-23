@@ -121,7 +121,7 @@ class OrderModelTestCase(TestCase):
         self.assertTrue(Order.is_paid.__get__(self.order))
 
     def test_fully_covered_order_no_longer_awaits_online_payment(self):
-        """awaits_online_payment is `not is_paid` behind an online pay
+        """awaits_online_payment reads the settled statuses behind an online pay
         way, so the same gap kept a settled order in the "pay now" state
         and let the checkout endpoints open a zero-amount session."""
         self.order.payment_status = PaymentStatus.COMPLETED

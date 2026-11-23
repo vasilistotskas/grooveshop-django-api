@@ -28,6 +28,7 @@ from django.utils.translation import gettext_lazy as _
 from shipping.exceptions import ShippingProviderNotFoundError
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from decimal import Decimal
 
     from django.db.models import Q
@@ -59,6 +60,43 @@ PICKUP_POINT_UNAVAILABLE = _(
 PICKUP_POINT_IN_ANOTHER_COUNTRY = _(
     "This pickup point is not in the delivery country. Choose another one."
 )
+
+
+PICKUP_POINT_TOO_SMALL = _(
+    "This locker has no compartment for your order's size. Choose another one."
+)
+
+
+PICKUP_POINT_SIZE_UNKNOWN = _(
+    "We cannot confirm yet that this locker takes your order's size. "
+    "Choose another one."
+)
+
+
+class PickupPointUnfit(ValueError):
+    """The pickup point cannot be confirmed to take the order's parcel: no
+    order is sent there (``assert_pickup_point_fits``). ``code`` is the
+    stable code the API answers with, ``message`` what the shopper reads."""
+
+    code: str
+    message: Any
+
+
+class PickupPointTooSmall(PickupPointUnfit):
+    """The pickup point lists the compartment sizes it has, and not the
+    order's."""
+
+    code = "pickup_point_too_small"
+    message = PICKUP_POINT_TOO_SMALL
+
+
+class PickupPointSizeUnknown(PickupPointUnfit):
+    """The pickup point's compartment sizes are not known yet (a locker the
+    carrier's size list does not hold yet): whether it takes the order
+    cannot be told."""
+
+    code = "pickup_point_size_unknown"
+    message = PICKUP_POINT_SIZE_UNKNOWN
 
 
 class PickupPointInAnotherCountry(ValueError):
@@ -191,6 +229,44 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
+    def erase_recipient_data(
+        self, order_ids: list[int], *, buyer_values: dict[int, list[str]]
+    ) -> dict[str, int]:
+        """Remove the recipient's data from this carrier's records of the
+        given orders, for GDPR erasure (``order.privacy``): the copies of
+        the order's name, address, phone and notes it keeps on rows of its
+        own, which survive the order's anonymisation. *buyer_values* are
+        each order's email, name, phone and typed cancel reason, to redact
+        from free text staff wrote (empty when the order was erased
+        earlier). Returns a tally of the rows touched, by kind.
+
+        Default: nothing to remove, for a carrier that keeps no records of
+        its own (the flat rate).
+        """
+        return {}
+
+    def orders_written_since(self, since: datetime) -> set[int]:
+        """The orders this carrier wrote a record of since *since*, read
+        from the rows written since then: what the daily sweep of erased
+        orders clears again (``order.privacy.erase_late_carrier_data``),
+        so data that arrives after an erasure, the parcel's last event
+        included, does not stay.
+
+        Default: none, for a carrier that keeps no records of its own.
+        """
+        return set()
+
+    def recipient_data(self, order_ids: list[int]) -> dict[int, dict]:
+        """What this carrier reported about the recipient of each of the
+        given orders and :meth:`erase_recipient_data` clears, for a data
+        export (``user.services.gdpr``), by order id. The copies of the
+        order's own data it keeps are not repeated: the export lists the
+        order.
+
+        Default: nothing, for a carrier that keeps no records of its own.
+        """
+        return {}
+
     def address_of_pickup_point(
         self, location: Mapping[str, str]
     ) -> PostalAddress:
@@ -271,6 +347,29 @@ class ShippingCarrierInterface(ABC):
         locker) refuses at checkout rather than at the courier.
         Default: no size limit.
         """
+        return
+
+    def parcel_size(
+        self,
+        *,
+        kind: ShippingKind,
+        items: Iterable[tuple[Any, int]],
+    ) -> int | None:
+        """The compartment size ``items`` pack into for this carrier and
+        kind, or ``None`` when the carrier has no sizes or they fit none.
+        Default: none."""
+        return None
+
+    def assert_pickup_point_fits(
+        self,
+        location: Mapping[str, str],
+        *,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Raise :class:`PickupPointUnfit` when the pickup point
+        *location* names cannot take ``items`` packed as the carrier
+        packs them. Called once the point is known to exist
+        (:meth:`deliverable_pickup_point`). Default: every point fits."""
         return
 
     def live_quote(

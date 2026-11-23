@@ -1,0 +1,517 @@
+"""What each viewset action serializes and how its OpenAPI operation reads.
+
+``ActionConfig`` names an action's request and response serializers and its
+schema metadata; ``crud_config`` builds the usual set for a model, and
+``create_schema_view_config`` turns a viewset's config into the
+``extend_schema_view`` decorator. ``BaseModelViewSet`` reads
+``serializers_config`` (``core.api.views``).
+"""
+
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, NotRequired, TypedDict
+
+from django.db import models
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
+from rest_framework import serializers
+
+
+class _CrudTemplate(TypedDict):
+    op_prefix: str
+    summary: str | Promise
+    description: str | Promise
+    use_plural: bool
+
+
+def camel_to_words(name):
+    result = re.sub(r"(?<!^)(?=[A-Z])", " ", name)
+    return result
+
+
+class DisplayConfig(TypedDict):
+    tag: NotRequired[str | Promise]
+    display_name: NotRequired[str | Promise]
+    display_name_plural: NotRequired[str | Promise]
+
+
+@dataclass(frozen=True, slots=True)
+class ActionConfig:
+    """Per-action serializer and schema configuration."""
+
+    request: type[serializers.Serializer] | None = None
+    response: type[serializers.Serializer] | None = None
+    # Keys are a status code, or a ``(status, media_type)`` pair when the
+    # action does not answer in JSON — that pair is what makes the schema
+    # say ``application/pdf`` for a label download instead of inheriting
+    # the view's JSON renderer. Values allow ``OpenApiTypes`` so a file
+    # stream can be declared as binary rather than as a serializer.
+    responses: (
+        dict[
+            int | tuple[int, str],
+            type[serializers.Serializer]
+            | dict
+            | OpenApiTypes
+            | OpenApiResponse
+            | None,
+        ]
+        | None
+    ) = None
+    operation_id: str | None = None
+    summary: str | Promise | None = None
+    description: str | Promise | None = None
+    tags: list[str] | None = None
+    parameters: list | None = None
+    deprecated: bool = False
+    many: bool = False
+    # Only meaningful when ``many=True`` on a non-CRUD action: whether the
+    # action actually paginates its output (most do, via
+    # ``paginate_and_serialize``). A handful of custom actions return a
+    # deliberately unpaginated array (``@action(..., pagination_class=None)``
+    # + a bare ``serializer_class(queryset, many=True)`` call) — set this to
+    # ``False`` there so the schema doesn't advertise pagination params the
+    # view ignores.
+    paginated: bool = True
+
+    def get_response_map(self, *, error_serializer=None, default_status=200):
+        result = {}
+        if error_serializer:
+            result.update(
+                {
+                    400: error_serializer,
+                    401: error_serializer,
+                    403: error_serializer,
+                    404: error_serializer,
+                    500: error_serializer,
+                }
+            )
+        if self.response is not None:
+            result[default_status] = (
+                self.response(many=True) if self.many else self.response
+            )
+        if self.responses:
+            result.update(self.responses)
+        return result
+
+
+type SerializersConfig = dict[str, ActionConfig]
+
+
+def crud_config(
+    *,
+    # `list` shadows the builtin, and that is the point: these three
+    # keyword names ARE the DRF action names the config maps to, so the
+    # call sites read `crud_config(list=..., detail=..., write=...)`.
+    # Renaming one of the three would break that symmetry at 28 call
+    # sites, and this function never calls the builtin.
+    list: type[serializers.Serializer],  # noqa: A002
+    detail: type[serializers.Serializer],
+    write: type[serializers.Serializer] | None = None,
+) -> SerializersConfig:
+    """Convenience factory for the most common CRUD pattern."""
+    config: SerializersConfig = {
+        "list": ActionConfig(response=list),
+        "retrieve": ActionConfig(response=detail),
+    }
+    if write:
+        config["create"] = ActionConfig(request=write, response=detail)
+        config["update"] = ActionConfig(request=write, response=detail)
+        config["partial_update"] = ActionConfig(request=write, response=detail)
+    return config
+
+
+def _resolve_display_names(model_class, display_config):
+    """Resolve display_name, display_name_plural, and tag from model and config."""
+    model_name = model_class.__name__
+
+    display_name = display_config.get("display_name")
+    if display_name is None:
+        if hasattr(model_class._meta, "verbose_name"):
+            display_name = model_class._meta.verbose_name
+        else:
+            display_name = camel_to_words(model_name).lower()
+
+    display_name_plural = display_config.get("display_name_plural")
+    if display_name_plural is None:
+        if hasattr(model_class._meta, "verbose_name_plural"):
+            display_name_plural = model_class._meta.verbose_name_plural
+        elif isinstance(display_name, Promise):
+            display_name_plural = display_name
+        else:
+            display_name_plural = f"{display_name}s"
+
+    tag = display_config.get("tag")
+    if tag is None:
+        if hasattr(model_class._meta, "verbose_name_plural"):
+            tag = model_class._meta.verbose_name_plural
+        else:
+            tag = camel_to_words(model_name)
+
+    return display_name, display_name_plural, tag
+
+
+def _build_language_parameter(include_language_param):
+    """Build language OpenAPI parameter if enabled."""
+    if not include_language_param:
+        return None
+    from django.conf import settings
+
+    try:
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+        return OpenApiParameter(
+            name="language_code",
+            description=_("Language code for translations (%s)")
+            % ", ".join(available_languages),
+            required=False,
+            type=str,
+            enum=available_languages,
+            default=default_language,
+        )
+    except AttributeError, KeyError:
+        return None
+
+
+#: ``?pagination=false`` on an operation whose view lists that action in
+#: ``unpaginated_actions``; ``create_schema_view_config`` adds it there and
+#: nowhere else, because every other list ignores it.
+PAGINATION_PARAMETER = OpenApiParameter(
+    name="pagination",
+    description=_("false returns the whole list in one response"),
+    required=False,
+    type=str,
+    enum=["true", "false"],
+    default="true",
+)
+
+
+def _build_pagination_parameters(include_pagination_params):
+    """Build pagination OpenAPI parameters if enabled."""
+    if not include_pagination_params:
+        return []
+    return [
+        OpenApiParameter(
+            name="pagination_type",
+            description=_("Pagination strategy type"),
+            required=False,
+            type=str,
+            enum=["pageNumber", "cursor", "limitOffset"],
+            default="pageNumber",
+        ),
+        OpenApiParameter(
+            name="page_size",
+            description=_("Number of results to return per page"),
+            required=False,
+            type=int,
+            default=20,
+        ),
+    ]
+
+
+def _build_custom_action_pagination_parameters(include_pagination_params):
+    """Pagination parameters for a custom (non-CRUD) ``many=True`` action.
+
+    Extends :func:`_build_pagination_parameters` with explicit ``page``/
+    ``cursor`` entries. drf-spectacular's paginator introspection — which
+    already documents ``page``/``cursor`` for the router-generated `list`
+    action — never fires for a hand-written ``@action`` method, so a
+    custom action has no other source for them. Kept out of
+    ``_build_pagination_parameters`` itself so `list` schemas are
+    untouched: merging these into that shared list would let spectacular
+    override the `list` action's introspected (better-localized) page/
+    cursor descriptions with these generic ones.
+    """
+    if not include_pagination_params:
+        return []
+    return [
+        *_build_pagination_parameters(True),
+        OpenApiParameter(
+            name="page",
+            description=_("Page number (pageNumber pagination strategy)"),
+            required=False,
+            type=int,
+        ),
+        OpenApiParameter(
+            name="cursor",
+            description=_("Opaque cursor (cursor pagination strategy)"),
+            required=False,
+            type=str,
+        ),
+    ]
+
+
+# Default status codes per CRUD action
+_CRUD_DEFAULT_STATUS = {
+    "create": 201,
+    "destroy": 204,
+}
+
+# Default summaries/descriptions per CRUD action
+_CRUD_TEMPLATES: dict[str, _CrudTemplate] = {
+    "list": {
+        "op_prefix": "list",
+        "summary": _("List %(name)s"),
+        "description": _(
+            "Retrieve a list of %(name)s with filtering and search capabilities. "
+            "Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset."
+        ),
+        "use_plural": True,
+    },
+    "create": {
+        "op_prefix": "create",
+        "summary": _("Create a %(name)s"),
+        "description": _("Create a new %(name)s. Requires authentication."),
+        "use_plural": False,
+    },
+    "retrieve": {
+        "op_prefix": "retrieve",
+        "summary": _("Retrieve a %(name)s"),
+        "description": _("Get detailed information about a specific %(name)s."),
+        "use_plural": False,
+    },
+    "update": {
+        "op_prefix": "update",
+        "summary": _("Update a %(name)s"),
+        "description": _(
+            "Update %(name)s information. Requires authentication."
+        ),
+        "use_plural": False,
+    },
+    "partial_update": {
+        "op_prefix": "partialUpdate",
+        "summary": _("Partially update a %(name)s"),
+        "description": _(
+            "Partially update %(name)s information. Requires authentication."
+        ),
+        "use_plural": False,
+    },
+    "destroy": {
+        "op_prefix": "destroy",
+        "summary": _("Delete a %(name)s"),
+        "description": _("Delete a %(name)s. Requires authentication."),
+        "use_plural": False,
+    },
+}
+
+# Error codes to filter per action type
+_NO_400_ACTIONS = {"retrieve", "destroy"}
+_NO_500_ACTIONS = {"destroy"}
+
+
+def _with_pagination_switch(parameters, action_name, unpaginated_actions):
+    """*parameters*, plus ``PAGINATION_PARAMETER`` for an action that
+    honours ``?pagination=false``."""
+    if action_name not in unpaginated_actions:
+        return parameters
+    return [*(parameters or []), PAGINATION_PARAMETER]
+
+
+def create_schema_view_config(
+    model_class: type[models.Model],
+    serializers_config: SerializersConfig,
+    error_serializer=None,
+    display_config: DisplayConfig | Mapping[str, Any] | None = None,
+    include_language_param: bool = True,
+    include_pagination_params: bool = True,
+    *,
+    unpaginated_actions: frozenset[str] = frozenset(),
+):
+    """
+    Create schema configuration for a ViewSet with translation support.
+
+    Iterates over ALL keys in ``serializers_config`` – including custom
+    actions – and auto-generates ``@extend_schema`` for each. Per-action
+    response overrides are set via ``ActionConfig.responses`` on the
+    matching ``serializers_config`` entry — no separate parameter.
+    ``unpaginated_actions`` names the actions whose view honours
+    ``?pagination=false`` (the view's own ``unpaginated_actions``);
+    only their operations document ``PAGINATION_PARAMETER``.
+    """
+    if display_config is None:
+        display_config = {}
+
+    model_name = model_class.__name__
+    display_name, display_name_plural, tag = _resolve_display_names(
+        model_class, display_config
+    )
+
+    language_parameter = _build_language_parameter(include_language_param)
+    pagination_parameters = _build_pagination_parameters(
+        include_pagination_params
+    )
+    custom_action_pagination_parameters = (
+        _build_custom_action_pagination_parameters(include_pagination_params)
+    )
+
+    list_parameters = []
+    if language_parameter:
+        list_parameters.append(language_parameter)
+    list_parameters.extend(pagination_parameters)
+
+    config = {}
+
+    for action_name, ac in serializers_config.items():
+        default_status = _CRUD_DEFAULT_STATUS.get(action_name, 200)
+        tpl = _CRUD_TEMPLATES.get(action_name)
+
+        # ── operation_id ──
+        if ac.operation_id:
+            operation_id = ac.operation_id
+        elif tpl:
+            operation_id = f"{tpl['op_prefix']}{model_name}"
+        else:
+            operation_id = f"{action_name}{model_name}"
+
+        # ── summary / description ──
+        name_for_tpl = (
+            display_name_plural
+            if (tpl and tpl.get("use_plural"))
+            else display_name
+        )
+        if ac.summary:
+            summary = ac.summary
+        elif tpl:
+            summary = tpl["summary"] % {"name": name_for_tpl}
+        else:
+            summary = f"{action_name.replace('_', ' ').title()} {display_name}"
+
+        if ac.description:
+            description = ac.description
+        elif tpl:
+            description = tpl["description"] % {"name": name_for_tpl}
+        else:
+            description = summary
+
+        # ── tags ──
+        tags = ac.tags if ac.tags else [tag]
+
+        # ── parameters ──
+        if ac.parameters is not None:
+            parameters = ac.parameters
+        elif action_name == "list":
+            parameters = list_parameters
+        elif action_name in {"create", "retrieve", "update", "partial_update"}:
+            parameters = [language_parameter] if language_parameter else None
+        elif ac.many:
+            # Custom list-shaped action (e.g. a `paginate_and_serialize`
+            # action like replies/thread/my_comments). spectacular's
+            # paginator introspection only fires for the router-generated
+            # `list` action, never a hand-written `@action` method, so
+            # these documented NO pagination/language params at all even
+            # though the view honours them at runtime — the Nuxt proxy's
+            # generated Zod schema then strips the query params before
+            # they ever reach Django. Actions that opt out via
+            # `paginated=False` (a real `pagination_class=None` action)
+            # still get the language param: every response goes through
+            # `get_serializer_context()`'s language_code lookup.
+            many_parameters = []
+            if language_parameter:
+                many_parameters.append(language_parameter)
+            if ac.paginated:
+                many_parameters.extend(custom_action_pagination_parameters)
+            parameters = many_parameters
+        else:
+            parameters = None
+
+        # ── request ──
+        request_body = ac.request
+
+        # ── responses ──
+        responses = ac.get_response_map(
+            error_serializer=error_serializer,
+            default_status=default_status,
+        )
+
+        # Filter inappropriate error codes
+        if action_name in _NO_400_ACTIONS:
+            responses.pop(400, None)
+        if action_name in _NO_500_ACTIONS:
+            responses.pop(500, None)
+
+        # Handle list action many=True
+        if action_name == "list" and default_status in responses:
+            resp_val = responses[default_status]
+            if isinstance(resp_val, type) and issubclass(
+                resp_val, serializers.Serializer
+            ):
+                responses[default_status] = resp_val(many=True)
+
+        config[action_name] = extend_schema(
+            operation_id=operation_id,
+            summary=str(summary) if summary else None,
+            description=str(description) if description else None,
+            tags=tags,
+            parameters=_with_pagination_switch(
+                parameters, action_name, unpaginated_actions
+            ),
+            request=request_body,
+            responses=responses,
+            deprecated=ac.deprecated if ac.deprecated else None,
+        )
+
+    # Ensure CRUD actions that have no config still get a schema entry
+    for crud_action in [
+        "list",
+        "create",
+        "retrieve",
+        "update",
+        "partial_update",
+        "destroy",
+    ]:
+        if crud_action not in config:
+            tpl = _CRUD_TEMPLATES[crud_action]
+            crud_default_status = _CRUD_DEFAULT_STATUS.get(crud_action, 200)
+            name_for_tpl = (
+                display_name_plural if tpl.get("use_plural") else display_name
+            )
+
+            responses = {}
+            if error_serializer:
+                responses = {
+                    400: error_serializer,
+                    401: error_serializer,
+                    403: error_serializer,
+                    404: error_serializer,
+                    500: error_serializer,
+                }
+            if crud_action in _NO_400_ACTIONS:
+                responses.pop(400, None)
+            if crud_action in _NO_500_ACTIONS:
+                responses.pop(500, None)
+
+            parameters = None
+            if crud_action == "list":
+                parameters = list_parameters
+            elif crud_action in {
+                "create",
+                "retrieve",
+                "update",
+                "partial_update",
+            }:
+                parameters = (
+                    [language_parameter] if language_parameter else None
+                )
+
+            config[crud_action] = extend_schema(
+                operation_id=f"{tpl['op_prefix']}{model_name}",
+                summary=tpl["summary"] % {"name": name_for_tpl},
+                description=tpl["description"] % {"name": name_for_tpl},
+                tags=[tag],
+                parameters=_with_pagination_switch(
+                    parameters, crud_action, unpaginated_actions
+                ),
+                responses={crud_default_status: None, **responses}
+                if crud_default_status not in responses
+                else responses,
+            )
+
+    return config

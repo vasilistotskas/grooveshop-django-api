@@ -3,6 +3,55 @@
 
 
 
+## v3.269.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(cart): evaluate the quote's promotions over the lines it prices
+
+The quote reads the cart's lines once and hands that read to
+PromotionEngine.evaluate (items=), so the promotions, the subtotal, the
+parcel and the cart digest come from one read; the engine still reads
+the lines itself for every other caller.
+
+The cart's appliedCoupons and the quote's are rendered by one
+serializer (AppliedCouponSerializer) and declared by one inline schema
+(APPLIED_COUPONS_SCHEMA): drf-spectacular lifts a component property's
+enum into a oneOf of enum components, which the live storefront and
+gateway, typed against the cart's nullable string, read as a type
+change. The cart's schema is unchanged but for two descriptions.
+
+A golden test pins the digest's canonical form with a fixed key and
+lines, and a line left out of the quote changes it. ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+* fix(cart): judge the quote's coupons on the codes its promotions read
+
+The quote's coupon verdicts read the attached codes again after the
+promotions were evaluated, so a coupon swapped between the two reads was
+reported with the other code's discount. The evaluation now keeps the
+codes it read (CartDiscountResult.codes, from collect_candidates or the
+wholesale branch) and the quote's verdicts are built from those, with no
+second read. The cart endpoint keeps its own read and its output. ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+### Features
+
+* feat(cart): the quote names the lines and coupon verdicts it priced (#823) ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+* feat(cart): the quote names the lines it priced
+
+POST /cart/quote, and the quote an order refusal carries, return the
+cart lines the quote priced (lines: the cart item, product id, name and
+main image path, quantity, unit and line price, the promotion money the
+line carries) and each attached coupon's verdict (appliedCoupons, the
+cart's appliedCoupons computed once in CartDiscountResult.coupon_verdicts).
+
+The quote reads the cart's lines once (OrderQuoteService.priced_lines):
+the subtotal, the parcel and the cart digest are computed from that read,
+so the lines a quote returns are the ones its total and digest cover. A
+client renders a checkout from the one answer its total came from.
+
+Refs vasilistotskas/grooveshop-agent-gateway#205 ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
 ## v3.268.1 (2026-11-23)
 
 ### Bug fixes

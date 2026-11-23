@@ -458,6 +458,58 @@ class TestRetryPaymentConcurrentChange:
             order=order, new_value__retry=True
         ).exists()
 
+    @pytest.mark.parametrize(
+        ("payment_status", "order_status"),
+        [
+            (PaymentStatus.PROCESSING, OrderStatus.PENDING),
+            (PaymentStatus.COMPLETED, OrderStatus.PROCESSING),
+        ],
+        ids=["processing", "completed"],
+    )
+    def test_the_new_payments_own_webhook_is_success(
+        self, payment_status, order_status, django_capture_on_commit_callbacks
+    ):
+        """The new payment's webhook landing between the service recording
+        it and the retry being noted is that payment going ahead, not a
+        conflict: the answer is success, with the status recorded."""
+        user = UserAccountFactory()
+        order = _stripe_order(user=user)
+        Order.objects.filter(pk=order.pk).update(confirmed_at=None)
+        process_payment = PayWayService.process_payment
+
+        def record_then_webhook(**kwargs):
+            result = process_payment(**kwargs)
+            Order.objects.filter(pk=order.pk).update(
+                payment_status=payment_status, status=order_status
+            )
+            return result
+
+        with (
+            _patch_provider(_provider()),
+            patch.object(
+                PayWayService,
+                "process_payment",
+                side_effect=record_then_webhook,
+            ),
+            patch(
+                "order.tasks.send_order_confirmation_email.apply_async"
+            ) as confirmation,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            response = _client(user).post(_url(order), {}, format="json")
+
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == payment_status
+        assert response.data["client_secret"] == "pi_new_retry_secret_abc"
+        order.refresh_from_db()
+        assert order.payment_id == "pi_new_retry"
+        assert order.payment_status == payment_status
+        [retry] = order.metadata["payment_retries"]
+        assert retry["new_payment_id"] == "pi_new_retry"
+        assert confirmation.call_count == (
+            1 if payment_status == PaymentStatus.COMPLETED else 0
+        )
+
 
 class TestRetryPaymentPermissions:
     def test_another_users_order_is_forbidden(self):

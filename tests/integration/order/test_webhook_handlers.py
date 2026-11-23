@@ -15,6 +15,7 @@ from order.signals.handlers import (
     handle_stripe_payment_failed,
     handle_stripe_payment_succeeded,
 )
+from pay_way.factories import PayWayFactory
 
 # What the ``mock_djstripe_event`` fixture says Stripe collected.
 STRIPE_CAPTURED = Money(Decimal(50), "USD")
@@ -103,9 +104,14 @@ class TestHandleStripePaymentSucceeded:
         payment_intent_id = "pi_test_123456"
         order = OrderFactory(
             num_order_items=0,
+            pay_way=PayWayFactory.create_online_payment("stripe"),
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+        )
+        # Where the (mocked) service leaves it: paid, not yet confirmed.
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED, confirmed_at=None
         )
 
         with (

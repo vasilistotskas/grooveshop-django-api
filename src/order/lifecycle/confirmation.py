@@ -21,17 +21,17 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 
-def confirmed_at_creation(order: Order) -> bool:
-    """Whether *order* is confirmed as it is placed: nothing is left to pay
-    online. Cash or card on delivery, BOX NOW pay on the go and bank
-    transfer are paid later, offline; an online order already paid has
-    nothing left to wait for. An order whose pay way was deleted is treated
-    as offline, so its customer still hears about it."""
-    pay_way = order.pay_way
+def due_for_confirmation() -> Q:
+    """The orders due to be confirmed (``OrderLifecycleService.confirm``):
+    nothing is left to pay online, or the online payment is COMPLETED. Cash
+    or card on delivery, BOX NOW pay on the go and bank transfer are paid
+    later, offline, so they are due as they are placed; a card order is due
+    once its payment went through. An order whose pay way was deleted is
+    treated as offline, so its customer still hears about it."""
     return (
-        pay_way is None
-        or PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
-        or order.payment_status == PaymentStatus.COMPLETED
+        Q(pay_way__isnull=True)
+        | ~Q(pay_way__settlement=PaySettlement.ONLINE)
+        | Q(payment_status=PaymentStatus.COMPLETED)
     )
 
 

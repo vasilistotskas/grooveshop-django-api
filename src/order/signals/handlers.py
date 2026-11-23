@@ -35,7 +35,7 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
-from order.lifecycle.confirmation import confirmed_at_creation, paid_online
+from order.lifecycle.confirmation import paid_online
 from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
@@ -310,8 +310,7 @@ def handle_order_created(
     neither the customer nor the store is told anything.
     """
     OrderHistory.log_note(order=order, note="Order created")
-    if confirmed_at_creation(order):
-        OrderLifecycleService.confirm(order)
+    OrderLifecycleService.confirm(order)
 
     # Clear the cart — but NOT while the shopper still owes an online
     # payment. See ``Order.awaits_online_payment``.
@@ -845,6 +844,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
                     event_id,
                     order.id,
                 )
+                # The payment this event reports may be on an order still
+                # unconfirmed: confirm it (a no-op otherwise).
+                OrderLifecycleService.confirm(order)
                 already_processed = True
             else:
                 if not order.metadata:
@@ -884,17 +886,20 @@ def handle_stripe_charge_fee(sender, **kwargs):
 
 
 def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
-    """What follows a Stripe payment the order service actually applied:
-    the history row, the confirmation email and the live toast.
+    """What follows a Stripe payment the order service handled: the history
+    row when it applied the payment, and the order's confirmation.
 
     Shared by the webhook and by the polled-status path
     (``handle_stripe_payment_polled``), which settles
     through the same ``OrderService.handle_payment_succeeded``. A stale
-    event, a repeat, or a charge on a canceled order changes nothing to
-    confirm: no history row, no "order confirmed" email.
+    event or a repeat writes no history row, and still confirms an order
+    paid but not yet confirmed (``OrderLifecycleService.confirm``, which
+    leaves a confirmed, unpaid or canceled order as it is).
     """
-    if outcome and outcome.applied:
-        order = outcome.order
+    if outcome is None:
+        return
+    order = outcome.order
+    if outcome.applied:
         OrderHistory.log_payment_update(
             order=order,
             previous_value={"payment_status": outcome.previous_payment_status},
@@ -903,7 +908,7 @@ def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
                 "payment_id": payment_intent_id,
             },
         )
-        OrderLifecycleService.confirm(order)
+    OrderLifecycleService.confirm(order)
 
 
 @receiver(
@@ -1772,6 +1777,9 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 event_id,
                 order.id,
             )
+            # An order its session paid may still be unconfirmed: confirm
+            # it (a no-op otherwise).
+            OrderLifecycleService.confirm(order)
             return
 
         if not order.metadata:

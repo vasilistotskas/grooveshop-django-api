@@ -31,11 +31,21 @@ when its payment settles, by every path that settles one: the Stripe
 `checkout.session.completed`, the Viva 1796, the Viva return page, the sweep's
 read-back, and a payment taken at once (`process_payment`, the agent SPT
 charge). `confirm` claims `Order.confirmed_at` with one
-`UPDATE ... WHERE confirmed_at IS NULL`, so however many of those report the
+`UPDATE ... WHERE confirmed_at IS NULL` that also requires the order to be due
+(`confirmation.due_for_confirmation`: nothing left to pay online, or the
+online payment COMPLETED) and not canceled, so however many of those report the
 same payment, one sends `order_confirmed`, and its receiver
 (`handle_order_confirmed`) queues the customer's confirmation email, the staff
 "New order" email and ONE in-app note: payment confirmed for an order paid
-online, order placed otherwise. A card order nobody paid is never confirmed:
+online, order placed otherwise. The claim and the signal commit together
+(`confirm` runs them in one atomic block): when the announcement fails, the
+claim is rolled back, and the order heals itself, because every sight of a
+settled payment calls `confirm`, even one that applies nothing: a repeated or
+stale Stripe event (`announce_stripe_payment_applied`, the receivers'
+already-processed branches), a checkout session seen again
+(`settle_paid_checkout_session`), a Viva 1796 already applied
+(`viva_settlement.apply_event`), and a poll that finds the payment completed
+(`OrderService.get_payment_status`). A card order nobody paid is never confirmed:
 nobody is told about it, its failure sends nothing, and its cancel (customer,
 staff or the sweep) is silent to the customer (`_cancel_order_locked`
 suppresses the CANCELED email and toast when `confirmed_at` is empty), while

@@ -12,26 +12,37 @@ is never confirmed, and its cancel is silent to the customer.
 
 from __future__ import annotations
 
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
+from django.db import transaction
 from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
+from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments import payment_hold
-from order.payments.viva_settlement import handle_payment_created
-from order.signals import order_created
+from order.payments.stripe_settlement import settle_checkout_session
+from order.payments.viva_settlement import (
+    VIVA_TRANSACTION_PAYMENT_CREATED,
+    apply_event,
+    handle_payment_created,
+    read_payment_created,
+)
+from order.services import OrderService
+from order.signals import order_confirmed, order_created
 from order.signals.handlers import announce_stripe_payment_applied
 from order.tasks import auto_cancel_stuck_pending_orders
 from pay_way.factories import PayWayFactory
 from tests.utils.viva import verified_payment
 
 pytestmark = [pytest.mark.django_db]
+
+_VIVA_TRANSACTION = "e32827bb-03bf-43d1-abe9-593eb5d2cd43"
 
 #: Every task that tells someone about an order, by what it is.
 _PUBLISHERS = {
@@ -49,16 +60,25 @@ _PUBLISHERS = {
 }
 
 
+#: Django's own ``on_commit``, before the suite makes hooks run at once.
+_ON_COMMIT = transaction.on_commit
+
+
 @pytest.fixture
-def published(django_capture_on_commit_callbacks):
-    """Each publisher's ``apply_async``, with commit hooks run."""
+def publishers():
+    """Each publisher's ``apply_async``."""
     with ExitStack() as stack:
-        mocks = {
+        yield {
             name: stack.enter_context(patch(f"{path}.apply_async"))
             for name, path in _PUBLISHERS.items()
         }
-        stack.enter_context(django_capture_on_commit_callbacks(execute=True))
-        yield mocks
+
+
+@pytest.fixture
+def published(publishers, django_capture_on_commit_callbacks):
+    """Each publisher's ``apply_async``, with commit hooks run."""
+    with django_capture_on_commit_callbacks(execute=True):
+        yield publishers
 
 
 def _calls(published, name: str) -> int:
@@ -203,8 +223,6 @@ class TestConfirmedWhenThePaymentSettles:
         order = _created(_order(PayWayFactory.create_online_payment("stripe")))
         Order.objects.filter(pk=order.pk).update(payment_id="pi_declined")
 
-        from order.services import OrderService
-
         outcome = OrderService.handle_payment_failed("pi_declined")
 
         assert outcome.applied
@@ -219,8 +237,6 @@ class TestConfirmedWhenThePaymentSettles:
     ):
         """The shopper's first card is declined, the second goes through:
         the failure told no one, the success confirms the order once."""
-        from order.services import OrderService
-
         order = _created(_order(PayWayFactory.create_online_payment("stripe")))
         Order.objects.filter(pk=order.pk).update(payment_id="pi_retry")
         OrderService.handle_payment_failed("pi_retry")
@@ -257,6 +273,173 @@ class TestACanceledOrderIsNeverConfirmed:
         order.refresh_from_db()
         assert order.confirmed_at is None
         assert _calls(published, "confirmation") == 0
+
+
+@contextmanager
+def _announcement_fails_once():
+    """The first ``order_confirmed`` raises, as a broken receiver or a
+    database error would, after the payment was committed."""
+    failed = []
+
+    def fail_once(sender, **kwargs):
+        if not failed:
+            failed.append(True)
+            raise RuntimeError("announcement failed")
+
+    order_confirmed.connect(fail_once, dispatch_uid="test.fail_once")
+    try:
+        yield
+    finally:
+        order_confirmed.disconnect(dispatch_uid="test.fail_once")
+
+
+def _paid_but_unconfirmed(commit, provider: str, payment_id: str, **fields):
+    """A card order, placed and committed, whose payment was then committed
+    COMPLETED while its confirmation failed: the claim rolled back with the
+    announcement."""
+    with commit():
+        order = _created(
+            _order(PayWayFactory.create_online_payment(provider), **fields)
+        )
+    with commit():
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id=payment_id,
+        )
+        with _announcement_fails_once(), pytest.raises(RuntimeError):
+            OrderLifecycleService.confirm(Order.objects.get(pk=order.pk))
+    order.refresh_from_db()
+    assert order.confirmed_at is None
+    return order
+
+
+def _assert_told_once(published, order):
+    order.refresh_from_db()
+    assert order.confirmed_at is not None
+    assert _calls(published, "confirmation") == 1
+    assert _calls(published, "staff") == 1
+    assert _calls(published, "paid_note") == 1
+    assert _calls(published, "placed_note") == 0
+
+
+class TestAPaidOrderLeftUnconfirmedHealsItself:
+    """A payment committed COMPLETED whose confirmation failed is
+    confirmed by the next path that sees it settled, even one that applies
+    nothing (a repeat of the event, a poll that finds it paid already),
+    and people are told once.
+
+    Commit hooks wait for the commit here, as in production (the suite
+    otherwise runs them at once), so the failed confirmation's rollback
+    takes its announcement with it; ``commit`` runs those that remain.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _hooks_wait_for_the_commit(self, monkeypatch):
+        monkeypatch.setattr(transaction, "on_commit", _ON_COMMIT)
+
+    @pytest.fixture
+    def commit(self, django_capture_on_commit_callbacks):
+        return lambda: django_capture_on_commit_callbacks(execute=True)
+
+    def test_confirm_refuses_a_card_order_not_paid(self, publishers, commit):
+        with commit():
+            order = _created(
+                _order(PayWayFactory.create_online_payment("stripe"))
+            )
+
+            assert not OrderLifecycleService.confirm(order)
+
+        order.refresh_from_db()
+        assert order.confirmed_at is None
+        assert _calls(publishers, "confirmation") == 0
+
+    def test_the_stripe_webhook_that_applies_nothing_confirms_it(
+        self, publishers, commit
+    ):
+        order = _paid_but_unconfirmed(commit, "stripe", "pi_heal")
+
+        with commit():
+            with patch(
+                "shipping.services.ShippingService.dispatch_create_shipment_task"
+            ):
+                for _ in range(2):
+                    outcome = OrderService.handle_payment_succeeded(
+                        "pi_heal", captured=order.calculate_order_total_amount()
+                    )
+                    assert not outcome.applied
+                    announce_stripe_payment_applied(outcome, "pi_heal")
+
+        _assert_told_once(publishers, order)
+
+    def test_a_poll_that_finds_it_paid_confirms_it(self, publishers, commit):
+        order = _paid_but_unconfirmed(commit, "stripe", "pi_heal")
+
+        with commit():
+            provider = Mock()
+            provider.get_payment_status.return_value = (
+                PaymentStatus.COMPLETED,
+                {"amount": "1", "currency": "EUR"},
+            )
+
+            with patch(
+                "order.payments.payment.get_payment_provider",
+                return_value=provider,
+            ):
+                for _ in range(2):
+                    OrderService.get_payment_status(
+                        Order.objects.get(pk=order.pk)
+                    )
+
+        _assert_told_once(publishers, order)
+
+    def test_a_repeated_checkout_session_confirms_it(self, publishers, commit):
+        order = _paid_but_unconfirmed(commit, "stripe", "pi_heal")
+
+        with commit():
+            for _ in range(2):
+                settle_checkout_session(
+                    order.pk,
+                    session_id="cs_heal",
+                    payment_intent_id="pi_heal",
+                    captured=order.calculate_order_total_amount(),
+                )
+
+        _assert_told_once(publishers, order)
+
+    def test_a_repeated_viva_payment_event_confirms_it(
+        self, publishers, commit
+    ):
+        order = _paid_but_unconfirmed(
+            commit,
+            "viva_wallet",
+            _VIVA_TRANSACTION,
+            metadata={"viva_order_codes": ["4507133103272600"]},
+        )
+
+        with commit():
+            VivaWebhookEvent.objects.create(
+                transaction_id=_VIVA_TRANSACTION,
+                event_type_id=VIVA_TRANSACTION_PAYMENT_CREATED,
+                order=order,
+                order_code="4507133103272600",
+                status_id="F",
+            )
+
+            for _ in range(2):
+                outcome = apply_event(
+                    Order.objects.get(pk=order.pk),
+                    event_type_id=VIVA_TRANSACTION_PAYMENT_CREATED,
+                    event_data={"StatusId": "F"},
+                    transaction_id=_VIVA_TRANSACTION,
+                    order_code="4507133103272600",
+                    status_id="F",
+                    handle=handle_payment_created,
+                    read=read_payment_created,
+                )
+                assert outcome is None
+
+        _assert_told_once(publishers, order)
 
 
 class TestCancelOfAnUnconfirmedOrder:

@@ -125,7 +125,11 @@ a charge land on a dead order. The provider call itself runs unlocked;
 payment status or payment id changed meanwhile (a cancel, a webhook for the
 previous intent), raises `OrderChangedDuringPaymentError` — the view answers
 409 and the new intent's client secret is never returned, so it can never be
-confirmed.
+confirmed. `retry-payment` locks the row once more to note the retry: a change
+landing there is refused the same way, except the new intent's own webhook
+moving it to PROCESSING or COMPLETED (same `payment_id`, order not canceled),
+which is that payment going through: the view answers 200 with the status the
+order records (`OrderViewSet._new_payment_went_ahead`).
 
 **`COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED`.**
 PARTIALLY_REFUNDED while part of what was captured is still refundable,

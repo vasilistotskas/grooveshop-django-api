@@ -877,6 +877,19 @@ class OrderViewSet(BaseModelViewSet):
         )
 
     @staticmethod
+    def _new_payment_went_ahead(order, locked_order) -> bool:
+        """Whether what changed on *locked_order* since the service recorded
+        *order*'s new payment is that payment's own webhook moving it to
+        PROCESSING or COMPLETED (and the order with it), not a cancel or
+        another payment."""
+        return (
+            locked_order.payment_id == order.payment_id
+            and locked_order.status != OrderStatus.CANCELED
+            and locked_order.payment_status
+            in (PaymentStatus.PROCESSING, PaymentStatus.COMPLETED)
+        )
+
+    @staticmethod
     def _order_changed_during_payment(order) -> Response:
         """409 for a payment whose order changed during the provider call.
 
@@ -1946,12 +1959,18 @@ class OrderViewSet(BaseModelViewSet):
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk)
             # The service stored the new intent under its own lock; a
-            # change landing since then wins in the same way.
+            # change landing since then wins in the same way, except the
+            # new payment's own webhook moving it ahead: that payment is
+            # going through, and the answer is its recorded status.
             if (
                 locked_order.status,
                 locked_order.payment_status,
                 locked_order.payment_id,
-            ) != (order.status, order.payment_status, order.payment_id):
+            ) != (
+                order.status,
+                order.payment_status,
+                order.payment_id,
+            ) and not self._new_payment_went_ahead(order, locked_order):
                 return self._order_changed_during_payment(order)
             if not locked_order.metadata:
                 locked_order.metadata = {}
@@ -1986,7 +2005,11 @@ class OrderViewSet(BaseModelViewSet):
         )
 
         response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(data=payment_response)
+        # The status the order records, which a webhook may have moved
+        # ahead of what the provider answered.
+        response_serializer = response_serializer_class(
+            data={**payment_response, "status": order.payment_status}
+        )
         response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 

@@ -593,9 +593,42 @@ def apply_event(
     redelivery, or :func:`settle_landed_payment`). Answers the outcome
     recorded, or ``None`` when the event had been applied already.
 
+    A Transaction Payment Created event then confirms the order, applied
+    or seen before: one paid but not yet confirmed is confirmed by the next
+    sight of its payment, and ``OrderLifecycleService.confirm`` leaves a
+    confirmed, unpaid or canceled order as it is.
+
     Raises ``RuntimeError`` when the transaction could not be verified
     with Viva: nothing is written and the event can be applied later.
     """
+    from order.lifecycle.service import OrderLifecycleService
+
+    outcome = _apply_event(
+        order,
+        event_type_id=event_type_id,
+        event_data=event_data,
+        transaction_id=transaction_id,
+        order_code=order_code,
+        status_id=status_id,
+        handle=handle,
+        read=read,
+    )
+    if event_type_id == VIVA_TRANSACTION_PAYMENT_CREATED:
+        OrderLifecycleService.confirm(order)
+    return outcome
+
+
+def _apply_event(
+    order: Order,
+    *,
+    event_type_id: int | None,
+    event_data: dict[str, Any],
+    transaction_id: str,
+    order_code: str,
+    status_id: str,
+    handle: EventHandler | None,
+    read: EventRead | None,
+) -> str | None:
     from order.models.viva_webhook_event import VivaWebhookEvent
 
     txn_hash = transaction_hash(transaction_id)

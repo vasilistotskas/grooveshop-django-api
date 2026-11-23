@@ -3,6 +3,16 @@
 
 
 
+## v3.267.4 (2026-11-23)
+
+### Refactoring
+
+* refactor(tenant): drop the BOX NOW partner id from the store config (#820)
+
+The storefront picks BOX NOW lockers in its own picker and no longer reads
+the partner id from the store config. The tenant field stays: the BOX NOW
+client, the credentials and the admin still use it. ([`19d17b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19d17b61fce5a37a2a973b1912b93427387936cc))
+
 ## v3.267.3 (2026-11-23)
 
 ### Bug fixes

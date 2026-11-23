@@ -7,6 +7,7 @@ payment settles. Confirming is what tells people about it.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.db.models import F, Q
@@ -45,18 +46,24 @@ def paid_online(order: Order) -> bool:
     )
 
 
-def backfill_confirmed_at(apps: Apps) -> int:
-    """Stamp ``confirmed_at = created_at`` on every order without one that
-    is not an online order never paid, and say how many. Those were
-    confirmed under the release that had no column: an offline order at
-    creation, an online one by its payment. Idempotent; it tells no one.
+def backfill_confirmed_at(apps: Apps, *, created_before: datetime) -> int:
+    """Stamp ``confirmed_at = created_at`` on every order created before
+    *created_before* without one that is not an online order never paid,
+    and say how many. Those were confirmed under the release that had no
+    column: an offline order at creation, an online one by its payment.
+    *created_before* is when the release that confirms orders finished
+    rolling out: every order created since is confirmed by that release,
+    and stamping one would silence its announcement. Idempotent; it tells
+    no one.
     """
     never_paid_online = Q(pay_way__settlement=PaySettlement.ONLINE) & ~Q(
         payment_status__in=CHARGED_PAYMENT_STATUSES
     )
     return (
         apps.get_model("order", "Order")
-        .objects.filter(confirmed_at__isnull=True)
+        .objects.filter(
+            confirmed_at__isnull=True, created_at__lt=created_before
+        )
         .exclude(never_paid_online)
         .update(confirmed_at=F("created_at"))
     )

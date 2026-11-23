@@ -288,3 +288,53 @@ class TestCancelOfAnUnconfirmedOrder:
         )
 
         assert _calls(published, "status_email") == 1
+
+
+class TestTheBackfill:
+    """``backfill_confirmed_at`` stamps orders the previous release
+    confirmed without the column, and only those created before the
+    rollout finished: an order the new release creates is confirmed by the
+    new release, and stamping it would silence its announcement."""
+
+    def test_only_orders_created_before_the_cutoff_are_stamped(self):
+        from django.apps import apps
+
+        from order.lifecycle.confirmation import backfill_confirmed_at
+
+        cutoff = timezone.now()
+        old_paid = _order(
+            PayWayFactory.create_online_payment("stripe"),
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        old_unpaid = _order(PayWayFactory.create_online_payment("stripe"))
+        new_paid = _order(
+            PayWayFactory.create_online_payment("stripe"),
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        Order.objects.filter(pk__in=[old_paid.pk, old_unpaid.pk]).update(
+            created_at=cutoff - timedelta(minutes=5)
+        )
+        Order.objects.filter(pk=new_paid.pk).update(
+            created_at=cutoff + timedelta(seconds=1)
+        )
+        Order.objects.update(confirmed_at=None)
+
+        assert backfill_confirmed_at(apps, created_before=cutoff) == 1
+
+        stamped = set(
+            Order.objects.filter(confirmed_at__isnull=False).values_list(
+                "pk", flat=True
+            )
+        )
+        assert stamped == {old_paid.pk}
+
+    @pytest.mark.parametrize(
+        "args",
+        [[], ["--created-before", "2026-11-23T05:00:00"]],
+        ids=["missing", "no-offset"],
+    )
+    def test_the_command_needs_an_aware_cutoff(self, args):
+        from django.core.management import CommandError, call_command
+
+        with pytest.raises(CommandError):
+            call_command("backfill_confirmed_at", *args, "--all-tenants")

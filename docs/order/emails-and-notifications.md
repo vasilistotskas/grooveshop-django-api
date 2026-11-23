@@ -46,7 +46,8 @@ pages staff (`record_payment_after_cancel`), and `confirm` never announces a
 canceled order, whichever path reports the payment. Orders confirmed before the
 column existed carry `created_at` (migration `order` 0115); orders the
 previous release created during a rollout are stamped by
-`manage.py backfill_confirmed_at`, run once after it.
+`manage.py backfill_confirmed_at --created-before <when the rollout finished>`,
+run once after it: every order created since is the new release's to confirm.
 
 Every customer email is sent through `emails.send.send_email` and carries
 the transactional `List-ID` and `List-Unsubscribe: mailto:` headers

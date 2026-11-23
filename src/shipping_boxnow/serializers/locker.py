@@ -23,8 +23,9 @@ class BoxNowLockerSerializer(serializers.ModelSerializer[BoxNowLocker]):
         read_only=True,
         help_text=_(
             "The compartment sizes the locker has (1 small, 2 medium, 3 "
-            "large). Empty when they are not known: the locker then fits "
-            "no order."
+            "large). Empty when they are not known: on a store on BOX NOW's "
+            "live network the locker then takes no order; a store on BOX "
+            "NOW's stage network has no sizes and checks none."
         ),
     )
     limited_availability = serializers.SerializerMethodField(

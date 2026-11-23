@@ -162,6 +162,8 @@ def sizes_exist() -> bool:
 
 def apply_catalogues(
     catalogues: dict[str, dict[str, list]],
+    *,
+    keep: bool = False,
 ) -> dict[str, int]:
     """Set the sizes and availability of this store's active lockers from
     ``catalogues`` (:func:`fetch_catalogues`). A store that is not on BOX
@@ -171,12 +173,16 @@ def apply_catalogues(
     A locker of a country in ``catalogues`` that the catalogue lacks gets
     empty sizes and no probability (unknown), and the count and ids are
     logged at WARNING. Lockers of a country that is not in ``catalogues``
-    keep what they hold. Returns ``{"updated": N, "unknown": M}``.
+    keep what they hold. With ``keep``, the countries it accepts are kept
+    for this store (:func:`remember_catalogues`); a refused one leaves the
+    kept copy of that country as it was. Returns
+    ``{"updated": N, "unknown": M}``.
     """
     if not sizes_exist():
         return _forget_stage_sizes()
     updated = unknown = 0
     changed_any = False
+    accepted: dict[str, dict[str, list]] = {}
     for country_code, facts in sorted(catalogues.items()):
         lockers = list(
             BoxNowLocker.objects.filter(
@@ -197,6 +203,7 @@ def apply_catalogues(
                 extra={"boxnow_country": country_code},
             )
             continue
+        accepted[country_code] = facts
         missing = [
             locker.external_id
             for locker in lockers
@@ -234,6 +241,8 @@ def apply_catalogues(
             )
     if changed_any:
         mark_surface_stale("shipping")
+    if keep and accepted:
+        remember_catalogues(accepted)
     logger.info(
         "BOX NOW catalogue applied: updated=%d unknown=%d at %s",
         updated,
@@ -268,12 +277,13 @@ _REMEMBERED_CATALOGUES = "shipping_boxnow:catalogues"
 def remember_catalogues(catalogues: dict[str, dict[str, list]]) -> None:
     """Keep ``catalogues`` for this store for
     ``BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS``
-    (:func:`apply_remembered_catalogues`)."""
+    (:func:`apply_remembered_catalogues`), over the copy kept of each
+    country they name; the other countries keep theirs."""
     from django.core.cache import cache
 
     cache.set(
         _REMEMBERED_CATALOGUES,
-        catalogues,
+        {**(cache.get(_REMEMBERED_CATALOGUES) or {}), **catalogues},
         timeout=settings.BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS,
     )
 

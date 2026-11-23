@@ -299,9 +299,17 @@ def test_a_locker_the_partner_sync_creates_is_sized_from_the_kept_catalogue():
     from shipping_boxnow.catalogue import apply_remembered_catalogues
 
     catalogue = {"GR": {"1": [[1, 2], 0.9], "new": [[3], 0.5]}}
-    with patch(
-        "shipping_boxnow.tasks._skip_if_boxnow_unconfigured",
-        return_value=False,
+    # The task runs under its store's schema, where production reads the
+    # store's row; the stand-in tenant is bound on this connection only.
+    with (
+        patch(
+            "shipping_boxnow.tasks._skip_if_boxnow_unconfigured",
+            return_value=False,
+        ),
+        patch(
+            "shipping_boxnow.catalogue.box_now_credentials",
+            return_value={"live_mode": True},
+        ),
     ):
         tasks.apply_boxnow_locker_catalogue(catalogue)
     BoxNowLockerFactory(external_id="new", compartment_sizes=[])
@@ -320,3 +328,22 @@ def test_nothing_is_applied_when_no_catalogue_is_kept():
 
     assert apply_remembered_catalogues() is None
     assert BoxNowLocker.objects.get(external_id="new").compartment_sizes == []
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_a_refused_catalogue_leaves_the_kept_copy_as_it_was():
+    """A truncated file is refused for the sizes (minimum fraction), and
+    for the kept copy too: a locker a later sync creates is still sized
+    from the last good one."""
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    for external_id in ("1", "2", "3"):
+        BoxNowLockerFactory(external_id=external_id, compartment_sizes=[])
+    good = {"GR": {i: [[2], 1.0] for i in ("1", "2", "3", "new")}}
+    apply_catalogues(good, keep=True)
+    apply_catalogues({"GR": {"1": [[1], 1.0]}}, keep=True)
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    apply_remembered_catalogues()
+
+    assert BoxNowLocker.objects.get(external_id="new").compartment_sizes == [2]

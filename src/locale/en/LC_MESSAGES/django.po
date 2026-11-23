@@ -14734,8 +14734,8 @@ msgstr "The code has reached its usage limit"
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 
-msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
-msgstr "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
+msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: on a store on BOX NOW's live network the locker then takes no order; a store on BOX NOW's stage network has no sizes and checks none."
+msgstr "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: on a store on BOX NOW's live network the locker then takes no order; a store on BOX NOW's stage network has no sizes and checks none."
 
 msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 msgstr "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."

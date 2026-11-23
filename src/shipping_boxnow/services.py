@@ -2961,13 +2961,12 @@ class BoxNowService:
                     },
                 )
 
-        if created_count:
-            # A locker created here has no sizes until the catalogue names
-            # it: the store's last catalogue may already, so the order the
-            # resync runs for is not refused for an hour.
-            from shipping_boxnow.catalogue import apply_remembered_catalogues
+        # A locker created or reactivated here has no sizes until the
+        # catalogue names it: the store's last catalogue may already, so
+        # the order a resync runs for is not refused until the next run.
+        from shipping_boxnow.catalogue import apply_remembered_catalogues
 
-            apply_remembered_catalogues()
+        apply_remembered_catalogues()
 
         logger.info(
             "sync_lockers: partner=%s created=%d updated=%d deactivated=%d "

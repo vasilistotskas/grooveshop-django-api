@@ -14736,8 +14736,8 @@ msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης το�
 msgid "The colour pair “%(label)s” has a contrast of %(ratio)s:1, below the required %(min)s:1."
 msgstr "Το ζεύγος χρωμάτων «%(label)s» έχει αντίθεση %(ratio)s:1, κάτω από την απαιτούμενη %(min)s:1."
 
-msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: the locker then fits no order."
-msgstr "Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3 μεγάλο). Κενό όταν δεν είναι γνωστά: το locker τότε δεν ταιριάζει σε καμία παραγγελία."
+msgid "The compartment sizes the locker has (1 small, 2 medium, 3 large). Empty when they are not known: on a store on BOX NOW's live network the locker then takes no order; a store on BOX NOW's stage network has no sizes and checks none."
+msgstr "Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3 μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα."
 
 msgid "The compartment sizes the locker has, from BOX NOW's public locker catalogue. Empty means not known: never that it takes every size."
 msgstr "Τα μεγέθη θυρίδων που έχει το locker, από τον δημόσιο κατάλογο lockers της BOX NOW. Κενό σημαίνει άγνωστα: ποτέ ότι δέχεται κάθε μέγεθος."

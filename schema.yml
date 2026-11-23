@@ -38295,8 +38295,9 @@ components:
             type: integer
           readOnly: true
           description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
-            μεγάλο). Κενό όταν δεν είναι γνωστά: το locker τότε δεν ταιριάζει σε καμία
-            παραγγελία.'
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
         limitedAvailability:
           type: boolean
           readOnly: true
@@ -38429,8 +38430,9 @@ components:
             type: integer
           readOnly: true
           description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
-            μεγάλο). Κενό όταν δεν είναι γνωστά: το locker τότε δεν ταιριάζει σε καμία
-            παραγγελία.'
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
         limitedAvailability:
           type: boolean
           readOnly: true

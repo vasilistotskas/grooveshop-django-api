@@ -3,6 +3,56 @@
 
 
 
+## v3.267.3 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): cancel a credit or a receipt in myDATA one document at a time, after a confirmation (#801) ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): "Cancel in myDATA" on the credit documents list is offered to who may use it
+
+RetailCreditAdmin is a read-only register: has_change_permission is
+False for everyone. Its cancel_in_mydata action asked for change, so
+Django dropped it from every user's actions, a superuser included, while
+the admin guide and the dashboard's reversed-credit alert both send staff
+there to cancel a credit document issued in error.
+
+The action now asks for its own permission: the store's
+order.change_retailcredit, and only where the platform issues the store's
+documents (OrderAdmin._issues_receipts), as the order's 'Cancel receipt
+in myDATA' does. The register still refuses change, so no credit
+document is edited. Tests: offered and refused per permission and per
+store, and a changelist post schedules the cancel of the registered
+credit; the action-permission test drops its offered-to-nobody entry.
+
+Closes #653 ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): cancel a credit in myDATA one credit at a time, from its own page
+
+The action becomes a per-credit detail action (danger variant) instead of a
+changelist bulk action, so a filter or select-all can no longer cancel a
+batch at AADE. It refuses a credit without a MARK or one already canceled,
+with a message and no task queued. Tests go through real store roles. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): confirm both myDATA cancel actions through a dialog
+
+The credit and receipt cancel actions ran their irreversible CancelInvoice on
+a plain GET of the action link, with no confirmation and no CSRF-protected
+POST. They now render Unfold's confirmation dialog and act only on the
+posted form. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): one myDATA cancel per document at a time
+
+The shared cancel helper sent CancelInvoice without re-checking the
+document, so two confirmed clicks, or a staff cancel racing the automatic
+settle of a canceled order's receipt, sent it twice. It now takes a claim per
+document (a receipt shares the settle path's key), reads the document again
+under it, and sends nothing for one already canceled. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+### Documentation
+
+* docs(order): describe the cancel confirmation and the per-document claim ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
 ## v3.267.2 (2026-11-23)
 
 ### Documentation

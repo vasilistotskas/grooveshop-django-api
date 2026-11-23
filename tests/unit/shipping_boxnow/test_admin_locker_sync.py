@@ -15,7 +15,7 @@ from shipping_boxnow.models import BoxNowLocker
 
 
 def _request():
-    request = RequestFactory().get("/")
+    request = RequestFactory().post("/", {"_form_submitted": "on"})
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     return request
 
@@ -41,6 +41,6 @@ def test_it_redirects_to_the_locker_list(locker_admin, fails):
         run.return_value = {}
         response = locker_admin.sync_from_boxnow(_request())
 
-    assert response.status_code == 302
-    assert response.url.endswith("/shipping_boxnow/boxnowlocker/")
+    assert response.status_code == 200
+    assert response["HX-Redirect"].endswith("/shipping_boxnow/boxnowlocker/")
     assert error.called is fails

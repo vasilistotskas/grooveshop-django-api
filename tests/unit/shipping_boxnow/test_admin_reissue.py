@@ -33,7 +33,7 @@ TASK = "shipping_boxnow.tasks.create_boxnow_shipment_for_order.apply_async"
 
 
 def _press(shipment):
-    request = RequestFactory().post("/")
+    request = RequestFactory().post("/", {"_form_submitted": "on"})
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)
@@ -130,7 +130,7 @@ def test_a_broker_failure_after_the_reset_keeps_the_request():
         response, _messages = _press(shipment)
 
     task.assert_called_once()
-    assert response.status_code == 302
+    assert response.status_code == 200
     shipment.refresh_from_db()
     assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
     row = DeferredDispatch.objects.get()

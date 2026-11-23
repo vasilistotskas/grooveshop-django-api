@@ -387,7 +387,7 @@ class TestWhileHeldNothingIsSent:
         _lose_one_answer(acs)
         waiting = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )
@@ -398,7 +398,7 @@ class TestWhileHeldNothingIsSent:
         ):
             response = admin.issue_voucher_now(request, waiting.pk)
 
-        assert response.status_code == 302
+        assert response.status_code == 200
         assert "held" in str(warned.call_args.args[1])
         informed.assert_not_called()
         waiting.refresh_from_db()
@@ -430,7 +430,7 @@ class TestWhileHeldNothingIsSent:
             voucher_hold.admit(lease_seconds=78, request_id=OTHER)
         shipment = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )

@@ -42,7 +42,7 @@ URL_BACKED = {"actions_row", "actions_list", "actions_detail"}
 
 
 def _request():
-    request = RequestFactory().get("/")
+    request = RequestFactory().post("/", {"_form_submitted": "on"})
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     return request
 
@@ -61,7 +61,7 @@ class TestRowActionsReturnAResponse:
 
         task.assert_called_once_with(shipment.id)
         assert isinstance(response, HttpResponseBase)
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_issue_voucher_now(self):
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
@@ -82,7 +82,7 @@ class TestRowActionsReturnAResponse:
             response = admin.issue_voucher_now(_request(), shipment.id)
 
         assert_published_once(task, [shipment.order_id])
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_issue_voucher_now_keeps_the_request_when_the_broker_is_down(self):
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
@@ -101,7 +101,7 @@ class TestRowActionsReturnAResponse:
         ):
             response = admin.issue_voucher_now(_request(), shipment.id)
 
-        assert response.status_code == 302
+        assert response.status_code == 200
         row = DeferredDispatch.objects.get()
         assert row.task_name == create_acs_voucher_for_order.name
         assert row.args == [shipment.order_id]
@@ -114,7 +114,7 @@ class TestRowActionsReturnAResponse:
         with patch("django.contrib.messages.error"):
             response = admin.issue_voucher_now(_request(), 10**9)
 
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_run_reconciliation(self):
         admin = AcsCodPayoutAdmin(AcsCodPayout, AdminSite())
@@ -126,9 +126,9 @@ class TestRowActionsReturnAResponse:
             response = admin.run_reconciliation(_request())
 
         task.assert_called_once_with()
-        assert response.status_code == 302
+        assert response.status_code == 200
         # Back to ITS own changelist, not the shipment one.
-        assert "acscodpayout" in response.url
+        assert "acscodpayout" in response["HX-Redirect"]
 
 
 class TestNoUrlBackedActionCanReturnNone:

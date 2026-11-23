@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib import admin, messages
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -9,12 +10,14 @@ from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
 )
+from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from admin.responses import hx_redirect
 from order.models.order import Order
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.models import (
@@ -190,6 +193,9 @@ class BoxNowParcelStateBadgeFilter(DropdownFilter):
 
 @admin.register(BoxNowShipment)
 class BoxNowShipmentAdmin(BaseModelAdmin):
+    # Actions that only read: a GET may run them.
+    read_actions = frozenset({"download_voucher_action"})
+
     list_display = (
         "parcel_id_display",
         "parcel_state_label",
@@ -495,7 +501,6 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         rather than 404'ing — admins are usually triaging stuck rows.
         """
         from django.http import HttpResponse
-        from django.shortcuts import redirect
 
         from shipping_boxnow.services import BoxNowService
 
@@ -557,8 +562,17 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         permissions=["change"],
         variant=ActionVariant.PRIMARY,
         icon="local_shipping",
+        dialog=ActionDialog(
+            title=_("Create the BOX NOW parcel"),
+            description=_(
+                "Creates a BOX NOW parcel for this shipment now. A cancelled "
+                "parcel is reset and a new one is created."
+            ),
+        ),
     )
-    def create_parcel_action(self, request, object_id):
+    def create_parcel_action(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Re-dispatch parcel creation after its data was corrected, or
         issue a new parcel for a cancelled one.
 
@@ -567,7 +581,6 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         in ``pending_creation`` and nothing retries it, so the alert's
         "fix the data, then re-dispatch" needs a button to press.
         """
-        from django.shortcuts import redirect
 
         from shipping_boxnow.services import BoxNowService
         from shipping_boxnow.tasks import create_boxnow_shipment_for_order
@@ -582,7 +595,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
         except BoxNowShipment.DoesNotExist:
             messages.error(request, _("Shipment not found."))
-            return redirect(change_url)
+            return hx_redirect(change_url)
 
         reissue = shipment.parcel_state == BoxNowParcelState.CANCELED
         if shipment.has_parcel and not reissue:
@@ -590,7 +603,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 request,
                 _("This shipment already has a BoxNow parcel."),
             )
-            return redirect(change_url)
+            return hx_redirect(change_url)
 
         # The service refuses an unpaid online order
         # (``ShipmentAwaitingPaymentError``), but inside a Celery task
@@ -605,7 +618,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 )
                 % {"order": shipment.order_id},
             )
-            return redirect(change_url)
+            return hx_redirect(change_url)
 
         # The service refuses these too (it finishes a canceled order's
         # cancel, and refuses one whose payment all went back), inside the
@@ -619,7 +632,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 )
                 % {"order": shipment.order_id},
             )
-            return redirect(change_url)
+            return hx_redirect(change_url)
 
         # A CANCELED parcel keeps its delivery request, which makes the
         # creation task return the dead parcel. Reset it first so a new
@@ -633,7 +646,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     _("Cannot reset the parcel for reissue: %(err)s")
                     % {"err": str(exc)},
                 )
-                return redirect(change_url)
+                return hx_redirect(change_url)
             messages.info(
                 request,
                 _("Cancelled parcel reset — creating a new one."),
@@ -643,17 +656,25 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             create_boxnow_shipment_for_order, [shipment.order_id]
         )
         messages.info(request, _("Parcel creation task dispatched."))
-        return redirect(change_url)
+        return hx_redirect(change_url)
 
     @action(
         description=_("Cancel parcel via BoxNow API"),
         permissions=["change"],
         variant=ActionVariant.DANGER,
         icon="cancel",
+        dialog=ActionDialog(
+            title=_("Cancel the BOX NOW parcel"),
+            description=_(
+                "Cancels this parcel at BOX NOW. Only a parcel that is still new "
+                "can be cancelled."
+            ),
+        ),
     )
-    def cancel_parcel_action(self, request, object_id):
+    def cancel_parcel_action(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Cancel a single shipment from the detail page."""
-        from django.shortcuts import redirect
 
         from shipping_boxnow.services import BoxNowService
 
@@ -661,7 +682,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             shipment = BoxNowShipment.objects.get(pk=object_id)
         except BoxNowShipment.DoesNotExist:
             messages.error(request, _("Shipment not found."))
-            return redirect(
+            return hx_redirect(
                 reverse(
                     "admin:shipping_boxnow_boxnowshipment_change",
                     args=[object_id],
@@ -680,7 +701,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "state": shipment.get_parcel_state_display(),
                 },
             )
-            return redirect(
+            return hx_redirect(
                 reverse(
                     "admin:shipping_boxnow_boxnowshipment_change",
                     args=[object_id],
@@ -704,7 +725,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 _("Cancel failed: %(err)s") % {"err": str(exc)},
             )
 
-        return redirect(
+        return hx_redirect(
             reverse(
                 "admin:shipping_boxnow_boxnowshipment_change",
                 args=[object_id],
@@ -791,8 +812,17 @@ class BoxNowLockerAdmin(BaseModelAdmin):
         permissions=["change"],
         variant=ActionVariant.INFO,
         icon="sync",
+        dialog=ActionDialog(
+            title=_("Sync lockers from BOX NOW"),
+            description=_(
+                "Fetches every active locker from BOX NOW and updates the list: "
+                "new ones are added and removed ones are deactivated."
+            ),
+        ),
     )
-    def sync_from_boxnow(self, request):
+    def sync_from_boxnow(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Fetch and upsert every active APM location from BoxNow's
         destination API — the whole set, never a selection."""
         from shipping_boxnow.services import BoxNowService
@@ -819,7 +849,7 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                 request,
                 _("Locker sync failed: %(err)s") % {"err": str(exc)},
             )
-        return redirect(
+        return hx_redirect(
             reverse(
                 f"{self.admin_site.name}:shipping_boxnow_boxnowlocker_changelist"
             )

@@ -73,7 +73,9 @@ def test_duplicating_a_product_does_not_500(
     product_admin, request_factory, operator
 ):
     original = _make_product(active=True, external_reference="woo:5")
-    request = _with_messages(request_factory.get("/admin/"))
+    request = _with_messages(
+        request_factory.post("/admin/", {"_form_submitted": "on"})
+    )
     request.user = operator
 
     with patch.object(ProductAdmin, "message_user"):

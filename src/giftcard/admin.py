@@ -26,6 +26,7 @@ from admin.base import BaseModelAdmin
 from admin.datasets import RelatedDatasetAdmin
 from admin.displays import money
 from admin.export import ExportActionMixin
+from admin.responses import hx_redirect
 from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
 from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
 from giftcard.services import GiftCardService
@@ -349,17 +350,26 @@ class GiftCardAdmin(BaseModelAdmin):
             }
         )
 
-    @action(description=_("Disable card"), icon="block", permissions=["change"])
+    @action(
+        description=_("Disable card"),
+        icon="block",
+        permissions=["change"],
+        dialog=ActionDialog(
+            title=_("Disable the card"),
+            description=_(
+                "The card can no longer be used to pay. Its balance is kept."
+            ),
+        ),
+    )
     def disable_card(
-        self, request: HttpRequest, object_id: int
+        self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
         GiftCard.objects.filter(pk=object_id).update(
             status=GiftCardStatus.DISABLED
         )
         self.message_user(request, _("Card disabled."), messages.SUCCESS)
-        from django.shortcuts import redirect
 
-        return redirect(
+        return hx_redirect(
             reverse("admin:giftcard_giftcard_change", args=[object_id])
         )
 
@@ -367,9 +377,15 @@ class GiftCardAdmin(BaseModelAdmin):
         description=_("Resend delivery email"),
         icon="forward_to_inbox",
         permissions=["change"],
+        dialog=ActionDialog(
+            title=_("Resend the delivery email"),
+            description=_(
+                "Sends the gift card's delivery email to its recipient again."
+            ),
+        ),
     )
     def resend_delivery(
-        self, request: HttpRequest, object_id: int
+        self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
 
         from giftcard.tasks import deliver_gift_card_email
@@ -379,9 +395,8 @@ class GiftCardAdmin(BaseModelAdmin):
         self.message_user(
             request, _("Delivery email queued."), messages.SUCCESS
         )
-        from django.shortcuts import redirect
 
-        return redirect(
+        return hx_redirect(
             reverse("admin:giftcard_giftcard_change", args=[object_id])
         )
 

@@ -58,7 +58,7 @@ def _paid_card_order():
 
 
 def _request():
-    request = RequestFactory().get("/")
+    request = RequestFactory().post("/", {"_form_submitted": "on"})
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     return request
 
@@ -186,7 +186,7 @@ class TestAdminButtons:
             response = admin.issue_voucher_now(_request(), shipment.id)
 
         task.assert_not_called()
-        assert response.status_code == 302
+        assert response.status_code == 200
         message = str(error.call_args.args[1])
         assert f"#{shipment.order_id}" in message
         assert "not been paid" in message
@@ -209,7 +209,7 @@ class TestAdminButtons:
             response = admin.create_parcel_action(_request(), shipment.id)
 
         task.assert_not_called()
-        assert response.status_code == 302
+        assert response.status_code == 200
         assert "not been paid" in str(error.call_args.args[1])
 
     def test_create_boxnow_parcel_now_dispatches_for_a_payable_order(self):
@@ -230,7 +230,7 @@ class TestAdminButtons:
             response = admin.create_parcel_action(_request(), shipment.id)
 
         assert_published_once(task, [shipment.order_id])
-        assert response.status_code == 302
+        assert response.status_code == 200
 
 
 @pytest.mark.usefixtures("open_email_gates")

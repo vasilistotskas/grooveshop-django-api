@@ -3323,7 +3323,9 @@ def _out_of_sight(order) -> list[str]:
 
 
 def _admin_request(data=None):
-    request = RequestFactory().post("/admin/order/order/", data)
+    request = RequestFactory().post(
+        "/admin/order/order/", data or {"_form_submitted": "on"}
+    )
     request.user = UserAccountFactory(is_staff=True, is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)

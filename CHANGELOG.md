@@ -3,6 +3,68 @@
 
 
 
+## v3.267.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): an online order paid and then partly refunded gets its courier voucher (#798) ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): an online order paid and then partly refunded gets its courier voucher
+
+Order.awaits_online_payment was 'not is_paid' behind an online pay way,
+so it held for every settled payment status but COMPLETED. A card order
+partly refunded before its voucher existed was refused by both carriers'
+mint as unpaid (ShipmentAwaitingPaymentError, no retry), the admin's
+'Issue ACS voucher now' and 'Create BoxNow parcel now' said it had not
+been paid, and the stale-shipment digest kept listing it as stranded with
+that same button as the remedy. Its receipt with movement waited for the
+same reason.
+
+The property is now the one-row form of awaiting_online_payment_q: an
+online pay way whose payment is not in SETTLED_PAYMENT_STATUSES. At order
+creation, where the cart readers ask, a payment is only PENDING or
+COMPLETED, so they answer as before; the payment hold's restatement of
+the settled check goes. A test holds the property to the queryset rule for
+every payment status, and both carriers mint for a partly refunded order.
+
+Closes #649 ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): no courier shipment for an order that ships nothing
+
+Review of the voucher fix: awaits_online_payment had also, by accident,
+refused a voucher for a canceled online order and for one refunded in
+full while still PROCESSING (a full refund does not move the order).
+Read as the settled statuses, it let both through, and ACS had nothing
+else refusing a canceled order: a retry that waited out a cancel in its
+backoff, or 'Issue ACS voucher now' on a retired shipment, minted a
+prepaid voucher for an order nobody pays for.
+
+Order.ships_nothing (and ships_nothing_q) is the one rule: CANCELED or
+REFUNDED as an order, or paid online and the store keeps nothing of the
+payment (PAYMENT_STATUSES_KEEPING_NOTHING). shipping_acs's
+needs_no_voucher reads it instead of its own order-status set. Both mint
+choke points raise ShipmentNotNeededError for it under the shipment lock
+(ACS also for a retired shipment; BOX NOW still finishes a canceled
+order's cancel first), the tasks report not_needed with no retry and no
+alert, and both admin buttons refuse with a message, the BOX NOW one for
+a first parcel as much as a reissue.
+
+The courier test helpers default to a PROCESSING order: the factory's
+random status was CANCELED or REFUNDED often enough to make a mint test
+refused at random. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(order): an order that ships nothing gets no receipt, and BOX NOW cancels a parcel it may hold for one
+
+receipt_issuable's pre-shipment branch refuses an order that ships nothing (a full refund leaves it PROCESSING with a voucher that is not to leave). The BOX NOW sweep of uncertain creations and the persist of a parcel created in flight treat such an order like a canceled one: the parcel is cancelled at BoxNow and the shipment recorded CANCELED. ACS builds its client only for an order it sends, so one that ships nothing is refused as not needed on a store without ACS credentials. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+* fix(shipping): tell staff when a refund in full cancels a BOX NOW shipment, and name why in its notes
+
+A refund that fails or is reversed makes the order payable again, and nothing but staff create its parcel then: the cancel leaves a note saying so. A refund reversed before the sweep's cancel leaves the shipment to the next run. The cancel-refused note, the log line and the recorded reason say refunded in full for such an order instead of canceled. ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
+### Code style
+
+* style(order): drop an import the merge left unused ([`9405e58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9405e588eb591a7ad67fec59021dd86cd63a18eb))
+
 ## v3.267.0 (2026-11-23)
 
 ### Bug fixes

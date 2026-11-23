@@ -16,7 +16,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
     contract_of = [("product", "0074_product_description_empty_string")]
 
-    dependencies = [("product", "0074_product_description_empty_string")]
+    dependencies = [("product", "0075_image_dimensions")]
 
     operations = [
         migrations.RunSQL(

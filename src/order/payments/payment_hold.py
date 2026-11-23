@@ -31,7 +31,6 @@ from django.utils import timezone
 from core.celery import celery_app
 from core.store_settings import store_setting
 from order.enum.status import (
-    SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )

@@ -3903,6 +3903,14 @@ msgstr "Κατανομές πίστωσης"
 msgid "Credit document"
 msgstr "Πιστωτικό παραστατικό"
 
+#, python-format
+msgid "Credit document %(number)s has no myDATA MARK - nothing to cancel."
+msgstr "Το πιστωτικό παραστατικό %(number)s δεν έχει MARK στο myDATA - δεν υπάρχει τίποτα για ακύρωση."
+
+#, python-format
+msgid "Credit document %(number)s is already canceled in myDATA."
+msgstr "Το πιστωτικό παραστατικό %(number)s έχει ήδη ακυρωθεί στο myDATA."
+
 msgid "Credit document PDF has not been rendered yet."
 msgstr "Το PDF του πιστωτικού παραστατικού δεν έχει δημιουργηθεί ακόμη."
 
@@ -12880,12 +12888,12 @@ msgid "Scheduled for"
 msgstr "Προγραμματισμένο για"
 
 #, python-format
-msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
-msgstr "Προγραμματίστηκε ακύρωση στο myDATA για %(count)d πιστωτικά παραστατικά."
-
-#, python-format
 msgid "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgstr "Προγραμματίστηκε ακύρωση στο myDATA για το MARK %(mark)s (παραγγελία #%(order_id)s)."
+
+#, python-format
+msgid "Scheduled myDATA cancellation for credit document %(number)s (MARK %(mark)s)."
+msgstr "Προγραμματίστηκε ακύρωση στο myDATA για το πιστωτικό παραστατικό %(number)s (MARK %(mark)s)."
 
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."

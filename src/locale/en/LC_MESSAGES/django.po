@@ -3899,6 +3899,14 @@ msgstr "Credit allocations"
 msgid "Credit document"
 msgstr "Credit document"
 
+#, python-format
+msgid "Credit document %(number)s has no myDATA MARK - nothing to cancel."
+msgstr "Credit document %(number)s has no myDATA MARK - nothing to cancel."
+
+#, python-format
+msgid "Credit document %(number)s is already canceled in myDATA."
+msgstr "Credit document %(number)s is already canceled in myDATA."
+
 msgid "Credit document PDF has not been rendered yet."
 msgstr "Credit document PDF has not been rendered yet."
 
@@ -12874,12 +12882,12 @@ msgid "Scheduled for"
 msgstr "Scheduled for"
 
 #, python-format
-msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
-msgstr "Scheduled myDATA cancellation for %(count)d credit document(s)."
-
-#, python-format
 msgid "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgstr "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
+
+#, python-format
+msgid "Scheduled myDATA cancellation for credit document %(number)s (MARK %(mark)s)."
+msgstr "Scheduled myDATA cancellation for credit document %(number)s (MARK %(mark)s)."
 
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."

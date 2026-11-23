@@ -285,9 +285,15 @@ before that has it canceled
 do not enforce the "never used" rule yet; the guard is listed in issue #197.
 Both are offered only where the platform issues the store's documents
 (`MyDataConfig.is_ready`): the receipt's to whoever may change the order, the
-credit's to whoever holds `order.change_retailcredit`
+credit's to whoever holds `order.change_retailcredit`, STAFF included
 (`RetailCreditAdmin.has_cancel_in_mydata_permission`; the register itself
-refuses `change`, so a credit document is never edited there).
+refuses `change`, so a credit document is never edited there). The credit's
+action is a detail action on the credit's own page, one credit at a time, never
+a changelist bulk action: a cancellation at AADE cannot be undone, so no filter
+or "select all" can cancel a batch. It cancels only a credit AADE registered
+(it has a MARK) and has not canceled; for any other it queues nothing and says
+why. The permission is the role gate alone, because one that failed on the
+credit would answer the click with a bare 403.
 
 **Invoices (B2B) are not issued by the platform.** From 2.11.2026 AADE decision
 Α.1128/2025 art. 1(2) requires 1.1 and 5.1 documents to come from a licensed

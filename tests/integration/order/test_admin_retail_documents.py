@@ -23,7 +23,15 @@ from order.enum.status import OrderStatus
 from order.factories import OrderFactory
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
+from tenant.enum import TenantMembershipRole
 from tests.utils.mydata import issuable, mydata_enabled
+from tests.utils.staff import (
+    bind_store_tenant,
+    stamp_platform_identity,
+    store_staff,
+    store_tenant,
+    unbind_store_tenant,
+)
 from user.factories import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -162,15 +170,23 @@ class TestTheOrderPage:
 
 
 class TestCancelACreditInMyData:
-    """ "Cancel in myDATA (issued in error)" on the credit documents list
-    (#653). The register refuses ``change`` to everyone, so while the
+    """ "Cancel in myDATA (issued in error)" on a credit document's own
+    page (#653). The register refuses ``change`` to everyone, so while the
     action asked for it nobody was offered it, a superuser included. It
     asks for the store's own permission on credit documents, and only
     where the platform issues the store's documents, like the order's
-    "Cancel receipt in myDATA"."""
+    "Cancel receipt in myDATA". One credit at a time: a cancellation at
+    AADE cannot be undone, so no selection can cancel a batch."""
+
+    @pytest.fixture
+    def tenant(self):
+        tenant = store_tenant("credit_cancel")
+        previous = bind_store_tenant(tenant)
+        yield tenant
+        unbind_store_tenant(previous)
 
     @staticmethod
-    def _registered_credit():
+    def _credit(*, mark=400000000000002, status=None, number="CRD-2026-000001"):
         from datetime import date
 
         from order.accounting.invoicing import generate_invoice
@@ -178,77 +194,167 @@ class TestCancelACreditInMyData:
         from tests.utils.mydata import registered
 
         order = _shipped_order()
-        invoice = registered(generate_invoice(order))
-        return RetailCredit.objects.create(
+        with mydata_enabled(auto_submit=False):
+            invoice = registered(generate_invoice(order))
+        type(invoice).objects.filter(pk=invoice.pk).update(
+            mydata_mark=500000000000000 + order.pk
+        )
+        credit = RetailCredit.objects.create(
             order=order,
             invoice=invoice,
             reason=CreditReason.SETTLEMENT,
-            credit_number="CRD-2026-000001",
+            credit_number=number,
             issue_date=date(2026, 3, 20),
-            mydata_mark=400000000000002,
+            mydata_mark=mark,
         )
+        if status is not None:
+            RetailCredit.objects.filter(pk=credit.pk).update(
+                mydata_status=status
+            )
+            credit.refresh_from_db()
+        return credit
 
     @staticmethod
-    def _store_staff(*codenames):
-        from django.contrib.auth.models import Permission
-
-        user = UserAccountFactory(is_staff=True)
-        user.user_permissions.set(
-            Permission.objects.filter(
-                content_type__app_label="order", codename__in=codenames
-            )
-        )
-        return user
-
-    def _offered(self, user) -> bool:
-        from order.admin import RetailCreditAdmin
-        from order.models.retail_credit import RetailCredit
-
-        model_admin = RetailCreditAdmin(RetailCredit, AdminSite())
-        return "cancel_in_mydata" in model_admin.get_actions(_request(user))
-
-    def test_offered_to_who_may_change_credits_where_the_platform_issues(
-        self,
-    ):
-        user = self._store_staff("view_retailcredit", "change_retailcredit")
-
-        with mydata_enabled():
-            assert self._offered(user)
-
-    def test_not_offered_where_the_store_issues_outside_the_platform(self):
-        user = self._store_staff("view_retailcredit", "change_retailcredit")
-
-        with mydata_enabled(ready=False):
-            assert not self._offered(user)
-
-    def test_not_offered_to_who_may_only_view_credits(self):
-        user = self._store_staff("view_retailcredit")
-
-        with mydata_enabled():
-            assert not self._offered(user)
-
-    def test_the_changelist_schedules_the_cancel_of_a_registered_credit(
-        self,
-    ):
-        from unittest.mock import patch
-
+    def _client(user) -> Client:
         from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
 
-        with mydata_enabled():
-            credit = self._registered_credit()
-            client = Client()
-            client.force_login(
-                UserAccountFactory(is_staff=True, is_superuser=True),
-                backend=PLATFORM_STAFF_BACKEND_PATH,
-            )
-            with patch("order.tasks.cancel_mydata_credit.delay") as cancel:
-                response = client.post(
-                    reverse("admin:order_retailcredit_changelist"),
-                    {
-                        "action": "cancel_in_mydata",
-                        "_selected_action": [credit.pk],
-                    },
-                )
+        client = Client(raise_request_exception=False)
+        client.force_login(user, backend=PLATFORM_STAFF_BACKEND_PATH)
+        return client
+
+    @staticmethod
+    def _url(credit) -> str:
+        return reverse(
+            "admin:order_retailcredit_cancel_in_mydata", args=[credit.pk]
+        )
+
+    def _post(self, tenant, role, credit, *, ready=True):
+        from unittest.mock import patch
+
+        client = self._client(store_staff(tenant, role=role))
+        with (
+            mydata_enabled(ready=ready),
+            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
+        ):
+            response = client.post(self._url(credit))
+        return response, cancel
+
+    @pytest.mark.parametrize(
+        "role", [TenantMembershipRole.STAFF, TenantMembershipRole.ADMIN]
+    )
+    def test_a_store_role_schedules_the_cancel_of_a_registered_credit(
+        self, tenant, role
+    ):
+        credit = self._credit()
+
+        response, cancel = self._post(tenant, role, credit)
 
         assert response.status_code == 302
         cancel.assert_called_once_with(credit.pk)
+
+    def test_the_success_message_names_the_credit(self, tenant):
+        credit = self._credit()
+        client = self._client(
+            store_staff(tenant, role=TenantMembershipRole.STAFF)
+        )
+        from unittest.mock import patch
+
+        with mydata_enabled(), patch("order.tasks.cancel_mydata_credit.delay"):
+            response = client.post(self._url(credit), follow=True)
+
+        assert [str(m) for m in response.context["messages"]] == [
+            (
+                "Scheduled myDATA cancellation for credit document "
+                f"{credit.credit_number} (MARK {credit.mydata_mark})."
+            )
+        ]
+
+    def test_no_bulk_action_is_left_on_the_changelist(self, tenant):
+        from order.admin import RetailCreditAdmin
+        from order.models.retail_credit import RetailCredit
+
+        user = store_staff(tenant, role=TenantMembershipRole.ADMIN)
+
+        with mydata_enabled():
+            actions = RetailCreditAdmin(RetailCredit, AdminSite()).get_actions(
+                _request(user)
+            )
+
+        assert "cancel_in_mydata" not in actions
+
+    def test_staff_without_a_role_in_the_store_is_refused(self, tenant):
+        from order.admin import RetailCreditAdmin
+        from order.models.retail_credit import RetailCredit
+
+        credit = self._credit()
+        outsider = stamp_platform_identity(UserAccountFactory(is_staff=True))
+        model_admin = RetailCreditAdmin(RetailCredit, AdminSite())
+
+        with mydata_enabled():
+            assert not model_admin.has_cancel_in_mydata_permission(
+                _request(outsider), str(credit.pk)
+            )
+            assert model_admin.has_cancel_in_mydata_permission(
+                _request(store_staff(tenant)), str(credit.pk)
+            )
+
+    def test_refused_where_the_store_issues_outside_the_platform(self, tenant):
+        credit = self._credit()
+
+        response, cancel = self._post(
+            tenant, TenantMembershipRole.ADMIN, credit, ready=False
+        )
+
+        assert response.status_code == 403
+        cancel.assert_not_called()
+
+    def test_a_credit_with_no_mark_is_refused_with_a_message(self, tenant):
+        from order.admin import RetailCreditAdmin
+        from order.models.retail_credit import RetailCredit
+
+        credit = self._credit(mark=None)
+        request = _request(store_staff(tenant, role=TenantMembershipRole.STAFF))
+
+        from unittest.mock import patch
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
+        ):
+            RetailCreditAdmin(RetailCredit, AdminSite()).cancel_in_mydata(
+                request, object_id=credit.pk
+            )
+
+        cancel.assert_not_called()
+        assert _messages(request) == [
+            (
+                f"Credit document {credit.credit_number} has no myDATA MARK "
+                "- nothing to cancel."
+            )
+        ]
+
+    def test_an_already_canceled_credit_is_refused_with_a_message(self, tenant):
+        from order.admin import RetailCreditAdmin
+        from order.models.invoice import MyDataStatus
+        from order.models.retail_credit import RetailCredit
+
+        credit = self._credit(status=MyDataStatus.CANCELED)
+        request = _request(store_staff(tenant, role=TenantMembershipRole.STAFF))
+
+        from unittest.mock import patch
+
+        with (
+            mydata_enabled(),
+            patch("order.tasks.cancel_mydata_credit.delay") as cancel,
+        ):
+            RetailCreditAdmin(RetailCredit, AdminSite()).cancel_in_mydata(
+                request, object_id=credit.pk
+            )
+
+        cancel.assert_not_called()
+        assert _messages(request) == [
+            (
+                f"Credit document {credit.credit_number} is already "
+                "canceled in myDATA."
+            )
+        ]

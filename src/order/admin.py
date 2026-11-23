@@ -3911,8 +3911,8 @@ class RetailCreditAdmin(BaseModelAdmin):
 
     Like the receipts, a credit document is a tax record: browse, search
     and download only. ``OrderAdmin``'s "Issue credit documents" resubmits
-    one AADE has not registered; the "Cancel in myDATA" action here is for
-    a document issued in error.
+    one AADE has not registered; the "Cancel in myDATA" action on a credit's own page is
+    for a document issued in error, one credit at a time.
     """
 
     list_display = (
@@ -3939,7 +3939,7 @@ class RetailCreditAdmin(BaseModelAdmin):
     ordering = ("-issue_date", "-credit_number")
     date_hierarchy = "issue_date"
     list_select_related = ("order",)
-    actions = ["cancel_in_mydata"]
+    actions_detail = ["cancel_in_mydata"]
 
     readonly_fields = (
         "credit_number",
@@ -4062,32 +4062,66 @@ class RetailCreditAdmin(BaseModelAdmin):
             label = f"{label} (#{obj.mydata_mark})"
         return obj.mydata_status, label
 
-    def has_cancel_in_mydata_permission(self, request) -> bool:
+    def has_cancel_in_mydata_permission(self, request, object_id=None) -> bool:
         """Who may cancel a credit document in myDATA: whoever holds the
         store's permission to change credit documents, and only where the
         platform issues the store's documents (``MyDataConfig.is_ready``),
         as for the order's "Cancel receipt in myDATA". Not ``change``
         itself: this register refuses that to everyone, so a tax record is
-        never edited here."""
+        never edited here. Whether the credit can be canceled is answered
+        by the action itself, with a message: a permission that failed on
+        it would answer a click with a bare 403 instead."""
         return request.user.has_perm(
             "order.change_retailcredit"
         ) and OrderAdmin._issues_receipts(request)
 
-    @admin.action(
+    @action(
         description=_("Cancel in myDATA (issued in error)"),
+        variant=ActionVariant.DANGER,
+        icon="cancel",
         permissions=["cancel_in_mydata"],
     )
-    def cancel_in_mydata(self, request, queryset):
+    def cancel_in_mydata(self, request, object_id):
+        """Schedule a ``CancelInvoice`` for this credit's MARK. One credit
+        at a time: a cancellation at AADE cannot be undone, so no filter
+        or selection can ever cancel a batch."""
+        change_url = reverse(
+            "admin:order_retailcredit_change", args=[object_id]
+        )
+        credit = RetailCredit.objects.filter(pk=object_id).first()
+        if credit is None:
+            messages.error(request, _("Credit document not found."))
+            return redirect(change_url)
+        if not credit.mydata_mark:
+            messages.warning(
+                request,
+                _(
+                    "Credit document %(number)s has no myDATA MARK "
+                    "- nothing to cancel."
+                )
+                % {"number": credit.credit_number},
+            )
+            return redirect(change_url)
+        if credit.mydata_status == MyDataStatus.CANCELED:
+            messages.warning(
+                request,
+                _("Credit document %(number)s is already canceled in myDATA.")
+                % {"number": credit.credit_number},
+            )
+            return redirect(change_url)
+
         from order.tasks import cancel_mydata_credit
 
-        registered = queryset.filter(mydata_mark__isnull=False)
-        for credit in registered:
-            cancel_mydata_credit.delay(credit.pk)
-        self.message_user(
+        cancel_mydata_credit.delay(credit.pk)
+        messages.success(
             request,
-            _("Scheduled myDATA cancellation for %(count)d credit document(s).")
-            % {"count": registered.count()},
+            _(
+                "Scheduled myDATA cancellation for credit document "
+                "%(number)s (MARK %(mark)s)."
+            )
+            % {"number": credit.credit_number, "mark": credit.mydata_mark},
         )
+        return redirect(change_url)
 
 
 @admin.register(InvoiceCounter)

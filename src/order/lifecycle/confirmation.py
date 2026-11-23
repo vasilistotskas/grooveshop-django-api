@@ -7,7 +7,6 @@ payment settles. Confirming is what tells people about it.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.db.models import F, Q
@@ -51,34 +50,25 @@ def paid_online(order: Order) -> bool:
     )
 
 
-def backfill_confirmed_at(apps: Apps, *, rollout_finished_at: datetime) -> int:
-    """Stamp ``confirmed_at = created_at`` on the orders without one that
-    the previous release, which had no column, already announced, and say
-    how many:
-
-    - an order with nothing to pay online (``due_for_confirmation``'s
-      offline kinds) created before *rollout_finished_at* (when the release
-      that confirms orders finished rolling out): it was announced as it
-      was placed;
-    - an online order whose confirmation email went out
-      (``CONFIRMATION_EMAIL_SENT_AT_KEY`` in its ``metadata``). The new
-      release sends that email only from a committed confirmation, so an
-      unconfirmed order that carries it was announced by the previous one.
-
-    Any other online order, paid during the rollout or since, is the new
-    release's to confirm (on its payment, or on the next sight of it), and
-    stamping it would silence its announcement. Idempotent; it tells no
-    one. An announcement the previous release still had queued is stamped
-    by a later run.
+def backfill_confirmed_at(apps: Apps) -> int:
+    """Stamp ``confirmed_at = created_at`` on the orders the previous
+    release, which had no column, already announced, and say how many: the
+    unconfirmed orders whose confirmation email went out
+    (``CONFIRMATION_EMAIL_SENT_AT_KEY`` in their ``metadata``), offline and
+    online alike. The new release sends that email only from a committed
+    confirmation, so an unconfirmed order carrying the key was announced by
+    the previous one, and an order without it, whenever it was placed or
+    paid, is the new release's to confirm: stamping it would silence its
+    announcement. An order the previous release announced while the store
+    had the confirmation email switched off carries no key and is left
+    unconfirmed. Idempotent; it tells no one. An announcement the previous
+    release still had queued is stamped by a later run.
     """
-    online = Q(pay_way__settlement=PaySettlement.ONLINE)
-    offline = Q(pay_way__isnull=True) | ~online
     return (
         apps.get_model("order", "Order")
-        .objects.filter(confirmed_at__isnull=True)
-        .filter(
-            (offline & Q(created_at__lt=rollout_finished_at))
-            | (online & Q(metadata__has_key=CONFIRMATION_EMAIL_SENT_AT_KEY))
+        .objects.filter(
+            confirmed_at__isnull=True,
+            metadata__has_key=CONFIRMATION_EMAIL_SENT_AT_KEY,
         )
         .update(confirmed_at=F("created_at"))
     )

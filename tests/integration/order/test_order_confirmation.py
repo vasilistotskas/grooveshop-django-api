@@ -82,6 +82,14 @@ def publishers():
 
 
 @pytest.fixture
+def commit(monkeypatch, django_capture_on_commit_callbacks):
+    """Commit hooks that wait for the commit, as in production (the suite
+    otherwise runs them at once); each ``with commit():`` block commits."""
+    monkeypatch.setattr(transaction, "on_commit", _ON_COMMIT)
+    return lambda: django_capture_on_commit_callbacks(execute=True)
+
+
+@pytest.fixture
 def published(publishers, django_capture_on_commit_callbacks):
     """Each publisher's ``apply_async``, with commit hooks run."""
     with django_capture_on_commit_callbacks(execute=True):
@@ -336,18 +344,9 @@ class TestAPaidOrderLeftUnconfirmedHealsItself:
     nothing (a repeat of the event, a poll that finds it paid already),
     and people are told once.
 
-    Commit hooks wait for the commit here, as in production (the suite
-    otherwise runs them at once), so the failed confirmation's rollback
-    takes its announcement with it; ``commit`` runs those that remain.
+    Commit hooks wait for the commit here (``commit``), so the failed
+    confirmation's rollback takes its announcement with it.
     """
-
-    @pytest.fixture(autouse=True)
-    def _hooks_wait_for_the_commit(self, monkeypatch):
-        monkeypatch.setattr(transaction, "on_commit", _ON_COMMIT)
-
-    @pytest.fixture
-    def commit(self, django_capture_on_commit_callbacks):
-        return lambda: django_capture_on_commit_callbacks(execute=True)
 
     def test_confirm_refuses_a_card_order_not_paid(self, publishers, commit):
         with commit():
@@ -492,98 +491,82 @@ def _book_charge(order, *, at):
 
 
 class TestTheBackfill:
-    """``backfill_confirmed_at`` stamps only orders the previous release
-    announced: an offline order created before the rollout finished
-    (announced as it was placed), and an online order whose confirmation
-    email went out (``metadata.confirmation_email_sent_at``) while
-    ``confirmed_at`` stayed empty, which only the previous release leaves.
-    Any other online order is the new release's to confirm, and stamping it
-    would silence its announcement."""
+    """``backfill_confirmed_at`` stamps only the orders the previous
+    release announced: unconfirmed orders whose confirmation email went
+    out (``metadata.confirmation_email_sent_at``). The new release sends
+    that email only from a committed confirmation, so any other order is
+    its to confirm, and stamping it would silence its announcement."""
 
     def test_it_stamps_only_what_the_previous_release_announced(self):
-        cutoff = timezone.now() - timedelta(minutes=1)
-        before = cutoff - timedelta(minutes=5)
-        after = cutoff + timedelta(seconds=30)
-
-        offline_before = _order(PayWayFactory.create_offline_payment())
-        offline_after = _order(PayWayFactory.create_offline_payment())
-        announced = _order(
+        offline_announced = _order(PayWayFactory.create_offline_payment())
+        online_announced = _order(
             PayWayFactory.create_online_payment("stripe"),
             payment_status=PaymentStatus.COMPLETED,
         )
+        offline_unannounced = _order(PayWayFactory.create_offline_payment())
         paid_unannounced = _order(
             PayWayFactory.create_online_payment("stripe"),
             payment_status=PaymentStatus.COMPLETED,
         )
-        paid_after = _order(
-            PayWayFactory.create_online_payment("stripe"),
-            payment_status=PaymentStatus.COMPLETED,
-        )
+        _book_charge(paid_unannounced, at=timezone.now())
         _order(PayWayFactory.create_online_payment("stripe"))
-        for order, booked_at in (
-            (announced, before),
-            (paid_unannounced, before),
-            (paid_after, after),
-        ):
-            _book_charge(order, at=booked_at)
         # Placed under the previous release: nothing confirmed, and only
-        # the announced order's confirmation email sent.
-        Order.objects.update(created_at=before, confirmed_at=None, metadata={})
-        Order.objects.filter(pk=announced.pk).update(
-            metadata={CONFIRMATION_EMAIL_SENT_AT_KEY: before.isoformat()}
+        # the announced orders' confirmation emails sent.
+        Order.objects.update(confirmed_at=None, metadata={})
+        Order.objects.filter(
+            pk__in=[offline_announced.pk, online_announced.pk]
+        ).update(
+            metadata={
+                CONFIRMATION_EMAIL_SENT_AT_KEY: timezone.now().isoformat()
+            }
         )
-        Order.objects.filter(pk=offline_after.pk).update(created_at=after)
 
-        assert backfill_confirmed_at(apps, rollout_finished_at=cutoff) == 2
+        assert backfill_confirmed_at(apps) == 2
+        assert backfill_confirmed_at(apps) == 0
 
         stamped = set(
             Order.objects.filter(confirmed_at__isnull=False).values_list(
                 "pk", flat=True
             )
         )
-        assert stamped == {offline_before.pk, announced.pk}
+        assert stamped == {offline_announced.pk, online_announced.pk}
+        assert offline_unannounced.pk not in stamped
+
+    def test_an_order_placed_now_is_left_to_its_own_confirmation(
+        self, publishers, commit
+    ):
+        """CodeRabbit's sequence on #816: the new release commits an
+        offline order, and the backfill runs before the commit hook that
+        confirms it."""
+        with commit():
+            order = _order(PayWayFactory.create_offline_payment())
+
+            assert backfill_confirmed_at(apps) == 0
+
+        order.refresh_from_db()
+        assert order.confirmed_at is not None
+        assert _calls(publishers, "confirmation") == 1
+        assert _calls(publishers, "staff") == 1
+        assert _calls(publishers, "placed_note") == 1
 
     @pytest.mark.parametrize(
-        "booked",
-        [None, "after", "before"],
-        ids=["taken-at-once", "booked-after", "booked-before"],
+        "booked", [False, True], ids=["taken-at-once", "booked"]
     )
     def test_a_payment_the_new_release_recorded_is_still_announced(
         self, published, booked
     ):
         """CodeRabbit's sequences on #816: the new release places a card
-        order during the rollout and records its payment, taken at once or
-        booked by a webhook after the rollout or before it (its
-        confirmation failing then), and the backfill runs before the
-        confirmation does."""
-        cutoff = timezone.now() - timedelta(minutes=1)
+        order and records its payment (taken at once, or booked by a
+        webhook, its confirmation failing), and the backfill runs before
+        the confirmation does."""
         order = _created(_order(PayWayFactory.create_online_payment("stripe")))
-        Order.objects.filter(pk=order.pk).update(
-            created_at=cutoff - timedelta(minutes=5)
-        )
-
         Order.objects.filter(pk=order.pk).update(
             payment_status=PaymentStatus.COMPLETED, payment_id="pi_rollout"
         )
-        if booked is not None:
-            _book_charge(
-                order,
-                at=cutoff + timedelta(seconds=30)
-                if booked == "after"
-                else cutoff - timedelta(minutes=2),
-            )
-        assert backfill_confirmed_at(apps, rollout_finished_at=cutoff) == 0
+        if booked:
+            _book_charge(order, at=timezone.now())
+
+        assert backfill_confirmed_at(apps) == 0
         assert OrderLifecycleService.confirm(Order.objects.get(pk=order.pk))
 
         _assert_told_once(published, order)
-
-    @pytest.mark.parametrize(
-        "args",
-        [[], ["--rollout-finished-at", "2026-11-23T05:00:00"]],
-        ids=["missing", "no-offset"],
-    )
-    def test_the_command_needs_an_aware_cutoff(self, args):
-        from django.core.management import CommandError, call_command
-
-        with pytest.raises(CommandError):
-            call_command("backfill_confirmed_at", *args, "--all-tenants")

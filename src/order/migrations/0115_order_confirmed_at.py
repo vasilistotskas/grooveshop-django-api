@@ -8,8 +8,8 @@ online order never paid stays empty. It runs before the new release
 serves anything, so every order it stamps was announced by the previous
 one. Those the previous release announces while the new one rolls out are
 stamped afterwards by ``manage.py backfill_confirmed_at``
-(``order.lifecycle.confirmation``): offline orders placed before the
-rollout finished, and online orders whose confirmation email went out.
+(``order.lifecycle.confirmation``): the unconfirmed orders whose
+confirmation email went out.
 """
 
 from django.db import migrations, models

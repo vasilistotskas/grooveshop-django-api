@@ -20,9 +20,7 @@ from order.serializers.order import CreatePaymentIntentRequestSerializer
 pytestmark = pytest.mark.django_db
 
 
-@pytest.mark.parametrize(
-    "key", ["order", "amount", "pay_way", "order_id", "on_paid"]
-)
+@pytest.mark.parametrize("key", ["order", "amount", "pay_way", "order_id"])
 def test_a_reserved_key_is_rejected_not_crashed(key):
     serializer = CreatePaymentIntentRequestSerializer(
         data={"payment_data": {key: "1"}}

@@ -1,5 +1,6 @@
 from unittest import mock
 
+from django.db import connection
 from django.test import TestCase
 from django.utils.translation import gettext as _
 
@@ -12,6 +13,14 @@ from pay_way.services import PayWayService
 
 class PayWayServiceTestCase(TestCase):
     def setUp(self):
+        # What the caller confirms the order with, inside the service's
+        # own transaction; records the atomic depth it was called at.
+        self.on_paid = mock.Mock(
+            side_effect=lambda order: self.paid_at_depth.append(
+                (order.payment_status, len(connection.atomic_blocks))
+            )
+        )
+        self.paid_at_depth: list = []
         self.online_pay_way = PayWayFactory(
             active=True,
             provider_code="stripe",
@@ -68,7 +77,7 @@ class PayWayServiceTestCase(TestCase):
         self.assertIsNone(PayWayService.get_provider_for_pay_way(unknown))
 
         success, data = PayWayService.process_payment(
-            pay_way=unknown, order=self.order
+            pay_way=unknown, order=self.order, on_paid=self.on_paid
         )
 
         self.assertFalse(success)
@@ -78,6 +87,7 @@ class PayWayServiceTestCase(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.payment_status, PaymentStatus.PENDING)
         self.assertEqual(self.order.payment_id, "")
+        self.on_paid.assert_not_called()
         self.assertEqual(self.order.payment_method, "")
 
     @mock.patch("pay_way.services.PayWayService.get_provider_for_pay_way")
@@ -85,7 +95,9 @@ class PayWayServiceTestCase(TestCase):
         self, mock_get_provider
     ):
         success, data = PayWayService.process_payment(
-            pay_way=self.offline_pay_way_without_confirmation, order=self.order
+            pay_way=self.offline_pay_way_without_confirmation,
+            order=self.order,
+            on_paid=self.on_paid,
         )
 
         self.assertTrue(success)
@@ -101,7 +113,9 @@ class PayWayServiceTestCase(TestCase):
     @mock.patch("pay_way.services.PayWayService.get_provider_for_pay_way")
     def test_process_offline_payment_with_confirmation(self, mock_get_provider):
         success, data = PayWayService.process_payment(
-            pay_way=self.offline_pay_way_with_confirmation, order=self.order
+            pay_way=self.offline_pay_way_with_confirmation,
+            order=self.order,
+            on_paid=self.on_paid,
         )
 
         self.assertTrue(success)
@@ -130,7 +144,7 @@ class PayWayServiceTestCase(TestCase):
         mock_get_provider.return_value = mock_provider
 
         success, data = PayWayService.process_payment(
-            pay_way=self.online_pay_way, order=self.order
+            pay_way=self.online_pay_way, order=self.order, on_paid=self.on_paid
         )
 
         self.assertTrue(success)
@@ -142,6 +156,11 @@ class PayWayServiceTestCase(TestCase):
         self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
         self.assertEqual(self.order.payment_id, "TEST_PAYMENT_123")
         self.assertTrue(self.order.is_paid)
+        # Confirmed in the transaction that records the payment, so no
+        # one ever reads the order paid and not yet confirmed.
+        [(status, depth)] = self.paid_at_depth
+        self.assertEqual(status, PaymentStatus.COMPLETED)
+        self.assertGreater(depth, len(connection.atomic_blocks))
 
         mock_get_provider.assert_called_once_with(self.online_pay_way)
         mock_provider.process_payment.assert_called_once()
@@ -156,7 +175,7 @@ class PayWayServiceTestCase(TestCase):
         mock_get_provider.return_value = mock_provider
 
         success, data = PayWayService.process_payment(
-            pay_way=self.online_pay_way, order=self.order
+            pay_way=self.online_pay_way, order=self.order, on_paid=self.on_paid
         )
 
         self.assertFalse(success)

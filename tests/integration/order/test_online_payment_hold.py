@@ -338,7 +338,7 @@ class TestEveryCreationPathCarriesTheExpiry:
             "pay_way.services.PayWayService.get_provider_for_pay_way",
             return_value=provider,
         ):
-            PayWayService.process_payment(order.pay_way, order)
+            PayWayService.process_payment(order.pay_way, order, on_paid=Mock())
 
         order.refresh_from_db()
         assert order.payment_hold_expires_at == applied
@@ -354,7 +354,7 @@ class TestEveryCreationPathCarriesTheExpiry:
             "pay_way.services.PayWayService.get_provider_for_pay_way",
             return_value=provider,
         ):
-            PayWayService.process_payment(order.pay_way, order)
+            PayWayService.process_payment(order.pay_way, order, on_paid=Mock())
 
         asked = provider.process_payment.call_args.kwargs["expires_at"]
         assert (
@@ -755,7 +755,9 @@ class TestARetryClosesThePaymentItReplaces:
                 StripePaymentProvider, "process_payment", return_value=opened
             ) as process,
         ):
-            result = PayWayService.process_payment(order.pay_way, order)
+            result = PayWayService.process_payment(
+                order.pay_way, order, on_paid=Mock()
+            )
         return result, cancelled, process
 
     def test_the_replaced_intent_is_canceled_first(self):
@@ -978,7 +980,7 @@ class TestTheTotalHoldIsBounded:
             "pay_way.services.PayWayService.get_provider_for_pay_way",
             return_value=provider,
         ):
-            PayWayService.process_payment(order.pay_way, order)
+            PayWayService.process_payment(order.pay_way, order, on_paid=Mock())
 
         asked = provider.process_payment.call_args.kwargs["expires_at"]
         assert asked == created + timedelta(minutes=60)

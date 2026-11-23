@@ -1822,7 +1822,12 @@ class OrderViewSet(BaseModelViewSet):
 
         try:
             success, payment_response = PayWayService.process_payment(
-                pay_way=order.pay_way, order=order, **payment_data
+                pay_way=order.pay_way,
+                order=order,
+                # A payment taken at once confirms the order in the same
+                # transaction as it is recorded paid.
+                on_paid=OrderLifecycleService.confirm,
+                **payment_data,
             )
         except OrderChangedDuringPaymentError:
             return self._order_changed_during_payment(order)
@@ -1836,10 +1841,6 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if order.payment_status == PaymentStatus.COMPLETED:
-            # The provider took the payment at once: the order is confirmed
-            # now, as its webhook, which may not come, would confirm it.
-            OrderLifecycleService.confirm(order)
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=payment_response)
@@ -1922,7 +1923,12 @@ class OrderViewSet(BaseModelViewSet):
         previous_payment_status = order.payment_status
         try:
             success, payment_response = PayWayService.process_payment(
-                pay_way=order.pay_way, order=order, **payment_data
+                pay_way=order.pay_way,
+                order=order,
+                # A payment taken at once confirms the order in the same
+                # transaction as it is recorded paid.
+                on_paid=OrderLifecycleService.confirm,
+                **payment_data,
             )
         except OrderChangedDuringPaymentError:
             return self._order_changed_during_payment(order)
@@ -1967,10 +1973,6 @@ class OrderViewSet(BaseModelViewSet):
             )
             locked_order.save(update_fields=["metadata"])
         order = locked_order
-        if order.payment_status == PaymentStatus.COMPLETED:
-            # The provider took the payment at once: the order is confirmed
-            # now, as its webhook, which may not come, would confirm it.
-            OrderLifecycleService.confirm(order)
 
         OrderHistory.log_payment_update(
             order=order,

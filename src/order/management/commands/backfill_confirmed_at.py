@@ -5,10 +5,10 @@ rolled out: the previous release keeps creating and settling orders on the
 migrated schema without writing it (``order.lifecycle.confirmation``).
 Idempotent, and it tells no one: those orders' emails went out already.
 
-Run it once the new release serves every request, at a quiet moment: a card
-payment the provider takes at once (a synchronous intent, an agent's
-delegated charge) is stored paid a moment before it is confirmed, and a run
-landing in that moment would stamp it without announcing it.
+The new release never stores an order paid without confirming it in the
+same transaction (``PayWayService.process_payment``'s ``on_paid``, the
+settle paths), so a run cannot stamp an order whose confirmation is still
+to come.
 """
 
 from __future__ import annotations

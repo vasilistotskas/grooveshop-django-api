@@ -1,0 +1,13 @@
+Payment pi_3QxExample has no order
+
+A confirmed stripe payment arrived and no order of the store carries it. The customer has been charged and nothing will ship.
+
+Payment method: stripe
+Payment reference: pi_3QxExample
+Amount: €45.50
+
+Look the payment up in the stripe dashboard. Refund the customer, or find their order and attach the payment to it.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

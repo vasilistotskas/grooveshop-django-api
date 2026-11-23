@@ -132,6 +132,25 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                            payment-confirmed note (on_commit, emails-and-notifications.md)
 ```
 
+**A payment no order carries pages staff** (#818). When
+`handle_payment_succeeded` finds no order for the intent (by `payment_id`,
+then by the order its server-set binding metadata names, `_bound_order_uuid`),
+it books nothing and calls `OrderService.alert_payment_without_order`:
+`ops.payment_without_order` (declared in `src/order/emails.py`, listed in
+[the email types](../emails/types.md)) carrying the intent id and what
+Stripe collected. It is never reached for a gift-card purchase's intent (the
+handler resolves those first and stops), nor for one an order carries or is
+bound to (Checkout Session, agent). It cannot raise: the handler runs inside
+dj-stripe's webhook `transaction.atomic`, and a mail failure there would
+roll the event back. It goes once per intent: dj-stripe's own `Event`
+dedupe stops a redelivered event only once the first delivery committed (a
+delivery that raised after the mail rolls back, and the polled path is no
+event), so the alert claims the intent id with `cache.add` before sending
+(`PAYMENT_WITHOUT_ORDER_CLAIM_KEY`, a week, longer than Stripe redelivers)
+and gives the claim back when the send fails. A payment-first intent
+(`cart/create-payment-intent`) whose webhook lands before its order is
+created alerts too; the order that follows settles the payment itself.
+
 **The collected amount must be the order's total.** `handle_payment_succeeded`
 (and the `checkout.session.completed` handler) compare what Stripe collected
 with `order.calculate_order_total_amount()` (currency, and amount within

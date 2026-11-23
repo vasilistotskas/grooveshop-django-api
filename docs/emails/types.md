@@ -183,6 +183,7 @@ the order note, whatever the switch says.
 | `ops.acs_voucher_request_unknown` | a `VoucherRequestUnknown` (order id, how the request ended) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.acs_unrecognised_vouchers` | an `UnrecognisedVouchers` (the voucher numbers ACS named for the first time, the pickup date) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.payment_after_cancel` | a `PaymentAfterCancel` | `src/order/emails.py` | |
+| `ops.payment_without_order` | a `PaymentWithoutOrder` (the intent id and what Stripe collected) | `src/order/emails.py` | |
 | `ops.payment_mismatch` | a `PaymentMismatch` | `src/order/emails.py` | |
 | `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `src/order/emails.py` | |
 | `ops.refund_failed` | a `RefundFailed` | `src/order/emails.py` | |

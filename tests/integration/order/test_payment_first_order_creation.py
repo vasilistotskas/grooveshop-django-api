@@ -238,19 +238,23 @@ class TestPaymentFirstOrderCreation(APITestCase):
         )
         self.assertEqual(depths, [baseline_depth])
 
-    def test_intentless_online_order_is_refused(self):
-        """Intent-less online orders are refused unless deductions
-        (promotions / loyalty / gift cards) fully cover the total."""
+    def test_intentless_online_order_is_created_order_first(self):
+        """An intent-less online order is created PENDING with nothing
+        charged, and the cart is kept for the payment that follows."""
         self.client.force_authenticate(user=self.user)
         data = self._order_data()
         del data["payment_intent_id"]
 
         response = self._post(data)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"]["type"], "invalid_order_data")
-        self.assertEqual(response.data["code"], "invalid_order_data")
-        self.assertIn("payment_intent_id", response.data["field_errors"])
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.data
+        )
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.status, OrderStatus.PENDING)
+        self.assertEqual(order.payment_status, PaymentStatus.PENDING)
+        self.assertFalse(order.payment_id)
+        self.assertTrue(self.cart.items.exists())
 
     def test_request_field_errors_are_reported_per_field(self):
         self.client.force_authenticate(user=self.user)

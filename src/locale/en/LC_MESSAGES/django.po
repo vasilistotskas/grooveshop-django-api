@@ -794,6 +794,10 @@ msgid "A completed payment needs an amount due, unless discounts, loyalty points
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
 #, python-format
+msgid "A confirmed %(provider)s payment arrived and no order of the store carries it. The customer has been charged and nothing will ship."
+msgstr "A confirmed %(provider)s payment arrived and no order of the store carries it. The customer has been charged and nothing will ship."
+
+#, python-format
 msgid "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 msgstr "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 
@@ -872,9 +876,6 @@ msgstr "A password was set on your account"
 
 msgid "A payment for this order was received and is being confirmed. Do not pay again."
 msgstr "A payment for this order was received and is being confirmed. Do not pay again."
-
-msgid "A payment intent is required — the applied discounts do not cover the order total."
-msgstr "A payment intent is required — the applied discounts do not cover the order total."
 
 msgid "A pickup-point order is delivered to its point's address, which can't be changed."
 msgstr "A pickup-point order is delivered to its point's address, which can't be changed."
@@ -8424,6 +8425,10 @@ msgstr "Look in the ACS portal for a voucher of order #%(order_id)s (its referen
 msgid "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
 msgstr "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
 
+#, python-format
+msgid "Look the payment up in the %(provider)s dashboard. Refund the customer, or find their order and attach the payment to it."
+msgstr "Look the payment up in the %(provider)s dashboard. Refund the customer, or find their order and attach the payment to it."
+
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Look up an order from Viva Wallet's post-payment redirect params"
 
@@ -10585,6 +10590,10 @@ msgstr "Payload"
 msgid "Payment"
 msgstr "Payment"
 
+#, python-format
+msgid "Payment %(payment_id)s has no order"
+msgstr "Payment %(payment_id)s has no order"
+
 msgid "Payment & Returns"
 msgstr "Payment & Returns"
 
@@ -10748,6 +10757,9 @@ msgstr "Payment status"
 
 msgid "Payment that does not match its order"
 msgstr "Payment that does not match its order"
+
+msgid "Payment that no order accounts for"
+msgstr "Payment that no order accounts for"
 
 msgid "Payment verification failed"
 msgstr "Payment verification failed"
@@ -14460,6 +14472,9 @@ msgstr "Tells the store's staff that a carrier refused to create the shipment of
 msgid "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
 msgstr "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
 
+msgid "Tells the store's staff that a confirmed payment has no order behind it, so the customer must be refunded or the order found."
+msgstr "Tells the store's staff that a confirmed payment has no order behind it, so the customer must be refunded or the order found."
+
 msgid "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
 msgstr "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
 
@@ -17902,6 +17917,10 @@ msgstr "[{site}] Payment does not match order {order_id}"
 #, python-brace-format
 msgid "[{site}] Payment received for canceled order {order_id}"
 msgstr "[{site}] Payment received for canceled order {order_id}"
+
+#, python-brace-format
+msgid "[{site}] Payment {payment_id} has no order"
+msgstr "[{site}] Payment {payment_id} has no order"
 
 #, python-brace-format
 msgid "[{site}] Price drop: {name} is now at your target"

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 from django.contrib.admin.options import ActionLocation
 from django.forms.models import _get_foreign_key
 from django.utils.translation import gettext as _
@@ -183,7 +185,6 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
     def custom_action_view(self, request, action_name: str, model_name: str):
         from django.apps import apps
         from django.core.exceptions import PermissionDenied
-        from djstripe.admin.views import ConfirmCustomAction
 
         try:
             model = apps.get_app_config("djstripe").get_model(model_name)
@@ -196,9 +197,45 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
             or action_name not in target.get_actions(request)
         ):
             raise PermissionDenied
-        return ConfirmCustomAction.as_view()(
+        return _confirm_stripe_custom_action()(
             request, action_name=action_name, model_name=model_name
         )
+
+
+@functools.cache
+def _confirm_stripe_custom_action():
+    """dj-stripe's confirm view for its custom actions, whose
+    ``form_invalid`` runs the action by indexing its tuple
+    (``get_action(name)[0]``, ``djstripe/admin/views.py``), which Django 6
+    reports with a ``RemovedInDjango2028Warning``. This one calls the
+    action's ``func``. Delete once dj-stripe does."""
+    from django.contrib import messages
+    from django.contrib.admin import helpers, site
+    from djstripe import utils
+    from djstripe.admin.views import ConfirmCustomAction
+
+    class ConfirmStripeCustomAction(ConfirmCustomAction):
+        def form_invalid(self, form):
+            model_name = self.kwargs.get("model_name")
+            action_name = self.kwargs.get("action_name")
+            model = utils.get_model(model_name)
+            pks = list(
+                map(int, form.data.getlist(helpers.ACTION_CHECKBOX_NAME))
+            )
+            queryset = utils.get_queryset(pks, model_name)
+            model_admin = site._registry.get(model)
+            for msg in form.errors.values():
+                messages.add_message(
+                    self.request,
+                    messages.ERROR,
+                    msg.as_text(),
+                    fail_silently=True,
+                )
+            return model_admin.get_action(action_name).func(
+                model_admin, self.request, queryset
+            )
+
+    return ConfirmStripeCustomAction.as_view()
 
 
 class WithheldOnTenantHostModelAdmin:

@@ -54,30 +54,90 @@ def test_action_location_is_honoured(monkeypatch):
     assert seen == [ActionLocation.CHANGE_LIST, ActionLocation.CHANGE_FORM]
 
 
+def _every_admin():
+    from admin.platform_site import platform_admin_site
+
+    return [
+        *admin.site._registry.values(),
+        *platform_admin_site._registry.values(),
+    ]
+
+
+def test_every_admin_takes_action_location():
+    """Django warns only through its own wrappers
+    (``_get_actions_with_action_location``,
+    ``_get_action_choices_with_action_location``), which read the
+    signature: every admin of both sites must accept it."""
+    from django.utils.inspect import get_func_args
+
+    missing = [
+        f"{type(model_admin).__name__}.{method}"
+        for model_admin in _every_admin()
+        for method in ("get_actions", "get_action_choices")
+        if "action_location" not in get_func_args(getattr(model_admin, method))
+    ]
+    assert missing == []
+
+
 def test_no_action_location_deprecation_warning():
+    """Through the wrapper the changelist calls, as Django does."""
     request = _request()
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        _model_admin().get_action_choices(request)
+        _model_admin()._get_action_choices_with_action_location(request)
+
+
+def _stripe_admin(model_name: str):
+    from django.apps import apps
+
+    return admin.site._registry[
+        apps.get_app_config("djstripe").get_model(model_name)
+    ]
 
 
 def test_dj_stripes_admins_list_their_actions_without_the_warning():
     """dj-stripe overrides ``get_actions`` with Django 5's signature;
-    ``admin.mixins.StripeMirrorModelAdmin`` takes ``action_location``."""
+    ``admin.mixins.StripeMirrorModelAdmin`` takes ``action_location`` and
+    keeps each admin's own choice of actions."""
     request = _request()
-    stripe_admins = [
-        model_admin
-        for model, model_admin in admin.site._registry.items()
-        if model._meta.app_label == "djstripe"
-    ]
-    listed = set()
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        for model_admin in stripe_admins:
-            listed |= set(model_admin.get_actions(request))
-            model_admin.get_action_choices(request)
-            assert model_admin.get_action_choices(
-                request, action_location=ActionLocation.CHANGE_FORM
-            ) == [("", _("Select action"))]
-    # dj-stripe's own changelist actions are still offered.
-    assert {"_resync_instances", "_sync_all_instances", "_cancel"} <= listed
+        for model_admin in _every_admin():
+            if model_admin.model._meta.app_label != "djstripe":
+                continue
+            model_admin._get_action_choices_with_action_location(request)
+            assert (
+                model_admin._get_actions_with_action_location(
+                    request, action_location=ActionLocation.CHANGE_FORM
+                )
+                == {}
+            )
+        discount = set(_stripe_admin("Discount").get_actions(request))
+        mandate = set(_stripe_admin("Mandate").get_actions(request))
+        webhook = set(_stripe_admin("WebhookEndpoint").get_actions(request))
+        subscription = set(_stripe_admin("Subscription").get_actions(request))
+        customer = set(_stripe_admin("Customer").get_actions(request))
+
+    assert not discount & {"_resync_instances", "_sync_all_instances"}
+    assert "_sync_all_instances" not in mandate
+    assert "delete_selected" not in webhook
+    assert "_cancel" in subscription
+    assert {"_resync_instances", "_sync_all_instances"} <= customer
+
+
+def test_a_stripe_action_refused_by_its_form_runs_without_the_warning():
+    """dj-stripe's confirm view runs the action again on an invalid form by
+    indexing its tuple; the project's runs its ``func``."""
+    from unittest.mock import MagicMock
+
+    from django.http import QueryDict
+
+    from admin.mixins import _confirm_stripe_custom_action
+
+    view = _confirm_stripe_custom_action().view_class()
+    view.request = _request()
+    view.kwargs = {"model_name": "customer", "action_name": "_resync_instances"}
+    form = MagicMock(data=QueryDict(""), errors={})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        view.form_invalid(form)

@@ -34,7 +34,6 @@ def apply_in(
     kwargs: Mapping[str, Any] | None = None,
     *,
     task_id: str,
-    throw: bool = True,
 ) -> Any:
     """Run *task* as a worker runs one copy of a dispatch: in *store*
     (``TenantTask`` binds the store the ``_schema_name`` header names) and
@@ -44,5 +43,5 @@ def apply_in(
         kwargs,
         task_id=task_id,
         headers={"_schema_name": store.schema_name},
-        throw=throw,
+        throw=True,
     )

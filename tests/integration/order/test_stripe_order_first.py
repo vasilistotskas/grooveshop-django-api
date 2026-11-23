@@ -305,14 +305,13 @@ def _webhook(payment_id, capture, metadata=None):
     return queued
 
 
-def _run_task(payment_id, *, throw=True):
+def _run_task(payment_id):
     return apply_in(
         CURRENT_STORE,
         alert_payment_without_order_task,
         [],
         {"payment_id": payment_id, "amount": "50", "currency": "EUR"},
         task_id=str(uuid.uuid4()),
-        throw=throw,
     )
 
 
@@ -360,6 +359,28 @@ class TestPaymentWithoutOrderAlert:
             _run_task(payment_id)
 
         send.assert_called_once()
+
+    def test_a_failed_release_does_not_hide_the_send_error(self, caplog):
+        payment_id = _payment_id()
+
+        with (
+            patch(
+                "emails.send.send_email",
+                side_effect=RuntimeError("the send failed"),
+            ),
+            patch(
+                "order.services.cache.delete",
+                side_effect=ConnectionError("redis is down"),
+            ),
+            pytest.raises(RuntimeError, match="the send failed"),
+        ):
+            OrderService.alert_payment_without_order(
+                payment_id, captured=Money(Decimal(50), "EUR")
+            )
+
+        assert "Could not release the payment-without-order claim" in (
+            caplog.text
+        )
 
     def test_an_unbound_payment_is_logged_and_queues_nothing(
         self, django_capture_on_commit_callbacks, caplog

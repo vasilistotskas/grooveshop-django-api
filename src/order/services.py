@@ -3260,7 +3260,14 @@ class OrderService:
                 ),
             )
         except BaseException:
-            cache.delete(claim)
+            try:
+                cache.delete(claim)
+            except Exception:
+                # The send's error is the one the task retries on.
+                logger.exception(
+                    "Could not release the payment-without-order claim for %s",
+                    payment_id,
+                )
             raise
 
     @staticmethod

@@ -112,7 +112,8 @@ and says which file holds each § number used here.
     the order can no longer be sent: its request cannot be built, or the
     mint refuses it because the shopper owes the money online again
     (`ShipmentAwaitingPaymentError`; the payment that settles it
-    dispatches the mint again). A request that was let through and never
+    dispatches the mint again) or because the order ships nothing
+    (`ShipmentNotNeededError`). A request that was let through and never
     reached ACS (a connection never made, the request cap, 403/406), or
     that something other than ACS answered while a hold is in force (an
     HTTP 4xx outside ACS's envelope, `AcsUndocumentedHttpError`), keeps

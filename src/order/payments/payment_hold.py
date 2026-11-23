@@ -31,7 +31,6 @@ from django.utils import timezone
 from core.celery import celery_app
 from core.store_settings import store_setting
 from order.enum.status import (
-    SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
@@ -179,11 +178,7 @@ def awaiting_payment(order: Order) -> bool:
     The one-order form of ``OrderQuerySet.holding_stock_for_online_payment``:
     a PENDING order of an online pay way whose payment is not final.
     """
-    return (
-        order.status == OrderStatus.PENDING
-        and order.awaits_online_payment
-        and order.payment_status not in SETTLED_PAYMENT_STATUSES
-    )
+    return order.status == OrderStatus.PENDING and order.awaits_online_payment
 
 
 def _next_sweep(after: datetime) -> datetime:

@@ -9856,8 +9856,12 @@ msgid "Order #%(order)s has not been paid yet — the voucher is issued automati
 msgstr "Order #%(order)s has not been paid yet — the voucher is issued automatically once the online payment is confirmed."
 
 #, python-format
-msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
-msgstr "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a parcel would ship an order nobody pays for."
+msgstr "Order #%(order)s is canceled or its payment was refunded in full — a parcel would ship an order nobody pays for."
+
+#, python-format
+msgid "Order #%(order)s is canceled or its payment was refunded in full — a voucher would ship an order nobody pays for."
+msgstr "Order #%(order)s is canceled or its payment was refunded in full — a voucher would ship an order nobody pays for."
 
 #, python-format
 msgid "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."

@@ -13034,6 +13034,9 @@ msgstr "Select a valid country."
 msgid "Select a valid region."
 msgstr "Select a valid region."
 
+msgid "Select action"
+msgstr "Select action"
+
 msgid "Select all"
 msgstr "Select all"
 

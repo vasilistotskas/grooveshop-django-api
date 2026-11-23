@@ -23,12 +23,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from order.accounting.invoicing import _verification_url
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.invoice import Invoice
 from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.storefront_links import order_page_path, order_page_url
-from order.tasks import send_payment_failed_email
 from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.tasks import acs_send_arrival_notification
@@ -211,14 +210,6 @@ def test_the_receipt_link_carries_the_uuid_only_without_accounts(
 class TestOrderEmails:
     """Sent through the queue, as the store sends them: the task runs on
     the store's schema (``tenant.celery.TenantTask``)."""
-
-    def test_payment_failed(self, store, make, accounts, page):
-        store(accounts=accounts)
-        order = make(language_code="en", payment_status=PaymentStatus.FAILED)
-
-        assert send_payment_failed_email.delay(order.id).get() is True
-
-        assert f"{BASE}/en{page(order)}" in _body(mail.outbox[-1])
 
     def test_acs_out_for_delivery(self, store, make, accounts, page):
         store(accounts=accounts)

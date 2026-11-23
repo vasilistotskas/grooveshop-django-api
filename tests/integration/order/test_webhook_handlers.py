@@ -15,6 +15,7 @@ from order.signals.handlers import (
     handle_stripe_payment_failed,
     handle_stripe_payment_succeeded,
 )
+from pay_way.factories import PayWayFactory
 
 # What the ``mock_djstripe_event`` fixture says Stripe collected.
 STRIPE_CAPTURED = Money(Decimal(50), "USD")
@@ -103,9 +104,14 @@ class TestHandleStripePaymentSucceeded:
         payment_intent_id = "pi_test_123456"
         order = OrderFactory(
             num_order_items=0,
+            pay_way=PayWayFactory.create_online_payment("stripe"),
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+        )
+        # Where the (mocked) service leaves it: paid, not yet confirmed.
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED, confirmed_at=None
         )
 
         with (
@@ -410,17 +416,9 @@ class TestHandleStripePaymentFailed:
 
         initial_history_count = OrderHistory.objects.filter(order=order).count()
 
-        # Execute (patch the email task so its own OrderHistory note
-        # does not count toward this test's history-entry assertion
-        # under CELERY_TASK_ALWAYS_EAGER).
-        with (
-            patch(
-                "order.signals.handlers.OrderService.handle_payment_failed"
-            ) as mock_service,
-            patch(
-                "order.signals.handlers.send_payment_failed_email.apply_async"
-            ),
-        ):
+        with patch(
+            "order.signals.handlers.OrderService.handle_payment_failed"
+        ) as mock_service:
             mock_service.return_value = _applied(order)
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)
 

@@ -26,7 +26,7 @@ from admin.dashboard.store import queries, widgets
 from emails.models import EmailSwitch
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.models.order import Order
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from shipping_acs.enum.charge_type import AcsChargeType
@@ -310,6 +310,37 @@ class TestCanceledStillPaid:
         assert _counts()["canceled_still_paid"] == 0
 
 
+class TestPaymentsToReview:
+    def test_counts_flagged_orders_the_store_has_not_decided(self):
+        def flagged(**fields):
+            return OrderFactory(
+                num_order_items=0,
+                metadata={AMOUNT_MISMATCH_FLAG: True},
+                **fields,
+            )
+
+        flagged(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        flagged(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PARTIALLY_REFUNDED,
+        )
+        flagged(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.COMPLETED
+        )
+        flagged(
+            status=OrderStatus.CANCELED, payment_status=PaymentStatus.REFUNDED
+        )
+        OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        assert _counts()["payments_to_review"] == 2
+
+
 def _superuser():
     return stamp_platform_identity(UserAccountFactory(admin=True))
 
@@ -335,6 +366,12 @@ class TestDashboardRows:
             status=OrderStatus.CANCELED,
             payment_status=PaymentStatus.COMPLETED,
         )
+        OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PARTIALLY_REFUNDED,
+            metadata={AMOUNT_MISMATCH_FLAG: True},
+        )
 
         rows = _rows()
 
@@ -348,6 +385,7 @@ class TestDashboardRows:
         assert rows["Canceled orders to refund"]["href"].endswith(
             "refund_owed=yes"
         )
+        assert rows["Payments to review"]["href"].endswith("payment_review=yes")
 
     def test_nothing_waiting_draws_no_row(self):
         labels = set(_rows())
@@ -357,6 +395,7 @@ class TestDashboardRows:
             "COD cash ACS has not paid out",
             "ACS payouts matching no shipment",
             "Canceled orders to refund",
+            "Payments to review",
         }
 
 

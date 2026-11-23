@@ -29,6 +29,7 @@ Exception Hierarchy:
     └── PaymentError
         ├── PaymentNotFoundError
         ├── PaymentStatusUnavailableError
+        │   └── ProviderTransactionUnknownError
         ├── PaymentVerificationError
         ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
@@ -657,6 +658,18 @@ class PaymentStatusUnavailableError(PaymentError):
         super().__init__(
             f"The provider could not be asked about payment {payment_id}"
         )
+
+
+class ProviderTransactionUnknownError(PaymentStatusUnavailableError):
+    """
+    Raised when the provider answers that the transaction does not exist
+    (Viva's Retrieve Transaction: 404, "Transaction Id does not exist").
+
+    Unavailable to a caller that knows no more: under another store's
+    credentials a real transaction reads the same, so a webhook that names
+    it is retried and tried against the next store. A caller that already
+    verified the rest skips it (a reversal's ``ParentId``).
+    """
 
 
 class OrderChangedDuringPaymentError(PaymentError):

@@ -358,15 +358,6 @@ def _order_shipped(order: Order, env: RenderEnv) -> dict[str, Any]:
         }
 
 
-def _payment_failed(order: Order, env: RenderEnv) -> dict[str, Any]:
-    with _email_language(order, env.language):
-        return {
-            "order_id": order.id,
-            "order": order,
-            "order_url": order_page_url(order, language=env.language),
-        }
-
-
 def _refund_confirmation(
     refund: PaymentTransaction, env: RenderEnv
 ) -> dict[str, Any]:
@@ -789,18 +780,6 @@ _customer_email(
     ),
     list_id="order_confirmation",
     gates=(_cart,),
-)
-_customer_email(
-    "order.payment_failed",
-    title=_("Payment failed"),
-    description=_(
-        "Sent when an order's payment fails, with a link to the order."
-    ),
-    templates="payment_failed",
-    subject=gettext_noop("Payment Failed - Order #{order_id}"),
-    build_context=_payment_failed,
-    sample=lambda env: _sample_order(env, payment_status=PaymentStatus.FAILED),
-    list_id="payment_failed",
 )
 _customer_email(
     "order.shipped",

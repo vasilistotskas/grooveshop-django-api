@@ -1,6 +1,9 @@
 from django.dispatch import Signal
 
 order_created = Signal()
+# Sent once per order, by ``OrderLifecycleService.confirm``, when the order
+# is confirmed: at creation, or when its online payment settles.
+order_confirmed = Signal()
 order_status_changed = Signal()
 order_paid = Signal()
 order_canceled = Signal()

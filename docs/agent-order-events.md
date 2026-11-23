@@ -38,7 +38,7 @@ sites that change these fields do run inside one:
 - payment: `OrderService.handle_payment_succeeded`, `handle_payment_failed`,
   `confirm_offline_payment` and `settle_cod_payment` (`@transaction.atomic`),
   Stripe's `checkout.session.completed` handler and Viva's
-  `_process_event_in_tenant` (`with transaction.atomic()`);
+  `viva_settlement.apply_event` (`with transaction.atomic()`);
 - the admin's change form (Django wraps it in a transaction).
 
 A save outside any transaction commits the order first and writes the event

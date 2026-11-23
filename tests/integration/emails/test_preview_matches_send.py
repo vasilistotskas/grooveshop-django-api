@@ -26,7 +26,6 @@ from order.tasks import (
     send_admin_new_order_email,
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_payment_failed_email,
     send_refund_confirmation_email,
     send_shipping_notification_email,
 )
@@ -132,21 +131,6 @@ class TestPreviewEqualsTheSentEmail:
 
         sent = mail.outbox[-1]
         _assert_same_email(_preview("order.shipped", order, language), sent)
-
-    def test_payment_failed(self, language):
-        order = OrderFactory(
-            num_order_items=1,
-            language_code=language,
-            payment_status=PaymentStatus.FAILED,
-        )
-        mail.outbox.clear()
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        sent = mail.outbox[-1]
-        _assert_same_email(
-            _preview("order.payment_failed", order, language), sent
-        )
 
     def test_status_update(self, language):
         order = OrderFactory(

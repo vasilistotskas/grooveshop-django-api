@@ -49,11 +49,13 @@ def on_relation_changed(sender, instance, raw=False, **kwargs):
     _schedule(instance.from_product_id)
 
 
-def on_order_created(sender, order, **kwargs):
-    # ``order_created`` is emitted from an on_commit hook inside the
-    # owning schema (src/order/signals/handlers.py), so the row is
-    # committed and the schema is right; the task then ties the
-    # order's lines back to the impressions that showed them.
+def on_order_confirmed(sender, order, **kwargs):
+    # ``order_confirmed`` is sent once per order, when it is confirmed
+    # (``OrderLifecycleService.confirm``): at creation for an order paid
+    # offline, when its payment settles for a card order. A card order
+    # nobody paid is no purchase, and is never attached. The task runs
+    # after the commit, in the owning schema, and ties the order's lines
+    # back to the impressions that showed them.
     from recommendation.tasks import record_recommendation_attach
 
     dispatch_on_commit(
@@ -62,12 +64,12 @@ def on_order_created(sender, order, **kwargs):
 
 
 def connect_signals() -> None:
-    from order.signals import order_created
+    from order.signals import order_confirmed
     from product.models import Product, ProductRelation
 
-    order_created.connect(
-        on_order_created,
-        dispatch_uid="recommendation.on_order_created",
+    order_confirmed.connect(
+        on_order_confirmed,
+        dispatch_uid="recommendation.on_order_confirmed",
         weak=False,
     )
 

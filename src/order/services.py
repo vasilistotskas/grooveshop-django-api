@@ -2604,14 +2604,18 @@ class OrderService:
 
         if update_order and payment_status_enum != order.payment_status:
             if payment_status_enum == PaymentStatus.COMPLETED:
-                cls._settle_polled_completion(order, status_data)
+                cls.settle_polled_completion(order, status_data)
             else:
                 cls._apply_polled_payment_status(order, payment_status_enum)
+        if update_order and payment_status_enum == PaymentStatus.COMPLETED:
+            # An order paid already may still be unconfirmed: the sight of
+            # its payment confirms it (a no-op otherwise).
+            OrderLifecycleService.confirm(order)
 
         return payment_status_enum, status_data
 
     @classmethod
-    def _settle_polled_completion(
+    def settle_polled_completion(
         cls, order: Order, status_data: dict[str, Any]
     ) -> None:
         """Settle an order the provider reports as paid, through the same
@@ -3135,11 +3139,28 @@ class OrderService:
         flag also keeps ``auto_cancel_stuck_pending_orders`` from closing
         the order with ``refund_payment=False``; a human reconciles it.
         Called with the order row locked by the payment handler.
+
+        Once per payment: the same payment met again while the order still
+        waits for that review (a read-back's next run, a refund of it, a
+        redelivery) changes nothing and emails no one. Another payment is
+        news, and flags it again. Either way the order's ``metadata`` is
+        saved, with what the caller wrote on it.
         """
         from emails.send import send_email
         from order.emails import PaymentMismatch
         from order.models.history import OrderHistory
         from order.models.order import AMOUNT_MISMATCH_FLAG
+        from order.payments import payment_hold
+
+        flagged = (order.metadata or {}).get(AMOUNT_MISMATCH_FLAG)
+        if (
+            isinstance(flagged, dict)
+            and str(flagged.get("transaction_id", "")).lower()
+            == str(payment_id).lower()
+            and payment_hold.awaits_payment_review(order)
+        ):
+            order.save(update_fields=["metadata"])
+            return
 
         if not order.metadata:
             order.metadata = {}

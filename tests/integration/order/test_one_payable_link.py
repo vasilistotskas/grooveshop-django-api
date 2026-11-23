@@ -867,7 +867,7 @@ class TestVivaCredentialsPerCall:
             provider._get_basic_auth_header()
 
     def test_an_oauth_only_store_still_settles_its_webhooks(self):
-        from order.views.viva_webhook import _verify_transaction
+        from order.payments.viva_settlement import verify_transaction
 
         transaction = Mock(status_code=200)
         transaction.json.return_value = {
@@ -882,7 +882,7 @@ class TestVivaCredentialsPerCall:
             _oauth_only(),
             patch("requests.get", return_value=transaction),
         ):
-            status, data = _verify_transaction("tx_1")
+            status, data = verify_transaction("tx_1")
 
         assert status == PaymentStatus.COMPLETED
         assert data["order_code"] == 1111

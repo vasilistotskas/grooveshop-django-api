@@ -25,9 +25,9 @@ from djstripe.models import Event
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.history import OrderHistory
+from order.payments.viva_settlement import handle_payment_created
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_checkout_completed
-from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
 from tests.utils.payments import CAPTURED
 from tests.utils.viva import verified_payment
@@ -74,7 +74,7 @@ class TestVivaChargeOnACanceledOrder:
     @staticmethod
     def _verified(order):
         return patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 verified_payment(order, "OC9"),
@@ -90,11 +90,9 @@ class TestVivaChargeOnACanceledOrder:
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,
-            patch(
-                "order.views.viva_webhook.dispatch_on_commit"
-            ) as confirmation,
+            patch("order.signals.handlers.dispatch_on_commit") as confirmation,
         ):
-            outcome = _handle_payment_created(
+            outcome = handle_payment_created(
                 order, {"StatusId": "F"}, "viva_txn_9"
             )
 
@@ -123,9 +121,9 @@ class TestVivaChargeOnACanceledOrder:
             self._verified(order),
             patch("emails.send.send_email") as alert,
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
             order.refresh_from_db()
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
 
         alert.assert_called_once()
 
@@ -143,7 +141,7 @@ class TestVivaChargeOnACanceledOrder:
             self._verified(order),
             patch("emails.send.send_email") as alert,
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED

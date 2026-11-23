@@ -15,7 +15,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.models.viva_webhook_event import VivaWebhookEvent
-from order.views.viva_webhook import _handle_payment_created
+from order.payments.viva_settlement import handle_payment_created
 from pay_way.factories import PayWayFactory
 
 pytestmark = pytest.mark.django_db
@@ -43,10 +43,10 @@ def _deliver(order, **overrides):
         **overrides,
     }
     with patch(
-        "order.views.viva_webhook._verify_transaction",
+        "order.payments.viva_settlement.verify_transaction",
         return_value=(PaymentStatus.COMPLETED, data),
     ):
-        return _handle_payment_created(order, {"StatusId": "F"}, "txn-1")
+        return handle_payment_created(order, {"StatusId": "F"}, "txn-1")
 
 
 def test_a_transaction_that_states_both_settles_the_order(order):

@@ -1,7 +1,6 @@
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import timedelta
 from decimal import Decimal
 from typing import Any, ClassVar, NoReturn
 from uuid import UUID
@@ -86,6 +85,7 @@ from order.payments.payment_ledger import (
 )
 from order.signals import (
     order_stripe_payment_polled,
+    payment_awaits_order,
 )
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
@@ -94,7 +94,6 @@ from pay_way.enum.settlement import PaySettlement
 from promotion.coupons import CouponService
 from promotion.engine.redemptions import record_redemptions
 from shipping.enum import ShippingKind
-from tenant.celery import dispatch_on_commit
 from tenant.internal import is_internal_caller
 
 logger = logging.getLogger(__name__)
@@ -102,7 +101,6 @@ logger = logging.getLogger(__name__)
 #: The claim that makes the payment-without-order alert once per payment
 #: (``OrderService.alert_payment_without_order``). Stripe redelivers an
 #: event for three days at most; the claim outlives that.
-PAYMENT_WITHOUT_ORDER_GRACE = "PAYMENT_WITHOUT_ORDER_GRACE_MINUTES"
 PAYMENT_WITHOUT_ORDER_CLAIM_KEY = "order:payment_without_order:{payment_id}"
 PAYMENT_WITHOUT_ORDER_CLAIM_TTL = 7 * 24 * 60 * 60
 
@@ -3204,7 +3202,8 @@ class OrderService:
     ) -> None:
         """Alert about a succeeded intent no order carries: at once, or,
         for a payment-first intent (``PaymentPurpose.CART``), after
-        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES``.
+        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` (``payment_awaits_order``,
+        a signal because the service imports no task).
 
         A payment-first intent can succeed while ``POST /order`` that
         carries it is still creating its order, so the webhook finds none
@@ -3216,20 +3215,8 @@ class OrderService:
         if (metadata or {}).get(PURPOSE_KEY) != PaymentPurpose.CART:
             cls.alert_payment_without_order(payment_id, captured=captured)
             return
-        from order.tasks import alert_payment_without_order_task
-
-        dispatch_on_commit(
-            alert_payment_without_order_task,
-            kwargs={
-                "payment_id": payment_id,
-                "amount": str(captured.amount),
-                "currency": str(captured.currency),
-            },
-            countdown=int(
-                timedelta(
-                    minutes=int(store_setting(PAYMENT_WITHOUT_ORDER_GRACE))
-                ).total_seconds()
-            ),
+        payment_awaits_order.send(
+            sender=cls, payment_id=payment_id, captured=captured
         )
 
     @classmethod

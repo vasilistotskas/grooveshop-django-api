@@ -150,7 +150,8 @@ event), so the alert claims the intent id with `cache.add` before sending
 and gives the claim back when the send fails. A payment-first intent
 (`cart/create-payment-intent`, binding purpose `cart`) is the exception: its
 webhook can land while `POST /order` is still creating the order, so
-`OrderService.report_payment_without_order` queues
+`OrderService.report_payment_without_order` sends
+`payment_awaits_order` (the services import no task), whose receiver queues
 `order.tasks.alert_payment_without_order_task` (`dispatch_on_commit`, a
 countdown of `PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`, default 15) and the task
 alerts only if no order carries the intent by then. An intent with no binding

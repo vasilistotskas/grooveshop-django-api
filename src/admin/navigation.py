@@ -433,38 +433,33 @@ def store_sidebar(request: Any) -> list[Item]:
         ],
     )
 
-    def carrier_pages(section: str) -> list[Item | None]:
-        """A section's pages of every carrier, a store's unused ones
-        included: the platform's System section keeps their logs."""
-        return [
-            page(p.model, str(p.title), p.icon)
-            for carrier in registered_providers()
-            for p in getattr(carrier.admin_pages(), section)
-        ]
-
     inactive = features.inactive_carrier_apps()
-    in_use = [
-        carrier.admin_pages()
-        for carrier in registered_providers()
-        if carrier.app_label not in inactive
-    ]
+
+    def carrier_pages(
+        section: str, *, in_use_only: bool = False
+    ) -> list[Item | None]:
+        """A section's pages of the carriers, in the order they declare
+        (``AdminPage.rank``, then registration). The System section keeps
+        a store's unused carriers' logs; the store's own groups do not."""
+        pages = sorted(
+            (
+                p
+                for carrier in registered_providers()
+                if not in_use_only or carrier.app_label not in inactive
+                for p in getattr(carrier.admin_pages(), section)
+            ),
+            key=lambda p: p.rank,
+        )
+        return [page(p.model, str(p.title), p.icon) for p in pages]
 
     shipping = _group(
         _("Shipping"),
         [
-            *(
-                page(p.model, str(p.title), p.icon)
-                for pages in in_use
-                for p in pages.shipments
-            ),
+            *carrier_pages("shipments", in_use_only=True),
             _menu(
                 _("Pickup Points"),
                 "location_on",
-                [
-                    page(p.model, str(p.title), p.icon)
-                    for pages in in_use
-                    for p in pages.pickup_points
-                ],
+                carrier_pages("pickup_points", in_use_only=True),
             ),
         ],
     )

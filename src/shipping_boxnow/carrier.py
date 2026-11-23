@@ -447,6 +447,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
                     "shipping_boxnow.BoxNowShipment",
                     _("BoxNow Shipments"),
                     "package_2",
+                    rank=1,
                 ),
             ),
             pickup_points=(

@@ -61,6 +61,9 @@ class AdminPage:
     model: str
     title: StrOrPromise
     icon: str = ""
+    # Where it sits among the same section's pages of every carrier:
+    # lower first, carriers that tie in the order they registered.
+    rank: int = 0
 
 
 @dataclass(frozen=True)

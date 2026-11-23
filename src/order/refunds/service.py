@@ -161,8 +161,11 @@ class RefundService:
         passes ``match_attempt=False``: the refund is then nobody's claim,
         and no other attempt of the same amount may take it.
 
-        A refund the ledger already holds changes nothing and returns
-        ``created=False``.
+        A refund the ledger already holds writes no row, leaves
+        ``payment_status`` and the order's allocation as they are, and
+        returns ``created=False``; an *attempt* passed with it is still
+        settled against that row (or dropped, when the row answers another
+        attempt).
         """
         row, created = PaymentLedger.record_refund(
             order,

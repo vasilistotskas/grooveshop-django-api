@@ -9695,8 +9695,8 @@ msgstr "Only for goods that are fit to sell again. Recorded on the stock log wit
 msgid "Only images of this store can be imported, not other sites."
 msgstr "Only images of this store can be imported, not other sites."
 
-msgid "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches."
-msgstr "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches."
+msgid "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches. Ignored on a store that is not on BOX NOW's live network, where no locker has a size."
+msgstr "Only lockers that have a compartment of this size (1 small, 2 medium, 3 large), by exact membership as BOX NOW's own picker does. A locker whose sizes are not known never matches. Ignored on a store that is not on BOX NOW's live network, where no locker has a size."
 
 msgid "Only one active newsletter topic can be the default."
 msgstr "Only one active newsletter topic can be the default."

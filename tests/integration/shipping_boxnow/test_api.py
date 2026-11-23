@@ -89,6 +89,7 @@ class TestLockerListExactFilters:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("boxnow_live_network")
 class TestLockerListBySize:
     """The compartment size filter and the size fields of each locker."""
 
@@ -152,6 +153,22 @@ class TestLockerListBySize:
         assert listed["av-ok"]["limitedAvailability"] is False
         assert listed["av-low"]["limitedAvailability"] is True
         assert listed["av-unknown"]["limitedAvailability"] is False
+
+
+@pytest.mark.django_db
+def test_a_stage_store_ignores_the_size_filter(boxnow_configured_tenant):
+    """No stage locker has a size, so the filter would hide every one."""
+    BoxNowLockerFactory(external_id="st-unknown", compartment_sizes=[])
+
+    response = APIClient().get(
+        reverse("shipping-boxnow-locker-list"),
+        {"compartmentSize": 2, "search": "st-"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert [row["externalId"] for row in response.json()["results"]] == [
+        "st-unknown"
+    ]
 
 
 @pytest.mark.django_db

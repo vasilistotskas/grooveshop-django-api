@@ -85,6 +85,7 @@ def test_a_key_that_differs_from_the_id_is_refused():
         parse_catalogue(body)
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_sizes_are_set_by_exact_membership():
     BoxNowLockerFactory(external_id="1", compartment_sizes=[])
     BoxNowLockerFactory(external_id="2", compartment_sizes=[])
@@ -100,6 +101,7 @@ def test_sizes_are_set_by_exact_membership():
     assert two.availability_probability == 0.4
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_locker_missing_from_the_catalogue_is_unknown(caplog):
     BoxNowLockerFactory(external_id="1")
     BoxNowLockerFactory(external_id="gone")
@@ -115,6 +117,7 @@ def test_a_locker_missing_from_the_catalogue_is_unknown(caplog):
     assert "gone" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_changed_catalogue_keeps_the_stored_sizes_and_logs_an_error(caplog):
     BoxNowLockerFactory(external_id="1", compartment_sizes=[2])
 
@@ -127,6 +130,7 @@ def test_a_changed_catalogue_keeps_the_stored_sizes_and_logs_an_error(caplog):
     assert "GR" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_a_failed_fetch_keeps_the_stored_sizes(caplog):
     BoxNowLockerFactory(external_id="1", compartment_sizes=[2])
 
@@ -202,6 +206,7 @@ def test_a_store_without_boxnow_skips_the_application():
         }
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 @pytest.mark.parametrize("rows", [[], ["1"]])
 def test_an_empty_or_truncated_catalogue_keeps_the_sizes(rows, caplog):
     for external_id in ("1", "2", "3", "4"):
@@ -218,6 +223,7 @@ def test_an_empty_or_truncated_catalogue_keeps_the_sizes(rows, caplog):
     assert "minimum fraction" in caplog.text
 
 
+@pytest.mark.usefixtures("boxnow_live_network")
 def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
     BoxNowLockerFactory(
         external_id="1",
@@ -231,4 +237,47 @@ def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
     ):
         sync_catalogue_facts()
 
+    purge.assert_not_called()
+
+
+def test_a_stage_store_takes_no_size_from_a_colliding_id(
+    boxnow_configured_tenant,
+):
+    """Stage locker 5 is not production locker 5: the catalogue's row 5
+    sizes nothing on a stage store, and what an earlier sync set there is
+    reset to unknown."""
+    BoxNowLockerFactory(
+        external_id="5",
+        compartment_sizes=[1, 2],
+        availability_probability=0.9,
+    )
+    BoxNowLockerFactory(external_id="6", compartment_sizes=[])
+
+    with (
+        _serve(_body([_row("5", ("3",), 0.4), _row("6")])),
+        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+    ):
+        result = sync_catalogue_facts()
+
+    for locker in BoxNowLocker.objects.all():
+        assert locker.compartment_sizes == []
+        assert locker.availability_probability is None
+    assert result == {"updated": 0, "unknown": 0}
+    purge.assert_called_once_with("shipping")
+
+
+def test_a_stage_store_with_nothing_sized_writes_nothing(
+    boxnow_configured_tenant,
+):
+    BoxNowLockerFactory(
+        external_id="5", compartment_sizes=[], availability_probability=None
+    )
+
+    with (
+        _serve(_body([_row("5")])),
+        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+    ):
+        sync_catalogue_facts()
+
+    assert BoxNowLocker.objects.get(external_id="5").compartment_sizes == []
     purge.assert_not_called()

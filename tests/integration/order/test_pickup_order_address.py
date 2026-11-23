@@ -553,6 +553,27 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         )
         resync.assert_not_called()
 
+    def test_is_found_by_a_resync_and_ordered_at_its_address_on_stage(
+        self, locker_checkout, resync
+    ):
+        """A stage store checks no size: the resynced locker takes the
+        order at the address BOX NOW lists."""
+        resync.return_value.append(
+            _destination("77", locker_checkout.country.alpha_2)
+        )
+
+        response = _post_locker_order(locker_checkout, boxnow_locker_id="77")
+
+        assert response.status_code == 201, response.content
+        resync.assert_called_once()
+        order = Order.objects.get()
+        assert (order.street, order.street_number, order.city) == (
+            "Ermou",
+            "40",
+            "Athens",
+        )
+
+    @pytest.mark.usefixtures("boxnow_live_network")
     def test_is_found_by_a_resync_but_refused_until_its_sizes_are_known(
         self, locker_checkout, resync
     ):

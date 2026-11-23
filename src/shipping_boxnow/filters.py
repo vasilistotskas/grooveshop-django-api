@@ -46,7 +46,7 @@ class BoxNowLockerFilter(CamelCaseFilterMixin, filters.FilterSet):
         ),
     )
 
-    def filter_compartment_size(self, queryset, name, value):
+    def filter_compartment_size(self, queryset, name, value: int):
         if not sizes_exist():
             return queryset
         return queryset.filter(compartment_sizes__contains=[value])

@@ -165,7 +165,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
         mock_get_payment_provider.return_value = provider
 
-    def _bind_boxnow_tenant(self):
+    def _bind_boxnow_tenant(self, *, live=False):
         """Same shape as the ``boxnow_configured_tenant`` fixture in
         ``tests/conftest.py``, inlined: pytest fixture injection by
         extra parameter name does not reach ``APITestCase`` methods
@@ -191,6 +191,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
             box_now_warehouse_id="2",
             box_now_notify_phone="+302100000000",
             box_now_webhook_secret="TEST_BOXNOW_WHS",
+            # BOX NOW's live network, the only one whose lockers have
+            # sizes (``shipping_boxnow.catalogue.sizes_exist``).
+            box_now_live_mode=live,
         )
         self.addCleanup(setattr, connection, "tenant", previous)
 
@@ -525,8 +528,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         locker,
         *,
         refused=False,
+        live=True,
     ):
-        self._bind_boxnow_tenant()
+        self._bind_boxnow_tenant(live=live)
         mock_validate_cart.return_value = {
             "valid": True,
             "errors": [],
@@ -612,6 +616,29 @@ class TestOrderCreateWithBoxNow(APITestCase):
             mock_validate_cart,
             mock_provider,
             self.locker,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+
+    @patch("order.payments.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_stage_store_checks_no_size(
+        self, mock_validate_address, mock_validate_cart, mock_provider
+    ):
+        """A stage locker's sizes are never known: the order goes."""
+        unsized = BoxNowLockerFactory(
+            external_id="sz-stage",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[],
+        )
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_provider,
+            unsized,
+            live=False,
         )
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()

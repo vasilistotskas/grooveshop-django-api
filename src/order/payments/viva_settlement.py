@@ -34,7 +34,6 @@ from order.payments.payment import (
     order_viva_codes,
     provider_amount,
 )
-from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -543,11 +542,10 @@ def handle_payment_created(
     )
 
     from order.payments.payment_events import publish_payment_status
-    from order.tasks import send_order_confirmation_email
 
     publish_payment_status(order)
 
-    dispatch_on_commit(send_order_confirmation_email, [order.id])
+    OrderLifecycleService.confirm(order)
 
     # Enqueue the carrier's delivery-request creation. Provider-agnostic
     # dispatch through the registry — Stripe's ``handle_payment_succeeded``

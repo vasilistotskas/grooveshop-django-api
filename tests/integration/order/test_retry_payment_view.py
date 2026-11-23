@@ -84,13 +84,7 @@ def _patch_provider(provider: Mock):
 class TestRetryPaymentSuccess:
     def test_swaps_intent_resets_status_and_returns_client_secret(self):
         user = UserAccountFactory()
-        order = _stripe_order(
-            user=user,
-            metadata={
-                "confirmation_email_sent_at": "2026-09-01T10:00:00+00:00",
-                "payment_failed_email_sent": True,
-            },
-        )
+        order = _stripe_order(user=user)
         provider = _provider()
 
         with _patch_provider(provider):
@@ -122,8 +116,6 @@ class TestRetryPaymentSuccess:
         )
         assert order.payment_id == "pi_new_retry"
         assert order.payment_status == PaymentStatus.PENDING
-        assert "confirmation_email_sent_at" not in order.metadata
-        assert "payment_failed_email_sent" not in order.metadata
         [retry] = order.metadata["payment_retries"]
         assert retry["previous_payment_id"] == "pi_old_failed"
         assert retry["new_payment_id"] == "pi_new_retry"

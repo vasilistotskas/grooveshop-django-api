@@ -9,10 +9,9 @@ and says which file holds each § number used here.
 
 | Event | Email task | Trigger | Idempotency flag |
 |---|---|---|---|
-| Order created (offline) | `send_order_confirmation_email` | `order_created` signal | `confirmation_email_sent` |
-| Order created (online, pending payment) | — | (deferred to payment success) | n/a |
-| Payment succeeded (online) | `send_order_confirmation_email` | webhook handler | `confirmation_email_sent` |
-| Payment failed | `send_payment_failed_email` | webhook handler | `payment_failed_email_sent` |
+| Order confirmed (see below) | `send_order_confirmation_email` and the staff `send_admin_new_order_email` | `order_confirmed` signal (`handle_order_confirmed`) | `Order.confirmed_at`, claimed once (and `confirmation_email_sent` in the task) |
+| Card order created, payment still due | — | nothing until the payment settles | n/a |
+| Card payment failed | — | nothing is sent: the failure is recorded (`FAILED`, a history row) | n/a |
 | Status changed → DELIVERED / CANCELED / COMPLETED / REFUNDED / RETURNED | `send_order_status_update_email` | `order_status_changed` signal | `status_update_email_sent_<status>` |
 | Status changed → PENDING / PROCESSING | — | (internal milestones — never a customer email) | n/a |
 | Order genuinely SHIPPED (status SHIPPED **and** tracking present) | `send_shipping_notification_email` | `order_status_changed`→SHIPPED **or** `order_shipment_dispatched`, whichever completes both conditions | `shipping_notification_email_sent` |
@@ -22,12 +21,38 @@ and says which file holds each § number used here.
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
 | Dispute lost (staff) | `send_dispute_notification_email(lost=True)` | `charge.dispute.closed` webhook, once per CHARGEBACK row ([§4.2.1](payments.md)) | the ledger row (a repeat records nothing) |
 
+**Confirmation.** An order is announced once, when it is confirmed
+(`OrderLifecycleService.confirm`, `src/order/lifecycle/confirmation.py`). An
+order with nothing left to pay online (cash or card on delivery, BOX NOW pay
+on the go, bank transfer, an online payment already taken) is confirmed as it
+is created (`handle_order_created`). A card order (Viva, Stripe) is confirmed
+when its payment settles, by every path that settles one: the Stripe
+`payment_intent.succeeded` (and a poll), the Stripe
+`checkout.session.completed`, the Viva 1796, the Viva return page, the sweep's
+read-back, and a payment taken at once (`process_payment`, the agent SPT
+charge). `confirm` claims `Order.confirmed_at` with one
+`UPDATE ... WHERE confirmed_at IS NULL`, so however many of those report the
+same payment, one sends `order_confirmed`, and its receiver
+(`handle_order_confirmed`) queues the customer's confirmation email, the staff
+"New order" email and ONE in-app note: payment confirmed for an order paid
+online, order placed otherwise. A card order nobody paid is never confirmed:
+nobody is told about it, its failure sends nothing, and its cancel (customer,
+staff or the sweep) is silent to the customer (`_cancel_order_locked`
+suppresses the CANCELED email and toast when `confirmed_at` is empty), while
+its stock and reservations are released as for any cancel. The history note
+"Order created", the stock holds, Meta's InitiateCheckout and the agent
+outbox still follow creation. A payment that lands after the cancel still
+pages staff (`record_payment_after_cancel`). Orders confirmed before the
+column existed carry `created_at` (migration `order` 0115); orders the
+previous release created during a rollout are stamped by
+`manage.py backfill_confirmed_at`, run once after it.
+
 Every customer email is sent through `emails.send.send_email` and carries
 the transactional `List-ID` and `List-Unsubscribe: mailto:` headers
 (`emails.headers.build_headers`); store-staff mail carries no list headers.
 
 **Each order email is an `EmailType`, declared in `src/order/emails.py`.**
-`order.received`, `order.payment_confirmed`, `order.payment_failed`,
+`order.received`, `order.payment_confirmed`,
 `order.shipped`, `order.delivered`, `order.completed`, `order.canceled`,
 `order.returned`, `order.status_refunded`, `order.refunded`,
 `order.receipt_issued`, `order.credit_issued`,
@@ -193,8 +218,8 @@ emails / toasts within ms:
 
 1. Carrier `_apply_order_status_transition` → DELIVERED →
    `maybe_advance_to_completed(silent_for_customer=True)` → COMPLETED.
-2. `handle_payment_succeeded` → PENDING → PROCESSING (then
-   `send_order_confirmation_email` covers the same ground).
+2. `handle_payment_succeeded` → PENDING → PROCESSING (then the
+   confirmation, `OrderLifecycleService.confirm`, covers the same ground).
 3. `OrderService.add_tracking_info` admin path → PENDING → PROCESSING →
    SHIPPED.
 
@@ -218,9 +243,11 @@ handler runs. Only user-visible dispatches are skipped.
 
 ### 6.4 Live notifications (WebSocket toasts)
 
-- `notify_order_created_live` — every order create.
-- `notify_payment_confirmed_live` / `notify_payment_failed_live` — payment
-  webhooks.
+- `notify_order_created_live` / `notify_payment_confirmed_live` — one of
+  the two when the order is confirmed (`handle_order_confirmed`): payment
+  confirmed for an order paid online, order placed otherwise. A failed
+  payment has no toast; `NotificationTypeEnum.PAYMENT_FAILED` stays for the
+  rows already stored.
 - `notify_order_status_changed_live` — meaningful status transitions only.
   Policy lives in `_ORDER_STATUS_COPY` (`src/order/communications/notifications.py`): SHIPPED,
   DELIVERED, COMPLETED, CANCELED. **PENDING and PROCESSING are intentionally

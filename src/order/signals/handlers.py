@@ -27,7 +27,6 @@ from order.communications.notifications import (
     notify_order_refunded_live,
     notify_order_status_changed_live,
     notify_payment_confirmed_live,
-    notify_payment_failed_live,
 )
 from order.emails import RefundFailed
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -36,6 +35,7 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.lifecycle.confirmation import confirmed_at_creation, paid_online
 from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
@@ -57,6 +57,7 @@ from order.services import OrderService
 from order.signals import (
     order_canceled,
     order_completed,
+    order_confirmed,
     order_created,
     order_delivered,
     order_paid,
@@ -78,12 +79,10 @@ from order.tasks import (
     send_invoice_to_mydata,
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_payment_failed_email,
     send_refund_confirmation_email,
     send_shipping_notification_email,
     settle_canceled_receipt,
 )
-from pay_way.enum.settlement import PaySettlement
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -302,33 +301,41 @@ def handle_order_paid_clear_cart(
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order creation."""
-    # Offline payments (COD, bank transfer) and already-paid orders get the
-    # confirmation email immediately. Online payments (Stripe, Viva Wallet)
-    # defer it to the payment-success webhook so the email only goes out
-    # once the payment actually succeeds. Missing pay_way (the FK was
-    # ``SET_NULL`` because someone deleted the PayWay row) is treated as
-    # offline so the customer still receives a confirmation.
-    pay_way = order.pay_way
-    is_online_pending = (
-        pay_way is not None
-        and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
-        and order.payment_status != PaymentStatus.COMPLETED
-    )
-    if not is_online_pending:
-        dispatch_on_commit(send_order_confirmation_email, [order.id])
-    dispatch_on_commit(send_admin_new_order_email, [order.id])
-    OrderHistory.log_note(order=order, note="Order created")
+    """Handle order creation.
 
-    # Live in-app notification for authenticated shoppers. The task
-    # itself drops guests silently, so there's no is_guest check here.
-    if order.user_id:
-        dispatch_on_commit(notify_order_created_live, [order.id])
+    An order with nothing left to pay online (cash or card on delivery,
+    BOX NOW pay on the go, bank transfer, an online payment already taken)
+    is confirmed now, which announces it (:func:`handle_order_confirmed`).
+    A card order is confirmed only when its payment settles: until then
+    neither the customer nor the store is told anything.
+    """
+    OrderHistory.log_note(order=order, note="Order created")
+    if confirmed_at_creation(order):
+        OrderLifecycleService.confirm(order)
 
     # Clear the cart — but NOT while the shopper still owes an online
     # payment. See ``Order.awaits_online_payment``.
     if not order.awaits_online_payment:
         transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
+
+
+@receiver(order_confirmed, dispatch_uid="order.handle_order_confirmed")
+def handle_order_confirmed(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Announce an order ``OrderLifecycleService.confirm`` just confirmed:
+    the customer's confirmation email, the staff "New order" email and one
+    in-app note, the payment going through for an order paid online and
+    the order being placed otherwise. The task drops a guest's note."""
+    dispatch_on_commit(send_order_confirmation_email, [order.id])
+    dispatch_on_commit(send_admin_new_order_email, [order.id])
+    if order.user_id:
+        dispatch_on_commit(
+            notify_payment_confirmed_live
+            if paid_online(order)
+            else notify_order_created_live,
+            [order.id],
+        )
 
 
 @receiver(
@@ -896,9 +903,7 @@ def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
                 "payment_id": payment_intent_id,
             },
         )
-        dispatch_on_commit(send_order_confirmation_email, [order.id])
-        if order.user_id:
-            dispatch_on_commit(notify_payment_confirmed_live, [order.id])
+        OrderLifecycleService.confirm(order)
 
 
 @receiver(
@@ -988,13 +993,6 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
-            dispatch_on_commit(send_payment_failed_email, [order.id])
-
-            # Parallel live notification — same idempotency story as
-            # the succeeded branch above (guarded by the event-level
-            # metadata flag).
-            if order.user_id:
-                dispatch_on_commit(notify_payment_failed_live, [order.id])
 
     except KeyError, TypeError:
         # Malformed payload only — see charge.refunded above. A failure in

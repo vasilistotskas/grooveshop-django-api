@@ -320,6 +320,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     status_updated_at = models.DateTimeField(
         _("Status Updated At"), auto_now=False, null=True, blank=True
     )
+    confirmed_at = models.DateTimeField(
+        _("Confirmed At"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the order was confirmed and the customer and the store "
+            "were told about it: when it was placed, or, for a card "
+            "payment, when the payment went through. Empty for a card "
+            "order that was never paid."
+        ),
+    )
     shipped_at = models.DateTimeField(
         _("Shipped At"),
         null=True,

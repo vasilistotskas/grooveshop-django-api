@@ -214,8 +214,7 @@ need accounts. Off, on that store's hosts:
   to reach their orders, so the order's uuid opens it as it opens a guest's
   (`Order.served_as_guest`, for `GUEST_ORDER_ACCESS_DAYS`): the order API's
   uuid routes and the receipt download. The emails and documents that link
-  to an order (`src/order/storefront_links.py`: the payment-failed email,
-  ACS out for delivery, BOX NOW at the locker, the receipt's QR before
+  to an order (`src/order/storefront_links.py`: ACS out for delivery, BOX NOW at the locker, the receipt's QR before
   AADE's) send such an order, and a guest's on any store, to the order
   confirmation by uuid, `/checkout/success/{uuid}`, and only an account
   holder's order on a store with accounts to `/account/orders/{id}`. In-app

@@ -976,26 +976,25 @@ class TestVivaPaymentFailedVerification:
             metadata={"viva_order_codes": ["OC2"]},
         )
 
-    def test_failed_flips_to_failed_when_verified(self):
+    def test_failed_flips_to_failed_when_verified(
+        self, django_capture_on_commit_callbacks
+    ):
+        """A verified failure is recorded and emails no one: a card order is
+        announced only once its payment goes through."""
         order = self._order()
         with (
             patch(
                 "order.payments.viva_settlement.verify_transaction",
                 return_value=(PaymentStatus.FAILED, {"order_code": "OC2"}),
             ),
-            patch(
-                "order.views.viva_webhook.send_payment_failed_email.apply_async"
-            ) as mock_email,
+            patch("emails.send.send_email") as sent,
+            django_capture_on_commit_callbacks(execute=True),
         ):
             _handle_payment_failed(order, {}, "viva_txn_2")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.FAILED
-        # Dispatched with the schema captured at lambda-build time so
-        # the worker enters the owning tenant's schema.
-        mock_email.assert_called_once()
-        assert mock_email.call_args.kwargs["args"] == [order.id]
-        assert "_schema_name" in mock_email.call_args.kwargs["headers"]
+        sent.assert_not_called()
 
     def test_failed_raises_when_verification_returns_error(self):
         """Viva failing to answer the verification is unavailable (raise),

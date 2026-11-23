@@ -285,7 +285,9 @@ only against other curated candidates. A changed slot is saved through
 the ORM, so the `recommendations` cache surface purges the cached strips.
 
 **Attach attribution** (`src/recommendation/events.py:record_attach_events`,
-dispatched from `order_created` by `src/recommendation/signals.py`): an order
+dispatched from `order_confirmed` by `src/recommendation/signals.py`, once the
+order is confirmed: at creation when it is paid offline, when its payment
+settles for a card order, never for a card order nobody paid): an order
 line attaches to an impression of its product by three identities, in
 precedence order and all labelled (`matched_by`):
 
@@ -405,7 +407,7 @@ every deploy. Enable `vectorStore` with the existing
 | `product.ProductRelation` | `from_product · to_product · relation_type · sort_order` | unique (from, to, type); `from != to`; `SortableModel` scoped per `from_product` |
 | `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · learn_weights · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `json_schemas.py`; `learn_weights` hands `weights` to the nightly learning (§5) |
 | `recommendation.RecommendationCandidate` | `product · candidate · strategy · score · relation_type · computed_at` | unique (product, candidate, strategy); indexed (product, strategy, -score) |
-| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · event_key · created_at` | `impression | click` from the storefront, `impression` also from the sent order email; `attach` derived from `order_created` (unique per order · product · impression); `impression | click` rows unique per `event_key` (`rec_event_key_unique`: `tenant.celery.dispatch_key` over the task id, kind, impression, product and position), so another copy of one dispatch writes nothing (`docs/deferred-dispatch.md`), NULL on `attach` rows; `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
+| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · event_key · created_at` | `impression | click` from the storefront, `impression` also from the sent order email; `attach` derived from `order_confirmed` (unique per order · product · impression); `impression | click` rows unique per `event_key` (`rec_event_key_unique`: `tenant.celery.dispatch_key` over the task id, kind, impression, product and position), so another copy of one dispatch writes nothing (`docs/deferred-dispatch.md`), NULL on `attach` rows; `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
 | `cart.CartItem.recommendation_impression_id` → `order.OrderItem.recommendation_impression_id` | nullable UUID on the line | the impression carried from add-to-cart (`CartItemCreateSerializer` / `CartItemUpdateSerializer`, latest add wins) and copied at checkout by both `OrderService` cart→order paths; read by `record_attach_events` as the first identity |
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`

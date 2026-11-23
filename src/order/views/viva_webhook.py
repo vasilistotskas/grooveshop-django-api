@@ -35,9 +35,6 @@ from order.models.order import Order
 from order.payments import payment_hold, viva_settlement
 from order.payments.disputes import announce_chargeback
 from order.payments.payment import order_viva_codes, provider_amount
-from order.tasks import (
-    send_payment_failed_email,
-)
 from tenant.celery import dispatch_on_commit
 
 
@@ -1170,8 +1167,6 @@ def _handle_payment_failed(order, event_data, transaction_id, *, reported=None):
     from order.payments.payment_events import publish_payment_status
 
     publish_payment_status(order)
-
-    dispatch_on_commit(send_payment_failed_email, [order.id])
 
 
 def _handle_reversal_created(

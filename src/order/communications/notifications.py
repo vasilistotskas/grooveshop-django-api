@@ -270,29 +270,6 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
     )
 
 
-@celery_app.task(name="notify_payment_failed_live", **TASK_DEFAULTS)
-def notify_payment_failed_live(self, order_id: int) -> dict:
-    """Fire when the payment provider rejects the charge."""
-    order = _load_order(order_id)
-    if order is None:
-        return {"status": "skipped"}
-
-    return _notify_order(
-        order,
-        kind=NotificationKindEnum.ERROR,
-        category=NotificationCategoryEnum.PAYMENT,
-        notification_type=NotificationTypeEnum.PAYMENT_FAILED,
-        translations=_render_translations(
-            gettext_noop("Payment failed for order #{order_id}"),
-            gettext_noop(
-                "We couldn't process your payment. Tap to retry with a "
-                "different method."
-            ),
-            order_id=order.id,
-        ),
-    )
-
-
 @celery_app.task(name="notify_order_refunded_live", **TASK_DEFAULTS)
 def notify_order_refunded_live(self, order_id: int) -> dict:
     """Fire once a refund has been recorded against the order."""

@@ -1,11 +1,9 @@
 from datetime import timedelta
 
 import pytest
-from django.core import mail
 from django.utils import timezone
 
 from order.enum.status import (
-    CHARGED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
@@ -15,7 +13,6 @@ from order.models.order import Order
 from order.services import OrderService
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
-    send_payment_failed_email,
 )
 from product.factories import ProductFactory
 
@@ -392,31 +389,3 @@ class TestAutoCancelReleasesStockAfterGracePeriod:
         )
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
-
-
-@pytest.mark.django_db
-class TestPaymentFailedEmailAfterACharge:
-    """The payment-failed email is queued when the payment fails and says
-    nothing was charged. A provider can charge the order before it runs
-    (a Viva retry that succeeds), and then it must not go out. A canceled
-    payment took nothing and can be retried, so the email still holds."""
-
-    @pytest.mark.parametrize("payment_status", sorted(CHARGED_PAYMENT_STATUSES))
-    def test_a_charged_order_gets_no_email(self, payment_status):
-        order = OrderFactory(num_order_items=0, payment_status=payment_status)
-        mail.outbox.clear()
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        assert mail.outbox == []
-
-    @pytest.mark.parametrize(
-        "payment_status", [PaymentStatus.FAILED, PaymentStatus.CANCELED]
-    )
-    def test_an_uncharged_order_gets_it(self, payment_status):
-        order = OrderFactory(num_order_items=0, payment_status=payment_status)
-        mail.outbox.clear()
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        assert [message.to for message in mail.outbox] == [[order.email]]

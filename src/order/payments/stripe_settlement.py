@@ -31,7 +31,6 @@ from order.payments.payment_ledger import (
     PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
-from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -188,9 +187,7 @@ def settle_paid_checkout_session(
         session_id,
     )
 
-    from order.tasks import send_order_confirmation_email
-
-    dispatch_on_commit(send_order_confirmation_email, [order.id])
+    OrderLifecycleService.confirm(order)
 
 
 def settle_checkout_session(

@@ -234,6 +234,38 @@ class OrderLifecycleService:
         return order
 
     @classmethod
+    def confirm(cls, order: Order) -> bool:
+        """Confirm *order*, once, and send ``order_confirmed``.
+
+        The one way an order is announced: its receiver
+        (``order.signals.handlers.handle_order_confirmed``) sends the
+        customer's confirmation email, the staff "New order" email and one
+        in-app note, and the recommendation engine records what the order
+        bought from its suggestions. Called at creation for an order with
+        nothing left to pay online (``confirmation.confirmed_at_creation``)
+        and by every path that settles an online payment: the webhooks,
+        the buyer's return, a poll, the sweep's read-back.
+
+        ``confirmed_at`` is claimed with one ``UPDATE ... WHERE
+        confirmed_at IS NULL``: whichever path reports the payment first
+        confirms it, and every other answers ``False`` and announces
+        nothing. In the caller's transaction, so a rollback takes the claim
+        and the queued messages with it.
+        """
+        from order.signals import order_confirmed
+
+        now = timezone.now()
+        claimed = Order.objects.filter(
+            pk=order.pk, confirmed_at__isnull=True
+        ).update(confirmed_at=now)
+        if not claimed:
+            return False
+        order.confirmed_at = now
+        order_confirmed.send(sender=Order, order=order)
+        logger.info("Order %s confirmed", order.id)
+        return True
+
+    @classmethod
     def suppress_customer_status_notifications(
         cls, order: Order, new_status: str
     ) -> None:
@@ -900,6 +932,16 @@ class OrderLifecycleService:
                 # committed. The flag is the durable half of that: it
                 # commits with the cancel and goes with the answer.
                 order.metadata[SHIPMENT_CANCEL_PENDING_FLAG] = True
+
+            # An order never confirmed was never announced (a card order
+            # nobody paid): its customer was told nothing about it, so its
+            # cancel is not announced either, whoever cancels it. The
+            # stock, the reservations and the payment are settled as for
+            # any cancel.
+            if order.confirmed_at is None:
+                cls.suppress_customer_status_notifications(
+                    order, OrderStatus.CANCELED.value
+                )
 
             # A courier order's receipt not yet handed to the customer is
             # set aside to be canceled in myDATA, here, under this lock and

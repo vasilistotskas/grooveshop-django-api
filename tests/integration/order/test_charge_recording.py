@@ -231,7 +231,7 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount),
-            patch("order.payments.viva_settlement.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
@@ -249,7 +249,7 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount, "OC1"),
-            patch("order.payments.viva_settlement.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
@@ -258,7 +258,7 @@ class TestVivaPaymentCreated:
             order.refresh_from_db()
         with (
             self._verified(amount, "OC2"),
-            patch("order.payments.viva_settlement.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
         ):
             handle_payment_created(order, {"StatusId": "F"}, "viva_txn_b")
 
@@ -273,7 +273,7 @@ class TestVivaPaymentCreated:
 
         with (
             self._verified(amount),
-            patch("order.payments.viva_settlement.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),

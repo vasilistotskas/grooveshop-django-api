@@ -108,7 +108,9 @@ unauthenticated body except `ParentId`:
    requires one of the order's issued order codes on it, `F`, a refund or
    void type and a negative amount; the refunded amount is `-amount`. The
    gift-card purchase path (`_process_gift_card_purchase_event`) goes
-   through the same verifier with the purchase's own order code. The card
+   through the same verifier with the purchase's own order code, on an
+   answer read before the purchase row is locked (`_read_gift_card_event`:
+   no Viva request is sent under that lock, as for an order). The card
    is the whole purchase, so each verified refund is added to
    `GiftCardPurchase.refunded_amount` and the card is voided once the
    refunds reach the purchase amount (a refund id counts once: the

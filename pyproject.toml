@@ -730,11 +730,6 @@ source_modules = [
 ]
 forbidden_modules = ["shipping_acs", "shipping_boxnow"]
 ignore_imports = [
-    "admin.dashboard.store.queries -> shipping_acs.attention",
-    "admin.displays -> shipping_acs.enum.shipment_state",
-    "admin.displays -> shipping_boxnow.enum",
-    "admin.features -> shipping_acs.carrier",
-    "admin.features -> shipping_boxnow.carrier",
     "core.urls -> shipping_boxnow.views.webhook",
     "devtools.demo_account -> shipping_acs.models",
     "devtools.demo_account -> shipping_boxnow.models",

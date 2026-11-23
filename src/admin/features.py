@@ -48,6 +48,7 @@ from django.apps import apps
 from django.db.models import Model, Q
 
 from core.store_settings import store_settings
+from shipping.interfaces import registered_providers
 from tenant.features import STORE_FEATURES, StoreFeature
 from tenant.membership import tenant_plan_allows
 from tenant.permissions import IsSettingEnabled
@@ -370,22 +371,30 @@ class StoreFeatures:
         sidebar lists none of their pages (a platform superuser's System
         section keeps their logs) and the ⌘K palette none of their
         screens beyond what the sidebar shows."""
-        from shipping.models import ShippingProvider
-        from shipping_acs.carrier import AcsCarrier
-        from shipping_boxnow.carrier import BoxNowCarrier
+        active = self._active_carrier_codes()
+        return frozenset(
+            carrier.app_label
+            for carrier in registered_providers()
+            if carrier.app_label and carrier.code not in active
+        )
 
-        active = set(
+    def uses_a_carrier_app(self) -> bool:
+        """Whether the store uses a carrier that is an app of its own: its
+        parcels are handed to a courier's integration."""
+        active = self._active_carrier_codes()
+        return any(
+            carrier.app_label and carrier.code in active
+            for carrier in registered_providers()
+        )
+
+    @staticmethod
+    def _active_carrier_codes() -> set[str]:
+        from shipping.models import ShippingProvider
+
+        return set(
             ShippingProvider.objects.filter(is_active=True).values_list(
                 "code", flat=True
             )
-        )
-        return frozenset(
-            app
-            for app, code in (
-                ("shipping_acs", AcsCarrier.code),
-                ("shipping_boxnow", BoxNowCarrier.code),
-            )
-            if code not in active
         )
 
 

@@ -23,6 +23,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from django.dispatch import Signal
 from django.utils.translation import gettext_lazy as _
 
 from shipping.exceptions import ShippingProviderNotFoundError
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from decimal import Decimal
 
     from django.db.models import Q
+    from django_stubs_ext import StrOrPromise
 
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
@@ -49,6 +51,49 @@ class PostalAddress:
     street_number: str
     postal_code: str
     city: str
+
+
+@dataclass(frozen=True)
+class AdminPage:
+    """One admin page a carrier adds to the sidebar: the model whose
+    changelist it opens (``app_label.Model``), its title and its icon."""
+
+    model: str
+    title: StrOrPromise
+    icon: str = ""
+    # Where it sits among the same section's pages of every carrier:
+    # lower first, carriers that tie in the order they registered.
+    rank: int = 0
+
+
+@dataclass(frozen=True)
+class AdminPages:
+    """The admin pages of a carrier, by the sidebar section they sit in:
+    the store's Shipping group (``shipments``), its Pickup Points menu, and
+    the platform's Audit & Logs and Reconciliation menus. A store that does
+    not use the carrier keeps none of the first two; the platform's System
+    section keeps the logs."""
+
+    shipments: tuple[AdminPage, ...] = ()
+    pickup_points: tuple[AdminPage, ...] = ()
+    audit: tuple[AdminPage, ...] = ()
+    reconciliation: tuple[AdminPage, ...] = ()
+
+
+@dataclass(frozen=True)
+class AttentionRow:
+    """One line of the dashboard's "Needs attention" list for work a
+    carrier leaves waiting: the count it reads (``count_key``, a key of
+    :meth:`ShippingCarrierInterface.attention_counts`), how it looks, and
+    the changelist (``model``, filtered by the ``query`` string) it opens."""
+
+    count_key: str
+    icon: str
+    tone: str
+    title: StrOrPromise
+    description: StrOrPromise
+    model: str
+    query: str
 
 
 # The refusals of a pickup point at checkout, one text each for every
@@ -121,6 +166,16 @@ class ShippingCarrierInterface(ABC):
     """
 
     code: ClassVar[str]
+
+    # The Django app label of a carrier that is an app of its own (it has
+    # models and admin pages); ``None`` for a carrier built into
+    # ``shipping`` (the flat rate). A store that does not use the carrier
+    # keeps its app's pages out of the sidebar and the ⌘K palette.
+    app_label: ClassVar[str | None] = None
+
+    # The models whose writes change :meth:`attention_counts`, as
+    # ``app_label.Model``: a write clears the dashboard's cached counts.
+    attention_models: ClassVar[tuple[str, ...]] = ()
 
     # Carrier-specific keys that arrive in the create-order request
     # body but are NOT columns on ``Order``. The order-flow code pops
@@ -433,6 +488,43 @@ class ShippingCarrierInterface(ABC):
         """
         return True
 
+    def admin_pages(self) -> AdminPages:
+        """The admin pages this carrier adds to the sidebar.
+
+        Default: none, for a carrier with no admin of its own.
+        """
+        return AdminPages()
+
+    def shipment_state_variants(self) -> Mapping[str, str]:
+        """The colour (an Unfold label variant: ``default``, ``info``,
+        ``success``, ``warning``, ``danger``) of each state value of this
+        carrier's shipments, for the admin's state labels.
+
+        Default: none, for a carrier whose shipments have no states.
+        """
+        return {}
+
+    def attention_counts(self, now: datetime) -> dict[str, int]:
+        """How much of this carrier's work waits for a person, by the keys
+        :meth:`attention_rows` reads: the same rules its alert emails use,
+        so a store that switches an email off still sees the work.
+
+        Default: none, for a carrier that leaves nothing waiting.
+        """
+        return {}
+
+    def attention_rows(
+        self, counts: Mapping[str, int]
+    ) -> tuple[AttentionRow, ...]:
+        """The dashboard lines for the work :meth:`attention_counts`
+        counted, in the order they are listed. A row is drawn only while
+        its count is above zero, and only when the viewer may open its
+        page.
+
+        Default: none.
+        """
+        return ()
+
     def create_shipment_row(
         self,
         order: Order,
@@ -522,6 +614,11 @@ class ShippingCarrierInterface(ABC):
         )
 
 
+# Sent once a carrier is registered, so a listener that needs every
+# carrier (the dashboard's cache invalidation) can wait for the ones that
+# register after it was set up.
+carrier_registered = Signal()
+
 # Module-level adapter registry. Populated by @register_provider at
 # AppConfig.ready() time. Lookup via get_provider("acs") etc.
 _REGISTRY: dict[str, ShippingCarrierInterface] = {}
@@ -542,6 +639,7 @@ def register_provider(
             "before @register_provider."
         )
     _REGISTRY[code] = cls()
+    carrier_registered.send(sender=cls)
     return cls
 
 

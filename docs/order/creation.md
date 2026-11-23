@@ -23,11 +23,14 @@ caller:
 | `create_order_from_cart_offline` (§3.2) | `lock=True` | the order's charges |
 
 - **The lines** (`CheckoutQuote.lines`, `QuoteLine`): the cart's lines
-  as priced, read once (`OrderQuoteService.priced_lines`): product,
-  quantity, unit price (wholesale prices bound) and the promotion money
-  the line carries (`promotion.line_discounts`). The subtotal, the parcel
-  and the cart digest are all computed from that one read, so the lines a
-  quote returns are the ones its total and digest cover.
+  as priced (`OrderQuoteService.priced_lines`): product, quantity, unit
+  price (wholesale prices bound) and the promotion money the line carries
+  (`promotion.line_discounts`). The quote reads the lines once
+  (`Cart.get_items`) and hands that read to `PromotionEngine.evaluate`
+  (`items=`), so the promotions, the subtotal, the parcel and the cart
+  digest all come from it: the lines a quote returns are the ones its
+  total and digest cover. The digest's canonical form is pinned by
+  `tests/unit/order/test_cart_digest_golden.py`.
 - **The rows** (`CheckoutQuote`): the products (`items_subtotal`, the
   lines' sum), the promotions (`promotion`, `discount_total`, and
   `coupons`: `CartDiscountResult.coupon_verdicts` on each attached code,
@@ -154,7 +157,12 @@ caller:
   `mainImagePath`, `quantity`, `unitPrice`, `totalPrice` before
   promotions and `promotionDiscount`, which sum to `itemsSubtotal` and
   `discountTotal`) and `appliedCoupons` (each attached code's `amount`,
-  `freeShipping`, `gift` or `rejection`), so a client renders the
+  `freeShipping`, `gift` or `rejection`: the cart's `appliedCoupons`, one
+  serializer and one schema declaration for both,
+  `order.serializers.quote.AppliedCouponSerializer` and
+  `APPLIED_COUPONS_SCHEMA`, inline because drf-spectacular would lift a
+  component's enum into a `oneOf` the live consumers read as a type
+  change), so a client renders the
   checkout from the one answer its total came from (the agent gateway
   reads no cart beside it); and the priced lists: `shippingOptions` (every delivery the store
   offers to the country, `ShippingService.available_options` priced with

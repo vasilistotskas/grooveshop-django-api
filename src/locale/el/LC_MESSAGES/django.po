@@ -8927,9 +8927,6 @@ msgstr "Έλεγχος"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Χρήματα που απέδωσε η ACS και καμία αποστολή δεν εξηγεί"
 
-msgid "Money this code takes off; 0 when its benefit is not money, or it is refused."
-msgstr "Τα χρήματα που αφαιρεί αυτός ο κωδικός· 0 όταν το όφελός του δεν είναι χρήματα ή όταν απορρίπτεται."
-
 msgid "Month"
 msgstr "Μήνας"
 
@@ -15535,12 +15532,6 @@ msgstr "Αυτό το συνημμένο παρακρατείται μέχρι �
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "Αυτό δεν μπορεί να αλλάξει μετά την υποβολή της παραγγελίας: τα μεταφορικά και ο ΦΠΑ έχουν υπολογιστεί γι' αυτό."
 
-msgid "This code earns a gift the order ships with."
-msgstr "Αυτός ο κωδικός κερδίζει ένα δώρο που αποστέλλεται με την παραγγελία."
-
-msgid "This code waives shipping."
-msgstr "Αυτός ο κωδικός καταργεί τα μεταφορικά."
-
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "Η παρούσα επιβεβαίωση δεν αποτελεί φορολογικό παραστατικό. Ο ΦΠΑ χρεώνεται όταν η δωροκάρτα εξαργυρώνεται για αγορά προϊόντων."
 
@@ -17379,9 +17370,6 @@ msgstr "Γιατί απορρίπτεται ο κωδικός, από το λε�
 
 msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 msgstr "Γιατί απορρίπτεται ο κωδικός, στο λεξιλόγιο απόρριψης κουπονιών (``discount_code_expired``, ...)."
-
-msgid "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
-msgstr "Γιατί οι προωθήσεις απορρίπτουν τώρα τον συνδεδεμένο κωδικό· null όσο ισχύει. Μόνο το blockingCoupon σταματά μια παραγγελία."
 
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Γιατί ακυρώνεται το voucher (π.χ. διορθωμένη διεύθυνση). Αποθηκεύεται στην αποστολή."

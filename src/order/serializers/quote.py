@@ -133,34 +133,58 @@ class QuoteLineSerializer(serializers.Serializer):
         )
 
 
-class QuoteAppliedCouponSerializer(serializers.Serializer):
-    """What one attached coupon code does for the quoted cart
+class AppliedCouponSerializer(serializers.Serializer):
+    """What one attached coupon code does for the cart
     (``CouponVerdict``): exactly one of ``amount``, ``freeShipping``,
-    ``gift`` and ``rejection`` holds."""
+    ``gift`` and ``rejection`` holds. The cart's ``appliedCoupons`` and
+    the quote's are rendered by it and declared by
+    ``APPLIED_COUPONS_SCHEMA``."""
 
     code = serializers.CharField()
-    amount = serializers.DecimalField(
-        help_text=_(
-            "Money this code takes off; 0 when its benefit is not money, "
-            "or it is refused."
-        ),
-        max_digits=11,
-        decimal_places=2,
-    )
-    free_shipping = serializers.BooleanField(
-        help_text=_("This code waives shipping.")
-    )
-    gift = serializers.BooleanField(
-        help_text=_("This code earns a gift the order ships with.")
-    )
-    rejection = serializers.ChoiceField(
-        choices=CouponRejectionReason.choices,
-        allow_null=True,
-        help_text=_(
-            "Why the promotions refuse the attached code now; null while "
-            "it applies. Only blockingCoupon stops an order."
-        ),
-    )
+    amount = serializers.DecimalField(max_digits=11, decimal_places=2)
+    free_shipping = serializers.BooleanField()
+    gift = serializers.BooleanField()
+    rejection = serializers.CharField(allow_null=True)
+
+
+# The one declaration of an ``appliedCoupons`` list, the cart's and the
+# quote's. Inline, not a component: drf-spectacular lifts an enum on a
+# component's property into a ``oneOf`` of enum components, which the
+# consumers typed against this nullable string read as a type change.
+APPLIED_COUPONS_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string"},
+            "amount": {
+                "type": "number",
+                "description": (
+                    "Money this code takes off; 0 when its benefit is not "
+                    "money, or it is refused"
+                ),
+            },
+            "freeShipping": {
+                "type": "boolean",
+                "description": "This code waives shipping",
+            },
+            "gift": {
+                "type": "boolean",
+                "description": "This code earns a gift the order ships with",
+            },
+            "rejection": {
+                "type": "string",
+                "nullable": True,
+                "enum": [*CouponRejectionReason.values, None],
+                "description": (
+                    "Why the promotions refuse the attached code now; null "
+                    "while it applies"
+                ),
+            },
+        },
+        "required": ["code", "amount", "freeShipping", "gift", "rejection"],
+    },
+}
 
 
 class QuoteBlockingCouponSerializer(serializers.Serializer):
@@ -290,9 +314,7 @@ class CheckoutQuoteSerializer(serializers.Serializer):
             "sum to discountTotal."
         ),
     )
-    applied_coupons = QuoteAppliedCouponSerializer(
-        source="coupons",
-        many=True,
+    applied_coupons = serializers.SerializerMethodField(
         help_text=_(
             "The verdict on each coupon code attached to the cart, as "
             "the promotions in this quote decided it."
@@ -377,6 +399,10 @@ class CheckoutQuoteSerializer(serializers.Serializer):
             "one."
         ),
     )
+
+    @extend_schema_field(APPLIED_COUPONS_SCHEMA)
+    def get_applied_coupons(self, quote) -> list:
+        return list(AppliedCouponSerializer(quote.coupons, many=True).data)
 
     @extend_schema_field(QuoteLineSerializer(many=True))
     def get_lines(self, quote) -> list:

@@ -8919,9 +8919,6 @@ msgstr "Moderation"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Money ACS paid out that no shipment explains"
 
-msgid "Money this code takes off; 0 when its benefit is not money, or it is refused."
-msgstr "Money this code takes off; 0 when its benefit is not money, or it is refused."
-
 msgid "Month"
 msgstr "Month"
 
@@ -15533,12 +15530,6 @@ msgstr "This attachment is withheld pending its scan result."
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 
-msgid "This code earns a gift the order ships with."
-msgstr "This code earns a gift the order ships with."
-
-msgid "This code waives shipping."
-msgstr "This code waives shipping."
-
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 
@@ -17377,9 +17368,6 @@ msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code
 
 msgid "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
 msgstr "Why the code is refused, in the coupon rejection vocabulary (``discount_code_expired``, ...)."
-
-msgid "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
-msgstr "Why the promotions refuse the attached code now; null while it applies. Only blockingCoupon stops an order."
 
 msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 msgstr "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."

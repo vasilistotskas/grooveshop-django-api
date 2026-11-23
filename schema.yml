@@ -39506,7 +39506,7 @@ components:
                 description: This code waives shipping
               gift:
                 type: boolean
-                description: This code earns the gift listed in promotionGiftItems
+                description: This code earns a gift the order ships with
               rejection:
                 type: string
                 nullable: true
@@ -39521,8 +39521,8 @@ components:
                 - discount_code_not_applicable
                 - discount_code_gift_unavailable
                 - null
-                description: Why the engine refuses the attached code now; null while
-                  it applies
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
             required:
             - code
             - amount
@@ -40195,7 +40195,43 @@ components:
         appliedCoupons:
           type: array
           items:
-            $ref: '#/components/schemas/QuoteAppliedCoupon'
+            type: object
+            properties:
+              code:
+                type: string
+              amount:
+                type: number
+                description: Money this code takes off; 0 when its benefit is not
+                  money, or it is refused
+              freeShipping:
+                type: boolean
+                description: This code waives shipping
+              gift:
+                type: boolean
+                description: This code earns a gift the order ships with
+              rejection:
+                type: string
+                nullable: true
+                enum:
+                - discount_code_invalid
+                - discount_code_expired
+                - discount_code_not_started
+                - discount_code_minimum_not_met
+                - discount_code_usage_limit_reached
+                - discount_code_combination_disallowed
+                - discount_code_user_ineligible
+                - discount_code_not_applicable
+                - discount_code_gift_unavailable
+                - null
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
+            required:
+            - code
+            - amount
+            - freeShipping
+            - gift
+            - rejection
+          readOnly: true
           description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
             το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
@@ -40446,7 +40482,43 @@ components:
         appliedCoupons:
           type: array
           items:
-            $ref: '#/components/schemas/QuoteAppliedCoupon'
+            type: object
+            properties:
+              code:
+                type: string
+              amount:
+                type: number
+                description: Money this code takes off; 0 when its benefit is not
+                  money, or it is refused
+              freeShipping:
+                type: boolean
+                description: This code waives shipping
+              gift:
+                type: boolean
+                description: This code earns a gift the order ships with
+              rejection:
+                type: string
+                nullable: true
+                enum:
+                - discount_code_invalid
+                - discount_code_expired
+                - discount_code_not_started
+                - discount_code_minimum_not_met
+                - discount_code_usage_limit_reached
+                - discount_code_combination_disallowed
+                - discount_code_user_ineligible
+                - discount_code_not_applicable
+                - discount_code_gift_unavailable
+                - null
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
+            required:
+            - code
+            - amount
+            - freeShipping
+            - gift
+            - rejection
+          readOnly: true
           description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
             το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
@@ -41289,28 +41361,6 @@ components:
       required:
       - detail
       - reason
-    CouponRejectionReasonEnum:
-      enum:
-      - discount_code_invalid
-      - discount_code_expired
-      - discount_code_not_started
-      - discount_code_minimum_not_met
-      - discount_code_usage_limit_reached
-      - discount_code_combination_disallowed
-      - discount_code_user_ineligible
-      - discount_code_not_applicable
-      - discount_code_gift_unavailable
-      type: string
-      description: |-
-        * `discount_code_invalid` - Ο κωδικός δεν υπάρχει
-        * `discount_code_expired` - Η προσφορά έχει λήξει
-        * `discount_code_not_started` - Η προσφορά δεν έχει ξεκινήσει ακόμα
-        * `discount_code_minimum_not_met` - Το καλάθι δεν καλύπτει ακόμη την ελάχιστη προϋπόθεση της προσφοράς
-        * `discount_code_usage_limit_reached` - Ο κωδικός έχει φτάσει το όριο χρήσης του
-        * `discount_code_combination_disallowed` - Ο κωδικός δεν μπορεί να συνδυαστεί με τις εφαρμοσμένες προσφορές
-        * `discount_code_user_ineligible` - Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά
-        * `discount_code_not_applicable` - Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά
-        * `discount_code_gift_unavailable` - Το δώρο αυτού του κωδικού δεν είναι διαθέσιμο αυτή τη στιγμή
     CreateCheckoutSessionRequestRequest:
       type: object
       properties:
@@ -51931,53 +51981,6 @@ components:
       - key
       - kind
       - updatedAt
-    QuoteAppliedCoupon:
-      type: object
-      description: |-
-        What one attached coupon code does for the quoted cart
-        (``CouponVerdict``): exactly one of ``amount``, ``freeShipping``,
-        ``gift`` and ``rejection`` holds.
-      properties:
-        code:
-          type: string
-        amount:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          description: Τα χρήματα που αφαιρεί αυτός ο κωδικός· 0 όταν το όφελός του
-            δεν είναι χρήματα ή όταν απορρίπτεται.
-        freeShipping:
-          type: boolean
-          description: Αυτός ο κωδικός καταργεί τα μεταφορικά.
-        gift:
-          type: boolean
-          description: Αυτός ο κωδικός κερδίζει ένα δώρο που αποστέλλεται με την παραγγελία.
-        rejection:
-          nullable: true
-          description: |-
-            Γιατί οι προωθήσεις απορρίπτουν τώρα τον συνδεδεμένο κωδικό· null όσο ισχύει. Μόνο το blockingCoupon σταματά μια παραγγελία.
-
-            * `discount_code_invalid` - Ο κωδικός δεν υπάρχει
-            * `discount_code_expired` - Η προσφορά έχει λήξει
-            * `discount_code_not_started` - Η προσφορά δεν έχει ξεκινήσει ακόμα
-            * `discount_code_minimum_not_met` - Το καλάθι δεν καλύπτει ακόμη την ελάχιστη προϋπόθεση της προσφοράς
-            * `discount_code_usage_limit_reached` - Ο κωδικός έχει φτάσει το όριο χρήσης του
-            * `discount_code_combination_disallowed` - Ο κωδικός δεν μπορεί να συνδυαστεί με τις εφαρμοσμένες προσφορές
-            * `discount_code_user_ineligible` - Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά
-            * `discount_code_not_applicable` - Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά
-            * `discount_code_gift_unavailable` - Το δώρο αυτού του κωδικού δεν είναι διαθέσιμο αυτή τη στιγμή
-          oneOf:
-          - $ref: '#/components/schemas/CouponRejectionReasonEnum'
-          - $ref: '#/components/schemas/NullEnum'
-      required:
-      - amount
-      - code
-      - freeShipping
-      - gift
-      - rejection
     QuoteAppliedPromotion:
       type: object
       properties:

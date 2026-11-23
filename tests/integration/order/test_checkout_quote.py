@@ -20,6 +20,7 @@ from uuid import uuid4
 import pytest
 from django.core.cache import cache
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from knox.models import get_token_model
@@ -27,7 +28,7 @@ from measurement.measures import Weight
 from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
-from cart.models import Cart
+from cart.models import Cart, CartItem
 from cart.throttles import (
     CartMutationAnonThrottle,
     CartQuoteAnonThrottle,
@@ -432,6 +433,32 @@ class TestQuoteLines:
             quote.promotion,
             shipping=shipping,
             weight_grams=quote.weight_grams,
+        )
+
+    def test_the_promotions_are_evaluated_over_the_lines_it_prices(self):
+        """One read of the cart's lines: a cart write cannot land between
+        the promotions' read and the priced lines'."""
+        checkout = self._two_lines_and_a_discount()
+
+        with CaptureQueriesContext(connection) as queries:
+            quote = OrderQuoteService.quote(
+                checkout.cart,
+                user=checkout.user,
+                shipping=ShippingChoice.of(_choices(checkout)),
+            )
+
+        line_reads = [
+            query["sql"]
+            for query in queries.captured_queries
+            if f'FROM "{CartItem._meta.db_table}"' in query["sql"]
+        ]
+        assert len(line_reads) == 1, line_reads
+        assert quote.promotion.line_discounts.keys() <= {
+            line.item_id for line in quote.lines
+        }
+        assert (
+            sum(line.promotion_discount for line in quote.lines)
+            == quote.discount_total.amount
         )
 
     def test_a_changed_line_changes_the_lines_and_the_digest_together(self):

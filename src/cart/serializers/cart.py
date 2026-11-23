@@ -10,8 +10,12 @@ from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
 from core.validators import address as address_rules
-from order.serializers.quote import PickupPointSerializer
-from promotion.enum import BenefitType, CouponRejectionReason
+from order.serializers.quote import (
+    APPLIED_COUPONS_SCHEMA,
+    AppliedCouponSerializer,
+    PickupPointSerializer,
+)
+from promotion.enum import BenefitType
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
     PromotionProductRefSerializer,
@@ -305,67 +309,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             return []
         return [row.code.code for row in obj.applied_codes.all()]
 
-    @extend_schema_field(
-        {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "string"},
-                    "amount": {
-                        "type": "number",
-                        "description": (
-                            "Money this code takes off; 0 when its "
-                            "benefit is not money, or it is refused"
-                        ),
-                    },
-                    "freeShipping": {
-                        "type": "boolean",
-                        "description": "This code waives shipping",
-                    },
-                    "gift": {
-                        "type": "boolean",
-                        "description": (
-                            "This code earns the gift listed in "
-                            "promotionGiftItems"
-                        ),
-                    },
-                    "rejection": {
-                        "type": "string",
-                        "nullable": True,
-                        "enum": [*CouponRejectionReason.values, None],
-                        "description": (
-                            "Why the engine refuses the attached code "
-                            "now; null while it applies"
-                        ),
-                    },
-                },
-                "required": [
-                    "code",
-                    "amount",
-                    "freeShipping",
-                    "gift",
-                    "rejection",
-                ],
-            },
-        }
-    )
-    def get_applied_coupons(self, obj: Cart) -> list[dict]:
+    @extend_schema_field(APPLIED_COUPONS_SCHEMA)
+    def get_applied_coupons(self, obj: Cart) -> list:
         if not self._codes_apply():
             return []
         verdicts = self._promotion_result(obj).coupon_verdicts(
             row.code.code for row in obj.applied_codes.all()
         )
-        return [
-            {
-                "code": verdict.code,
-                "amount": verdict.amount,
-                "freeShipping": verdict.free_shipping,
-                "gift": verdict.gift,
-                "rejection": verdict.rejection,
-            }
-            for verdict in verdicts
-        ]
+        return list(AppliedCouponSerializer(verdicts, many=True).data)
 
     @extend_schema_field(
         {

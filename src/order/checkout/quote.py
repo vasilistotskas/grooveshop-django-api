@@ -37,7 +37,7 @@ from promotion.enum import BenefitType
 from shipping.enum import FreeShippingSource, ShippingRefusal
 
 if TYPE_CHECKING:
-    from cart.models import Cart
+    from cart.models import Cart, CartItem
     from giftcard.services import RedemptionPlan
     from pay_way.models import PayWay
     from product.models.product import Product
@@ -331,8 +331,11 @@ class OrderQuoteService:
         """
         from b2b.services import B2BService
 
+        # One read of the lines: the promotions are evaluated over the
+        # lines the quote prices, digests and returns.
+        items = tuple(cart.get_items())
         promotion = PromotionEngine.evaluate(
-            cart, user=user, email=email, lock=lock
+            cart, user=user, email=email, lock=lock, items=items
         )
         if lock:
             blocking = promotion.blocking_rejections
@@ -340,7 +343,7 @@ class OrderQuoteService:
                 code, reason = blocking[0]
                 raise InvalidCouponError(code=code, reason=reason)
 
-        lines = cls.priced_lines(cart, promotion)
+        lines = cls.priced_lines(items, promotion)
         items_subtotal = Money(
             sum((line.total_price.amount for line in lines), Decimal(0)),
             settings.DEFAULT_CURRENCY,
@@ -445,11 +448,11 @@ class OrderQuoteService:
 
     @staticmethod
     def priced_lines(
-        cart: Cart, promotion: CartDiscountResult
+        items: Iterable[CartItem], promotion: CartDiscountResult
     ) -> tuple[QuoteLine, ...]:
-        """The cart's lines at the prices checkout charges, each with
-        the promotion money ``promotion`` puts on it: one read of the
-        cart, which the quote's subtotal, parcel and digest all take."""
+        """The cart's lines (``items``, one read of the cart) at the
+        prices checkout charges, each with the promotion money
+        ``promotion``, evaluated over those same lines, puts on it."""
         line_discounts = promotion.line_discounts
         return tuple(
             QuoteLine(
@@ -459,7 +462,7 @@ class OrderQuoteService:
                 unit_price=item.final_price,
                 promotion_discount=line_discounts.get(item.pk, Decimal(0)),
             )
-            for item in cart.get_items()
+            for item in items
         )
 
     @staticmethod
@@ -627,9 +630,12 @@ class OrderQuoteService:
         """
         from shipping.services import ShippingService
 
-        promotion = PromotionEngine.evaluate(cart, user=user, email=email)
+        items = tuple(cart.get_items())
+        promotion = PromotionEngine.evaluate(
+            cart, user=user, email=email, items=items
+        )
         _parcel_items, weight_grams = cls._parcel(
-            cls.priced_lines(cart, promotion), promotion
+            cls.priced_lines(items, promotion), promotion
         )
         kind, provider_code = cls._carrier(
             shipping.kind,

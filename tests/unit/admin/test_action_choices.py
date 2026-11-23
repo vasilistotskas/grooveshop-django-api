@@ -59,3 +59,25 @@ def test_no_action_location_deprecation_warning():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         _model_admin().get_action_choices(request)
+
+
+def test_dj_stripes_admins_list_their_actions_without_the_warning():
+    """dj-stripe overrides ``get_actions`` with Django 5's signature;
+    ``admin.mixins.StripeMirrorModelAdmin`` takes ``action_location``."""
+    request = _request()
+    stripe_admins = [
+        model_admin
+        for model, model_admin in admin.site._registry.items()
+        if model._meta.app_label == "djstripe"
+    ]
+    listed = set()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        for model_admin in stripe_admins:
+            listed |= set(model_admin.get_actions(request))
+            model_admin.get_action_choices(request)
+            assert model_admin.get_action_choices(
+                request, action_location=ActionLocation.CHANGE_FORM
+            ) == [("", _("Select action"))]
+    # dj-stripe's own changelist actions are still offered.
+    assert {"_resync_instances", "_sync_all_instances", "_cancel"} <= listed

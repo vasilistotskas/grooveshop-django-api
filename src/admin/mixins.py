@@ -151,6 +151,18 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
     applies an action's ``allowed_permissions``).
     """
 
+    def get_actions(self, request, action_location=ActionLocation.CHANGE_LIST):
+        """dj-stripe's admins override ``get_actions`` with Django 5's
+        signature (``djstripe.admin.actions.CustomActionMixin`` and four
+        of its model admins), which Django 6 reports with a
+        ``RemovedInDjango2028Warning`` on every changelist. Their actions
+        are changelist actions, so the change form gets none, as Django
+        gives an override of the old signature. Delete once dj-stripe
+        accepts ``action_location``."""
+        if action_location != ActionLocation.CHANGE_LIST:
+            return {}
+        return super().get_actions(request)
+
     def get_urls(self):
         from django.urls import path
 

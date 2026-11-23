@@ -225,7 +225,7 @@ class CouponPickerService:
         coupon add" excludes every attached code — including, when the
         picker re-reads the coupon that is already on, itself.
         """
-        candidates, _rejected = collect_candidates(cart, lock=False)
+        candidates, _rejected, _codes = collect_candidates(cart, lock=False)
         automatic = [
             (promotion, code) for promotion, code in candidates if code is None
         ]

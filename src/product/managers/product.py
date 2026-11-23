@@ -33,6 +33,18 @@ if TYPE_CHECKING:
     from typing import Self
 
 
+def main_image_prefetch() -> Prefetch:
+    """The products' main image, where ``Product.main_image`` reads it:
+    one query for any number of products."""
+    from product.models.image import ProductImage
+
+    return Prefetch(
+        "images",
+        queryset=ProductImage.objects.filter(is_main=True),
+        to_attr="_prefetched_main_images",
+    )
+
+
 def likes_count_expression(product: str = "pk") -> Coalesce:
     """The number of favourites of a product, as a correlated subquery.
 
@@ -187,15 +199,7 @@ class ProductQuerySet(
 
     def with_main_image(self) -> Self:
         """Prefetch only the main image to avoid N+1 in main_image_path."""
-        from product.models.image import ProductImage
-
-        return self.prefetch_related(
-            Prefetch(
-                "images",
-                queryset=ProductImage.objects.filter(is_main=True),
-                to_attr="_prefetched_main_images",
-            )
-        )
+        return self.prefetch_related(main_image_prefetch())
 
     def with_ordered_images(self) -> Self:
         """Prefetch every image in display order (main first).

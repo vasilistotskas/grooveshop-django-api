@@ -3,6 +3,43 @@
 
 
 
+## v3.267.2 (2026-11-23)
+
+### Documentation
+
+* docs(order): name RefundService where the refund docs still said the ledger books
+
+The refund execution, payments and reconciliation pages, and the Stripe
+refund handler's docstring, said the ledger settles the attempt or frees
+the credit; RefundService books both now. A test pins that the ledger's
+record_refund alone writes the row and the status and settles nothing.
+
+Refs #658 ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+* docs(order): say what booking a refund the ledger already holds still does ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+### Refactoring
+
+* refactor(order): RefundService books a refund above the ledger and the allocation (#804) ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+* refactor(order): RefundService books a refund above the ledger and the allocation
+
+PaymentLedger.record_refund booked the allocation and the overcharge flag
+itself, and the allocation read the ledger back: the two modules called
+each other four deep on the refund path, with four function-local
+imports to hide it. A refund is now booked as one unit by
+RefundService.book_refund (and book_cod_refund, book_refund_reversal):
+the ledger row and payment status, the attempt it fulfils, the
+allocation and the overcharge flag, in the order the ledger did them.
+The ledger's writes are plain writes, goods_returned moves to the
+ledger (it reads allocation rows, a model), credit_allocation imports
+the ledger at module level, and the payments contract loses its last
+ignored edge. The Stripe and Viva refund handlers and every test that
+booked through the ledger book through RefundService.
+
+Closes #658
+Closes #565 ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
 ## v3.267.1 (2026-11-23)
 
 ### Bug fixes

@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -297,18 +296,8 @@ class PayWayService:
 
     @staticmethod
     def process_payment(
-        pay_way: PayWay,
-        order: Order,
-        *,
-        on_paid: Callable[[Order], object],
-        **kwargs,
+        pay_way: PayWay, order: Order, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        """Open a payment for *order* with its provider and record it.
-
-        *on_paid* is what confirms an order whose payment the provider
-        took at once: it runs in the transaction that records the paid
-        payment, so the order is never stored paid and unconfirmed.
-        """
         if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             # Amount owed, not the raw total: a loyalty redemption is
             # deducted by calculate_order_total_amount(). Cash on
@@ -422,8 +411,13 @@ class PayWayService:
                 # The expiry the provider applied, else the one asked for
                 # (a PaymentIntent has none: the sweep cancels it).
                 hold_expires_at=payment_data.get("expires_at", hold_expires_at),
-                on_paid=on_paid,
             )
+
+            if order.payment_status == PaymentStatus.COMPLETED:
+                order.mark_as_paid(
+                    payment_id=payment_data.get("payment_id", ""),
+                    payment_method=order.payment_method,
+                )
 
         return success, payment_data
 
@@ -436,11 +430,8 @@ class PayWayService:
         observed: OpenPayment,
         provider: PaymentProvider,
         hold_expires_at: datetime,
-        on_paid: Callable[[Order], object],
     ) -> None:
-        """Store the payment the provider just opened on *order*, and when
-        the provider took it at once, mark the order paid and confirm it
-        (*on_paid*) in the same transaction.
+        """Store the payment the provider just opened on *order*.
 
         The provider call ran without the row lock, so the row is locked
         and compared with what *order* was read as. A change that landed
@@ -468,14 +459,6 @@ class PayWayService:
                     "payment_hold_expires_at",
                 ]
             )
-            if locked.payment_status == PaymentStatus.COMPLETED:
-                locked.mark_as_paid(
-                    payment_id=locked.payment_id,
-                    payment_method=locked.payment_method,
-                )
-                on_paid(locked)
         order.payment_method = locked.payment_method
         order.payment_status = locked.payment_status
         order.payment_id = locked.payment_id
-        order.amount_due = locked.amount_due
-        order.confirmed_at = locked.confirmed_at

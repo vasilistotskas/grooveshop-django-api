@@ -38300,8 +38300,8 @@ components:
         limitedAvailability:
           type: boolean
           readOnly: true
-          description: Αληθές όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
-            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· ψευδές όταν δεν είναι γνωστή.
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true
@@ -38434,8 +38434,8 @@ components:
         limitedAvailability:
           type: boolean
           readOnly: true
-          description: Αληθές όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
-            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· ψευδές όταν δεν είναι γνωστή.
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true

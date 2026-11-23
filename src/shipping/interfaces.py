@@ -67,10 +67,36 @@ PICKUP_POINT_TOO_SMALL = _(
 )
 
 
-class PickupPointTooSmall(ValueError):
-    """The pickup point has no compartment for the order's parcel, or its
-    sizes are not known: no order is sent there
-    (``assert_pickup_point_fits``)."""
+PICKUP_POINT_SIZE_UNKNOWN = _(
+    "We cannot confirm yet that this locker takes your order's size. "
+    "Choose another one."
+)
+
+
+class PickupPointUnfit(ValueError):
+    """The pickup point cannot be confirmed to take the order's parcel: no
+    order is sent there (``assert_pickup_point_fits``). ``code`` is the
+    stable code the API answers with, ``message`` what the shopper reads."""
+
+    code: str
+    message: Any
+
+
+class PickupPointTooSmall(PickupPointUnfit):
+    """The pickup point lists the compartment sizes it has, and not the
+    order's."""
+
+    code = "pickup_point_too_small"
+    message = PICKUP_POINT_TOO_SMALL
+
+
+class PickupPointSizeUnknown(PickupPointUnfit):
+    """The pickup point's compartment sizes are not known yet (a locker the
+    carrier's size list does not hold yet): whether it takes the order
+    cannot be told."""
+
+    code = "pickup_point_size_unknown"
+    message = PICKUP_POINT_SIZE_UNKNOWN
 
 
 class PickupPointInAnotherCountry(ValueError):
@@ -340,7 +366,7 @@ class ShippingCarrierInterface(ABC):
         *,
         items: Iterable[tuple[Any, int]],
     ) -> None:
-        """Raise :class:`PickupPointTooSmall` when the pickup point
+        """Raise :class:`PickupPointUnfit` when the pickup point
         *location* names cannot take ``items`` packed as the carrier
         packs them. Called once the point is known to exist
         (:meth:`deliverable_pickup_point`). Default: every point fits."""

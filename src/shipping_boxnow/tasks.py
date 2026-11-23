@@ -338,8 +338,9 @@ def apply_boxnow_locker_catalogue(
     if _skip_if_boxnow_unconfigured("apply_boxnow_locker_catalogue"):
         return {"updated": 0, "unknown": 0}
 
-    from shipping_boxnow.catalogue import apply_catalogues
+    from shipping_boxnow.catalogue import apply_catalogues, remember_catalogues
 
+    remember_catalogues(catalogue)
     return apply_catalogues(catalogue)
 
 

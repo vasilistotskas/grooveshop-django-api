@@ -281,3 +281,42 @@ def test_a_stage_store_with_nothing_sized_writes_nothing(
 
     assert BoxNowLocker.objects.get(external_id="5").compartment_sizes == []
     purge.assert_not_called()
+
+
+@pytest.fixture
+def store_cache():
+    from tests.utils.redis import private_cache
+
+    with patch("django.core.cache.cache", private_cache()):
+        yield
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_a_locker_the_partner_sync_creates_is_sized_from_the_kept_catalogue():
+    """The hourly task keeps what it applied; a locker the daily sync or
+    an order's resync creates later is sized from it at once."""
+    from shipping_boxnow import tasks
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    catalogue = {"GR": {"1": [[1, 2], 0.9], "new": [[3], 0.5]}}
+    with patch(
+        "shipping_boxnow.tasks._skip_if_boxnow_unconfigured",
+        return_value=False,
+    ):
+        tasks.apply_boxnow_locker_catalogue(catalogue)
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    assert apply_remembered_catalogues() == {"updated": 1, "unknown": 0}
+    new = BoxNowLocker.objects.get(external_id="new")
+    assert new.compartment_sizes == [3]
+    assert new.availability_probability == 0.5
+
+
+@pytest.mark.usefixtures("boxnow_live_network", "store_cache")
+def test_nothing_is_applied_when_no_catalogue_is_kept():
+    from shipping_boxnow.catalogue import apply_remembered_catalogues
+
+    BoxNowLockerFactory(external_id="new", compartment_sizes=[])
+
+    assert apply_remembered_catalogues() is None
+    assert BoxNowLocker.objects.get(external_id="new").compartment_sizes == []

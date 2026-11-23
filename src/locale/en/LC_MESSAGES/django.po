@@ -16917,6 +16917,9 @@ msgstr "Warning"
 msgid "We Miss You!"
 msgstr "We Miss You!"
 
+msgid "We cannot confirm yet that this locker takes your order's size. Choose another one."
+msgstr "We cannot confirm yet that this locker takes your order's size. Choose another one."
+
 msgid "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 msgstr "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 

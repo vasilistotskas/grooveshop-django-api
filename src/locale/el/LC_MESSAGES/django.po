@@ -16027,7 +16027,7 @@ msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr "True αν έχει σταλεί email στον πελάτη για αυτή την εγκαταλελειμμένη δέσμευση"
 
 msgid "True when BOX NOW rates the chance of a free compartment below BOXNOW_LIMITED_AVAILABILITY_BELOW; false when it is not known."
-msgstr "Αληθές όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· ψευδές όταν δεν είναι γνωστή."
+msgstr "True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή."
 
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True όταν το ``weight_grams`` του αιτήματος ξεπερνά το ``max_weight_grams``. Η επιλογή επιστρέφεται κανονικά αντί να κρύβεται — το κατάστημα τη δείχνει απενεργοποιημένη με την αιτία, ώστε ένα βαρύ καλάθι να μη βλέπει ποτέ μια επιλογή λιγότερη χωρίς εξήγηση."
@@ -16918,6 +16918,9 @@ msgstr "Προειδοποίηση"
 
 msgid "We Miss You!"
 msgstr "Μας λείπετε!"
+
+msgid "We cannot confirm yet that this locker takes your order's size. Choose another one."
+msgstr "Δεν μπορούμε ακόμη να επιβεβαιώσουμε ότι αυτό το locker δέχεται το μέγεθος της παραγγελίας σας. Διαλέξτε άλλο."
 
 msgid "We could not reach the courier to cancel your parcel. Please try again in a few minutes."
 msgstr "Δεν μπορέσαμε να επικοινωνήσουμε με τον courier για να ακυρώσουμε το δέμα σας. Δοκιμάστε ξανά σε λίγα λεπτά."

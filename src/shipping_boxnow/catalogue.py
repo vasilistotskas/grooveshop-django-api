@@ -258,3 +258,36 @@ def _forget_stage_sizes() -> dict[str, int]:
             reset,
         )
     return {"updated": 0, "unknown": 0}
+
+
+# This store's last applied catalogue (the cache is keyed per store
+# schema): what a partner sync sizes the lockers it creates from.
+_REMEMBERED_CATALOGUES = "shipping_boxnow:catalogues"
+
+
+def remember_catalogues(catalogues: dict[str, dict[str, list]]) -> None:
+    """Keep ``catalogues`` for this store for
+    ``BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS``
+    (:func:`apply_remembered_catalogues`)."""
+    from django.core.cache import cache
+
+    cache.set(
+        _REMEMBERED_CATALOGUES,
+        catalogues,
+        timeout=settings.BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS,
+    )
+
+
+def apply_remembered_catalogues() -> dict[str, int] | None:
+    """Apply this store's last catalogue again (:func:`apply_catalogues`),
+    so the lockers a partner sync just created get their sizes now rather
+    than at the next hourly run: the daily sync, and the resync an order
+    for a locker the table lacks runs. ``None`` when none is kept (none
+    read yet, expired, or the cache unreachable): those lockers stay
+    unknown until the next run."""
+    from django.core.cache import cache
+
+    catalogues = cache.get(_REMEMBERED_CATALOGUES)
+    if not catalogues:
+        return None
+    return apply_catalogues(catalogues)

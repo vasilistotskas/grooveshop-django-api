@@ -158,6 +158,13 @@ BOXNOW_LOCKER_CATALOGUE_COUNTRIES = {
 BOXNOW_LOCKER_CATALOGUE_MAX_BYTES = int(
     getenv("BOXNOW_LOCKER_CATALOGUE_MAX_BYTES", str(8 * 1024 * 1024))
 )
+# How long a store keeps the last catalogue it applied, to size the lockers
+# a partner sync creates before the next hourly run
+# (``shipping_boxnow.catalogue.apply_remembered_catalogues``): three
+# missed runs, after which a new locker waits for the next good one.
+BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS = int(
+    getenv("BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS", str(3 * 60 * 60))
+)
 # A locker whose catalogue ``probability`` is below this is shown with the
 # "limited availability" marker. Source: BOX NOW's widget, which marks a
 # locker available from 0.87 (its ``acceptLocker.js``).

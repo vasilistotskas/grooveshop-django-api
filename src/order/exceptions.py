@@ -335,14 +335,16 @@ class ShippingRefusedError(InvalidOrderDataError):
         )
 
 
-class PickupPointTooSmallError(InvalidOrderDataError):
-    """Raised when the chosen pickup point has no compartment for the
-    cart's parcel. Answered by order creation as the field error
-    ``pickup_point_too_small`` on the carrier's location field."""
+class PickupPointUnfitError(InvalidOrderDataError):
+    """Raised when the chosen pickup point cannot be confirmed to take the
+    cart's parcel (``shipping.interfaces.PickupPointUnfit``). Answered as
+    the field error ``code`` (``pickup_point_too_small``,
+    ``pickup_point_size_unknown``) on the carrier's location field."""
 
-    def __init__(self, field: str, message: str):
+    def __init__(self, field: str, message: str, code: str):
         self.field = field
         self.message = message
+        self.code = code
         super().__init__(message, field_errors={field: [message]})
 
 

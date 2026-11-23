@@ -442,15 +442,17 @@ class TestQuoteRefusals:
         assert "too big" not in body["detail"]
 
     def test_a_locker_without_the_carts_size_is_named(self):
-        from order.exceptions import PickupPointTooSmallError
+        from order.exceptions import PickupPointUnfitError
 
         checkout = _checkout()
 
         with patch.object(
             OrderQuoteService,
             "_assert_pickup_point_fits",
-            side_effect=PickupPointTooSmallError(
-                "boxnow_locker_id", "Choose another one."
+            side_effect=PickupPointUnfitError(
+                "boxnow_locker_id",
+                "Choose another one.",
+                "pickup_point_too_small",
             ),
         ):
             response = _post_quote(checkout, **_choices(checkout))

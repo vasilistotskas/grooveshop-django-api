@@ -583,7 +583,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
     @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
-    def test_a_locker_with_no_known_sizes_is_refused_the_same(
+    def test_a_locker_with_no_known_sizes_is_refused_as_unknown(
         self, mock_validate_address, mock_validate_cart, mock_provider
     ):
         unsynced = BoxNowLockerFactory(
@@ -601,7 +601,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.json()["code"] == "pickup_point_too_small"
+        assert response.json()["code"] == "pickup_point_size_unknown"
 
     @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")

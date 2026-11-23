@@ -25,7 +25,7 @@ from order.exceptions import (
     InvalidCouponError,
     InvalidGiftCardError,
     LoyaltyRedemptionError,
-    PickupPointTooSmallError,
+    PickupPointUnfitError,
     ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
@@ -799,11 +799,7 @@ class OrderQuoteService:
         """Refuse a chosen pickup point that cannot take the cart's parcel
         (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
         from shipping.enum import ShippingKind
-        from shipping.interfaces import (
-            PICKUP_POINT_TOO_SMALL,
-            PickupPointTooSmall,
-            get_provider,
-        )
+        from shipping.interfaces import PickupPointUnfit, get_provider
         from shipping.services import ShippingService
 
         if (
@@ -818,10 +814,11 @@ class OrderQuoteService:
                 dict(shipping.location),
                 items=parcel_items,
             )
-        except PickupPointTooSmall as exc:
-            raise PickupPointTooSmallError(
+        except PickupPointUnfit as exc:
+            raise PickupPointUnfitError(
                 get_provider(shipping.provider_code).location_keys[0],
-                str(PICKUP_POINT_TOO_SMALL),
+                str(exc.message),
+                exc.code,
             ) from exc
 
     @classmethod

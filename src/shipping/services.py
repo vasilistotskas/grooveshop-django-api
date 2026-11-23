@@ -1220,7 +1220,7 @@ class ShippingService:
         *,
         items: Iterable[tuple[Any, int]],
     ) -> None:
-        """Raise ``PickupPointTooSmall`` when the carrier's pickup point
+        """Raise ``PickupPointUnfit`` when the carrier's pickup point
         *location* names cannot take ``items``
         (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
         get_provider(provider_code).assert_pickup_point_fits(

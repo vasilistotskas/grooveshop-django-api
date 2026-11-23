@@ -114,6 +114,95 @@ def _post_locker_order(checkout, **body):
     )
 
 
+def _default_compartment_size(size: int) -> None:
+    """The store's size for a cart whose products carry no dimensions."""
+    from extra_settings.models import Setting
+
+    Setting.objects.update_or_create(
+        name="BOXNOW_DEFAULT_COMPARTMENT_SIZE",
+        defaults={"value_type": "int", "value_int": size},
+    )
+
+
+@pytest.mark.usefixtures("boxnow_live_network")
+class TestALockerOnBoxNowsLiveNetwork:
+    """The size check at the endpoints, unmocked: a medium cart (the
+    store's default size, its products carry no dimensions)."""
+
+    @staticmethod
+    def _quote(checkout):
+        return checkout.client.post(
+            reverse("cart-quote"),
+            {
+                **BUYER,
+                "country_id": checkout.country.alpha_2,
+                "pay_way_id": checkout.pay_way.id,
+                "shipping_kind": "pickup_point",
+                "shipping_provider_code": "boxnow",
+                "boxnow_locker_id": "4",
+            },
+            format="json",
+            HTTP_X_CART_ID=str(checkout.cart.uuid),
+        )
+
+    @pytest.mark.parametrize(
+        ("sizes", "code"),
+        [
+            ([1, 3], "pickup_point_too_small"),
+            ([], "pickup_point_size_unknown"),
+        ],
+    )
+    def test_the_quote_names_why_the_locker_is_refused(
+        self, locker_checkout, sizes, code
+    ):
+        _default_compartment_size(2)
+        locker_checkout.locker.compartment_sizes = sizes
+        locker_checkout.locker.save()
+
+        response = self._quote(locker_checkout)
+
+        assert response.status_code == 400, response.content
+        assert response.json()["code"] == response.json()["reason"] == code
+
+    def test_order_creation_refuses_a_locker_of_unknown_sizes(
+        self, locker_checkout
+    ):
+        _default_compartment_size(2)
+        locker_checkout.locker.compartment_sizes = []
+        locker_checkout.locker.save()
+
+        response = locker_checkout.client.post(
+            reverse("order-list"),
+            {
+                **BUYER,
+                "country_id": locker_checkout.country.alpha_2,
+                "pay_way_id": locker_checkout.pay_way.id,
+                "terms_accepted": True,
+                "shipping_kind": "pickup_point",
+                "shipping_provider_code": "boxnow",
+                "boxnow_locker_id": "4",
+                "expected_total": UNQUOTED,
+            },
+            format="json",
+            HTTP_X_CART_ID=str(locker_checkout.cart.uuid),
+        )
+
+        assert response.status_code == 400, response.content
+        body = response.json()
+        assert body["code"] == "pickup_point_size_unknown"
+        assert body["fields"]["boxnowLockerId"][0]["code"] == (
+            "pickup_point_size_unknown"
+        )
+        assert not Order.objects.exists()
+
+    def test_a_locker_with_the_carts_size_is_quoted(self, locker_checkout):
+        _default_compartment_size(2)
+
+        response = self._quote(locker_checkout)
+
+        assert response.status_code == 200, response.content
+
+
 class TestALockerOrder:
     def test_needs_no_address_of_the_buyer(self, locker_checkout):
         response = _post_locker_order(locker_checkout)
@@ -573,13 +662,43 @@ class TestALockerTheCatalogueDoesNotHoldYet:
             "Athens",
         )
 
+    def test_is_found_by_a_resync_and_sized_from_the_last_catalogue(
+        self, locker_checkout, resync
+    ):
+        """The resync brings the locker's address; its compartment sizes
+        come from the store's last catalogue, so the order goes now."""
+        from shipping_boxnow.catalogue import remember_catalogues
+
+        country = locker_checkout.country.alpha_2
+        remember_catalogues(
+            {country: {"4": [[1, 2, 3], 1.0], "77": [[2], 1.0]}}
+        )
+        _default_compartment_size(2)
+        resync.return_value.append(_destination("77", country))
+
+        # A store on BOX NOW's live network, on every thread: the resync
+        # runs on one of its own under the store's schema
+        # (``ShippingService._resync_within_deadline``), where a stand-in
+        # tenant bound on the test's connection is not seen.
+        with patch(
+            "shipping_boxnow.catalogue.box_now_credentials",
+            return_value={"live_mode": True},
+        ):
+            response = _post_locker_order(
+                locker_checkout, boxnow_locker_id="77"
+            )
+
+        assert response.status_code == 201, response.content
+        resync.assert_called_once()
+        locker = BoxNowLocker.objects.get(external_id="77")
+        assert locker.compartment_sizes == [2]
+
     @pytest.mark.usefixtures("boxnow_live_network")
     def test_is_found_by_a_resync_but_refused_until_its_sizes_are_known(
         self, locker_checkout, resync
     ):
-        """The resync brings the locker's address, not its compartment
-        sizes (BOX NOW's public catalogue holds those, hourly): until
-        then it lists no size and takes no order."""
+        """No catalogue kept by the store (or one without the locker): it
+        lists no size, so whether it takes the order cannot be told."""
         resync.return_value.append(
             _destination("77", locker_checkout.country.alpha_2)
         )
@@ -588,7 +707,7 @@ class TestALockerTheCatalogueDoesNotHoldYet:
 
         assert response.status_code == 400, response.content
         assert response.json()["fields"]["boxnowLockerId"][0]["code"] == (
-            "pickup_point_too_small"
+            "pickup_point_size_unknown"
         )
         resync.assert_called_once()
         assert (

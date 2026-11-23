@@ -367,9 +367,18 @@ and says which file holds each § number used here.
   `POST /cart/quote` names the cart's `compartmentSize` on a BOX NOW pickup
   option (null elsewhere, and on a store that is not live). **Order
   creation on a live store refuses a locker that does not list the cart's
-  size** (or whose sizes are unknown) with 400 `pickup_point_too_small` on
-  `boxnowLockerId` (`ShippingCarrierInterface.assert_pickup_point_fits`,
-  run in the locked quote).
+  size** with 400 `pickup_point_too_small` on `boxnowLockerId`, and one
+  whose sizes are not known with `pickup_point_size_unknown`
+  (`ShippingCarrierInterface.assert_pickup_point_fits` raising a
+  `shipping.interfaces.PickupPointUnfit`, run in the locked quote; the
+  quote answers the same codes, the payment intent `invalid_order_data`).
+  A locker is unknown only until the catalogue names it: each store keeps
+  the last catalogue it applied for `BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS`
+  (3 hours, `remember_catalogues`), and a partner sync that creates lockers
+  (the daily one, the admin button, the resync an order for a locker the
+  table lacks runs) applies it again at once
+  (`apply_remembered_catalogues`), so a locker BOX NOW added is sized
+  before the next hourly run when the catalogue already lists it.
 - **A locker is withdrawn after N daily syncs without it**, not at the
   first absence: the partner list churns about 3% a day (62 rows left and
   48 joined in 14 hours, production 2026-11-21).

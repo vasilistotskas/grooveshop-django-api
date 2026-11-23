@@ -10,7 +10,7 @@ from extra_settings.models import Setting
 from measurement.measures import Distance
 
 from shipping.enum import ShippingKind
-from shipping.interfaces import PickupPointTooSmall
+from shipping.interfaces import PickupPointSizeUnknown, PickupPointTooSmall
 from shipping_boxnow.carrier import BoxNowCarrier
 from shipping_boxnow.factories import BoxNowLockerFactory
 
@@ -85,11 +85,14 @@ def test_a_locker_that_lists_the_size_fits_and_one_that_does_not_is_refused():
     carrier.assert_pickup_point_fits(
         {"boxnow_locker_id": "fit"}, items=medium_cart
     )
-    for locker_id in ("skip", "blank"):
-        with pytest.raises(PickupPointTooSmall):
-            carrier.assert_pickup_point_fits(
-                {"boxnow_locker_id": locker_id}, items=medium_cart
-            )
+    with pytest.raises(PickupPointTooSmall):
+        carrier.assert_pickup_point_fits(
+            {"boxnow_locker_id": "skip"}, items=medium_cart
+        )
+    with pytest.raises(PickupPointSizeUnknown):
+        carrier.assert_pickup_point_fits(
+            {"boxnow_locker_id": "blank"}, items=medium_cart
+        )
     # A locker the catalogue does not hold is the point resolution's refusal.
     carrier.assert_pickup_point_fits(
         {"boxnow_locker_id": "missing"}, items=medium_cart

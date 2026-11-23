@@ -18,6 +18,7 @@ from shipping.enum import ShippingKind
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import (
     PickupPointInAnotherCountry,
+    PickupPointSizeUnknown,
     PickupPointTooSmall,
     PickupPointUnknown,
     PostalAddress,
@@ -401,6 +402,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
             # by the point's own resolution (``PickupPointUnknown``).
             return
         size = resolve_compartment_size(items)
+        if not locker.compartment_sizes:
+            raise PickupPointSizeUnknown(
+                f"BOX NOW locker {location.get('boxnow_locker_id') or ''} "
+                "has no known compartment sizes."
+            )
         if int(size) not in locker.compartment_sizes:
             raise PickupPointTooSmall(
                 f"BOX NOW locker {location.get('boxnow_locker_id') or ''} "

@@ -63,7 +63,7 @@ from order.exceptions import (
     InvalidGiftCardError,
     InvalidOrderDataError,
     LoyaltyRedemptionError,
-    PickupPointTooSmallError,
+    PickupPointUnfitError,
     ShippingRefusedError,
     StockReservationError,
 )
@@ -1004,7 +1004,7 @@ class CartViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except PickupPointTooSmallError as exc:
+        except PickupPointUnfitError as exc:
             if not name_shipping_refusal:
                 return self._invalid_order_data(exc)
             # Before InvalidOrderDataError, which it subclasses: the client
@@ -1012,8 +1012,8 @@ class CartViewSet(BaseModelViewSet):
             return Response(
                 {
                     "detail": exc.message,
-                    "reason": "pickup_point_too_small",
-                    "code": "pickup_point_too_small",
+                    "reason": exc.code,
+                    "code": exc.code,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

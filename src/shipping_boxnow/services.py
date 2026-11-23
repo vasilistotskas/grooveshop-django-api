@@ -821,8 +821,12 @@ class BoxNowService:
         )
 
     @staticmethod
-    def report_cancel_refused(order_id: int, error: str) -> None:
-        """Tell staff that a canceled order's parcel was not canceled.
+    def report_cancel_refused(
+        order_id: int, error: str, *, refunded_in_full: bool = False
+    ) -> None:
+        """Tell staff that the parcel of an order that ships nothing (a
+        canceled one, or with ``refunded_in_full`` a PROCESSING order whose
+        payment all went back) was not canceled.
 
         The record ``OrderLifecycleService.cancel_attached_shipment`` leaves when
         the courier refuses an order's cancel: an ERROR line (the
@@ -833,8 +837,10 @@ class BoxNowService:
         from order.models.history import OrderHistory
         from order.models.order import Order
 
+        why = "refunded in full" if refunded_in_full else "canceled"
         logger.error(
-            "BoxNow did not cancel the parcel of canceled order %s: %s",
+            "BoxNow did not cancel the parcel of %s order %s: %s",
+            why,
             order_id,
             error,
             extra={"order_id": order_id, "carrier": "boxnow"},
@@ -844,7 +850,7 @@ class BoxNowService:
             OrderHistory.log_note(
                 order=order,
                 note=(
-                    "Order canceled, but BoxNow did not cancel its parcel "
+                    f"Order {why}, but BoxNow did not cancel its parcel "
                     f"or could not be asked: {error}. The parcel may still "
                     "be delivered; arrange its return with BoxNow."
                 ),
@@ -866,9 +872,11 @@ class BoxNowService:
         time, and no creation is in flight, BoxNow's answer is
         authoritative:
 
-        - a canceled order: its cancel is finished
-          (:meth:`_cancel_for_a_canceled_order`: a parcel BoxNow lists is
-          cancelled there, none is a local cancel). A refusal is reported
+        - an order that ships nothing (``Order.ships_nothing``: canceled,
+          or refunded in full): its shipment is cancelled
+          (:meth:`_cancel_unsent_shipment`: a parcel BoxNow lists is
+          cancelled there, none is a local cancel; staff are told of a
+          refund's). A refusal is reported
           to staff (:meth:`report_cancel_refused`) and ends the
           uncertainty, so it is reported once;
         - a live order: the parcel is looked up under the creation's own
@@ -929,20 +937,50 @@ class BoxNowService:
         )
         if shipment.has_parcel:
             return "canceled"
+        if not shipment.order.ships_nothing:
+            # A refund reversed since the decision (taken with no creation
+            # claim): the order ships again, and the next run settles it
+            # as a live order's creation.
+            return "not_due"
+        refunded_in_full = shipment.order.status != _CANCELED_ORDER_STATUS
         try:
             cls._cancel_unsent_shipment(
                 shipment,
                 reason=(
-                    "The order was canceled before its parcel was created."
-                    if shipment.order.status == _CANCELED_ORDER_STATUS
-                    else "The order's payment was refunded in full before "
+                    "The order's payment was refunded in full before "
                     "its parcel was created."
+                    if refunded_in_full
+                    else "The order was canceled before its parcel was created."
                 ),
             )
         except BoxNowCancelRefusedError as exc:
-            cls.report_cancel_refused(shipment.order_id, exc.message)
+            cls.report_cancel_refused(
+                shipment.order_id,
+                exc.message,
+                refunded_in_full=refunded_in_full,
+            )
             return "cancel_refused"
+        if refunded_in_full:
+            cls._note_shipment_canceled_for_a_refund(shipment.order)
         return "canceled"
+
+    @staticmethod
+    def _note_shipment_canceled_for_a_refund(order: Order) -> None:
+        """Tell staff the BOX NOW shipment of an order still PROCESSING was
+        canceled because its payment was refunded in full: a refund that
+        fails or is reversed makes the order payable again, and nothing
+        creates its parcel then but staff."""
+        from order.models.history import OrderHistory
+
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                "The BOX NOW shipment was canceled because the order's "
+                "payment was refunded in full. If the refund fails or is "
+                "reversed and the order is to ship, press “Create BoxNow "
+                "parcel now” on its BOX NOW shipment."
+            ),
+        )
 
     @classmethod
     def _settle_unless_canceled(cls, shipment_pk: int) -> tuple[bool, bool]:
@@ -1282,14 +1320,18 @@ class BoxNowService:
                 shipment.parcel_state == BoxNowParcelState.CANCELED
                 or order_canceled
             )
+            refunded_in_full = (
+                order_canceled
+                and shipment.order.status != _CANCELED_ORDER_STATUS
+            )
             if canceled_meanwhile:
                 logger.warning(
                     "create_shipment_for_order: shipment=%s (order=%s) or "
-                    "its order was canceled while BoxNow created "
-                    "parcel_id=%s — keeping the cancel and cancelling the "
-                    "parcel at BoxNow.",
+                    "its order was %s while BoxNow created parcel_id=%s — "
+                    "keeping the cancel and cancelling the parcel at BoxNow.",
                     shipment.pk,
                     order.id,
+                    "refunded in full" if refunded_in_full else "canceled",
                     parcel_id,
                 )
                 shipment.metadata = {
@@ -1312,9 +1354,16 @@ class BoxNowService:
                     # it, so no later creation treats the row as waiting.
                     cls._record_cancel(
                         shipment,
-                        reason="The order was canceled while BoxNow "
-                        "created its parcel.",
+                        reason=(
+                            "The order's payment was refunded in full while "
+                            "BoxNow created its parcel."
+                            if refunded_in_full
+                            else "The order was canceled while BoxNow "
+                            "created its parcel."
+                        ),
                     )
+                    if refunded_in_full:
+                        cls._note_shipment_canceled_for_a_refund(shipment.order)
 
             elif shipment.parcel_id:
                 logger.error(

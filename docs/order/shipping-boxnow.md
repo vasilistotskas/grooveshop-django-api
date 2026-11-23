@@ -212,10 +212,14 @@ and says which file holds each § number used here.
     payment refunded in full, which leaves it PROCESSING): its shipment is
     cancelled as a canceled order's creation would
     (`_cancel_unsent_shipment`): a parcel BoxNow lists is cancelled there
-    and recorded, none is a local cancel. A refusal is reported
+    and recorded, none is a local cancel. A refund's cancel leaves a staff
+    note on the order: a refund that fails or is reversed makes it payable
+    again, and only "Create BoxNow parcel now" creates its parcel then. An
+    order whose refund was reversed before the cancel is left for the next
+    run, which settles it as a live order's creation. A refusal is reported
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
     and ends the uncertainty wherever it is met, by the sweep or by the
-    creation task (`_cancel_for_a_canceled_order` ends it), so it is
+    creation task (`_cancel_unsent_shipment` ends it), so it is
     reported once;
   - a live order: under the creation's own claim, the order is looked up by
     `orderNumber`. One live `new` parcel created for this shipment's terms

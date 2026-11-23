@@ -1043,6 +1043,7 @@ class TestAParcelCreatedForAShipmentCanceledMeanwhile:
         self._assert_stays_canceled(shipment, order)
         [minted] = shipment.metadata["minted_after_cancel"]
         assert minted["canceled_at_boxnow"]
+        assert any("refunded in full" in note for note in _notes(order))
 
     def test_a_parcel_boxnow_will_not_cancel_is_recorded_for_ops(self, http):
         order = _paid_order()
@@ -1393,6 +1394,35 @@ class TestTheSweepSettlesUncertainCreations:
         assert shipment.metadata["creation_uncertain_at"] is None
         order.refresh_from_db()
         assert not order.tracking_number
+        assert any("refunded in full" in note for note in _notes(order))
+
+    def test_a_refund_reversed_before_the_cancel_leaves_it_to_the_next_run(
+        self, http
+    ):
+        """The sweep decided on a refund in full; the refund came back
+        before the cancel: nothing is cancelled, the order ships."""
+        order = _refunded_in_full_order()
+        shipment = _settled(order)
+        real = BoxNowService._settle_for_an_order_that_ships_nothing.__func__
+
+        def reversed_first(cls, shipment):
+            type(order).objects.filter(pk=order.pk).update(
+                payment_status=PaymentStatus.COMPLETED
+            )
+            return real(cls, shipment)
+
+        with patch.object(
+            BoxNowService,
+            "_settle_for_an_order_that_ships_nothing",
+            classmethod(reversed_first),
+        ):
+            outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "not_due"
+        assert http.routes() == []
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+        assert shipment.metadata["creation_uncertain_at"]
 
     def test_a_parcel_taken_over_by_the_settle_gets_its_receipt(
         self, http, django_capture_on_commit_callbacks

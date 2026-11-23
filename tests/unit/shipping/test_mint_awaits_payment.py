@@ -422,6 +422,42 @@ class TestAnOrderThatShipsNothingGetsNoShipment:
 
         client.return_value.create_voucher.assert_not_called()
 
+    def test_acs_refuses_before_it_needs_the_stores_credentials(self):
+        """No ACS credentials are bound here: an order that ships nothing
+        is refused as such, not as a store missing its configuration."""
+        from shipping.exceptions import ShipmentNotNeededError
+        from shipping_acs.services import AcsService
+
+        order = _card_order(OrderStatus.CANCELED, PaymentStatus.REFUNDED)
+        AcsShipmentFactory(order=order)
+
+        with pytest.raises(ShipmentNotNeededError):
+            AcsService.create_voucher_for_order(order)
+
+    def test_no_movement_receipt_for_an_order_paid_back_in_full(self):
+        """A voucher held for an order refunded in full is not to leave, so
+        it issues no receipt with movement indication (CodeRabbit on
+        #798)."""
+        from order.accounting.invoicing import receipt_issuable
+        from order.enum.document_type import OrderDocumentTypeEnum
+
+        order = _card_order(OrderStatus.PROCESSING, PaymentStatus.REFUNDED)
+        order.document_type = OrderDocumentTypeEnum.RECEIPT.value
+
+        with (
+            patch(
+                "order.accounting.invoicing.movement_receipts_on",
+                return_value=True,
+            ),
+            patch(
+                "shipping.services.ShippingService.carrier_holds_the_parcel",
+                return_value=True,
+            ),
+        ):
+            assert receipt_issuable(order) is False
+            order.payment_status = PaymentStatus.COMPLETED
+            assert receipt_issuable(order) is True
+
     def test_a_retry_after_a_cancel_in_its_backoff_mints_nothing(
         self, acs_configured_tenant
     ):

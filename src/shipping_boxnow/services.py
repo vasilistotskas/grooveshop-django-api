@@ -737,9 +737,23 @@ class BoxNowService:
             or shipment.has_parcel
         ):
             return None
+        return cls._cancel_unsent_shipment(
+            shipment,
+            reason="The order was canceled before its parcel was created.",
+        )
+
+    @classmethod
+    def _cancel_unsent_shipment(
+        cls, shipment: BoxNowShipment, *, reason: str
+    ) -> BoxNowShipment:
+        """Cancel a shipment that has no parcel saved, whose order ships
+        nothing: a parcel BoxNow lists is cancelled there, none is a local
+        cancel (:meth:`cancel_shipment`). See
+        :meth:`_cancel_for_a_canceled_order` for what it raises."""
+        order = shipment.order
         if shipment.parcel_state != BoxNowParcelState.CANCELED:
             logger.info(
-                "create_shipment_for_order: order=%s is canceled — "
+                "create_shipment_for_order: order=%s ships nothing — "
                 "cancelling its shipment instead of creating a parcel",
                 order.id,
                 extra={
@@ -749,12 +763,7 @@ class BoxNowService:
                 },
             )
             try:
-                cls.cancel_shipment(
-                    shipment,
-                    reason=(
-                        "The order was canceled before its parcel was created."
-                    ),
-                )
+                cls.cancel_shipment(shipment, reason=reason)
             except BoxNowRetryableError, BoxNowAuthError:
                 # No answer, or the store's credentials refused: nothing
                 # was said about the parcel, so the uncertainty stays and
@@ -891,7 +900,10 @@ class BoxNowService:
                 or cls._creation_in_flight(metadata) is not None
             ):
                 return "not_due"
-            order_canceled = shipment.order.status == _CANCELED_ORDER_STATUS
+            # Canceled, or its payment all went back (a full refund leaves
+            # the order PROCESSING): BoxNow may hold its parcel, which
+            # must not leave, so it is cancelled like a canceled order's.
+            order_canceled = shipment.order.ships_nothing
             if not order_canceled:
                 # The creation's own claim: no creation runs while BoxNow
                 # is asked, and a cancel waits for it.
@@ -902,14 +914,31 @@ class BoxNowService:
                 shipment.save(update_fields=["metadata", "updated_at"])
 
         if order_canceled:
-            return cls._settle_for_a_canceled_order(shipment)
+            return cls._settle_for_an_order_that_ships_nothing(shipment)
         return cls._settle_for_a_live_order(shipment)
 
     @classmethod
-    def _settle_for_a_canceled_order(cls, shipment: BoxNowShipment) -> str:
-        """The canceled-order half of :meth:`settle_uncertain_creation`."""
+    def _settle_for_an_order_that_ships_nothing(
+        cls, shipment: BoxNowShipment
+    ) -> str:
+        """The half of :meth:`settle_uncertain_creation` for an order that
+        ships nothing (``Order.ships_nothing``: canceled, or refunded in
+        full)."""
+        shipment = BoxNowShipment.objects.select_related("order").get(
+            pk=shipment.pk
+        )
+        if shipment.has_parcel:
+            return "canceled"
         try:
-            cls._cancel_for_a_canceled_order(shipment.order)
+            cls._cancel_unsent_shipment(
+                shipment,
+                reason=(
+                    "The order was canceled before its parcel was created."
+                    if shipment.order.status == _CANCELED_ORDER_STATUS
+                    else "The order's payment was refunded in full before "
+                    "its parcel was created."
+                ),
+            )
         except BoxNowCancelRefusedError as exc:
             cls.report_cancel_refused(shipment.order_id, exc.message)
             return "cancel_refused"
@@ -932,7 +961,7 @@ class BoxNowService:
                 BoxNowShipment.objects.filter(pk=shipment_pk)
             )
             metadata = shipment.metadata or {}
-            if shipment.order.status == _CANCELED_ORDER_STATUS:
+            if shipment.order.ships_nothing:
                 shipment.metadata = {**metadata, "mint_started_at": None}
                 shipment.save(update_fields=["metadata", "updated_at"])
                 return True, False
@@ -1013,7 +1042,7 @@ class BoxNowService:
         canceled, told = cls._settle_unless_canceled(shipment.pk)
         if canceled:
             shipment.refresh_from_db()
-            return cls._settle_for_a_canceled_order(shipment)
+            return cls._settle_for_an_order_that_ships_nothing(shipment)
 
         match live:
             case []:
@@ -1247,7 +1276,8 @@ class BoxNowService:
             # The order row is locked first (lock_with_order), so an
             # order cancel still in its transaction is waited for and then
             # seen.
-            order_canceled = shipment.order.status == _CANCELED_ORDER_STATUS
+            # Canceled, or refunded in full, meanwhile (Order.ships_nothing).
+            order_canceled = shipment.order.ships_nothing
             canceled_meanwhile = (
                 shipment.parcel_state == BoxNowParcelState.CANCELED
                 or order_canceled

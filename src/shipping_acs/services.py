@@ -517,7 +517,6 @@ class AcsService:
         outcome does to the hold is the table in
         ``shipping_acs.voucher_hold``.
         """
-        client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
         with transaction.atomic():
             try:
@@ -569,6 +568,12 @@ class AcsService:
                     else "Held voucher request: order awaits payment",
                 )
             else:
+                # Only an order that is sent needs the store's ACS
+                # credentials (``AcsConfigError``): one that ships nothing
+                # or awaits payment is refused above whatever they are.
+                # Nothing is written before this, so a failure leaves no
+                # claim.
+                client = AcsClient()
                 # A voucher request whose answer was lost: ACS may hold a
                 # voucher for this order, and ``ACS_Create_Voucher`` has no
                 # idempotency key, so nothing sends another one until staff

@@ -125,8 +125,10 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   (`src/devtools/anonymise/rules.py`, `order.Invoice`), like the receipt's
   `buyer_snapshot`.
 - **When it is issued.** The order is issuable before it ships
-  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, and the
-  carrier holds the parcel, `ShippingService.carrier_holds_the_parcel`:
+  (`receipt_issuable`: PENDING or PROCESSING, nothing owed online, the
+  order still ships (not `Order.ships_nothing`: a full refund leaves it
+  PROCESSING with a voucher that is not to leave), and the carrier holds
+  the parcel, `ShippingService.carrier_holds_the_parcel`:
   ACS's voucher, BOX NOW's parcel; neither the shipment row checkout
   writes nor a tracking number staff type on the order is one). Every
   path that makes a shipment live records it through `Order.add_tracking_info`

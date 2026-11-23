@@ -191,8 +191,9 @@ and says which file holds each § number used here.
   (`_cancel_for_a_canceled_order`), which cancels a parcel BoxNow lists,
   refuses with a `BoxNowBusyError` while the creation settles (the task
   retries) and cancels locally once the lookup is authoritative or when no
-  creation was sent. In phase 3, `_persist_parcel` treats an order canceled
-  meanwhile like a shipment canceled meanwhile: the row is recorded
+  creation was sent. In phase 3, `_persist_parcel` treats an order that
+  stopped shipping meanwhile (`Order.ships_nothing`: canceled, or its
+  payment refunded in full) like a shipment canceled meanwhile: the row is recorded
   CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
   cancelled at BoxNow. It locks the order row first
   (`shipping.locks.lock_with_order`), so an order cancel still in its
@@ -207,9 +208,11 @@ and says which file holds each § number used here.
   `BoxNowService.settle_uncertain_creation` for each shipment with no
   parcel whose `creation_uncertain_at` is older than the settle time and
   whose creation is not in flight:
-  - a canceled order: its cancel is finished as the creation would
-    (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
-    there and recorded, none is a local cancel. A refusal is reported
+  - an order that ships nothing (`Order.ships_nothing`: canceled, or its
+    payment refunded in full, which leaves it PROCESSING): its shipment is
+    cancelled as a canceled order's creation would
+    (`_cancel_unsent_shipment`): a parcel BoxNow lists is cancelled there
+    and recorded, none is a local cancel. A refusal is reported
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
     and ends the uncertainty wherever it is met, by the sweep or by the
     creation task (`_cancel_for_a_canceled_order` ends it), so it is

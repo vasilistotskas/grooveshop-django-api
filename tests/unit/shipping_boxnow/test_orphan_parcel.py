@@ -1016,6 +1016,34 @@ class TestAParcelCreatedForAShipmentCanceledMeanwhile:
         assert minted["canceled_at_boxnow"]
         assert "orphan_delivery_requests" not in shipment.metadata
 
+    def test_a_refund_in_full_meanwhile_cancels_the_parcel_at_boxnow(
+        self, http
+    ):
+        order = _paid_order()
+        from pay_way.factories import PayWayFactory
+
+        type(order).objects.filter(pk=order.pk).update(
+            pay_way=PayWayFactory.create_online_payment()
+        )
+        order.refresh_from_db()
+        shipment = _pending_shipment(order)
+
+        def refunded_while_boxnow_answers():
+            type(order).objects.filter(pk=order.pk).update(
+                payment_status=PaymentStatus.REFUNDED
+            )
+            return _response(200, self._CREATED)
+
+        http.answer(_CREATE, refunded_while_boxnow_answers)
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        BoxNowService.create_shipment_for_order(order)
+
+        assert http.routes() == [_CREATE, _cancel("9219709201")]
+        self._assert_stays_canceled(shipment, order)
+        [minted] = shipment.metadata["minted_after_cancel"]
+        assert minted["canceled_at_boxnow"]
+
     def test_a_parcel_boxnow_will_not_cancel_is_recorded_for_ops(self, http):
         order = _paid_order()
         shipment = _pending_shipment(order)
@@ -1274,6 +1302,21 @@ def _canceled_order():
     return order
 
 
+def _refunded_in_full_order():
+    """A card order whose payment all went back while it is PROCESSING:
+    it ships nothing (``Order.ships_nothing``)."""
+    from pay_way.factories import PayWayFactory
+
+    order = _paid_order(pay_way=PayWayFactory.create_online_payment())
+    type(order).objects.filter(pk=order.pk).update(
+        payment_status=PaymentStatus.REFUNDED
+    )
+    order.refresh_from_db()
+    assert order.status == OrderStatus.PROCESSING
+    assert order.ships_nothing
+    return order
+
+
 def _notes(order) -> list[str]:
     return [
         row.new_value["note"]
@@ -1331,6 +1374,25 @@ class TestTheSweepSettlesUncertainCreations:
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
         assert shipment.parcel_id == "9219709201"
+
+    def test_an_order_refunded_in_full_has_its_parcel_canceled(self, http):
+        """Refunded in full while the creation's outcome was unknown: the
+        order stays PROCESSING, and the parcel BoxNow holds must not leave
+        (CodeRabbit on #798)."""
+        order = _refunded_in_full_order()
+        shipment = _settled(order)
+        http.answer(_LOOKUP, _lookup(_parcel("9219709201", "new")))
+        http.answer(_cancel("9219709201"), _response(200, {}))
+
+        outcome = BoxNowService.settle_uncertain_creation(shipment.pk)
+
+        assert outcome == "canceled"
+        assert http.routes() == [*_LOOKUPS, _cancel("9219709201")]
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.metadata["creation_uncertain_at"] is None
+        order.refresh_from_db()
+        assert not order.tracking_number
 
     def test_a_parcel_taken_over_by_the_settle_gets_its_receipt(
         self, http, django_capture_on_commit_callbacks

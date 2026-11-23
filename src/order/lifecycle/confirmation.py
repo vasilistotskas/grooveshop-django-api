@@ -10,8 +10,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import CHARGED_PAYMENT_STATUSES, PaymentStatus
 from pay_way.enum.settlement import PaySettlement
 
@@ -46,24 +47,46 @@ def paid_online(order: Order) -> bool:
     )
 
 
-def backfill_confirmed_at(apps: Apps, *, created_before: datetime) -> int:
-    """Stamp ``confirmed_at = created_at`` on every order created before
-    *created_before* without one that is not an online order never paid,
-    and say how many. Those were confirmed under the release that had no
-    column: an offline order at creation, an online one by its payment.
-    *created_before* is when the release that confirms orders finished
-    rolling out: every order created since is confirmed by that release,
-    and stamping one would silence its announcement. Idempotent; it tells
-    no one.
+def backfill_confirmed_at(apps: Apps, *, rollout_finished_at: datetime) -> int:
+    """Stamp ``confirmed_at = created_at`` on the orders without one that
+    the previous release, which had no column, announced or settled before
+    *rollout_finished_at* (when the release that confirms orders finished
+    rolling out), and say how many:
+
+    - an order with nothing to pay online (``due_for_confirmation``'s
+      offline kinds) created before then: it was announced as it was
+      placed;
+    - an online order paid (``CHARGED_PAYMENT_STATUSES``) whose payment
+      the ledger booked before then: a CHARGE ``PaymentTransaction``
+      with ``created_at`` before *rollout_finished_at*. The order has no
+      paid-at of its own, and that row is the moment its payment was
+      recorded by a webhook, a checkout session or a read-back.
+
+    An online order whose payment is recorded since, whenever it was
+    placed, is the new release's to confirm (on its payment, or on the next
+    sight of it), and stamping it would silence its announcement.
+    Idempotent; it tells no one.
     """
-    never_paid_online = Q(pay_way__settlement=PaySettlement.ONLINE) & ~Q(
-        payment_status__in=CHARGED_PAYMENT_STATUSES
+    offline = Q(pay_way__isnull=True) | ~Q(
+        pay_way__settlement=PaySettlement.ONLINE
+    )
+    booked_before = Exists(
+        apps.get_model("order", "PaymentTransaction").objects.filter(
+            order=OuterRef("pk"),
+            kind=PaymentTransactionKind.CHARGE,
+            created_at__lt=rollout_finished_at,
+        )
     )
     return (
         apps.get_model("order", "Order")
-        .objects.filter(
-            confirmed_at__isnull=True, created_at__lt=created_before
+        .objects.filter(confirmed_at__isnull=True)
+        .filter(
+            (offline & Q(created_at__lt=rollout_finished_at))
+            | (
+                Q(pay_way__settlement=PaySettlement.ONLINE)
+                & Q(payment_status__in=CHARGED_PAYMENT_STATUSES)
+                & booked_before
+            )
         )
-        .exclude(never_paid_online)
         .update(confirmed_at=F("created_at"))
     )

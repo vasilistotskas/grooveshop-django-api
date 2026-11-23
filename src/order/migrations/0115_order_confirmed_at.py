@@ -4,10 +4,12 @@ told about it (``OrderLifecycleService.confirm``).
 Additive: a nullable column the serving release does not know. Every order
 the previous releases confirmed (an offline order at creation, an online
 one when its payment went through) is stamped with its ``created_at``; an
-online order never paid stays empty. Orders that release creates or settles
-while this one rolls out are stamped afterwards by
-``manage.py backfill_confirmed_at`` (``order.lifecycle.confirmation``), the
-same rule (idempotent).
+online order never paid stays empty. It runs before the new release
+serves anything, so every order it stamps was announced by the previous
+one. Those the previous release announces while the new one rolls out are
+stamped afterwards by ``manage.py backfill_confirmed_at``
+(``order.lifecycle.confirmation``): offline orders placed and online
+payments booked before the rollout finished.
 """
 
 from django.db import migrations, models

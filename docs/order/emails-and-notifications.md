@@ -54,10 +54,14 @@ its stock and reservations are released as for any cancel. The history note
 outbox still follow creation. A payment that lands after the cancel still
 pages staff (`record_payment_after_cancel`), and `confirm` never announces a
 canceled order, whichever path reports the payment. Orders confirmed before the
-column existed carry `created_at` (migration `order` 0115); orders the
-previous release created during a rollout are stamped by
-`manage.py backfill_confirmed_at --created-before <when the rollout finished>`,
-run once after it: every order created since is the new release's to confirm.
+column existed carry `created_at` (migration `order` 0115). The orders the
+previous release announced during a rollout are stamped by
+`manage.py backfill_confirmed_at --rollout-finished-at <when the rollout finished>`,
+run once after it: offline orders placed before then, and online orders whose
+payment the ledger booked before then (a CHARGE `PaymentTransaction` with
+`created_at` before it; the order has no paid-at of its own). An online order
+whose payment is recorded since, whenever it was placed, is the new release's
+to confirm, so the backfill never silences its announcement.
 
 Every customer email is sent through `emails.send.send_email` and carries
 the transactional `List-ID` and `List-Unsubscribe: mailto:` headers

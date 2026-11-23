@@ -17,15 +17,19 @@ from datetime import timedelta
 from unittest.mock import Mock, patch
 
 import pytest
+from django.apps import apps
 from django.db import transaction
 from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
+from order.lifecycle.confirmation import backfill_confirmed_at
 from order.lifecycle.service import OrderLifecycleService
 from order.models.order import Order
+from order.models.payment_transaction import PaymentTransaction
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payments import payment_hold
+from order.payments.payment_ledger import PaymentLedger
 from order.payments.stripe_settlement import settle_checkout_session
 from order.payments.viva_settlement import (
     VIVA_TRANSACTION_PAYMENT_CREATED,
@@ -473,47 +477,88 @@ class TestCancelOfAnUnconfirmedOrder:
         assert _calls(published, "status_email") == 1
 
 
+def _book_charge(order, *, at):
+    """The ledger's CHARGE row for *order*'s payment, booked at *at*."""
+    row, _ = PaymentLedger.record_charge(
+        order,
+        amount=order.calculate_order_total_amount(),
+        provider="stripe",
+        reference=f"pi_{order.pk}",
+    )
+    PaymentTransaction.objects.filter(pk=row.pk).update(created_at=at)
+
+
 class TestTheBackfill:
-    """``backfill_confirmed_at`` stamps orders the previous release
-    confirmed without the column, and only those created before the
-    rollout finished: an order the new release creates is confirmed by the
-    new release, and stamping it would silence its announcement."""
+    """``backfill_confirmed_at`` stamps only orders the previous release
+    announced or settled before the rollout finished: an offline order
+    created before then (announced as it was placed), and an online order
+    whose payment the ledger booked before then. An online order paid
+    since is the new release's to confirm, and stamping it would silence
+    its announcement."""
 
-    def test_only_orders_created_before_the_cutoff_are_stamped(self):
-        from django.apps import apps
+    def test_it_stamps_only_what_the_previous_release_settled(self):
+        cutoff = timezone.now() - timedelta(minutes=1)
+        before = cutoff - timedelta(minutes=5)
+        after = cutoff + timedelta(seconds=30)
 
-        from order.lifecycle.confirmation import backfill_confirmed_at
-
-        cutoff = timezone.now()
-        old_paid = _order(
+        offline_before = _order(PayWayFactory.create_offline_payment())
+        offline_after = _order(PayWayFactory.create_offline_payment())
+        paid_before = _order(
             PayWayFactory.create_online_payment("stripe"),
             payment_status=PaymentStatus.COMPLETED,
         )
-        old_unpaid = _order(PayWayFactory.create_online_payment("stripe"))
-        new_paid = _order(
+        paid_after = _order(
             PayWayFactory.create_online_payment("stripe"),
             payment_status=PaymentStatus.COMPLETED,
         )
-        Order.objects.filter(pk__in=[old_paid.pk, old_unpaid.pk]).update(
-            created_at=cutoff - timedelta(minutes=5)
+        paid_unbooked = _order(
+            PayWayFactory.create_online_payment("stripe"),
+            payment_status=PaymentStatus.COMPLETED,
         )
-        Order.objects.filter(pk=new_paid.pk).update(
-            created_at=cutoff + timedelta(seconds=1)
-        )
-        Order.objects.update(confirmed_at=None)
+        unpaid = _order(PayWayFactory.create_online_payment("stripe"))
+        for order, booked_at in ((paid_before, before), (paid_after, after)):
+            _book_charge(order, at=booked_at)
+        Order.objects.update(created_at=before, confirmed_at=None)
+        Order.objects.filter(pk=offline_after.pk).update(created_at=after)
 
-        assert backfill_confirmed_at(apps, created_before=cutoff) == 1
+        assert backfill_confirmed_at(apps, rollout_finished_at=cutoff) == 2
 
         stamped = set(
             Order.objects.filter(confirmed_at__isnull=False).values_list(
                 "pk", flat=True
             )
         )
-        assert stamped == {old_paid.pk}
+        assert stamped == {offline_before.pk, paid_before.pk}
+        assert {paid_after.pk, paid_unbooked.pk, unpaid.pk}.isdisjoint(stamped)
+
+    @pytest.mark.parametrize(
+        "booked", [False, True], ids=["taken-at-once", "booked-by-webhook"]
+    )
+    def test_a_payment_recorded_after_the_rollout_is_still_announced(
+        self, published, booked
+    ):
+        """CodeRabbit's sequence on #816: the new release places a card
+        order during the rollout, its payment is recorded after it, and
+        the backfill runs before the confirmation does."""
+        cutoff = timezone.now() - timedelta(minutes=1)
+        order = _created(_order(PayWayFactory.create_online_payment("stripe")))
+        Order.objects.filter(pk=order.pk).update(
+            created_at=cutoff - timedelta(minutes=5)
+        )
+
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED, payment_id="pi_rollout"
+        )
+        if booked:
+            _book_charge(order, at=timezone.now())
+        assert backfill_confirmed_at(apps, rollout_finished_at=cutoff) == 0
+        assert OrderLifecycleService.confirm(Order.objects.get(pk=order.pk))
+
+        _assert_told_once(published, order)
 
     @pytest.mark.parametrize(
         "args",
-        [[], ["--created-before", "2026-11-23T05:00:00"]],
+        [[], ["--rollout-finished-at", "2026-11-23T05:00:00"]],
         ids=["missing", "no-offset"],
     )
     def test_the_command_needs_an_aware_cutoff(self, args):

@@ -4,10 +4,10 @@ Run it once per store after the release that adds the column has fully
 rolled out, with ``--rollout-finished-at`` set to the moment the rollout
 finished: the previous release kept creating and settling orders on the
 migrated schema without writing it. It stamps the offline orders placed
-before then and the online orders whose payment was booked before then
-(``order.lifecycle.confirmation.backfill_confirmed_at``); an online order
-paid since is the new release's to confirm. Idempotent, and it tells no
-one: those orders' emails went out already.
+before then and the online orders whose confirmation email went out
+(``order.lifecycle.confirmation.backfill_confirmed_at``); any other online
+order is the new release's to confirm. Idempotent, and it tells no one:
+those orders' emails went out already.
 """
 
 from __future__ import annotations
@@ -38,7 +38,8 @@ class Command(TenantCommandMixin, BaseCommand):
             help=(
                 "ISO 8601 time with its offset: when the release that "
                 "confirms orders finished rolling out. Offline orders "
-                "placed and online payments booked before it are stamped."
+                "placed before it are stamped, and online orders whose "
+                "confirmation email went out."
             ),
         )
 

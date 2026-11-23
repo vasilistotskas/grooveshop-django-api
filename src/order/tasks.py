@@ -40,6 +40,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import PaymentStatusUnavailableError
+from order.lifecycle.confirmation import CONFIRMATION_EMAIL_SENT_AT_KEY
 from order.lifecycle.service import (
     SHIPMENT_CANCEL_PENDING_FLAG,
     OrderLifecycleService,
@@ -87,7 +88,6 @@ logger = logging.getLogger(__name__)
 #   New: lock acquired → worker killed → lock expires in 60 s →
 #         next retry claims lock → send succeeds → DB flag written.
 # ──────────────────────────────────────────────────────────────
-CONFIRMATION_EMAIL_SENT_AT_KEY = "confirmation_email_sent_at"
 CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
 # TTL for the execution lock. Long enough for a slow SMTP send; short
 # enough that a dead worker's lock expires quickly so a retry can proceed.

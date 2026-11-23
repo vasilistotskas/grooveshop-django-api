@@ -288,13 +288,15 @@ move to `failed` later, the money returning to the merchant's Stripe balance,
 and the merchant must pay the customer another way: docs.stripe.com/refunds).
 
 - The ledger counted the refund when it was accepted, so the handler writes ONE
-  `REFUND_REVERSAL` row (`PaymentLedger.record_refund_reversal`) keyed on the
+  `REFUND_REVERSAL` row (`RefundService.book_refund_reversal`, writing it
+  through `PaymentLedger.record_refund_reversal`) keyed on the
   refund id: the three event types and redeliveries book it once. It is capped
   at what the ledger holds as refunded on that charge, and a refund the ledger
   never counted (nothing to reverse) is logged and ignored. The refund row it
   reverses is found by the same refund id (`handle_stripe_refund_made` books
   under it), so the credit it would have owed is freed
-  (`credit_allocation.free_reversed`).
+  (`credit_allocation.free_reversed`) and the overcharge flag re-derived, both
+  in `book_refund_reversal`.
 - `refunded`, `refunded_on`, `balances` and `left_on` subtract a reversal, so
   the money is refundable again, and `refund_status` derives `payment_status`
   again (COMPLETED when every refund was reversed, PARTIALLY_REFUNDED when some

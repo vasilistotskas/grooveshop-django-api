@@ -53,6 +53,7 @@ from order.payments.payment_ledger import (
     PaymentLedger,
 )
 from order.payments.stripe_settlement import settle_paid_checkout_session
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -1207,7 +1208,7 @@ def handle_stripe_refund_made(sender, **kwargs):
     cannot disagree. A refund this app made is already
     in the ledger under the same id, so its event adds nothing, and so
     does a redelivery. One nobody claimed settles the PENDING attempt that
-    matches it (``PaymentLedger.record_refund``).
+    matches it (``RefundService.book_refund``).
 
     ``Order.status`` is intentionally NOT changed: deciding whether a
     refund means the goods came back is a business call.
@@ -1280,7 +1281,7 @@ def handle_stripe_refund_made(sender, **kwargs):
                 if key
                 else None
             )
-            refund_row, created = PaymentLedger.record_refund(
+            refund_row, created = RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=refunded,
@@ -1383,7 +1384,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
 
             previous_payment_status = order.payment_status
             try:
-                _row, created = PaymentLedger.record_refund_reversal(
+                _row, created = RefundService.book_refund_reversal(
                     order,
                     charge=charge,
                     amount=failed,

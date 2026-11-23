@@ -27,6 +27,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory, RefundNotification
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.signals import order_charged_back
 from order.signals.handlers import (
     handle_stripe_dispute_closed,
@@ -280,7 +281,7 @@ class TestDisputeClosedOtherwise:
 
 class TestChargebackIsCappedAtWhatIsLeft:
     def _refund(self, order, charge, amount):
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal(amount), "EUR"),
@@ -362,7 +363,7 @@ class TestChargebackAmongRefunds:
         self, refunded_signals
     ):
         order, charge = _paid_order()
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal("10.00"), "EUR"),
@@ -412,7 +413,7 @@ class TestLoyaltyReversal:
 
     def test_refund_and_chargeback_together_cover_it(self, queued):
         order, charge = self._order_with_customer()
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal("10.00"), "EUR"),
@@ -450,7 +451,7 @@ class TestLoyaltyReversal:
         _close(_event("evt_loy_4", amount=2000))
         queued.assert_not_called()
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal("30.00"), "EUR"),

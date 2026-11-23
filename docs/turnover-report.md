@@ -118,7 +118,7 @@ credit document and takes no room on the receipt (`order.accounting.credit_alloc
 or booked and never scaled afterwards, capped to what the refund really moved
 (`order.reporting.turnover._ledger_goods`). A refund with no allocation at all (not decided
 yet, or older than allocations) counts whole. A provider reversal takes the
-duplicate part back first and then the goods, as `credit_allocation.goods_returned`
+duplicate part back first and then the goods, as `PaymentLedger.goods_returned`
 does: after reversing `c` the refund stands for `max(min(goods, paid - c), 0)`, and
 the reversal row counts the drop, in its own month. A reversal with no refund row
 counts whole.

@@ -23,7 +23,6 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory, PaymentTransaction, RefundNotification
-from order.payments.payment_ledger import PaymentLedger
 from order.refunds.service import RefundService
 from order.tasks import _claim_refund_email, send_refund_confirmation_email
 from pay_way.factories import PayWayFactory
@@ -45,7 +44,7 @@ def _order(**kwargs):
 
 
 def _refund(order, amount, reference) -> PaymentTransaction:
-    row, _created = PaymentLedger.record_refund(
+    row, _created = RefundService.book_refund(
         order,
         charge=order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE

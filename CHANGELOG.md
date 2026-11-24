@@ -3,6 +3,20 @@
 
 
 
+## v3.270.3 (2026-11-24)
+
+### Refactoring
+
+* refactor(shipping): routes, fan-outs and demo shipments come from the carrier apps (#830)
+
+core.urls mounts shipping.webhook_urls and shipping.urls, which include
+every registered carrier's webhook_urlconf and api_urlconf, so the root
+URL conf names no carrier. Each carrier's beat fan-outs live in its own
+tasks.py under the tenant.tasks names beat and queued messages address.
+The demo seed asks the order's carrier for its demo shipment
+(create_demo_shipment): shipping.demo holds the shared row and timing,
+shipping_acs.demo and shipping_boxnow.demo what each carrier writes. ([`bd2969f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd2969f8f9fed9db6cc6b1f17c2e03c2cfc295f8))
+
 ## v3.270.2 (2026-11-24)
 
 ### Chores

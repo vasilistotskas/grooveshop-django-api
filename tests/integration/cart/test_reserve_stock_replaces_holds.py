@@ -10,7 +10,6 @@ replaces the cart's holds, whatever products they were on.
 
 import threading
 from datetime import timedelta
-from unittest.mock import Mock, patch
 
 import pytest
 from django.db import OperationalError, connection, transaction
@@ -25,11 +24,11 @@ from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart
 from cart.services import CartService
 from country.factories import CountryFactory
-from order.enum.status import PaymentStatus
 from order.exceptions import CartStockUnavailableError
 from order.inventory.stock import StockManager
 from order.models import StockLog, StockReservation
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.checkout import priced
@@ -219,7 +218,6 @@ class TestCompetingCarts:
         assert StockManager.get_available_stock(product.id) == 1
 
 
-@pytest.mark.usefixtures("trust_intent_binding")
 class TestOrderCreationAfterReReserve:
     @pytest.fixture
     def country(self):
@@ -234,33 +232,30 @@ class TestOrderCreationAfterReReserve:
         first_ids = _reserve(client).data["reservation_ids"]
         current_ids = _reserve(client).data["reservation_ids"]
 
-        with patch("order.payments.payment.get_payment_provider") as provider:
-            provider.return_value = Mock(
-                get_payment_status=Mock(
-                    return_value=(PaymentStatus.COMPLETED, {"status": "ok"})
-                )
+        order = OrderService.create_order_from_cart(
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address={
+                    "first_name": "Test",
+                    "last_name": "User",
+                    "email": "test@example.com",
+                    "street": "123 Test St",
+                    "street_number": "1",
+                    "city": "Test City",
+                    "zipcode": "12345",
+                    "country_id": country.alpha_2,
+                    "phone": "+1234567890",
+                    "shipping_kind": "home_delivery",
+                },
+                pay_way=PayWayFactory(
+                    provider_code="stripe",
+                    settlement=PaySettlement.ONLINE,
+                    active=True,
+                ),
+                user=user,
             )
-            order = OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=cart,
-                    shipping_address={
-                        "first_name": "Test",
-                        "last_name": "User",
-                        "email": "test@example.com",
-                        "street": "123 Test St",
-                        "street_number": "1",
-                        "city": "Test City",
-                        "zipcode": "12345",
-                        "country_id": country.alpha_2,
-                        "phone": "+1234567890",
-                        "shipping_kind": "home_delivery",
-                    },
-                    payment_intent_id="pi_replace_holds",
-                    pay_way=PayWayFactory(provider_code="stripe"),
-                    user=user,
-                )
-            )
+        )
 
         assert order.metadata["stock_reservation_ids"] == current_ids
         linked = StockReservation.objects.filter(order=order)

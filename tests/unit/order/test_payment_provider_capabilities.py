@@ -104,12 +104,12 @@ class TestWhatEachProviderCanDo:
         assert StripePaymentProvider.supports_delegated_payment
 
     def test_viva_is_hosted_redirect_only(self):
-        """Its ``process_payment`` delegates straight to
-        ``create_checkout_session`` — there is no intent to confirm, so
-        a Viva order is created BEFORE any money moves."""
+        """A hosted checkout session alone: there is no intent to
+        confirm, so Viva implements no ``process_payment``."""
         assert not VivaWalletPaymentProvider.supports_payment_intent
         assert VivaWalletPaymentProvider.supports_hosted_checkout
         assert not VivaWalletPaymentProvider.supports_delegated_payment
+        assert not hasattr(VivaWalletPaymentProvider, "process_payment")
 
     def test_a_provider_declaring_delegated_payment_implements_it(self):
         for code in registered_provider_codes():
@@ -119,6 +119,16 @@ class TestWhatEachProviderCanDo:
                     f"{code} declares supports_delegated_payment but has no "
                     "confirm_delegated_payment"
                 )
+
+    def test_a_provider_declaring_payment_intents_implements_them(self):
+        """The gift-card purchase calls ``process_payment`` on any
+        provider that declares ``supports_payment_intent``, and on no
+        other."""
+        for code in registered_provider_codes():
+            provider_class = get_payment_provider_class(code)
+            assert provider_class.supports_payment_intent == hasattr(
+                provider_class, "process_payment"
+            ), f"{code}: supports_payment_intent and process_payment disagree"
 
     def test_every_provider_can_do_at_least_one_flow(self):
         """A registered PSP that can do neither is unreachable — it
@@ -172,7 +182,6 @@ class TestProvidersOwnTheirShape:
         class _Bare(PaymentProvider):
             code = "bare"
 
-            def process_payment(self, amount, order_id, **kwargs): ...
             def refund_payment(
                 self, payment_id, amount, *, idempotency_key
             ): ...

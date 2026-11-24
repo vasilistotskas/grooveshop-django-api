@@ -84,7 +84,7 @@ def checkout():
 
 class TestInvoiceFieldsFlow:
     def test_billing_fields_snapshot_onto_order(self, checkout):
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -106,7 +106,7 @@ class TestInvoiceFieldsFlow:
         assert order.billing_zipcode == "18531"
 
     def test_read_serializer_exposes_billing_block(self, checkout):
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -128,7 +128,7 @@ class TestInvoiceFieldsFlow:
         snapshot its receipts and credit documents render carries the
         customer's name and address, never the company requisites that
         staff read from the order when they issue the invoice in timologio."""
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],

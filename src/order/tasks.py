@@ -2781,8 +2781,8 @@ def alert_payment_without_order_task(
     an order carries it, so nothing was sent.
 
     Queued after the webhook committed, so a mail that fails is retried
-    here: Stripe has had its answer and sends nothing again. A payment-first
-    intent is checked after a grace, when its order should exist.
+    here: Stripe has had its answer and sends nothing again. Nothing is sent
+    when an order carries the payment by the time the task runs.
     """
     from decimal import Decimal
 

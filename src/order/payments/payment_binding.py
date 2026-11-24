@@ -1,16 +1,13 @@
 """What a PaymentIntent was created FOR, written on it by the server.
 
-A PaymentIntent proves that money moved, not what it paid for. Before this
-module an intent carried only an amount and a currency, so one payment could
-be presented twice: a Stripe gift-card purchase for exactly a cart's total
-bought the card (``payment_intent.succeeded``) and then, with the same
-``payment_intent_id`` posted to ``POST /api/v1/order``, a paid order.
-
-Every intent we create now carries three server-set metadata keys, and the
-payment-first order path refuses an intent whose keys do not name THIS cart,
-this purpose and this tenant. Only the server writes them (Stripe metadata is
+A PaymentIntent proves that money moved, not what it paid for. Every intent
+we create carries three server-set metadata keys naming what it pays for, the
+thing itself and the tenant. Only the server writes them (Stripe metadata is
 set with the secret key at creation), so a shopper holding an intent id
-cannot present it for anything else.
+cannot present it for anything else. The webhook finds an order's intent by
+them (``OrderService.handle_payment_succeeded``), and a succeeded intent of
+ours that nothing carries alerts staff
+(``OrderService.report_payment_without_order``).
 """
 
 from __future__ import annotations
@@ -28,8 +25,6 @@ TENANT_KEY = "tenant_schema"
 class PaymentPurpose(StrEnum):
     """What the payment buys; ``SUBJECT_KEY`` names the thing."""
 
-    #: Payment-first checkout; the subject is the cart's uuid.
-    CART = "cart"
     #: An order that already exists; the subject is the order's uuid.
     ORDER = "order"
     #: A gift-card purchase; the subject is the purchase's uuid.

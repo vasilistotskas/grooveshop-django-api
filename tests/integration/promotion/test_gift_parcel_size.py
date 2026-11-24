@@ -41,7 +41,7 @@ from vat.factories import VatFactory
 
 pytestmark = [
     pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding", "boxnow_configured_tenant"),
+    pytest.mark.usefixtures("boxnow_configured_tenant"),
 ]
 
 
@@ -176,7 +176,7 @@ class TestOrderCreation:
         }
 
     def _place(self, checkout):
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],

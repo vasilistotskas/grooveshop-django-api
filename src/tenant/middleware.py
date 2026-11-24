@@ -105,7 +105,7 @@ class SuspendedTenantMiddleware:
     So a merchant suspended for abuse or non-payment went dark on the
     storefront (whose SSR calls ``resolve`` first) while their API kept
     serving in full — catalogue reads, cart mutations, ORDER CREATION
-    and payment-intent creation against their own live provider keys.
+    and payment links against their own live provider keys.
     Any client that does not go through the resolve path — the agent
     gateway with a warm config, a mobile client, an already-rendered
     session — transacted on a frozen store indefinitely.

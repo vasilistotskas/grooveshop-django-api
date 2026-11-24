@@ -4,7 +4,7 @@
 quote the buyer was shown. ``expectedCartDigest`` refuses one whose
 CONTENTS changed at the same total: a line swapped for one at the same
 price, another pickup point. Both are compared under the cart lock by
-``OrderService._quote_under_lock`` on both creation paths.
+``OrderService._quote_under_lock``, whatever the pay way.
 
 The quote and order creation must take the same inputs, or a digest over
 the delivery would refuse every order the quote cannot see the whole of:
@@ -41,7 +41,6 @@ from tests.integration.order.test_checkout_quote import (
     _checkout,
     _choices,
     _money,
-    _post_intent,
     _post_order,
     _product,
     _quote,
@@ -280,7 +279,9 @@ class TestOrderCreation:
 
         assert response.status_code == 201, response.content
 
-    def test_the_payment_first_path_compares_it_too(self):
+    def test_a_stripe_order_compares_it_too(self):
+        """Stripe is paid after the order, so its order is refused for a
+        changed cart before any payment exists."""
         checkout = _checkout()
         stripe = PayWayFactory(
             provider_code="stripe",
@@ -292,15 +293,10 @@ class TestOrderCreation:
         choices = {**_choices(checkout), "pay_way_id": stripe.id}
         with fake_stripe():
             quote = _quote(checkout, **choices)
-            intent = _post_intent(checkout, stripe)
-            assert intent.status_code == 200, intent.content
             _swap_line(checkout)
 
             response = _post_order(
-                checkout,
-                pay_way_id=stripe.id,
-                payment_intent_id=intent.data["payment_intent_id"],
-                **_guards(quote),
+                checkout, pay_way_id=stripe.id, **_guards(quote)
             )
 
         assert response.status_code == 409, response.content
@@ -565,8 +561,7 @@ NOT_PRICED = {
     # Store-side carrier overrides of the voucher, not a buyer's choice.
     "acs_charge_type",
     "acs_item_quantity",
-    # How the order is paid, guarded and recorded.
-    "payment_intent_id",
+    # How the order is guarded and recorded.
     "expected_total",
     "expected_cart_digest",
     "terms_accepted",

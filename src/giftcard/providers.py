@@ -12,7 +12,7 @@ provider declares about itself.
 
 from __future__ import annotations
 
-#: Matches ``StripePaymentProvider.code``. Intent-first, so the buyer
-#: confirms the card inline instead of leaving for a hosted page —
-#: fewer steps for the common case.
+#: Matches ``StripePaymentProvider.code``. Paid by a client-confirmed
+#: intent, so the buyer confirms the card inline instead of leaving for a
+#: hosted page — fewer steps for the common case.
 DEFAULT_GIFT_CARD_PROVIDER = "stripe"

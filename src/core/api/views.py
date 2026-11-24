@@ -357,7 +357,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
 # Apply an extra action's ``@action(...)`` arguments when the view is
 # wired by hand, as DRF's router does.
 #
-# The URL confs call ``ViewSet.as_view({"post": "retry_payment"})``
+# The URL confs call ``ViewSet.as_view({"post": "create_checkout_session"})``
 # directly, and only the router merges the action's decorator
 # arguments (``throttle_classes``, ``permission_classes``,
 # ``pagination_class``, ``queryset``, ...) into the view it builds

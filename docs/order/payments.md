@@ -83,24 +83,22 @@ whose intent failed leaves the session `complete` for ever, and it is gone.
 `checkout.session.expired` never writes over the recorded session: a late
 event for an older session, or for one that lost a concurrent request, would
 make the next request mint a second payable one. A hosted session and a PaymentIntent are never
-payable together: an open intent is closed (`close_payment`) before a session
-opens, and an open session is expired before `PayWayService.process_payment`
-mints an intent; one that may still be paid refuses the other.
+payable together: an open intent the order holds (an agent's delegated card
+awaiting its confirmation) is closed (`close_payment`) before a session
+opens; one that may still be paid refuses the session.
 
 One payable instrument per order is enforced where every newly opened
-payment is written: `OpenPayment.lock_unchanged` (`src/order/payments/
-payment.py`), under the order's row lock, for a hosted session
-(`create_checkout_session`) and for a client-confirmed intent
-(`PayWayService._record_opened_payment`). Each request reads `OpenPayment`
+hosted session is written: `OpenPayment.lock_unchanged` (`src/order/payments/
+payment.py`), under the order's row lock (`create_checkout_session`). Each
+request reads `OpenPayment`
 (status, payment status, `payment_id`, the recorded session) before its
 provider call; when anything of it changed meanwhile, it records nothing.
 Two concurrent link requests: the second records nothing of its own, leaves
 the hold alone and answers with the first one's link. A link request that
-loses to an intent opened meanwhile (another tab's retry), or an intent that
-loses to a session, answers 409 `order_changed_during_payment`; a lost
-Stripe session is expired, a lost intent's client secret is never
-returned. Reusing a live session closes an open intent first, as minting
-does. Its own
+loses to another change of the order's payment meanwhile (an agent's
+delegated payment, a cancel, a webhook) answers 409
+`order_changed_during_payment`, and its Stripe session is expired. Reusing a
+live session closes an open intent first, as minting does. Its own
 link reached nobody; a Stripe one is expired (`discard_checkout_session`),
 a Viva one is left, as Viva's cancel is not documented well enough to build
 on.
@@ -157,12 +155,11 @@ it books nothing and calls `OrderService.report_payment_without_order`.
 - **Never for** a gift-card purchase's intent (the handler resolves those
   first and stops), nor one an order carries or is bound to (Checkout
   Session, agent).
-- **A payment-first intent waits** (binding purpose `cart`, until R3 of
-  #818): its webhook can land while `POST /order` is still creating the
-  order, so its task runs `PAYMENT_WITHOUT_ORDER_GRACE_MINUTES` later
-  (default 15) and sends only if no order carries the intent by then. An
-  intent bound to an order that does not exist alerts at once. The wait is
-  removed with the payment-first path.
+- **At once.** Every intent of ours is opened for an order that already
+  exists (`order`) or for a gift-card purchase (`giftcard`), so nothing is
+  waited for: an intent bound to an order that does not exist alerts at
+  once. An intent bound with the retired `cart` purpose (the payment-first
+  path #818 removed) is not one of ours any more and is only logged.
 
 **The collected amount must be the order's total.** `handle_payment_succeeded`
 (and the `checkout.session.completed` handler) compare what Stripe collected
@@ -201,12 +198,12 @@ polling writer) was removed.
 **A poll records only an open payment's state**
 (`_POLLED_STATUS_RECORDED` in `src/order/services.py`): PENDING, PROCESSING
 and FAILED as reported, and a provider's `canceled` (a Stripe intent closed by
-a retry whose new intent then failed to open, a Viva `X`) as **FAILED**. The
+a hosted link opened in its place, a Viva `X`) as **FAILED**. The
 attempt is over, not the order: CANCELED is the payment state of a closed
 order (`Order.settle_unpaid_payment`), and on an open one it is settled, so
 neither bucket of `auto_cancel_stuck_pending_orders` selected the order, its
 stock stayed reserved, and a later success was ignored as stale (#697).
-FAILED keeps the order payable (`retry-payment`) and is swept after
+FAILED keeps the order payable (a new link, `create_checkout_session`) and is swept after
 `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`. A polled REFUNDED or
 PARTIALLY_REFUNDED is never written: the ledger derives those from the refunds
 it booked ([§7.3](payment-ledger.md)).
@@ -216,8 +213,7 @@ provider's `get_payment_status` raises `PaymentStatusUnavailableError` for a
 network error, a timeout, a rate limit, an outage or an answer it could not
 read; it used to answer FAILED, which the 30-minute sweep then acted on.
 Nothing is written. `GET /order/{id}/payment_status` answers 503
-`payment_provider_unavailable`, payment-first order creation refuses the
-intent as before (400 `payment_verification`), `PaymentLedger.ensure_charge`
+`payment_provider_unavailable`, `PaymentLedger.ensure_charge`
 records no charge, and the Viva webhook's verification raises so Viva
 redelivers.
 
@@ -476,7 +472,7 @@ refunds and disputes, the return page and a lost webhook.
 ### 4.4 COD / PAY_ON_DELIVERY (offline)
 
 ```
-1. create_order_from_cart_offline → status=PENDING, payment_status=PENDING
+1. create_order_from_cart → status=PENDING, payment_status=PENDING
 2. _dispatch_shipment_creation_task (on_commit) → courier voucher mints
 3. AcsService._advance_pending_order_to_processing → status=PROCESSING
 4. Carrier polls: shipment_state advances → status flips PROCESSING → SHIPPED → DELIVERED

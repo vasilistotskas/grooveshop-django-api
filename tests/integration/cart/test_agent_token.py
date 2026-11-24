@@ -436,7 +436,6 @@ class TestRefusedActions:
         [
             ("post", "cart-reserve-stock"),
             ("post", "cart-release-reservations"),
-            ("post", "cart-create-payment-intent"),
             ("delete", "cart-detail"),
             ("put", "cart-detail"),
             ("patch", "cart-detail"),

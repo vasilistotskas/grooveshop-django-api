@@ -30,9 +30,9 @@ rolls back with the change only when the save runs inside a transaction:
 `ATOMIC_REQUESTS` is off and `Order.save` opens none of its own. The call
 sites that change these fields do run inside one:
 
-- order creation: `OrderService._create_order_for_verified_intent` (behind
-  `create_order_from_cart`) and `OrderService.create_order_from_cart_offline`,
-  both `@transaction.atomic`, the attribution row included;
+- order creation: `OrderService._create_order_locked` (behind
+  `create_order_from_cart`), `@transaction.atomic`, the attribution row
+  included;
 - status: `OrderLifecycleService.update_order_status`, `_cancel_order_locked` (behind
   `cancel_order`) and `add_tracking_info`, all `@transaction.atomic`;
 - payment: `OrderService.handle_payment_succeeded`, `handle_payment_failed`,

@@ -45,8 +45,8 @@ def collect_candidates(
     # `_matching_items` and `_gift_entitlement` walk five relations
     # for EVERY candidate, so without the prefetch the engine's
     # cost grows with the number of live promotions — and
-    # `evaluate()` runs on every cart read, on the payment-intent
-    # path, and twice more during order creation.
+    # `evaluate()` runs on every cart read, on every quote, and
+    # twice more during order creation.
     promotions_qs = (
         Promotion.objects.filter(pk__in={*automatic_ids, *code_promotion_ids})
         .with_scope_relations()

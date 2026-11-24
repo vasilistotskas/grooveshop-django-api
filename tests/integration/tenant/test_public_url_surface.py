@@ -62,6 +62,9 @@ SHARED_PATHS = [
     "/api/v1/country",
     "/api/v1/region",
     "/api/v1/tenant/resolve",
+    # The couriers' webhooks (``shipping.webhook_urls``): a courier posts to
+    # whichever host the webhook was registered with.
+    "/boxnow/webhook/",
 ]
 
 # Platform control-plane only. MUST resolve on the platform host.

@@ -55,7 +55,7 @@ from shipping_acs.exceptions import (
 )
 from shipping_acs.models import AcsShipment
 from shipping_acs.services import AcsService
-from tenant.celery import TenantTask
+from tenant.celery import TenantTask, run_for_all_tenants
 
 logger = logging.getLogger(__name__)
 
@@ -1067,3 +1067,86 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         "order_id": order.id,
         "voucher_no": shipment.voucher_no,
     }
+
+
+# ---------------------------------------------------------------------------
+# Fan-outs: beat runs each in the public schema, and it queues the task in
+# every store's. Each keeps the name it had in ``tenant.tasks``, by which
+# beat, queued messages and deferred dispatches address it.
+# ---------------------------------------------------------------------------
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_poll_acs_tracking_batch"
+)
+def fanout_poll_acs_tracking_batch():
+    return run_for_all_tenants("shipping_acs.tasks.poll_acs_tracking_batch")
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_issue_held_acs_vouchers"
+)
+def fanout_issue_held_acs_vouchers():
+    return run_for_all_tenants("shipping_acs.tasks.issue_held_acs_vouchers")
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_reconcile_acs_cod_payouts"
+)
+def fanout_reconcile_acs_cod_payouts():
+    return run_for_all_tenants("shipping_acs.tasks.reconcile_acs_cod_payouts")
+
+
+@shared_task(base=TenantTask, name="tenant.tasks.fanout_sync_acs_stations")
+def fanout_sync_acs_stations():
+    return run_for_all_tenants("shipping_acs.tasks.sync_acs_stations")
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_issue_daily_acs_pickup_list"
+)
+def fanout_issue_daily_acs_pickup_list():
+    return run_for_all_tenants("shipping_acs.tasks.issue_daily_acs_pickup_list")
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_alert_unremitted_cod_payouts"
+)
+def fanout_alert_unremitted_cod_payouts():
+    # AcsShipment and AcsCodPayout are tenant-scoped, so beat must
+    # dispatch per-schema or the check runs against an empty public one.
+    return run_for_all_tenants(
+        "shipping_acs.tasks.alert_unremitted_cod_payouts"
+    )
+
+
+# A retention sweep like the ones above: the ACS call history holds
+# recipient details, so it reaches SUSPENDED tenants too.
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_purge_expired_acs_api_calls"
+)
+def fanout_purge_expired_acs_api_calls():
+    return run_for_all_tenants(
+        "shipping_acs.tasks.purge_expired_acs_api_calls",
+        include_suspended=True,
+    )
+
+
+# More retention sweeps, so they reach SUSPENDED tenants too: a store's
+# billing state does not pause a deletion the platform promised.
+@shared_task(
+    base=TenantTask,
+    name="tenant.tasks.fanout_purge_expired_acs_tracking_events",
+)
+def fanout_purge_expired_acs_tracking_events():
+    return run_for_all_tenants(
+        "shipping_acs.tasks.purge_expired_acs_tracking_events",
+        include_suspended=True,
+    )
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_check_stale_acs_shipments"
+)
+def fanout_check_stale_acs_shipments():
+    return run_for_all_tenants("shipping_acs.tasks.check_stale_acs_shipments")

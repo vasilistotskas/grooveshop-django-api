@@ -357,6 +357,19 @@ accepting Cyprus orders at the Greek flat rate.
    - An email to the customer about its shipment is declared in its own
      `emails.py` through `order.emails.shipment_email` (templates stay in
      `emails/order/`; `shipping_acs.emails`, `shipping_boxnow.emails`).
+   - The routing and scheduling hooks, so no `core` or `tenant` module names
+     the carrier. `api_urlconf` is its storefront API's URL conf, mounted
+     under `api/v1/` after `shipping.urls` (which includes every carrier's).
+     `webhook_urlconf` is the URL conf of the endpoints the courier calls,
+     mounted at the root of both hosts by `shipping.webhook_urls`, with no
+     language prefix (BoxNow: `shipping_boxnow.webhook_urls`). Its beat
+     fan-outs (`run_for_all_tenants`) live in its own `tasks.py`; the ones
+     that moved there from `tenant.tasks` keep their `tenant.tasks.fanout_*`
+     names, which beat and queued messages address.
+   - `create_demo_shipment(order, row, ...)` writes the shipment a demo
+     account's order shipped under (`shipping.demo.ShipmentRow`, timed by
+     `shipping.demo.event_times`), from the carrier's own `demo.py`; the demo
+     seed (`devtools.demo_account`) asks the order's carrier for it.
    - Webhook-based carriers handle events in their own service (BoxNow:
      `BoxNowService.apply_webhook_event`); it is not part of the interface.
 3. Decorate the adapter with `@register_provider` and import it in the app's

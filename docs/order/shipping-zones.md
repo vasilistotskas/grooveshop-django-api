@@ -80,6 +80,13 @@ does any other rate.
 Order creation answers a country no home delivery reaches as before: the
 delivery's own refusal (`shipping_unavailable`).
 
+A home delivery that names no carrier takes the one the store picks
+(`ShippingService.resolve_home_delivery_provider`). When no carrier's rate is
+in the region's zone while one delivers home elsewhere in the country, the
+pick names that one, so the quote answers `shipping_region_unavailable`
+rather than `shipping_unavailable`, as the weight cap names the first carrier
+so an over-weight cart is refused for its weight.
+
 Order creation refuses a region no home delivery reaches before anything
 else is priced (`OrderCreateFromCartSerializer._validate_home_address`), and
 a carrier that skips the region with `invalid_order_data` under
@@ -121,12 +128,12 @@ longer has one. The form refuses (`zone_errors`, `rate_kind_errors`):
 
 ### Release history
 
-Release N (expand, `shipping` `0022`-`0024`): the zone tables; one base zone
+Release N (expand, `shipping` `0022`-`0025`): the zone tables; one base zone
 per country a store had rates for, named after the country, each rate put in
 it (so nothing a store serves or charges changed); `ShippingRate.country`
 made nullable and taken out of the state with its unique constraint and
 index (`SeparateDatabaseAndState`), `zone` required in the state and
 nullable in the database for the release still serving during the rollout.
-Release N+1 (contract, `contract_of` `0024`) puts any rate that release wrote
+Release N+1 (contract, `contract_of` `0025`) puts any rate that release wrote
 into its country's base zone, sets `zone` NOT NULL and drops `country`, the
 old constraint and its index ([`docs/migrations.md`](../migrations.md)).

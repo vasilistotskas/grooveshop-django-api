@@ -3,7 +3,7 @@
 Creates ``ShippingZone`` and its region set (``ShippingZoneRegion``, whose
 unique ``region`` keeps a region in one zone of a store), with their
 history. Only new tables: nothing the serving release reads changes.
-The rates move onto zones in ``0023`` and ``0024``.
+The rates move onto zones in ``0023``-``0025``.
 """
 
 import django.contrib.postgres.indexes

@@ -197,6 +197,18 @@ class TestCheckout:
         documented(response, "/api/v1/cart/quote", "post")
         assert response.json()["code"] == "shipping_region_unavailable"
 
+    def test_a_home_delivery_no_carrier_takes_to_the_region_is_refused_for_it(
+        self, store
+    ):
+        # No carrier named: the store picks one, and none reaches the
+        # region while one reaches the rest of the country.
+        response = _post_quote(
+            store, **_choices(store), region_id=store.crete.alpha
+        )
+
+        assert response.status_code == 400, response.content
+        assert response.json()["code"] == "shipping_region_unavailable"
+
     def test_an_order_to_a_region_not_served_is_refused_on_the_region(
         self, store, documented
     ):

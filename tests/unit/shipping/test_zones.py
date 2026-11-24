@@ -203,9 +203,27 @@ class TestCheckoutRespectsZones:
             )
             == "flat_rate"
         )
+
+    def test_a_region_no_carrier_reaches_names_the_countrys_carrier(
+        self, greece_like
+    ):
+        # So the quote fails as not reaching the region, not the country.
+        country = greece_like["country"].alpha_2
+
         assert (
             ShippingService.resolve_home_delivery_provider(
                 country, region_id=greece_like["crete"].pk
+            )
+            == "flat_rate"
+        )
+
+    def test_a_country_no_carrier_reaches_names_none(self):
+        country = CountryFactory(num_regions=0)
+        region = RegionFactory(country=country)
+
+        assert (
+            ShippingService.resolve_home_delivery_provider(
+                country.alpha_2, region_id=region.pk
             )
             is None
         )

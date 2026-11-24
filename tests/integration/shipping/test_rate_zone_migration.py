@@ -1,6 +1,6 @@
-"""``0023_shipping_rate_zone`` puts every rate in a zone covering its whole
-country, so what each store serves and charges does not change, and its
-reverse gives every rate its country back.
+"""``0024_shipping_rate_zone_backfill`` puts every rate in a zone covering
+its whole country, so what each store serves and charges does not change,
+and its reverse gives every rate its country back.
 
 Drives the real ``MigrationExecutor`` with rows written through the
 historical models (``tests/integration/pay_way/test_migration_key.py`` is
@@ -18,7 +18,7 @@ from django.test import TestCase
 from tests.utils.migrations import migrate_to
 
 BEFORE = ("shipping", "0022_shipping_zone")
-AFTER = ("shipping", "0023_shipping_rate_zone")
+AFTER = ("shipping", "0024_shipping_rate_zone_backfill")
 
 
 def _settle_deferred_constraints():

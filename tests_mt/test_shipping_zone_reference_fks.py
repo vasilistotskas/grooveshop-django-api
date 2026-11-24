@@ -67,7 +67,7 @@ def test_a_zone_resolves_its_cross_schema_country_and_regions(mt_tenant):
 def test_a_provisioned_store_has_its_seeded_rates_in_a_whole_country_zone(
     mt_tenant,
 ):
-    """Migrations ``0023``/``0024`` ran in the store's schema when it was
+    """Migrations ``0023``-``0025`` ran in the store's schema when it was
     created: every rate ``0011`` seeded is in GR's whole-country zone."""
     from shipping.models import ShippingRate
 

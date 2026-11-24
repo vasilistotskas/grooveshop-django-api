@@ -9,7 +9,7 @@ Verifies:
 * Idempotent re-run, and reverse deletes what it created.
 
 The migration wrote rates with a ``country``, before rates moved onto
-shipping zones (``0023``/``0024``), so it runs here at that state: the
+shipping zones (``0023``-``0025``), so it runs here at that state: the
 database migrated back to the shipping migration before the zones, and
 the historical models of that state, as ``migrate`` hands them to it.
 PostgreSQL DDL is transactional, so the test's transaction leaves the

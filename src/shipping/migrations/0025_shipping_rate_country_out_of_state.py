@@ -21,7 +21,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("shipping", "0023_shipping_rate_zone"),
+        ("shipping", "0024_shipping_rate_zone_backfill"),
     ]
 
     operations = [

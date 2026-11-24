@@ -18,7 +18,7 @@ from functools import reduce
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from djmoney.money import Money
 
 from core.cache_backend import REDIS_UNAVAILABLE
@@ -1127,32 +1127,61 @@ class ShippingService:
         uncapped one behind it. When none can, it still names the
         first carrier, so the quote fails as over-weight rather than as
         unavailable for the country.
+
+        With ``region_id`` the carrier is one whose rate is in the zone
+        the region resolves to (``shipping.zones``). When none is, while
+        one delivers home elsewhere in the country, it names that one, so
+        the quote fails as not reaching the region
+        (``ShippingRegionUnavailableError``) rather than as unavailable
+        for the country.
         """
-        qs = ShippingProvider.objects.filter(
+        carriers = ShippingProvider.objects.filter(
             is_active=True, supports_home_delivery=True
         )
-        if country_code:
-            # The zone a home delivery to the destination is priced by.
-            rate = Q(
-                rates__in=destination_rates(country_code, region_id),
-                rates__kind=ShippingKind.HOME_DELIVERY.value,
-                rates__is_active=True,
+        if not country_code:
+            picked = carriers.order_by("priority", "code").first()
+            return picked.code if picked is not None else None
+        code = cls._home_delivery_carrier(
+            carriers, destination_rates(country_code, region_id), weight_grams
+        )
+        if code is None and region_id:
+            code = cls._home_delivery_carrier(
+                carriers,
+                ShippingRate.objects.filter(
+                    zone__country_id=country_code.upper()
+                ),
+                weight_grams,
             )
-            if weight_grams is not None:
-                # In the same filter() as ``rate``, so both conditions
-                # hold on ONE rate row, not on two different ones.
-                fitting = qs.filter(
-                    rate
-                    & (
-                        Q(rates__max_weight_grams__isnull=True)
-                        | Q(rates__max_weight_grams__gte=weight_grams)
-                    )
+        return code
+
+    @staticmethod
+    def _home_delivery_carrier(
+        carriers: QuerySet[ShippingProvider],
+        rates: QuerySet[ShippingRate],
+        weight_grams: int | None,
+    ) -> str | None:
+        """The first of ``carriers`` with an active home-delivery rate
+        among ``rates``, preferring one whose rate carries
+        ``weight_grams`` (:meth:`resolve_home_delivery_provider`)."""
+        rate = Q(
+            rates__in=rates,
+            rates__kind=ShippingKind.HOME_DELIVERY.value,
+            rates__is_active=True,
+        )
+        if weight_grams is not None:
+            # In the same filter() as ``rate``, so both conditions hold
+            # on ONE rate row, not on two different ones.
+            fitting = carriers.filter(
+                rate
+                & (
+                    Q(rates__max_weight_grams__isnull=True)
+                    | Q(rates__max_weight_grams__gte=weight_grams)
                 )
-                picked = fitting.order_by("priority", "code").first()
-                if picked is not None:
-                    return picked.code
-            qs = qs.filter(rate)
-        picked = qs.order_by("priority", "code").first()
+            )
+            picked = fitting.order_by("priority", "code").first()
+            if picked is not None:
+                return picked.code
+        picked = carriers.filter(rate).order_by("priority", "code").first()
         return picked.code if picked is not None else None
 
     @classmethod

@@ -1,4 +1,4 @@
-"""Put every shipping rate in a zone: one whole-country zone per country.
+"""Give every shipping rate a zone column: the schema half.
 
 Expand step of moving ``ShippingRate.country`` onto ``ShippingRate.zone``
 (``docs/migrations.md``):
@@ -7,66 +7,18 @@ Expand step of moving ``ShippingRate.country`` onto ``ShippingRate.zone``
    so the reverse makes it NOT NULL again only after it has been filled.
 2. ``zone`` is added nullable: the release still serving during the
    rollout inserts rates without it.
-3. Each country a store has rates for gets one zone that covers the whole
-   country (no regions), named after the country, and its rates are put
-   in it. A whole-country zone covers every region, so what each store
-   serves and charges does not change.
 
-``0024`` takes ``country`` out of the state; the contract release drops
-it after copying any rate the old release wrote meanwhile.
+``0024`` puts each rate in its country's zone. It is a migration of its
+own: the index and foreign key of ``zone`` are built when this migration
+ends, and a store provisioned in one transaction has rates written in it
+(``0011``), whose rows would still have queued checks against them if the
+backfill ran first ("cannot CREATE INDEX ... pending trigger events").
+``0025`` takes ``country`` out of the state; the contract release drops it
+after copying any rate the old release wrote meanwhile.
 """
 
 import django.db.models.deletion
-from django.conf import settings
 from django.db import migrations, models
-
-
-def zone_every_rate(apps, schema_editor):
-    ShippingRate = apps.get_model("shipping", "ShippingRate")
-    ShippingZone = apps.get_model("shipping", "ShippingZone")
-    CountryTranslation = apps.get_model("country", "CountryTranslation")
-
-    countries = (
-        ShippingRate.objects.filter(zone__isnull=True)
-        .order_by()
-        .values_list("country_id", flat=True)
-        .distinct()
-    )
-    for country_id in countries:
-        name = (
-            CountryTranslation.objects.filter(
-                master_id=country_id,
-                language_code=settings.PARLER_DEFAULT_LANGUAGE_CODE,
-            )
-            .values_list("name", flat=True)
-            .first()
-        )
-        zone, _created = ShippingZone.objects.get_or_create(
-            country_id=country_id,
-            regions__isnull=True,
-            defaults={"name": name or country_id},
-        )
-        ShippingRate.objects.filter(
-            country_id=country_id, zone__isnull=True
-        ).update(zone=zone)
-    # The rows written queue their deferred foreign-key checks; run them
-    # now, so a later ALTER of this table in the same transaction (a store
-    # provisioned in one) does not meet "pending trigger events".
-    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-
-
-def unzone_every_rate(apps, schema_editor):
-    ShippingRate = apps.get_model("shipping", "ShippingRate")
-    ShippingZone = apps.get_model("shipping", "ShippingZone")
-
-    for rate in ShippingRate.objects.filter(country__isnull=True).select_related(
-        "zone"
-    ):
-        rate.country_id = rate.zone.country_id
-        rate.save(update_fields=["country"])
-    ShippingRate.objects.update(zone=None)
-    ShippingZone.objects.all().delete()
-    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 class Migration(migrations.Migration):
@@ -112,5 +64,4 @@ class Migration(migrations.Migration):
                 verbose_name="Shipping Zone",
             ),
         ),
-        migrations.RunPython(zone_every_rate, unzone_every_rate),
     ]

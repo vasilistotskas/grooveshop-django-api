@@ -17,6 +17,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from djmoney.money import Money
 
+from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
 from product.models.product import Product, ProductTranslation
 from search.serializers import ProductTranslationSerializer
@@ -85,6 +86,31 @@ def test_a_zero_price_is_serialized_as_zero_not_null():
     assert by_master[priced.id]["final_price"] == float(
         priced.final_price.amount
     )
+
+
+@pytest.mark.django_db
+def test_a_hit_carries_the_stored_size_of_its_main_image():
+    """The size is the main image's stored one, as every other product
+    endpoint states it; a product with no image has no size."""
+    pictured = ProductFactory(num_images=0, num_reviews=0)
+    ProductImageFactory(
+        product=pictured,
+        is_main=True,
+        image__width=800,
+        image__height=600,
+    )
+    ProductImageFactory(product=pictured, is_main=False)
+    bare = ProductFactory(num_images=0, num_reviews=0)
+
+    by_master = {
+        row["master"]: row
+        for row in _serialize_hits(_en_translation_pks([pictured, bare]))
+    }
+
+    assert by_master[pictured.id]["main_image_width"] == 800
+    assert by_master[pictured.id]["main_image_height"] == 600
+    assert by_master[bare.id]["main_image_width"] is None
+    assert by_master[bare.id]["main_image_height"] is None
 
 
 @pytest.mark.django_db

@@ -130,7 +130,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.order.id)
         self.assertEqual(
-            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+            set(response.data.keys()), set(OrderDetailSerializer().fields)
         )
 
     def test_list_no_n_plus_one(self):
@@ -213,7 +213,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             f"order creation failed: {response.data}",
         )
         self.assertEqual(
-            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+            set(response.data.keys()), set(OrderDetailSerializer().fields)
         )
         created_order = Order.objects.get(email="new-order@example.com")
         self.assertEqual(created_order.id, response.data["id"])
@@ -255,7 +255,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+            set(response.data.keys()), set(OrderDetailSerializer().fields)
         )
         self.order.refresh_from_db()
         self.assertEqual(self.order.first_name, "Updated")
@@ -295,7 +295,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+            set(response.data.keys()), set(OrderDetailSerializer().fields)
         )
         self.order.refresh_from_db()
         self.assertEqual(self.order.city, "Updated City")

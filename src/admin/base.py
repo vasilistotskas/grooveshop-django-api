@@ -204,17 +204,21 @@ class BaseModelAdmin(
 
     def get_list_filter(self, request):
         """Every plain field name in ``list_filter`` as its Unfold filter
-        (``unfold_filter_for``); explicit ``(field, Filter)`` pairs and
-        filter classes are kept as declared."""
+        (:meth:`unfold_list_filter`)."""
         return [
-            (
-                entry,
-                unfold_filter_for(get_fields_from_path(self.model, entry)[-1]),
-            )
-            if isinstance(entry, str)
-            else entry
+            self.unfold_list_filter(entry)
             for entry in super().get_list_filter(request)
         ]
+
+    def unfold_list_filter(self, entry):
+        """A plain field name as its Unfold filter (``unfold_filter_for``);
+        an explicit ``(field, Filter)`` pair or filter class as declared."""
+        if not isinstance(entry, str):
+            return entry
+        return (
+            entry,
+            unfold_filter_for(get_fields_from_path(self.model, entry)[-1]),
+        )
 
 
 class BaseTranslatableAdmin(TranslatableAdmin, BaseModelAdmin):

@@ -16,6 +16,10 @@ are switched to it whatever language they were loaded in. The subject is a
 msgid with plain named fields, filled from the context by the pipeline
 (``emails.render.format_subject``).
 
+A carrier declares its own emails about a shipment in its app
+(``shipping_acs.emails``, ``shipping_boxnow.emails``) through
+:func:`shipment_email`, so this module names no carrier.
+
 What stays with the tasks (``order.tasks``, ``shipping_acs.tasks``,
 ``shipping_boxnow.tasks``): choosing WHEN to send (idempotency claims,
 status gates) and the bookkeeping after a send.
@@ -47,17 +51,17 @@ from djmoney.money import Money
 from core.store_settings import store_setting
 from core.utils.tenant_urls import get_tenant_frontend_url
 from emails.declare import customer_email, staff_email
-from emails.gates import CarrierGate, FeatureGate, StoreSwitchGate
+from emails.gates import FeatureGate, StoreSwitchGate
 from emails.recipients import Recipient, customer_of
 from emails.types import EmailType, Kind, RenderEnv
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.payments.payment import payment_provider_label
 from order.payments.payment_ledger import PaymentLedger
-from order.storefront_links import order_page_url
 from pay_way.enum.settlement import PaySettlement
 from product.models.review import ProductReview
 from recommendation.order_email import EmailStrip, order_email_strip
+from shipping.interfaces import get_provider
 from tenant.credentials import tenant_site_name
 from tenant.features import feature_on
 
@@ -413,33 +417,6 @@ def _document_issued(
         }
 
 
-def _acs_out_for_delivery(shipment: Any, env: RenderEnv) -> dict[str, Any]:
-    with _email_language(shipment.order, env.language):
-        return {
-            "order": shipment.order,
-            "order_url": order_page_url(shipment.order, language=env.language),
-            "shipment": shipment,
-            "voucher_no": shipment.voucher_no,
-        }
-
-
-def _boxnow_parcel_at_locker(shipment: Any, env: RenderEnv) -> dict[str, Any]:
-    locker = shipment.locker
-    with _email_language(shipment.order, env.language):
-        return {
-            "order": shipment.order,
-            "order_url": order_page_url(shipment.order, language=env.language),
-            "shipment": shipment,
-            "locker": locker,
-            "locker_address": (
-                locker.address_line_1
-                if locker is not None
-                else shipment.locker_external_id
-            ),
-            "parcel_id": shipment.parcel_id,
-        }
-
-
 def _new_order_alert(order: Order, env: RenderEnv) -> dict[str, Any]:
     with _email_language(order, env.language):
         return {
@@ -610,27 +587,6 @@ def _sample_dispute(env: RenderEnv) -> OrderDispute:
     )
 
 
-def _sample_acs_shipment(env: RenderEnv) -> Any:
-    from shipping_acs.models import AcsShipment
-
-    return AcsShipment(order=_sample_order(env), voucher_no="7000000001")
-
-
-def _sample_boxnow_shipment(env: RenderEnv) -> Any:
-    from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
-
-    return BoxNowShipment(
-        order=_sample_order(env),
-        locker=BoxNowLocker(
-            external_id="apm-sample",
-            name="Locker Stadiou",
-            title="Locker Stadiou",
-            address_line_1="Stadiou 5",
-        ),
-        parcel_id="9200000001",
-    )
-
-
 # ---------------------------------------------------------------------------
 # The preview's real object for each type
 # ---------------------------------------------------------------------------
@@ -672,9 +628,9 @@ def _dispute_of(order: Order) -> OrderDispute:
     )
 
 
-def _shipment_of(related_name: str) -> Callable[[Order], Any]:
+def _shipment_of(carrier: str) -> Callable[[Order], Any]:
     def shipment_of(order: Order) -> Any:
-        shipment = getattr(order, related_name, None)
+        shipment = get_provider(carrier).shipment_for_order(order)
         if shipment is None:
             raise NothingToPreview(_("This order has no such shipment."))
         return shipment
@@ -683,15 +639,14 @@ def _shipment_of(related_name: str) -> Callable[[Order], Any]:
 
 
 #: The object each type is about, found from an order, for the admin
-#: preview of a real order. A type absent here is about the order itself.
-_PREVIEW_OBJECTS: Mapping[str, Callable[[Order], Any]] = {
+#: preview of a real order. A type absent here is about the order itself;
+#: a carrier's shipment email adds its own (``shipment_email``).
+_PREVIEW_OBJECTS: dict[str, Callable[[Order], Any]] = {
     "order.refunded": _refund_of,
     "order.receipt_issued": _invoice_of,
     "order.credit_issued": _credit_of,
     "team.dispute_opened": _dispute_of,
     "team.dispute_lost": _dispute_of,
-    "shipping.acs_out_for_delivery": _shipment_of("acs_shipment"),
-    "shipping.boxnow_at_locker": _shipment_of("boxnow_shipment"),
 }
 
 
@@ -751,6 +706,43 @@ def _customer_email(
 def _staff_email(key: str, *, templates: str, **fields: Any) -> EmailType:
     ORDER_EMAIL_KEYS.add(key)
     return staff_email(key, templates=f"{TEMPLATE_DIR}/{templates}", **fields)
+
+
+def shipment_email(
+    key: str,
+    *,
+    carrier: str,
+    templates: str,
+    build_context: Callable[[Any, RenderEnv], dict[str, Any]],
+    sample: Callable[[Order], Any],
+    **fields: Any,
+) -> EmailType:
+    """Declare a carrier's email to the customer about the shipment of
+    their order, from the carrier app's own ``emails.py``.
+
+    It is an order email like the ones above: its templates are in
+    ``emails/order/``, its recipient is the order's customer, and the admin
+    previews it from a chosen order, through *carrier*'s shipment of it
+    (``shipment_for_order``). *build_context* runs in the email's language
+    with the order's translated rows switched to it (``_email_language``);
+    *sample* is given the unsaved sample order and returns the unsaved
+    shipment the preview renders.
+    """
+    _PREVIEW_OBJECTS[key] = _shipment_of(carrier)
+
+    def build(shipment: Any, env: RenderEnv) -> dict[str, Any]:
+        with _email_language(shipment.order, env.language):
+            return build_context(shipment, env)
+
+    return _customer_email(
+        key,
+        templates=templates,
+        build_context=build,
+        sample=lambda env: sample(_sample_order(env)),
+        recipients=_customer_of_related_order,
+        area="shipping",
+        **fields,
+    )
 
 
 _cart = FeatureGate(feature="cart", label=_("Cart feature"))
@@ -923,36 +915,6 @@ _customer_email(
     list_id="order_credit",
     recipients=_customer_of_related_order,
     gates=(_mydata,),
-)
-
-_customer_email(
-    "shipping.acs_out_for_delivery",
-    title=_("ACS parcel out for delivery"),
-    description=_("Sent when ACS has the parcel out for delivery."),
-    templates="acs_out_for_delivery",
-    subject=gettext_noop("Your ACS parcel is out for delivery"),
-    build_context=_acs_out_for_delivery,
-    sample=_sample_acs_shipment,
-    list_id="acs_out_for_delivery",
-    recipients=_customer_of_related_order,
-    required=False,
-    area="shipping",
-    gates=(CarrierGate(carrier="acs", label=_("ACS carrier")),),
-)
-_customer_email(
-    "shipping.boxnow_at_locker",
-    title=_("BOX NOW parcel at the locker"),
-    description=_(
-        "Sent when the parcel arrives at the locker to be collected."
-    ),
-    templates="boxnow_parcel_at_locker",
-    subject=gettext_noop("Your BOX NOW parcel arrived at the locker"),
-    build_context=_boxnow_parcel_at_locker,
-    sample=_sample_boxnow_shipment,
-    list_id="boxnow_at_locker",
-    recipients=_customer_of_related_order,
-    area="shipping",
-    gates=(CarrierGate(carrier="boxnow", label=_("BOX NOW carrier")),),
 )
 
 _staff_email(

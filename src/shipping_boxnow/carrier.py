@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
@@ -20,6 +21,7 @@ from shipping.exceptions import ShippingParcelTooLargeError
 from shipping.interfaces import (
     AdminPage,
     AdminPages,
+    OrderShipmentField,
     PickupPointInAnotherCountry,
     PickupPointSizeUnknown,
     PickupPointTooSmall,
@@ -35,6 +37,8 @@ from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+    from django_stubs_ext import StrOrPromise
 
     from order.models.order import Order
     from shipping_boxnow.models import BoxNowShipment
@@ -67,10 +71,23 @@ class BoxNowCarrier(ShippingCarrierInterface):
     attention_models: ClassVar[tuple[str, ...]] = (
         "shipping_boxnow.BoxNowShipment",
     )
+    shipment_relation: ClassVar[str | None] = "boxnow_shipment"
+    order_detail_prefetches: ClassVar[tuple[str, ...]] = ("boxnow_shipment",)
+    # Support pastes a 10-digit voucher, a delivery request or a locker
+    # ID and finds the order; the changelist filters on the parcel state.
+    admin_order_search_fields: ClassVar[tuple[str, ...]] = (
+        "boxnow_shipment__parcel_id",
+        "boxnow_shipment__delivery_request_id",
+        "boxnow_shipment__locker_external_id",
+    )
+    admin_order_list_filters: ClassVar[tuple[str, ...]] = (
+        "boxnow_shipment__parcel_state",
+    )
 
-    # Carrier-specific request-body keys popped before Order.create().
-    payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
     location_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
+    tracking_url_template: ClassVar[str | None] = (
+        "https://boxnow.gr/en?track={number}"
+    )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -115,8 +132,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
         # receiver, not by polling. No-op here.
         return []
 
-    def shipment_for_order(self, order: Order):
-        return getattr(order, "boxnow_shipment", None)
+    def shipment_state(self, shipment: Any) -> tuple[str, StrOrPromise]:
+        return shipment.parcel_state, shipment.get_parcel_state_display()
+
+    def last_reported_at(self, shipment: Any) -> datetime | None:
+        return shipment.last_event_at
 
     def holds_the_parcel(self, shipment: Any) -> bool:
         """BOX NOW holds a parcel for the shipment (created, or taken over
@@ -283,6 +303,36 @@ class BoxNowCarrier(ShippingCarrierInterface):
         )
 
         return BoxNowShipmentDetailSerializer(shipment, context=context).data
+
+    def checkout_fields(self) -> dict[str, serializers.Field]:
+        """The locker of a pickup-point order."""
+        return {
+            "boxnow_locker_id": serializers.CharField(
+                max_length=64,
+                required=False,
+                allow_blank=True,
+                help_text=_("BoxNow APM locker ID from the widget"),
+            ),
+        }
+
+    def order_shipment_field(self) -> OrderShipmentField:
+        from shipping_boxnow.serializers.shipment import (
+            BoxNowShipmentDetailSerializer,
+        )
+
+        return OrderShipmentField(
+            name="boxnow_shipment",
+            serializer=BoxNowShipmentDetailSerializer,
+            help_text=(
+                "BoxNow shipment details when shipping_provider.code is "
+                "'boxnow', else null."
+            ),
+        )
+
+    def admin_order_inline(self):
+        from shipping_boxnow.admin import BoxNowShipmentOrderInline
+
+        return BoxNowShipmentOrderInline
 
     # ------------------------------------------------------------------
     # Validation (called by order/services._validate_address_data)

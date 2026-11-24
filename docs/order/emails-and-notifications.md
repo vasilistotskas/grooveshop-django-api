@@ -29,8 +29,8 @@ is created (`handle_order_created`). A card order (Viva, Stripe) is confirmed
 when its payment settles, by every path that settles one: the Stripe
 `payment_intent.succeeded` (and a poll), the Stripe
 `checkout.session.completed`, the Viva 1796, the Viva return page, the sweep's
-read-back, and a payment taken at once (`process_payment`, the agent SPT
-charge). `confirm` claims `Order.confirmed_at` with one
+read-back, and a payment taken at once (the agent SPT charge,
+`confirm_agent_payment`). `confirm` claims `Order.confirmed_at` with one
 `UPDATE ... WHERE confirmed_at IS NULL` that also requires the order to be due
 (`confirmation.due_for_confirmation`: nothing left to pay online, or the
 online payment COMPLETED) and not canceled, so however many of those report the

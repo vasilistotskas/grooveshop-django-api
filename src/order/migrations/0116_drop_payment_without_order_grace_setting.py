@@ -16,9 +16,11 @@ the row would be a lie.
 from django.db import migrations
 
 
-def drop_setting(apps, _schema_editor):
+def drop_setting(apps, schema_editor):
     Setting = apps.get_model("extra_settings", "Setting")
-    Setting.objects.filter(name="PAYMENT_WITHOUT_ORDER_GRACE_MINUTES").delete()
+    Setting.objects.using(schema_editor.connection.alias).filter(
+        name="PAYMENT_WITHOUT_ORDER_GRACE_MINUTES"
+    ).delete()
 
 
 class Migration(migrations.Migration):

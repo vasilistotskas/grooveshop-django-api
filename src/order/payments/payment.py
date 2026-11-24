@@ -469,7 +469,8 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        # Outside the try, as in ``process_payment``.
+        # Outside the try: a caller that forgets to say what the session
+        # is for is a bug to see, not a payment failure to report.
         binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
         try:
             logger.info(
@@ -651,9 +652,10 @@ class StripePaymentProvider(PaymentProvider):
 
         A hosted Checkout Session ends at its ``expires_at`` (the stored
         hold) and records no ``payment_id`` on the order, so it has nothing
-        to cancel here and waits for the hold like any link. An
-        intent opened by ``process_payment`` stays confirmable until
-        canceled, so it is canceled here before the stock is released.
+        to cancel here and waits for the hold like any link. An intent
+        the order records (an agent's delegated card awaiting its
+        confirmation) stays confirmable until canceled, so it is canceled
+        here before the stock is released.
         Stripe refuses once the intent is processing or succeeded (or
         belongs to a Checkout Session, which can only be expired); the
         intent is then read back and the order stays open unless it is
@@ -1299,9 +1301,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
     TIME_ZONE: ClassVar[ZoneInfo] = ZoneInfo("Europe/Athens")
     #: A read made while a shopper waits for their payment link.
     READ_TIMEOUT_SECONDS: ClassVar[int] = 15
-    # Hosted redirect only. ``process_payment`` below delegates straight
-    # to ``create_checkout_session`` — there is no intent to confirm, so
-    # an order using Viva is created BEFORE any money moves.
+    # Hosted redirect only: there is no intent to confirm, and the order
+    # is paid through ``create_checkout_session``.
     supports_payment_intent: ClassVar[bool] = False
     supports_hosted_checkout: ClassVar[bool] = True
 

@@ -24,7 +24,7 @@ Where it sits in ``MIDDLEWARE`` is part of the contract:
 
 An error response also names its ``code``, the stable identifier of the
 API error contract (``docs/error-contract.md``), so a spike of one code
-(checkout's ``payment_intent_failed``, a 5xx) can be counted and alerted
+(checkout's ``checkout_session_failed``, a 5xx) can be counted and alerted
 on per route. It is read here, from the response, rather than in the
 exception handler, because the handler only sees RAISED errors: the
 order, cart and payment views build most of their error responses

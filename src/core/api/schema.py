@@ -256,12 +256,17 @@ ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
         "description": (
             "A validation error: the field keys DRF always sent, plus "
             "``code`` (the one code all errors share, else ``invalid``; "
-            "absent when a field is itself named ``code``) and ``fields``, "
-            "each field's messages with their codes. A field of a nested "
-            "serializer holds the nested object."
+            "when a field is itself named ``code``, that field's messages "
+            "instead) and ``fields``, each field's messages with their "
+            "codes. A field of a nested serializer holds the nested object."
         ),
         "properties": {
-            "code": {"type": "string"},
+            "code": {
+                "anyOf": [
+                    {"type": "string"},
+                    {"type": "array", "items": {"type": "string"}},
+                ]
+            },
             "fields": {
                 "type": "object",
                 "additionalProperties": {
@@ -277,53 +282,54 @@ ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
 
 _SCHEMA_REF = "#/components/schemas/"
 
-#: A 400 is either a validation error (field keys, ``code``, ``fields``)
-#: or a plain one (``ParseError``, ``{"detail", "code"}``): the handler
-#: answers both with this status, so the operation documents the choice.
-#: The views declare their plain 400 body, and this maps each one to the
-#: plain variants it stands for: the generic ``ErrorResponse`` is
-#: ``ApiError`` (its ``code`` is always set by the handler), and the
-#: provider actions' ``PaymentProviderError`` sits beside ``ApiError``
-#: because those views also refuse with a plain ``{detail, code}``.
-PLAIN_400_BODIES: dict[str, tuple[str, ...]] = {
-    "ErrorResponse": ("ApiError",),
-    "PaymentProviderError": ("ApiError", "PaymentProviderError"),
-    # The page builder's ``invalid_document``: a plain error that also lists
-    # what is wrong (``errors``), beside the validation and plain bodies.
-    "BuilderDocumentInvalidError": ("ApiError", "BuilderDocumentInvalidError"),
-}
+#: The generic error body the views declare (``create_schema_view_config``).
+#: Its ``code`` is optional; the handler always sets it, so where this body
+#: is documented beside others it becomes ``ApiError``.
+GENERIC_ERROR_BODY = "ErrorResponse"
 
 
-def _validation_or_plain(plain: tuple[str, ...]) -> dict[str, Any]:
-    return {
-        "anyOf": [
-            {"$ref": f"{_SCHEMA_REF}{name}"}
-            for name in ("ApiValidationError", *plain)
-        ]
-    }
+def _any_of(names: tuple[str, ...]) -> dict[str, Any]:
+    return {"anyOf": [{"$ref": f"{_SCHEMA_REF}{name}"} for name in names]}
 
 
-def _document_validation_errors(result: dict[str, Any]) -> None:
-    """Add the validation variant to every 400 that documents a plain body.
+def _declared_body(operation: dict[str, Any], status: str):
+    """Each JSON media of ``status`` whose schema is one ``$ref``, with the
+    component it names."""
+    response = operation.get("responses", {}).get(status)
+    for media in (response or {}).get("content", {}).values():
+        ref = media.get("schema", {}).get("$ref", "")
+        if ref.startswith(_SCHEMA_REF):
+            yield media, ref.removeprefix(_SCHEMA_REF)
 
-    The views declare a plain error body for every error status
-    (``create_schema_view_config``), which suits a plain error but not a
-    validation one, whose body has no ``detail``. Rewriting here, once,
-    keeps the schema equal to ``core.api.exception_handler`` for all
-    operations. A view that names a 400 body of its own that is not in
-    ``PLAIN_400_BODIES`` (``B2BErrorResponse``, ``CouponErrorResponse``)
-    is left alone.
+
+def _document_raised_errors(result: dict[str, Any]) -> None:
+    """Document beside each declared 400 and 404 body what the handler
+    sends for an error any view can raise.
+
+    - A 400 is also a validation error (field keys, ``code``, ``fields``,
+      no ``detail``: a serializer's ``is_valid(raise_exception=True)``) and
+      a plain one (``ParseError``, ``{"detail", "code"}``). So every 400 is
+      ``ApiValidationError`` or ``ApiError`` or the view's own body, if it
+      names one (``B2BErrorResponse``, ``GiftCardErrorResponse``).
+    - A 404 is also a plain ``NotFound`` (``get_object``, a feature gate):
+      a view that names a 404 body of its own documents ``ApiError`` beside
+      it.
+
+    Rewriting here, once, keeps the schema equal to
+    ``core.api.exception_handler`` for every operation.
     """
     for operations in result.get("paths", {}).values():
         for operation in operations.values():
             if not isinstance(operation, dict):
                 continue
-            response = operation.get("responses", {}).get("400")
-            for media in (response or {}).get("content", {}).values():
-                ref = media.get("schema", {}).get("$ref", "")
-                plain = PLAIN_400_BODIES.get(ref.removeprefix(_SCHEMA_REF))
-                if plain:
-                    media["schema"] = _validation_or_plain(plain)
+            for media, name in _declared_body(operation, "400"):
+                own = () if name == GENERIC_ERROR_BODY else (name,)
+                media["schema"] = _any_of(
+                    ("ApiValidationError", "ApiError", *own)
+                )
+            for media, name in _declared_body(operation, "404"):
+                if name != GENERIC_ERROR_BODY:
+                    media["schema"] = _any_of(("ApiError", name))
 
 
 def publish_error_schemas(
@@ -331,5 +337,5 @@ def publish_error_schemas(
 ) -> dict[str, Any]:
     schemas = result.setdefault("components", {}).setdefault("schemas", {})
     schemas.update(ERROR_SCHEMAS)
-    _document_validation_errors(result)
+    _document_raised_errors(result)
     return result

@@ -13402,9 +13402,6 @@ msgstr "Sequential identifier in the form ``CRD-{YEAR}-{NNNNNN}``."
 msgid "Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not allowed by Greek tax law."
 msgstr "Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not allowed by Greek tax law."
 
-msgid "Serialized representation of the related content object"
-msgstr "Serialized representation of the related content object"
-
 msgid "Series and number of that credit invoice."
 msgstr "Series and number of that credit invoice."
 
@@ -15140,6 +15137,9 @@ msgstr "The number of the version this one restores (kind restore)."
 
 msgid "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
 msgstr "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
+
+msgid "The object to tag does not exist."
+msgstr "The object to tag does not exist."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
@@ -19110,6 +19110,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Sent when order is shipped"
 #~ msgstr "Sent when order is shipped"
+
+#~ msgid "Serialized representation of the related content object"
+#~ msgstr "Serialized representation of the related content object"
 
 #, python-format
 #~ msgid "Setting '%(key)s' not found"

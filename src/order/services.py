@@ -94,6 +94,7 @@ from pay_way.enum.settlement import PaySettlement
 from promotion.coupons import CouponService
 from promotion.engine.redemptions import record_redemptions
 from shipping.enum import ShippingKind
+from shipping.interfaces import order_detail_prefetches
 from tenant.internal import is_internal_caller
 
 logger = logging.getLogger(__name__)
@@ -3346,10 +3347,7 @@ class OrderService:
                         "user"
                     ).order_by("created_at"),
                 ),
-                "boxnow_shipment",
-                "acs_shipment",
-                "acs_shipment__events",
-                "acs_shipment__station_destination",
+                *order_detail_prefetches(),
                 "invoice",
             )
         )

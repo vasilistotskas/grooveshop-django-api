@@ -1,4 +1,8 @@
-"""The ACS operational alerts: their types, builders and samples.
+"""The ACS emails: their types, builders and samples.
+
+The customer's mail when ACS has the parcel out for delivery, an order
+email declared through ``order.emails.shipment_email``, and the
+operational alerts.
 
 Five mails to the store's own staff about a parcel, a voucher or COD money
 that needs a person: shipments that stopped moving, a voucher request whose
@@ -24,11 +28,15 @@ from django.utils.translation import gettext_noop
 from emails.declare import staff_email
 from emails.gates import CarrierGate
 from emails.types import RenderEnv
+from order.emails import shipment_email
+from order.storefront_links import order_page_url
+from shipping_acs.carrier import AcsCarrier
 from shipping_acs.enum.shipment_state import AcsShipmentState
+from shipping_acs.models import AcsShipment
 from tenant.credentials import tenant_site_name
 
 if TYPE_CHECKING:
-    from shipping_acs.models import AcsShipment
+    from order.models import Order
 
 TEMPLATE_DIR = "emails/shipping_acs"
 
@@ -152,8 +160,6 @@ def _unrecognised_vouchers(
 
 
 def _sample_stale_shipments(env: RenderEnv) -> StaleShipments:
-    from shipping_acs.models import AcsShipment
-
     now = timezone.now()
     return StaleShipments(
         shipments=[
@@ -276,5 +282,33 @@ staff_email(
     sample=lambda env: UnattributablePayouts(
         unmatched=2, skipped=1, cod_payment_date=date(2026, 10, 29)
     ),
+    gates=(_acs,),
+)
+
+
+def _out_for_delivery(shipment: AcsShipment, env: RenderEnv) -> dict[str, Any]:
+    return {
+        "order": shipment.order,
+        "order_url": order_page_url(shipment.order, language=env.language),
+        "shipment": shipment,
+        "voucher_no": shipment.voucher_no,
+    }
+
+
+def _sample_out_for_delivery(order: Order) -> AcsShipment:
+    return AcsShipment(order=order, voucher_no="7000000001")
+
+
+shipment_email(
+    "shipping.acs_out_for_delivery",
+    carrier=AcsCarrier.code,
+    title=_("ACS parcel out for delivery"),
+    description=_("Sent when ACS has the parcel out for delivery."),
+    templates="acs_out_for_delivery",
+    subject=gettext_noop("Your ACS parcel is out for delivery"),
+    build_context=_out_for_delivery,
+    sample=_sample_out_for_delivery,
+    list_id="acs_out_for_delivery",
+    required=False,
     gates=(_acs,),
 )

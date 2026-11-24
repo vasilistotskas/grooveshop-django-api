@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from shipping.exceptions import (
+    CarrierAPIError,
     CarrierBusyError,
     CarrierError,
     CarrierUnavailableError,
@@ -54,7 +55,7 @@ class BoxNowUnsupportedSettlementError(BoxNowError):
         )
 
 
-class BoxNowAPIError(BoxNowError):
+class BoxNowAPIError(BoxNowError, CarrierAPIError):
     """
     Raised for non-2xx HTTP responses from the BoxNow API.
 
@@ -84,6 +85,10 @@ class BoxNowAPIError(BoxNowError):
 
     def __str__(self) -> str:
         return f"BoxNow API {self.status_code} [{self.code}]: {self.message}"
+
+    @property
+    def text(self) -> str:
+        return self.message
 
 
 class BoxNowAuthError(BoxNowAPIError, CarrierUnavailableError):

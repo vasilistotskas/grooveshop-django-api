@@ -83,9 +83,6 @@ class FlatRateCarrier(ShippingCarrierInterface):
     def fetch_tracking_events(self, shipment: Any) -> list[dict[str, Any]]:
         return []
 
-    def shipment_for_order(self, order: Order) -> Any | None:
-        return None
-
     def holds_the_parcel(self, shipment: Any) -> bool:
         return False
 

@@ -307,7 +307,6 @@ accepting Cyprus orders at the Greek flat rate.
    - The abstract methods: `create_shipment`, `cancel_shipment`, `has_label`,
      `fetch_label_bytes`,
      `fetch_tracking_events` (return `[]` when events arrive by webhook),
-     `shipment_for_order`,
      `serialize_shipment`, `validate_order_payload`.
    - `dispatch_create_shipment_task(self, order, *, schema_name: str | None = None)`
      — enqueues the
@@ -328,6 +327,26 @@ accepting Cyprus orders at the Greek flat rate.
      put the work it leaves waiting on the dashboard's "Needs attention" list
      (the same rules as its alert emails, §5.4);
      `attention_models` lists the models whose writes clear the cached counts.
+   - The order hooks, so no `order` module names the carrier (all default
+     to nothing). `shipment_relation` is the `related_name` of its shipment
+     row's one-to-one to `Order` (`acs_shipment`): `shipment_for_order`
+     reads it and the order lists join it (`OrderQuerySet.with_shipments`).
+     `order_detail_prefetches` lists what the order detail reads of it
+     (`for_detail`). `shipment_state(shipment)` is the state the order
+     changelist labels, `last_reported_at(shipment)` the last report the
+     follow-up rule reads (`order.lifecycle.follow_up`).
+     `admin_order_inline()` is the inline the order change page shows for
+     its orders; `admin_order_search_fields` and `admin_order_list_filters`
+     join the order changelist's. `order_shipment_field()` gives it a typed
+     field of its own on the order detail (`OrderShipmentField`: name,
+     detail serializer, `rank` among the carriers' fields), before the
+     generic `shipment`.
+   - Its API errors subclass `shipping.exceptions.CarrierAPIError` and
+     return the courier's message from `text`: the order's cancel view
+     answers a refusal with it.
+   - An email to the customer about its shipment is declared in its own
+     `emails.py` through `order.emails.shipment_email` (templates stay in
+     `emails/order/`; `shipping_acs.emails`, `shipping_boxnow.emails`).
    - Webhook-based carriers handle events in their own service (BoxNow:
      `BoxNowService.apply_webhook_event`); it is not part of the interface.
 3. Decorate the adapter with `@register_provider` and import it in the app's

@@ -18,6 +18,7 @@ from shipping.interfaces import (
     AdminPage,
     AdminPages,
     AttentionRow,
+    OrderShipmentField,
     PickupPointInAnotherCountry,
     PickupPointUnknown,
     PostalAddress,
@@ -28,6 +29,8 @@ from shipping_acs.enum.shipment_state import AcsShipmentState
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+    from django_stubs_ext import StrOrPromise
 
     from order.models.order import Order
     from shipping.models import ShippingRate
@@ -59,6 +62,13 @@ class AcsCarrier(ShippingCarrierInterface):
         "shipping_acs.AcsCodPayout",
         "shipping_acs.AcsUnrecognisedVoucher",
         "shipping_acs.AcsVoucherHold",
+    )
+    shipment_relation: ClassVar[str | None] = "acs_shipment"
+    # The detail serializer lists the tracking events and the station.
+    order_detail_prefetches: ClassVar[tuple[str, ...]] = (
+        "acs_shipment",
+        "acs_shipment__events",
+        "acs_shipment__station_destination",
     )
 
     # Carrier-specific request-body keys popped before Order.create().
@@ -108,8 +118,11 @@ class AcsCarrier(ShippingCarrierInterface):
         # Polling-only — caller dispatches via the Celery task.
         return []
 
-    def shipment_for_order(self, order: Order):
-        return getattr(order, "acs_shipment", None)
+    def shipment_state(self, shipment: Any) -> tuple[str, StrOrPromise]:
+        return shipment.shipment_state, shipment.get_shipment_state_display()
+
+    def last_reported_at(self, shipment: Any) -> datetime | None:
+        return shipment.last_event_at
 
     def holds_the_parcel(self, shipment: Any) -> bool:
         """ACS minted (or staff adopted) the voucher."""
@@ -414,6 +427,26 @@ class AcsCarrier(ShippingCarrierInterface):
         )
 
         return AcsShipmentDetailSerializer(shipment, context=context).data
+
+    def order_shipment_field(self) -> OrderShipmentField:
+        from shipping_acs.serializers.shipment import (
+            AcsShipmentDetailSerializer,
+        )
+
+        return OrderShipmentField(
+            name="acs_shipment",
+            serializer=AcsShipmentDetailSerializer,
+            help_text=(
+                "ACS shipment details when the order's shipping provider "
+                "is ACS, else null."
+            ),
+            rank=1,
+        )
+
+    def admin_order_inline(self):
+        from shipping_acs.admin import AcsShipmentOrderInline
+
+        return AcsShipmentOrderInline
 
     # ------------------------------------------------------------------
     # Validation

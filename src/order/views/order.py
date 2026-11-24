@@ -3091,10 +3091,8 @@ class OrderViewSet(BaseModelViewSet):
         already in a pickup list).
         """
         from shipping.api_errors import unanswered
-        from shipping.exceptions import CarrierUnavailableError
+        from shipping.exceptions import CarrierAPIError, CarrierUnavailableError
         from shipping.services import ShippingService
-        from shipping_acs.exceptions import AcsAPIError
-        from shipping_boxnow.exceptions import BoxNowAPIError
 
         order = self.get_object()
 
@@ -3125,7 +3123,7 @@ class OrderViewSet(BaseModelViewSet):
                 exc,
             )
             raise unanswered(exc) from exc
-        except (BoxNowAPIError, AcsAPIError) as exc:
+        except CarrierAPIError as exc:
             logger.warning(
                 "Shipment cancel (generic) failed | order=%s | "
                 "provider=%s | msg=%s",
@@ -3134,14 +3132,9 @@ class OrderViewSet(BaseModelViewSet):
                 exc,
             )
             # Surface the carrier's parsed business message
-            # (``BoxNowAPIError.message`` / ``AcsAPIError.error_message``)
-            # rather than ``str(exc)``, which CodeQL treats as exception
-            # text (py/stack-trace-exposure).
-            detail = (
-                getattr(exc, "message", "")
-                or getattr(exc, "error_message", "")
-                or _("The carrier rejected the cancellation.")
-            )
+            # (``CarrierAPIError.text``) rather than ``str(exc)``, which
+            # CodeQL treats as exception text (py/stack-trace-exposure).
+            detail = exc.text or _("The carrier rejected the cancellation.")
             return Response(
                 {"detail": detail, "code": "carrier_cancellation_rejected"},
                 status=status.HTTP_400_BAD_REQUEST,

@@ -73,9 +73,12 @@ the transactional `List-ID` and `List-Unsubscribe: mailto:` headers
 `order.received`, `order.payment_confirmed`,
 `order.shipped`, `order.delivered`, `order.completed`, `order.canceled`,
 `order.returned`, `order.status_refunded`, `order.refunded`,
-`order.receipt_issued`, `order.credit_issued`,
-`shipping.acs_out_for_delivery`, `shipping.boxnow_at_locker` and the
+`order.receipt_issued`, `order.credit_issued` and the
 store-facing `team.new_order`, `team.dispute_opened`, `team.dispute_lost`.
+The order emails about a carrier's shipment,
+`shipping.acs_out_for_delivery` and `shipping.boxnow_at_locker`, are
+declared in their carrier's app (`src/shipping_acs/emails.py`,
+`src/shipping_boxnow/emails.py`) through `order.emails.shipment_email`.
 A type holds the template pair, the subject (a msgid with plain named
 fields, e.g. `Order #{order_id} Status Update - {status_display}`), the
 `build_context(obj, env)` that reads the order for it, a `sample(env)` (an

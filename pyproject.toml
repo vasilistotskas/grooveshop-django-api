@@ -739,14 +739,6 @@ ignore_imports = [
     "devtools.demo_shipments -> shipping_boxnow.enum.compartment_size",
     "devtools.demo_shipments -> shipping_boxnow.enum.payment_mode",
     "devtools.demo_shipments -> shipping_boxnow.models",
-    "order.admin -> shipping_acs.admin",
-    "order.admin -> shipping_boxnow.admin",
-    "order.emails -> shipping_acs.models",
-    "order.emails -> shipping_boxnow.models",
-    "order.serializers.order -> shipping_acs.serializers.shipment",
-    "order.serializers.order -> shipping_boxnow.serializers.shipment",
-    "order.views.order -> shipping_acs.exceptions",
-    "order.views.order -> shipping_boxnow.exceptions",
 ]
 allow_indirect_imports = true
 

@@ -17,7 +17,6 @@ from emails.gates import CarrierGate
 from emails.types import RenderEnv
 from order.emails import shipment_email
 from order.storefront_links import order_page_url
-from shipping_boxnow.carrier import BoxNowCarrier
 from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
 
 if TYPE_CHECKING:
@@ -57,7 +56,7 @@ def _sample_parcel_at_locker(order: Order) -> BoxNowShipment:
 
 shipment_email(
     "shipping.boxnow_at_locker",
-    carrier=BoxNowCarrier.code,
+    carrier="boxnow",
     title=_("BOX NOW parcel at the locker"),
     description=_(
         "Sent when the parcel arrives at the locker to be collected."
@@ -67,7 +66,5 @@ shipment_email(
     build_context=_parcel_at_locker,
     sample=_sample_parcel_at_locker,
     list_id="boxnow_at_locker",
-    gates=(
-        CarrierGate(carrier=BoxNowCarrier.code, label=_("BOX NOW carrier")),
-    ),
+    gates=(CarrierGate(carrier="boxnow", label=_("BOX NOW carrier")),),
 )

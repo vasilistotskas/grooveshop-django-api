@@ -30,7 +30,6 @@ from emails.gates import CarrierGate
 from emails.types import RenderEnv
 from order.emails import shipment_email
 from order.storefront_links import order_page_url
-from shipping_acs.carrier import AcsCarrier
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import AcsShipment
 from tenant.credentials import tenant_site_name
@@ -301,7 +300,7 @@ def _sample_out_for_delivery(order: Order) -> AcsShipment:
 
 shipment_email(
     "shipping.acs_out_for_delivery",
-    carrier=AcsCarrier.code,
+    carrier="acs",
     title=_("ACS parcel out for delivery"),
     description=_("Sent when ACS has the parcel out for delivery."),
     templates="acs_out_for_delivery",

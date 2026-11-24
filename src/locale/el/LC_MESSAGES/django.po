@@ -8479,9 +8479,6 @@ msgstr "Locker"
 msgid "Locker External ID"
 msgstr "Εξωτερικό ID locker"
 
-msgid "Locker ID required when shipping method is BoxNow"
-msgstr "Το ID locker είναι υποχρεωτικό όταν η μέθοδος αποστολής είναι BoxNow"
-
 msgid "Locker address"
 msgstr "Διεύθυνση locker"
 
@@ -19264,6 +19261,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Location type, e.g. HOME or OFFICE (optional)"
 #~ msgstr "Τύπος τοποθεσίας, π.χ. HOME ή OFFICE (προαιρετικό)"
+
+#~ msgid "Locker ID required when shipping method is BoxNow"
+#~ msgstr "Το ID locker είναι υποχρεωτικό όταν η μέθοδος αποστολής είναι BoxNow"
 
 #, python-format
 #~ msgid "Low (%(stock)s)"

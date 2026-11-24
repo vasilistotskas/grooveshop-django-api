@@ -42,10 +42,6 @@ if TYPE_CHECKING:
 class FlatRateCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "flat_rate"
 
-    #: Nothing to pick — no locker, no pickup point, no per-order
-    #: carrier data. The interface anticipates exactly this shape.
-    payload_keys: ClassVar[tuple[str, ...]] = ()
-
     # ------------------------------------------------------------------
     # Lifecycle — there is no carrier system to talk to
     # ------------------------------------------------------------------
@@ -82,9 +78,6 @@ class FlatRateCarrier(ShippingCarrierInterface):
 
     def fetch_tracking_events(self, shipment: Any) -> list[dict[str, Any]]:
         return []
-
-    def shipment_for_order(self, order: Order) -> Any | None:
-        return None
 
     def holds_the_parcel(self, shipment: Any) -> bool:
         return False

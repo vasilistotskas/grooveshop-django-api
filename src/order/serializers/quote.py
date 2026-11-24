@@ -18,6 +18,7 @@ from rest_framework import serializers
 from product.managers.product import main_image_prefetch
 from promotion.enum import CouponRejectionReason
 from shipping.enum import FreeShippingSource, ShippingKind
+from shipping.interfaces import providers_by_field_rank
 
 
 class PickupPointSerializer(serializers.Serializer):
@@ -26,28 +27,20 @@ class PickupPointSerializer(serializers.Serializer):
     take the same fields, so the quote's ``cartDigest`` covers the
     point the order is sent to."""
 
-    # BoxNow locker (required when carrier=boxnow + kind=pickup_point)
-    boxnow_locker_id = serializers.CharField(
-        max_length=64,
-        required=False,
-        allow_blank=True,
-        help_text=_("BoxNow APM locker ID from the widget"),
-    )
-    # ACS station, only honoured when shipping_provider_code='acs'.
-    acs_station_external_id = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_(
-            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
-        ),
-    )
-    acs_station_branch = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_("ACS_Station_Branch_Destination value."),
-    )
+    def get_fields(self):
+        """Every registered carrier's pickup-point fields
+        (``checkout_fields`` named in its ``location_keys``, by its
+        ``field_rank``), then the declared ones: the carriers register
+        after this class is defined."""
+        return {
+            **{
+                name: field
+                for carrier in providers_by_field_rank()
+                for name, field in carrier.checkout_fields().items()
+                if name in carrier.location_keys
+            },
+            **super().get_fields(),
+        }
 
 
 class ExpectedTotalSerializer(serializers.Serializer):

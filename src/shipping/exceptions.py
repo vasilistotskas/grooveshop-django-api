@@ -135,6 +135,21 @@ class CarrierError(Exception):
     """
 
 
+class CarrierAPIError(CarrierError):
+    """The courier's API answered with an error (``AcsAPIError``,
+    ``BoxNowAPIError``): a refusal of the request, or, as a subclass that
+    is also a :class:`CarrierUnavailableError`, an answer to act on later.
+
+    :attr:`text` is the message the error carries, the one a view may
+    show: the courier's own words, or, for a :class:`CarrierBusyError`,
+    ours. Never ``str(exc)``, which holds the call's details for the log.
+    """
+
+    @property
+    def text(self) -> str:
+        raise NotImplementedError
+
+
 class CarrierUnavailableError(CarrierError):
     """The courier gave no answer to act on.
 

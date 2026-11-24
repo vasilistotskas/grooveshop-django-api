@@ -385,6 +385,24 @@ class TestAStationOrder:
         assert error.code == "pickup_point_required"
 
 
+class TestALockerOrderWithoutALocker:
+    def test_is_refused_on_the_locker_as_a_station_order_is(self):
+        """The one rule for every carrier (``_deliver_to_pickup_point``),
+        not a BoxNow rule of the serializer's own."""
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+        country = _checkout().country
+
+        serializer = _serializer(
+            country=country,
+            shipping_kind="pickup_point",
+            shipping_provider_code="boxnow",
+        )
+
+        assert not serializer.is_valid()
+        error = serializer.errors["boxnow_locker_id"][0]
+        assert error.code == "pickup_point_required"
+
+
 class TestAHomeDelivery:
     def test_still_needs_the_buyers_address(self):
         country = _checkout().country

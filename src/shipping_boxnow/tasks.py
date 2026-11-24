@@ -22,7 +22,7 @@ from shipping_boxnow.exceptions import (
     BoxNowConfigError,
     BoxNowRetryableError,
 )
-from tenant.celery import TenantTask
+from tenant.celery import TenantTask, run_for_all_tenants
 
 logger = logging.getLogger(__name__)
 
@@ -765,3 +765,48 @@ def settle_uncertain_boxnow_creations(
             )
             outcomes["unanswered"] += 1
     return dict(outcomes)
+
+
+# ---------------------------------------------------------------------------
+# Fan-outs: beat runs each in the public schema, and it queues the task in
+# every store's. Each keeps the name it had in ``tenant.tasks``, by which
+# beat, queued messages and deferred dispatches address it.
+# ---------------------------------------------------------------------------
+
+
+@shared_task(
+    base=TenantTask, name="tenant.tasks.fanout_poll_boxnow_tracking_batch"
+)
+def fanout_poll_boxnow_tracking_batch():
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.poll_boxnow_tracking_batch"
+    )
+
+
+@shared_task(
+    base=TenantTask,
+    name="tenant.tasks.fanout_settle_uncertain_boxnow_creations",
+)
+def fanout_settle_uncertain_boxnow_creations():
+    # Suspended stores too: a canceled order's parcel may be live at
+    # BoxNow whatever the store's status.
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        include_suspended=True,
+    )
+
+
+@shared_task(base=TenantTask, name="tenant.tasks.fanout_sync_boxnow_lockers")
+def fanout_sync_boxnow_lockers():
+    return run_for_all_tenants("shipping_boxnow.tasks.sync_boxnow_lockers")
+
+
+@shared_task(
+    base=TenantTask,
+    name="tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
+)
+def fanout_purge_expired_boxnow_parcel_events():
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
+        include_suspended=True,
+    )

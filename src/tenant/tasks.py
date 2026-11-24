@@ -203,62 +203,6 @@ def fanout_check_low_stock_products():
 
 
 @celery_app.task(base=TenantTask)
-def fanout_poll_acs_tracking_batch():
-    return run_for_all_tenants("shipping_acs.tasks.poll_acs_tracking_batch")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_issue_held_acs_vouchers():
-    return run_for_all_tenants("shipping_acs.tasks.issue_held_acs_vouchers")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_reconcile_acs_cod_payouts():
-    return run_for_all_tenants("shipping_acs.tasks.reconcile_acs_cod_payouts")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_poll_boxnow_tracking_batch():
-    return run_for_all_tenants(
-        "shipping_boxnow.tasks.poll_boxnow_tracking_batch"
-    )
-
-
-@celery_app.task(base=TenantTask)
-def fanout_settle_uncertain_boxnow_creations():
-    # Suspended stores too: a canceled order's parcel may be live at
-    # BoxNow whatever the store's status.
-    return run_for_all_tenants(
-        "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
-        include_suspended=True,
-    )
-
-
-@celery_app.task(base=TenantTask)
-def fanout_sync_boxnow_lockers():
-    return run_for_all_tenants("shipping_boxnow.tasks.sync_boxnow_lockers")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_sync_acs_stations():
-    return run_for_all_tenants("shipping_acs.tasks.sync_acs_stations")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_issue_daily_acs_pickup_list():
-    return run_for_all_tenants("shipping_acs.tasks.issue_daily_acs_pickup_list")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_alert_unremitted_cod_payouts():
-    # AcsShipment and AcsCodPayout are tenant-scoped, so beat must
-    # dispatch per-schema or the check runs against an empty public one.
-    return run_for_all_tenants(
-        "shipping_acs.tasks.alert_unremitted_cod_payouts"
-    )
-
-
-@celery_app.task(base=TenantTask)
 def fanout_anonymize_old_search_queries():
     return run_for_all_tenants(
         "search.tasks.anonymize_old_search_queries", days=90
@@ -339,16 +283,6 @@ def fanout_purge_expired_contact_records():
     )
 
 
-# A retention sweep like the ones above: the ACS call history holds
-# recipient details, so it reaches SUSPENDED tenants too.
-@celery_app.task(base=TenantTask)
-def fanout_purge_expired_acs_api_calls():
-    return run_for_all_tenants(
-        "shipping_acs.tasks.purge_expired_acs_api_calls",
-        include_suspended=True,
-    )
-
-
 # Erasure is owed by every store, so it reaches SUSPENDED tenants too.
 @celery_app.task(base=TenantTask)
 def fanout_erase_late_carrier_data():
@@ -365,26 +299,6 @@ def fanout_erase_late_carrier_data():
 def fanout_purge_unconfirmed_guest_subscriptions():
     return run_for_all_tenants(
         "user.tasks.purge_unconfirmed_guest_subscriptions",
-        include_suspended=True,
-    )
-
-
-# Suspended stores too, for the same reason: a guest's alert left
-# unconfirmed past its link's week is an address kept without consent.
-# More retention sweeps, so they reach SUSPENDED tenants too: a store's
-# billing state does not pause a deletion the platform promised.
-@celery_app.task(base=TenantTask)
-def fanout_purge_expired_acs_tracking_events():
-    return run_for_all_tenants(
-        "shipping_acs.tasks.purge_expired_acs_tracking_events",
-        include_suspended=True,
-    )
-
-
-@celery_app.task(base=TenantTask)
-def fanout_purge_expired_boxnow_parcel_events():
-    return run_for_all_tenants(
-        "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
         include_suspended=True,
     )
 
@@ -451,6 +365,8 @@ def fanout_purge_expired_email_logs():
     )
 
 
+# Suspended stores too, for the same reason: a guest's alert left
+# unconfirmed past its link's week is an address kept without consent.
 @celery_app.task(base=TenantTask)
 def fanout_purge_unconfirmed_guest_alerts():
     return run_for_all_tenants(
@@ -462,11 +378,6 @@ def fanout_purge_unconfirmed_guest_alerts():
 @celery_app.task(base=TenantTask)
 def fanout_cleanup_expired_data_exports():
     return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")
-
-
-@celery_app.task(base=TenantTask)
-def fanout_check_stale_acs_shipments():
-    return run_for_all_tenants("shipping_acs.tasks.check_stale_acs_shipments")
 
 
 @celery_app.task(base=TenantTask)

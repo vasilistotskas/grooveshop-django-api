@@ -18,6 +18,23 @@ from tenant.celery import run_for_all_tenants
 from tests.utils.staff import store_tenant
 
 
+def _registered_fanouts() -> list:
+    """Every fan-out task the worker registers, by its name
+    (``tenant.tasks.fanout_*``): ``tenant.tasks`` holds most, a carrier
+    app its own. Every app's ``tasks`` is imported first, as the worker's
+    autodiscovery does."""
+    from django.utils.module_loading import autodiscover_modules
+
+    from core import celery_app
+
+    autodiscover_modules("tasks")
+    return [
+        task
+        for name, task in sorted(celery_app.tasks.items())
+        if name.startswith("tenant.tasks.fanout_")
+    ]
+
+
 class TestRunForAllTenants:
     @pytest.mark.django_db
     def test_dispatches_one_send_per_active_tenant(self, db):
@@ -131,13 +148,7 @@ class TestSuspendedStores:
 
     @staticmethod
     def _run_every_fanout() -> list:
-        from tenant import tasks as tenant_tasks
-
-        wrappers = [
-            getattr(tenant_tasks, name)
-            for name in dir(tenant_tasks)
-            if name.startswith("fanout_")
-        ]
+        wrappers = _registered_fanouts()
         with (
             patch("core.celery_app.send_task") as send,
             patch("devtools.tasks.reset_demo_store_task.apply_async"),
@@ -333,10 +344,10 @@ class TestFanoutTaskWrappers:
 
     @pytest.mark.django_db
     def test_fanout_check_stale_acs_shipments(self):
-        from tenant import tasks as tenant_tasks
+        from shipping_acs import tasks as acs_tasks
 
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            tenant_tasks.fanout_check_stale_acs_shipments()
+        with patch("shipping_acs.tasks.run_for_all_tenants") as run:
+            acs_tasks.fanout_check_stale_acs_shipments()
 
         run.assert_called_once_with(
             "shipping_acs.tasks.check_stale_acs_shipments"
@@ -453,13 +464,12 @@ class TestBeatScheduleTenantCoverage:
     def test_every_fanout_beat_target_exists(self):
         from django.conf import settings
 
-        from tenant import tasks as tenant_tasks
-
+        registered = {task.name for task in _registered_fanouts()}
         missing = [
             entry["task"]
             for entry in settings.CELERY_BEAT_SCHEDULE.values()
             if entry["task"].startswith("tenant.tasks.fanout_")
-            and not hasattr(tenant_tasks, entry["task"].rsplit(".", 1)[1])
+            and entry["task"] not in registered
         ]
         assert not missing, f"Beat points at missing fanout tasks: {missing}"
 

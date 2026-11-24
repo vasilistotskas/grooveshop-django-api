@@ -83,10 +83,18 @@ Declared in `src/order/emails.py`, next to the builders that read the order:
 | `order.status_refunded` | the `Order`, closed as REFUNDED | required |
 | `order.refunded` | one refund `PaymentTransaction` | required |
 | `order.receipt_issued`, `order.credit_issued` | the `Invoice` / `RetailCredit` (PDF attached) | required; `StoreSwitchGate("MYDATA_ENABLED")` |
-| `shipping.acs_out_for_delivery` | the `AcsShipment` | switchable; `CarrierGate("acs")` |
-| `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
 | `team.new_order` | the `Order` | switchable, store staff |
 | `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
+
+Declared by the carrier apps through `order.emails.shipment_email`
+(`src/shipping_acs/emails.py`, `src/shipping_boxnow/emails.py`): order
+emails about the order's shipment, previewed from an order through the
+carrier's `shipment_for_order`, with their templates in `emails/order/`:
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `shipping.acs_out_for_delivery` | the `AcsShipment` | switchable; `CarrierGate("acs")` |
+| `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
 
 Declared in `src/product/emails.py` (templates in `emails/product_alerts/`; the
 ops alert `ops.review_pending` is under Operational alerts below):

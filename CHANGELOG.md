@@ -3,6 +3,28 @@
 
 
 
+## v3.270.0 (2026-11-24)
+
+### Features
+
+* feat(search): every product search hit states its main image's size (#826) ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
+* feat(search): a product search hit carries its main image's width and height
+
+The hit is enriched from the database, from the main image that
+get_search_result_queryset already prefetches for mainImagePath, so the
+size costs no query and needs no reindex.
+
+Refs #813 ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
+### Testing
+
+* test(search): pin the hit's image size to the main image, not the first
+
+The non-main image now comes first in the gallery, a main image of
+unknown size is covered, and the constant-query test gives every product
+a main image instead of the factory's random flag. ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
 ## v3.269.1 (2026-11-24)
 
 ### Bug fixes

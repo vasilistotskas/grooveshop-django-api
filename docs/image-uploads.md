@@ -99,7 +99,7 @@ size and stores none (null).
 |---|---|---|
 | `blog.BlogPost`, `blog.BlogCategory` | `image_width`, `image_height` | `mainImageWidth`, `mainImageHeight` on the post and category serializers |
 | `user.UserAccount` (a blog author's avatar) | `image_width`, `image_height` | the same, on `UserPublicSerializer` |
-| `product.ProductImage` | `image_width`, `image_height` | the same, on `ProductImageSerializer`; a product's card and detail carry its main image's (`Product.main_image`, prefetched) |
+| `product.ProductImage` | `image_width`, `image_height` | the same, on `ProductImageSerializer`; a product's card, its detail and its product search hit (`GET /api/v1/search/product`, read from the database like the hit's other card fields, not the index) carry its main image's (`Product.main_image`, prefetched) |
 
 Source: `src/core/utils/image_size.py` (`displayed_size`,
 `displayed_dimensions`: the one measurement, also used by an upload's validation

@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -81,6 +82,46 @@ def generate_schema_multi_lang(
         for language in languages
     }
     return {"type": "object", "properties": fields}
+
+
+_TEMPLATE_EXPRESSION = re.compile(r"\{([^}]+)\}")
+
+
+def _folded(name: str) -> str:
+    """A name without case or underscores: ``alpha_2`` and ``alpha2``,
+    ``page_key`` and ``pageKey`` fold to the same key."""
+    return name.replace("_", "").lower()
+
+
+def name_path_parameters_as_their_template(result, generator, **kwargs):
+    """Give every path parameter the name its URL template uses.
+
+    ``camelize_serializer_fields`` camel-cases every parameter name,
+    because the camel-case middleware underscores query names on the way
+    in. A path is matched by Django against the URL itself, which keeps
+    its snake_case expression (``/country/{alpha_2}``), and OpenAPI
+    requires a path parameter's ``name`` to equal that expression. Runs
+    after the camel-case hook; query parameters stay camel-cased.
+    """
+    for path, methods in result.get("paths", {}).items():
+        by_folded = {
+            _folded(expression): expression
+            for expression in _TEMPLATE_EXPRESSION.findall(path)
+        }
+        for operation in methods.values():
+            if not isinstance(operation, dict):
+                continue
+            for parameter in operation.get("parameters", []):
+                if parameter.get("in") != "path":
+                    continue
+                expression = by_folded.get(_folded(parameter["name"]))
+                if expression is None:
+                    raise ValueError(
+                        f"path parameter {parameter['name']!r} of {path} "
+                        "matches no expression of its template"
+                    )
+                parameter["name"] = expression
+    return result
 
 
 def postprocess_schema_parameters_to_accept_strings(

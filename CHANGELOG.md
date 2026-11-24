@@ -3,6 +3,32 @@
 
 
 
+## v3.269.1 (2026-11-24)
+
+### Bug fixes
+
+* fix(api): name each path parameter as its URL template names it (#825) ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
+* fix(api): name each path parameter as its URL template names it
+
+camelize_serializer_fields camel-cases every parameter name for the
+camel-case middleware, which underscores query names on the way in, but
+Django matches a path against the URL itself, whose expression stays
+snake_case. OpenAPI requires a path parameter's name to equal its
+template expression, so 15 operations were invalid. A postprocessing
+hook after the camel-case one gives each path parameter its template's
+expression and fails the schema build for one that matches none.
+
+The 15 renames are accepted in api-contract/ignore.txt until the
+storefront's next regeneration: nothing on the wire changes.
+
+Closes #814 ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
+* fix(api): retire the path-parameter overrides with the storefront release that regenerates them
+
+The regeneration ships in a feat release, v3.359.0; a stray v3.358.x
+patch reaching production first would have expired the lines early. ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
 ## v3.269.0 (2026-11-23)
 
 ### Bug fixes

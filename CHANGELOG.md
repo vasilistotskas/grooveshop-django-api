@@ -3,6 +3,43 @@
 
 
 
+## v3.270.2 (2026-11-24)
+
+### Chores
+
+* chore(shipping): unfinished work on #580 part 2 (order callers ask the carrier interface)
+
+Saved before a pause; not reviewed or complete. Resume from this branch. ([`fd8e423`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd8e4233132eb0f4e0db89345b292aa5e23467a8))
+
+* chore(api): drop the contract overrides storefront v3.359.0 retired (#828)
+
+The storefront's v3.359.0 takes the tagged-item contentObject as a
+Product (#793) and the path parameters named as their URL templates
+(#825); with it in production, check-ignore.py expires the 20 lines
+accepted until that release. ([`3d2dfa1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d2dfa133fed42b4f9824dfb6e761656d210f41a))
+
+### Refactoring
+
+* refactor(shipping): order callers ask the carrier interface; carriers declare checkout fields and tracking URLs (#829) ([`fd8e423`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd8e4233132eb0f4e0db89345b292aa5e23467a8))
+
+* refactor(shipping): the order code asks the carrier for its checkout fields and tracking page
+
+The checkout request fields (each carrier's pickup point and order
+options), the order view's shipment payload and the carrier tracking
+links come from the carrier interface (checkout_fields, field_rank,
+tracking_url_template) instead of naming ACS and BOX NOW in order. The
+order detail memoises the shipment payload on the serializer instead of
+in DRF's context, and with_shipments joins nothing when no carrier has a
+shipment row. ([`fd8e423`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd8e4233132eb0f4e0db89345b292aa5e23467a8))
+
+* refactor(shipping): the carrier emails name their carrier by its code, so importing them registers no carrier early
+
+Importing the carrier class from its emails module registered the
+carrier while the email catalogue was collected, ahead of the app order,
+which moved ACS ahead of BOX NOW wherever the admin lists one entry per
+carrier. The order view and detail tests read the serializer's fields,
+which now include the carriers' own. ([`fd8e423`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd8e4233132eb0f4e0db89345b292aa5e23467a8))
+
 ## v3.270.1 (2026-11-24)
 
 ### Bug fixes

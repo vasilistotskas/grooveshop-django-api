@@ -107,7 +107,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - Supports three pagination strategies via `?pagination_type=` query param: `pageNumber` (default), `cursor`, `limitOffset`
 - Handles multipart translation data via `TranslationsProcessingMixin`
 - Atomic transactions on create/update
-- URL confs wire actions by hand (`ViewSet.as_view({"post": "retry_payment"})`), not through a router; `RouterActionOverridesMixin` (in `BaseModelViewSet`) applies each extra action's `@action(...)` arguments — `throttle_classes`, `permission_classes`, `pagination_class`, `queryset` — the way DRF's router would. A viewset not built on `BaseModelViewSet` must include it; `tests/unit/core/test_routes_apply_action_overrides.py` fails for any route that drops an override
+- URL confs wire actions by hand (`ViewSet.as_view({"post": "create_checkout_session"})`), not through a router; `RouterActionOverridesMixin` (in `BaseModelViewSet`) applies each extra action's `@action(...)` arguments — `throttle_classes`, `permission_classes`, `pagination_class`, `queryset` — the way DRF's router would. A viewset not built on `BaseModelViewSet` must include it; `tests/unit/core/test_routes_apply_action_overrides.py` fails for any route that drops an override
 
 **Optimized Managers** (`src/core/managers/`):
 - `OptimizedManager`/`OptimizedQuerySet` — Override `for_list()` and `for_detail()` for select_related/prefetch_related

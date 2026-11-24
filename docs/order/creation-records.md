@@ -91,7 +91,7 @@ Orders made outside checkout — the demo seed (`src/devtools/demo_account.py`,
   an account cart brings no source, so the merged cart has none either.
   The cart response does not expose it; the storefront never reads it.
 - **Cart source on the order.** The cart is deleted once its lines
-  become an order (`_clear_cart_for_order`), so both creation paths copy
+  become an order (`_clear_cart_for_order`), so order creation copies
   the cart's first touch into `OrderAttribution.cart_source_type` /
   `cart_source` (`OrderAttributionService.record(..., cart=cart)`), next
   to the checkout source on the same row. Empty strings mean the cart
@@ -244,7 +244,7 @@ ordering (`CHECKOUT_CONSENT_SLUGS` in `src/page_config/legal_documents.py`).
 `OrderCreateFromCartSerializer.terms_accepted` (write-only boolean) says
 so; `false` is refused with `terms_not_accepted`. With it, the view
 resolves the acceptance (`OrderLegalAcceptanceService.accept`) before it
-creates anything or looks up a payment, and both creation paths store it
+creates anything, and order creation stores it
 (`OrderLegalAcceptanceService.record`, `src/order/services.py`) right after
 the attribution, inside the creation transaction: one
 `OrderLegalAcceptance` row per document.
@@ -269,16 +269,15 @@ the attribution, inside the creation transaction: one
   non-empty text in the language raises `LegalDocumentUnavailableError`:
   the buyer was shown a broken link, so nothing was accepted. Order
   creation answers 409 `legal_document_unavailable` (`error.document`
-  names the slug), logs an error and creates nothing. The cart's
-  `create_payment_intent` refuses the same way, because on the
-  payment-first path ([§3.1](creation.md)) the card is confirmed before the
-  order is
-  created: no money moves for an order Django would refuse.
+  names the slug), logs an error and creates nothing. Every order is
+  created before its payment ([§3.1](creation.md)), so no money moves for
+  an order Django would refuse.
   A store does not get there by an edit: `src/page_config/legal_guard.py`
   refuses, in the admin and the staff API, unpublishing, scheduling,
   renaming, emptying a served language or deleting a legal page.
-- **Every order.** `terms_accepted` is required, and both creation
-  paths take the resolved `LegalAcceptance` as a required argument, so
+- **Every order.** `terms_accepted` is required, and
+  `create_order_from_cart` takes the resolved `LegalAcceptance` as a
+  required argument, so
   no order is created without both rows. Orders placed before the field
   existed (`0092_legal_acceptance`, no backfill) have none.
 

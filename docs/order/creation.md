@@ -5,9 +5,11 @@ and says which file holds each § number used here.
 
 ## 3. Order creation paths
 
-Two entry points in `src/order/services.py` (the legacy
-`OrderService.create_order`
-— dead code with zero production callers — was removed 2026-08-24):
+One entry point in `src/order/services.py`,
+`OrderService.create_order_from_cart` (§3.1), for every pay way. The
+payment-first Stripe path (`cart/create-payment-intent`, then `POST /order`
+with `payment_intent_id`) was removed in #818: no money moves before the
+locked quote has run every refusal.
 
 ### 3.0 One total: the checkout quote and the expected total
 
@@ -18,9 +20,7 @@ caller:
 | Caller | Locks | Reads |
 |---|---|---|
 | `POST /api/v1/cart/quote` (`CartViewSet.quote`) | none | the whole quote, partial input allowed |
-| `POST /api/v1/cart/create-payment-intent` | none | `amount_due` is the intent's amount |
-| `create_order_from_cart` (§3.1) | `lock=True` | compares the intent's amount with `amount_due` |
-| `create_order_from_cart_offline` (§3.2) | `lock=True` | the order's charges |
+| `create_order_from_cart` (§3.1) | `lock=True` | the order's charges |
 
 - **The lines** (`CheckoutQuote.lines`, `QuoteLine`): the cart's lines
   as priced (`OrderQuoteService.priced_lines`): product, quantity, unit
@@ -56,8 +56,8 @@ caller:
 - **No carrier is asked while those rows are locked.** A carrier's live
   price is an HTTP call that can take seconds (ACS: a 15 s timeout), and
   every checkout sharing the cart, a promotion, the customer or a gift
-  card would wait behind it. So both creation paths resolve it BEFORE
-  their transaction (`OrderService._resolve_live_shipping` ->
+  card would wait behind it. So order creation resolves it BEFORE
+  its transaction (`OrderService._resolve_live_shipping` ->
   `OrderQuoteService.resolve_live_shipping` ->
   `ShippingService.resolve_live_price`), where the carrier's adapter
   caches the answer, and the locked quote prices with `cached_only`: it
@@ -74,9 +74,8 @@ caller:
   `redeem_points` is given the same one, as is `POST /loyalty/redeem` on
   an existing order.
 - **A pay way is accepted exactly when it is listed.** The quote's
-  `payWays`, the pay way a quote or a payment intent accepts, and the one
-  order creation accepts on both paths
-  (`OrderViewSet._validate_pay_way_for_order`) all come from
+  `payWays`, the pay way a quote accepts, and the one order creation
+  accepts (`OrderViewSet._validate_pay_way_for_order`) all come from
   `OrderQuoteService.offered_pay_ways`: active, through a provider the
   store holds credentials for, and not excluded for the delivery (a home
   delivery that names no carrier is judged by every carrier that could
@@ -96,12 +95,13 @@ caller:
 - **The expected total.** `POST /api/v1/order` requires
   `expectedTotal` `{amount, currency}`: the amount due in minor units
   (cents), as the quote returned it. An order is never created at a total
-  the client did not send. Both creation paths compare it, exactly, with the quote computed
-  under the cart lock. A difference creates nothing and answers **409**
+  the client did not send. Order creation compares it, exactly, with the
+  quote computed under the cart lock. A difference creates nothing and answers **409**
   `{detail, error: {type, quote}, code: "total_changed"}`, `quote` being
   the quote the order would have been created at, so the client shows the
   new total and sends its `expectedTotal`. This is the only amount check
-  the order-first path has (cash on delivery, Viva).
+  creation has: the payment is opened afterwards for the order's own
+  `calculate_order_total_amount()`.
   - What can change between the last render and the order: a price, VAT
     or markdown edit (a cart stores no price), a promotion starting, ending
     or reaching a usage limit, an edit to a shipping rate or a pay way, an
@@ -129,7 +129,7 @@ caller:
   completes) and no shipping charge, fee, loyalty or gift-card amount;
   `expectedTotal` holds what is paid, the pay way's fee included. It is stable while those do not change and reveals
   nothing of the cart. `POST /api/v1/order` takes an optional
-  `expectedCartDigest`; both creation paths compare it under the cart
+  `expectedCartDigest`; order creation compares it under the cart
   lock, before the total, and a difference creates nothing and answers
   **409** `{detail, error: {type, quote}, code: "cart_changed"}`. It
   catches what the total cannot: a line swapped for one at the same
@@ -148,8 +148,8 @@ caller:
     (`order.enum.create_error.CART_CHANGED_CODE`), and only to a request
     carrying `expectedCartDigest`. Optional until the storefront and the
     gateway send it; a later release requires it (#755).
-- **`POST /api/v1/cart/quote`** takes the choices of the payment-intent
-  body, each optional (`CartQuoteRequestSerializer`). A delivery is priced
+- **`POST /api/v1/cart/quote`** takes the checkout's choices, each
+  optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation
   prices a missing kind as home delivery; a quote does not assume one).
   Besides the rows it returns `expectedTotal` and `cartDigest`, to send
@@ -178,10 +178,10 @@ caller:
     priced has a code of its own (`shipping.enum.ShippingRefusal`:
     `shipping_unavailable`, `shipping_parcel_too_large`,
     `shipping_weight_exceeded`), so a client drops the selection instead
-    of matching translated text; the payment intent and order creation
-    keep `invalid_order_data` with `fieldErrors` for the same three
-    (`ShippingRefusedError` is an `InvalidOrderDataError`). The rest are
-    the payment-intent endpoint's: 400 `pay_way_unavailable` / 404
+    of matching translated text; order creation keeps
+    `invalid_order_data` with `fieldErrors` for the same three
+    (`ShippingRefusedError` is an `InvalidOrderDataError`). The rest: 400
+    `pay_way_unavailable` / 404
     `pay_way_not_found`, 400 `loyalty_requires_authentication` /
     `loyalty_redemption_invalid` / `loyalty_redemption_too_small` (points
     worth less than a cent would be spent for a discount of 0.00; the
@@ -200,14 +200,14 @@ caller:
     `cart_quote_anon` (`CartQuoteAnonThrottle`: guests, per cart for the
     gateway), not by the cart's write budget.
   - **Guessing a gift-card code is budgeted, using one is not.** The
-    quote, the payment intent and order creation each say what a card
-    settles (or that the code is no card), so each could be used to guess
-    codes. `giftcard.throttles.gift_card_code_throttles`, the one helper
-    the three views add to their throttles, gives a request that carries
+    quote and order creation each say what a card settles (or that the
+    code is no card), so each could be used to guess codes.
+    `giftcard.throttles.gift_card_code_throttles`, the one helper the two
+    views add to their throttles, gives a request that carries
     `giftCardCodes` a `GiftCardCodeThrottle`:
     - only a code **new to the cart** counts. The cart keeps the codes it
       has been allowed to try for `GIFT_CARD_CODES_SEEN_TTL_SECONDS`
-      (keyed digests, never the code), across the three routes, so a
+      (keyed digests, never the code), across the two routes, so a
       checkout that re-prices the same card on every change is never
       refused; a request with several new codes costs that many;
     - the caller pays, from the `gift_card_check` budget that
@@ -238,78 +238,35 @@ caller:
     the goods' rates and spreads the loyalty discount over the lines; the
     cart's `totalVatValue` is the goods' VAT only.
 
-### 3.1 `create_order_from_cart` — payment-first / online
-- **Caller**: `OrderViewSet.create` for an intent-based ONLINE pay way (Stripe)
-  whose request carries `payment_intent_id`. Every client reaches it through
-  `POST /api/v1/order`: the storefront, and the agent gateway's UCP/ACP
-  checkout (which sends no intent, so it takes §3.2). Nothing else calls it.
-  A Stripe request with no `payment_intent_id` takes §3.2 instead; this
-  path is being retired for it (#818).
-- Sets `status=PENDING`, `payment_status=<provider-returned>`.
-- **Does NOT** dispatch courier task here. Online payments defer
-  the dispatch to the payment-success webhook (PR #1 commit
-  `59527a87`; the `transaction.on_commit` invariant in
-  [§8](invariants.md) has the reason).
-- **The provider, like the carrier (§3.0), is asked before the
-  transaction opens.**
-  `_retrieve_payment_intent` runs `get_payment_status` (for Stripe
-  `PaymentIntent.retrieve` plus the dj-stripe sync, an HTTP round trip) and
-  refuses an intent that is not PENDING / PROCESSING / COMPLETED. Inside the
-  transaction that call held the cart row and every live automatic
-  `Promotion` row, which every concurrent checkout (Viva and COD included)
-  also locks, for as long as Stripe took to answer. Nothing is locked while
-  the provider answers, and `OrderViewSet.create` is deliberately NOT
-  `@transaction.atomic`: a view-level block would put the call back inside a
-  transaction, idle on a connection that `idle_in_transaction_session_timeout`
-  kills. `_create_order_for_verified_intent` is the one transaction; it
-  re-compares only what depends on server state, the intent's amount and
-  currency against the total it computes under lock (Step 2.5, the quote
-  of §3.0, which also prices loyalty and gift cards under their own
-  locks). Order of checks
-  therefore changed: a cart that cannot be checked out costs one provider
-  read first, with no lock.
-- **The intent must be this cart's** (`src/order/payments/payment_binding.py`,
-  `OrderService._verify_intent_binding`). An intent proves that money moved,
-  not what for, so each intent is tied to its purpose. Every PaymentIntent we
-  create now carries server-set metadata
-  (`purpose` = `cart` / `order` / `giftcard`, `subject` = the cart, order or
-  purchase uuid, `tenant_schema`), written by `StripePaymentProvider`
-  (`process_payment`, `create_checkout_session` and `confirm_delegated_payment`
-  all require it; `PayWayService.process_payment` sets it last, so a
-  caller's `payment_data` cannot). Payment-first creation refuses, as
-  `payment_verification`, an intent whose metadata is not `cart` + this
-  cart's uuid + this tenant, and any intent id a `GiftCardPurchase` holds.
-  The refusal names the key that differs, never the uuid. An intent created
-  before this shipped carries no metadata and is refused too. The webhook
-  side is the mirror: `payment_intent.succeeded` issues no gift card for an
-  intent an order also holds.
-- **Idempotent per payment intent.** `Order.payment_id` is unique
-  (`order_payment_id_unique`, a partial unique index over non-empty ids), and
-  `_order_created_for_payment` looks the intent up twice: first WITHOUT a lock,
-  before the provider is asked, so a repeat is answered from what is stored
-  and does not depend on the provider being reachable (a retry after a timeout
-  is when it may not be); then right after taking the cart row lock, BEFORE
-  cart validation, which is what serialises two first submits of one cart. The
-  order it produced for THIS cart is returned as it is (the view answers `201`
-  again, the same response the first submit got), so a double click, a retry
-  after a timeout or Back-and-resubmit while the hosted payment is open yields
-  one order and one stock decrement. Both run before cart validation because
-  the first order has already taken the stock (and, once paid, emptied the
-  cart), which a repeat would otherwise be refused for. An intent that belongs
-  to another cart, or to a canceled or deleted order, is not a repeat:
-  `PaymentVerificationError` (400 `payment_verification`) — answering would
-  hand one shopper another's order, creating would take a payment already
-  committed elsewhere. The cart lock does not serialise two DIFFERENT carts
-  submitting one intent: both can miss the lookup, and the unique index then
-  rejects the second insert. `create_order_from_cart` reads the violated
-  constraint's name off the database error (`PAYMENT_ID_UNIQUE_CONSTRAINT`;
-  any other integrity error keeps its generic `invalid_order_data`) and
-  answers it the same way, `payment_verification`.
-  Limits: the repeat must reach the service (the view validates the cart
-  first, so a repeat after the first order emptied the last units, or after the
-  cart was deleted on payment, is refused there as before, with no duplicate);
-  and a repeat is answered with the first order even if the body now carries a
-  different address, because the intent was paid for that one.
+### 3.1 `create_order_from_cart` — every pay way, order first
+- **Caller**: `OrderViewSet.create` (`POST /api/v1/order`) alone, for every
+  pay way: the storefront's checkout (both designs) and the agent gateway's
+  UCP/ACP checkout. The body carries no payment; the cart comes from
+  `X-Cart-Id`.
+- Sets `status=PENDING`, `payment_status=PENDING`.
+- **Every online pay way is order-first** (#818). An order for Stripe or
+  Viva is created PENDING with nothing charged and no `payment_id`, the cart
+  kept (`Order.awaits_online_payment`; it clears on `order_paid`), the
+  courier voucher deferred to the payment, and the payment opened
+  afterwards on the provider's hosted page by `create_checkout_session`
+  (or, for an agent's delegated card, `confirm_agent_payment`), which
+  charge `calculate_order_total_amount()`, what is left after the gift
+  cards, points and promotions. The quote's locked refusals (stock, total,
+  cart digest, the wholesale minimum) therefore all run before any payment
+  exists. Deductions covering the whole total settle the order here
+  (step 6.8: `GIFTCARD_<uuid>` or `DISCOUNT_<uuid>`, the voucher
+  dispatched, the cart cleared), whatever the pay way. There is no refusal
+  of a partial cover: the remainder is what the payment is opened for.
+- **No provider call, and no carrier call inside the transaction.** The
+  carrier's live price is resolved before the transaction opens (§3.0),
+  and `OrderViewSet.create` is deliberately NOT `@transaction.atomic`: a
+  view-level block would put that HTTP call back inside a transaction,
+  idle on a connection that `idle_in_transaction_session_timeout` kills.
+  `_create_order_locked` is the one transaction.
+- **Lock order**: the cart row, then what the quote locks (§3.0:
+  promotions, the customer's row when points are redeemed, the gift
+  cards), then the cart lines, then the products in pk order before any
+  `OrderItem` insert (below).
 - **Product locks are taken in ascending pk order, all in one statement, before
   the first row that references a product is inserted.** The cart-item query
   locks only the cart lines (`of=("self",)`; the join used to lock the products
@@ -376,33 +333,9 @@ caller:
   look at reservations: the import's preview warns when the new stock is below
   what is reserved.
 
-### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
-- **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
-  agent gateway's UCP/ACP checkout; `OrderViewSet.create` for every request
-  that carries no `payment_intent_id`, an intent-capable online pay way
-  (Stripe) included.
-- Sets `status=PENDING`, `payment_status=PENDING`.
-- **Every online pay way is order-first** (#818). An order for Stripe with no
-  intent is created like Viva's: PENDING with nothing charged and no
-  `payment_id`, the cart kept (`Order.awaits_online_payment`; it clears on
-  `order_paid`), the courier voucher deferred to the payment, and the
-  payment opened afterwards by `create_checkout_session` or
-  `create_payment_intent`, which charge `calculate_order_total_amount()`,
-  what is left after the gift cards, points and promotions. The quote's
-  locked refusals (stock, total, cart digest) therefore all run before any
-  payment exists. Deductions covering the whole total settle the order here
-  (step 6.8: `GIFTCARD_<uuid>` or `DISCOUNT_<uuid>`, the voucher dispatched,
-  the cart cleared), whatever the pay way. There is no refusal of a partial
-  cover: the remainder is what the payment is opened for.
-- Same lock order as §3.1: the cart row, then what the quote locks (§3.0:
-  promotions, the customer's row when points are redeemed, the gift
-  cards), then the cart lines, then the products in pk order before any
-  `OrderItem` insert. Until #635 this path priced loyalty and the gift
-  cards after the lines were written; it now takes those locks where §3.1
-  always did. There is no provider call here, and the carrier's live
-  price is resolved before the transaction (§3.0).
-- **Not idempotent for the storefront.** A hosted-payment order (Viva) keeps
-  the cart, so a repeat submit creates a second PENDING order that takes its
+### 3.2 Repeats: the storefront's, and one agent checkout, one order
+- **Not idempotent for the storefront.** A hosted-payment order (Viva,
+  Stripe) keeps the cart, so a repeat submit creates a second PENDING order that takes its
   own stock until its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a
   key over
   the whole request (cart lines and prices, pay way, address, loyalty points,
@@ -417,7 +350,6 @@ caller:
   when an order call goes unanswered, asks again with the same id. A
   repeat is answered with the order that checkout placed, the same `201`
   and body the first call got, and creates, refuses and sends nothing.
-  Both paths (§3.1 too) apply it the same way.
   - **Only the gateway names one.** `agentCheckout` is believed beside the
     gateway's secret in `X-Internal-Gateway` alone
     (`OrderViewSet._named_agent_checkout`), as `agentProtocol` is
@@ -434,7 +366,7 @@ caller:
     request serializer's own `agent_checkout` field; a malformed value
     names no checkout and the validation refuses it) and looks the
     checkout up (`OrderService.order_for_agent_checkout`) before the body
-    is validated. The first order took the stock and kept (Viva), emptied
+    is validated. The first order took the stock and kept (online), emptied
     or deleted (cash on delivery) the cart, and validation reads rows that
     can change after it (an active carrier, a country, a region), so the
     validation and the pay way, cart, stock and unpaid-cart checks could
@@ -445,8 +377,8 @@ caller:
     stock that other carts' active holds leave. A call whose first attempt
     never reached Django is an ordinary creation, refused only when that
     stock no longer covers the cart.
-  - **Under the cart lock.** Both locked halves look it up again right
-    after the cart row lock and before `_refuse_agent_order_on_unpaid_cart`.
+  - **Under the cart lock.** The locked half (`_create_order_locked`)
+    looks it up again right after the cart row lock and before `_refuse_agent_order_on_unpaid_cart`.
     Two calls of one checkout on one cart serialise there and the second
     returns the first's committed order.
   - **The index.** `order_agent_checkout_unique` is a partial unique index
@@ -483,16 +415,10 @@ caller:
     end the payment ([§7.1.0](cancel.md)). The earlier order need not be an
     agent's. It stops counting when it is paid, canceled (by its buyer, staff
     or the sweep at the end of its hold) or deleted.
-  - **Where.** In `create_order_from_cart_offline` alone, under the cart row
+  - **Where.** In `create_order_from_cart` alone, under the cart row
     lock and before the cart is validated. The lock is what serialises two
     agent orders racing for one cart: the second waits for it and then finds
     the first one's committed order.
-  - **Not on the payment-first path (§3.1).** There the payment is already
-    taken when the order is created, so a refusal would keep money for no
-    order, and the order it creates is a paid one, not a second order
-    awaiting its payment; the earlier unpaid order is left to the sweep. The
-    gateway sends no payment intent, so no agent order takes that path
-    today.
   - **The answer.** `CartHasUnpaidOrderError`, which `OrderViewSet.create`
     answers as it answers `cart_empty`: `400`, `code`
     `cart_has_unpaid_order`, the message under `cart`. It names no order: an
@@ -506,5 +432,5 @@ caller:
   dispatch is wrapped in `transaction.on_commit` inside
   `ShippingService.dispatch_create_shipment_task` so the worker
   only sees the order after the create transaction commits.
-- For **online (Viva)**: skips the immediate dispatch — Viva's
-  webhook handler does it after payment confirms.
+- For **online (Viva, Stripe)**: skips the immediate dispatch — the
+  provider's webhook handler does it after the payment confirms.

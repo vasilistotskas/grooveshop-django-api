@@ -85,7 +85,7 @@ def checkout():
 
 
 def _create_order(checkout, codes):
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
@@ -144,7 +144,7 @@ class TestSplitPayment:
         )
         card = GiftCardFactory(initial_value=Money(Decimal(10), "EUR"))
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],

@@ -1,11 +1,10 @@
 """A Stripe order is created first and paid afterwards (#818).
 
-An online pay way whose provider can mint a client-confirmed intent
-(Stripe) takes the same path as Viva: ``POST /order`` without a payment
-intent creates the order PENDING, keeps the cart, defers the courier
-voucher, and the payment is opened by ``create_checkout_session`` or
-``create_payment_intent``. Deductions covering the whole total settle it
-at creation, as for any pay way.
+Stripe takes the same path as Viva: ``POST /order`` creates the order
+PENDING, keeps the cart, defers the courier voucher, and the payment is
+opened afterwards on the hosted page (``create_checkout_session``).
+Deductions covering the whole total settle it at creation, as for any pay
+way.
 
 ``TestPaymentWithoutOrderAlert`` covers the guard beside it: a succeeded
 PaymentIntent no order carries pages the store's staff, once.
@@ -129,7 +128,7 @@ def _create_order(checkout, codes=None):
     with patch.object(
         OrderService, "_dispatch_shipment_creation_task"
     ) as dispatch:
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -149,7 +148,7 @@ def _client(user):
     return client
 
 
-class TestAStripeOrderWithoutAnIntent:
+class TestAStripeOrderIsCreatedFirst:
     def test_is_created_pending_and_keeps_the_cart(self, checkout):
         order, dispatch = _create_order(checkout)
 
@@ -235,32 +234,6 @@ class TestThePaymentIsOpenedAfterwards:
         order.refresh_from_db()
         assert order.metadata["stripe_checkout_session_id"] == "cs_818"
 
-    def test_create_payment_intent_charges_the_remainder(
-        self, enable_gift_cards, checkout
-    ):
-        order = self._remainder_order(enable_gift_cards, checkout)
-        intent = Mock(
-            id="pi_818",
-            status="requires_payment_method",
-            client_secret="pi_818_secret",
-            next_action=None,
-        )
-
-        with patch.object(
-            stripe.PaymentIntent, "create", return_value=intent
-        ) as create:
-            response = _client(checkout["user"]).post(
-                reverse("order-create-payment-intent", kwargs={"pk": order.pk}),
-                {},
-                format="json",
-            )
-
-        assert response.status_code == 200, response.data
-        sent = create.call_args.kwargs
-        assert sent["amount"] == round(order.amount_due.amount * 100)
-        order.refresh_from_db()
-        assert order.payment_id == "pi_818"
-
 
 def _succeeded(payment_id, *, metadata=None):
     event = Mock(spec=Event)
@@ -328,7 +301,9 @@ class TestPaymentWithoutOrderAlert:
         )
 
         queued.assert_called_once()
-        assert queued.call_args.kwargs["countdown"] == 0
+        # At once: every intent of ours is opened for an order that
+        # already exists, so nothing is waited for.
+        assert "countdown" not in queued.call_args.kwargs
         assert queued.call_args.kwargs["kwargs"]["payment_id"] == payment_id
 
     def test_the_task_alerts_once_however_often_it_runs(self):
@@ -381,6 +356,19 @@ class TestPaymentWithoutOrderAlert:
         assert "Could not release the payment-without-order claim" in (
             caplog.text
         )
+
+    def test_an_order_that_carries_it_by_then_sends_nothing(self):
+        payment_id = _payment_id()
+        OrderFactory(
+            num_order_items=0,
+            payment_id=payment_id,
+            pay_way=PayWayFactory.create_online_payment("stripe"),
+        )
+
+        with patch("emails.send.send_email") as send:
+            _run_task(payment_id)
+
+        send.assert_not_called()
 
     def test_an_unbound_payment_is_logged_and_queues_nothing(
         self, django_capture_on_commit_callbacks, caplog
@@ -502,43 +490,25 @@ class TestPaymentWithoutOrderAlert:
         queued.assert_not_called()
 
 
-class TestAPaymentFirstIntentWaitsForItsOrder:
-    """A payment-first intent can succeed before ``POST /order`` has created
-    its order, so its alert waits the grace and is sent only if no order
-    carries it by then. Removed with the payment-first path (#818, R3)."""
+class TestARetiredCartBoundIntent:
+    """The payment-first path bound its intent to a cart (purpose
+    ``cart``). No client can confirm one since that path went (#818), and
+    such an intent is no payment of this store's orders any more: it is
+    logged, never alerted."""
 
-    def test_the_alert_is_deferred_by_the_grace(
-        self, django_capture_on_commit_callbacks
+    def test_is_logged_and_queues_nothing(
+        self, django_capture_on_commit_callbacks, caplog
     ):
-        payment_id = _payment_id()
+        metadata = {
+            "purpose": "cart",
+            "subject": str(uuid.uuid4()),
+            "tenant_schema": connection.schema_name,
+        }
 
-        queued = _webhook(
-            payment_id,
-            django_capture_on_commit_callbacks,
-            _bound(PaymentPurpose.CART),
-        )
+        with caplog.at_level("WARNING"):
+            queued = _webhook(
+                _payment_id(), django_capture_on_commit_callbacks, metadata
+            )
 
-        queued.assert_called_once()
-        assert queued.call_args.kwargs["countdown"] == 15 * 60
-
-    def test_an_order_created_meanwhile_sends_nothing(self):
-        payment_id = _payment_id()
-        OrderFactory(
-            num_order_items=0,
-            payment_id=payment_id,
-            pay_way=PayWayFactory.create_online_payment("stripe"),
-        )
-
-        with patch("emails.send.send_email") as send:
-            _run_task(payment_id)
-
-        send.assert_not_called()
-
-    def test_no_order_after_the_grace_alerts_once(self):
-        payment_id = _payment_id()
-
-        with patch("emails.send.send_email") as send:
-            _run_task(payment_id)
-            _run_task(payment_id)
-
-        send.assert_called_once()
+        queued.assert_not_called()
+        assert "is not bound to this store's orders" in caplog.text

@@ -136,7 +136,7 @@ address it cannot place (prod order #316: street "1", street number
   country. A `region_id` with no such region is a 400 `region_invalid` and
   one of another country `region_country_mismatch`, both on `regionId`
   (`address_rules.region_errors`), from order creation and from the quote
-  and create-payment-intent bodies, which skip it for a pickup delivery;
+  body, which skips it for a pickup delivery;
   never a foreign key the database refuses.
   `src/country/migrations/0012_seed_iso_countries.py` seeds the
   full ISO 3166-1 list, most of which have no seeded regions at all —

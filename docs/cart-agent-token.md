@@ -41,7 +41,7 @@ The gateway then sends `X-Cart-Token: <token>` on its calls.
 | `GET/POST /cart/item`, `GET/PUT/PATCH/DELETE /cart/item/<id>` | yes |
 | `POST/DELETE /cart/coupon` | yes |
 | `GET /shipping/options`, `POST /shipping/boxnow/lockers/nearest` | yes (they read the cart only to tell whether it fits a carrier's parcels: `exceedsParcelSize`, the locker `requiredSize`) |
-| `PUT/PATCH/DELETE /cart`, `reserve-stock`, `release-reservations`, `create-payment-intent`, orders, everything else | **403** `cart_token_not_permitted` |
+| `PUT/PATCH/DELETE /cart`, `reserve-stock`, `release-reservations`, orders, everything else | **403** `cart_token_not_permitted` |
 
 The allowlist is `CartViewSet._CART_TOKEN_ACTIONS`, every action of
 `CartItemViewSet` and the two shipping reads (through `cart_item_pairs`);

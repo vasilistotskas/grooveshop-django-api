@@ -88,7 +88,7 @@ def checkout():
 
 
 def _create_offline_order(checkout):
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
@@ -197,7 +197,7 @@ class TestOfflineCheckoutWithCoupon:
         cart = CartFactory(user=second_user)
         cart.items.all().delete()
         CartItemFactory(cart=cart, product=checkout["product"], quantity=1)
-        second = OrderService.create_order_from_cart_offline(
+        second = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,

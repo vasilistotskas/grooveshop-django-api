@@ -131,9 +131,8 @@ accepting Cyprus orders at the Greek flat rate.
   coupon discounts, excluding shipping and the pay-way fee (loyalty
   points and gift cards are payment, not discounts, and do not move it).
   `OrderQuoteService.quote` passes it to `shipping_cost` and
-  `calculate_payment_method_fee`, and both order-creation paths, the
-  cart's create-payment-intent and `POST /cart/quote` price through that
-  one function ([§3.0](creation.md)), so they agree for the same pricing
+  `calculate_payment_method_fee`, and order creation and
+  `POST /cart/quote` price through that one function ([§3.0](creation.md)), so they agree for the same pricing
   inputs. The inputs can change between two requests (a price, a
   promotion, a rate), and then the later total differs: every order is
   created with the quote's `expectedTotal`, and only at that total. The cart response

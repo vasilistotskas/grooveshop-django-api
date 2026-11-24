@@ -277,8 +277,9 @@ class GiftCardViewSet(BaseModelViewSet):
             "currency": str(amount.currency),
         }
 
-        # Hosted-redirect providers mint a checkout session; intent-first
-        # ones return a client secret the browser confirms. Asking the
+        # Hosted-redirect providers mint a checkout session; one that
+        # mints a client-confirmed intent returns a client secret the
+        # browser confirms. Asking the
         # capability rather than the vendor name means a new PSP picks
         # the right branch by declaring what it does.
         if not provider_supports(provider_code, "supports_payment_intent"):

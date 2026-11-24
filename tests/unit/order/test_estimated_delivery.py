@@ -17,10 +17,7 @@ from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 MONDAY_10_ATHENS = datetime(2026, 10, 5, 7, 0, tzinfo=UTC)
 MONDAY_1530_ATHENS = datetime(2026, 10, 5, 12, 30, tzinfo=UTC)
@@ -151,7 +148,7 @@ class TestSetAtCreation:
         with patch(
             "order.services.timezone.now", return_value=MONDAY_10_ATHENS
         ):
-            return OrderService.create_order_from_cart_offline(
+            return OrderService.create_order_from_cart(
                 **priced(
                     legal_acceptance=checkout_acceptance(),
                     cart=cart,
@@ -179,7 +176,7 @@ def _create_online():
     from djmoney.money import Money
 
     from cart.factories import CartFactory, CartItemFactory
-    from order.enum.status import PaymentStatus
+    from pay_way.enum.settlement import PaySettlement
     from pay_way.factories import PayWayFactory
     from product.factories import ProductFactory
     from user.factories import UserAccountFactory
@@ -199,14 +196,7 @@ def _create_online():
     )
     country = _country_with_rate(delivery_days_min=1, delivery_days_max=3)
 
-    with (
-        patch("order.payments.payment.get_payment_provider") as provider,
-        patch("order.services.timezone.now", return_value=MONDAY_10_ATHENS),
-    ):
-        provider.return_value.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {"payment_id": "pi_test_123", "status": "succeeded"},
-        )
+    with patch("order.services.timezone.now", return_value=MONDAY_10_ATHENS):
         order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
@@ -223,8 +213,11 @@ def _create_online():
                     "phone": "+306900000000",
                     "shipping_kind": "home_delivery",
                 },
-                payment_intent_id="pi_test_123",
-                pay_way=PayWayFactory(provider_code="stripe"),
+                pay_way=PayWayFactory(
+                    provider_code="stripe",
+                    settlement=PaySettlement.ONLINE,
+                    active=True,
+                ),
                 user=user,
             )
         )
@@ -233,9 +226,9 @@ def _create_online():
     return order
 
 
-def test_payment_first_creation_stores_the_estimate():
-    """``create_order_from_cart`` (online) seeds it too, not only the
-    offline path."""
+def test_online_creation_stores_the_estimate():
+    """An order an online pay way will pay afterwards seeds it too, not
+    only an offline one."""
     assert _create_online().estimated_delivery == date(2026, 10, 8)
 
 
@@ -269,7 +262,7 @@ class TestUnreadableCutoff:
         assert order.estimated_delivery is None
         assert "DISPATCH_CUTOFF" in caplog.text
 
-    def test_payment_first_order_is_still_created(self, caplog):
+    def test_online_order_is_still_created(self, caplog):
         _store_unvalidated_cutoff("25:99")
         order = _create_online()
         assert order.pk

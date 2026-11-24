@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -21,8 +21,6 @@ from tests.utils.payments import captured_for
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
-
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
 
 
 @pytest.mark.django_db
@@ -67,10 +65,8 @@ class TestTransactionFailuresRollbackCompletely:
             "stock_log_save_fails",
         ],
     )
-    @patch("order.payments.payment.get_payment_provider")
     def test_order_creation_rollback_on_failure(
         self,
-        mock_get_provider,
         failure_point,
         initial_stock,
         order_quantity,
@@ -86,14 +82,6 @@ class TestTransactionFailuresRollbackCompletely:
         4. No StockLog records are persisted
         5. No StockReservation records are consumed
         """
-        # Mock payment provider
-        mock_provider = Mock()
-        mock_provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {"status": "succeeded"},
-        )
-        mock_get_provider.return_value = mock_provider
-
         # Create product with initial stock
         product = ProductFactory.create(
             price=Money("50.00", settings.DEFAULT_CURRENCY),
@@ -118,10 +106,6 @@ class TestTransactionFailuresRollbackCompletely:
             cart=cart, product=product, quantity=order_quantity
         )
 
-        payment_intent_id = (
-            f"pi_test_rollback_{failure_point}_{timezone.now().timestamp()}"
-        )
-
         # Simulate failure at specified point
         if failure_point == "order_save":
             # Patch Order.save to raise exception
@@ -137,7 +121,6 @@ class TestTransactionFailuresRollbackCompletely:
                         legal_acceptance=checkout_acceptance(),
                         cart=cart,
                         shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
                         pay_way=self.pay_way,
                         user=self.user,
                     )
@@ -159,7 +142,6 @@ class TestTransactionFailuresRollbackCompletely:
                         legal_acceptance=checkout_acceptance(),
                         cart=cart,
                         shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
                         pay_way=self.pay_way,
                         user=self.user,
                     )
@@ -179,7 +161,6 @@ class TestTransactionFailuresRollbackCompletely:
                         legal_acceptance=checkout_acceptance(),
                         cart=cart,
                         shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
                         pay_way=self.pay_way,
                         user=self.user,
                     )
@@ -201,11 +182,9 @@ class TestTransactionFailuresRollbackCompletely:
             f"Expected {initial_order_count} orders, but found {final_order_count}"
         )
 
-        # Verify no order with this payment_id exists
-        assert not Order.objects.filter(
-            payment_id=payment_intent_id
-        ).exists(), (
-            f"Order with payment_id {payment_intent_id} should not exist after rollback"
+        # Verify no order of this customer exists
+        assert not Order.objects.filter(user=self.user).exists(), (
+            "No order of the customer should exist after rollback"
         )
 
         # 3. No OrderItem created
@@ -533,44 +512,30 @@ class TestTransactionFailuresRollbackCompletely:
         for product in products:
             CartItem.objects.create(cart=cart, product=product, quantity=10)
 
-        payment_intent_id = f"pi_test_multi_{timezone.now().timestamp()}"
+        # Simulate failure after processing some items
+        # Patch OrderItem.save to fail on the 3rd item
+        call_count = {"count": 0}
+        original_save = OrderItem.save
 
-        # Mock payment provider
-        with patch(
-            "order.payments.payment.get_payment_provider"
-        ) as mock_get_provider:
-            mock_provider = Mock()
-            mock_provider.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {"status": "succeeded"},
-            )
-            mock_get_provider.return_value = mock_provider
+        def failing_save(self, *args, **kwargs):
+            call_count["count"] += 1
+            if call_count["count"] >= 3:
+                raise Exception("OrderItem save failed on 3rd item")
+            return original_save(self, *args, **kwargs)
 
-            # Simulate failure after processing some items
-            # Patch OrderItem.save to fail on the 3rd item
-            call_count = {"count": 0}
-            original_save = OrderItem.save
-
-            def failing_save(self, *args, **kwargs):
-                call_count["count"] += 1
-                if call_count["count"] >= 3:
-                    raise Exception("OrderItem save failed on 3rd item")
-                return original_save(self, *args, **kwargs)
-
-            with patch.object(OrderItem, "save", failing_save):
-                with pytest.raises(
-                    Exception, match="OrderItem save failed on 3rd item"
-                ):
-                    OrderService.create_order_from_cart(
-                        **priced(
-                            legal_acceptance=checkout_acceptance(),
-                            cart=cart,
-                            shipping_address=self.shipping_address,
-                            payment_intent_id=payment_intent_id,
-                            pay_way=self.pay_way,
-                            user=self.user,
-                        )
+        with patch.object(OrderItem, "save", failing_save):
+            with pytest.raises(
+                Exception, match="OrderItem save failed on 3rd item"
+            ):
+                OrderService.create_order_from_cart(
+                    **priced(
+                        legal_acceptance=checkout_acceptance(),
+                        cart=cart,
+                        shipping_address=self.shipping_address,
+                        pay_way=self.pay_way,
+                        user=self.user,
                     )
+                )
 
         # Verify complete rollback for ALL products
         for product in products:

@@ -401,8 +401,8 @@ and says which file holds each § number used here.
   adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by
   default) and a `ShippingParcelTooLargeError` becomes the 400
   `invalid_order_data` ("The cart is too large for the selected shipping
-  method.") on `shippingProviderCode`, from order creation and from the
-  create-payment-intent endpoint. `/shipping/options` finds the cart the
+  method.") on `shippingProviderCode` from order creation, and the quote
+  answers it as `shipping_parcel_too_large`. `/shipping/options` finds the cart the
   way every cart endpoint does (`X-Cart-Id`, or the signed-in user's
   cart; `CartService`) and flags each option the cart does not fit with
   `exceeds_parcel_size`, by the same `assert_parcel_fits` rule. The option

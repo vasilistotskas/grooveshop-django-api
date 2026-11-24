@@ -54,12 +54,13 @@ from decimal import Decimal
 from typing import Any
 
 from core.enum import FloorChoicesEnum
-from devtools.demo_shipments import ShipmentRow
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
     NotificationTypeEnum,
 )
+from shipping.demo import ShipmentRow
+from shipping.enum import ShippingKind
 
 logger = logging.getLogger(__name__)
 
@@ -182,11 +183,16 @@ FAVOURITE_SLUGS: tuple[str, ...] = (
 )
 
 #: Where the parcels go. The lockers are named, never written to
-#: ``BoxNowLocker`` (see ``src/devtools/demo_shipments.py``).
+#: ``BoxNowLocker`` (see ``src/shipping_boxnow/demo.py``).
 _ACS_STATION = "ACS Θεσσαλονίκη — Κέντρο"
 _ACS_STATION_ATHENS = "ACS Αθήνα — Κέντρο"
 _LOCKER_THESSALONIKI = ShipmentRow(
-    "boxnow", "", "", "BOX NOW Locker · Τσιμισκή 70", "demo-apm-3001"
+    "boxnow",
+    "",
+    "",
+    "BOX NOW Locker · Τσιμισκή 70",
+    "demo-apm-3001",
+    kind=ShippingKind.PICKUP_POINT,
 )
 _LOCKER_CYPRUS = ShipmentRow(
     "boxnow",
@@ -195,6 +201,7 @@ _LOCKER_CYPRUS = ShipmentRow(
     "BOX NOW Locker · Λευκωσία, Λήδρας",
     "demo-apm-6001",
     destination_country="CY",
+    kind=ShippingKind.PICKUP_POINT,
 )
 
 
@@ -771,7 +778,6 @@ def _seed_orders(
     from order.models.order import Order
     from pay_way.models import PayWay
     from product.models import Product
-    from shipping.enum import ShippingKind
     from shipping.models.provider import ShippingProvider
 
     now = timezone.now()
@@ -861,8 +867,8 @@ def _seed_orders(
             "shipping_price": Money(Decimal(row.shipping_price), "EUR"),
             "shipping_provider": providers.get(carrier or "flat_rate"),
             "shipping_kind": (
-                ShippingKind.PICKUP_POINT
-                if carrier == "boxnow"
+                row.shipment.kind
+                if row.shipment
                 else ShippingKind.HOME_DELIVERY
             ),
             "tracking_number": row.shipment.voucher if row.shipment else "",
@@ -932,22 +938,18 @@ def _seed_orders(
 
 
 def _seed_shipment(row: OrderRow, order, now) -> bool:
-    """The ACS voucher or BoxNow parcel the order shipped under."""
+    """The parcel the order shipped under, written by its carrier
+    (``create_demo_shipment``)."""
     from djmoney.money import Money
 
-    from devtools.demo_shipments import (
-        create_acs_shipment,
-        create_boxnow_shipment,
-    )
     from pay_way.enum.settlement import PaySettlement
-    from shipping_acs.models import AcsShipment
-    from shipping_boxnow.models import BoxNowShipment
+    from shipping.interfaces import get_provider
 
     shipment = row.shipment
     if shipment is None:
         return False
-    model = AcsShipment if shipment.carrier == "acs" else BoxNowShipment
-    if model.objects.filter(order=order).exists():
+    carrier = get_provider(shipment.carrier)
+    if carrier.shipment_for_order(order) is not None:
         return False
 
     weight = sum(
@@ -959,26 +961,14 @@ def _seed_shipment(row: OrderRow, order, now) -> bool:
         PaySettlement(order.pay_way.settlement)
         in PaySettlement.collected_on_delivery()
     )
-    owed = order.amount_due if collected else Money(0, "EUR")
-    if shipment.carrier == "acs":
-        create_acs_shipment(
-            order,
-            shipment,
-            placed_at=order.created_at,
-            now=now,
-            cod_amount=owed,
-            weight_grams=weight,
-            pickup_point=False,
-        )
-    else:
-        create_boxnow_shipment(
-            order,
-            shipment,
-            placed_at=order.created_at,
-            now=now,
-            amount_to_collect=owed,
-            weight_grams=weight,
-        )
+    carrier.create_demo_shipment(
+        order,
+        shipment,
+        placed_at=order.created_at,
+        now=now,
+        collect=order.amount_due if collected else Money(0, "EUR"),
+        weight_grams=weight,
+    )
     return True
 
 

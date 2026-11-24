@@ -634,7 +634,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/B2BErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '500':
           content:
@@ -673,7 +675,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/B2BErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '401':
           content:
@@ -10324,7 +10329,7 @@ paths:
         description: Language to resolve the content in; unknown or omitted means
           the store's default language.
       - in: path
-        name: pageKey
+        name: page_key
         schema:
           type: string
         required: true
@@ -10548,7 +10553,7 @@ paths:
         description: Language to resolve the content in; unknown or omitted means
           the store's default language.
       - in: path
-        name: pageKey
+        name: page_key
         schema:
           type: string
         required: true
@@ -11299,7 +11304,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CouponErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/CouponErrorResponse'
           description: ''
         '401':
           content:
@@ -14045,7 +14053,7 @@ paths:
       summary: Ανάκτηση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14102,7 +14110,7 @@ paths:
       summary: Ενημέρωση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14178,7 +14186,7 @@ paths:
       summary: Μερική ενημέρωση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14253,7 +14261,7 @@ paths:
       summary: Διαγραφή Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14887,7 +14895,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GiftCardErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -15112,7 +15123,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GiftCardErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -17344,7 +17358,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderCreateError'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/OrderCreateError'
           description: ''
         '401':
           content:
@@ -18506,7 +18523,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderCancelError'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/OrderCancelError'
           description: ''
         '401':
           content:
@@ -28243,7 +28263,7 @@ paths:
           default: el
         description: Κωδικός γλώσσας για μεταφράσεις (el, en)
       - in: path
-        name: productId
+        name: product_id
         schema:
           oneOf:
           - type: string
@@ -29479,7 +29499,7 @@ paths:
       summary: Download ACS pickup-list manifest PDF
       parameters:
       - in: path
-        name: pickupListNo
+        name: pickup_list_no
         schema:
           type: string
         required: true
@@ -29526,7 +29546,7 @@ paths:
       summary: Cancel an ACS voucher
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -29556,7 +29576,7 @@ paths:
       summary: Download ACS voucher label PDF
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -29583,7 +29603,7 @@ paths:
       summary: Read ACS shipment tracking snapshot
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -30032,7 +30052,7 @@ paths:
       summary: Cancel a BoxNow parcel
       parameters:
       - in: path
-        name: parcelId
+        name: parcel_id
         schema:
           type: string
         required: true
@@ -30062,7 +30082,7 @@ paths:
       summary: Download BoxNow parcel label PDF
       parameters:
       - in: path
-        name: parcelId
+        name: parcel_id
         schema:
           type: string
         required: true
@@ -30231,7 +30251,7 @@ paths:
       summary: What shipping one product costs
       parameters:
       - in: path
-        name: productId
+        name: product_id
         schema:
           oneOf:
           - type: string
@@ -32339,7 +32359,7 @@ paths:
       summary: Λήψη εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
-        name: exportId
+        name: export_id
         schema:
           oneOf:
           - type: string
@@ -42074,7 +42094,7 @@ components:
           type: string
           format: email
           readOnly: true
-          title: Email παραλήπτη
+          nullable: true
         recipientName:
           type: string
           readOnly: true
@@ -50406,6 +50426,12 @@ components:
           type: string
         mainImagePath:
           type: string
+        mainImageWidth:
+          type: integer
+          nullable: true
+        mainImageHeight:
+          type: integer
+          nullable: true
         matchesPosition: {}
         rankingScore:
           type: number
@@ -50481,7 +50507,9 @@ components:
       - languageCode
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - master
       - matchesPosition
       - name
@@ -54744,25 +54772,8 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          type: object
-          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
-          properties:
-            id:
-              type: integer
-              example: 1
-            name:
-              type: string
-              example: Sample Product
-            description:
-              type: string
-              example: Product description
-            price:
-              type: string
-              example: '29.99'
-            active:
-              type: boolean
-              example: true
-          additionalProperties: true
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         createdAt:
           type: string
@@ -54811,25 +54822,8 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          type: object
-          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
-          properties:
-            id:
-              type: integer
-              example: 1
-            name:
-              type: string
-              example: Sample Product
-            description:
-              type: string
-              example: Product description
-            price:
-              type: string
-              example: '29.99'
-            active:
-              type: boolean
-              example: true
-          additionalProperties: true
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         createdAt:
           type: string
@@ -56377,12 +56371,16 @@ components:
     ApiValidationError:
       type: object
       description: 'A validation error: the field keys DRF always sent, plus ``code``
-        (the one code all errors share, else ``invalid``; absent when a field is itself
-        named ``code``) and ``fields``, each field''s messages with their codes. A
-        field of a nested serializer holds the nested object.'
+        (the one code all errors share, else ``invalid``; when a field is itself named
+        ``code``, that field''s messages instead) and ``fields``, each field''s messages
+        with their codes. A field of a nested serializer holds the nested object.'
       properties:
         code:
-          type: string
+          anyOf:
+          - type: string
+          - type: array
+            items:
+              type: string
         fields:
           type: object
           additionalProperties:

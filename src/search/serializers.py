@@ -66,6 +66,8 @@ class ProductTranslationSerializer(
 ):
     slug = serializers.SerializerMethodField()
     main_image_path = serializers.SerializerMethodField()
+    main_image_width = serializers.SerializerMethodField()
+    main_image_height = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
     formatted = serializers.SerializerMethodField()
@@ -98,6 +100,8 @@ class ProductTranslationSerializer(
             "description",
             "master",
             "main_image_path",
+            "main_image_width",
+            "main_image_height",
             "matches_position",
             "ranking_score",
             "formatted",
@@ -126,6 +130,14 @@ class ProductTranslationSerializer(
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
+
+    # The stored size of the main image, read from the image that
+    # ``get_search_result_queryset`` prefetches for the path: no query.
+    def get_main_image_width(self, obj) -> int | None:
+        return obj.master.main_image_width if obj.master else None
+
+    def get_main_image_height(self, obj) -> int | None:
+        return obj.master.main_image_height if obj.master else None
 
     def get_matches_position(self, obj):
         return self.context.get("_matchesPosition", {})
@@ -249,6 +261,8 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     master = serializers.IntegerField()
     slug = serializers.CharField()
     main_image_path = serializers.CharField()
+    main_image_width = serializers.IntegerField(allow_null=True)
+    main_image_height = serializers.IntegerField(allow_null=True)
     matches_position = serializers.JSONField()
     ranking_score = serializers.FloatField(allow_null=True)
     formatted = serializers.JSONField()

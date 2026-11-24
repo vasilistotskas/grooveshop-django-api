@@ -3,6 +3,250 @@
 
 
 
+## v3.270.1 (2026-11-24)
+
+### Bug fixes
+
+* fix(api): document the errors every view can raise, contentObject as a Product, and a gift card with no recipient as null (#793) ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(api): responses that broke their published schema
+
+- cart totalItems was declared int | Literal[0], a oneOf that 0 matches
+  twice: it is an int.
+- POST /country answered without hasRegions: Country.has_regions reads
+  the annotation, else one EXISTS.
+- tagged-item contentObject was a hand-written object with a string
+  price: it is declared as the ProductSerializer it returns.
+- Every 400 a view documents with its own body also lists
+  ApiValidationError and ApiError, and a 404 with its own body lists
+  ApiError, which is what the handler sends for a serializer error, a
+  ParseError or a NotFound. ApiValidationError.code is a string, or a
+  field's messages when a field is itself named code.
+- Test data: BoxNow locker mocks return BoxNow's whole locker, reviews
+  use ReviewStatus values, and search test products carry an empty
+  description.
+
+Known drifts, marked on the tests that meet them until their fixes land:
+a NULL product description in search hits, the bare array of
+?pagination=false on country and gift card lists, and a blank
+recipientEmail on an admin-issued gift card.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(api): keep the error-body and contentObject schema fixes for a release of their own
+
+The API contract check refuses them beside the live storefront: every 400
+gaining the validation and plain branches, ApiValidationError.code widening
+to a list, the B2B 404 gaining ApiError, and contentObject becoming the
+Product it returns (a number price) all change a response the storefront's
+generated document holds. They ship apart, consumer first; until then the
+tests that meet those bodies carry known_schema_drift. Drift markers are
+read when asked for, so a test can mark one of its parameters itself.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(api): document the errors every view can raise, contentObject as the Product it is, and a gift card with no recipient as null
+
+- Every 400 a view documents with its own body also lists
+  ApiValidationError and ApiError (a serializer error, a ParseError),
+  a 404 with its own body lists ApiError (a NotFound or a feature gate),
+  and ApiValidationError.code may be a field's messages when a field is
+  itself named code.
+- tagged-item contentObject is declared as the ProductSerializer it
+  returns, so its price is a number.
+- GiftCard.recipient_email is NULL for a card with no recipient: the
+  column is nullable, a data migration turns every empty string into
+  NULL, the service, the admin and erasure write NULL, the delivery and
+  reminder sweeps select cards that have one, and the API declares it
+  nullable instead of serving an empty string as an email.
+
+The known_schema_drift markers these fixed come off.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(giftcard): keep "" in the column and serve a missing recipient as null
+
+The repository's rule is one spelling of "no value" in a string column
+("", NOT NULL as the destination). The column keeps it; the API declares
+recipientEmail nullable and serves "" as null, as the product alert's
+email does. The migration, the NULL writers and the sweep filters go.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(tag): a tagged item names an existing object of a model its read serializer serves
+
+A write with any other content type made every read of the row a 500,
+and one naming a missing object served contentObject null, which the
+schema declares non-nullable. The content type choices are limited to
+the models CONTENT_OBJECT_SERIALIZERS serves and the object must exist
+(content_object_not_found). The demo seed stops tagging blog posts
+through TaggedItem: nothing reads those rows, and a blog post has tags
+of its own.
+
+The contentObject overrides now expire at storefront v3.359.0, the
+regeneration release. ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(tag): delete the tagged items whose object the API cannot serve
+
+The demo seed tagged blog posts through TaggedItem; GET tagged-item
+answered 500 for every page holding such a row, and nothing else read
+them. The migration names the servable models itself and only deletes,
+so the release still serving during the rollout is unaffected. ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(tag): hold every tagged item write to a servable, existing object
+
+The rule moves onto the model, where the admin and the API both go:
+TaggedItem.content_type limits its choices to the models the API serves
+(limit_choices_to, a state-only AlterField), and TaggedItem.clean refuses
+an object that does not exist. The serializer calls the same rule and
+keeps its coded 400. ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* fix(tag): also delete the product tagged items whose product row is gone
+
+Such a row served contentObject null. A soft-deleted product is kept:
+content_object resolves through the base manager, so the API still
+serves it. ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+### Chores
+
+* chore(api): accept the contentObject price as a number until the storefront regenerates it
+
+No storefront route reads tagged items, and no order of releases can
+pass the check otherwise: a storefront declaring Product is stricter
+than the live loose object, and Django declaring it changes the price's
+type. Django declares it first; the storefront's next regeneration takes
+it and the lines expire.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* chore(api): the contentObject override waits for the storefront release that regenerates it
+
+Its until is a placeholder that check-ignore refuses, so the PR cannot
+merge until the storefront release regenerated from this schema is cut
+and its version is written in.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* chore(api): name storefront v3.358.1 as the release that retires the contentObject overrides ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+### Testing
+
+* test: judge every API response the suite receives against the schema
+
+Wrap django.test.Client.request for the whole session: each /api/v1
+response is matched to its operation (literal routes before parametric
+ones, an equal fit fails) and a JSON body of a documented status, error
+bodies included, must satisfy the generated document, formats included.
+A failure names the method, the operation, the status and the first
+schema error. What cannot be judged is counted in the terminal summary
+and listed with -v. A drift waiting on a contract decision is marked on
+the test that meets it (known_schema_drift), and the test fails once the
+drift is gone.
+
+The builder's own guard folds into it (its strict undeclared-status rule
+is kept for /api/v1/builder/), the duplicate generated_schema fixture and
+the inlining as_json_schema converter go, and the components are
+converted once per document.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* test: build the response contract's document before any test runs
+
+A test marked to serve the platform URL conf (tenant.urls_public) that
+answered the first API response of a worker built the document from that
+conf, and every later test of the worker was judged against one missing
+the store's operations.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* test: the response contract's formats as strict as the storefront's parsers
+
+The independent review of the guard:
+
+- uuid and email use zod 4's own patterns, date-time its ranges, and
+  uri follows URL.canParse or is stricter (a host without a forbidden
+  code point for a special scheme, a valid address, a port in range); a
+  ValueError from urlsplit or ipaddress fails the value.
+- A known_schema_drift marker names the paths where a body may fail
+  (at=), so any other failure on that operation still fails.
+- A test whose call already failed is not told its drift is gone.
+- The validator cache keeps the node it is keyed by, and the literal
+  parts of a route template are escaped.
+docs/builder/publishing.md names the guard that replaced the builder's.
+
+The public-residue command tests patched tenant.app_labels, which the
+command had already bound by import, so they ran against the real set of
+every tenant table: they now patch the name where the command reads it.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* test: the response contract after CodeRabbit's review
+
+- uri: an authority is validated for every scheme (an opaque host has no
+  forbidden code point, a port is in range) and an IPv6 host with a zone
+  is refused, as URL.canParse refuses it.
+- A drift marker is judged gone only after its test's call ran and
+  passed, never after a skip or a failure.
+- Under /api/v1/builder/ a path no operation fits fails.
+- The docs say which responses the guard judges: a documented status
+  with a JSON schema and a JSON body.
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* test: take off the drift markers this fixes, after the merge of main
+
+Refs #684 ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+* test(giftcard): import TenantMembershipRole from tenant.enum, where it moved ([`b75a5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b75a5fd3b771db1fdee8edf047916277a591399a))
+
+## v3.270.0 (2026-11-24)
+
+### Features
+
+* feat(search): every product search hit states its main image's size (#826) ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
+* feat(search): a product search hit carries its main image's width and height
+
+The hit is enriched from the database, from the main image that
+get_search_result_queryset already prefetches for mainImagePath, so the
+size costs no query and needs no reindex.
+
+Refs #813 ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
+### Testing
+
+* test(search): pin the hit's image size to the main image, not the first
+
+The non-main image now comes first in the gallery, a main image of
+unknown size is covered, and the constant-query test gives every product
+a main image instead of the factory's random flag. ([`b8dcf70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8dcf708573d777dc06dda5ad3296489a1bedca1))
+
+## v3.269.1 (2026-11-24)
+
+### Bug fixes
+
+* fix(api): name each path parameter as its URL template names it (#825) ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
+* fix(api): name each path parameter as its URL template names it
+
+camelize_serializer_fields camel-cases every parameter name for the
+camel-case middleware, which underscores query names on the way in, but
+Django matches a path against the URL itself, whose expression stays
+snake_case. OpenAPI requires a path parameter's name to equal its
+template expression, so 15 operations were invalid. A postprocessing
+hook after the camel-case one gives each path parameter its template's
+expression and fails the schema build for one that matches none.
+
+The 15 renames are accepted in api-contract/ignore.txt until the
+storefront's next regeneration: nothing on the wire changes.
+
+Closes #814 ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
+* fix(api): retire the path-parameter overrides with the storefront release that regenerates them
+
+The regeneration ships in a feat release, v3.359.0; a stray v3.358.x
+patch reaching production first would have expired the lines early. ([`7ecc88c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecc88c34a37f654b6323e46340e078f3d866361))
+
 ## v3.269.0 (2026-11-23)
 
 ### Bug fixes

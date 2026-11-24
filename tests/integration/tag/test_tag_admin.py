@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
 from django.utils import formats, timezone
 
+from blog.factories.post import BlogPostFactory
 from product.factories import ProductFactory
 from tag.admin import (
     ContentTypeFilter,
@@ -212,6 +213,70 @@ class TestTagAdmin:
         assert tag1.active is False
         assert tag2.active is False
         mock_message_user.assert_called_once()
+
+
+def _add_form(tagged_item_admin, admin_request, **data):
+    form_class = tagged_item_admin.get_form(admin_request)
+    return form_class(data=data)
+
+
+@pytest.mark.django_db
+class TestTaggedItemAdminAddForm:
+    """The admin add form holds a row to what the API can serve: a
+    product that exists (``TaggedItem.content_type``'s
+    ``limit_choices_to`` and ``TaggedItem.clean``)."""
+
+    def test_accepts_an_existing_product(
+        self, tagged_item_admin, admin_request
+    ):
+        product = ProductFactory(num_images=0, num_reviews=0)
+        form = _add_form(
+            tagged_item_admin,
+            admin_request,
+            tag=TagFactory(active=True).pk,
+            content_type=ContentType.objects.get(
+                app_label="product", model="product"
+            ).pk,
+            object_id=product.pk,
+        )
+
+        assert form.is_valid(), form.errors
+
+    def test_refuses_a_blog_post(self, tagged_item_admin, admin_request):
+        post = BlogPostFactory()
+        form = _add_form(
+            tagged_item_admin,
+            admin_request,
+            tag=TagFactory(active=True).pk,
+            content_type=ContentType.objects.get(
+                app_label="blog", model="blogpost"
+            ).pk,
+            object_id=post.pk,
+        )
+
+        assert not form.is_valid()
+        assert form.errors.as_data()["content_type"][0].code == (
+            "invalid_choice"
+        )
+
+    def test_refuses_a_product_that_does_not_exist(
+        self, tagged_item_admin, admin_request
+    ):
+        product = ProductFactory(num_images=0, num_reviews=0)
+        form = _add_form(
+            tagged_item_admin,
+            admin_request,
+            tag=TagFactory(active=True).pk,
+            content_type=ContentType.objects.get(
+                app_label="product", model="product"
+            ).pk,
+            object_id=product.pk + 1000,
+        )
+
+        assert not form.is_valid()
+        assert form.errors.as_data()["object_id"][0].code == (
+            "content_object_not_found"
+        )
 
 
 @pytest.mark.django_db

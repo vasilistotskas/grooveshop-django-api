@@ -32,9 +32,11 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
+    from django.contrib.admin.options import InlineModelAdmin
     from django.db.models import Q
     from django_stubs_ext import StrOrPromise
     from djmoney.money import Money
+    from rest_framework.serializers import BaseSerializer, Field
 
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
@@ -96,6 +98,18 @@ class AttentionRow:
     description: StrOrPromise
     model: str
     query: str
+
+
+@dataclass(frozen=True)
+class OrderShipmentField:
+    """A carrier's own field on the order detail: its shipment, in the
+    shape of its detail serializer, null for an order another carrier
+    ships. The serializer types the field in the OpenAPI schema; the value
+    is :meth:`ShippingCarrierInterface.serialize_shipment`'s."""
+
+    name: str
+    serializer: type[BaseSerializer]
+    help_text: str
 
 
 # The refusals of a pickup point at checkout, one text each for every
@@ -185,26 +199,44 @@ class ShippingCarrierInterface(ABC):
     # (``shipping.webhook_urls``): its paths are the ones registered with
     # the courier. ``None`` for a carrier that calls us nothing.
     webhook_urlconf: ClassVar[str | None] = None
+    # The reverse one-to-one from ``Order`` to this carrier's shipment row
+    # (``AcsShipment.order``'s ``related_name``), ``None`` for a carrier
+    # with no row of its own. The order lists join it, and
+    # :meth:`shipment_for_order` reads it.
+    shipment_relation: ClassVar[str | None] = None
+
+    # What the order detail reads of this carrier, as prefetch lookups
+    # on ``Order``: the shipment relation, and the rows below it its
+    # detail serializer reads.
+    order_detail_prefetches: ClassVar[tuple[str, ...]] = ()
+
+    # The order changelist's search fields and list filters this carrier
+    # adds, as lookups on ``Order`` (``boxnow_shipment__parcel_id``).
+    admin_order_search_fields: ClassVar[tuple[str, ...]] = ()
+    admin_order_list_filters: ClassVar[tuple[str, ...]] = ()
 
     # The models whose writes change :meth:`attention_counts`, as
     # ``app_label.Model``: a write clears the dashboard's cached counts.
     attention_models: ClassVar[tuple[str, ...]] = ()
 
-    # Carrier-specific keys that arrive in the create-order request
-    # body but are NOT columns on ``Order``. The order-flow code pops
-    # these off the request dict before calling ``Order.objects.create``
-    # and hands them to ``create_shipment_row`` so each provider reads
-    # its own subset. Override per provider — empty tuple means the
-    # carrier doesn't add any per-order payload (e.g. flat home-delivery
-    # carriers without locker selection).
-    payload_keys: ClassVar[tuple[str, ...]] = ()
-
-    # The ``payload_keys`` that name the pickup point the shopper chose
-    # (a locker, a station). The checkout quote takes them as order
-    # creation does, and the cart digest covers them
+    # The names of :meth:`checkout_fields` that name the pickup point the
+    # shopper chose (a locker, a station). The checkout quote takes them
+    # as order creation does, and the cart digest covers them
     # (``order.checkout.quote.ShippingChoice``), so an order goes to the
     # pickup point it was quoted for.
     location_keys: ClassVar[tuple[str, ...]] = ()
+
+    # Where this carrier's own fields sit among the carriers' in an API
+    # body (the checkout's :meth:`checkout_fields`, the order detail's
+    # :meth:`order_shipment_field`): lower first, carriers that tie in
+    # the order they registered (:func:`providers_by_field_rank`).
+    field_rank: ClassVar[int] = 0
+
+    # The courier's public tracking page of a parcel, ``{number}`` its
+    # tracking number (``Order.tracking_number``, recorded with this
+    # carrier's ``code``), for the order's tracking link; ``None`` for a
+    # carrier with no such page.
+    tracking_url_template: ClassVar[str | None] = None
 
     @abstractmethod
     def create_shipment(
@@ -275,9 +307,29 @@ class ShippingCarrierInterface(ABC):
         return an empty list because events arrive via webhook.
         """
 
-    @abstractmethod
     def shipment_for_order(self, order: Order) -> Any | None:
-        """Return the provider's shipment row attached to ``order`` or None."""
+        """The carrier's shipment row of ``order`` (its
+        :attr:`shipment_relation`), or ``None``."""
+        if self.shipment_relation is None:
+            return None
+        return getattr(order, self.shipment_relation, None)
+
+    def shipment_state(self, shipment: Any) -> tuple[str, StrOrPromise] | None:
+        """The state of ``shipment`` as the admin labels it: its value
+        (a key of :meth:`shipment_state_variants`) and its display.
+
+        Default: none, for a carrier whose shipments have no states.
+        """
+        return None
+
+    def last_reported_at(self, shipment: Any) -> datetime | None:
+        """When the carrier last reported on the parcel of ``shipment``
+        (a tracking event, a webhook), what the follow-up of a waiting
+        order reads (``order.lifecycle.follow_up``).
+
+        Default: never, for a carrier that reports nothing.
+        """
+        return None
 
     @abstractmethod
     def holds_the_parcel(self, shipment: Any) -> bool:
@@ -529,6 +581,35 @@ class ShippingCarrierInterface(ABC):
         """
         return AdminPages()
 
+    def admin_order_inline(self) -> type[InlineModelAdmin] | None:
+        """The inline the order change page shows for an order this
+        carrier ships: its shipment row.
+
+        Default: none, for a carrier with no row of its own.
+        """
+        return None
+
+    def checkout_fields(self) -> dict[str, Field]:
+        """The fields a checkout body takes for this carrier, by name, new
+        instances on every call: its pickup point (the
+        :attr:`location_keys`, on every body that names a delivery: the
+        quote, the payment intent, the order) and its options for the
+        order alone (order creation's body). Order creation hands the
+        values to :meth:`create_shipment` and
+        :meth:`validate_order_payload` as the payload.
+
+        Default: none, for a carrier with nothing to choose.
+        """
+        return {}
+
+    def order_shipment_field(self) -> OrderShipmentField | None:
+        """This carrier's own field on the order detail
+        (``OrderDetailSerializer``), next to the generic ``shipment``.
+
+        Default: none.
+        """
+        return None
+
     def shipment_state_variants(self) -> Mapping[str, str]:
         """The colour (an Unfold label variant: ``default``, ``info``,
         ``success``, ``warning``, ``danger``) of each state value of this
@@ -693,3 +774,33 @@ def is_registered(code: str) -> bool:
 def registered_providers() -> tuple[ShippingCarrierInterface, ...]:
     """Every registered adapter, for a rule that asks each carrier."""
     return tuple(_REGISTRY.values())
+
+
+def providers_by_field_rank() -> list[ShippingCarrierInterface]:
+    """Every registered adapter by its
+    :attr:`~ShippingCarrierInterface.field_rank`, for an API body that
+    lists fields of each carrier."""
+    return sorted(
+        registered_providers(), key=lambda carrier: carrier.field_rank
+    )
+
+
+def shipment_relations() -> tuple[str, ...]:
+    """Every carrier's :attr:`~ShippingCarrierInterface.shipment_relation`,
+    for a queryset of orders that joins their shipments."""
+    return tuple(
+        carrier.shipment_relation
+        for carrier in registered_providers()
+        if carrier.shipment_relation is not None
+    )
+
+
+def order_detail_prefetches() -> tuple[str, ...]:
+    """Every carrier's
+    :attr:`~ShippingCarrierInterface.order_detail_prefetches`, for a
+    queryset of orders the detail serializer reads."""
+    return tuple(
+        lookup
+        for carrier in registered_providers()
+        for lookup in carrier.order_detail_prefetches
+    )

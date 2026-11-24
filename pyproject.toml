@@ -728,16 +728,6 @@ source_modules = [
     "vat",
 ]
 forbidden_modules = ["shipping_acs", "shipping_boxnow"]
-ignore_imports = [
-    "order.admin -> shipping_acs.admin",
-    "order.admin -> shipping_boxnow.admin",
-    "order.emails -> shipping_acs.models",
-    "order.emails -> shipping_boxnow.models",
-    "order.serializers.order -> shipping_acs.serializers.shipment",
-    "order.serializers.order -> shipping_boxnow.serializers.shipment",
-    "order.views.order -> shipping_acs.exceptions",
-    "order.views.order -> shipping_boxnow.exceptions",
-]
 allow_indirect_imports = true
 
 # Inside `order` (issue #565). Each names one direction that held on the day

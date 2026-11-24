@@ -121,8 +121,10 @@ secrets), `src/tenant/provisioning.py`, `src/tenant/lifecycle.py`,
 `src/tenant/billing.py`, `src/tenant/cache.py` (`make_tenant_key`,
 `tenant_resolve_key`), `src/tenant/celery.py` (`TenantTask`,
 `run_for_all_tenants`, `dispatch_on_commit`), `src/tenant/tasks.py`
-(every beat fan-out, the health monitor and the scheduled backup, which
-alert the operators through `src/tenant/emails.py`), `src/tenant/features.py` (`STORE_FEATURES`, the
+(the beat fan-outs, a carrier's own excepted: those are in its app's
+`tasks.py` under their `tenant.tasks.fanout_*` names; the health monitor
+and the scheduled backup, which alert the operators through
+`src/tenant/emails.py`), `src/tenant/features.py` (`STORE_FEATURES`, the
 store feature table) and `src/tenant/customer_accounts.py` (a store
 without customer accounts).
 

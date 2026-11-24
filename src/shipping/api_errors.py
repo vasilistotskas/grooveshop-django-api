@@ -12,7 +12,11 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import APIException
 
-from shipping.exceptions import CarrierBusyError, CarrierUnavailableError
+from shipping.exceptions import (
+    CarrierAPIError,
+    CarrierBusyError,
+    CarrierUnavailableError,
+)
 
 
 class CarrierUnavailable(APIException):
@@ -75,6 +79,6 @@ def unanswered(exc: CarrierUnavailableError) -> APIException:
     with the refusal's text when the work is already running here, else
     the 503 outage answer."""
     if isinstance(exc, CarrierBusyError):
-        text = getattr(exc, "message", "") or getattr(exc, "error_message", "")
+        text = exc.text if isinstance(exc, CarrierAPIError) else ""
         return CarrierBusy(detail=text or None)
     return CarrierUnavailable()

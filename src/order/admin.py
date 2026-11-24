@@ -121,6 +121,8 @@ from order.refunds.service import RefundService
 from order.services import OrderService
 from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
+from shipping.interfaces import registered_providers, shipment_relations
+from shipping.services import ShippingService
 from user.models import UserAccount
 
 logger = logging.getLogger(__name__)
@@ -1402,9 +1404,8 @@ class OrderAdmin(BaseModelAdmin):
         # support uses for ticket triage.
         ("shipping_provider", RelatedDropdownFilter),
         "shipping_kind",
-        # Filter on the BoxNow parcel state via the OneToOne reverse
-        # relation. Only fires for BoxNow pickup-point orders.
-        "boxnow_shipment__parcel_state",
+        # Then each carrier's own (``admin_order_list_filters``, such as
+        # the BoxNow parcel state): ``get_list_filter``.
     ]
     search_fields = [
         "id",
@@ -1416,11 +1417,8 @@ class OrderAdmin(BaseModelAdmin):
         "city",
         "tracking_number",
         "payment_id",
-        # BoxNow voucher / delivery-request lookup by parcel ID, so
-        # support can paste a 10-digit voucher and find the order.
-        "boxnow_shipment__parcel_id",
-        "boxnow_shipment__delivery_request_id",
-        "boxnow_shipment__locker_external_id",
+        # Then each carrier's own (``admin_order_search_fields``, such as
+        # a BoxNow voucher): ``get_search_fields``.
     ]
     search_help_text = _(
         "Search by order ID, UUID, customer email/name/phone, city, "
@@ -1687,36 +1685,39 @@ class OrderAdmin(BaseModelAdmin):
         # lines. A row typed into a form has none of that behind it.
         return False
 
+    def get_search_fields(self, request):
+        # The carriers register after this class is defined, so their
+        # fields are read per request.
+        return [
+            *super().get_search_fields(request),
+            *(
+                field
+                for carrier in registered_providers()
+                for field in carrier.admin_order_search_fields
+            ),
+        ]
+
+    def get_list_filter(self, request):
+        return [
+            *super().get_list_filter(request),
+            *(
+                self.unfold_list_filter(lookup)
+                for carrier in registered_providers()
+                for lookup in carrier.admin_order_list_filters
+            ),
+        ]
+
     def get_inlines(self, request, obj=None):
-        # Show the carrier-specific shipment inline only when the order
-        # actually uses that provider — keeps the change form clean for
-        # the other case (e.g. ACS orders don't get a BoxNow inline).
-        # Lazy imports sidestep the circular ``order ↔ shipping_*``
-        # registration cycle at app-load time.
+        # The shipment inline of the order's own carrier only, so an ACS
+        # order shows no BoxNow inline. An order with no provider set
+        # gets none; its data lives on the order itself.
         inlines = list(super().get_inlines(request, obj))
         if obj is None:
             return inlines
-
-        provider_code = (
-            obj.shipping_provider.code if obj.shipping_provider_id else None
-        )
-        # Registry-driven inline routing keyed on
-        # ``obj.shipping_provider.code``. Rows with no provider set
-        # (pre-registry data) get neither carrier inline; their data
-        # still lives on the order itself and can be reviewed from
-        # the change form fields.
-        if provider_code == "boxnow":
-            from shipping_boxnow.admin import (
-                BoxNowShipmentOrderInline,
-            )
-
-            inlines.append(BoxNowShipmentOrderInline)
-        elif provider_code == "acs":
-            from shipping_acs.admin import (
-                AcsShipmentOrderInline,
-            )
-
-            inlines.append(AcsShipmentOrderInline)
+        carrier = ShippingService.adapter_for_order(obj)
+        inline = carrier.admin_order_inline() if carrier else None
+        if inline is not None:
+            inlines.append(inline)
         return inlines
 
     def get_queryset(self, request):
@@ -1742,8 +1743,7 @@ class OrderAdmin(BaseModelAdmin):
                 "pay_way",
                 "attribution",
                 "shipping_provider",
-                "boxnow_shipment",
-                "acs_shipment",
+                *shipment_relations(),
             )
         )
 
@@ -2047,26 +2047,14 @@ class OrderAdmin(BaseModelAdmin):
 
     @display(description=_("Shipment"), label=SHIPMENT_STATE_VARIANT)
     def shipment_state(self, obj):
-        """Carrier-agnostic shipment state, branching on the registry
-        FK's ``code`` — mirrors ``get_inlines`` provider routing.
-        """
-        provider_code = (
-            obj.shipping_provider.code if obj.shipping_provider_id else None
-        )
-        if provider_code == "acs":
-            shipment = getattr(obj, "acs_shipment", None)
-            if shipment is None:
-                return None
-            return (
-                shipment.shipment_state,
-                shipment.get_shipment_state_display(),
-            )
-        if provider_code == "boxnow":
-            shipment = getattr(obj, "boxnow_shipment", None)
-            if shipment is None:
-                return None
-            return shipment.parcel_state, shipment.get_parcel_state_display()
-        return None
+        """The state of the order's shipment, as its carrier labels it."""
+        carrier = ShippingService.adapter_for_order(obj)
+        if carrier is None:
+            return None
+        shipment = carrier.shipment_for_order(obj)
+        if shipment is None:
+            return None
+        return carrier.shipment_state(shipment)
 
     @display(description=_("Shipping"), ordering="tracking_number")
     def shipping_info(self, obj):
@@ -3261,8 +3249,6 @@ class OrderAdmin(BaseModelAdmin):
         """
         from django.http import HttpResponse
 
-        from shipping.services import ShippingService
-
         try:
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
@@ -3299,10 +3285,8 @@ class OrderAdmin(BaseModelAdmin):
         # etc.) and there is no label to fetch: say so instead of
         # showing the carrier's raw API error in the flash bar.
         if not adapter.has_label(shipment):
-            state_label = getattr(
-                shipment, "get_parcel_state_display", None
-            ) or getattr(shipment, "get_shipment_state_display", None)
-            state = state_label() if callable(state_label) else "pending"
+            labelled = adapter.shipment_state(shipment)
+            state = labelled[1] if labelled else "pending"
             messages.warning(
                 request,
                 _(

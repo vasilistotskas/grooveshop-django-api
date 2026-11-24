@@ -670,7 +670,6 @@ ignore_imports = [
     "core.templatetags.store_brand -> admin.branding",
     "core.urls -> emails.webhooks",
     "core.urls -> order.views.viva_webhook",
-    "core.urls -> shipping_boxnow.views.webhook",
     "core.utils.files -> search.transliteration",
     "core.validators.address -> country.models",
     "core.validators.address -> region.models",
@@ -730,15 +729,6 @@ source_modules = [
 ]
 forbidden_modules = ["shipping_acs", "shipping_boxnow"]
 ignore_imports = [
-    "core.urls -> shipping_boxnow.views.webhook",
-    "devtools.demo_account -> shipping_acs.models",
-    "devtools.demo_account -> shipping_boxnow.models",
-    "devtools.demo_shipments -> shipping_acs.enum.charge_type",
-    "devtools.demo_shipments -> shipping_acs.enum.cod_payment_way",
-    "devtools.demo_shipments -> shipping_acs.models",
-    "devtools.demo_shipments -> shipping_boxnow.enum.compartment_size",
-    "devtools.demo_shipments -> shipping_boxnow.enum.payment_mode",
-    "devtools.demo_shipments -> shipping_boxnow.models",
     "order.admin -> shipping_acs.admin",
     "order.admin -> shipping_boxnow.admin",
     "order.emails -> shipping_acs.models",

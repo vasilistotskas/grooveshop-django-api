@@ -36,7 +36,10 @@ from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 if TYPE_CHECKING:
     from datetime import datetime
 
+    from djmoney.money import Money
+
     from order.models.order import Order
+    from shipping.demo import ShipmentRow
     from shipping_boxnow.models import BoxNowShipment
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,8 @@ SHIPMENT_STATE_VARIANT: dict[str, str] = {
 class BoxNowCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "boxnow"
     app_label: ClassVar[str | None] = "shipping_boxnow"
+    api_urlconf: ClassVar[str | None] = "shipping_boxnow.urls"
+    webhook_urlconf: ClassVar[str | None] = "shipping_boxnow.webhook_urls"
     # BoxNow counts no work of its own; a canceled or re-issued parcel
     # moves the follow-up count (``canceled_shipment_q``).
     attention_models: ClassVar[tuple[str, ...]] = (
@@ -274,6 +279,27 @@ class BoxNowCarrier(ShippingCarrierInterface):
                     customer["data"]["customer"]
                 )
         return {order_id: entry for order_id, entry in data.items() if entry}
+
+    def create_demo_shipment(
+        self,
+        order: Order,
+        row: ShipmentRow,
+        *,
+        placed_at: datetime,
+        now: datetime,
+        collect: Money,
+        weight_grams: int,
+    ) -> Any:
+        from shipping_boxnow.demo import create_demo_shipment
+
+        return create_demo_shipment(
+            order,
+            row,
+            placed_at=placed_at,
+            now=now,
+            collect=collect,
+            weight_grams=weight_grams,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

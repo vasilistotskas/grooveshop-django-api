@@ -168,7 +168,7 @@ App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src
 
 Tasks are split by domain:
 - `src/core/tasks.py` — the database dump and old-backup cleanup, cache clearing, session and history cleanup
-- `src/tenant/tasks.py` — the per-store fan-outs, deferred dispatch, and the platform's health monitor and scheduled backup, which alert the operators (`src/tenant/emails.py`)
+- `src/tenant/tasks.py` — the per-store fan-outs (a carrier's own are in its app's `tasks.py`, under their `tenant.tasks.fanout_*` names), deferred dispatch, and the platform's health monitor and scheduled backup, which alert the operators (`src/tenant/emails.py`)
 - `src/cart/tasks.py` — abandoned and old guest cart cleanup
 - `src/user/tasks.py` — account and allauth emails, data export, the inactive-user re-engagement email
 - `src/meili/tasks.py` — document indexing and the daily index sync

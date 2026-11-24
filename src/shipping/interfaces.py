@@ -34,9 +34,11 @@ if TYPE_CHECKING:
 
     from django.db.models import Q
     from django_stubs_ext import StrOrPromise
+    from djmoney.money import Money
 
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
+    from shipping.demo import ShipmentRow
     from shipping.enum import ShippingKind
     from shipping.models import ShippingRate
 
@@ -172,6 +174,17 @@ class ShippingCarrierInterface(ABC):
     # ``shipping`` (the flat rate). A store that does not use the carrier
     # keeps its app's pages out of the sidebar and the ⌘K palette.
     app_label: ClassVar[str | None] = None
+
+    # The URL conf of this carrier's storefront API (its pickup points, its
+    # shipment actions), mounted under ``api/v1/`` on a store's host with
+    # ``shipping.urls``; ``None`` for a carrier with no API of its own.
+    api_urlconf: ClassVar[str | None] = None
+
+    # The URL conf of the endpoints the courier itself calls (a webhook),
+    # mounted at the root of both hosts, unprefixed by a language
+    # (``shipping.webhook_urls``): its paths are the ones registered with
+    # the courier. ``None`` for a carrier that calls us nothing.
+    webhook_urlconf: ClassVar[str | None] = None
 
     # The models whose writes change :meth:`attention_counts`, as
     # ``app_label.Model``: a write clears the dashboard's cached counts.
@@ -487,6 +500,27 @@ class ShippingCarrierInterface(ABC):
         stations for the country, independently of home delivery.
         """
         return True
+
+    def create_demo_shipment(
+        self,
+        order: Order,
+        row: ShipmentRow,
+        *,
+        placed_at: datetime,
+        now: datetime,
+        collect: Money,
+        weight_grams: int,
+    ) -> Any:
+        """Write the shipment a demo account's order shipped under, as
+        this carrier's clients would have after a voucher and a few polls
+        (``shipping.demo``): its row in ``row.state`` and its events, timed
+        from *placed_at* to *now*, the courier collecting *collect*.
+
+        Default: refused, for a carrier with no shipment rows to write.
+        """
+        raise NotImplementedError(
+            f"The {self.code} carrier has no demo shipments."
+        )
 
     def admin_pages(self) -> AdminPages:
         """The admin pages this carrier adds to the sidebar.

@@ -296,11 +296,14 @@ the cross-service view is
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,
   `AcsVoucherHold` and `AcsUnrecognisedVoucher`; the HTTP client
   (`src/shipping_acs/client.py`), `AcsService`
-  (`src/shipping_acs/services.py`) and the tasks. Read
+  (`src/shipping_acs/services.py`), the tasks with their per-store
+  fan-outs and the demo shipment (`src/shipping_acs/demo.py`). Read
   `docs/order/shipping-acs.md` and `docs/acs-debugging.md`.
 - `shipping_boxnow/`: `BoxNowShipment`, `BoxNowLocker` and
-  `BoxNowParcelEvent`; the client, `BoxNowService`, the tasks and the
-  webhook (`src/shipping_boxnow/views/webhook.py`). Read
+  `BoxNowParcelEvent`; the client, `BoxNowService`, the tasks with their
+  per-store fan-outs, the demo shipment (`src/shipping_boxnow/demo.py`)
+  and the webhook (`src/shipping_boxnow/views/webhook.py`, routed by
+  `src/shipping_boxnow/webhook_urls.py`). Read
   `docs/order/shipping-boxnow.md`.
 
 The import contracts keep the two carrier apps from importing each other

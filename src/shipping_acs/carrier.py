@@ -29,7 +29,10 @@ from shipping_acs.enum.shipment_state import AcsShipmentState
 if TYPE_CHECKING:
     from datetime import datetime
 
+    from djmoney.money import Money
+
     from order.models.order import Order
+    from shipping.demo import ShipmentRow
     from shipping.models import ShippingRate
     from shipping_acs.models import AcsShipment
 
@@ -54,6 +57,7 @@ SHIPMENT_STATE_VARIANT: dict[str, str] = {
 class AcsCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "acs"
     app_label: ClassVar[str | None] = "shipping_acs"
+    api_urlconf: ClassVar[str | None] = "shipping_acs.urls"
     attention_models: ClassVar[tuple[str, ...]] = (
         "shipping_acs.AcsShipment",
         "shipping_acs.AcsCodPayout",
@@ -405,6 +409,27 @@ class AcsCarrier(ShippingCarrierInterface):
             entry = data.setdefault(order_id, {})
             entry.setdefault("acs_cod_receivers", []).append(receiver)
         return data
+
+    def create_demo_shipment(
+        self,
+        order: Order,
+        row: ShipmentRow,
+        *,
+        placed_at: datetime,
+        now: datetime,
+        collect: Money,
+        weight_grams: int,
+    ) -> Any:
+        from shipping_acs.demo import create_demo_shipment
+
+        return create_demo_shipment(
+            order,
+            row,
+            placed_at=placed_at,
+            now=now,
+            collect=collect,
+            weight_grams=weight_grams,
+        )
 
     def serialize_shipment(
         self, shipment: Any, *, context: Mapping[str, Any]

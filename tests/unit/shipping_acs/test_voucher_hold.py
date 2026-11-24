@@ -1422,8 +1422,8 @@ class TestHeldPastTheRetryBudget:
         entry = settings.CELERY_BEAT_SCHEDULE["issue-held-acs-vouchers"]
 
         assert entry["task"] == "tenant.tasks.fanout_issue_held_acs_vouchers"
-        with patch("tenant.tasks.run_for_all_tenants") as fan_out:
-            from tenant.tasks import fanout_issue_held_acs_vouchers
+        with patch("shipping_acs.tasks.run_for_all_tenants") as fan_out:
+            from shipping_acs.tasks import fanout_issue_held_acs_vouchers
 
             fanout_issue_held_acs_vouchers.run()
         fan_out.assert_called_once_with(issue_held_acs_vouchers.name)

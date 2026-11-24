@@ -86,13 +86,46 @@ def carrier_offers(
     supported, and enabled by the adapter for the country (ACS without the
     store's credentials offers neither kind). The carrier half of the gate
     ``ShippingService.active_rate`` puts on every quote."""
-    return (
-        is_registered(provider.code)
-        and provider.supports(kind)
-        and get_provider(provider.code).is_kind_enabled(
-            ShippingKind(kind), country_code=country_code
-        )
+    return country_code.upper() in carrier_offering_countries(
+        provider, kind, [country_code]
     )
+
+
+def carrier_offering_countries(
+    provider: ShippingProvider, kind: str, country_codes: Iterable[str]
+) -> frozenset[str]:
+    """:func:`carrier_offers` for a set of countries at once: the
+    adapter answers the set in one go (``kind_enabled_countries``)."""
+    if not is_registered(provider.code) or not provider.supports(kind):
+        return frozenset()
+    return get_provider(provider.code).kind_enabled_countries(
+        ShippingKind(kind), country_codes
+    )
+
+
+def offered(rates: QuerySet[ShippingRate]) -> list[ShippingRate]:
+    """The chargeable ``rates`` whose carrier passes the gate a quote puts
+    on it in their zone's country (:func:`carrier_offers`), with provider
+    and zone loaded: one query for the rates, and one adapter answer per
+    (provider, kind) for all its countries."""
+    loaded = list(
+        chargeable(rates).select_related("provider", "zone").order_by()
+    )
+    countries: dict[tuple[int, str], set[str]] = {}
+    for rate in loaded:
+        countries.setdefault((rate.provider_id, rate.kind), set()).add(
+            rate.zone.country_id
+        )
+    providers = {rate.provider_id: rate.provider for rate in loaded}
+    passing = {
+        key: carrier_offering_countries(providers[key[0]], key[1], codes)
+        for key, codes in countries.items()
+    }
+    return [
+        rate
+        for rate in loaded
+        if rate.zone.country_id in passing[(rate.provider_id, rate.kind)]
+    ]
 
 
 def chargeable(rates: QuerySet[ShippingRate]) -> QuerySet[ShippingRate]:
@@ -125,19 +158,14 @@ class HomeCoverage:
         counts only when its carrier passes the gate a quote puts on it
         (:func:`carrier_offers`), so a region is never offered where
         checkout would then find no home delivery."""
-        home_kind = ShippingKind.HOME_DELIVERY.value
-        offers: dict[tuple[int, str], bool] = {}
-        delivering: set[int] = set()
-        for rate in chargeable(
-            ShippingRate.objects.filter(kind=home_kind)
-        ).select_related("provider", "zone"):
-            key = (rate.provider_id, rate.zone.country_id)
-            if key not in offers:
-                offers[key] = carrier_offers(
-                    rate.provider, home_kind, rate.zone.country_id
+        delivering = {
+            rate.zone_id
+            for rate in offered(
+                ShippingRate.objects.filter(
+                    kind=ShippingKind.HOME_DELIVERY.value
                 )
-            if offers[key]:
-                delivering.add(rate.zone_id)
+            )
+        }
         zone_country = dict(
             ShippingZone.objects.values_list("pk", "country_id")
         )

@@ -314,6 +314,18 @@ class TestHomeCoverage:
             greece_like["country"].alpha_2, greece_like["mainland"].pk
         )
 
+    def test_a_country_whose_carrier_checkout_refuses_is_not_shippable(
+        self, greece_like
+    ):
+        country = greece_like["country"].alpha_2
+        adapter = type(get_provider("flat_rate"))
+        assert country in ShippingService.shippable_country_codes()
+
+        with mock.patch.object(
+            adapter, "kind_enabled_countries", return_value=frozenset()
+        ):
+            assert country not in ShippingService.shippable_country_codes()
+
     def test_the_error_names_the_field_to_fix(self, greece_like):
         country = greece_like["country"].alpha_2
         crete = greece_like["crete"].pk

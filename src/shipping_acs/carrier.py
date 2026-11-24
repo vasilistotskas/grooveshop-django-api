@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import urlencode
@@ -500,6 +500,10 @@ class AcsCarrier(ShippingCarrierInterface):
         """
         from shipping_acs import config as acs_config
 
+        if country_code is not None:
+            return country_code.upper() in self.kind_enabled_countries(
+                kind, [country_code]
+            )
         if not acs_config.is_configured():
             return False
         if kind != ShippingKind.PICKUP_POINT:
@@ -507,18 +511,37 @@ class AcsCarrier(ShippingCarrierInterface):
 
         from shipping_acs.models import AcsStation
 
-        stations = AcsStation.objects.filter(is_active=True)
-        if country_code is None:
-            stations = stations.filter(
-                shop_kind__in=acs_config.all_locker_kinds()
-            )
-        else:
-            country_code = country_code.upper()
-            stations = stations.filter(
-                country_code=country_code,
-                shop_kind__in=acs_config.shop_kinds_for_country(country_code),
-            )
-        return stations.exists()
+        return AcsStation.objects.filter(
+            is_active=True, shop_kind__in=acs_config.all_locker_kinds()
+        ).exists()
+
+    def kind_enabled_countries(
+        self, kind: ShippingKind, country_codes: Iterable[str]
+    ) -> frozenset[str]:
+        """:meth:`is_kind_enabled` for a set of countries in one query of
+        the stations (and one of the carrier's locker kinds per country).
+        """
+        from shipping_acs import config as acs_config
+
+        codes = {code.upper() for code in country_codes}
+        if not codes or not acs_config.is_configured():
+            return frozenset()
+        if kind != ShippingKind.PICKUP_POINT:
+            return frozenset(codes)
+
+        from shipping_acs.models import AcsStation
+
+        kinds = acs_config.shop_kinds_by_country(codes)
+        found = (
+            AcsStation.objects.filter(is_active=True, country_code__in=codes)
+            .values_list("country_code", "shop_kind")
+            .distinct()
+        )
+        return frozenset(
+            country
+            for country, shop_kind in found
+            if shop_kind in kinds[country]
+        )
 
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)

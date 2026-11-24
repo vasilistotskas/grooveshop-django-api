@@ -26,6 +26,7 @@ these tests need, with no fake data required.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from decimal import Decimal
 
 import pytest
@@ -40,6 +41,7 @@ from shipping.exceptions import (
 from shipping.factories import ShippingProviderFactory, ShippingRateFactory
 from shipping.models import ShippingProvider
 from shipping.services import ShippingService
+from tests.utils.shipping import registered_carrier
 
 pytestmark = pytest.mark.django_db
 
@@ -343,6 +345,20 @@ class TestQuote:
 
 
 class TestShippableCountryCodes:
+    @pytest.fixture(autouse=True)
+    def _registered_carriers(self):
+        # A made-up carrier needs an adapter to pass checkout's gate.
+        with ExitStack() as stack:
+            for code in (
+                "rate_shippable_test",
+                "rate_shippable_inactive_test",
+                "rate_shippable_provider_off_test",
+                "rate_shippable_order_test",
+                "rate_shippable_two_kinds_test",
+            ):
+                stack.enter_context(registered_carrier(code))
+            yield
+
     def test_includes_a_country_with_an_active_rate(self):
         provider = ShippingProviderFactory(code="rate_shippable_test")
         country = CountryFactory()

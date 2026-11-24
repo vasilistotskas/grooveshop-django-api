@@ -488,6 +488,22 @@ class ShippingCarrierInterface(ABC):
         """
         return True
 
+    def kind_enabled_countries(
+        self, kind: ShippingKind, country_codes: Iterable[str]
+    ) -> frozenset[str]:
+        """The upper-case ``country_codes`` where ``kind`` is enabled,
+        :meth:`is_kind_enabled` answered for a set at once (the store's
+        shippable countries, its home coverage).
+
+        Defaults to asking :meth:`is_kind_enabled` per country. Override
+        when the answer is a query, so a set costs one (ACS's stations).
+        """
+        return frozenset(
+            code
+            for code in {code.upper() for code in country_codes}
+            if self.is_kind_enabled(kind, country_code=code)
+        )
+
     def admin_pages(self) -> AdminPages:
         """The admin pages this carrier adds to the sidebar.
 

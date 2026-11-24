@@ -15,7 +15,11 @@ from rest_framework.test import APIClient
 from country.factories import CountryFactory
 from order.models.order import Order
 from region.factories import RegionFactory
-from shipping.factories import ShippingRateFactory, ShippingZoneFactory
+from shipping.factories import (
+    ShippingProviderFactory,
+    ShippingRateFactory,
+    ShippingZoneFactory,
+)
 from shipping.models import ShippingProvider
 from tests.integration.order.test_checkout_quote import (
     _checkout,
@@ -24,6 +28,7 @@ from tests.integration.order.test_checkout_quote import (
     _post_quote,
 )
 from tests.utils.checkout import UNQUOTED
+from tests.utils.shipping import registered_carrier
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 
@@ -138,19 +143,24 @@ class TestAddressCountryPicker:
         # Shippable (a locker there), but no home delivery reaches it, so
         # an address there would be refused with country_not_served.
         lockers_only = CountryFactory(num_regions=0)
-        ShippingRateFactory(
-            provider=ShippingProvider.objects.get(code="boxnow"),
-            country=lockers_only,
-            kind="pickup_point",
-        )
-        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+        with registered_carrier("zone_api_lockers") as code:
+            ShippingRateFactory(
+                provider=ShippingProviderFactory(
+                    code=code,
+                    supports_home_delivery=False,
+                    supports_pickup_point=True,
+                ),
+                country=lockers_only,
+                kind="pickup_point",
+            )
 
-        home = APIClient().get(
-            reverse("country-list"), {"homeDelivery": "true", "pageSize": 100}
-        )
-        shippable = APIClient().get(
-            reverse("country-list"), {"shippable": "true", "pageSize": 100}
-        )
+            home = APIClient().get(
+                reverse("country-list"),
+                {"homeDelivery": "true", "pageSize": 100},
+            )
+            shippable = APIClient().get(
+                reverse("country-list"), {"shippable": "true", "pageSize": 100}
+            )
 
         assert home.status_code == 200, home.content
         documented(home, "/api/v1/country", "get")

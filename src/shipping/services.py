@@ -39,7 +39,12 @@ from shipping.interfaces import (
     registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
-from shipping.zones import carrier_offers, chargeable, destination_rates
+from shipping.zones import (
+    carrier_offers,
+    chargeable,
+    destination_rates,
+    offered,
+)
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -1077,7 +1082,11 @@ class ShippingService:
         """Alpha-2 codes with at least one active rate, by ``Country.sort_order``.
 
         A rate in any of a country's zones counts, a region zone's too:
-        the store ships somewhere in that country.
+        the store ships somewhere in that country. Its carrier must pass
+        the gate a quote puts on it (``shipping.zones.offered``): ACS
+        without the store's credentials, or its lockers in a country with
+        no stations, makes no country shippable. That is one query for
+        the rates and one adapter answer per (carrier, kind).
 
         The ordering matches the countries API's own default (``Country``
         is itself ``ordering = ["sort_order"]``), so a caller that lists
@@ -1087,17 +1096,9 @@ class ShippingService:
         """
         from country.models import Country
 
-        # ``.order_by()`` clears ``ShippingRate.Meta.ordering`` for this
-        # queryset — without it, Postgres' ``SELECT DISTINCT`` must
-        # include every ``ORDER BY`` column, so a country with rates
-        # under two different kinds (different ``ORDER BY`` values)
-        # would count as two "distinct" rows instead of one.
-        rated_codes = (
-            chargeable(ShippingRate.objects.all())
-            .order_by()
-            .values_list("zone__country_id", flat=True)
-            .distinct()
-        )
+        rated_codes = {
+            rate.zone.country_id for rate in offered(ShippingRate.objects.all())
+        }
         return list(
             Country.objects.filter(alpha_2__in=rated_codes)
             .order_by("sort_order")

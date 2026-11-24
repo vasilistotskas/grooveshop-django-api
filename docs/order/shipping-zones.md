@@ -60,7 +60,13 @@ does any other rate.
 
 - **A country is shippable** (`/country?shippable=true`,
   `ShippingService.shippable_country_codes`) when any of its zones has an
-  active rate with an active provider, pickup included.
+  active rate, pickup included, whose carrier passes the gate a quote puts on
+  it (`shipping.zones.offered`, `carrier_offers`): ACS without the store's
+  credentials, or its lockers in a country with no stations, makes no country
+  shippable. It costs one query for the rates and one adapter answer per
+  (carrier, kind) for all its countries (`kind_enabled_countries`; ACS answers
+  a set of countries with one station query), so the cart, which reads it for
+  its free-shipping line, does not grow with the store's countries.
 - **A region is served** when a home delivery reaches it: an active
   home-delivery rate in its resolved zone whose carrier passes the gate a
   quote puts on it (`carrier_offers`: an active provider with a registered

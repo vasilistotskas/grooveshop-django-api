@@ -39,6 +39,7 @@ Why JSONField metadata and not ``extra_settings.Setting``:
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
@@ -90,17 +91,26 @@ def shop_kinds_for_country(country_code: str) -> tuple[int, ...]:
     isn't in metadata — keeps the picker functional for any new
     country until ops add an entry.
     """
+    return shop_kinds_by_country([country_code])[country_code.upper()]
+
+
+def shop_kinds_by_country(
+    country_codes: Iterable[str],
+) -> dict[str, tuple[int, ...]]:
+    """:func:`shop_kinds_for_country` for each of ``country_codes`` (keyed
+    upper-case), reading the provider's metadata once."""
     metadata = _provider_metadata()
     by_country: dict[str, list[int]] = (
         metadata.get("shop_kinds_by_country") or _DEFAULT_SHOP_KINDS_BY_COUNTRY
     )
-    kinds = by_country.get(country_code.upper())
-    if not kinds:
-        # Defensive default — try the first-listed country in metadata
-        # before falling back to the constants.
-        first = next(iter(by_country.values()), None)
-        kinds = first or _DEFAULT_SHOP_KINDS_BY_COUNTRY["GR"]
-    return tuple(int(k) for k in kinds)
+    # Defensive default — the first-listed country in metadata before
+    # the constants.
+    first = next(iter(by_country.values()), None)
+    fallback = first or _DEFAULT_SHOP_KINDS_BY_COUNTRY["GR"]
+    return {
+        code: tuple(int(k) for k in (by_country.get(code) or fallback))
+        for code in {code.upper() for code in country_codes}
+    }
 
 
 def all_locker_kinds() -> tuple[int, ...]:

@@ -11,15 +11,67 @@ every order-creation path rejects it as unavailable
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from shipping.enum import ShippingKind
 from shipping.factories import ShippingProviderFactory, whole_country_zone
+from shipping.interfaces import (
+    _REGISTRY,
+    ShippingCarrierInterface,
+    register_provider,
+)
 from shipping.models import ShippingRate
 
 if TYPE_CHECKING:
     from country.models import Country
+
+
+class _TestCarrier(ShippingCarrierInterface):
+    """A carrier with no courier behind it, for a test's own provider
+    code: every hook does nothing, and every kind is enabled."""
+
+    def create_shipment(self, order, *, kind, payload=None):
+        return None
+
+    def cancel_shipment(self, shipment, *, reason="") -> None:
+        return None
+
+    def has_label(self, shipment) -> bool:
+        return False
+
+    def fetch_label_bytes(self, shipment) -> bytes:
+        return b""
+
+    def fetch_tracking_events(self, shipment) -> list[dict[str, Any]]:
+        return []
+
+    def shipment_for_order(self, order):
+        return None
+
+    def holds_the_parcel(self, shipment) -> bool:
+        return False
+
+    def serialize_shipment(self, shipment, *, context):
+        return None
+
+    def validate_order_payload(self, *, kind, payload) -> dict[str, list[str]]:
+        return {}
+
+
+@contextmanager
+def registered_carrier(code: str) -> Generator[str]:
+    """Register an adapter under ``code`` for the block: checkout's gate
+    (``shipping.zones.carrier_offers``) offers no carrier without one."""
+    register_provider(
+        type(f"TestCarrier_{code}", (_TestCarrier,), {"code": code})
+    )
+    try:
+        yield code
+    finally:
+        _REGISTRY.pop(code, None)
 
 
 def enable_rate(

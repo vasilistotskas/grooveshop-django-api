@@ -17,7 +17,12 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
+from country.factories import CountryFactory
 from product.factories import ProductFactory
+from shipping.enum import ShippingKind
+from shipping.models import ShippingProvider
+from shipping_acs.factories import AcsStationFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -71,6 +76,31 @@ class TestQueryBudget:
 
         assert response.status_code == status.HTTP_200_OK
         assert count <= GET_CART_QUERIES + 1, count
+
+    def test_the_stores_shipping_countries_cost_no_query_each(
+        self, shopper, acs_configured_tenant
+    ):
+        # The cart's free-shipping line is judged for the first shippable
+        # country, and a country is shippable only where its carrier passes
+        # the quote's gate: ACS lockers need stations there. That is one
+        # station query for every country, not one per country.
+        _user, _cart, client = shopper
+        ShippingProvider.objects.filter(code="acs").update(is_active=True)
+
+        def lockers_in(country):
+            enable_rate(
+                country, provider_code="acs", kind=ShippingKind.PICKUP_POINT
+            )
+            AcsStationFactory(country_code=country.alpha_2)
+
+        lockers_in(CountryFactory(num_regions=0))
+        one, _response = _queries(lambda: client.get(reverse("cart-detail")))
+        for _ in range(3):
+            lockers_in(CountryFactory(num_regions=0))
+        four, response = _queries(lambda: client.get(reverse("cart-detail")))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert four == one, (one, four)
 
     def test_add_item(self, shopper):
         _user, _cart, client = shopper

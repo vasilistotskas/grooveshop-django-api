@@ -15138,6 +15138,9 @@ msgstr "The number of the version this one restores (kind restore)."
 msgid "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
 msgstr "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
 
+msgid "The object to tag does not exist."
+msgstr "The object to tag does not exist."
+
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
 msgstr "The order costs {due}; confirm exactly that amount."

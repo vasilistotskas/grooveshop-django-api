@@ -15140,6 +15140,9 @@ msgstr "Ο αριθμός της έκδοσης που επαναφέρει αυ
 msgid "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
 msgstr "Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN): 8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει."
 
+msgid "The object to tag does not exist."
+msgstr "Το αντικείμενο που θα πάρει την ετικέτα δεν υπάρχει."
+
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
 msgstr "Η παραγγελία κοστίζει {due}· επιβεβαιώστε ακριβώς αυτό το ποσό."

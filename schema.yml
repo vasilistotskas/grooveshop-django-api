@@ -50406,6 +50406,12 @@ components:
           type: string
         mainImagePath:
           type: string
+        mainImageWidth:
+          type: integer
+          nullable: true
+        mainImageHeight:
+          type: integer
+          nullable: true
         matchesPosition: {}
         rankingScore:
           type: number
@@ -50481,7 +50487,9 @@ components:
       - languageCode
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - master
       - matchesPosition
       - name

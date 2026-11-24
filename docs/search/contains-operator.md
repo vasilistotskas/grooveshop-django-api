@@ -316,7 +316,7 @@ Always combine CONTAINS with other filters to improve performance:
 ```python
 # Good: Narrow down by category first
 ProductTranslation.meilisearch.filter(
-    category_name="Laptops", name__contains="pro"
+    category=3, name__contains="pro"
 )
 
 # Bad: CONTAINS on entire index
@@ -378,10 +378,6 @@ string and the `TypeError` on non-string values. Run it with:
 uv run pytest tests/unit/meili/test_contains_operator.py
 ```
 
-This section used to carry invented example tests that were never in the
-repository — read the file above instead, it is the behaviour that is actually
-enforced.
-
 ## Troubleshooting
 
 ### Feature Not Enabled
@@ -424,9 +420,8 @@ ProductTranslation.meilisearch.filter(
 
 ## References
 
-- [Meilisearch CONTAINS Documentation](https://docs.meilisearch.com/learn/filtering_and_sorting/filter_expression_reference.html#contains)
-- [Experimental Features](https://docs.meilisearch.com/learn/experimental/overview.html)
+- [Meilisearch CONTAINS Documentation](https://www.meilisearch.com/docs/capabilities/filtering_sorting_faceting/advanced/filter_expression_syntax)
+- [Experimental Features](https://www.meilisearch.com/docs/resources/help/experimental_features_overview)
 - `src/meili/querysets.py` — the `IndexQuerySet` implementation
 - [Search API Documentation](../api/search.md)
-
 - [Meilisearch Discord](https://discord.gg/meilisearch) for engine-side questions

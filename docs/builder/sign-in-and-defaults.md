@@ -40,7 +40,7 @@ Security properties, each with a test:
   `scope = builder` (`tenant.enum.StaffTokenScope`): knox's auto-refresh
   would push any token to its seven-day lifetime, so
   `PlatformStaffTokenAuthentication` does not renew a builder token (it ends
-  at `BUILDER_STAFF_SESSION_TTL_SECONDS`, a working day) and refuses it on
+  at `BUILDER_STAFF_SESSION_TTL_SECONDS`, eight hours by default) and refuses it on
   every route outside the `builder` URL namespace (`401 staff_token_scope`).
 - **Revocation.** The authenticator re-checks `is_staff` and the role in this
   store on every request, so removing the membership, clearing `is_staff` or
@@ -79,8 +79,8 @@ builder tests, commit.
 `src/builder/seeding.py` loads `src/builder/seeds/*.json` (each `{key, document,
 i18n}`). Provisioning (`tenant.provisioning`, step "page builder")
 stores each as a document whose draft equals its published content, one
-version, and ONE release (number 1) holding them all; today that is
-`template:home`, 11 sections with fixed ids. It calls no service, so a
+version, and ONE release (number 1) holding them all (`src/builder/seeds/`:
+`template:home`, with fixed section ids). It calls no service, so a
 storefront outage cannot leave a store without its homepage, and a store that
 already has builder data is left alone. What stands in for validation is
 `tests/unit/builder/test_seeds.py`, which validates every seed against the
@@ -107,8 +107,3 @@ against the store's catalogue, references included, like a publish, and
 nothing is written when the storefront does not answer.
 `tests/unit/devtools/test_demo_pages.py` holds the files to the pinned real
 catalogue.
-
-## Not here yet
-
-The `builder_block_usage` command that will gate removing a block type is its
-own change.

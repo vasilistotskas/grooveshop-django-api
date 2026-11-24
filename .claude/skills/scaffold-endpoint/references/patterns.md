@@ -194,6 +194,8 @@ class YourModelQuerySet(SoftDeleteQuerySetMixin, TranslatableOptimizedQuerySet):
 
 ### Annotation Methods (for counts/aggregates)
 
+A queryset that carries several annotations uses correlated subqueries, not `Count`/`Avg` joins: each aggregate join puts every other annotation into the `GROUP BY` and multiplies the rows (`.claude/rules/domain-patterns.md`, "Computed properties"). `Count`/`Avg` below fits a queryset with one or two aggregates and no other annotation.
+
 ```python
 from django.db.models import Avg, Count, F, Q, Value
 from django.db.models.functions import Coalesce

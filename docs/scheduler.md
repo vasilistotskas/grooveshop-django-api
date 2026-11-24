@@ -2,8 +2,8 @@
 
 `celery beat` runs the periodic tasks, with our own scheduler
 (`src/scheduler/beat.py: CodeOwnedScheduler`, a `celery.beat.Scheduler` subclass)
-in place of django-celery-beat, which we removed because its `Django<x` cap
-blocked every Django upgrade until it published a release.
+in place of django-celery-beat, whose `Django<x` cap would block every Django
+upgrade until it published a release.
 
 ## Where things live
 
@@ -37,7 +37,7 @@ not in the settings, because Celery installs it while
   that is discarded, not run, and it counts from the send, with the run already
   recorded. So only an entry that runs again within the hour may set it, which a
   test enforces: a daily job discarded because a worker was down would lose its
-  day. django-celery-beat silently dropped this option.
+  day.
 
 ## Money jobs
 
@@ -52,16 +52,15 @@ money and shows on the store dashboard until staff record its outcome.
 
 `allocate-credit-sources` runs every five minutes through
 `tenant.tasks.fanout_allocate_credit_sources` (one run per store, suspended
-stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`src/order/accounting/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
+stores included). The write paths that need an order's books complete decide its unallocated sources first (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`src/order/accounting/credit_allocation_backfill.py`): for instance a source that waited for a refund claim still PENDING to resolve. When it decides a source of an order that has a receipt it asks for the credit documents, and an order whose receipt was deferred for that reason (`metadata["receipt_deferred"]`) is issued its receipt once nothing is undecided. It is idempotent and takes each order's row lock.
 
 ## Time zones
 
 Times are Athens local (`CELERY_TIMEZONE`). Celery's crontab decides around a
 clock change:
 
-- **Autumn, 04:00 back to 03:00.** The repeated hour is skipped. On 2026-10-25
-  a `*/5` job had a 65-minute gap, a `*/15` job 75 and an hourly job 120. Nothing
-  ran twice. `GrooveShopBeatSilent` fires for that hour, truthfully, and needs
+- **Autumn, 04:00 back to 03:00.** The repeated hour is skipped: a `*/5` job
+  has a 65-minute gap, a `*/15` job 75 and an hourly job 120. Nothing runs twice. `GrooveShopBeatSilent` fires for that hour, truthfully, and needs
   no action.
 - **Spring, 03:00 to 04:00.** A job in the missing hour runs once at 04:00.
 

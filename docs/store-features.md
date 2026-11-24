@@ -124,6 +124,9 @@ consumed by tasks and integrations.
 | `INDEXNOW_ENABLED` | (s) | the batched IndexNow notification (`docs/indexnow.md`); only its key is read by the storefront, from `TenantConfig.indexnowKey`, empty while off |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |
 
+The setting names and defaults are `EXTRA_SETTINGS_DEFAULTS` (`src/settings/store_settings.py`);
+a new `*_ENABLED` setting gets its row here when it is added.
+
 `ACCOUNT_LOGIN_BY_CODE_ENABLED`, `MFA_*_ENABLED`, `DB_POOL_ENABLED` and the
 other constants of `src/settings/` are deployment configuration, not store
 settings.
@@ -163,11 +166,7 @@ widget still has a live `/chat` (flipping it back needs no deploy).
 ## Customer accounts
 
 `CUSTOMER_ACCOUNTS_ENABLED` (default on) lets a store run without customer
-accounts: a store that sells to guests only, or sells nothing. Owner
-decisions on #198 (2026-10-14): a store setting the store's own admin
-edits, not a plan flag; a sign-in a shopper already holds is left to
-expire, never revoked; the customers' data is kept; reviews and comments
-need accounts. Off, on that store's hosts:
+accounts: a store that sells to guests only, or sells nothing. It is a store setting the store's own admin edits, not a plan flag; a sign-in a shopper already holds is left to expire, never revoked; the customers' data is kept; reviews and comments need accounts. Off, on that store's hosts:
 
 - **The identity routes answer 404.** Every view `src/core/urls.py` mounts
   in its three customer identity groups (`CUSTOMER_IDENTITY_VIEWS`):
@@ -250,23 +249,15 @@ serializer serves `reviewCount: 0` and `reviewAverage: null`. The fields
 keep their shape: making a field nullable is a loosening that the live
 storefront's schemas reject.
 
-## Cart and catalogue: the move (done)
+## Cart and catalogue
 
-The cart and the catalogue started as two presentation preferences that
-hid the storefront's chrome while their routes kept answering, and the
-agent gateway calls those routes (`/cart`, `/cart/item`,
-`/cart/reserve-stock`, `/order`, `/product`, `/product/category/all`).
-They moved into `STORE_FEATURES` in four releases, in this order because a
-client reads a field that is missing from `features` as off:
-
-1. `features.cart` and `features.catalogue` were stated, beside the
-   preferences. Additive.
-2. The gateway read them and stopped offering the cart, checkout and
-   catalogue tools, the feeds and the chat's product tools when off.
-3. The storefront read them from `features`.
-4. The routes now refuse (404, `feature_gate:refused`), and
-   `preferences.cart` and `preferences.catalogue` left `STORE_PREFERENCES`,
-   a field removal that only shipped once step 3 was in production.
+The agent gateway calls the cart and catalogue routes (`/cart`, `/cart/item`,
+`/cart/reserve-stock`, `/order`, `/product`, `/product/category/all`), so both
+are features in `STORE_FEATURES`, not presentation preferences: the routes
+refuse (404, `feature_gate:refused`) and the gateway stops offering the cart,
+checkout and catalogue tools, the feeds and the chat's product tools. A
+client reads a field missing from `features` as off, so a new feature ships
+Django first (an addition), then its clients.
 
 What refuses when `catalogue` is off: the public product routes, their
 actions, categories, category images, product images, brands, attributes,
@@ -340,7 +331,7 @@ How it is wired:
   the permission (`permissions=["change"]`): Unfold serves `actions_list`,
   `actions_row` and `actions_detail` at URLs of their own and checks nothing
   but what the decorator was given. An action with none ran for every
-  signed-in member of the store's staff, on a read-only page too (#646);
+  signed-in member of the store's staff, on a read-only page too;
   `tests/unit/admin/test_actions_declare_permissions.py` fails for one.
 - `feature_gates` on an admin lists `Gate(feature, fields=…, filters=…,
   kind=…, data=Q(...))`: the fields (an emptied fieldset goes with them) and the

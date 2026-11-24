@@ -552,9 +552,21 @@ self.client.force_authenticate(user=self.user)
 admin = UserAccountFactory(admin=True)
 self.client.force_authenticate(user=admin)
 
-# Staff user
-staff = UserAccountFactory(staff=True)
-self.client.force_authenticate(user=staff)
+# Store staff with a role (STAFF, ADMIN or OWNER) in a bound store
+from tenant.enum import TenantMembershipRole
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_staff,
+    store_tenant,
+    unbind_store_tenant,
+)
+
+tenant = store_tenant("your_store")
+previous = bind_store_tenant(tenant)
+self.client.force_authenticate(
+    user=store_staff(tenant, role=TenantMembershipRole.STAFF)
+)
+# ... and unbind_store_tenant(previous) when the test ends
 
 # Unauthenticated (reset)
 self.client.force_authenticate(user=None)
@@ -778,7 +790,7 @@ user = UserAccountFactory()
 # Admin (superuser + staff)
 admin = UserAccountFactory(admin=True)
 
-# Staff only
+# Staff flag only: no store role, so no store-staff API rights (§7)
 staff = UserAccountFactory(staff=True)
 
 # With addresses

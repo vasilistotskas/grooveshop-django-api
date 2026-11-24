@@ -70,7 +70,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Verify message content is not user-controlled HTML
 
 ### 10. Rate Limiting
-- Throttling is app-level DRF: `AnonRateThrottle`/`UserRateThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in each app's `throttles.py`, built on the bases in `src/core/api/throttling.py`, with rates in `DEFAULT_THROTTLE_RATES`
+- Throttling is app-level DRF: `core.api.throttling.AnonIpRateThrottle` and `UserBudgetThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in each app's `throttles.py`, built on the bases in `src/core/api/throttling.py`, with rates in `DEFAULT_THROTTLE_RATES`
 - Flag a throttle keyed on `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` read directly; the ident is `edge_client_ip(request) or self.get_ident(request)` (CLAUDE.md, "Client IP and throttle identity")
 - A new throttle uses `ResilientThrottleMixin` and sets `fail_closed` by the rule in that module's docstring (secret or existence oracle, money or stock, email to a caller-chosen address, uploads, third-party budgets deny while Redis is down)
 

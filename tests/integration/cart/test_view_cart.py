@@ -1,6 +1,5 @@
 import datetime
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -11,7 +10,6 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import Cart
-from country.factories import CountryFactory
 from product.factories.product import ProductFactory
 from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
@@ -19,7 +17,6 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
-@pytest.mark.usefixtures("checkout_legal_documents")
 class CartViewSetTest(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -42,113 +39,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
     def test_cart_only_supports_detail_operations(self):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_create_payment_intent_returns_numeric_amount(self):
-        """The create-payment-intent ``amount`` must serialize as a JSON
-        number (DecimalField), matching the OpenAPI contract the Nuxt
-        client validates with ``z.number()``. Returning a raw ``str(amount)``
-        442'd every cart-Stripe checkout at the client's Zod gate."""
-        import json
-        from decimal import Decimal
-        from unittest.mock import MagicMock, patch
-
-        from djmoney.money import Money
-
-        from pay_way.factories import PayWayFactory
-        from shipping.services import ShippingCharge
-
-        pay_way = PayWayFactory.create_online_payment(
-            provider_code="stripe", active=True
-        )
-
-        provider = MagicMock()
-        provider.process_payment.return_value = (
-            True,
-            {"client_secret": "cs_test_123", "payment_id": "pi_test_123"},
-        )
-
-        country = CountryFactory()
-        url = reverse("cart-create-payment-intent")
-        with (
-            patch(
-                "cart.views.cart.OrderQuoteService.shipping_cost",
-                return_value=ShippingCharge(Money("0.00", "EUR")),
-            ),
-            patch(
-                "cart.views.cart.OrderQuoteService.calculate_payment_method_fee",
-                return_value=Money("0.00", "EUR"),
-            ),
-            patch(
-                "pay_way.services.PayWayService.get_provider_for_pay_way",
-                return_value=provider,
-            ),
-            # The store holds the provider's credentials: a pay way it
-            # could not charge with is not offered.
-            patch(
-                "pay_way.services.PayWayService.is_provider_configured",
-                return_value=True,
-            ),
-        ):
-            response = self.client.post(
-                url,
-                {
-                    "pay_way_id": pay_way.id,
-                    "shipping_kind": "home_delivery",
-                    "country_id": country.alpha_2,
-                },
-                format="json",
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Pre-render: DecimalField (coerce_to_string=False) yields a
-        # Decimal, never a str.
-        self.assertIsInstance(response.data["amount"], Decimal)
-        # The wire contract: the rendered JSON ``amount`` is a number.
-        rendered = json.loads(response.content)
-        self.assertNotIsInstance(rendered["amount"], str)
-        self.assertIsInstance(rendered["amount"], (int, float))
-
-    def test_create_payment_intent_refuses_an_inactive_pay_way(self):
-        """Never mint an intent order creation would then refuse.
-
-        The flow is confirm-THEN-create: the shopper confirms the card in
-        Stripe.js against this intent and only afterwards POSTs the
-        order. If `_validate_pay_way_for_order` rejects the pay-way at
-        that point the customer has been charged for an order that does
-        not exist, with nothing to refund against. So this endpoint has
-        to apply the same `active()` + carrier-exclusion gate.
-        """
-        from unittest.mock import MagicMock, patch
-
-        from pay_way.factories import PayWayFactory
-
-        pay_way = PayWayFactory.create_online_payment(
-            provider_code="stripe", active=False
-        )
-
-        provider = MagicMock()
-        country = CountryFactory()
-        url = reverse("cart-create-payment-intent")
-        with patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
-        ):
-            response = self.client.post(
-                url,
-                {
-                    "pay_way_id": pay_way.id,
-                    "shipping_kind": "home_delivery",
-                    "country_id": country.alpha_2,
-                },
-                format="json",
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["reason"], "pay_way_unavailable")
-        self.assertEqual(response.data["code"], "pay_way_unavailable")
-        # The decisive part: no intent was ever created, so there is
-        # nothing for the shopper to confirm.
-        provider.process_payment.assert_not_called()
 
     def test_retrieve_no_n_plus_one(self):
         """Cart-detail query count must not grow with the number of items

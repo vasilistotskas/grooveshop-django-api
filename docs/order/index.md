@@ -16,7 +16,7 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 |---|---|---|
 | 1 | [`overview.md`](overview.md) | anything here: the three axes of an order (status, payment status, settlement), the two "payment method" columns, the carrier adapter |
 | 2 | [`state-machines.md`](state-machines.md) | an order status or payment status transition, who may make it, the follow-up flag |
-| 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds |
+| 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the one creation path (every pay way order first), repeats and agent checkouts, locks and stock holds |
 | 3.3 | [`creation-address.md`](creation-address.md) | delivery-address rules: the country's postcode and street rules, regions, pickup-point orders delivered to the point's address |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
 | 4 | [`payments.md`](payments.md) | Stripe or cash on delivery, and what every provider shares: per-tenant credentials, webhooks, fees, provider refunds, disputes |
@@ -43,7 +43,10 @@ outgrows the limit is split on a subject, and this table gains a row.
 Last refresh: 2026-11-24 (shipping zones: a rate belongs to a zone, a
 whole country or some of its regions, a home delivery is priced by its
 region's zone, an order or a saved address no home delivery reaches is
-refused, [§5.5](shipping-zones.md) / [§3.3](creation-address.md); before
+refused, [§5.5](shipping-zones.md) / [§3.3](creation-address.md); every
+pay way creates the order first and pays it afterwards; the payment-first
+Stripe path, `retry-payment` and the order's `create_payment_intent` are
+removed, [§3.1](creation.md); before
 that 2026-11-21: an order's address line 2, [§3.3](creation-address.md);
 an order has one payable payment link: a request for one returns the live
 one, [§4](payments.md); the cart digest leaves out the pay way and
@@ -56,7 +59,7 @@ address and needs none of the buyer's, [§3.3](creation-address.md); before that
 2026-11-18: an agent checkout places one order, and a repeat
 of its creation is answered with that order, [§3.2](creation.md); one
 checkout total: `OrderQuoteService.quote`
-behind `POST /cart/quote`, the payment intent and both creation paths, and
+behind `POST /cart/quote` and order creation, and
 an order created with `expectedTotal` exists only at that total,
 [§3.0](creation.md); before that 2026-11-16: a staff or system cancel asks the courier after it
 has committed, with no row locked, and a sweep finishes a cancel whose worker

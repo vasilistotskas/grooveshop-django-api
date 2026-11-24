@@ -48,12 +48,7 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCartChangedError,
     OrderTotalChangedError,
-    PaymentAmountMismatchError,
-    PaymentCurrencyMismatchError,
     PaymentError,
-    PaymentNotFoundError,
-    PaymentStatusUnavailableError,
-    PaymentVerificationError,
     ProductNotFoundError,
     ShippingPriceUnresolvedError,
     StockReservationError,
@@ -65,7 +60,6 @@ from order.models.item import OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import (
     AGENT_CHECKOUT_UNIQUE_CONSTRAINT,
-    PAYMENT_ID_UNIQUE_CONSTRAINT,
     Order,
 )
 from order.models.stock_reservation import StockReservation
@@ -613,94 +607,6 @@ class OrderService:
                 spread_by_remaining_value(lines, loyalty_discount.amount),
             )
 
-    @classmethod
-    def _retrieve_payment_intent(
-        cls, payment_intent_id: str, pay_way
-    ) -> tuple[PaymentStatus, dict[str, Any]]:
-        """Ask the provider about the intent and refuse one that cannot pay.
-
-        An HTTP round trip (and, for Stripe, the dj-stripe sync), so it
-        runs BEFORE the order-creation transaction opens: inside it the
-        call held the cart row and every live automatic ``Promotion`` row
-        for as long as the provider took to answer, which serialised every
-        concurrent checkout (Viva and COD included, they evaluate the same
-        promotions) behind a slow provider. The transaction re-compares
-        only what depends on server state: the amount and currency the
-        intent was created for, against the total it computes under lock.
-
-        PENDING and PROCESSING are accepted: the provider's webhook
-        settles the order once the charge completes.
-        """
-        from order.payments.payment import get_payment_provider
-
-        if not payment_intent_id:
-            raise InvalidOrderDataError(
-                str(_("Payment intent ID is required for order creation"))
-            )
-
-        provider = get_payment_provider(pay_way.provider_code)
-        try:
-            payment_status, payment_data = provider.get_payment_status(
-                payment_intent_id
-            )
-        except PaymentStatusUnavailableError as exc:
-            # Nothing can be created from an intent nobody could read; the
-            # shopper submits again.
-            raise PaymentVerificationError(
-                payment_intent_id, "the provider could not be asked"
-            ) from exc
-        if payment_status not in [
-            PaymentStatus.PENDING,
-            PaymentStatus.PROCESSING,
-            PaymentStatus.COMPLETED,
-        ]:
-            raise PaymentVerificationError(
-                payment_intent_id,
-                _("payment intent is in an invalid state: {status}").format(
-                    status=payment_status
-                ),
-            )
-        return payment_status, payment_data
-
-    @classmethod
-    def _verify_intent_binding(
-        cls, payment_intent_id: str, payment_data: dict[str, Any], cart
-    ) -> None:
-        """Refuse an intent that was not created to pay for THIS cart.
-
-        An intent proves that money moved, not what for. The server writes
-        the purpose, the cart uuid and the tenant on every intent it
-        creates (``order.payments.payment_binding``), so an intent made for a
-        gift card, for another shopper's cart, for an existing order or for
-        another tenant cannot be presented here: one payment would
-        otherwise buy a gift card AND a paid order.
-
-        An intent id that a gift-card purchase holds is refused outright,
-        whatever its metadata says.
-        """
-        from giftcard.models import GiftCardPurchase
-
-        if GiftCardPurchase.objects.filter(
-            payment_id=payment_intent_id
-        ).exists():
-            raise PaymentVerificationError(
-                payment_intent_id,
-                "payment intent was created for a gift-card purchase",
-            )
-        mismatch = binding_mismatch(
-            payment_data.get("metadata"),
-            purpose=PaymentPurpose.CART,
-            subject=cart.uuid,
-        )
-        if mismatch is not None:
-            logger.warning(
-                "Refusing payment intent %s for cart %s: %s",
-                payment_intent_id,
-                cart.uuid,
-                mismatch,
-            )
-            raise PaymentVerificationError(payment_intent_id, mismatch)
-
     @staticmethod
     def order_for_agent_checkout(agent_checkout: UUID) -> Order | None:
         """The order this agent checkout placed, if it placed one.
@@ -714,8 +620,8 @@ class OrderService:
 
         Read by ``OrderViewSet.create`` before anything else (the
         first order may have emptied or deleted the cart), and under the
-        cart row lock by both creation paths, where two calls of one
-        checkout serialise and the second finds the first's committed
+        cart row lock by ``create_order_from_cart``, where two calls of
+        one checkout serialise and the second finds the first's committed
         order.
         """
         return (
@@ -723,801 +629,6 @@ class OrderService:
             .filter(agent_checkout=agent_checkout)
             .first()
         )
-
-    @classmethod
-    def _order_created_for_payment(cls, payment_intent_id: str, cart):
-        """The order this payment intent already produced for ``cart``.
-
-        Returns ``None`` when no order carries the intent. Called twice:
-        first without a lock, before the provider is asked, so a repeat
-        is answered from what is stored; then under the cart row lock,
-        where two submits of one checkout (a double click, a retry after
-        a timeout, Back and resubmit while the hosted payment is still
-        open) serialise and the second one finds the first one's
-        committed order instead of creating its own and taking the stock
-        a second time. ``Order.payment_id`` is unique
-        (``order_payment_id_unique``), which backs this up for submits of
-        two DIFFERENT carts: the cart lock does not serialise those, the
-        index rejects the second insert and ``create_order_from_cart``
-        answers it as it answers the sequential case.
-
-        An intent that belongs to a different cart or user, or to an
-        order that was canceled or deleted, is not a repeat of this
-        checkout: answering with that order would hand one shopper
-        another's order, and a new order would take a payment already
-        committed elsewhere. It is refused.
-        """
-        existing = (
-            Order.objects.all_with_deleted()
-            .filter(payment_id=payment_intent_id)
-            .first()
-        )
-        if existing is None:
-            return None
-        snapshot = (existing.metadata or {}).get("cart_snapshot") or {}
-        if (
-            existing.status != OrderStatus.CANCELED
-            and not existing.is_deleted
-            and snapshot.get("cart_uuid") == str(cart.uuid)
-        ):
-            logger.info(
-                "Payment intent %s already created order %s; "
-                "returning it instead of creating another",
-                payment_intent_id,
-                existing.id,
-            )
-            return existing
-        raise PaymentVerificationError(
-            payment_intent_id,
-            f"payment intent already belongs to order {existing.id}, which "
-            "is not an open order of this cart",
-        )
-
-    @classmethod
-    def create_order_from_cart(
-        cls,
-        *,
-        cart,
-        shipping_address: dict[str, Any],
-        payment_intent_id: str,
-        pay_way,
-        user=None,
-        loyalty_points_to_redeem: int | None = None,
-        gift_card_codes: list[str] | None = None,
-        meta_context: dict[str, Any] | None = None,
-        attribution: AttributionInput | None = None,
-        legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal,
-        expected_cart_digest: str | None = None,
-        agent_checkout: UUID | None = None,
-    ) -> Order:
-        """
-        Create order from cart after payment confirmation (payment-first flow).
-
-        This method implements the payment-first approach where payment is confirmed
-        before order creation. It performs the following steps:
-        0. Returns the order this payment intent already created for the
-           cart, if any, before the provider is asked anything; otherwise
-           retrieves the intent from the provider and checks its state,
-           OUTSIDE any transaction (``_retrieve_payment_intent``)
-        then, in ONE transaction (``_create_order_for_verified_intent``):
-        1. Locks the cart; returns the order this agent checkout or this
-           payment intent already created, if any (idempotent)
-        2. Validates cart items still exist and prices match
-        3. Validates shipping address completeness
-        4. Re-compares the intent's amount and currency, and the
-           client's ``expected_total`` with the total
-           computed under lock (``OrderQuoteService.quote``)
-        5. Gets stock reservations for cart session
-        6. Creates Order with payment_id field populated
-        7. Creates OrderItems from CartItems
-        8. Converts stock reservations to decrements via StockManager
-        9. Clears cart
-        10. Returns order in PENDING status (webhook will move to PROCESSING)
-
-        Args:
-            cart: Cart object containing items to order
-            shipping_address: Dictionary with shipping address fields
-            payment_intent_id: Stripe payment intent ID (must be confirmed)
-            pay_way: PayWay object for payment method
-            user: Optional UserAccount (None for guest orders)
-
-        Returns:
-            Order: Created order in PENDING status, or the order this
-            payment intent already created for the cart
-
-        Raises:
-            InvalidOrderDataError: If validation fails
-            InsufficientStockError: If stock unavailable
-            PaymentNotFoundError: If payment_intent_id invalid
-            PaymentVerificationError: If the intent is in an invalid state
-                or already belongs to another order
-            OrderTotalChangedError: If ``expected_total`` is not the
-                amount due computed under lock
-            OrderCartChangedError: If ``expected_cart_digest`` is not the
-                cart digest computed under lock
-            AgentCheckoutOrderedError: If another call of
-                ``agent_checkout`` committed its order first
-
-        Example:
-            >>> order = OrderService.create_order_from_cart(
-            ...     cart=cart,
-            ...     shipping_address={
-            ...         'first_name': 'John',
-            ...         'last_name': 'Doe',
-            ...         'email': 'john@example.com',
-            ...         'street': 'Main St',
-            ...         'street_number': '123',
-            ...         'city': 'Athens',
-            ...         'zipcode': '12345',
-            ...         'country_id': 1,
-            ...         'phone': '+30123456789'
-            ...     },
-            ...     payment_intent_id='pi_123abc',
-            ...     pay_way=pay_way,
-            ...     user=user
-            ... )
-        """
-        try:
-            # A repeat of a submit that already created its order is
-            # answered from what is stored, before the provider is asked
-            # anything: the order exists, so its answer must not depend
-            # on the provider being reachable (a retry after a timeout is
-            # exactly when it may not be). No lock here; the locked lookup
-            # below is what serialises two first submits racing.
-            if payment_intent_id:
-                existing_order = cls._order_created_for_payment(
-                    payment_intent_id, cart
-                )
-                if existing_order is not None:
-                    return existing_order
-            payment_status, payment_data = cls._retrieve_payment_intent(
-                payment_intent_id, pay_way
-            )
-            cls._verify_intent_binding(payment_intent_id, payment_data, cart)
-        except InvalidOrderDataError, PaymentVerificationError:
-            raise
-        except Exception as e:
-            logger.exception(
-                "Unexpected error retrieving the payment intent",
-            )
-            raise InvalidOrderDataError(
-                _("Failed to create order: {error}").format(error=str(e))
-            ) from e
-
-        cls._resolve_live_shipping(
-            cart, user=user, shipping_address=shipping_address
-        )
-        try:
-            return cls._create_order_for_verified_intent(
-                cart=cart,
-                shipping_address=shipping_address,
-                payment_intent_id=payment_intent_id,
-                payment_status=payment_status,
-                payment_data=payment_data,
-                pay_way=pay_way,
-                user=user,
-                loyalty_points_to_redeem=loyalty_points_to_redeem,
-                gift_card_codes=gift_card_codes,
-                meta_context=meta_context,
-                attribution=attribution,
-                legal_acceptance=legal_acceptance,
-                expected_total=expected_total,
-                expected_cart_digest=expected_cart_digest,
-                agent_checkout=agent_checkout,
-            )
-        except ShippingPriceUnresolvedError:
-            cls._refuse_unpriced(
-                cart,
-                user=user,
-                pay_way=pay_way,
-                shipping_address=shipping_address,
-                loyalty_points_to_redeem=loyalty_points_to_redeem,
-                gift_card_codes=gift_card_codes,
-            )
-
-    @classmethod
-    @transaction.atomic
-    def _create_order_for_verified_intent(
-        cls,
-        *,
-        cart,
-        shipping_address: dict[str, Any],
-        payment_intent_id: str,
-        payment_status: PaymentStatus,
-        payment_data: dict[str, Any],
-        pay_way,
-        user,
-        loyalty_points_to_redeem: int | None,
-        gift_card_codes: list[str] | None,
-        meta_context: dict[str, Any] | None,
-        attribution: AttributionInput | None,
-        legal_acceptance: LegalAcceptance,
-        expected_total: ExpectedTotal,
-        expected_cart_digest: str | None,
-        agent_checkout: UUID | None,
-    ) -> Order:
-        """The locked half of ``create_order_from_cart``.
-
-        Makes no provider call and no carrier call: ``payment_status``
-        and ``payment_data`` were read, and the carrier's live price was
-        resolved (``_resolve_live_shipping``), before this transaction
-        opened. Everything here either hits the database, reads the cache
-        or recomputes the server-side total. A live price the cache does
-        not hold raises ``ShippingPriceUnresolvedError``.
-        """
-        try:
-            from cart.models import Cart
-
-            # Lock the Cart row immediately so concurrent checkouts on the
-            # same cart are serialised.  Must happen before any reads so
-            # validate_cart_for_checkout sees the locked snapshot.
-            cart = Cart.objects.select_for_update().get(pk=cart.pk)
-
-            if agent_checkout is not None:
-                existing_order = cls.order_for_agent_checkout(agent_checkout)
-                if existing_order is not None:
-                    return existing_order
-
-            # Step 0: a repeat of a submit that already created its order
-            # answers with that order. BEFORE the cart checks: the first
-            # order has already taken the stock and, once it is paid,
-            # emptied the cart, so a repeat can fail both and would
-            # otherwise be refused for the very thing the first submit
-            # did.
-            existing_order = cls._order_created_for_payment(
-                payment_intent_id, cart
-            )
-            if existing_order is not None:
-                return existing_order
-
-            # Step 1: Validate cart for checkout
-            validation_result = cls.validate_cart_for_checkout(cart)
-            if not validation_result.get("valid", False):
-                raise CartNotReadyError.from_validation(validation_result)
-
-            # Step 2: Validate shipping address
-            cls.validate_shipping_address(shipping_address, pay_way=pay_way)
-
-            # Step 2.4: Re-bind wholesale pricing on the LOCKED cart —
-            # the refetch above produced a fresh instance. Everything
-            # below (promotion gating, totals, shipping threshold,
-            # payment fee, item price snapshots, PaymentIntent amount
-            # verification) must see the same prices the cart preview
-            # showed. Kept in lockstep with the offline path.
-            from b2b.services import B2BPricingService
-
-            B2BPricingService.bind_cart(cart, user)
-
-            # Wholesale minimum-order-value gate (standard B2B term).
-            # Checked here AND at payment-intent creation so an online
-            # payment can never be captured for an order this would
-            # reject.
-            unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
-            if unmet_minimum is not None:
-                raise InvalidOrderDataError(
-                    str(
-                        _(
-                            "The order total is below this wholesale "
-                            "tier's minimum of {minimum}."
-                        ).format(minimum=unmet_minimum)
-                    )
-                )
-
-            # Step 2.5: The total, once, under lock (promotions, the
-            # customer's points, the gift cards): what the intent and
-            # the client's expected total are compared with, and what
-            # the order below is built from.
-            quote = cls._quote_under_lock(
-                cart,
-                user=user,
-                pay_way=pay_way,
-                shipping_address=shipping_address,
-                loyalty_points_to_redeem=loyalty_points_to_redeem,
-                gift_card_codes=gift_card_codes,
-                expected_total=expected_total,
-                expected_cart_digest=expected_cart_digest,
-            )
-            charges = quote.charges()
-            promo_result = quote.promotion
-
-            # Step 3: Verify the provider amount matches that total. The
-            # intent itself (existence, state) was read before this
-            # transaction opened, so this is the only part of the
-            # verification that needs server state. It prevents a
-            # tampered client submitting a PI created for a lower
-            # amount. payment_data["amount"] is in euros
-            # (stripe_pi.amount / 100).
-            calculated_total_cents = ExpectedTotal.of(charges.amount_due).amount
-            # The Stripe provider returns amount already divided by 100
-            # (see payment.py StripePaymentProvider.get_payment_status) and
-            # also returns a currency code. Some providers/tests return a
-            # stripped payload without amount/currency — only enforce the
-            # check when the provider actually supplied those fields.
-            expected_currency = settings.DEFAULT_CURRENCY.lower()
-
-            if "amount" in payment_data and payment_data["amount"] is not None:
-                provider_amount_cents = round(payment_data["amount"] * 100)
-                if provider_amount_cents != calculated_total_cents:
-                    # Log the full input set that produced the mismatch so
-                    # root-causing doesn't require re-running the checkout
-                    # under a debugger. The (provider, kind, weight,
-                    # country, region, cart_total, shipping_cost,
-                    # payment_fee) tuple is exactly what was fed into
-                    # ``shipping_cost`` + ``calculate_payment_
-                    # method_fee`` above — if any of these differ from
-                    # what the create-payment-intent step saw, the
-                    # mismatch is upstream of this point.
-                    logger.warning(
-                        "Payment amount mismatch for intent %s: "
-                        "provider=%d cents, calculated=%d cents",
-                        payment_intent_id,
-                        provider_amount_cents,
-                        calculated_total_cents,
-                        extra={
-                            "payment_intent_id": payment_intent_id,
-                            "cart_uuid": str(cart.uuid),
-                            "provider_amount_cents": provider_amount_cents,
-                            "calculated_amount_cents": calculated_total_cents,
-                            "cart_total_amount": str(
-                                quote.items_subtotal.amount
-                            ),
-                            "shipping_cost_amount": str(
-                                charges.shipping.price.amount
-                            ),
-                            "payment_fee_amount": str(
-                                charges.payment_fee.amount.amount
-                            ),
-                            "promotion_discount_amount": str(
-                                quote.discount_total.amount
-                            ),
-                            "promotion_free_shipping": (
-                                promo_result.free_shipping
-                            ),
-                            "loyalty_preview_amount": str(
-                                quote.loyalty_discount.amount
-                            ),
-                            "gift_plan_amount": str(
-                                charges.gift_cards.amount.amount
-                            ),
-                            "shipping_provider_code": shipping_address.get(
-                                "shipping_provider_code"
-                            ),
-                            "shipping_kind": shipping_address.get(
-                                "shipping_kind"
-                            ),
-                            "cart_weight_grams": quote.weight_grams,
-                            "country_id": shipping_address.get("country_id"),
-                            "region_id": shipping_address.get("region_id"),
-                            "pay_way_code": pay_way.provider_code,
-                        },
-                    )
-                    raise PaymentAmountMismatchError(
-                        provider_amount_cents=provider_amount_cents,
-                        calculated_amount_cents=calculated_total_cents,
-                    )
-
-            if payment_data.get("currency"):
-                provider_currency = payment_data["currency"].lower()
-                if provider_currency not in {
-                    "eur",
-                    expected_currency,
-                }:
-                    logger.warning(
-                        "Payment currency mismatch for intent %s: "
-                        "provider='%s', expected='%s'",
-                        payment_intent_id,
-                        provider_currency,
-                        expected_currency,
-                    )
-                    raise PaymentCurrencyMismatchError(
-                        provider_currency=provider_currency,
-                        expected_currency=expected_currency,
-                    )
-
-            # Step 4: Get stock reservations for cart session
-            # Reservations are identified by cart.uuid (session_id)
-            reservations = list(
-                StockReservation.objects.filter(
-                    session_id=str(cart.uuid), consumed=False
-                ).select_related("product")
-            )
-
-            # Validate we have reservations for all cart items.
-            # Materialize the queryset eagerly: the order_created signal
-            # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
-            # if anything causes that callback to fire before this loop
-            # executes, the lazy queryset would resolve to zero rows.
-            # Also lock the CartItem rows within the same transaction to
-            # prevent concurrent mutations while we process them.
-            # ``of=("self",)``: without it the join also locked every
-            # product row, in this cart's line order, and two carts that
-            # share products in different line orders deadlocked. The
-            # products are locked next, in pk order.
-            cart_items = list(
-                cart.items.select_for_update(of=("self",)).select_related(
-                    "product"
-                )
-            )
-            cls._lock_order_products(
-                cart_items=cart_items,
-                reservations=reservations,
-                promo_result=promo_result,
-            )
-
-            # Reservations (active, expired, or duplicated) are reconciled
-            # against the cart in Step 7 via _consume_stock_for_order, which
-            # releases every hold and decrements physical stock by the cart
-            # quantity. Expired holds therefore need no special handling here:
-            # a lapsed hold whose stock was taken by another session simply
-            # fails the decrement below and rolls the whole checkout back.
-
-            # Step 5: Create Order with payment_id field populated
-            # Determine target currency from shipping address or default
-            target_currency = settings.DEFAULT_CURRENCY
-
-            # Build order data
-            order_data = {
-                "user": user if user and user.is_authenticated else None,
-                "pay_way": pay_way,
-                "payment_id": payment_intent_id,
-                "payment_status": payment_status,
-                "status": OrderStatus.PENDING,
-                "agent_checkout": agent_checkout,
-                # Shipping address fields
-                "first_name": shipping_address.get("first_name"),
-                "last_name": shipping_address.get("last_name"),
-                "email": shipping_address.get("email"),
-                "street": shipping_address.get("street"),
-                "street_number": shipping_address.get("street_number"),
-                "address_line_2": shipping_address.get("address_line_2", ""),
-                "city": shipping_address.get("city"),
-                "zipcode": shipping_address.get("zipcode"),
-                "country_id": shipping_address.get("country_id"),
-                "region_id": shipping_address.get("region_id"),
-                "phone": shipping_address.get("phone"),
-                "customer_notes": shipping_address.get("customer_notes", ""),
-                # B2B billing identity — empty for retail (Tier A),
-                # populated for Τιμολόγιο Πώλησης (Tier B). The
-                # serializer already normalised these (stripped
-                # EL/GR prefix, uppercased country).
-                "billing_vat_id": shipping_address.get("billing_vat_id", ""),
-                "billing_country": shipping_address.get("billing_country", ""),
-                "billing_company_name": shipping_address.get(
-                    "billing_company_name", ""
-                ),
-                "billing_tax_office": shipping_address.get(
-                    "billing_tax_office", ""
-                ),
-                "billing_activity": shipping_address.get(
-                    "billing_activity", ""
-                ),
-                "billing_street": shipping_address.get("billing_street", ""),
-                "billing_street_number": shipping_address.get(
-                    "billing_street_number", ""
-                ),
-                "billing_city": shipping_address.get("billing_city", ""),
-                "billing_zipcode": shipping_address.get("billing_zipcode", ""),
-                "document_type": (
-                    shipping_address.get("document_type")
-                    or OrderDocumentTypeEnum.RECEIPT
-                ),
-            }
-
-            # Shipping and the pay-way fee are the quote's: the parcel
-            # it weighed (gifts included) is the one the shipment is
-            # created for.
-            parcel_items = list(quote.parcel_items)
-            cart_weight_grams = quote.weight_grams
-            order_data["shipping_price"] = charges.shipping.price
-            order_data["payment_method_fee"] = charges.payment_fee.amount
-
-            # Resolve provider FK + kind, then create the order.
-            order_data.setdefault(
-                "shipping_provider_code",
-                shipping_address.get("shipping_provider_code"),
-            )
-            order_data.setdefault(
-                "shipping_kind", shipping_address.get("shipping_kind")
-            )
-            cls._resolve_shipping_provider(
-                order_data, weight_grams=cart_weight_grams
-            )
-            cls._seed_language_code(order_data)
-            cls._seed_estimated_delivery(order_data)
-            order = Order.objects.create(**order_data)
-            OrderAttributionService.record(
-                order, attribution or AttributionInput(), cart=cart
-            )
-            OrderLegalAcceptanceService.record(order, legal_acceptance)
-
-            # Provider-agnostic shipment row creation. The carrier
-            # adapter reads its own keys out of ``shipping_address``
-            # (its ``checkout_fields``) and filters on ``shipping_kind``
-            # itself.
-            from shipping.services import ShippingService
-
-            ShippingService.create_shipment_row_for_order(
-                order, payload=shipping_address, items=parcel_items
-            )
-
-            # Initialize metadata with cart snapshot
-            order.metadata = {
-                "cart_snapshot": {
-                    "cart_id": cart.id,
-                    "cart_uuid": str(cart.uuid),
-                    "total_items": cart.total_items,
-                    "total_price": str(cart.total_price.amount),
-                    "currency": str(cart.total_price.currency),
-                },
-            }
-            # Meta Pixel context forwarded by the storefront proxy.
-            # Persisted alongside cart_snapshot so the CAPI dispatcher
-            # can build a UserData payload with the same fbp/fbc the
-            # browser pixel saw.
-            # Wholesale audit: which group priced this order. The line
-            # prices are already snapshotted on OrderItem rows — this
-            # records WHY they differ from retail.
-            b2b_context = getattr(cart, "_b2b_pricing", None)
-            if b2b_context is not None:
-                order.metadata["b2b_pricing"] = {
-                    "group_id": b2b_context.group.pk,
-                    "group_name": b2b_context.group.name,
-                    "discount_percent": str(b2b_context.group.discount_percent),
-                }
-            sanitised_meta = cls._sanitise_meta_context(meta_context)
-            if sanitised_meta:
-                order.metadata["meta"] = sanitised_meta
-
-            # Step 6: Create OrderItems from CartItems
-            # Cart item pk -> the line written for it: the promotion
-            # engine reports each promotion's money per cart item, and
-            # the order lines snapshot it below.
-            order_items: dict[int, OrderItem] = {}
-            for cart_item in cart_items:
-                product = cart_item.product
-                quantity = cart_item.quantity
-
-                # Validate product still exists and has stock
-                if not product:
-                    raise InvalidOrderDataError(
-                        str(_("Product is required for order items"))
-                    )
-
-                if quantity <= 0:
-                    raise InvalidOrderDataError(
-                        str(
-                            _(
-                                "Invalid quantity {quantity} for product {product_id}"
-                            ).format(
-                                quantity=quantity,
-                                product_id=product.id,
-                            )
-                        )
-                    )
-
-                # Get the line price — bound-aware: a wholesale cart's
-                # items carry their group price — and convert currency
-                # if needed
-                product_price = cart_item.final_price
-                if product_price.currency != target_currency:
-                    item_price = Money(product_price.amount, target_currency)
-                else:
-                    item_price = product_price
-
-                _log_price_drift_if_needed(cart_item, item_price)
-
-                # bulk_create cannot be used here: the post_save signal
-                # on OrderItem (handle_order_item_post_save) writes an
-                # OrderHistory audit note for each new item and is the
-                # canonical creation hook. bulk_create skips all signals.
-                # The loop is already inside @transaction.atomic so all
-                # inserts land in one DB round-trip on commit.
-                order_items[cart_item.pk] = OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=quantity,
-                    price=item_price,
-                    # The rate the cart backed this price's VAT out of —
-                    # frozen on the line so the invoice and myDATA split
-                    # ``price`` at it, whatever the catalogue says later.
-                    vat_rate=cart_item.vat_percent,
-                    recommendation_impression_id=(
-                        cart_item.recommendation_impression_id
-                    ),
-                )
-
-            # Step 7: Reconcile reservations against the cart and decrement
-            # physical stock exactly once per product (guards against
-            # duplicate/missing/expired reservations double-decrementing,
-            # over-selling, or skipping the decrement).
-            reservation_ids = cls._consume_stock_for_order(
-                order=order,
-                cart=cart,
-                cart_items=cart_items,
-                reservations=reservations,
-            )
-
-            # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids
-
-            # FREE_GIFT entitlements become zero-price lines (stock
-            # decremented directly; an out-of-stock gift is skipped,
-            # never a blocker).
-            cls._inject_promotion_gifts(order, promo_result, target_currency)
-
-            # Step 7.5: Apply loyalty points redemption if requested
-            loyalty_discount = Money(0, target_currency)
-            if quote.loyalty_points:
-                try:
-                    from loyalty.services import LoyaltyService
-
-                    # Redeem points and get discount amount
-                    discount_amount = LoyaltyService.redeem_points(
-                        user=user,
-                        points_amount=quote.loyalty_points,
-                        currency=str(target_currency),
-                        order=order,
-                        # The cap the quote priced it under: the goods
-                        # after promotions, never shipping or a fee.
-                        max_discount=quote.free_threshold_value.amount,
-                    )
-                    loyalty_discount = Money(discount_amount, target_currency)
-
-                    # Store loyalty redemption in order metadata
-                    order.metadata["loyalty_redemption"] = {
-                        "points_redeemed": quote.loyalty_points,
-                        "discount_amount": str(discount_amount),
-                        "currency": str(target_currency),
-                    }
-
-                    logger.info(
-                        "Applied loyalty discount of %s %s (%s points) to order %s",
-                        discount_amount,
-                        target_currency,
-                        quote.loyalty_points,
-                        order.id,
-                    )
-                except ValidationError:
-                    raise
-                except Exception as e:
-                    logger.exception(
-                        "Failed to apply loyalty discount to order %s",
-                        order.id,
-                    )
-                    # The PaymentIntent was verified WITH the loyalty
-                    # discount (Step 2.5) — silently dropping it here
-                    # would make the captured amount disagree with
-                    # ``amount_due``. The user-row lock taken during
-                    # verification makes this branch unreachable in
-                    # practice; if it ever fires, fail loud so the
-                    # transaction (and its idempotency mark) rolls
-                    # back and the checkout retries cleanly.
-                    raise InvalidOrderDataError(
-                        str(
-                            _(
-                                "Loyalty redemption failed after payment "
-                                "verification."
-                            )
-                        )
-                    ) from e
-
-            # Step 7.6: Record promotion redemptions (rows + metadata)
-            # for the evaluation done under lock at Step 2.5, and the
-            # gift-card plan locked during payment verification.
-            from giftcard.services import GiftCardService
-
-            order.discount_amount = record_redemptions(order, promo_result)
-            order.loyalty_discount = loyalty_discount
-            cls._snapshot_line_discounts(
-                order_items, promo_result, loyalty_discount
-            )
-            order.gift_card_amount = GiftCardService.record_plan(
-                charges.gift_cards, order
-            )
-
-            # Persist the deductions so they survive on the order, then
-            # let calculate_order_total_amount() be the single authority
-            # on what the customer owes. Subtracting here and leaving
-            # the order's own total undiscounted is what let every
-            # charge site bill the full amount while the points were
-            # burnt.
-            order.amount_due = order.calculate_order_total_amount()
-            cls._require_quoted_total(order, charges.amount_due)
-            order.save(
-                update_fields=[
-                    "discount_amount",
-                    "discount_amount_currency",
-                    "loyalty_discount",
-                    "loyalty_discount_currency",
-                    "gift_card_amount",
-                    "gift_card_amount_currency",
-                    "amount_due",
-                    "amount_due_currency",
-                    "metadata",
-                ]
-            )
-
-            # Items, discounts and charges are final: keep what the
-            # receipt will bill, so every sales figure reads it
-            # (order.vat_snapshot).
-            write_vat_lines(order)
-
-            # The coupon's durable record is the redemption row — the
-            # cart attachment has served its purpose.
-            CouponService.clear_after_order(cart)
-
-            # Step 8: Clear cart
-            # Keep the cart while the shopper still owes a hosted
-            # payment — see Order.awaits_online_payment. It clears on
-            # ``order_paid`` instead.
-            if order.awaits_online_payment:
-                logger.info(
-                    "Kept cart %s — order %s awaits online payment",
-                    cart.uuid,
-                    order.id,
-                )
-            else:
-                cart.items.all().delete()
-                logger.info("Cleared cart %s after order creation", cart.uuid)
-
-            # Step 9: Return order in PENDING status
-            # Note: Webhook will move order to PROCESSING when payment is confirmed
-            logger.info(
-                "Order %s created successfully from cart %s with payment %s",
-                order.id,
-                cart.uuid,
-                payment_intent_id,
-            )
-
-            return order
-
-        except (
-            ProductNotFoundError,
-            InsufficientStockError,
-            StockReservationError,
-            InvalidCouponError,
-            InvalidGiftCardError,
-            InvalidOrderDataError,
-            OrderTotalChangedError,
-            OrderCartChangedError,
-            PaymentNotFoundError,
-            PaymentVerificationError,
-            PaymentAmountMismatchError,
-            PaymentCurrencyMismatchError,
-        ):
-            raise
-        except Exception as e:
-            if (
-                isinstance(e, IntegrityError)
-                and agent_checkout is not None
-                and _violated_constraint(e) == AGENT_CHECKOUT_UNIQUE_CONSTRAINT
-            ):
-                raise AgentCheckoutOrderedError(agent_checkout) from e
-            if (
-                isinstance(e, IntegrityError)
-                and _violated_constraint(e) == PAYMENT_ID_UNIQUE_CONSTRAINT
-            ):
-                # Another cart's checkout committed an order on this
-                # intent between the lookup above and this insert (the
-                # cart lock only serialises submits of ONE cart). It is
-                # the sequential case's answer: the intent is taken.
-                logger.warning(
-                    "Payment intent %s was taken by another order while "
-                    "this one was being created",
-                    payment_intent_id,
-                )
-                raise PaymentVerificationError(
-                    payment_intent_id,
-                    "payment intent was attached to another order "
-                    "while this one was being created",
-                ) from e
-            logger.exception(
-                "Unexpected error creating order from cart",
-            )
-            raise InvalidOrderDataError(
-                _("Failed to create order: {error}").format(error=str(e))
-            ) from e
 
     @staticmethod
     def _enforce_unpaid_order_limit(*, pay_way, user, email: str) -> None:
@@ -1567,13 +678,9 @@ class OrderService:
         online payment (``OrderQuerySet.awaiting_online_payment``), an
         agent's or not.
 
-        Called by ``create_order_from_cart_offline`` alone, under the cart
-        row lock, so two agent orders racing for one cart are judged one
-        after the other and the second finds the first's committed order.
-        Not by the payment-first path: there the payment is already taken
-        when the order is created, so a refusal would keep money for no
-        order, and the order it creates is a paid one, not a second order
-        awaiting its payment. The gateway sends no payment intent.
+        Called by ``create_order_from_cart`` under the cart row lock, so
+        two agent orders racing for one cart are judged one after the
+        other and the second finds the first's committed order.
         """
         if attribution is None or not attribution.from_agent:
             return
@@ -1598,7 +705,7 @@ class OrderService:
         raise CartHasUnpaidOrderError
 
     @classmethod
-    def create_order_from_cart_offline(
+    def create_order_from_cart(
         cls,
         *,
         cart,
@@ -1615,12 +722,14 @@ class OrderService:
         agent_checkout: UUID | None = None,
     ) -> Order:
         """
-        Create order from cart using the order-first flow.
+        Create an order from a cart: the one creation path.
 
-        Used for offline payments (COD, Bank Transfer) and online
-        providers (Viva Wallet, Stripe): an online order is created
-        PENDING with no payment, and the shopper pays it afterwards. It
-        performs the following steps:
+        Every pay way creates the order first. An offline one (COD, bank
+        transfer) is collected later; an online one (Viva Wallet,
+        Stripe) is created PENDING with no payment, and the shopper pays
+        it afterwards on the provider's hosted page. No money moves
+        before the locked quote below has run every refusal. It performs
+        the following steps:
         0. Locks the cart; returns the order this agent checkout already
            created, if any (idempotent)
         1. Validates cart items still exist and prices match
@@ -1652,12 +761,8 @@ class OrderService:
             AgentCheckoutOrderedError: If another call of
                 ``agent_checkout`` committed its order first
 
-        References:
-            - Design Section "Order Service"
-            - Dual-Flow Payment Architecture
-
         Example:
-            >>> order = OrderService.create_order_from_cart_offline(
+            >>> order = OrderService.create_order_from_cart(
             ...     cart=cart,
             ...     shipping_address={
             ...         'first_name': 'John',
@@ -1678,7 +783,7 @@ class OrderService:
             cart, user=user, shipping_address=shipping_address
         )
         try:
-            return cls._create_order_offline_locked(
+            return cls._create_order_locked(
                 cart=cart,
                 shipping_address=shipping_address,
                 pay_way=pay_way,
@@ -1704,7 +809,7 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
-    def _create_order_offline_locked(
+    def _create_order_locked(
         cls,
         *,
         cart,
@@ -1720,7 +825,7 @@ class OrderService:
         expected_cart_digest: str | None,
         agent_checkout: UUID | None,
     ) -> Order:
-        """The locked half of ``create_order_from_cart_offline``: one
+        """The locked half of ``create_order_from_cart``: one
         transaction, no carrier call (the live price was resolved before
         it opened; one the cache does not hold raises
         ``ShippingPriceUnresolvedError``)."""
@@ -1758,16 +863,18 @@ class OrderService:
                 email=shipping_address.get("email") or "",
             )
 
-            # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
-            # (see the payment-first path for the rationale).
+            # Step 2.4: Re-bind wholesale pricing on the LOCKED cart —
+            # the refetch above produced a fresh instance. Everything
+            # below (promotion gating, totals, shipping threshold,
+            # payment fee, item price snapshots) must see the same
+            # prices the cart preview showed.
             from b2b.services import B2BPricingService
 
             B2BPricingService.bind_cart(cart, user)
 
             # Wholesale minimum-order-value gate (standard B2B term).
-            # Checked here AND at payment-intent creation so an online
-            # payment can never be captured for an order this would
-            # reject.
+            # The order exists before any payment, so this refusal is
+            # the only one needed.
             unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
             if unmet_minimum is not None:
                 raise InvalidOrderDataError(
@@ -1779,9 +886,11 @@ class OrderService:
                     )
                 )
 
-            # Step 2.5: The total, once, under lock (see the
-            # payment-first path). No provider amount guards this path,
-            # so the client's expected total is its only check.
+            # Step 2.5: The total, once, under lock (promotions, the
+            # customer's points, the gift cards): what the client's
+            # expected total is compared with, and what the order below
+            # is built from. The payment is opened for this order's own
+            # amount afterwards, so no provider amount is compared here.
             quote = cls._quote_under_lock(
                 cart,
                 user=user,
@@ -1809,9 +918,11 @@ class OrderService:
             # if anything causes that callback to fire before this loop
             # executes, the lazy queryset would resolve to zero rows.
             # Also lock the CartItem rows within the same transaction to
-            # prevent concurrent mutations while we process them. Only the
-            # cart lines are locked here; the products follow in pk order
-            # (see the payment-first path for why).
+            # prevent concurrent mutations while we process them.
+            # ``of=("self",)``: without it the join also locked every
+            # product row, in this cart's line order, and two carts that
+            # share products in different line orders deadlocked. The
+            # products are locked next, in pk order.
             cart_items = list(
                 cart.items.select_for_update(of=("self",)).select_related(
                     "product"
@@ -1824,8 +935,11 @@ class OrderService:
             )
 
             # Reservations (active, expired, or duplicated) are reconciled
-            # against the cart in Step 7 via _consume_stock_for_order. Expired
-            # holds need no special handling here (see the payment-first path).
+            # against the cart in Step 6 via _consume_stock_for_order, which
+            # releases every hold and decrements physical stock by the cart
+            # quantity. Expired holds therefore need no special handling
+            # here: a lapsed hold whose stock was taken by another session
+            # simply fails the decrement and rolls the whole checkout back.
 
             # Step 4: Create Order with PENDING status
             # Determine target currency from shipping address or default
@@ -2074,13 +1188,12 @@ class OrderService:
                         "Failed to apply loyalty discount to order %s",
                         order.id,
                     )
-                    # Fail loud, like the payment-first path. The offline
-                    # providers (COD, Viva) have no amount guard, so
-                    # swallowing this charged the shopper the undiscounted
+                    # Fail loud. No provider amount guards order creation,
+                    # so swallowing this charged the shopper the undiscounted
                     # total while the checkout sidebar had shown the
-                    # discount and the points stayed unspent — the exact
-                    # outcome _evaluate_promotions' docstring says a
-                    # refused discount must never produce. Raising rolls
+                    # discount and the points stayed unspent: a refused
+                    # discount must never charge more than was shown.
+                    # Raising rolls
                     # the whole creation back so the shopper retries and
                     # sees a price that matches what they are charged.
                     raise InvalidOrderDataError(
@@ -2143,8 +1256,8 @@ class OrderService:
             # remainder and settles identically. Anything LESS than
             # full coverage on an online pay way leaves the order
             # PENDING for the remainder: the payment is opened later
-            # (``create_checkout_session`` or ``create_payment_intent``),
-            # for every provider alike.
+            # (``create_checkout_session``, or ``confirm_agent_payment``
+            # for an agent's delegated card), for every provider alike.
             deductions_present = (
                 order.gift_card_amount.amount > 0
                 or order.discount_amount.amount > 0
@@ -2179,9 +1292,9 @@ class OrderService:
 
             # Step 8: Dispatch shipment creation for true offline payments
             # (COD, Bank Transfer) and fully-gift-card-settled orders.
-            # Online providers that route through this method (Viva
-            # Wallet) defer dispatch to the payment webhook so the
-            # courier voucher only mints after the shopper actually pays.
+            # An online pay way (Viva Wallet, Stripe) defers dispatch to
+            # the payment webhook so the courier voucher only mints after
+            # the shopper actually pays.
             if (
                 PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
                 or fully_covered
@@ -2190,7 +1303,7 @@ class OrderService:
 
             # Step 9: Return order in PENDING status
             logger.info(
-                "Order %s created successfully from cart %s (order-first, %s)",
+                "Order %s created successfully from cart %s (%s)",
                 order.id,
                 cart.uuid,
                 pay_way.provider_code or "offline",
@@ -2219,7 +1332,7 @@ class OrderService:
                 # cart's calls serialise on its lock), committed first.
                 raise AgentCheckoutOrderedError(agent_checkout) from e
             logger.exception(
-                "Unexpected error creating order from cart (order-first)",
+                "Unexpected error creating order from cart",
             )
             raise InvalidOrderDataError(
                 _("Failed to create order: {error}").format(error=str(e))
@@ -3237,15 +2350,11 @@ class OrderService:
         queued after the webhook's transaction commits (a rolled-back
         webhook queues nothing) and retried when the mail is. The
         services import no task, so the receiver of
-        ``payment_without_order_found`` queues it. A payment-first intent
-        (``PaymentPurpose.CART``) can succeed while the ``POST /order``
-        that carries it is still creating its order, so its alert waits
-        ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` and is sent only if no
-        order carries it by then. That wait goes with the payment-first
-        path (#818, R3).
+        ``payment_without_order_found`` queues it. Every intent of ours is
+        opened for an order that already exists, or for a gift-card
+        purchase, so one no order carries is alerted at once.
         """
-        purpose = own_purpose(metadata)
-        if purpose is None:
+        if own_purpose(metadata) is None:
             logger.warning(
                 "Payment %s is not bound to this store's orders: no alert",
                 payment_id,
@@ -3255,7 +2364,6 @@ class OrderService:
             sender=cls,
             payment_id=payment_id,
             captured=captured,
-            grace=purpose == PaymentPurpose.CART,
         )
 
     @classmethod
@@ -3331,12 +2439,12 @@ class OrderService:
         follows the guards below.
 
         The order is the one whose ``payment_id`` is the intent. An intent
-        the order no longer points at (the shopper paid in an older tab
-        after a retry opened a newer intent) is found by what the server
-        wrote on it, *metadata*: it must bind the intent to an existing
-        order (``PaymentPurpose.ORDER``) of this store, checked by
-        ``binding_mismatch``. A payment-first intent is bound to a cart,
-        its order may not exist yet, and "not found" stays the answer.
+        the order does not point at (a hosted Checkout Session's intent,
+        whose ``checkout.session.completed`` has not been booked yet, or
+        an older payment the order has since replaced) is found by what
+        the server wrote on it, *metadata*: it must bind the intent to an
+        existing order (``PaymentPurpose.ORDER``) of this store, checked
+        by ``binding_mismatch``.
         """
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres

@@ -259,7 +259,7 @@ class TestAnIntentTheOrderNoLongerNames:
         assert len(_alerts(send_email)) == 1
         assert order.payment_transactions.count() == 2
 
-    def test_an_older_intent_paid_after_a_retry_settles_the_order(
+    def test_an_older_intent_paid_after_another_settles_the_order(
         self, send_email
     ):
         order = _order(payment_id="pi_newer")
@@ -277,7 +277,8 @@ class TestAnIntentTheOrderNoLongerNames:
     @pytest.mark.parametrize(
         "forge",
         [
-            {"purpose": PaymentPurpose.CART.value},
+            # The retired payment-first purpose binds nothing.
+            {"purpose": "cart"},
             {"purpose": PaymentPurpose.GIFT_CARD.value},
             {"tenant_schema": "another_store"},
             {"subject": "not-a-uuid"},
@@ -298,18 +299,6 @@ class TestAnIntentTheOrderNoLongerNames:
         order.refresh_from_db()
         assert order.payment_transactions.count() == 0
         assert order.payment_status == PaymentStatus.PENDING
-        assert _alerts(send_email) == []
-
-    def test_a_payment_first_intent_with_no_order_yet_stays_as_today(
-        self, send_email
-    ):
-        cart_uuid = "5b1c1f06-6d6c-4a63-9c36-1e0a3f0b8a11"
-
-        _intent_succeeded(
-            "pi_early", binding_metadata(PaymentPurpose.CART, cart_uuid)
-        )
-
-        assert PaymentLedger.captured(_order()) == 0
         assert _alerts(send_email) == []
 
 

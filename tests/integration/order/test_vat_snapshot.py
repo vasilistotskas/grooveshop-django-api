@@ -137,7 +137,7 @@ class TestCheckoutWritesTheLines:
         country = CountryFactory()
         enable_rate(country)
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,

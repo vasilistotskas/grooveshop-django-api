@@ -1,16 +1,18 @@
 """A payment may only be started on an order that is still waiting for one.
 
 Cancelling an unpaid order releases its stock and settles its payment
-to CANCELED (``Order.settle_unpaid_payment``). Minting a PaymentIntent
-or a hosted checkout session for it anyway takes money for goods that
-will never ship — ``record_payment_after_cancel`` then books the charge
-and alerts ops for a manual refund. Every endpoint that starts a
-payment refuses such an order before the provider is ever called, and
-one cancelled while the provider call is in flight is not reopened.
+to CANCELED (``Order.settle_unpaid_payment``). Opening a hosted checkout
+session for it anyway, or charging an agent's delegated card, takes money
+for goods that will never ship — ``record_payment_after_cancel`` then
+books the charge and alerts ops for a manual refund. Every endpoint that
+starts a payment refuses such an order before the provider is ever
+called, and one cancelled while the provider call is in flight is not
+reopened.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
 import pytest
@@ -50,9 +52,7 @@ def canceled_order():
 @pytest.mark.parametrize(
     "route",
     [
-        "order-create-payment-intent",
         "order-create-checkout-session",
-        "order-retry-payment",
         "order-confirm-agent-payment",
     ],
 )
@@ -68,9 +68,7 @@ def test_a_canceled_order_cannot_start_a_payment(canceled_order, route):
             "pay_way.services.PayWayService.is_provider_configured",
             return_value=True,
         ),
-        patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way"
-        ) as provider,
+        patch("order.views.order.get_payment_provider") as provider,
     ):
         response = client.post(
             reverse(route, kwargs={"pk": canceled_order.pk}), {}, format="json"
@@ -86,7 +84,8 @@ def test_a_canceled_order_cannot_start_a_payment(canceled_order, route):
 
 def test_a_cancel_during_the_provider_call_is_not_overwritten():
     """The provider call runs without the row lock. A cancel landing
-    meanwhile wins, and the intent just opened is never handed out."""
+    meanwhile wins: the session just opened is ended, never recorded and
+    its link never handed out."""
     user = UserAccountFactory(num_addresses=0)
     order = OrderFactory(
         user=user,
@@ -96,7 +95,10 @@ def test_a_cancel_during_the_provider_call_is_not_overwritten():
         payment_status=PaymentStatus.PENDING,
         payment_id="",
     )
-    provider = Mock()
+    provider = Mock(min_hosted_session=timedelta(0))
+    provider.recorded_checkout_session.return_value = None
+    provider.live_checkout_session.return_value = None
+    provider.checkout_session_params.return_value = {}
 
     def cancel_then_open(**kwargs):
         Order.objects.filter(pk=order.pk).update(
@@ -104,12 +106,11 @@ def test_a_cancel_during_the_provider_call_is_not_overwritten():
             payment_status=PaymentStatus.CANCELED,
         )
         return True, {
-            "payment_id": "pi_opened_meanwhile",
-            "status": PaymentStatus.PENDING,
-            "client_secret": "pi_opened_meanwhile_secret",
+            "session_id": "cs_opened_meanwhile",
+            "checkout_url": "https://checkout.example/cs_opened_meanwhile",
         }
 
-    provider.process_payment.side_effect = cancel_then_open
+    provider.create_checkout_session.side_effect = cancel_then_open
     client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
     client.force_authenticate(user=user)
 
@@ -118,20 +119,25 @@ def test_a_cancel_during_the_provider_call_is_not_overwritten():
             "pay_way.services.PayWayService.is_provider_configured",
             return_value=True,
         ),
-        patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
-        ),
+        patch("order.views.order.get_payment_provider", return_value=provider),
     ):
         response = client.post(
-            reverse("order-create-payment-intent", kwargs={"pk": order.pk}),
-            {},
+            reverse("order-create-checkout-session", kwargs={"pk": order.pk}),
+            {
+                "successUrl": "https://shop.example/ok",
+                "cancelUrl": "https://shop.example/no",
+            },
             format="json",
         )
 
     assert response.status_code == 409, response.data
-    assert "pi_opened_meanwhile_secret" not in str(response.data)
+    assert response.json()["code"] == "order_changed_during_payment"
+    assert "cs_opened_meanwhile" not in str(response.data)
+    provider.discard_checkout_session.assert_called_once_with(
+        "cs_opened_meanwhile"
+    )
     order.refresh_from_db()
     assert order.status == OrderStatus.CANCELED
     assert order.payment_status == PaymentStatus.CANCELED
     assert order.payment_id == ""
+    provider.record_checkout_session.assert_not_called()

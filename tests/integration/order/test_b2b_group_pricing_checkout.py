@@ -86,7 +86,7 @@ class TestGroupPricingCheckout:
         cart, product = _cart_for(profile.user, "100.00", vat_rate="24")
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -111,7 +111,7 @@ class TestGroupPricingCheckout:
         )
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -131,7 +131,7 @@ class TestGroupPricingCheckout:
         cart, _product = _cart_for(profile.user, "100.00")
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -151,7 +151,7 @@ class TestGroupPricingCheckout:
         cart, product = _cart_for(None, "100.00", vat_rate="24")
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -171,7 +171,7 @@ class TestGroupPricingCheckout:
         cart, product = _cart_for(profile.user, "100.00")
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -200,7 +200,7 @@ class TestGroupPricingCheckout:
         # Match the amount, not the wording — the message is localized
         # (Greek when the compiled .mo is present, English in CI).
         with pytest.raises(InvalidOrderDataError, match="500"):
-            OrderService.create_order_from_cart_offline(
+            OrderService.create_order_from_cart(
                 **priced(
                     legal_acceptance=checkout_acceptance(),
                     cart=cart,
@@ -216,7 +216,7 @@ class TestGroupPricingCheckout:
         cart, product = _cart_for(profile.user, "100.00")
         country = CountryFactory()
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,

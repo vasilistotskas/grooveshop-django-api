@@ -257,7 +257,7 @@ class ExclusionCountryCallerTests(APITestCase):
         ):
             view._validate_pay_way_for_order(self.card, submitted)
 
-    def test_payment_intent_refuses_the_method_for_a_cyprus_address(self):
+    def test_the_quote_refuses_the_method_for_a_cyprus_address(self):
         from cart.factories.cart import CartFactory
         from user.factories.account import UserAccountFactory
 
@@ -266,7 +266,7 @@ class ExclusionCountryCallerTests(APITestCase):
         self.client.force_authenticate(user=user)
 
         response = self.client.post(
-            reverse("cart-create-payment-intent"),
+            reverse("cart-quote"),
             {
                 "pay_way_id": self.potg.id,
                 "shipping_provider_code": "boxnow",

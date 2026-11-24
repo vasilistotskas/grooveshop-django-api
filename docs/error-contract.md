@@ -191,10 +191,10 @@ line sees both, once each. In production it is one JSON object (the
 ```json
 {"level": "INFO", "logger": "core.middleware.access_log",
  "schema": "webside", "correlation_id": "…",
- "message": "POST api/v1/order/<int:pk>/create_payment_intent 400 812.4ms payment_intent_failed",
- "method": "POST", "route": "api/v1/order/<int:pk>/create_payment_intent",
+ "message": "POST api/v1/order/<int:pk>/create_checkout_session 400 812.4ms checkout_session_failed",
+ "method": "POST", "route": "api/v1/order/<int:pk>/create_checkout_session",
  "status": 400, "duration_ms": 812.4, "db_queries": 14, "db_ms": 233.1,
- "code": "payment_intent_failed"}
+ "code": "checkout_session_failed"}
 ```
 
 - `route` is the URL pattern, never the path; `schema` is the store. No

@@ -570,9 +570,8 @@ class LoyaltyService:
 
         Raises ValidationError on any rule violation; returns the
         discount, rounded half up to the cent — both ``redeem_points`` and the
-        payment-intent preview go through this, so the amount a Stripe
-        PaymentIntent is created for and the amount later persisted on
-        the order cannot drift.
+        checkout quote go through this, so the amount the shopper is
+        quoted and the amount later persisted on the order cannot drift.
 
         ``lock=True`` takes ``select_for_update`` on the user row: run
         inside the order-create transaction it guarantees a subsequent
@@ -668,10 +667,9 @@ class LoyaltyService:
     ) -> Decimal:
         """Price a redemption without redeeming.
 
-        Used by the cart payment-intent endpoint and the order-create
-        verification so the charged amount already reflects the
-        loyalty discount (the redemption itself still happens at order
-        creation). Same validations and the same exact Decimal as
+        Used by the checkout quote, and under lock by order creation, so
+        the amount due already reflects the loyalty discount (the
+        redemption itself still happens at order creation). Same validations and the same exact Decimal as
         ``redeem_points``.
         """
         return cls._validate_and_price_redemption(

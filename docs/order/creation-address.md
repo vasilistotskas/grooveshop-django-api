@@ -136,7 +136,7 @@ address it cannot place (prod order #316: street "1", street number
   country. A `region_id` with no such region is a 400 `region_invalid` and
   one of another country `region_country_mismatch`, both on `regionId`
   (`address_rules.region_errors`), from order creation and from the quote
-  and create-payment-intent bodies, which skip it for a pickup delivery;
+  body, which skips it for a pickup delivery;
   never a foreign key the database refuses.
   A region the store's home deliveries skip while they reach the rest of
   its country (its shipping zones, [§5.5](shipping-zones.md)) is a 400

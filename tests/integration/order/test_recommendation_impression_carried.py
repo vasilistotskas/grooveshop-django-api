@@ -8,14 +8,12 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
 from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
-from order.enum.status import PaymentStatus
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -25,10 +23,7 @@ from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 
 def _product():
@@ -40,12 +35,12 @@ def _product():
     )
 
 
-def _checkout(cart):
+def _checkout(cart, *, pay_way=None, user=None):
     country = CountryFactory()
     # A ShippingRate is per-country now — this ad-hoc country has none
     # until this call.
     enable_rate(country)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,
@@ -61,13 +56,14 @@ def _checkout(cart):
                 "phone": "+306900000000",
                 "shipping_kind": "home_delivery",
             },
-            pay_way=PayWayFactory(
+            pay_way=pay_way
+            or PayWayFactory(
                 settlement=PaySettlement.COURIER_CASH,
                 active=True,
                 cost=Money(Decimal(0), "EUR"),
                 free_threshold=Money(Decimal(0), "EUR"),
             ),
-            user=None,
+            user=user,
         )
     )
 
@@ -98,7 +94,7 @@ def test_the_offline_order_line_inherits_the_cart_line_impression():
     assert _lines(order) == {carried.id: impression, plain.id: None}
 
 
-def test_the_payment_first_order_line_inherits_the_cart_line_impression():
+def test_the_online_order_line_inherits_the_cart_line_impression():
     user = UserAccountFactory()
     cart = CartFactory(user=user)
     cart.items.all().delete()
@@ -112,36 +108,9 @@ def test_the_payment_first_order_line_inherits_the_cart_line_impression():
         recommendation_impression_id=impression,
     )
     CartItemFactory(cart=cart, product=plain, quantity=1)
-    country = CountryFactory()
-    # A ShippingRate is per-country now — this ad-hoc country has none
-    # until this call.
-    enable_rate(country)
 
-    with patch("order.payments.payment.get_payment_provider") as provider:
-        provider.return_value.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {"payment_id": "pi_test_123", "status": "succeeded"},
-        )
-        order = OrderService.create_order_from_cart(
-            **priced(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address={
-                    "first_name": "Maria",
-                    "last_name": "Papadopoulou",
-                    "email": "maria@example.com",
-                    "street": "Ermou",
-                    "street_number": "1",
-                    "city": "Athens",
-                    "zipcode": "10563",
-                    "country_id": country.alpha_2,
-                    "phone": "+306900000000",
-                    "shipping_kind": "home_delivery",
-                },
-                payment_intent_id="pi_test_123",
-                pay_way=PayWayFactory(provider_code="stripe"),
-                user=user,
-            )
-        )
+    order = _checkout(
+        cart, pay_way=PayWayFactory.create_online_payment(), user=user
+    )
 
     assert _lines(order) == {carried.id: impression, plain.id: None}

@@ -50,7 +50,7 @@ def _order():
     # A ShippingRate is per-country now — this ad-hoc country has none
     # until this call.
     enable_rate(country)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,

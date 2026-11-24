@@ -4303,7 +4303,7 @@ class AcsService:
         """Bump a PENDING order to PROCESSING after voucher mint.
 
         For COD / offline-paid orders the order sits at PENDING through
-        the entire create_order_from_cart_offline flow because nothing
+        the entire create_order_from_cart flow because nothing
         else advances payment_status either; without this nudge the
         shopper sees "Εκκρεμεί" forever even after the voucher is live
         at ACS and the courier has been engaged. Online-paid orders

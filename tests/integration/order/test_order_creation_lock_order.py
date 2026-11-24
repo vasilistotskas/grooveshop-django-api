@@ -21,7 +21,7 @@ afterwards hold each other's lock whatever order they then ask in.
 import re
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -32,7 +32,6 @@ from djmoney.money import Money
 
 from cart.models.cart import Cart
 from cart.models.item import CartItem
-from order.enum.status import PaymentStatus
 from order.inventory.stock import StockManager
 from order.lifecycle.service import OrderLifecycleService
 from order.models.stock_reservation import StockReservation
@@ -46,7 +45,6 @@ from user.factories.account import UserAccountFactory
 
 pytestmark = [
     pytest.mark.assert_english,
-    pytest.mark.usefixtures("trust_intent_binding"),
 ]
 
 
@@ -186,33 +184,8 @@ class TestCheckoutLocksProductsInPkOrder:
             CartItem.objects.create(cart=cart, product=product, quantity=1)
         return cart
 
-    def _payment_first(self, cart):
-        pay_way = PayWayFactory.create(
-            provider_code="stripe", settlement=PaySettlement.ONLINE
-        )
-        provider = Mock()
-        provider.get_payment_status.return_value = (PaymentStatus.PENDING, {})
-        with patch(
-            "order.payments.payment.get_payment_provider"
-        ) as get_provider:
-            get_provider.return_value = provider
-            return OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=cart,
-                    shipping_address=self.shipping_address,
-                    payment_intent_id="pi_lock_order",
-                    pay_way=pay_way,
-                    user=None,
-                )
-            )
-
-    def _order_first(self, cart):
-        pay_way = PayWayFactory.create(
-            provider_code="cash_on_delivery",
-            settlement=PaySettlement.COURIER_CASH,
-        )
-        return OrderService.create_order_from_cart_offline(
+    def _create(self, cart, pay_way):
+        return OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
@@ -222,8 +195,28 @@ class TestCheckoutLocksProductsInPkOrder:
             )
         )
 
+    def _card(self, cart):
+        """Paid online afterwards: the order keeps its cart."""
+        return self._create(
+            cart,
+            PayWayFactory.create(
+                provider_code="stripe", settlement=PaySettlement.ONLINE
+            ),
+        )
+
+    def _cash_on_delivery(self, cart):
+        """Collected by the courier: the cart clears and the shipment is
+        dispatched in the same checkout."""
+        return self._create(
+            cart,
+            PayWayFactory.create(
+                provider_code="cash_on_delivery",
+                settlement=PaySettlement.COURIER_CASH,
+            ),
+        )
+
     @pytest.mark.parametrize("lines_added_in", ["ascending", "descending"])
-    @pytest.mark.parametrize("flow", ["_payment_first", "_order_first"])
+    @pytest.mark.parametrize("flow", ["_card", "_cash_on_delivery"])
     def test_product_locks_follow_pk_order_not_line_order(
         self, flow, lines_added_in
     ):
@@ -238,7 +231,7 @@ class TestCheckoutLocksProductsInPkOrder:
             walked_in_pk_order=True,
         )
 
-    @pytest.mark.parametrize("flow", ["_payment_first", "_order_first"])
+    @pytest.mark.parametrize("flow", ["_card", "_cash_on_delivery"])
     def test_a_held_reservation_for_a_product_not_in_the_cart_is_locked_too(
         self, flow
     ):

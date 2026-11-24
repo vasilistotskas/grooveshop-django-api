@@ -3,6 +3,36 @@
 
 
 
+## v3.270.4 (2026-11-24)
+
+### Refactoring
+
+* refactor(order): every pay way creates the order first; remove the pay-first path (#832) ([`7901c98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7901c984db82fcd6871e1cab2edce7ef598410f1))
+
+* refactor(order): every pay way creates the order first; remove the pay-first path
+
+Release 3 of #818. The storefront pays Stripe order-first on its hosted
+page since v3.358.1, and no client calls the pay-first routes.
+
+- Remove POST cart/create-payment-intent, POST order/{id}/create_payment_intent
+  and POST order/{id}/retry-payment, with their serializers, and the
+  paymentIntentId field of POST /order. The quote request keeps its
+  component and enum; the payment-intent body's fields fold into it.
+- OrderService.create_order_from_cart is the one creation path (it was
+  create_order_from_cart_offline); the pay-first creation, its intent
+  read, binding check and per-intent idempotency are gone, with the
+  exceptions and create-error types only they raised.
+- PayWayService.process_payment and its helpers go; the provider's
+  process_payment is Stripe-only, gated by supports_payment_intent, for
+  the gift-card purchase.
+- PaymentPurpose.CART and the payment-without-order grace go: the alert
+  is sent at once, and migration 0116 deletes the retired
+  PAYMENT_WITHOUT_ORDER_GRACE_MINUTES rows.
+- api-contract: accept the three route removals until storefront
+  v3.359.1, which regenerates from this schema. ([`7901c98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7901c984db82fcd6871e1cab2edce7ef598410f1))
+
+* refactor(order): drop the remaining references to the removed pay-first path ([`7901c98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7901c984db82fcd6871e1cab2edce7ef598410f1))
+
 ## v3.270.3 (2026-11-24)
 
 ### Refactoring

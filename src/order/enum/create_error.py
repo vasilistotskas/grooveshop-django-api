@@ -41,16 +41,3 @@ class OrderCreateErrorType(models.TextChoices):
         "legal_document_unavailable",
         _("Legal document unavailable"),
     )
-    PAYMENT_NOT_FOUND = "payment_not_found", _("Payment not found")
-    PAYMENT_VERIFICATION = (
-        "payment_verification",
-        _("Payment verification failed"),
-    )
-    PAYMENT_AMOUNT_MISMATCH = (
-        "payment_amount_mismatch",
-        _("Payment amount mismatch"),
-    )
-    PAYMENT_CURRENCY_MISMATCH = (
-        "payment_currency_mismatch",
-        _("Payment currency mismatch"),
-    )

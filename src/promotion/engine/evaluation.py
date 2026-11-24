@@ -3,7 +3,9 @@ with, and the classification the coupon picker shares."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from djmoney.money import Money
@@ -36,6 +38,9 @@ from promotion.engine.teasers import (
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.models import Promotion, PromotionCode
 
+if TYPE_CHECKING:
+    from cart.models import CartItem
+
 
 class PromotionEngine:
     """Stateless evaluation of promotions against a cart."""
@@ -63,6 +68,7 @@ class PromotionEngine:
         user=None,
         email: str = "",
         lock: bool = False,
+        items: Sequence[CartItem] | None = None,
     ) -> CartDiscountResult:
         """Compute the discount the cart is entitled to right now.
 
@@ -72,6 +78,10 @@ class PromotionEngine:
         preview surfaces (cart read, payment-intent create) evaluate
         without locks; the order-create verification recomputes with
         the lock held and is the source of truth.
+
+        ``items`` are the cart's lines as the caller already read them:
+        the checkout quote prices the lines it evaluated, from one read.
+        Without them the engine reads the lines itself.
         """
         result = CartDiscountResult()
         if not cls.is_enabled():
@@ -96,15 +106,20 @@ class PromotionEngine:
             B2BPricingService.cart_pricing_active(cart)
             and not B2BService.promotions_allowed()
         ):
+            result.codes = list(
+                cart.applied_codes.values_list("code__code", flat=True)
+            )
             result.rejected.extend(
                 (code, str(CouponRejectionReason.COMBINATION_DISALLOWED))
-                for code in cart.applied_codes.values_list(
-                    "code__code", flat=True
-                )
+                for code in result.codes
             )
             return result
 
-        cart_items = list(cart.items.select_related("product"))
+        cart_items = (
+            list(items)
+            if items is not None
+            else list(cart.items.select_related("product"))
+        )
         if not cart_items:
             return result
 
@@ -113,7 +128,7 @@ class PromotionEngine:
             (item.total_price.amount for item in cart_items), Decimal(0)
         )
 
-        candidates, rejected = collect_candidates(cart, lock=lock)
+        candidates, rejected, result.codes = collect_candidates(cart, lock=lock)
         result.rejected.extend(rejected)
 
         monetary, applicable_free_shipping = cls.classify(

@@ -25,6 +25,7 @@ from order.payments.payment_ledger import (
     PaymentLedger,
     is_cash_collection,
 )
+from order.refunds.service import RefundService
 
 pytestmark = pytest.mark.django_db
 
@@ -156,7 +157,7 @@ class TestTheSums:
         )
         [(collection, _share)] = PaymentLedger.plan_refund(order, None)
 
-        row, created = PaymentLedger.record_cod_refund(
+        row, created = RefundService.book_cod_refund(
             order,
             collection=collection,
             amount=_eur("15.00"),
@@ -179,7 +180,7 @@ class TestTheSums:
         order = _order()
         spent = _charge(order, "10.00", "pi_spent")
         _charge(order, "10.00", "pi_open")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=spent, amount=_eur("10.00"), reference="re_spent"
         )
 
@@ -193,7 +194,7 @@ class TestPaymentStatusIsDerivedFromTheSums:
         order = _order()
         charge = _charge(order, "50.00")
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("15.00"), reference="re_1"
         )
 
@@ -207,10 +208,10 @@ class TestPaymentStatusIsDerivedFromTheSums:
         order = _order()
         charge = _charge(order, "50.00")
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("15.00"), reference="re_1"
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("35.00"), reference="re_2"
         )
 
@@ -227,7 +228,7 @@ class TestPaymentStatusIsDerivedFromTheSums:
             order, charge=charge, amount=_eur("20.00"), reference="dp_1"
         )
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
 
@@ -238,11 +239,11 @@ class TestPaymentStatusIsDerivedFromTheSums:
     def test_a_refund_that_failed_is_not_refunded(self):
         order = _order()
         charge = _charge(order, "50.00")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("50.00"), reference="re_1"
         )
 
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("50.00"), reference="re_1"
         )
 
@@ -256,13 +257,13 @@ class TestPaymentStatusIsDerivedFromTheSums:
         first = _charge(order, "50.00", "pi_first")
         second = _charge(order, "30.00", "pi_second")
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=first, amount=_eur("50.00"), reference="re_1"
         )
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=second, amount=_eur("30.00"), reference="re_2"
         )
         order.refresh_from_db()
@@ -274,7 +275,7 @@ class TestPaymentStatusIsDerivedFromTheSums:
         order = _order()
         charge = _charge(order, "50.00")
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("60.00"), reference="re_over"
         )
 
@@ -284,11 +285,11 @@ class TestPaymentStatusIsDerivedFromTheSums:
     def test_a_repeated_refund_changes_nothing(self):
         order = _order()
         charge = _charge(order, "50.00")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("15.00"), reference="re_1"
         )
 
-        row, created = PaymentLedger.record_refund(
+        row, created = RefundService.book_refund(
             order, charge=charge, amount=_eur("15.00"), reference="re_1"
         )
 
@@ -300,7 +301,7 @@ class TestPaymentStatusIsDerivedFromTheSums:
         order = _order()
         charge = _charge(order, "50.00")
 
-        row, _created = PaymentLedger.record_refund(
+        row, _created = RefundService.book_refund(
             order,
             charge=charge,
             amount=_eur("5.00"),
@@ -365,6 +366,44 @@ class TestRecording:
         assert collection.kind == PaymentTransactionKind.COD_COLLECTION
         assert collection.provider_reference == "V1"
 
+    def test_the_ledger_writes_the_refund_row_and_books_nothing_more(self):
+        """``record_refund`` is a ledger write: the row and the status. The
+        attempt it fulfils is settled, and the order's sources allocated, by
+        ``RefundService.book_refund`` (#658), so a caller that writes the
+        row alone leaves a live attempt live."""
+        from order.models.credit_allocation import CreditAllocation
+        from order.models.refund_attempt import (
+            RefundAttempt,
+            RefundAttemptStatus,
+        )
+
+        order = _order()
+        charge = _charge(order, "50.00")
+        attempt = RefundAttempt.objects.create(
+            order=order, charge=charge, amount=_eur("15.00")
+        )
+
+        row, created = PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("15.00"), reference="re_1"
+        )
+
+        assert created is True
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+        assert attempt.refund is None
+        assert not CreditAllocation.objects.filter(refund=row).exists()
+
+        RefundService.book_refund(
+            order, charge=charge, amount=_eur("15.00"), reference="re_1"
+        )
+
+        # The row is the ledger's already: booking it again settles nothing
+        # by matching (that needs a new row) and allocates nothing.
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+
 
 class TestPlanningARefund:
     def test_everything_left_when_no_amount_is_given(self):
@@ -406,7 +445,7 @@ class TestPlanningARefund:
         order = _order()
         first = _charge(order, "30.00", "pi_a")
         _charge(order, "20.00", "pi_b")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=first, amount=_eur("25.00"), reference="re_1"
         )
 

@@ -794,6 +794,10 @@ msgid "A completed payment needs an amount due, unless discounts, loyalty points
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
 #, python-format
+msgid "A confirmed %(provider)s payment arrived and no order of the store carries it. The customer has been charged and nothing will ship."
+msgstr "A confirmed %(provider)s payment arrived and no order of the store carries it. The customer has been charged and nothing will ship."
+
+#, python-format
 msgid "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 msgstr "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 
@@ -872,9 +876,6 @@ msgstr "A password was set on your account"
 
 msgid "A payment for this order was received and is being confirmed. Do not pay again."
 msgstr "A payment for this order was received and is being confirmed. Do not pay again."
-
-msgid "A payment intent is required — the applied discounts do not cover the order total."
-msgstr "A payment intent is required — the applied discounts do not cover the order total."
 
 msgid "A pickup-point order is delivered to its point's address, which can't be changed."
 msgstr "A pickup-point order is delivered to its point's address, which can't be changed."
@@ -1864,6 +1865,9 @@ msgstr "Approve selected comments"
 msgid "Approve selected reviews"
 msgstr "Approve selected reviews"
 
+msgid "Approve the review"
+msgstr "Approve the review"
+
 msgid "Approved"
 msgstr "Approved"
 
@@ -1890,6 +1894,12 @@ msgstr "Ask for a new link"
 
 msgid "Ask the store's owner to add you to the team, or sign in with another account."
 msgstr "Ask the store's owner to add you to the team, or sign in with another account."
+
+msgid "Asks ACS for this parcel's latest tracking checkpoints now."
+msgstr "Asks ACS for this parcel's latest tracking checkpoints now."
+
+msgid "Asks VIES again whether this business's VAT number is valid and records the answer."
+msgstr "Asks VIES again whether this business's VAT number is valid and records the answer."
 
 msgid "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
 msgstr "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
@@ -2790,8 +2800,17 @@ msgstr "Cancel selected orders and restore stock"
 msgid "Cancel the ACS voucher"
 msgstr "Cancel the ACS voucher"
 
+msgid "Cancel the BOX NOW parcel"
+msgstr "Cancel the BOX NOW parcel"
+
 msgid "Cancel the carrier shipment for an order"
 msgstr "Cancel the carrier shipment for an order"
+
+msgid "Cancel the credit document in myDATA"
+msgstr "Cancel the credit document in myDATA"
+
+msgid "Cancel the receipt in myDATA"
+msgstr "Cancel the receipt in myDATA"
 
 msgid "Canceled"
 msgstr "Canceled"
@@ -2816,6 +2835,15 @@ msgstr "Cancelled shipment reset — minting a fresh voucher."
 
 msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
 msgstr "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
+
+msgid "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
+msgstr "Cancels this credit document at AADE. It cannot be undone. Only for a document issued in error and never used."
+
+msgid "Cancels this parcel at BOX NOW. Only a parcel that is still new can be cancelled."
+msgstr "Cancels this parcel at BOX NOW. Only a parcel that is still new can be cancelled."
+
+msgid "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
+msgstr "Cancels this receipt at AADE. It cannot be undone. Only for a receipt issued in error and never used: a sale that did not happen is undone by a credit document instead."
 
 msgid "Candidate"
 msgstr "Candidate"
@@ -3316,6 +3344,9 @@ msgstr "Clear discount from selected products"
 
 msgid "Clearance (>50%)"
 msgstr "Clearance (>50%)"
+
+msgid "Clears the dashboard alerts for money refunded past the receipt and for goods the customer kept that the receipt lacks. It is recorded in the order's history with your name. Use it once you have settled the difference with your accountant."
+msgstr "Clears the dashboard alerts for money refunded past the receipt and for goods the customer kept that the receipt lacks. It is recorded in the order's history with your name. Use it once you have settled the difference with your accountant."
 
 msgid "Click"
 msgstr "Click"
@@ -3850,6 +3881,9 @@ msgstr "Create cart"
 msgid "Create payment intent from cart"
 msgstr "Create payment intent from cart"
 
+msgid "Create the BOX NOW parcel"
+msgstr "Create the BOX NOW parcel"
+
 msgid "Created"
 msgstr "Created"
 
@@ -3868,6 +3902,18 @@ msgstr "Created at"
 
 msgid "Created by (staff)"
 msgstr "Created by (staff)"
+
+msgid "Creates a BOX NOW parcel for this shipment now. A cancelled parcel is reset and a new one is created."
+msgstr "Creates a BOX NOW parcel for this shipment now. A cancelled parcel is reset and a new one is created."
+
+msgid "Creates an ACS voucher for this shipment now. A cancelled voucher is reset and a new one is issued."
+msgstr "Creates an ACS voucher for this shipment now. A cancelled voucher is reset and a new one is issued."
+
+msgid "Creates an inactive copy of this promotion, with its translations, products and categories, and opens it."
+msgstr "Creates an inactive copy of this promotion, with its translations, products and categories, and opens it."
+
+msgid "Creates an inactive draft copy of this product and opens it for editing."
+msgstr "Creates an inactive draft copy of this product and opens it for editing."
 
 msgid "Creates unique random codes attached to this promotion."
 msgstr "Creates unique random codes attached to this promotion."
@@ -3898,6 +3944,14 @@ msgstr "Credit allocations"
 
 msgid "Credit document"
 msgstr "Credit document"
+
+#, python-format
+msgid "Credit document %(number)s has no myDATA MARK - nothing to cancel."
+msgstr "Credit document %(number)s has no myDATA MARK - nothing to cancel."
+
+#, python-format
+msgid "Credit document %(number)s is already canceled in myDATA."
+msgstr "Credit document %(number)s is already canceled in myDATA."
 
 msgid "Credit document PDF has not been rendered yet."
 msgstr "Credit document PDF has not been rendered yet."
@@ -4379,6 +4433,9 @@ msgstr "Direct approved child comments (replies)"
 msgid "Disable card"
 msgstr "Disable card"
 
+msgid "Disable the card"
+msgstr "Disable the card"
+
 msgid "Disable the feature instead of enabling it"
 msgstr "Disable the feature instead of enabling it"
 
@@ -4577,6 +4634,9 @@ msgstr "Duplicate attachment."
 
 msgid "Duplicate category IDs are not allowed."
 msgstr "Duplicate category IDs are not allowed."
+
+msgid "Duplicate the promotion"
+msgstr "Duplicate the promotion"
 
 msgid "Duration (ms)"
 msgstr "Duration (ms)"
@@ -4781,6 +4841,9 @@ msgstr "Ended: ACS answered"
 
 msgid "Ends At"
 msgstr "Ends At"
+
+msgid "Ends the customer's wholesale pricing until you approve the profile again."
+msgstr "Ends the customer's wholesale pricing until you approve the profile again."
 
 msgid "Engagement"
 msgstr "Engagement"
@@ -5231,6 +5294,9 @@ msgstr "Feeds the learning loop. Pass the impression_id from the suggestions res
 
 msgid "Fees"
 msgstr "Fees"
+
+msgid "Fetches every active locker from BOX NOW and updates the list: new ones are added and removed ones are deactivated."
+msgstr "Fetches every active locker from BOX NOW and updates the list: new ones are added and removed ones are deactivated."
 
 msgid "Fifth Floor"
 msgstr "Fifth Floor"
@@ -6604,6 +6670,9 @@ msgstr "General"
 msgid "Generate codes"
 msgstr "Generate codes"
 
+msgid "Generates the order's retail receipt, registers it with AADE and emails it to the customer. Only for an order that has shipped and has no receipt yet."
+msgstr "Generates the order's retail receipt, registers it with AADE and emails it to the customer. Only for an order that has shipped and has no receipt yet."
+
 msgid "Generic Tag list/detail and the M2M-through TaggedItem cache. Tags are shared by Products and Blog posts so this surface lives outside both."
 msgstr "Generic Tag list/detail and the M2M-through TaggedItem cache. Tags are shared by Products and Blog posts so this surface lives outside both."
 
@@ -7312,6 +7381,9 @@ msgstr "Hidden from readers until approved"
 msgid "Hidden from shoppers until approved"
 msgstr "Hidden from shoppers until approved"
 
+msgid "Hides the review from the product page."
+msgstr "Hides the review from the product page."
+
 msgid "High"
 msgstr "High"
 
@@ -7896,6 +7968,18 @@ msgstr "Issue date"
 msgid "Issue receipt (myDATA)"
 msgstr "Issue receipt (myDATA)"
 
+msgid "Issue the ACS pickup list"
+msgstr "Issue the ACS pickup list"
+
+msgid "Issue the ACS voucher"
+msgstr "Issue the ACS voucher"
+
+msgid "Issue the credit documents"
+msgstr "Issue the credit documents"
+
+msgid "Issue the receipt"
+msgstr "Issue the receipt"
+
 msgid "Issued To"
 msgstr "Issued To"
 
@@ -7919,6 +8003,12 @@ msgstr "Issued via admin"
 
 msgid "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 msgstr "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
+
+msgid "Issues the retail credit documents this order owes and sends to AADE any that it has not registered. Nothing is issued before the receipt is registered."
+msgstr "Issues the retail credit documents this order owes and sends to AADE any that it has not registered. Nothing is issued before the receipt is registered."
+
+msgid "Issues today's ACS pickup list now, without waiting for the daily run. ACS refuses it while a voucher on it is unprinted."
+msgstr "Issues today's ACS pickup list now, without waiting for the daily run. ACS refuses it while a voucher on it is unprinted."
 
 msgid "Issuing receipts through myDATA"
 msgstr "Issuing receipts through myDATA"
@@ -8404,6 +8494,10 @@ msgstr "Look in the ACS portal for a voucher of order #%(order_id)s (its referen
 msgid "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
 msgstr "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
 
+#, python-format
+msgid "Look the payment up in the %(provider)s dashboard. Refund the customer, or find their order and attach the payment to it."
+msgstr "Look the payment up in the %(provider)s dashboard. Refund the customer, or find their order and attach the payment to it."
+
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Look up an order from Viva Wallet's post-payment redirect params"
 
@@ -8664,6 +8758,9 @@ msgstr "Master switch — when False the provider is hidden from checkout regard
 
 msgid "Matched by"
 msgstr "Matched by"
+
+msgid "Matches ACS's cash-on-delivery payouts with the orders now, without waiting for the scheduled run."
+msgstr "Matches ACS's cash-on-delivery payouts with the orders now, without waiting for the scheduled run."
 
 msgid "Matches no shipment, not reconciled"
 msgstr "Matches no shipment, not reconciled"
@@ -10565,6 +10662,10 @@ msgstr "Payload"
 msgid "Payment"
 msgstr "Payment"
 
+#, python-format
+msgid "Payment %(payment_id)s has no order"
+msgstr "Payment %(payment_id)s has no order"
+
 msgid "Payment & Returns"
 msgstr "Payment & Returns"
 
@@ -10728,6 +10829,9 @@ msgstr "Payment status"
 
 msgid "Payment that does not match its order"
 msgstr "Payment that does not match its order"
+
+msgid "Payment that no order accounts for"
+msgstr "Payment that no order accounts for"
 
 msgid "Payment verification failed"
 msgstr "Payment verification failed"
@@ -11603,6 +11707,9 @@ msgstr "Published by (staff)"
 msgid "Published revision"
 msgstr "Published revision"
 
+msgid "Publishes the review on the product page."
+msgstr "Publishes the review on the product page."
+
 msgid "Publishing"
 msgstr "Publishing"
 
@@ -12153,6 +12260,9 @@ msgstr "Reg. No."
 msgid "Regenerate receipt (same number)"
 msgstr "Regenerate receipt (same number)"
 
+msgid "Regenerate the receipt"
+msgstr "Regenerate the receipt"
+
 msgid "Region"
 msgstr "Region"
 
@@ -12199,6 +12309,9 @@ msgstr "Reject business profile"
 
 msgid "Reject selected reviews"
 msgstr "Reject selected reviews"
+
+msgid "Reject the review"
+msgstr "Reject the review"
 
 msgid "Rejected"
 msgstr "Rejected"
@@ -12280,6 +12393,9 @@ msgstr "Rendered"
 msgid "Rendered as the storefront's author/creator/publisher meta tags. Empty → the tags are not emitted."
 msgstr "Rendered as the storefront's author/creator/publisher meta tags. Empty → the tags are not emitted."
 
+msgid "Renders the receipt PDF again under the same number and date. Use it to fix a damaged PDF or to apply an updated seller address or VAT number."
+msgstr "Renders the receipt PDF again under the same number and date. Use it to fix a damaged PDF or to apply an updated seller address or VAT number."
+
 msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
 msgstr "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
 
@@ -12351,6 +12467,9 @@ msgstr "Resend confirmation"
 
 msgid "Resend delivery email"
 msgstr "Resend delivery email"
+
+msgid "Resend the delivery email"
+msgstr "Resend the delivery email"
 
 msgid "Resend webhook signing secret"
 msgstr "Resend webhook signing secret"
@@ -12700,6 +12819,9 @@ msgstr "Row fingerprint"
 msgid "Run"
 msgstr "Run"
 
+msgid "Run COD reconciliation"
+msgstr "Run COD reconciliation"
+
 msgid "Run COD reconciliation now"
 msgstr "Run COD reconciliation now"
 
@@ -12874,12 +12996,12 @@ msgid "Scheduled for"
 msgstr "Scheduled for"
 
 #, python-format
-msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
-msgstr "Scheduled myDATA cancellation for %(count)d credit document(s)."
-
-#, python-format
 msgid "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgstr "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
+
+#, python-format
+msgid "Scheduled myDATA cancellation for credit document %(number)s (MARK %(mark)s)."
+msgstr "Scheduled myDATA cancellation for credit document %(number)s (MARK %(mark)s)."
 
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
@@ -13101,11 +13223,17 @@ msgstr "Send test goes only to the email address of your own account, in the lan
 msgid "Send the link"
 msgstr "Send the link"
 
+msgid "Send the receipt to myDATA"
+msgstr "Send the receipt to myDATA"
+
 msgid "Send the revision you are changing in If-Match."
 msgstr "Send the revision you are changing in If-Match."
 
 msgid "Sender Name"
 msgstr "Sender Name"
+
+msgid "Sends the gift card's delivery email to its recipient again."
+msgstr "Sends the gift card's delivery email to its recipient again."
 
 msgid "Sent"
 msgstr "Sent"
@@ -13961,6 +14089,9 @@ msgstr "Stock reservation no longer valid"
 msgid "Stock set by a catalogue import"
 msgstr "Stock set by a catalogue import"
 
+msgid "Storage path of the product's main image; empty without one."
+msgstr "Storage path of the product's main image; empty without one."
+
 msgid "Store"
 msgstr "Store"
 
@@ -14136,6 +14267,9 @@ msgstr "Submit or update my business profile"
 msgid "Submit storefront feedback (rating, category, message)."
 msgstr "Submit storefront feedback (rating, category, message)."
 
+msgid "Submits this order's receipt to AADE now. Its status and MARK appear on the receipt once AADE answers."
+msgstr "Submits this order's receipt to AADE now. Its status and MARK appear on the receipt once AADE answers."
+
 msgid "Submitted"
 msgstr "Submitted"
 
@@ -14270,6 +14404,9 @@ msgstr "Suspend"
 msgid "Suspend selected tenants"
 msgstr "Suspend selected tenants"
 
+msgid "Suspend the business profile"
+msgstr "Suspend the business profile"
+
 msgid "Suspended"
 msgstr "Suspended"
 
@@ -14315,6 +14452,9 @@ msgstr "Switched off"
 
 msgid "Switched on at"
 msgstr "Switched on at"
+
+msgid "Sync lockers from BOX NOW"
+msgstr "Sync lockers from BOX NOW"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Sync lockers from BoxNow API"
@@ -14436,6 +14576,9 @@ msgstr "Tells the store's staff that a carrier refused to create the shipment of
 
 msgid "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
 msgstr "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
+
+msgid "Tells the store's staff that a confirmed payment has no order behind it, so the customer must be refunded or the order found."
+msgstr "Tells the store's staff that a confirmed payment has no order behind it, so the customer must be refunded or the order found."
 
 msgid "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
 msgstr "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
@@ -14679,6 +14822,9 @@ msgstr "The bounce type and sub-type; never an address."
 msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
 msgstr "The buyer accepts the store's terms of use and privacy policy. Must be true."
 
+msgid "The card can no longer be used to pay. Its balance is kept."
+msgstr "The card can no longer be used to pay. Its balance is kept."
+
 msgid "The carrier rejected the cancellation."
 msgstr "The carrier rejected the cancellation."
 
@@ -14694,6 +14840,9 @@ msgstr "The cart is too heavy for the selected shipping method."
 msgid "The cart is too large for the selected shipping method."
 msgstr "The cart is too large for the selected shipping method."
 
+msgid "The cart item the line is."
+msgstr "The cart item the line is."
+
 msgid "The cart token is invalid or has expired."
 msgstr "The cart token is invalid or has expired."
 
@@ -14705,6 +14854,9 @@ msgstr "The cart's free_threshold_value: the products after discounts, excluding
 
 msgid "The cart's lines at the prices the shopper pays."
 msgstr "The cart's lines at the prices the shopper pays."
+
+msgid "The cart's lines the quote priced, from the same read as itemsSubtotal and cartDigest: what the digest covers of each (product, quantity, unit price, promotion money), with the product's name and image."
+msgstr "The cart's lines the quote priced, from the same read as itemsSubtotal and cartDigest: what the digest covers of each (product, quantity, unit price, promotion money), with the product's name and image."
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
@@ -15012,6 +15164,9 @@ msgstr "The pages, theme and sections a store published with the page builder, a
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 
+msgid "The part of discountTotal this line carries; the lines' amounts sum to it."
+msgstr "The part of discountTotal this line carries; the lines' amounts sum to it."
+
 msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 msgstr "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
 
@@ -15092,6 +15247,9 @@ msgstr "The previous payment could not be closed."
 msgid "The previous payment is still in progress."
 msgstr "The previous payment is still in progress."
 
+msgid "The price per unit the shopper pays, before promotions."
+msgstr "The price per unit the shopper pays, before promotions."
+
 msgid "The product ships free on its own: ``price`` is 0."
 msgstr "The product ships free on its own: ``price`` is 0."
 
@@ -15106,6 +15264,9 @@ msgstr "The product's SKU when the line was created. Invoices use it, never the 
 
 msgid "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
 msgstr "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
+
+msgid "The product's name in the request's language."
+msgstr "The product's name in the request's language."
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
@@ -15363,6 +15524,9 @@ msgstr "The value every free-above threshold is judged on: the products after di
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
+
+msgid "The verdict on each coupon code attached to the cart, as the promotions in this quote decided it."
+msgstr "The verdict on each coupon code attached to the cart, as the promotions in this quote decided it."
 
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "The visitor ticked the consent box. Must be true."
@@ -17881,6 +18045,10 @@ msgid "[{site}] Payment received for canceled order {order_id}"
 msgstr "[{site}] Payment received for canceled order {order_id}"
 
 #, python-brace-format
+msgid "[{site}] Payment {payment_id} has no order"
+msgstr "[{site}] Payment {payment_id} has no order"
+
+#, python-brace-format
 msgid "[{site}] Price drop: {name} is now at your target"
 msgstr "[{site}] Price drop: {name} is now at your target"
 
@@ -18147,6 +18315,9 @@ msgstr "payment intent is in an invalid state: {status}"
 
 msgid "payment provider"
 msgstr "payment provider"
+
+msgid "quantity units at unitPrice, before promotions."
+msgstr "quantity units at unitPrice, before promotions."
 
 msgid "sha256 of data+i18n"
 msgstr "sha256 of data+i18n"
@@ -18889,9 +19060,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Refund order"
 #~ msgstr "Refund order"
-
-#~ msgid "Refunded beyond the receipt"
-#~ msgstr "Refunded beyond the receipt"
 
 #~ msgid "Reminder Count"
 #~ msgstr "Reminder Count"

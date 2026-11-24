@@ -1,5 +1,5 @@
 [project]
-version = "3.267.1"
+version = "3.269.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -730,11 +730,6 @@ source_modules = [
 ]
 forbidden_modules = ["shipping_acs", "shipping_boxnow"]
 ignore_imports = [
-    "admin.dashboard.store.queries -> shipping_acs.attention",
-    "admin.displays -> shipping_acs.enum.shipment_state",
-    "admin.displays -> shipping_boxnow.enum",
-    "admin.features -> shipping_acs.carrier",
-    "admin.features -> shipping_boxnow.carrier",
     "core.urls -> shipping_boxnow.views.webhook",
     "devtools.demo_account -> shipping_acs.models",
     "devtools.demo_account -> shipping_boxnow.models",
@@ -822,8 +817,9 @@ allow_indirect_imports = true
 # (#658: accounting -> payments). Every payments module imports the order
 # models, which reach every app and so every subpackage, so the layers
 # contract above cannot hold it without one ignored chain per module: this
-# contract checks its direct imports. The one ignored edge is the ledger
-# booking a refund's allocation (#658), removed by #658's refund booking.
+# contract checks its direct imports. A refund is booked above both, by
+# ``order.refunds.service.RefundService`` (#658), so the ledger imports
+# none of them.
 [[tool.importlinter.contracts]]
 name = "order payments import neither accounting, refunds, reporting nor checkout"
 type = "forbidden"
@@ -833,9 +829,6 @@ forbidden_modules = [
     "order.checkout",
     "order.refunds",
     "order.reporting",
-]
-ignore_imports = [
-    "order.payments.payment_ledger -> order.accounting.credit_allocation",
 ]
 allow_indirect_imports = true
 

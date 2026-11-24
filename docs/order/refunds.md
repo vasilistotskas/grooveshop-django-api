@@ -21,7 +21,8 @@ of §7.2, in [`refund-execution.md`](refund-execution.md).
   ([§4.3](payments-viva.md)). The same webhook also reports the refunds the in-app
   path makes; they are already on the ledger and add nothing.
 
-Every path ends in `PaymentLedger.record_refund` ([§7.3](payment-ledger.md)),
+Every path ends in `RefundService.book_refund`, which writes the row through
+`PaymentLedger.record_refund` ([§7.3](payment-ledger.md)),
 so there is one rule for REFUNDED versus PARTIALLY_REFUNDED, and one
 `order_refunded.send` per REFUND row recorded → `handle_order_refunded` → email +
 WS notification + Meta Refund event (a share that goes back onto gift cards and
@@ -301,7 +302,7 @@ merchant had already made. There is still no provider to call for cash, so
 paid back themselves:
 
 - A plan share against a `COD_COLLECTION` is written with
-  `PaymentLedger.record_cod_refund`: a REFUND row whose `charge` is the
+  `RefundService.book_cod_refund`: a REFUND row whose `charge` is the
   collection, `provider="manual"` (`MANUAL_REFUND_PROVIDER`, who moved the
   money) and
   `provider_reference = f"order-{order.pk}-{collection.pk}-{reference}"`.

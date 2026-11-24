@@ -20,6 +20,7 @@ from uuid import uuid4
 import pytest
 from django.core.cache import cache
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from knox.models import get_token_model
@@ -27,7 +28,7 @@ from measurement.measures import Weight
 from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
-from cart.models import Cart
+from cart.models import Cart, CartItem
 from cart.throttles import (
     CartMutationAnonThrottle,
     CartQuoteAnonThrottle,
@@ -41,14 +42,20 @@ from giftcard.throttles import GiftCardCodeThrottle
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
-from order.checkout.quote import ExpectedTotal, OrderQuoteService
+from order.checkout.quote import (
+    ExpectedTotal,
+    OrderQuoteService,
+    ShippingChoice,
+)
 from order.exceptions import InvalidOrderDataError, OrderTotalChangedError
 from order.models import OrderVatLine
 from order.models.order import Order
+from order.serializers.quote import CheckoutQuoteSerializer
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory, PayWayShippingExclusionFactory
 from product.factories import ProductFactory
+from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode, PromotionRedemption
@@ -222,8 +229,12 @@ class TestPartialQuote:
         assert _money(quote["freeThresholdValue"]) == PRICE
         assert _money(quote["loyaltyDiscount"]) == 0
         assert quote["appliedPromotions"] == []
+        assert quote["appliedCoupons"] == []
         assert quote["blockingCoupon"] is None
         assert quote["currency"] == "EUR"
+        [line] = quote["lines"]
+        assert line["productId"] == checkout.product.id
+        assert _money(line["totalPrice"]) == PRICE
         for row in (
             "shipping",
             "paymentMethodFee",
@@ -356,6 +367,178 @@ class TestQuoteRows:
         assert "usage_limit" in quote["blockingCoupon"]["reason"]
         assert _money(quote["discountTotal"]) == 0
         assert _money(quote["amountDue"]) == TOTAL
+
+
+class TestQuoteLines:
+    """The quote names the lines it priced: the ones its subtotal, its
+    parcel and its digest were computed from (agent-gateway #205)."""
+
+    def _two_lines_and_a_discount(self):
+        checkout = _checkout()
+        second = _product(Decimal("7.50"))
+        CartItemFactory(cart=checkout.cart, product=second, quantity=2)
+        PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal("5.00"),
+        )
+        return checkout
+
+    def test_each_line_at_the_price_it_was_quoted(self, documented):
+        checkout = self._two_lines_and_a_discount()
+
+        response = _post_quote(checkout, **_choices(checkout))
+
+        assert response.status_code == 200, response.content
+        documented(response, QUOTE_PATH, "post")
+        quote = response.json()
+        lines = {line["id"]: line for line in quote["lines"]}
+        items = list(checkout.cart.items.all())
+        assert set(lines) == {item.id for item in items}
+        for item in items:
+            line = lines[item.id]
+            assert line["productId"] == item.product_id
+            assert line["productName"] == item.product.safe_translation_getter(
+                "name", any_language=True
+            )
+            assert line["quantity"] == item.quantity
+            assert _money(line["unitPrice"]) == item.final_price.amount
+            assert _money(line["totalPrice"]) == item.total_price.amount
+        assert sum(_money(line["totalPrice"]) for line in lines.values()) == (
+            _money(quote["itemsSubtotal"])
+        )
+        assert (
+            sum(_money(line["promotionDiscount"]) for line in lines.values())
+            == _money(quote["discountTotal"])
+            == Decimal("5.00")
+        )
+
+    def test_the_digest_covers_exactly_these_lines(self):
+        checkout = self._two_lines_and_a_discount()
+        shipping = ShippingChoice.of(_choices(checkout))
+
+        quote = OrderQuoteService.quote(
+            checkout.cart, user=checkout.user, shipping=shipping
+        )
+
+        rendered = CheckoutQuoteSerializer(quote).data["lines"]
+        assert [
+            (line["id"], line["product_id"], line["quantity"])
+            for line in rendered
+        ] == [
+            (line.item_id, line.product.pk, line.quantity)
+            for line in quote.lines
+        ]
+        assert quote.cart_digest == OrderQuoteService.cart_digest(
+            quote.lines,
+            quote.promotion,
+            shipping=shipping,
+            weight_grams=quote.weight_grams,
+        )
+
+    def test_the_promotions_are_evaluated_over_the_lines_it_prices(self):
+        """One read of the cart's lines: a cart write cannot land between
+        the promotions' read and the priced lines'."""
+        checkout = self._two_lines_and_a_discount()
+
+        with CaptureQueriesContext(connection) as queries:
+            quote = OrderQuoteService.quote(
+                checkout.cart,
+                user=checkout.user,
+                shipping=ShippingChoice.of(_choices(checkout)),
+            )
+
+        line_reads = [
+            query["sql"]
+            for query in queries.captured_queries
+            if f'FROM "{CartItem._meta.db_table}"' in query["sql"]
+        ]
+        assert len(line_reads) == 1, line_reads
+        assert quote.promotion.line_discounts.keys() <= {
+            line.item_id for line in quote.lines
+        }
+        assert (
+            sum(line.promotion_discount for line in quote.lines)
+            == quote.discount_total.amount
+        )
+
+    def test_the_verdicts_are_on_the_codes_the_promotions_judged(self):
+        """A coupon swapped after the promotions were evaluated is not
+        reported with the discount of the one they judged."""
+        checkout = _checkout()
+        judged = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FIXED_AMOUNT,
+                benefit_value=Decimal("5.00"),
+            )
+        )
+        swapped_in = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FREE_SHIPPING,
+            )
+        )
+        CartPromotionCode.objects.create(cart=checkout.cart, code=judged)
+        evaluate = PromotionEngine.evaluate
+
+        def evaluate_then_swap(*args, **kwargs):
+            result = evaluate(*args, **kwargs)
+            CartPromotionCode.objects.filter(cart=checkout.cart).update(
+                code=swapped_in
+            )
+            return result
+
+        with patch.object(
+            PromotionEngine, "evaluate", side_effect=evaluate_then_swap
+        ):
+            quote = OrderQuoteService.quote(checkout.cart, user=checkout.user)
+
+        [verdict] = quote.coupons
+        assert verdict.code == judged.code
+        assert verdict.amount == quote.discount_total.amount == Decimal("5.00")
+
+    def test_a_changed_line_changes_the_lines_and_the_digest_together(self):
+        checkout = _checkout()
+        before = _quote(checkout, **_choices(checkout))
+
+        checkout.cart.items.update(quantity=2)
+        after = _quote(checkout, **_choices(checkout))
+
+        assert [line["quantity"] for line in before["lines"]] == [1]
+        assert [line["quantity"] for line in after["lines"]] == [2]
+        assert before["cartDigest"] != after["cartDigest"]
+
+    def test_each_attached_code_with_what_it_does(self):
+        checkout = _checkout()
+        free_shipping = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FREE_SHIPPING,
+            )
+        )
+        exhausted = PromotionFactory(usage_limit_total=1)
+        refused = PromotionCodeFactory(promotion=exhausted)
+        PromotionRedemption.objects.create(
+            promotion=exhausted, code=refused, amount=Money(Decimal(5), "EUR")
+        )
+        for code in (free_shipping, refused):
+            CartPromotionCode.objects.create(cart=checkout.cart, code=code)
+
+        quote = _quote(checkout, **_choices(checkout))
+
+        coupons = {entry["code"]: entry for entry in quote["appliedCoupons"]}
+        assert coupons[free_shipping.code] == {
+            "code": free_shipping.code,
+            "amount": 0,
+            "freeShipping": True,
+            "gift": False,
+            "rejection": None,
+        }
+        assert coupons[refused.code]["rejection"] == (
+            "discount_code_usage_limit_reached"
+        )
+        assert quote["blockingCoupon"]["code"] == refused.code
 
 
 class TestQuoteRefusals:

@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import Any
 
 from django.db import connection, transaction
@@ -11,6 +12,7 @@ from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
 from agent.outbox import record_order_changed
+from core.store_settings import store_setting
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
 from order.accounting.invoicing import (
@@ -53,6 +55,7 @@ from order.payments.payment_ledger import (
     PaymentLedger,
 )
 from order.payments.stripe_settlement import settle_paid_checkout_session
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -68,9 +71,11 @@ from order.signals import (
     order_status_changed,
     order_stored_value_returned,
     order_stripe_payment_polled,
+    payment_without_order_found,
 )
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
+    alert_payment_without_order_task,
     generate_order_invoice,
     issue_receipt_for_pickup,
     send_admin_new_order_email,
@@ -86,6 +91,9 @@ from order.tasks import (
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
+
+#: The store setting behind ``handle_payment_without_order_found``'s countdown.
+PAYMENT_WITHOUT_ORDER_GRACE = "PAYMENT_WITHOUT_ORDER_GRACE_MINUTES"
 
 
 @receiver(post_save, sender=Order, dispatch_uid="order.handle_order_post_save")
@@ -923,6 +931,31 @@ def handle_stripe_payment_polled(
     announce_stripe_payment_applied(outcome, payment_intent_id)
 
 
+@receiver(
+    payment_without_order_found,
+    dispatch_uid="order.handle_payment_without_order_found",
+)
+def handle_payment_without_order_found(
+    sender: Any, payment_id: str, captured: Money, grace: bool, **kwargs: Any
+) -> None:
+    """Queue the alert about a payment no order carries, after the
+    webhook's transaction commits. A payment-first intent waits
+    ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` first; the wait goes with that
+    path (#818, R3)."""
+    wait = timedelta(
+        minutes=int(store_setting(PAYMENT_WITHOUT_ORDER_GRACE)) if grace else 0
+    )
+    dispatch_on_commit(
+        alert_payment_without_order_task,
+        kwargs={
+            "payment_id": payment_id,
+            "amount": str(captured.amount),
+            "currency": str(captured.currency),
+        },
+        countdown=int(wait.total_seconds()),
+    )
+
+
 @djstripe_receiver("payment_intent.payment_failed")
 @with_tenant_schema_from_event
 def handle_stripe_payment_failed(sender, **kwargs):
@@ -1207,7 +1240,7 @@ def handle_stripe_refund_made(sender, **kwargs):
     cannot disagree. A refund this app made is already
     in the ledger under the same id, so its event adds nothing, and so
     does a redelivery. One nobody claimed settles the PENDING attempt that
-    matches it (``PaymentLedger.record_refund``).
+    matches it (``RefundService.book_refund``).
 
     ``Order.status`` is intentionally NOT changed: deciding whether a
     refund means the goods came back is a business call.
@@ -1280,7 +1313,7 @@ def handle_stripe_refund_made(sender, **kwargs):
                 if key
                 else None
             )
-            refund_row, created = PaymentLedger.record_refund(
+            refund_row, created = RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=refunded,
@@ -1383,7 +1416,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
 
             previous_payment_status = order.payment_status
             try:
-                _row, created = PaymentLedger.record_refund_reversal(
+                _row, created = RefundService.book_refund_reversal(
                     order,
                     charge=charge,
                     amount=failed,

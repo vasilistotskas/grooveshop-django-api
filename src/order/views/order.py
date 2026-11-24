@@ -1369,14 +1369,11 @@ class OrderViewSet(BaseModelViewSet):
         # one in src/order/services.py; both are now the provider's own
         # ``supports_payment_intent`` declaration.
 
-        # An intent-less submission on a non-redirect online pay
-        # way routes ORDER-FIRST: deductions covering the FULL
-        # total (gift cards, a 100% promotion, a full loyalty
-        # redemption) settle there with no provider involved,
-        # and anything short of full coverage is rejected by the
-        # service with a typed error — strictly better than the
-        # old blanket "payment_intent_id required" 400, which
-        # made zero-total checkouts impossible.
+        # An intent-less submission routes ORDER-FIRST, whatever the
+        # online pay way: deductions covering the FULL total (gift
+        # cards, a 100% promotion, a full loyalty redemption) settle
+        # there with no provider involved, and a remainder leaves the
+        # order PENDING for the payment opened afterwards.
         if (
             PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
             and provider_supports(
@@ -1511,8 +1508,8 @@ class OrderViewSet(BaseModelViewSet):
         """
         Create order with order-first flow.
 
-        Used for offline payments and redirect-based online providers
-        (e.g. Viva Wallet). No payment_intent_id required.
+        Used for offline payments and every online provider (Viva
+        Wallet, Stripe). No payment_intent_id required.
         Order created with PENDING status.
         ``validated_data`` comes from ``OrderCreateFromCartSerializer``
         and is already type-checked and cross-validated.

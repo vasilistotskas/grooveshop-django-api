@@ -22,8 +22,20 @@ caller:
 | `create_order_from_cart` (§3.1) | `lock=True` | compares the intent's amount with `amount_due` |
 | `create_order_from_cart_offline` (§3.2) | `lock=True` | the order's charges |
 
-- **The rows** (`CheckoutQuote`): the products (`items_subtotal`), the
-  promotions (`promotion`, `discount_total`), `free_threshold_value`
+- **The lines** (`CheckoutQuote.lines`, `QuoteLine`): the cart's lines
+  as priced (`OrderQuoteService.priced_lines`): product, quantity, unit
+  price (wholesale prices bound) and the promotion money the line carries
+  (`promotion.line_discounts`). The quote reads the lines once
+  (`Cart.get_items`) and hands that read to `PromotionEngine.evaluate`
+  (`items=`), so the promotions, the subtotal, the parcel and the cart
+  digest all come from it: the lines a quote returns are the ones its
+  total and digest cover. The digest's canonical form is pinned by
+  `tests/unit/order/test_cart_digest_golden.py`.
+- **The rows** (`CheckoutQuote`): the products (`items_subtotal`, the
+  lines' sum), the promotions (`promotion`, `discount_total`, and
+  `coupons`: `CartDiscountResult.coupon_verdicts` on each attached code,
+  the verdict the cart's `appliedCoupons` gives too, on the codes the
+  evaluation itself read, `CartDiscountResult.codes`, never a second read), `free_threshold_value`
   ([§5.0](shipping.md)), the delivery (`shipping`: price and `waived_by`,
   a `ShippingCharge`), the pay-way fee (`payment_fee`: amount and
   `waived`), the loyalty discount, the gift-card plan, `grand_total`
@@ -108,8 +120,8 @@ caller:
 - **The cart digest.** A quote with a delivery chosen also returns
   `cartDigest` (`OrderQuoteService.cart_digest`): an HMAC, keyed by the
   `SECRET_KEY`, over a canonical form of what the order would be made of:
-  each line (product, quantity, unit price as priced, the promotion money
-  it carries), the promotions that apply with their codes, amounts and
+  each of the quote's `lines` (product, quantity, unit price as priced,
+  the promotion money it carries), the promotions that apply with their codes, amounts and
   gifts, the delivery (kind as `delivery_kind` reads it, the carrier that
   takes it, as `_carrier` resolves one a home delivery does not name,
   country, region, the pickup point). It is a check of contents: it holds
@@ -141,7 +153,19 @@ caller:
   once `shippingKind` and `countryId` are both given (order creation
   prices a missing kind as home delivery; a quote does not assume one).
   Besides the rows it returns `expectedTotal` and `cartDigest`, to send
-  back with the order, and the priced lists: `shippingOptions` (every delivery the store
+  back with the order; `lines` (`QuoteLineSerializer`: the cart item
+  `id`, `productId`, `productName` in the request's language,
+  `mainImagePath`, `quantity`, `unitPrice`, `totalPrice` before
+  promotions and `promotionDiscount`, which sum to `itemsSubtotal` and
+  `discountTotal`) and `appliedCoupons` (each attached code's `amount`,
+  `freeShipping`, `gift` or `rejection`: the cart's `appliedCoupons`, one
+  serializer and one schema declaration for both,
+  `order.serializers.quote.AppliedCouponSerializer` and
+  `APPLIED_COUPONS_SCHEMA`, inline because drf-spectacular would lift a
+  component's enum into a `oneOf` the live consumers read as a type
+  change), so a client renders the
+  checkout from the one answer its total came from (the agent gateway
+  reads no cart beside it); and the priced lists: `shippingOptions` (every delivery the store
   offers to the country, `ShippingService.available_options` priced with
   the region and a free-shipping promotion, each with `waivedBy`; null
   without a country) and `payWays` (every pay way a shopper is offered
@@ -219,6 +243,8 @@ caller:
   whose request carries `payment_intent_id`. Every client reaches it through
   `POST /api/v1/order`: the storefront, and the agent gateway's UCP/ACP
   checkout (which sends no intent, so it takes §3.2). Nothing else calls it.
+  A Stripe request with no `payment_intent_id` takes §3.2 instead; this
+  path is being retired for it (#818).
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
@@ -352,8 +378,22 @@ caller:
 
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
-  agent gateway's UCP/ACP checkout.
+  agent gateway's UCP/ACP checkout; `OrderViewSet.create` for every request
+  that carries no `payment_intent_id`, an intent-capable online pay way
+  (Stripe) included.
 - Sets `status=PENDING`, `payment_status=PENDING`.
+- **Every online pay way is order-first** (#818). An order for Stripe with no
+  intent is created like Viva's: PENDING with nothing charged and no
+  `payment_id`, the cart kept (`Order.awaits_online_payment`; it clears on
+  `order_paid`), the courier voucher deferred to the payment, and the
+  payment opened afterwards by `create_checkout_session` or
+  `create_payment_intent`, which charge `calculate_order_total_amount()`,
+  what is left after the gift cards, points and promotions. The quote's
+  locked refusals (stock, total, cart digest) therefore all run before any
+  payment exists. Deductions covering the whole total settle the order here
+  (step 6.8: `GIFTCARD_<uuid>` or `DISCOUNT_<uuid>`, the voucher dispatched,
+  the cart cleared), whatever the pay way. There is no refusal of a partial
+  cover: the remainder is what the payment is opened for.
 - Same lock order as §3.1: the cart row, then what the quote locks (§3.0:
   promotions, the customer's row when points are redeemed, the gift
   cards), then the cart lines, then the products in pk order before any

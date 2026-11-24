@@ -56,6 +56,7 @@ from admin.displays import (
 from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
+from admin.responses import hx_redirect
 from core.forms.choices import BLANK_CHOICE_LABEL
 from order.accounting import credit_allocation
 from order.accounting.chargebacks import (
@@ -1317,6 +1318,15 @@ TIMOLOGIO_FIELDS = (
 
 @admin.register(Order)
 class OrderAdmin(BaseModelAdmin):
+    # Actions a GET may run: downloads and a redirect. The voucher
+    # download is not a pure read for ACS: on a cache miss
+    # ``AcsService.fetch_label_bytes`` asks ACS to print the voucher and
+    # stamps ``label_printed_at``. It stays a GET so the browser can
+    # download the file.
+    read_actions = frozenset(
+        {"download_shipping_voucher", "view_customer_orders_row"}
+    )
+
     # What an order shows of a feature that is off: only if this order (or,
     # for a filter, any order) carries its data. The figures are stamped
     # at checkout, so an order keeps showing what it was charged.
@@ -2555,8 +2565,19 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Acknowledge receipt differences"),
         icon="task_alt",
         permissions=["change", "acknowledge_uncovered"],
+        dialog=ActionDialog(
+            title=_("Acknowledge receipt differences"),
+            description=_(
+                "Clears the dashboard alerts for money refunded past the receipt "
+                "and for goods the customer kept that the receipt lacks. It is "
+                "recorded in the order's history with your name. Use it once you "
+                "have settled the difference with your accountant."
+            ),
+        ),
     )
-    def acknowledge_uncovered(self, request, object_id):
+    def acknowledge_uncovered(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Clear the dashboard alerts for money refunded past the receipt
         and for a receipt short of goods the customer kept: staff looked at
         the order's history and settled it with the accountant. Recorded in
@@ -2577,7 +2598,7 @@ class OrderAdmin(BaseModelAdmin):
                 "are acknowledged."
             ),
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     def has_acknowledge_uncovered_permission(self, request, object_id=None):
         """Offered while the order has refunded money past its receipt,
@@ -2910,16 +2931,30 @@ class OrderAdmin(BaseModelAdmin):
             filename=f"{credit.credit_number}.pdf",
         )
 
+    @staticmethod
+    def _order_change_url(object_id) -> str:
+        return reverse("admin:order_order_change", args=[object_id])
+
     def _redirect_to_order_change(self, object_id):
-        return redirect(reverse("admin:order_order_change", args=[object_id]))
+        return redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Issue receipt (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Issue the receipt"),
+            description=_(
+                "Generates the order's retail receipt, registers it with AADE and "
+                "emails it to the customer. Only for an order that has shipped and "
+                "has no receipt yet."
+            ),
+        ),
     )
-    def issue_receipt_now(self, request, object_id):
+    def issue_receipt_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Issue the order's retail receipt now (generate, register with
         AADE, email).
 
@@ -2935,7 +2970,7 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         if not receipt_issuable(order):
             messages.warning(
@@ -2951,7 +2986,7 @@ class OrderAdmin(BaseModelAdmin):
                     "status": order.get_status_display(),
                 },
             )
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         if not Invoice.objects.filter(order=order).exists():
             # The receipt would wait for a refund claim still PENDING
@@ -2977,7 +3012,7 @@ class OrderAdmin(BaseModelAdmin):
                         "blockers": credit_allocation.describe_blockers(order),
                     },
                 )
-                return self._redirect_to_order_change(object_id)
+                return hx_redirect(self._order_change_url(object_id))
 
         generate_order_invoice.delay(order.id)
         messages.success(
@@ -2985,15 +3020,25 @@ class OrderAdmin(BaseModelAdmin):
             _("Scheduled the receipt for order #%(order_id)s.")
             % {"order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Issue credit documents (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Issue the credit documents"),
+            description=_(
+                "Issues the retail credit documents this order owes and sends to "
+                "AADE any that it has not registered. Nothing is issued before the "
+                "receipt is registered."
+            ),
+        ),
     )
-    def issue_credit_documents_now(self, request, object_id):
+    def issue_credit_documents_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Issue the retail credit documents the order owes, and resubmit
         any that AADE has not registered.
 
@@ -3013,7 +3058,7 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         # A receipt myDATA could not see, held for staff, is released to
         # the credit path, which issues them itself.
@@ -3028,15 +3073,25 @@ class OrderAdmin(BaseModelAdmin):
             )
             % {"order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Regenerate receipt (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Regenerate the receipt"),
+            description=_(
+                "Renders the receipt PDF again under the same number and date. Use "
+                "it to fix a damaged PDF or to apply an updated seller address or "
+                "VAT number."
+            ),
+        ),
     )
-    def regenerate_invoice(self, request, object_id):
+    def regenerate_invoice(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Re-render the receipt PDF + snapshots in place.
 
         Preserves the original ``invoice_number`` and ``issue_date`` so
@@ -3051,13 +3106,13 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         try:
             invoice = generate_invoice(order, force=True)
         except ReceiptNotIssuable as refusal:
             messages.warning(request, str(refusal))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
         except Exception as exc:
             logger.exception(
                 "Admin invoice regeneration failed for order %s", order.id
@@ -3066,7 +3121,7 @@ class OrderAdmin(BaseModelAdmin):
                 request,
                 _("Invoice regeneration failed: %(err)s") % {"err": str(exc)},
             )
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         messages.success(
             request,
@@ -3076,15 +3131,24 @@ class OrderAdmin(BaseModelAdmin):
             )
             % {"num": invoice.invoice_number, "order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Send receipt to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Send the receipt to myDATA"),
+            description=_(
+                "Submits this order's receipt to AADE now. Its status and MARK "
+                "appear on the receipt once AADE answers."
+            ),
+        ),
     )
-    def send_invoice_to_mydata_now(self, request, object_id):
+    def send_invoice_to_mydata_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Dispatch a manual myDATA submission for this order.
 
         Fire-and-forget via the Celery task so the admin response
@@ -3095,7 +3159,7 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.select_related("invoice").get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.has_document():
@@ -3107,7 +3171,7 @@ class OrderAdmin(BaseModelAdmin):
                 )
                 % {"order_id": order.id},
             )
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         from order.tasks import send_invoice_to_mydata
 
@@ -3121,15 +3185,25 @@ class OrderAdmin(BaseModelAdmin):
             )
             % {"num": invoice.invoice_number, "order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Cancel receipt in myDATA (issued in error)"),
         variant=ActionVariant.DANGER,
         icon="cancel",
         permissions=["change", "issuing"],
+        dialog=ActionDialog(
+            title=_("Cancel the receipt in myDATA"),
+            description=_(
+                "Cancels this receipt at AADE. It cannot be undone. Only "
+                "for a receipt issued in error and never used: a sale that "
+                "did not happen is undone by a credit document instead."
+            ),
+        ),
     )
-    def cancel_mydata_invoice_now(self, request, object_id):
+    def cancel_mydata_invoice_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Schedule a ``CancelInvoice`` call for this order's MARK.
 
         Only for a receipt issued in error, and only once it has been
@@ -3140,7 +3214,7 @@ class OrderAdmin(BaseModelAdmin):
             order = Order.objects.select_related("invoice").get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.mydata_mark:
@@ -3152,7 +3226,7 @@ class OrderAdmin(BaseModelAdmin):
                 )
                 % {"order_id": order.id},
             )
-            return self._redirect_to_order_change(object_id)
+            return hx_redirect(self._order_change_url(object_id))
 
         from order.tasks import cancel_mydata_invoice
 
@@ -3165,7 +3239,7 @@ class OrderAdmin(BaseModelAdmin):
             )
             % {"mark": invoice.mydata_mark, "order_id": order.id},
         )
-        return self._redirect_to_order_change(object_id)
+        return hx_redirect(self._order_change_url(object_id))
 
     @action(
         description=_("Download shipping voucher (PDF)"),
@@ -3911,8 +3985,8 @@ class RetailCreditAdmin(BaseModelAdmin):
 
     Like the receipts, a credit document is a tax record: browse, search
     and download only. ``OrderAdmin``'s "Issue credit documents" resubmits
-    one AADE has not registered; the "Cancel in myDATA" action here is for
-    a document issued in error.
+    one AADE has not registered; the "Cancel in myDATA" action on a credit's own page is
+    for a document issued in error, one credit at a time.
     """
 
     list_display = (
@@ -3939,7 +4013,7 @@ class RetailCreditAdmin(BaseModelAdmin):
     ordering = ("-issue_date", "-credit_number")
     date_hierarchy = "issue_date"
     list_select_related = ("order",)
-    actions = ["cancel_in_mydata"]
+    actions_detail = ["cancel_in_mydata"]
 
     readonly_fields = (
         "credit_number",
@@ -4062,22 +4136,76 @@ class RetailCreditAdmin(BaseModelAdmin):
             label = f"{label} (#{obj.mydata_mark})"
         return obj.mydata_status, label
 
-    # Offered to nobody while this register refuses ``change`` (issue 653).
-    @admin.action(
+    def has_cancel_in_mydata_permission(self, request, object_id=None) -> bool:
+        """Who may cancel a credit document in myDATA: whoever holds the
+        store's permission to change credit documents, and only where the
+        platform issues the store's documents (``MyDataConfig.is_ready``),
+        as for the order's "Cancel receipt in myDATA". Not ``change``
+        itself: this register refuses that to everyone, so a tax record is
+        never edited here. Whether the credit can be canceled is answered
+        by the action itself, with a message: a permission that failed on
+        it would answer a click with a bare 403 instead."""
+        return request.user.has_perm(
+            "order.change_retailcredit"
+        ) and OrderAdmin._issues_receipts(request)
+
+    @action(
         description=_("Cancel in myDATA (issued in error)"),
-        permissions=["change"],
+        variant=ActionVariant.DANGER,
+        icon="cancel",
+        permissions=["cancel_in_mydata"],
+        dialog=ActionDialog(
+            title=_("Cancel the credit document in myDATA"),
+            description=_(
+                "Cancels this credit document at AADE. It cannot be "
+                "undone. Only for a document issued in error and never "
+                "used."
+            ),
+        ),
     )
-    def cancel_in_mydata(self, request, queryset):
+    def cancel_in_mydata(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        """Schedule a ``CancelInvoice`` for this credit's MARK. One credit
+        at a time: a cancellation at AADE cannot be undone, so no filter
+        or selection can ever cancel a batch."""
+        change_url = reverse(
+            "admin:order_retailcredit_change", args=[object_id]
+        )
+        credit = RetailCredit.objects.filter(pk=object_id).first()
+        if credit is None:
+            messages.error(request, _("Credit document not found."))
+            return hx_redirect(change_url)
+        if not credit.mydata_mark:
+            messages.warning(
+                request,
+                _(
+                    "Credit document %(number)s has no myDATA MARK "
+                    "- nothing to cancel."
+                )
+                % {"number": credit.credit_number},
+            )
+            return hx_redirect(change_url)
+        if credit.mydata_status == MyDataStatus.CANCELED:
+            messages.warning(
+                request,
+                _("Credit document %(number)s is already canceled in myDATA.")
+                % {"number": credit.credit_number},
+            )
+            return hx_redirect(change_url)
+
         from order.tasks import cancel_mydata_credit
 
-        registered = queryset.filter(mydata_mark__isnull=False)
-        for credit in registered:
-            cancel_mydata_credit.delay(credit.pk)
-        self.message_user(
+        cancel_mydata_credit.delay(credit.pk)
+        messages.success(
             request,
-            _("Scheduled myDATA cancellation for %(count)d credit document(s).")
-            % {"count": registered.count()},
+            _(
+                "Scheduled myDATA cancellation for credit document "
+                "%(number)s (MARK %(mark)s)."
+            )
+            % {"number": credit.credit_number, "mark": credit.mydata_mark},
         )
+        return hx_redirect(change_url)
 
 
 @admin.register(InvoiceCounter)

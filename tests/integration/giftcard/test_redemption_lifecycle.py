@@ -1,7 +1,7 @@
 """Gift-card redemption through the order-creation service.
 
 Split payment (card + COD remainder), full coverage (no provider at
-all), the insufficient-coverage guard for intent-less online checkouts,
+all), the remainder an online pay way is left to charge,
 and the refund credit round-trip.
 """
 
@@ -18,7 +18,6 @@ from country.factories import CountryFactory
 from giftcard.enum import GiftCardTransactionKind
 from giftcard.factories import GiftCardFactory
 from giftcard.services import GiftCardService
-from order.exceptions import InvalidGiftCardError
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -134,7 +133,7 @@ class TestSplitPayment:
         # The card keeps whatever the order didn't need.
         assert card.balance.amount == Decimal(500) - total
 
-    def test_insufficient_cards_block_intent_less_online_checkout(
+    def test_insufficient_cards_leave_the_remainder_for_an_online_payment(
         self, enable_gift_cards, checkout
     ):
         online = PayWayFactory(
@@ -145,19 +144,21 @@ class TestSplitPayment:
         )
         card = GiftCardFactory(initial_value=Money(Decimal(10), "EUR"))
 
-        with pytest.raises(InvalidGiftCardError) as excinfo:
-            OrderService.create_order_from_cart_offline(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=checkout["cart"],
-                    shipping_address=checkout["shipping_address"],
-                    pay_way=online,
-                    user=checkout["user"],
-                    gift_card_codes=[card.code],
-                )
+        order = OrderService.create_order_from_cart_offline(
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=checkout["cart"],
+                shipping_address=checkout["shipping_address"],
+                pay_way=online,
+                user=checkout["user"],
+                gift_card_codes=[card.code],
             )
+        )
 
-        assert excinfo.value.reason == "gift_card_insufficient"
+        order.refresh_from_db()
+        assert order.gift_card_amount.amount == Decimal("10.00")
+        assert order.amount_due.amount > 0
+        assert order.payment_status != "COMPLETED"
 
     def test_refund_credits_the_source_card(self, enable_gift_cards, checkout):
         card = GiftCardFactory(initial_value=Money(Decimal(30), "EUR"))

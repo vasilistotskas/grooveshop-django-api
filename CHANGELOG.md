@@ -3,6 +3,268 @@
 
 
 
+## v3.269.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(cart): evaluate the quote's promotions over the lines it prices
+
+The quote reads the cart's lines once and hands that read to
+PromotionEngine.evaluate (items=), so the promotions, the subtotal, the
+parcel and the cart digest come from one read; the engine still reads
+the lines itself for every other caller.
+
+The cart's appliedCoupons and the quote's are rendered by one
+serializer (AppliedCouponSerializer) and declared by one inline schema
+(APPLIED_COUPONS_SCHEMA): drf-spectacular lifts a component property's
+enum into a oneOf of enum components, which the live storefront and
+gateway, typed against the cart's nullable string, read as a type
+change. The cart's schema is unchanged but for two descriptions.
+
+A golden test pins the digest's canonical form with a fixed key and
+lines, and a line left out of the quote changes it. ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+* fix(cart): judge the quote's coupons on the codes its promotions read
+
+The quote's coupon verdicts read the attached codes again after the
+promotions were evaluated, so a coupon swapped between the two reads was
+reported with the other code's discount. The evaluation now keeps the
+codes it read (CartDiscountResult.codes, from collect_candidates or the
+wholesale branch) and the quote's verdicts are built from those, with no
+second read. The cart endpoint keeps its own read and its output. ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+### Features
+
+* feat(cart): the quote names the lines and coupon verdicts it priced (#823) ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+* feat(cart): the quote names the lines it priced
+
+POST /cart/quote, and the quote an order refusal carries, return the
+cart lines the quote priced (lines: the cart item, product id, name and
+main image path, quantity, unit and line price, the promotion money the
+line carries) and each attached coupon's verdict (appliedCoupons, the
+cart's appliedCoupons computed once in CartDiscountResult.coupon_verdicts).
+
+The quote reads the cart's lines once (OrderQuoteService.priced_lines):
+the subtotal, the parcel and the cart digest are computed from that read,
+so the lines a quote returns are the ones its total and digest cover. A
+client renders a checkout from the one answer its total came from.
+
+Refs vasilistotskas/grooveshop-agent-gateway#205 ([`8dd9e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dd9e9f8fda240b871a9df43b7a7166674d487aa))
+
+## v3.268.1 (2026-11-23)
+
+### Bug fixes
+
+* fix(admin): side-effect actions confirm first and act only on a POST (#824) ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* fix(admin): side-effect actions confirm first and act only on a POST
+
+Every list, row or detail admin action either confirms through an Unfold
+dialog before it acts, or is declared a read; any other answers 405 to a
+non-POST request. The receipt, credit-document, parcel, voucher, gift card,
+business profile, review, duplicate and acknowledge actions now confirm. ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* fix(giftcard): read Viva before locking the gift-card purchase, one finished-payment test for every path (#821) ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(giftcard): read Viva before locking the purchase row on webhook events ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(giftcard): refuse a purchase event whose state moved since the Viva read ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+* fix(order): treat a null StatusId of a payment event as no status in one place ([`f91a1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f91a1b5cfcecd13e3db815fdfabf617bdc363a5c))
+
+### Refactoring
+
+* refactor(admin): give the tracking re-poll the signature of the other confirmed actions ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* refactor(shipping): the admin pages ask the carrier interface instead of branching per carrier (#822) ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+* refactor(shipping): ask the carrier registry for admin pages, state colours and waiting work
+
+The sidebar, the shipment-state display, the dashboard's attention counts
+and the dispatch-point alert named the ACS and BoxNow apps. They now read
+admin_pages, shipment_state_variants, attention_counts, attention_rows,
+app_label and attention_models from ShippingCarrierInterface, so a carrier
+adds its admin by implementing the interface in its own app.
+
+The dashboard clears its cached counts for the models each carrier lists as
+it registers. Five ignore_imports lines of the carrier-apps contract go. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+* refactor(shipping): let a carrier's admin pages declare their rank
+
+The sidebar lists the carriers' pages in the order the pages declare,
+so the Shipping, Pickup Points, Audit and Reconciliation menus keep the
+order they had. A test pins all four. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+### Testing
+
+* test(admin): assert the confirmed actions' redirect, walk every admin site
+
+The confirmed action tests now assert the HX-Redirect target, not just the
+status; the walker covers every registered admin site. The voucher download's
+docstring states that it also stamps the ACS label as printed. ([`0ad486d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad486d30146f8a8317d12a5128b824aca83cb4b))
+
+* test(shipping): pin that carrier writes clear the cached attention counts
+
+Through the real startup order, a write to an ACS or BoxNow model clears the
+dashboard's cached counts; it fails without the carrier_registered receiver. ([`b9421cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9421cc2176a4ef39e5c654601d21004fc754e75))
+
+## v3.268.0 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): wait for a payment-first intent's order before alerting, and isolate the email log's lookup
+
+A payment-first intent can succeed while POST /order is still creating its
+order, so the payment-without-order alert now waits
+PAYMENT_WITHOUT_ORDER_GRACE_MINUTES for a cart-bound intent and sends only if
+no order carries it by then. An unbound intent still alerts at once.
+
+emails.log._claim reads EmailLog inside a savepoint, so a failed read no longer
+poisons the transaction the send runs in, a webhook's atomic block included.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): queue the delayed payment-without-order check through a signal
+
+The order services may not import order.tasks, so report_payment_without_order
+sends payment_awaits_order and a receiver in order.signals.handlers queues the
+task. The task name joins the locked list of Celery task names.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): send the payment-without-order alert from a retried task, for the store's own payments only
+
+The alert is always queued as order.tasks.alert_payment_without_order_task
+through payment_without_order_found, after the webhook commits, so a rolled
+back webhook queues nothing and a transient mail error is retried instead of
+lost. Only an intent carrying this store's binding alerts; any other payment
+on the account is logged at WARNING. A payment-first intent still waits the
+grace, an order-bound one alerts at once.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* fix(order): keep the send error when releasing the alert's claim fails
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+### Features
+
+* feat(order): create a Stripe order before its payment and alert staff to a payment no order carries (#819) ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+* feat(order): create a Stripe order before its payment and alert staff to a payment no order carries
+
+An online pay way whose provider mints a client-confirmed intent no longer
+needs a payment_intent_id at order creation. Such an order is created PENDING
+like a Viva one: the cart is kept, the courier voucher waits for the payment,
+and create_checkout_session or create_payment_intent open the payment for what
+is left after the deductions. Deductions covering the whole total still settle
+the order at creation.
+
+handle_payment_succeeded now sends ops.payment_without_order when no order
+carries or is bound to a succeeded PaymentIntent. The alert claims the intent
+id before it sends, never raises inside dj-stripe's webhook transaction, and
+gives the claim back when the send fails.
+
+Refs #818 ([`4cf7f53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf7f5387f4c32eb21ff5c2f81161fa530688c47))
+
+## v3.267.4 (2026-11-23)
+
+### Refactoring
+
+* refactor(tenant): drop the BOX NOW partner id from the store config (#820)
+
+The storefront picks BOX NOW lockers in its own picker and no longer reads
+the partner id from the store config. The tenant field stays: the BOX NOW
+client, the credentials and the admin still use it. ([`19d17b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19d17b61fce5a37a2a973b1912b93427387936cc))
+
+## v3.267.3 (2026-11-23)
+
+### Bug fixes
+
+* fix(order): cancel a credit or a receipt in myDATA one document at a time, after a confirmation (#801) ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): "Cancel in myDATA" on the credit documents list is offered to who may use it
+
+RetailCreditAdmin is a read-only register: has_change_permission is
+False for everyone. Its cancel_in_mydata action asked for change, so
+Django dropped it from every user's actions, a superuser included, while
+the admin guide and the dashboard's reversed-credit alert both send staff
+there to cancel a credit document issued in error.
+
+The action now asks for its own permission: the store's
+order.change_retailcredit, and only where the platform issues the store's
+documents (OrderAdmin._issues_receipts), as the order's 'Cancel receipt
+in myDATA' does. The register still refuses change, so no credit
+document is edited. Tests: offered and refused per permission and per
+store, and a changelist post schedules the cancel of the registered
+credit; the action-permission test drops its offered-to-nobody entry.
+
+Closes #653 ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): cancel a credit in myDATA one credit at a time, from its own page
+
+The action becomes a per-credit detail action (danger variant) instead of a
+changelist bulk action, so a filter or select-all can no longer cancel a
+batch at AADE. It refuses a credit without a MARK or one already canceled,
+with a message and no task queued. Tests go through real store roles. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): confirm both myDATA cancel actions through a dialog
+
+The credit and receipt cancel actions ran their irreversible CancelInvoice on
+a plain GET of the action link, with no confirmation and no CSRF-protected
+POST. They now render Unfold's confirmation dialog and act only on the
+posted form. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+* fix(order): one myDATA cancel per document at a time
+
+The shared cancel helper sent CancelInvoice without re-checking the
+document, so two confirmed clicks, or a staff cancel racing the automatic
+settle of a canceled order's receipt, sent it twice. It now takes a claim per
+document (a receipt shares the settle path's key), reads the document again
+under it, and sends nothing for one already canceled. ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+### Documentation
+
+* docs(order): describe the cancel confirmation and the per-document claim ([`40752a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40752a509c6081545961f4b81d8bf53b2c67716b))
+
+## v3.267.2 (2026-11-23)
+
+### Documentation
+
+* docs(order): name RefundService where the refund docs still said the ledger books
+
+The refund execution, payments and reconciliation pages, and the Stripe
+refund handler's docstring, said the ledger settles the attempt or frees
+the credit; RefundService books both now. A test pins that the ledger's
+record_refund alone writes the row and the status and settles nothing.
+
+Refs #658 ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+* docs(order): say what booking a refund the ledger already holds still does ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+### Refactoring
+
+* refactor(order): RefundService books a refund above the ledger and the allocation (#804) ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
+* refactor(order): RefundService books a refund above the ledger and the allocation
+
+PaymentLedger.record_refund booked the allocation and the overcharge flag
+itself, and the allocation read the ledger back: the two modules called
+each other four deep on the refund path, with four function-local
+imports to hide it. A refund is now booked as one unit by
+RefundService.book_refund (and book_cod_refund, book_refund_reversal):
+the ledger row and payment status, the attempt it fulfils, the
+allocation and the overcharge flag, in the order the ledger did them.
+The ledger's writes are plain writes, goods_returned moves to the
+ledger (it reads allocation rows, a model), credit_allocation imports
+the ledger at module level, and the payments contract loses its last
+ignored edge. The Stripe and Viva refund handlers and every test that
+booked through the ledger book through RefundService.
+
+Closes #658
+Closes #565 ([`02582b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02582b5bb9a87e237ece500e64ee65566f735ef3))
+
 ## v3.267.1 (2026-11-23)
 
 ### Bug fixes

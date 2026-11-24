@@ -1928,8 +1928,58 @@ def send_credit_email(self, credit_id: int) -> bool:
         return False
 
 
+def _cancel_claim_key(order: Order, document) -> str:
+    """One claim per document. A receipt shares the settle path's key, so
+    a staff cancel and ``settle_canceled_receipt`` exclude each other; a
+    credit document has a key of its own."""
+    from order.models.invoice import Invoice
+
+    if isinstance(document, Invoice):
+        return _settle_claim_key(order.id)
+    return f"mydata:cancel_credit:{document.pk}"
+
+
 def _cancel_registered_document(task, order: Order, document) -> bool:
-    """Send ``CancelInvoice`` for a registered document issued in error."""
+    """Send ``CancelInvoice`` for a registered document issued in error.
+
+    One cancel per document at a time: a claim (``cache.lock``,
+    ``MYDATA_SETTLE_CLAIM_SECONDS``) is taken before the document is read
+    again and held across the AADE call, so two confirmed clicks, or a
+    staff cancel racing the automatic settle of a canceled order's
+    receipt, never send ``CancelInvoice`` twice. A cancel that finds the
+    claim taken sends nothing and returns False (staff can confirm again
+    later); one that finds the document already canceled sends nothing
+    and returns True. No row lock is held across the AADE call.
+    """
+    claim = cache.lock(
+        _cancel_claim_key(order, document),
+        timeout=settings.MYDATA_SETTLE_CLAIM_SECONDS,
+    )
+    if not claim.acquire():
+        logger.warning(
+            "myDATA cancellation of %s (order #%s) skipped - a cancel is "
+            "already running",
+            document.document_number,
+            order.id,
+        )
+        return False
+    try:
+        # Not the instance the task loaded: the claim holder before us
+        # may have canceled it since.
+        document = type(document).objects.get(pk=document.pk)
+        return _send_cancellation(task, order, document)
+    finally:
+        try:
+            claim.release()
+        except LockError:
+            logger.warning(
+                "myDATA cancellation of %s (order #%s) outlasted its claim",
+                document.document_number,
+                order.id,
+            )
+
+
+def _send_cancellation(task, order: Order, document) -> bool:
     from order.accounting.mydata import (
         MyDataError,
         MyDataTransportError,
@@ -1937,6 +1987,15 @@ def _cancel_registered_document(task, order: Order, document) -> bool:
     from order.accounting.mydata import (
         cancel_document as _cancel,
     )
+    from order.models.invoice import MyDataStatus
+
+    if document.mydata_status == MyDataStatus.CANCELED:
+        logger.info(
+            "myDATA cancellation of %s (order #%s) skipped - already canceled",
+            document.document_number,
+            order.id,
+        )
+        return True
 
     if not document.mydata_mark:
         logger.warning(
@@ -2705,3 +2764,35 @@ def purge_expired_pending_payment_fees() -> dict[str, int]:
     if deleted:
         logger.info("Purged %s pending payment fees", deleted)
     return {"deleted": deleted}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def alert_payment_without_order_task(
+    payment_id: str, amount: str, currency: str
+) -> bool:
+    """Alert staff to a succeeded Stripe payment of the store that no order
+    carries (``OrderService.report_payment_without_order``). Returns whether
+    an order carries it, so nothing was sent.
+
+    Queued after the webhook committed, so a mail that fails is retried
+    here: Stripe has had its answer and sends nothing again. A payment-first
+    intent is checked after a grace, when its order should exist.
+    """
+    from decimal import Decimal
+
+    from djmoney.money import Money
+
+    from order.services import OrderService
+
+    if Order.objects.all_with_deleted().filter(payment_id=payment_id).exists():
+        return True
+    OrderService.alert_payment_without_order(
+        payment_id, captured=Money(Decimal(amount), currency)
+    )
+    return False

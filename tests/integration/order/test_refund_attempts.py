@@ -281,7 +281,7 @@ class TestTheWebhookBeatsTheRecord:
                 refund = super()._create(**kwargs)
                 # ``charge.refunded`` lands while the call is in flight,
                 # before the caller can record it.
-                PaymentLedger.record_refund(
+                RefundService.book_refund(
                     order,
                     charge=charge,
                     amount=_eur("40.00"),
@@ -308,7 +308,7 @@ class TestTheWebhookBeatsTheRecord:
             order=order, charge=charge, amount=_eur("40.00")
         )
 
-        row, created = PaymentLedger.record_refund(
+        row, created = RefundService.book_refund(
             order, charge=charge, amount=_eur("40.00"), reference="re_x"
         )
 

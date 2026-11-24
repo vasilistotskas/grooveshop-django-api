@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.conf import settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
@@ -12,8 +10,12 @@ from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
 from core.validators import address as address_rules
-from order.serializers.quote import PickupPointSerializer
-from promotion.enum import BenefitType, CouponRejectionReason
+from order.serializers.quote import (
+    APPLIED_COUPONS_SCHEMA,
+    AppliedCouponSerializer,
+    PickupPointSerializer,
+)
+from promotion.enum import BenefitType
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
     PromotionProductRefSerializer,
@@ -307,90 +309,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             return []
         return [row.code.code for row in obj.applied_codes.all()]
 
-    @extend_schema_field(
-        {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "string"},
-                    "amount": {
-                        "type": "number",
-                        "description": (
-                            "Money this code takes off; 0 when its "
-                            "benefit is not money, or it is refused"
-                        ),
-                    },
-                    "freeShipping": {
-                        "type": "boolean",
-                        "description": "This code waives shipping",
-                    },
-                    "gift": {
-                        "type": "boolean",
-                        "description": (
-                            "This code earns the gift listed in "
-                            "promotionGiftItems"
-                        ),
-                    },
-                    "rejection": {
-                        "type": "string",
-                        "nullable": True,
-                        "enum": [*CouponRejectionReason.values, None],
-                        "description": (
-                            "Why the engine refuses the attached code "
-                            "now; null while it applies"
-                        ),
-                    },
-                },
-                "required": [
-                    "code",
-                    "amount",
-                    "freeShipping",
-                    "gift",
-                    "rejection",
-                ],
-            },
-        }
-    )
-    def get_applied_coupons(self, obj: Cart) -> list[dict]:
-        # A coupon row that only knows its own money cannot tell "free
-        # shipping" from "a better offer applies" (demo store: SHIPFREE
-        # read "a better offer applies" while it was waiving shipping),
-        # nor say why a code that stopped applying is idle. The engine
-        # already decided all of it; this hands its verdict over.
+    @extend_schema_field(APPLIED_COUPONS_SCHEMA)
+    def get_applied_coupons(self, obj: Cart) -> list:
         if not self._codes_apply():
             return []
-        result = self._promotion_result(obj)
-        rejections: dict[str, str] = {}
-        for code, reason in result.rejected:
-            rejections.setdefault(code, reason)
-        benefits = {
-            code.code: promotion.benefit_type
-            for promotion, code in result.non_monetary
-            if code is not None
-        }
-        entries = []
-        for row in obj.applied_codes.all():
-            code = row.code.code
-            entries.append(
-                {
-                    "code": code,
-                    "amount": sum(
-                        (
-                            entry.amount.amount
-                            for entry in result.applied
-                            if entry.code is not None
-                            and entry.code.code == code
-                        ),
-                        Decimal(0),
-                    ),
-                    "freeShipping": benefits.get(code)
-                    == BenefitType.FREE_SHIPPING,
-                    "gift": benefits.get(code) == BenefitType.FREE_GIFT,
-                    "rejection": rejections.get(code),
-                }
-            )
-        return entries
+        verdicts = self._promotion_result(obj).coupon_verdicts(
+            row.code.code for row in obj.applied_codes.all()
+        )
+        return list(AppliedCouponSerializer(verdicts, many=True).data)
 
     @extend_schema_field(
         {

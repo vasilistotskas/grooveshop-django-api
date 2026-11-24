@@ -1002,6 +1002,15 @@ class PaymentAfterCancel:
 
 
 @dataclass(frozen=True, slots=True)
+class PaymentWithoutOrder:
+    """A confirmed payment no order of the store accounts for."""
+
+    payment_id: str
+    provider: str
+    amount: object
+
+
+@dataclass(frozen=True, slots=True)
 class PaymentMismatch:
     """A confirmed charge whose amount is not the order's."""
 
@@ -1042,6 +1051,17 @@ def _payment_after_cancel(
         "order_id": alert.order_id,
         "payment_id": alert.payment_id,
         "provider": alert.payment_method,
+    }
+
+
+def _payment_without_order(
+    alert: PaymentWithoutOrder, env: RenderEnv
+) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "payment_id": alert.payment_id,
+        "provider": alert.provider,
+        "amount": alert.amount,
     }
 
 
@@ -1094,6 +1114,23 @@ staff_email(
     build_context=_payment_after_cancel,
     sample=lambda env: PaymentAfterCancel(
         order_id=1234, payment_id="pi_3QxExample", payment_method="stripe"
+    ),
+)
+staff_email(
+    "ops.payment_without_order",
+    area="ops",
+    title=_("Payment that no order accounts for"),
+    description=_(
+        "Tells the store's staff that a confirmed payment has no order "
+        "behind it, so the customer must be refunded or the order found."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/payment_without_order",
+    subject=gettext_noop("[{site}] Payment {payment_id} has no order"),
+    build_context=_payment_without_order,
+    sample=lambda env: PaymentWithoutOrder(
+        payment_id="pi_3QxExample",
+        provider="Stripe",
+        amount=Money(Decimal("45.50"), "EUR"),
     ),
 )
 staff_email(

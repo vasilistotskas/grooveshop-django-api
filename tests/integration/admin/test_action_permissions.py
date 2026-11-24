@@ -71,15 +71,6 @@ pytestmark = pytest.mark.django_db
 
 MODEL_PERMISSIONS = frozenset({"view", "add", "change", "delete"})
 
-# Declared, and offered to nobody: the permission it would need is one
-# its admin refuses to everyone. Each names the issue that decides it.
-OFFERED_TO_NOBODY = {
-    # The ledger is read-only (``has_change_permission`` is False), so
-    # since the September default of ``change`` nobody has been offered
-    # "Cancel in myDATA": #653.
-    "RetailCreditAdmin.cancel_in_mydata",
-}
-
 
 def _signed_in(user) -> Client:
     client = Client()
@@ -228,9 +219,7 @@ class TestEveryAction:
         model_admin, name, _method = BULK_ACTIONS[label]
         request = _request(UserAccountFactory(admin=True))
 
-        offered = name in model_admin.get_actions(request)
-
-        assert offered is (label not in OFFERED_TO_NOBODY)
+        assert name in model_admin.get_actions(request)
 
     @pytest.mark.parametrize(
         "label",
@@ -344,8 +333,9 @@ class TestTheAcsPayoutLedgerIsThePlatforms:
     ):
         client = _signed_in(store_staff(store, role=role))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acscodpayout_run_reconciliation")
+        response = client.post(
+            reverse("admin:shipping_acs_acscodpayout_run_reconciliation"),
+            DIALOG,
         )
 
         assert response.status_code == 403
@@ -373,11 +363,12 @@ class TestTheAcsPayoutLedgerIsThePlatforms:
     ):
         client = _signed_in(UserAccountFactory(admin=True))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acscodpayout_run_reconciliation")
+        response = client.post(
+            reverse("admin:shipping_acs_acscodpayout_run_reconciliation"),
+            DIALOG,
         )
 
-        assert response.status_code == 302
+        assert response.status_code == 200
         assert acs_http.call_count == 1
 
     def test_a_platform_superuser_reconciles_a_payout(self, store):
@@ -404,11 +395,12 @@ class TestStoreStaffStillWorkTheirShipments:
     def test_staff_issue_the_pickup_list(self, store, acs_http):
         client = _signed_in(store_staff(store))
 
-        response = client.get(
-            reverse("admin:shipping_acs_acsshipment_issue_pickup_list_now")
+        response = client.post(
+            reverse("admin:shipping_acs_acsshipment_issue_pickup_list_now"),
+            DIALOG,
         )
 
-        assert response.status_code == 302
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
 
     @pytest.mark.parametrize(
         "name",

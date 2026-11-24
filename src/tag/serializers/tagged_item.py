@@ -1,16 +1,13 @@
-from functools import reduce
-from operator import or_
-
-from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from core.api.serializers import (
-    CONTENT_OBJECT_SERIALIZERS,
-    ContentObjectRelatedField,
-)
+from core.api.serializers import ContentObjectRelatedField
 from tag.models import TaggedItem
+from tag.models.tagged_item import (
+    CONTENT_OBJECT_NOT_FOUND,
+    CONTENT_OBJECT_NOT_FOUND_MESSAGE,
+    content_object_exists,
+)
 from tag.serializers.tag import TagDetailSerializer, TagSerializer
 
 
@@ -50,20 +47,6 @@ class TaggedItemDetailSerializer(TaggedItemSerializer):
         fields = TaggedItemSerializer.Meta.fields
 
 
-# The content types the read serializer can draw (``contentObject``): a
-# row of any other model would make every read of it a 500. Built from
-# the models' own app label and name, so no query runs at import.
-TAGGABLE_CONTENT_TYPES = ContentType.objects.filter(
-    reduce(
-        or_,
-        (
-            Q(app_label=model._meta.app_label, model=model._meta.model_name)
-            for model in CONTENT_OBJECT_SERIALIZERS
-        ),
-    )
-)
-
-
 class TaggedItemWriteSerializer(serializers.ModelSerializer[TaggedItem]):
     tag_id = serializers.IntegerField(
         write_only=True,
@@ -81,19 +64,19 @@ class TaggedItemWriteSerializer(serializers.ModelSerializer[TaggedItem]):
         return value
 
     def validate(self, attrs):
-        # A partial update may name only one of the pair: judge the pair
-        # the row will hold.
+        # ``TaggedItem.clean``'s rule; a partial update may name only one
+        # of the pair, so judge the pair the row will hold. The content
+        # type's own choices come from the field's ``limit_choices_to``.
         content_type = attrs.get(
             "content_type", getattr(self.instance, "content_type", None)
         )
         object_id = attrs.get(
             "object_id", getattr(self.instance, "object_id", None)
         )
-        model = content_type.model_class() if content_type else None
-        if model is None or not model.objects.filter(pk=object_id).exists():
+        if not content_object_exists(content_type, object_id):
             raise serializers.ValidationError(
-                {"object_id": _("The object to tag does not exist.")},
-                code="content_object_not_found",
+                {"object_id": CONTENT_OBJECT_NOT_FOUND_MESSAGE},
+                code=CONTENT_OBJECT_NOT_FOUND,
             )
         return attrs
 
@@ -112,4 +95,3 @@ class TaggedItemWriteSerializer(serializers.ModelSerializer[TaggedItem]):
             "content_type",
             "object_id",
         )
-        extra_kwargs = {"content_type": {"queryset": TAGGABLE_CONTENT_TYPES}}

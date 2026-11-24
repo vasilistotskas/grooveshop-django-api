@@ -50,6 +50,7 @@ from shipping.interfaces import (
     is_registered,
 )
 from shipping.services import ShippingService
+from shipping.zones import destination_errors
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
@@ -1717,6 +1718,19 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             attrs["country_id"], attrs.get("region_id")
         ):
             raise serializers.ValidationError(errors, code="region_invalid")
+        # A region the store's home deliveries skip, while they reach
+        # the rest of its country (its shipping zones), is refused on the
+        # region: no carrier would take it there. A country they do not
+        # reach at all is the delivery's refusal (``shipping_unavailable``).
+        errors = destination_errors(
+            attrs["country_id"],
+            attrs.get("region_id"),
+            region_field="region_id",
+        )
+        if "region_id" in errors:
+            raise serializers.ValidationError(
+                {"region_id": errors["region_id"]}, code="region_not_served"
+            )
         region = None
         if attrs.get("region_id"):
             region = Region.objects.filter(alpha=attrs["region_id"]).first()

@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -16,15 +15,15 @@ from tenant.staff_actors import history_user_getter, history_user_setter
 class ShippingRate(TimeStampMixinModel):
     """Single source of truth for a store's shipping price + availability.
 
-    One row per (provider, country, kind): the price the shopper pays,
-    the subtotal above which the combination ships free, and the
-    weight cap the carrier will accept. Country/Region are global ISO
-    reference data — this table is what turns "Cyprus exists" into
-    "this store ships to Cyprus", per tenant, per carrier.
+    One row per (provider, zone, kind): the price the shopper pays, the
+    subtotal above which the combination ships free, and the weight cap
+    the carrier will accept. Country/Region are global ISO reference
+    data; a ``ShippingZone`` and its rates are what turn "Cyprus exists"
+    into "this store ships to Cyprus", per tenant, per carrier, and
+    "Crete exists" into "this store charges more for Crete".
 
-    Lives in the tenant schema (unlike ``country.Country``, which is
-    SHARED_APPS/public) — ``country`` below is a cross-schema FK, the
-    same shape ``Order.country`` already uses.
+    A pickup-point rate belongs to a zone covering a whole country: a
+    pickup point has no region (``shipping.zones``).
     """
 
     provider = models.ForeignKey(
@@ -33,24 +32,14 @@ class ShippingRate(TimeStampMixinModel):
         on_delete=models.CASCADE,
         verbose_name=_("Shipping Provider"),
     )
-    # Cross-schema FK to the public ``country.Country`` row.
-    # ``PROTECT``: a country referenced by a rate must be removed from
-    # the rate first — silently cascading would delete pricing data a
-    # deleted-but-still-referenced order might need to reconstruct. The
-    # collector enforces it only where this table is visible; a delete
-    # from the public schema cannot see it, so ``tenant.reference_guard``
-    # is what refuses there.
-    # ``related_name="+"``: no reverse accessor, so ``Country`` exposes
-    # no ``rates`` into every tenant schema's rates. (``Order.country``
-    # and ``UserAddress.country`` are different: they keep ``orders`` and
-    # ``user_addresses``.) The relation still exists, and the delete
-    # guard (``tenant.reference_guard``) finds it as a hidden one, which
-    # is how a country a store prices shipping for cannot be deleted.
-    country = models.ForeignKey(
-        "country.Country",
-        related_name="+",
-        on_delete=models.PROTECT,
-        verbose_name=_("Country"),
+    # The destination this price applies to: a whole country, or the
+    # regions of one (``ShippingZone``). Which countries and regions a
+    # store serves is a question of its zones and their rates.
+    zone = models.ForeignKey(
+        "shipping.ShippingZone",
+        related_name="rates",
+        on_delete=models.CASCADE,
+        verbose_name=_("Shipping Zone"),
     )
     kind = models.CharField(
         _("Shipping Kind"),
@@ -63,7 +52,7 @@ class ShippingRate(TimeStampMixinModel):
         decimal_places=2,
         default=0,
         help_text=_(
-            "What the shopper pays for this (provider, country, kind), "
+            "What the shopper pays for this (provider, zone, kind), "
             "before ``free_shipping_threshold`` or a carrier's own "
             "``live_quote`` override it."
         ),
@@ -121,7 +110,7 @@ class ShippingRate(TimeStampMixinModel):
         default=True,
         db_default=True,
         help_text=_(
-            "Master switch for this (provider, country, kind) — off "
+            "Master switch for this (provider, zone, kind) — off "
             "hides it from checkout regardless of the provider's own "
             "``is_active``."
         ),
@@ -139,23 +128,17 @@ class ShippingRate(TimeStampMixinModel):
     class Meta(TypedModelMeta):
         verbose_name = _("Shipping Rate")
         verbose_name_plural = _("Shipping Rates")
-        ordering = ["provider__priority", "country_id", "kind"]
+        ordering = ["provider__priority", "zone_id", "kind"]
         constraints = [
             models.UniqueConstraint(
-                fields=["provider", "country", "kind"],
-                name="shipping_rate_provider_country_kind_unique",
+                fields=["provider", "zone", "kind"],
+                name="shipping_rate_provider_zone_kind_unique",
             ),
         ]
-        indexes = [
-            *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(
-                fields=["country", "is_active"],
-                name="shipping_rate_country_active_ix",
-            ),
-        ]
+        indexes = [*TimeStampMixinModel.Meta.indexes]
 
     def __str__(self) -> str:
-        return f"{self.provider.code}/{self.country_id}/{self.kind}"
+        return f"{self.provider.code}/{self.zone}/{self.kind}"
 
     def clean(self) -> None:
         super().clean()

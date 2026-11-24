@@ -31,7 +31,7 @@ def test_the_relations_checked_are_the_ones_a_store_owns():
 
     # Found through the hidden (``related_name="+"``) relations too.
     assert {
-        "shipping.ShippingRate",
+        "shipping.ShippingZone",
         "pay_way.PayWayShippingExclusion",
     } <= owners
     assert {"order.Order", "user.UserAddress"} <= owners
@@ -47,7 +47,13 @@ def test_the_relations_checked_are_the_ones_a_store_owns():
 def test_a_region_is_checked_through_its_own_relations():
     from region.models import Region
 
-    assert {"order.Order", "user.UserAddress"} <= _owners(Region)
+    # A shipping zone's region set is a hidden relation too, through its
+    # own model (``shipping.ShippingZoneRegion``).
+    assert {
+        "order.Order",
+        "user.UserAddress",
+        "shipping.ShippingZoneRegion",
+    } <= _owners(Region)
 
 
 def test_the_message_names_the_store_and_what_it_holds():

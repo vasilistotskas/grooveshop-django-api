@@ -26,6 +26,7 @@ from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
     PickupPointCheckUnavailableError,
     ShippingParcelTooLargeError,
+    ShippingRegionUnavailableError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
@@ -38,6 +39,7 @@ from shipping.interfaces import (
     registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
+from shipping.zones import chargeable, destination_rates
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -617,17 +619,22 @@ class ShippingService:
         that do not fit the carrier's parcels: ``exceeds_parcel_size``,
         decided by the rule :meth:`assert_available` enforces.
 
-        ``region_id`` and ``free`` (a free-shipping promotion) are what
-        :meth:`quote` prices with, so a caller that knows them (the
-        checkout quote) gets each row at the price an order would be
-        charged, with ``waived_by`` saying what made it free.
+        ``region_id`` picks the zone a home delivery is priced by
+        (``shipping.zones``): without one, the country's base zone, the
+        rows a checkout shows before the shopper picks a region. It and
+        ``free`` (a free-shipping promotion) are what :meth:`quote` prices
+        with, so a caller that knows them (the checkout quote) gets each
+        row at the price an order would be charged, with ``waived_by``
+        saying what made it free.
         """
         items = None if items is None else list(items)
         country_code = country_code.upper()
         order_value = Money(order_value_amount, currency)
 
         options: list[dict[str, Any]] = []
-        for provider, kind, adapter, rate in cls.offered_rates(country_code):
+        for provider, kind, adapter, rate in cls.offered_rates(
+            country_code, region_id
+        ):
             exceeds_max_weight = bool(
                 weight_grams is not None
                 and rate.max_weight_grams is not None
@@ -753,7 +760,7 @@ class ShippingService:
 
     @classmethod
     def offered_rates(
-        cls, country_code: str
+        cls, country_code: str, region_id: str | None = None
     ) -> Iterator[
         tuple[
             ShippingProvider,
@@ -762,7 +769,8 @@ class ShippingService:
             ShippingRate,
         ]
     ]:
-        """Every (provider, kind) this store ships to ``country_code``.
+        """Every (provider, kind) this store ships to ``country_code``
+        (and ``region_id``, for a home delivery).
 
         The one definition of "the store offers this", shared by
         :meth:`available_options` (checkout) and :meth:`shipping_policy`
@@ -776,10 +784,17 @@ class ShippingService:
           through — a provider can advertise capability via the
           ``ShippingProvider`` row but gate user-facing visibility on
           state it controls itself (ACS lockers need synced stations);
-        * an active ``ShippingRate`` exists for
-          (provider, country_code, kind) — the single source of "does
-          this store ship this way to this country".
+        * an active ``ShippingRate`` exists for (provider, kind) in the
+          zone the destination resolves to (``shipping.zones.
+          destination_rates``) — the single source of "does this store
+          ship this way there".
         """
+        rates = {
+            (rate.provider_id, rate.kind): rate
+            for rate in destination_rates(country_code, region_id)
+            .filter(is_active=True)
+            .select_related("provider")
+        }
         qs = (
             ShippingProvider.objects.filter(is_active=True)
             .filter(
@@ -808,19 +823,10 @@ class ShippingService:
                 if not adapter.is_kind_enabled(kind, country_code=country_code):
                     continue
 
-                rate = (
-                    ShippingRate.objects.filter(
-                        provider=provider,
-                        country_id=country_code,
-                        kind=kind.value,
-                        is_active=True,
-                    )
-                    .select_related("provider")
-                    .first()
-                )
+                rate = rates.get((provider.pk, kind.value))
                 if rate is None:
-                    # No rate for this country — this (provider, kind)
-                    # simply does not ship here.
+                    # No rate for this destination — this (provider,
+                    # kind) simply does not ship here.
                     continue
 
                 yield provider, kind, adapter, rate
@@ -1000,6 +1006,9 @@ class ShippingService:
     ) -> list[ShippingRate]:
         """The rates to ``country_code`` that ship free above a threshold.
 
+        Judged for the country with no region, as every caller here
+        knows none: its base zone (``shipping.zones``).
+
         Each passes the gate :meth:`active_rate` puts on a quote (an
         active provider with a registered adapter, supporting the kind,
         the kind enabled for the country, an active rate), and has a
@@ -1012,12 +1021,11 @@ class ShippingService:
         """
         country_code = country_code.upper()
         items = None if items is None else list(items)
-        rates = ShippingRate.objects.filter(
-            provider__is_active=True,
-            country_id=country_code,
-            is_active=True,
-            free_shipping_threshold__isnull=False,
-        ).select_related("provider")
+        rates = (
+            chargeable(destination_rates(country_code))
+            .filter(free_shipping_threshold__isnull=False)
+            .select_related("provider")
+        )
 
         usable: list[ShippingRate] = []
         for rate in rates:
@@ -1068,6 +1076,9 @@ class ShippingService:
     def shippable_country_codes(cls) -> list[str]:
         """Alpha-2 codes with at least one active rate, by ``Country.sort_order``.
 
+        A rate in any of a country's zones counts, a region zone's too:
+        the store ships somewhere in that country.
+
         The ordering matches the countries API's own default (``Country``
         is itself ``ordering = ["sort_order"]``), so a caller that lists
         shippable countries and one that lists all countries agree on
@@ -1082,11 +1093,9 @@ class ShippingService:
         # under two different kinds (different ``ORDER BY`` values)
         # would count as two "distinct" rows instead of one.
         rated_codes = (
-            ShippingRate.objects.filter(
-                is_active=True, provider__is_active=True
-            )
+            chargeable(ShippingRate.objects.all())
             .order_by()
-            .values_list("country_id", flat=True)
+            .values_list("zone__country_id", flat=True)
             .distinct()
         )
         return list(
@@ -1097,7 +1106,10 @@ class ShippingService:
 
     @classmethod
     def resolve_home_delivery_provider(
-        cls, country_code: str | None, weight_grams: int | None = None
+        cls,
+        country_code: str | None,
+        weight_grams: int | None = None,
+        region_id: str | None = None,
     ) -> str | None:
         """Return the active home-delivery carrier's code for ``country_code``.
 
@@ -1120,8 +1132,9 @@ class ShippingService:
             is_active=True, supports_home_delivery=True
         )
         if country_code:
+            # The zone a home delivery to the destination is priced by.
             rate = Q(
-                rates__country_id=country_code.upper(),
+                rates__in=destination_rates(country_code, region_id),
                 rates__kind=ShippingKind.HOME_DELIVERY.value,
                 rates__is_active=True,
             )
@@ -1149,13 +1162,18 @@ class ShippingService:
         provider_code: str | None,
         kind: str | None,
         country_code: str | None,
+        region_id: str | None = None,
     ) -> ShippingRate:
         """Resolve the single active ``ShippingRate`` for this combination.
 
         The one gate every quote and every order-creation path shares:
         an active provider, a registered adapter, the provider actually
         supporting ``kind``, the kind enabled for checkout, and an
-        active rate row for ``country_code``. Raises
+        active rate in the zone ``(country_code, region_id)`` resolves
+        to (``shipping.zones``). A carrier that has the rate elsewhere in
+        the country but not in that zone raises
+        :class:`~shipping.exceptions.ShippingRegionUnavailableError`.
+        Raises
         :class:`~shipping.exceptions.ShippingUnavailableError` the
         moment any of those is not true, naming exactly which — a
         missing ``kind`` included, since ``home_delivery`` auto-
@@ -1196,22 +1214,35 @@ class ShippingService:
             )
 
         rate = (
-            ShippingRate.objects.select_related("provider")
-            .filter(
-                provider=provider,
-                country_id=country_code,
-                kind=kind,
-                is_active=True,
-            )
+            destination_rates(country_code, region_id)
+            .select_related("provider")
+            .filter(provider=provider, kind=kind, is_active=True)
             .first()
         )
-        if rate is None:
-            raise ShippingUnavailableError(
+        if rate is not None:
+            return rate
+        if (
+            region_id
+            and ShippingRate.objects.filter(
+                provider=provider,
+                kind=kind,
+                zone__country_id=country_code,
+                is_active=True,
+            ).exists()
+        ):
+            # The carrier delivers this way in the country, only not to
+            # the region: its zone has no such rate.
+            raise ShippingRegionUnavailableError(
                 provider_code=provider_code,
                 kind=kind,
                 country_code=country_code,
+                region_code=region_id,
             )
-        return rate
+        raise ShippingUnavailableError(
+            provider_code=provider_code,
+            kind=kind,
+            country_code=country_code,
+        )
 
     @staticmethod
     def assert_pickup_point_fits(
@@ -1234,6 +1265,7 @@ class ShippingService:
         provider_code: str | None,
         kind: str | None,
         country_code: str | None,
+        region_id: str | None = None,
         weight_grams: int | None = None,
         items: Iterable[tuple[Any, int]] | None = None,
     ) -> ShippingRate:
@@ -1250,7 +1282,10 @@ class ShippingService:
         over-weight option through just because it charges nothing.
         """
         rate = cls.active_rate(
-            provider_code=provider_code, kind=kind, country_code=country_code
+            provider_code=provider_code,
+            kind=kind,
+            country_code=country_code,
+            region_id=region_id,
         )
         if (
             weight_grams is not None
@@ -1346,6 +1381,7 @@ class ShippingService:
                 provider_code=provider_code,
                 kind=kind,
                 country_code=country_code,
+                region_id=region_id,
             )
         except ShippingUnavailableError:
             return
@@ -1392,6 +1428,7 @@ class ShippingService:
             provider_code=provider_code,
             kind=kind,
             country_code=country_code,
+            region_id=region_id,
             weight_grams=weight_grams,
             items=items,
         )

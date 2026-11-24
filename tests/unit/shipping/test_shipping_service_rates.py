@@ -73,7 +73,7 @@ class TestActiveRate:
             kind=ShippingKind.HOME_DELIVERY.value,
             country_code=country.alpha_2.lower(),
         )
-        assert resolved.country_id == country.alpha_2
+        assert resolved.zone.country_id == country.alpha_2
 
     def test_raises_without_a_provider_code(self):
         country = CountryFactory()

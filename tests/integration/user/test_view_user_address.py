@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
@@ -31,6 +32,8 @@ class UserAddressViewSetTestCase(APITestCase):
             num_regions=0,
         )
         self.region = RegionFactory(alpha="GRC", country=self.country)
+        # A saved address is one the store delivers to at home.
+        enable_rate(self.country)
         self.client.force_authenticate(user=self.user)
         self.address = UserAddressFactory(
             user=self.user,

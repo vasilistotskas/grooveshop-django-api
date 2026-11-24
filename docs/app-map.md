@@ -284,14 +284,16 @@ the cross-service view is
 ### `shipping/`, `shipping_acs/`, `shipping_boxnow/`
 
 - `shipping/`: the carrier abstraction (`src/shipping/interfaces.py`),
-  `ShippingProvider`, the per-store `ShippingRate` table
+  `ShippingProvider`, the per-store `ShippingZone` (where the store
+  delivers: a whole country or some regions, `src/shipping/models/zone.py`,
+  resolved by `src/shipping/zones.py`) and its `ShippingRate` table
   (`src/shipping/models/rate.py`: the only source of a shipping price,
   availability and weight cap), `ShippingService`
   (`src/shipping/services.py`), the one lock order for an order and its
   shipment (`src/shipping/locks.py`), the HTTP session and retry rule
   both carrier clients send through (`src/shipping/carrier_http.py`) and
   the operational alerts (`src/shipping/alerts.py`). Read
-  `docs/order/shipping.md`.
+  `docs/order/shipping.md` and `docs/order/shipping-zones.md`.
 - `shipping_acs/`: `AcsShipment`, `AcsPickupList`, `AcsPickupListRun`,
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,
   `AcsVoucherHold` and `AcsUnrecognisedVoucher`; the HTTP client

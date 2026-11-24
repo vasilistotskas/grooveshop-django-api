@@ -109,8 +109,10 @@ stable discriminator already existed, `code` now repeats it:
 - `{"detail", "reason"}` (cart coupons, quotes and payment intents, gift
   cards, business profile): `code` equals `reason`. `POST /cart/quote`
   answers a delivery it cannot price this way, with
-  `shipping_unavailable`, `shipping_parcel_too_large` or
-  `shipping_weight_exceeded` (`shipping.enum.ShippingRefusal`), so a
+  `shipping_unavailable`, `shipping_region_unavailable` (the delivery
+  reaches the country but not the region's shipping zone),
+  `shipping_parcel_too_large` or `shipping_weight_exceeded`
+  (`shipping.enum.ShippingRefusal`), so a
   client can drop the selection and go on, and a pickup point that cannot
   be confirmed to take the cart with `pickup_point_too_small` or
   `pickup_point_size_unknown` (`shipping.interfaces.PickupPointUnfit`;

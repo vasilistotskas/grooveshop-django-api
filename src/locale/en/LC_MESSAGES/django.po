@@ -244,6 +244,12 @@ msgid "%(count)d promotions deactivated."
 msgstr "%(count)d promotions deactivated."
 
 #, python-format
+msgid "%(count)d region"
+msgid_plural "%(count)d regions"
+msgstr[0] "%(count)d region"
+msgstr[1] "%(count)d regions"
+
+#, python-format
 msgid "%(count)d review was approved."
 msgid_plural "%(count)d reviews were approved."
 msgstr[0] "%(count)d review was approved."
@@ -593,6 +599,10 @@ msgstr[0] "%(query)s (%(type)s) - %(count)s result"
 msgstr[1] "%(query)s (%(type)s) - %(count)s results"
 
 #, python-format
+msgid "%(region)s is already in the zone %(zone)s."
+msgstr "%(region)s is already in the zone %(zone)s."
+
+#, python-format
 msgid "%(schema)s (destroyed %(date)s)"
 msgstr "%(schema)s (destroyed %(date)s)"
 
@@ -880,6 +890,9 @@ msgstr "A payment for this order was received and is being confirmed. Do not pay
 msgid "A pickup-point order is delivered to its point's address, which can't be changed."
 msgstr "A pickup-point order is delivered to its point's address, which can't be changed."
 
+msgid "A pickup-point rate belongs to the zone that covers the whole country: a pickup point has no region, so a rate here would never apply."
+msgstr "A pickup-point rate belongs to the zone that covers the whole country: a pickup point has no region, so a rate here would never apply."
+
 msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 msgstr "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
 
@@ -1053,6 +1066,9 @@ msgstr "A voucher request for order #%(order_id)s sent before its check was reso
 #, python-format
 msgid "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
 msgstr "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
+
+msgid "A zone with no regions covers the whole country. A zone with regions covers only those, and its rates replace the whole-country zone's there: give the islands their own price, or no home-delivery rate to stop delivering there. Pickup-point rates belong to the whole-country zone: a pickup point has no region."
+msgstr "A zone with no regions covers the whole country. A zone with regions covers only those, and its rates replace the whole-country zone's there: give the islands their own price, or no home-delivery rate to stop delivering there. Pickup-point rates belong to the whole-country zone: a pickup point has no region."
 
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
@@ -1813,6 +1829,9 @@ msgstr "Anonymous"
 #, python-format
 msgid "Another refund of this order is waiting for %(blockers)s to be settled, so nothing more can be refunded until then."
 msgstr "Another refund of this order is waiting for %(blockers)s to be settled, so nothing more can be refunded until then."
+
+msgid "Another zone already covers the whole of this country. Choose the regions this zone covers instead."
+msgstr "Another zone already covers the whole of this country. Choose the regions this zone covers instead."
 
 msgid "Any APM"
 msgstr "Any APM"
@@ -3833,6 +3852,9 @@ msgstr "Courier could not be reached"
 
 msgid "Courier rejected a shipment"
 msgstr "Courier rejected a shipment"
+
+msgid "Covers"
+msgstr "Covers"
 
 msgid "Create BoxNow parcel now"
 msgstr "Create BoxNow parcel now"
@@ -6559,6 +6581,9 @@ msgstr "For a refund that is no line of the order. Up to %(refundable)s can stil
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 
+msgid "For your staff only, never shown to shoppers (e.g. 'Greece', 'Greek islands')."
+msgstr "For your staff only, never shown to shoppers (e.g. 'Greece', 'Greek islands')."
+
 msgid "Forgotten your password or username?"
 msgstr "Forgotten your password or username?"
 
@@ -8208,6 +8233,9 @@ msgstr "Latitude (string as returned by BoxNow)"
 msgid "Learn weights"
 msgstr "Learn weights"
 
+msgid "Leave empty to cover the whole country. Choose regions to cover only those: their rates replace the whole-country zone's there."
+msgstr "Leave empty to cover the whole country. Choose regions to cover only those: their rates replace the whole-country zone's there."
+
 msgid "Ledger"
 msgstr "Ledger"
 
@@ -8750,8 +8778,8 @@ msgstr "Marketing Opted Out At"
 msgid "Marketing email"
 msgstr "Marketing email"
 
-msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
-msgstr "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
+msgid "Master switch for this (provider, zone, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
+msgstr "Master switch for this (provider, zone, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 
 msgid "Master switch — when False the provider is hidden from checkout regardless of capability flags."
 msgstr "Master switch — when False the provider is hidden from checkout regardless of capability flags."
@@ -13607,6 +13635,18 @@ msgstr "Shipping Rates"
 msgid "Shipping Update"
 msgstr "Shipping Update"
 
+msgid "Shipping Zone"
+msgstr "Shipping Zone"
+
+msgid "Shipping Zone Region"
+msgstr "Shipping Zone Region"
+
+msgid "Shipping Zone Regions"
+msgstr "Shipping Zone Regions"
+
+msgid "Shipping Zones"
+msgstr "Shipping Zones"
+
 msgid "Shipping kind"
 msgstr "Shipping kind"
 
@@ -14941,6 +14981,9 @@ msgstr "The day the cost belongs to (the invoice date), which is the month of th
 msgid "The default language has no such setting."
 msgstr "The default language has no such setting."
 
+msgid "The delivery region's code, once the shopper has chosen it. A home delivery is priced by the shipping zone of the region; without one, by the zone covering the whole country."
+msgstr "The delivery region's code, once the shopper has chosen it. A home delivery is priced by the shipping zone of the region; without one, by the zone covering the whole country."
+
 msgid "The destination this option was priced for."
 msgstr "The destination this option was priced for."
 
@@ -15416,6 +15459,9 @@ msgstr "The selected payment method cannot be paid with a card on this page."
 msgid "The selected payment method is not available for this order."
 msgstr "The selected payment method is not available for this order."
 
+msgid "The selected shipping method does not deliver to the selected region."
+msgstr "The selected shipping method does not deliver to the selected region."
+
 msgid "The selected shipping method is not available for the selected country."
 msgstr "The selected shipping method is not available for the selected country."
 
@@ -15616,6 +15662,10 @@ msgstr "These orders were refunded more than their receipt holds. No credit docu
 
 msgid "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
 msgstr "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
+
+#, python-format
+msgid "These regions are not in the zone's country: %(regions)s"
+msgstr "These regions are not in the zone's country: %(regions)s"
 
 msgid "These system components failed their health checks:"
 msgstr "These system components failed their health checks:"
@@ -15843,6 +15893,9 @@ msgstr "This shipment is already being worked on. Try again in a few minutes."
 msgid "This shipment is already recorded as received outside ACS."
 msgstr "This shipment is already recorded as received outside ACS."
 
+msgid "This shipping method does not deliver to the selected region."
+msgstr "This shipping method does not deliver to the selected region."
+
 msgid "This shipping method is not available for the selected country."
 msgstr "This shipping method is not available for the selected country."
 
@@ -15854,6 +15907,12 @@ msgstr "This staff token is for the page builder only."
 
 msgid "This status means"
 msgstr "This status means"
+
+msgid "This store does not deliver to this country."
+msgstr "This store does not deliver to this country."
+
+msgid "This store does not deliver to this region."
+msgstr "This store does not deliver to this region."
 
 #, python-format
 msgid "This store has no block called %(type)s."
@@ -17228,8 +17287,8 @@ msgstr "What the provider reported"
 msgid "What the redeemed loyalty points take off."
 msgstr "What the redeemed loyalty points take off."
 
-msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
-msgstr "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
+msgid "What the shopper pays for this (provider, zone, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
+msgstr "What the shopper pays for this (provider, zone, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 
 msgid "What the source returned of goods before any reversal of it by the provider (what it owed after the duplicate payment); set on one row of the source."
 msgstr "What the source returned of goods before any reversal of it by the provider (what it owed after the duplicate payment); set on one row of the source."
@@ -17423,6 +17482,9 @@ msgstr "Whether the payment requires additional action (3D Secure, etc.)"
 msgid "Whether the product is currently in stock"
 msgstr "Whether the product is currently in stock"
 
+msgid "Whether the store delivers to this address at home today (its shipping zones). An address saved before the store stopped delivering to its region is kept and reads false."
+msgstr "Whether the store delivers to this address at home today (its shipping zones). An address saved before the store stopped delivering to its region is kept and reads false."
+
 msgid "Whether the store has a default newsletter topic the form can subscribe to."
 msgstr "Whether the store has a default newsletter topic the form can subscribe to."
 
@@ -17464,6 +17526,9 @@ msgstr "Who receives the email"
 
 msgid "Who sees what"
 msgstr "Who sees what"
+
+msgid "Whole country"
+msgstr "Whole country"
 
 msgid "Wholesale"
 msgstr "Wholesale"
@@ -18363,6 +18428,9 @@ msgstr "to create and populate the index."
 msgid "total %(qty)s, refunded %(refunded)s, net %(net)s"
 msgstr "total %(qty)s, refunded %(refunded)s, net %(net)s"
 
+msgid "true: only the regions the current store delivers to at home (its shipping zones); false: only the others. On the platform host, which has no store, true returns none."
+msgstr "true: only the regions the current store delivers to at home (its shipping zones); false: only the others. On the platform host, which has no store, true returns none."
+
 msgid "unknown"
 msgstr "unknown"
 
@@ -19196,9 +19264,6 @@ msgstr "…and {count} more lines with errors."
 #~ msgstr ""
 #~ "Thank you for using %(site_name)s!\n"
 #~ "%(site_domain)s"
-
-#~ msgid "The selected locker is not in the delivery country."
-#~ msgstr "The selected locker is not in the delivery country."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

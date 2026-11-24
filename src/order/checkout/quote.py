@@ -522,6 +522,7 @@ class OrderQuoteService:
             shipping.provider_code,
             shipping.country_id,
             weight_grams,
+            shipping.region_id,
         )
         delivery = [
             kind,
@@ -582,13 +583,15 @@ class OrderQuoteService:
         shipping_provider_code: str | None,
         country_id: str | None,
         weight_grams: int | None,
+        region_id: str | None,
     ) -> tuple[str, str | None]:
         """The (kind, carrier code) a delivery is priced as.
 
         A home delivery (:meth:`delivery_kind`) that names no carrier
-        takes the active home-delivery carrier for the country, by the
-        helper that assigns the order's carrier, so the price charged
-        and the carrier assigned always agree.
+        takes the active home-delivery carrier for the destination (the
+        country and the region's zone), by the helper that assigns the
+        order's carrier, so the price charged and the carrier assigned
+        always agree.
         """
         from shipping.enum import ShippingKind
         from shipping.services import ShippingService
@@ -600,7 +603,7 @@ class OrderQuoteService:
         ):
             shipping_provider_code = (
                 ShippingService.resolve_home_delivery_provider(
-                    country_id, weight_grams
+                    country_id, weight_grams, region_id
                 )
             )
         return shipping_kind, shipping_provider_code
@@ -637,6 +640,7 @@ class OrderQuoteService:
             shipping.provider_code,
             shipping.country_id,
             weight_grams,
+            shipping.region_id,
         )
         ShippingService.resolve_live_price(
             provider_code=provider_code,
@@ -939,13 +943,18 @@ class OrderQuoteService:
         from shipping.exceptions import (
             ShippingLivePriceUnresolvedError,
             ShippingParcelTooLargeError,
+            ShippingRegionUnavailableError,
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
         from shipping.services import ShippingService
 
         shipping_kind, shipping_provider_code = cls._carrier(
-            shipping_kind, shipping_provider_code, country_id, weight_grams
+            shipping_kind,
+            shipping_provider_code,
+            country_id,
+            weight_grams,
+            region_id,
         )
 
         try:
@@ -962,6 +971,17 @@ class OrderQuoteService:
             )
         except ShippingLivePriceUnresolvedError as exc:
             raise ShippingPriceUnresolvedError from exc
+        except ShippingRegionUnavailableError as exc:
+            # Before ShippingUnavailableError, which it subclasses.
+            raise ShippingRefusedError(
+                ShippingRefusal.REGION_UNAVAILABLE,
+                str(
+                    _(
+                        "The selected shipping method does not deliver "
+                        "to the selected region."
+                    )
+                ),
+            ) from exc
         except ShippingUnavailableError as exc:
             raise ShippingRefusedError(
                 ShippingRefusal.UNAVAILABLE,

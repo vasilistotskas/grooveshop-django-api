@@ -81,7 +81,9 @@ def test_inactive_rate_is_not_used():
     from shipping.models import ShippingRate
 
     data = _order_data(country)
-    ShippingRate.objects.filter(country_id=country_rate).update(is_active=False)
+    ShippingRate.objects.filter(zone__country_id=country_rate).update(
+        is_active=False
+    )
     assert _seed(data, MONDAY_10_ATHENS) is None
 
 

@@ -62,9 +62,21 @@ class ShippingOptionsView(APIView):
                 name="country_code",
                 description=(
                     "ISO 3166-1 alpha-2 country code (e.g. 'GR'). "
-                    "Required — a ``ShippingRate`` is per-country."
+                    "Required — a ``ShippingRate`` belongs to a zone of "
+                    "one country."
                 ),
                 required=True,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="region_id",
+                description=(
+                    "The delivery region's code, once chosen. A home "
+                    "delivery is priced by the shipping zone of the "
+                    "region; without one, by the zone covering the whole "
+                    "country."
+                ),
+                required=False,
                 type=str,
             ),
             OpenApiParameter(
@@ -114,6 +126,7 @@ class ShippingOptionsView(APIView):
         amount = float(query.validated_data.get("order_value_amount") or 0)
         currency = query.validated_data.get("currency") or "EUR"
         weight_grams = query.validated_data.get("weight_grams")
+        region_id = query.validated_data.get("region_id") or None
 
         # The caller's cart, found the way every cart endpoint finds it
         # (``X-Cart-Id`` / the signed-in user). None when it names none.
@@ -125,6 +138,7 @@ class ShippingOptionsView(APIView):
             currency=currency,
             weight_grams=weight_grams,
             items=items,
+            region_id=region_id,
         )
         serializer = ShippingOptionSerializer(options, many=True)
         return Response(serializer.data)

@@ -1,4 +1,5 @@
-"""Give a test's own country an active ``ShippingRate``.
+"""Give a test's own country an active ``ShippingRate``, in the zone
+covering the whole country.
 
 ``CountryFactory`` mints a country with a random alpha-2 code — never
 ``GR``, the one country the shipping migrations seed a rate for (kept
@@ -14,7 +15,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from shipping.enum import ShippingKind
-from shipping.factories import ShippingProviderFactory
+from shipping.factories import ShippingProviderFactory, whole_country_zone
 from shipping.models import ShippingRate
 
 if TYPE_CHECKING:
@@ -63,7 +64,7 @@ def enable_rate(
 
     rate, _created = ShippingRate.objects.update_or_create(
         provider=provider,
-        country=country,
+        zone=whole_country_zone(country),
         kind=kind_value,
         defaults={
             "price": price,

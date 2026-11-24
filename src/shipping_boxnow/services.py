@@ -2948,9 +2948,9 @@ class BoxNowService:
                         )
                         continue
 
-                    # ShippingRate is now per-country: a locker we can't
-                    # place in a country can't be checked against the
-                    # destination's ``ShippingRate.country``, and
+                    # A rate belongs to a country's zone: a locker we
+                    # can't place in a country can't be checked against
+                    # the destination's rates, and
                     # defaulting to GR used to let a Cypriot locker with
                     # dropped country data mint as if it were Greek.
                     # Skipped rather than deactivated — added to

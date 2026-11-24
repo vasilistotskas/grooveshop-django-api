@@ -45,6 +45,29 @@ class ShippingUnavailableError(ShippingError):
         )
 
 
+class ShippingRegionUnavailableError(ShippingUnavailableError):
+    """The carrier delivers this kind in the country, but not to the region.
+
+    The zone the region resolves to (``shipping.zones.zone_for``) has no
+    active rate for (provider, kind), while another zone of the same
+    country has one: the store does not deliver this way to that region
+    (an island, say), though it does elsewhere in the country.
+    """
+
+    def __init__(
+        self,
+        *,
+        provider_code: str | None,
+        kind: str,
+        country_code: str | None,
+        region_code: str,
+    ) -> None:
+        super().__init__(
+            provider_code=provider_code, kind=kind, country_code=country_code
+        )
+        self.region_code = region_code
+
+
 class ShippingWeightExceededError(ShippingError):
     """The cart's weight exceeds the resolved rate's ``max_weight_grams``.
 

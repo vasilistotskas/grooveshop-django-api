@@ -2,9 +2,9 @@
 
 Single source of truth for a store's shipping price, availability and
 weight cap — see ``docs/order/shipping.md`` (5.0). ``ShippingRateFactory``
-requires an explicit ``country`` (see its docstring); these tests use
-``CountryFactory`` for a country that has nothing to do with the GR
-row the shipping migrations seed.
+puts a rate in the whole-country zone of the ``country`` it is given (see
+its docstring); these tests use ``CountryFactory`` for a country that has
+nothing to do with the GR zone the shipping migrations seed.
 """
 
 from __future__ import annotations
@@ -18,20 +18,24 @@ from djmoney.money import Money
 
 from country.factories import CountryFactory
 from shipping.enum import ShippingKind
-from shipping.factories import ShippingProviderFactory, ShippingRateFactory
+from shipping.factories import (
+    ShippingProviderFactory,
+    ShippingRateFactory,
+    whole_country_zone,
+)
 from shipping.models import ShippingRate
 
 pytestmark = pytest.mark.django_db
 
 
-def test_str_is_provider_country_kind():
+def test_str_is_provider_zone_kind():
     provider = ShippingProviderFactory(code="rate_str_test")
     country = CountryFactory()
     rate = ShippingRateFactory(provider=provider, country=country)
-    assert str(rate) == f"rate_str_test/{country.alpha_2}/home_delivery"
+    assert str(rate) == f"rate_str_test/{rate.zone.name}/home_delivery"
 
 
-def test_unique_together_provider_country_kind():
+def test_unique_together_provider_zone_kind():
     provider = ShippingProviderFactory(code="rate_unique_test")
     country = CountryFactory()
     ShippingRateFactory(
@@ -40,7 +44,7 @@ def test_unique_together_provider_country_kind():
     with transaction.atomic(), pytest.raises(IntegrityError):
         ShippingRate.objects.create(
             provider=provider,
-            country=country,
+            zone=whole_country_zone(country),
             kind=ShippingKind.HOME_DELIVERY,
             price=Money("5.00", "EUR"),
         )
@@ -71,7 +75,7 @@ def test_clean_rejects_a_kind_the_provider_does_not_support():
     country = CountryFactory()
     rate = ShippingRate(
         provider=provider,
-        country=country,
+        zone=whole_country_zone(country),
         kind=ShippingKind.PICKUP_POINT,
         price=Money("3.00", "EUR"),
     )
@@ -85,7 +89,7 @@ def test_clean_rejects_negative_price():
     country = CountryFactory()
     rate = ShippingRate(
         provider=provider,
-        country=country,
+        zone=whole_country_zone(country),
         kind=ShippingKind.HOME_DELIVERY,
         price=Money("-1.00", "EUR"),
     )
@@ -101,7 +105,7 @@ def test_clean_rejects_a_currency_that_does_not_match_the_store():
     country = CountryFactory()
     rate = ShippingRate(
         provider=provider,
-        country=country,
+        zone=whole_country_zone(country),
         kind=ShippingKind.HOME_DELIVERY,
         price=Money("3.00", "USD"),
     )
@@ -115,7 +119,7 @@ def test_clean_passes_for_a_well_formed_rate():
     country = CountryFactory()
     rate = ShippingRate(
         provider=provider,
-        country=country,
+        zone=whole_country_zone(country),
         kind=ShippingKind.HOME_DELIVERY,
         price=Money("3.00", "EUR"),
         free_shipping_threshold=Money("50.00", "EUR"),

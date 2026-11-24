@@ -2466,14 +2466,24 @@ class OrderService:
         if not errors.get("shipping_provider_code") and not errors.get(
             "country_id"
         ):
-            from shipping.exceptions import ShippingUnavailableError
+            from shipping.exceptions import (
+                ShippingRegionUnavailableError,
+                ShippingUnavailableError,
+            )
             from shipping.services import ShippingService
 
+            # A pickup point is judged by its country; a home delivery by
+            # the zone of its region too.
+            region_id = (
+                address.get("region_id")
+                if kind_value == "home_delivery"
+                else None
+            )
             resolved_provider_code = provider_code
             if not resolved_provider_code and kind_value == "home_delivery":
                 resolved_provider_code = (
                     ShippingService.resolve_home_delivery_provider(
-                        address.get("country_id")
+                        address.get("country_id"), region_id=region_id
                     )
                 )
             if resolved_provider_code and kind_value:
@@ -2482,7 +2492,15 @@ class OrderService:
                         provider_code=resolved_provider_code,
                         kind=kind_value,
                         country_code=address.get("country_id"),
+                        region_id=region_id,
                     )
+                except ShippingRegionUnavailableError:
+                    errors["shipping_provider_code"] = [
+                        _(
+                            "This shipping method does not deliver to "
+                            "the selected region."
+                        )
+                    ]
                 except ShippingUnavailableError:
                     errors["shipping_provider_code"] = [
                         _(
@@ -2743,7 +2761,9 @@ class OrderService:
         # always agree.
         if not code and kind == "home_delivery":
             code = ShippingService.resolve_home_delivery_provider(
-                order_data.get("country_id"), weight_grams
+                order_data.get("country_id"),
+                weight_grams,
+                order_data.get("region_id"),
             )
 
         if code:
@@ -2768,18 +2788,23 @@ class OrderService:
         stored ``DISPATCH_CUTOFF`` is unreadable.
         """
         from shipping.delivery import configured_cutoff, estimated_delivery
-        from shipping.models import ShippingRate
+        from shipping.zones import destination_rates
 
         provider = order_data.get("shipping_provider")
         country_id = order_data.get("country_id")
         if provider is None or not country_id:
             return
-        rate = ShippingRate.objects.filter(
-            provider=provider,
-            country_id=country_id,
-            kind=order_data["shipping_kind"],
-            is_active=True,
-        ).first()
+        # The rate of the zone the order's destination resolves to: the
+        # islands' own delivery days, where they have their own rate.
+        rate = (
+            destination_rates(country_id, order_data.get("region_id"))
+            .filter(
+                provider=provider,
+                kind=order_data["shipping_kind"],
+                is_active=True,
+            )
+            .first()
+        )
         try:
             cutoff = configured_cutoff()
         except ValueError:

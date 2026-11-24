@@ -48,7 +48,7 @@ def test_a_store_with_no_active_provider_has_an_empty_policy():
 def test_a_row_carries_exactly_what_the_rate_holds(_acs_only):
     ShippingRate.objects.filter(
         provider__code="acs",
-        country_id="GR",
+        zone__country_id="GR",
         kind=ShippingKind.HOME_DELIVERY.value,
     ).update(
         price=Decimal("4.20"),
@@ -81,7 +81,7 @@ def test_a_row_carries_exactly_what_the_rate_holds(_acs_only):
 def test_unset_optional_rate_fields_are_none(_acs_only):
     ShippingRate.objects.filter(
         provider__code="acs",
-        country_id="GR",
+        zone__country_id="GR",
         kind=ShippingKind.HOME_DELIVERY.value,
     ).update(
         free_shipping_threshold=None,

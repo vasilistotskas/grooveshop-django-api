@@ -4,7 +4,7 @@ platform migration.
 
 Mirrors ``test_seed_default_country.py``'s pattern for the sibling
 migration. Every test clears ``Country`` first (deleting any
-``ShippingRate`` first — its FK to ``country.Country`` is ``PROTECT``)
+``ShippingZone`` first, with its rates — its FK to ``country.Country`` is ``PROTECT``)
 since the migration's ``sort_order``/uniqueness logic depends on
 exactly which rows already exist.
 """
@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from country.models import Country
-from shipping.models import ShippingRate
+from shipping.models import ShippingZone
 
 MIGRATION = "country.migrations.0012_seed_iso_countries"
 
@@ -43,7 +43,7 @@ def seed(seed_module):
 
 
 def _reset():
-    ShippingRate.objects.all().delete()
+    ShippingZone.objects.all().delete()
     Country.objects.all().delete()
 
 

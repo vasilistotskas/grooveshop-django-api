@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from django.contrib.admin.options import InlineModelAdmin
     from django.db.models import Q
     from django_stubs_ext import StrOrPromise
-    from rest_framework.serializers import BaseSerializer
+    from rest_framework.serializers import BaseSerializer, Field
 
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
@@ -108,9 +108,6 @@ class OrderShipmentField:
     name: str
     serializer: type[BaseSerializer]
     help_text: str
-    # Where it sits among the carriers' fields: lower first, carriers
-    # that tie in the order they registered.
-    rank: int = 0
 
 
 # The refusals of a pickup point at checkout, one text each for every
@@ -210,21 +207,24 @@ class ShippingCarrierInterface(ABC):
     # ``app_label.Model``: a write clears the dashboard's cached counts.
     attention_models: ClassVar[tuple[str, ...]] = ()
 
-    # Carrier-specific keys that arrive in the create-order request
-    # body but are NOT columns on ``Order``. The order-flow code pops
-    # these off the request dict before calling ``Order.objects.create``
-    # and hands them to ``create_shipment_row`` so each provider reads
-    # its own subset. Override per provider — empty tuple means the
-    # carrier doesn't add any per-order payload (e.g. flat home-delivery
-    # carriers without locker selection).
-    payload_keys: ClassVar[tuple[str, ...]] = ()
-
-    # The ``payload_keys`` that name the pickup point the shopper chose
-    # (a locker, a station). The checkout quote takes them as order
-    # creation does, and the cart digest covers them
+    # The names of :meth:`checkout_fields` that name the pickup point the
+    # shopper chose (a locker, a station). The checkout quote takes them
+    # as order creation does, and the cart digest covers them
     # (``order.checkout.quote.ShippingChoice``), so an order goes to the
     # pickup point it was quoted for.
     location_keys: ClassVar[tuple[str, ...]] = ()
+
+    # Where this carrier's own fields sit among the carriers' in an API
+    # body (the checkout's :meth:`checkout_fields`, the order detail's
+    # :meth:`order_shipment_field`): lower first, carriers that tie in
+    # the order they registered (:func:`providers_by_field_rank`).
+    field_rank: ClassVar[int] = 0
+
+    # The courier's public tracking page of a parcel, ``{number}`` its
+    # tracking number (``Order.tracking_number``, recorded with this
+    # carrier's ``code``), for the order's tracking link; ``None`` for a
+    # carrier with no such page.
+    tracking_url_template: ClassVar[str | None] = None
 
     @abstractmethod
     def create_shipment(
@@ -556,6 +556,19 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
+    def checkout_fields(self) -> dict[str, Field]:
+        """The fields a checkout body takes for this carrier, by name, new
+        instances on every call: its pickup point (the
+        :attr:`location_keys`, on every body that names a delivery: the
+        quote, the payment intent, the order) and its options for the
+        order alone (order creation's body). Order creation hands the
+        values to :meth:`create_shipment` and
+        :meth:`validate_order_payload` as the payload.
+
+        Default: none, for a carrier with nothing to choose.
+        """
+        return {}
+
     def order_shipment_field(self) -> OrderShipmentField | None:
         """This carrier's own field on the order detail
         (``OrderDetailSerializer``), next to the generic ``shipment``.
@@ -728,6 +741,15 @@ def is_registered(code: str) -> bool:
 def registered_providers() -> tuple[ShippingCarrierInterface, ...]:
     """Every registered adapter, for a rule that asks each carrier."""
     return tuple(_REGISTRY.values())
+
+
+def providers_by_field_rank() -> list[ShippingCarrierInterface]:
+    """Every registered adapter by its
+    :attr:`~ShippingCarrierInterface.field_rank`, for an API body that
+    lists fields of each carrier."""
+    return sorted(
+        registered_providers(), key=lambda carrier: carrier.field_rank
+    )
 
 
 def shipment_relations() -> tuple[str, ...]:

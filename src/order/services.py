@@ -1233,8 +1233,8 @@ class OrderService:
 
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
-            # (boxnow_locker_id, acs_station_external_id, etc.) and
-            # filters on ``shipping_kind`` itself.
+            # (its ``checkout_fields``) and filters on ``shipping_kind``
+            # itself.
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(

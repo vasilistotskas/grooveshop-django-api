@@ -1,5 +1,5 @@
-from collections.abc import MutableMapping
-from typing import Any, ClassVar, cast
+from collections.abc import Callable
+from typing import ClassVar
 
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
@@ -52,67 +52,48 @@ from shipping.interfaces import (
     ShippingCarrierInterface,
     get_provider,
     is_registered,
-    registered_providers,
+    providers_by_field_rank,
 )
 from shipping.services import ShippingService
 from tenant.features import feature_on
 
-CARRIER_TRACKING_URLS: dict[str, str] = {
+#: The tracking pages of the couriers staff record by hand, no carrier of
+#: ours (``Order.shipping_carrier`` typed into the admin); a registered
+#: carrier names its own (``tracking_url_template``).
+OTHER_COURIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
-    # ACS's public Vue SPA at ``webapp.acscourier.net`` reads the
-    # voucher number from the URL path (NOT a query string) and
-    # auto-runs the search on page load. The older
-    # ``/el/track-and-trace/?p={number}`` URL on the main site is a
-    # generic search page that ignores query parameters, which is
-    # why path-based deep-linking on the SPA is the right form.
-    "acs": "https://webapp.acscourier.net/track-shipment/{number}",
-    "boxnow": "https://boxnow.gr/en?track={number}",
     "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",
     "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
     "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
 }
 
 
-def _context_of(field: serializers.Field) -> MutableMapping[str, Any]:
-    """The serializer context *field* reads, as what it is: the dict the
-    root serializer was given (``BaseSerializer.__init__`` stores the
-    ``context`` argument, ``{}`` without one). DRF's ``Field.context``
-    is typed a ``Mapping``."""
-    return cast("MutableMapping[str, Any]", field.context)
-
-
-def _serialized_shipment(
-    order: Order, context: MutableMapping[str, Any]
-) -> dict | None:
-    """The carrier shipment payload of ``order``, computed once per
-    response: the generic ``shipment`` field and the carrier's own field
-    (:class:`CarrierShipmentField`) both read it. *context* is the root
-    serializer's: a dict DRF types as a ``Mapping`` (``_context_of``)."""
-    cache: dict = context.setdefault("_shipment_cache", {})
-    if order.pk not in cache:
-        cache[order.pk] = ShippingService.serialize_shipment(
-            order, context=context
-        )
-    return cache[order.pk]
-
-
 class CarrierShipmentField(serializers.Field):
     """A carrier's own field on the order detail (``order_shipment_field``):
     the shipment payload when the order ships with that carrier, else
-    null. Typed in the schema by the carrier's detail serializer."""
+    null. Typed in the schema by the carrier's detail serializer.
+
+    *payload* is the detail serializer's
+    :meth:`OrderDetailSerializer.serialized_shipment`, so this field and
+    the generic ``shipment`` share one computation per order.
+    """
 
     def __init__(
-        self, carrier: ShippingCarrierInterface, spec: OrderShipmentField
+        self,
+        carrier: ShippingCarrierInterface,
+        spec: OrderShipmentField,
+        payload: Callable[[Order], dict | None],
     ) -> None:
         self.carrier_code = carrier.code
         self.shipment_serializer = spec.serializer
+        self.payload = payload
         super().__init__(source="*", read_only=True, help_text=spec.help_text)
 
     def to_representation(self, value: Order) -> dict | None:
         provider = getattr(value, "shipping_provider", None)
         if provider is None or provider.code != self.carrier_code:
             return None
-        return _serialized_shipment(value, _context_of(self))
+        return self.payload(value)
 
 
 class CarrierShipmentFieldExtension(OpenApiSerializerFieldExtension):
@@ -681,23 +662,37 @@ class OrderDetailSerializer(OrderSerializer):
     def get_has_specimen_receipt(self, obj: Order) -> bool:
         return specimen_available(obj)
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._shipments: dict[int, dict | None] = {}
+
+    def serialized_shipment(self, obj: Order) -> dict | None:
+        """The carrier shipment payload of ``obj``, computed once per order
+        this serializer renders: the generic ``shipment`` field and the
+        carrier's own (:class:`CarrierShipmentField`) both read it."""
+        if obj.pk not in self._shipments:
+            self._shipments[obj.pk] = ShippingService.serialize_shipment(
+                obj, context=self.context
+            )
+        return self._shipments[obj.pk]
+
     def get_fields(self):
         """The declared fields, and before the generic ``shipment`` each
         registered carrier's own (``order_shipment_field``, by its
-        ``rank``): the carriers register after this class is defined."""
-        carriers = sorted(
-            (
-                (spec, carrier)
-                for carrier in registered_providers()
-                if (spec := carrier.order_shipment_field()) is not None
-            ),
-            key=lambda entry: entry[0].rank,
-        )
+        ``field_rank``): the carriers register after this class is
+        defined."""
+        carriers = [
+            (spec, carrier)
+            for carrier in providers_by_field_rank()
+            if (spec := carrier.order_shipment_field()) is not None
+        ]
         fields = {}
         for name, field in super().get_fields().items():
             if name == "shipment":
                 for spec, carrier in carriers:
-                    fields[spec.name] = CarrierShipmentField(carrier, spec)
+                    fields[spec.name] = CarrierShipmentField(
+                        carrier, spec, self.serialized_shipment
+                    )
             fields[name] = field
         return fields
 
@@ -722,7 +717,7 @@ class OrderDetailSerializer(OrderSerializer):
         provider-specific fields (``boxnow_shipment`` /
         ``acs_shipment``) should consume this one.
         """
-        return _serialized_shipment(obj, _context_of(self))
+        return self.serialized_shipment(obj)
 
     @extend_schema_field({"type": "integer"})
     def get_loyalty_points_to_earn(self, obj: Order) -> int:
@@ -1022,7 +1017,12 @@ class OrderDetailSerializer(OrderSerializer):
     def get_tracking_details(self, obj) -> dict | None:
         tracking_url = None
         if obj.tracking_number and obj.shipping_carrier:
-            template = CARRIER_TRACKING_URLS.get(obj.shipping_carrier.lower())
+            courier = obj.shipping_carrier.lower()
+            template = (
+                get_provider(courier).tracking_url_template
+                if is_registered(courier)
+                else OTHER_COURIER_TRACKING_URLS.get(courier)
+            )
             if template:
                 tracking_url = template.format(number=obj.tracking_number)
 
@@ -1348,48 +1348,9 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         required=False,
         help_text=_("Generic fulfilment kind, independent of provider."),
     )
-    # ACS-specific fields, only honoured when shipping_provider_code='acs'.
-    # Its pickup point is on ``PickupPointSerializer``.
-    acs_charge_type = serializers.ChoiceField(
-        choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
-        required=False,
-        # No ``default=`` — when the field is absent, DRF omits it
-        # from ``validated_data`` so the carrier's own default
-        # (``AcsChargeType.COD`` in ``shipping_acs.carrier``) wins.
-        # Our ACS contract is COD-only; PREPAID is rejected at the
-        # API. Setting ``default=1`` here used to leak that PREPAID
-        # past the carrier fix (orders 53, 55, 56). The field stays
-        # as an *optional* admin override so an admin can flip an
-        # individual order back to PREPAID if the contract ever
-        # gets it enabled — but the platform-wide default lives in
-        # the carrier code, not here.
-        help_text=_(
-            "Optional per-order ACS Charge_Type override. Leave "
-            "unset to use the carrier-level default (COD on a "
-            "COD-only contract). Setting this here only makes "
-            "sense if the ACS commercial contract permits the "
-            "chosen value — invalid combinations are rejected by "
-            "ACS_Create_Voucher."
-        ),
-    )
-    acs_item_quantity = serializers.IntegerField(
-        required=False,
-        min_value=1,
-        max_value=20,
-        # No ``default=`` — same lesson as ``acs_charge_type`` above.
-        # Carrier-level default is 1 (single physical parcel per
-        # order). Override here only when the merchant ships a
-        # single order in multiple physical boxes; ACS will mint a
-        # parent voucher + N-1 child vouchers. The shop's
-        # operational reality is one box per order, so leaving this
-        # unset is correct for every normal order.
-        help_text=_(
-            "Optional per-order override for ACS Item_Quantity (number "
-            "of physical parcels in the shipment). Defaults to 1. "
-            "Must NOT be set for Smartpoint pickup — ACS rejects "
-            "multipart vouchers on lockers."
-        ),
-    )
+    # Then each carrier's options for the order (``checkout_fields``
+    # outside its ``location_keys``): ``get_fields``. Its pickup point is
+    # on ``PickupPointSerializer``.
 
     # ---------- The total the buyer was shown ----------
     # Required: the order is created only at the total the buyer saw
@@ -1540,6 +1501,23 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
                 code="country_code_invalid",
             )
         return cleaned
+
+    def get_fields(self):
+        """The fields, and after ``shipping_kind`` every registered
+        carrier's options for the order (its ``checkout_fields`` outside
+        its ``location_keys``, by its ``field_rank``)."""
+        options = {
+            name: field
+            for carrier in providers_by_field_rank()
+            for name, field in carrier.checkout_fields().items()
+            if name not in carrier.location_keys
+        }
+        fields = {}
+        for name, field in super().get_fields().items():
+            fields[name] = field
+            if name == "shipping_kind":
+                fields.update(options)
+        return fields
 
     def validate(self, attrs):
         """Cross-field rules for B2B invoicing, the carrier and the

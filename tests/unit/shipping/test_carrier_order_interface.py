@@ -2,10 +2,11 @@
 
 A carrier names the relation its shipment row hangs on, what the order
 detail reads below it, its shipment's state and last report, its admin
-inline, search fields and filters, and its own field on the order detail.
-The order manager, the admin, the follow-up rule, the detail serializer
-and the cancel view read those answers from the registry, so a carrier no
-order module names shows up everywhere a built-in one does.
+inline, search fields and filters, its own field on the order detail, the
+checkout fields it takes and its tracking page. The order manager, the
+admin, the follow-up rule, the serializers and the views read those
+answers from the registry, so a carrier no order module names shows up
+everywhere a built-in one does.
 """
 
 from __future__ import annotations
@@ -17,10 +18,11 @@ import pytest
 from django.contrib.admin import AdminSite
 from django.test import RequestFactory
 from django.urls import reverse
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.test import APIClient
 from unfold.admin import StackedInline
 
+from cart.serializers.cart import CartQuoteRequestSerializer
 from order.admin import OrderAdmin
 from order.factories.order import OrderFactory
 from order.lifecycle.follow_up import last_carrier_event_at
@@ -28,8 +30,11 @@ from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.serializers.order import (
     OrderAttributionSerializer,
+    OrderCreateFromCartSerializer,
     OrderDetailSerializer,
 )
+from order.serializers.quote import PickupPointSerializer
+from order.views.order import OrderViewSet
 from shipping.exceptions import CarrierAPIError
 from shipping.interfaces import (
     _REGISTRY,
@@ -72,6 +77,11 @@ class _FakeCarrier(ShippingCarrierInterface):
     admin_order_list_filters: ClassVar[tuple[str, ...]] = (
         "attribution__medium",
     )
+    location_keys: ClassVar[tuple[str, ...]] = ("fake_point",)
+    field_rank: ClassVar[int] = 2
+    tracking_url_template: ClassVar[str | None] = (
+        "https://fake.example/track/{number}"
+    )
 
     def create_shipment(self, order, *, kind, payload=None):
         return None
@@ -106,12 +116,17 @@ class _FakeCarrier(ShippingCarrierInterface):
     def admin_order_inline(self):
         return _FakeInline
 
+    def checkout_fields(self) -> dict[str, serializers.Field]:
+        return {
+            "fake_point": serializers.CharField(required=False),
+            "fake_fragile": serializers.BooleanField(required=False),
+        }
+
     def order_shipment_field(self) -> OrderShipmentField:
         return OrderShipmentField(
             name="fake_shipment",
             serializer=OrderAttributionSerializer,
             help_text="Fake shipment details, else null.",
-            rank=2,
         )
 
 
@@ -150,6 +165,8 @@ class TestInterfaceDefaults:
         assert flat.order_shipment_field() is None
         assert flat.admin_order_search_fields == ()
         assert flat.admin_order_list_filters == ()
+        assert flat.checkout_fields() == {}
+        assert flat.tracking_url_template is None
 
     def test_the_built_in_carriers_name_their_relations(self):
         acs = get_provider("acs")
@@ -296,3 +313,71 @@ class TestCancelView:
             "detail": "Too late to cancel",
             "code": "carrier_cancellation_rejected",
         }
+
+
+class TestCheckoutFields:
+    def test_the_pickup_point_fields_lead_every_body_that_names_one(
+        self, fake_carrier
+    ):
+        for serializer in (
+            PickupPointSerializer(),
+            CartQuoteRequestSerializer(),
+            OrderCreateFromCartSerializer(),
+        ):
+            assert list(serializer.fields)[:4] == [
+                "boxnow_locker_id",
+                "acs_station_external_id",
+                "acs_station_branch",
+                "fake_point",
+            ]
+
+    def test_a_carriers_order_options_follow_the_shipping_kind(
+        self, fake_carrier
+    ):
+        names = list(OrderCreateFromCartSerializer().fields)
+        at = names.index("shipping_kind")
+
+        assert names[at + 1 : at + 4] == [
+            "acs_charge_type",
+            "acs_item_quantity",
+            "fake_fragile",
+        ]
+        assert "fake_fragile" not in PickupPointSerializer().fields
+        assert "fake_fragile" not in CartQuoteRequestSerializer().fields
+
+    def test_order_creation_hands_the_carrier_what_the_body_sent(
+        self, fake_carrier
+    ):
+        payload = OrderViewSet()._build_shipping_address_from_validated(
+            {"fake_point": "P-1", "fake_fragile": True, "acs_item_quantity": 2}
+        )
+
+        assert payload["fake_point"] == "P-1"
+        assert payload["fake_fragile"] is True
+        assert payload["acs_item_quantity"] == 2
+        assert "boxnow_locker_id" not in payload
+
+
+class TestTrackingLink:
+    def _url(self, order: Order) -> str | None:
+        return OrderDetailSerializer(order).data["tracking_details"][
+            "tracking_url"
+        ]
+
+    def test_a_carriers_link_is_its_own_template(self, fake_carrier):
+        order = _fake_order(tracking_number="F123", shipping_carrier=FAKE_CODE)
+
+        assert self._url(order) == "https://fake.example/track/F123"
+
+    def test_the_built_in_carriers_and_other_couriers_keep_theirs(self):
+        acs = OrderFactory(
+            num_order_items=0, tracking_number="7001", shipping_carrier="ACS"
+        )
+        elta = OrderFactory(
+            num_order_items=0, tracking_number="RR1", shipping_carrier="elta"
+        )
+
+        assert self._url(acs) == (
+            "https://webapp.acscourier.net/track-shipment/7001"
+        )
+        assert self._url(elta) == "https://www.elta.gr/en/tracking?code=RR1"

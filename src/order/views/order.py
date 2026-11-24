@@ -150,6 +150,7 @@ from pay_way.models import PayWay
 from pay_way.services import PayWayService
 from shipping.api_errors import PickupPointCheckUnavailable
 from shipping.exceptions import PickupPointCheckUnavailableError
+from shipping.interfaces import registered_providers
 from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
@@ -1764,18 +1765,15 @@ class OrderViewSet(BaseModelViewSet):
                 "shipping_provider_code"
             ),
             "shipping_kind": validated_data.get("shipping_kind"),
-            # Carrier-specific payload keys — kept here so each
-            # adapter's ``payload_keys`` ClassVar can pop what it
-            # needs in ``_extract_shipment_payload``. Adding a new
-            # carrier means listing its keys on the adapter, not
-            # editing this dict.
-            "boxnow_locker_id": validated_data.get("boxnow_locker_id", ""),
-            "acs_station_external_id": validated_data.get(
-                "acs_station_external_id", ""
-            ),
-            "acs_station_branch": validated_data.get("acs_station_branch", ""),
-            "acs_charge_type": validated_data.get("acs_charge_type"),
-            "acs_item_quantity": validated_data.get("acs_item_quantity"),
+            # What the body sent of each carrier's own fields
+            # (``checkout_fields``): its pickup point and options, which
+            # the carrier reads back from the payload.
+            **{
+                name: validated_data[name]
+                for carrier in registered_providers()
+                for name in carrier.checkout_fields()
+                if name in validated_data
+            },
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent

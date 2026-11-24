@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 
 from django.utils import formats, timezone
 from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
@@ -71,18 +72,19 @@ class AcsCarrier(ShippingCarrierInterface):
         "acs_shipment__station_destination",
     )
 
-    # Carrier-specific request-body keys popped before Order.create().
-    # Add a new key here when ACS introduces a new per-order field
-    # (Phase 4 added ``acs_charge_type`` for offline-payway override).
-    payload_keys: ClassVar[tuple[str, ...]] = (
-        "acs_station_external_id",
-        "acs_station_branch",
-        "acs_charge_type",
-        "acs_item_quantity",
-    )
     location_keys: ClassVar[tuple[str, ...]] = (
         "acs_station_external_id",
         "acs_station_branch",
+    )
+    # After BOX NOW's in the API bodies, where they have always been.
+    field_rank: ClassVar[int] = 1
+    # ACS's public Vue SPA at ``webapp.acscourier.net`` reads the voucher
+    # number from the URL path (NOT a query string) and runs the search
+    # on page load. The older ``/el/track-and-trace/?p={number}`` URL on
+    # the main site is a generic search page that ignores query
+    # parameters, which is why the path deep-links.
+    tracking_url_template: ClassVar[str | None] = (
+        "https://webapp.acscourier.net/track-shipment/{number}"
     )
 
     def create_shipment(
@@ -428,6 +430,62 @@ class AcsCarrier(ShippingCarrierInterface):
 
         return AcsShipmentDetailSerializer(shipment, context=context).data
 
+    def checkout_fields(self) -> dict[str, serializers.Field]:
+        """The station of a pickup-point order, and the per-order
+        overrides of the voucher (order creation alone)."""
+        return {
+            "acs_station_external_id": serializers.CharField(
+                max_length=32,
+                required=False,
+                allow_blank=True,
+                help_text=_(
+                    "ACS Smartpoint / shop external ID (Phase 2 "
+                    "pickup-point flow)."
+                ),
+            ),
+            "acs_station_branch": serializers.CharField(
+                max_length=32,
+                required=False,
+                allow_blank=True,
+                help_text=_("ACS_Station_Branch_Destination value."),
+            ),
+            "acs_charge_type": serializers.ChoiceField(
+                choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
+                required=False,
+                # No ``default=``: when the field is absent, DRF omits
+                # it from ``validated_data`` so the carrier's own default
+                # (``AcsChargeType.COD``, ``create_shipment_row``) wins.
+                # Our ACS contract is COD-only; PREPAID is rejected at
+                # the API. A ``default=1`` once leaked PREPAID past the
+                # carrier fix (orders 53, 55, 56). The field stays an
+                # optional override so staff can flip one order back to
+                # PREPAID if the contract ever allows it.
+                help_text=_(
+                    "Optional per-order ACS Charge_Type override. Leave "
+                    "unset to use the carrier-level default (COD on a "
+                    "COD-only contract). Setting this here only makes "
+                    "sense if the ACS commercial contract permits the "
+                    "chosen value — invalid combinations are rejected by "
+                    "ACS_Create_Voucher."
+                ),
+            ),
+            "acs_item_quantity": serializers.IntegerField(
+                required=False,
+                min_value=1,
+                max_value=20,
+                # No ``default=``, as for ``acs_charge_type``: the
+                # carrier's default is one parcel per order. Set it only
+                # when one order ships in several boxes; ACS then mints a
+                # parent voucher and N-1 child vouchers.
+                help_text=_(
+                    "Optional per-order override for ACS Item_Quantity "
+                    "(number of physical parcels in the shipment). "
+                    "Defaults to 1. Must NOT be set for Smartpoint pickup "
+                    "— ACS rejects multipart vouchers on lockers."
+                ),
+            ),
+        }
+
     def order_shipment_field(self) -> OrderShipmentField:
         from shipping_acs.serializers.shipment import (
             AcsShipmentDetailSerializer,
@@ -440,7 +498,6 @@ class AcsCarrier(ShippingCarrierInterface):
                 "ACS shipment details when the order's shipping provider "
                 "is ACS, else null."
             ),
-            rank=1,
         )
 
     def admin_order_inline(self):

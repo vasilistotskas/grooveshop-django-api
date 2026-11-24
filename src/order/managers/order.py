@@ -173,8 +173,10 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """Select related carrier shipment rows. Reverse one-to-ones, so an
         order without a row caches ``None`` instead of querying again —
         what ``Order.can_be_canceled_by_customer`` reads per order. Every
-        carrier's (``shipment_relation``)."""
-        return self.select_related(*shipment_relations())
+        carrier's (``shipment_relation``); none to join leaves the queryset
+        as it is, as ``select_related()`` with no names joins every FK."""
+        relations = shipment_relations()
+        return self.select_related(*relations) if relations else self
 
     def _enriched_items_prefetch(self) -> Prefetch:
         """Prefetch ``items`` with each item's product enriched for the

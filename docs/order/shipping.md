@@ -338,9 +338,19 @@ accepting Cyprus orders at the Greek flat rate.
      `admin_order_inline()` is the inline the order change page shows for
      its orders; `admin_order_search_fields` and `admin_order_list_filters`
      join the order changelist's. `order_shipment_field()` gives it a typed
-     field of its own on the order detail (`OrderShipmentField`: name,
-     detail serializer, `rank` among the carriers' fields), before the
-     generic `shipment`.
+     field of its own on the order detail (`OrderShipmentField`: name and
+     detail serializer), before the generic `shipment`.
+   - The checkout hooks. `checkout_fields()` returns the request fields it
+     takes, by name. The ones named in `location_keys` are its pickup
+     point: they lead `PickupPointSerializer`, so the quote, the payment
+     intent and the order all take them, and the cart digest covers them.
+     The rest are options for the order alone and follow `shipping_kind`
+     on `OrderCreateFromCartSerializer`. The order view hands what the
+     body sent of them to the carrier as the payload. `field_rank` places
+     its fields among the carriers' in every API body, the order detail's
+     included (BOX NOW 0, ACS 1). `tracking_url_template` (`{number}`) is
+     its parcel's public tracking page, the order's `tracking_url` when
+     `shipping_carrier` is its `code`.
    - Its API errors subclass `shipping.exceptions.CarrierAPIError` and
      return the courier's message from `text`: the order's cancel view
      answers a refusal with it.

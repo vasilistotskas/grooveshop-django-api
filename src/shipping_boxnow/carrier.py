@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
@@ -83,9 +84,10 @@ class BoxNowCarrier(ShippingCarrierInterface):
         "boxnow_shipment__parcel_state",
     )
 
-    # Carrier-specific request-body keys popped before Order.create().
-    payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
     location_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
+    tracking_url_template: ClassVar[str | None] = (
+        "https://boxnow.gr/en?track={number}"
+    )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -301,6 +303,17 @@ class BoxNowCarrier(ShippingCarrierInterface):
         )
 
         return BoxNowShipmentDetailSerializer(shipment, context=context).data
+
+    def checkout_fields(self) -> dict[str, serializers.Field]:
+        """The locker of a pickup-point order."""
+        return {
+            "boxnow_locker_id": serializers.CharField(
+                max_length=64,
+                required=False,
+                allow_blank=True,
+                help_text=_("BoxNow APM locker ID from the widget"),
+            ),
+        }
 
     def order_shipment_field(self) -> OrderShipmentField:
         from shipping_boxnow.serializers.shipment import (

@@ -130,6 +130,38 @@ class TestRegionPickers:
         assert len(unfiltered.json()) == 3
 
 
+@pytest.mark.usefixtures("as_tenant_host")
+class TestAddressCountryPicker:
+    def test_a_pickup_only_country_is_not_offered_for_an_address(
+        self, store, documented
+    ):
+        # Shippable (a locker there), but no home delivery reaches it, so
+        # an address there would be refused with country_not_served.
+        lockers_only = CountryFactory(num_regions=0)
+        ShippingRateFactory(
+            provider=ShippingProvider.objects.get(code="boxnow"),
+            country=lockers_only,
+            kind="pickup_point",
+        )
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        home = APIClient().get(
+            reverse("country-list"), {"homeDelivery": "true", "pageSize": 100}
+        )
+        shippable = APIClient().get(
+            reverse("country-list"), {"shippable": "true", "pageSize": 100}
+        )
+
+        assert home.status_code == 200, home.content
+        documented(home, "/api/v1/country", "get")
+        home_codes = {row["alpha2"] for row in home.json()["results"]}
+        assert store.country.alpha_2 in home_codes
+        assert lockers_only.alpha_2 not in home_codes
+        assert lockers_only.alpha_2 in {
+            row["alpha2"] for row in shippable.json()["results"]
+        }
+
+
 def test_the_platform_host_lists_no_region_as_shippable(store):
     response = APIClient().get(
         reverse("region-list"),

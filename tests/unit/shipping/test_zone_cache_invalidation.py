@@ -8,9 +8,11 @@ from unittest import mock
 
 import pytest
 
+from core.cache.invalidation import surfaces_invalidated_by
 from country.factories import CountryFactory
 from region.factories import RegionFactory
 from shipping.factories import ShippingZoneFactory
+from shipping.models import ShippingProvider
 
 pytestmark = pytest.mark.django_db
 
@@ -33,3 +35,11 @@ def test_a_region_set_change_marks_the_shipping_surfaces(change):
         "shipping",
         "regions_countries",
     }
+
+
+def test_a_carrier_switched_on_or_off_marks_the_region_and_country_pickers():
+    # Which regions and countries are shippable depends on the carrier's
+    # ``is_active`` as much as on its rates.
+    assert {"shipping", "regions_countries"} <= set(
+        surfaces_invalidated_by(ShippingProvider)
+    )

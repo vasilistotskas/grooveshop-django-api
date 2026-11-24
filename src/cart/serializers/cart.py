@@ -268,7 +268,10 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "description": (
                         "The country the carriers' thresholds were "
                         "judged for: the store's first shipping country, "
-                        "the one checkout preselects"
+                        "the one checkout preselects, at the rates of its "
+                        "shipping zone covering the whole country (a cart "
+                        "knows no region; a region zone's own threshold "
+                        "applies once checkout prices the address)"
                     ),
                 },
             },

@@ -25,6 +25,7 @@ SURFACES = (
         # through its M2M, which sends no ``post_save``:
         # ``shipping.signals.zone_regions_changed`` marks it.
         invalidated_by=(
+            "shipping.ShippingProvider",
             "shipping.ShippingRate",
             "shipping.ShippingZone",
             "shipping.ShippingZoneRegion",

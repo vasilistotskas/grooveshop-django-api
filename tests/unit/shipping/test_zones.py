@@ -4,13 +4,16 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest import mock
 
 import pytest
+from django.db import connection, transaction
 from djmoney.money import Money
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
 from region.models import Region
+from shipping.admin import ShippingZoneAdminForm
 from shipping.enum import ShippingKind
 from shipping.exceptions import (
     ShippingRegionUnavailableError,
@@ -22,6 +25,7 @@ from shipping.factories import (
     ShippingZoneFactory,
     whole_country_zone,
 )
+from shipping.interfaces import get_provider
 from shipping.models import ShippingProvider
 from shipping.services import ShippingService
 from shipping.zones import (
@@ -284,6 +288,32 @@ class TestHomeCoverage:
 
         assert not HomeCoverage.load().serves(country.alpha_2, None)
 
+    def test_a_carrier_checkout_would_refuse_serves_nothing(self, greece_like):
+        # The gate a quote puts on the carrier (its adapter's kind switch:
+        # ACS without the store's credentials offers no home delivery)
+        # decides coverage too, so no region is offered where checkout
+        # would then find no delivery.
+        country = greece_like["country"].alpha_2
+        adapter = type(get_provider("flat_rate"))
+
+        with mock.patch.object(adapter, "is_kind_enabled", return_value=False):
+            coverage = HomeCoverage.load()
+
+        assert not coverage.serves(country, greece_like["mainland"].pk)
+        assert not coverage.serves(country, greece_like["islands"].pk)
+        assert country not in coverage.reached
+
+    def test_a_carrier_that_stopped_supporting_home_delivery_serves_nothing(
+        self, greece_like
+    ):
+        ShippingProvider.objects.filter(code="flat_rate").update(
+            supports_home_delivery=False
+        )
+
+        assert not HomeCoverage.load().serves(
+            greece_like["country"].alpha_2, greece_like["mainland"].pk
+        )
+
     def test_the_error_names_the_field_to_fix(self, greece_like):
         country = greece_like["country"].alpha_2
         crete = greece_like["crete"].pk
@@ -365,3 +395,23 @@ def test_the_factory_reuses_a_countrys_whole_country_zone():
     country = CountryFactory(num_regions=0)
 
     assert whole_country_zone(country) == whole_country_zone(country)
+
+
+def test_a_zone_save_serialises_the_countrys_zones():
+    # "One whole-country zone per country" has no column a constraint can
+    # hold: the form takes a lock on the country's zones for the rest of
+    # the admin's transaction, so a concurrent save waits and then sees
+    # this one.
+    country = CountryFactory(num_regions=0)
+    form = ShippingZoneAdminForm(data={"name": "Q", "country": country.pk})
+
+    with transaction.atomic():
+        assert form.is_valid(), form.errors
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                "AND pid = pg_backend_pid()"
+            )
+            (held,) = cursor.fetchone()
+
+    assert held >= 1

@@ -30,12 +30,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ErrorDetail
 
 from shipping.enum import ShippingKind
-from shipping.models import ShippingRate, ShippingZone, ShippingZoneRegion
+from shipping.interfaces import get_provider, is_registered
+from shipping.models import (
+    ShippingProvider,
+    ShippingRate,
+    ShippingZone,
+    ShippingZoneRegion,
+)
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
@@ -72,6 +78,23 @@ def destination_rates(
     return ShippingRate.objects.filter(matches)
 
 
+def carrier_offers(
+    provider: ShippingProvider, kind: str, country_code: str
+) -> bool:
+    """Whether an active ``provider`` delivers ``kind`` in ``country_code``
+    at checkout, whatever its rates: a registered adapter, the kind
+    supported, and enabled by the adapter for the country (ACS without the
+    store's credentials offers neither kind). The carrier half of the gate
+    ``ShippingService.active_rate`` puts on every quote."""
+    return (
+        is_registered(provider.code)
+        and provider.supports(kind)
+        and get_provider(provider.code).is_kind_enabled(
+            ShippingKind(kind), country_code=country_code
+        )
+    )
+
+
 def chargeable(rates: QuerySet[ShippingRate]) -> QuerySet[ShippingRate]:
     """``rates`` a shopper can be charged: active, with an active
     provider. The same rule as ``ShippingService.shippable_country_codes``."""
@@ -97,36 +120,42 @@ class HomeCoverage:
 
     @classmethod
     def load(cls) -> HomeCoverage:
-        delivers_home = Exists(
-            chargeable(
-                ShippingRate.objects.filter(
-                    zone=OuterRef("pk"), kind=ShippingKind.HOME_DELIVERY
+        """Three queries: the chargeable home-delivery rates with their
+        carrier and country, the zones, and the zones' regions. A rate
+        counts only when its carrier passes the gate a quote puts on it
+        (:func:`carrier_offers`), so a region is never offered where
+        checkout would then find no home delivery."""
+        home_kind = ShippingKind.HOME_DELIVERY.value
+        offers: dict[tuple[int, str], bool] = {}
+        delivering: set[int] = set()
+        for rate in chargeable(
+            ShippingRate.objects.filter(kind=home_kind)
+        ).select_related("provider", "zone"):
+            key = (rate.provider_id, rate.zone.country_id)
+            if key not in offers:
+                offers[key] = carrier_offers(
+                    rate.provider, home_kind, rate.zone.country_id
                 )
-            )
+            if offers[key]:
+                delivering.add(rate.zone_id)
+        zone_country = dict(
+            ShippingZone.objects.values_list("pk", "country_id")
         )
-        zones = ShippingZone.objects.annotate(delivers_home=delivers_home)
-        base_served = frozenset(
-            zones.filter(regions__isnull=True, delivers_home=True).values_list(
-                "country_id", flat=True
-            )
+        zone_regions = list(
+            ShippingZoneRegion.objects.values_list("zone_id", "region_id")
         )
-        region_zone_served = dict(
-            zones.filter(regions__isnull=False)
-            .values_list("pk", "delivers_home")
-            .distinct()
+        region_zones = {zone for zone, _region in zone_regions}
+        return cls(
+            countries=frozenset(
+                country
+                for zone, country in zone_country.items()
+                if zone in delivering and zone not in region_zones
+            ),
+            regions={
+                region: zone in delivering for zone, region in zone_regions
+            },
+            reached=frozenset(zone_country[zone] for zone in delivering),
         )
-        regions = {
-            region: region_zone_served[zone]
-            for zone, region in ShippingZoneRegion.objects.values_list(
-                "zone_id", "region_id"
-            )
-        }
-        reached = frozenset(
-            zones.filter(delivers_home=True).values_list(
-                "country_id", flat=True
-            )
-        )
-        return cls(countries=base_served, regions=regions, reached=reached)
 
     def serves(self, country_code: str | None, region_code: str | None) -> bool:
         """Whether a home delivery reaches ``(country_code, region_code)``;

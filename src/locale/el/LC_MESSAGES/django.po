@@ -14947,8 +14947,8 @@ msgstr "Το κόστος χωρίς ΦΠΑ: αυτό χρησιμοποιεί �
 msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
 msgstr "Η χώρα για την οποία υπολογίστηκε η τιμή: η πρώτη χώρα αποστολής του καταστήματος, αυτή που προεπιλέγει η ολοκλήρωση αγοράς."
 
-msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
-msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
+msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. The thresholds are those of its shipping zone covering the whole country: a region zone's own threshold applies once checkout prices an address in it. Null only when the store has no active shipping rate anywhere yet."
+msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Τα όρια είναι της ζώνης αποστολής που καλύπτει ολόκληρη τη χώρα: το όριο μιας ζώνης περιοχών ισχύει μόλις η ολοκλήρωση αγοράς τιμολογήσει διεύθυνση σε αυτήν. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
 
 msgid "The coupon code can no longer be used."
 msgstr "Ο κωδικός κουπονιού δεν μπορεί πλέον να χρησιμοποιηθεί."
@@ -18429,6 +18429,9 @@ msgstr "για δημιουργία και συμπλήρωση του index."
 #, python-format
 msgid "total %(qty)s, refunded %(refunded)s, net %(net)s"
 msgstr "σύνολο %(qty)s, επιστράφηκε %(refunded)s, καθαρό %(net)s"
+
+msgid "true: only the countries the current store delivers to at home (its shipping zones), the countries a saved address may be in; false: only the others. shippable also counts pickup points. On the platform host true returns none."
+msgstr "true: μόνο οι χώρες όπου το τρέχον κατάστημα παραδίδει στο σπίτι (οι ζώνες αποστολής του), οι χώρες όπου μπορεί να βρίσκεται μια αποθηκευμένη διεύθυνση· false: μόνο οι υπόλοιπες. Το shippable μετρά και τα σημεία παραλαβής. Στον host της πλατφόρμας το true δεν επιστρέφει καμία."
 
 msgid "true: only the regions the current store delivers to at home (its shipping zones); false: only the others. On the platform host, which has no store, true returns none."
 msgstr "true: μόνο οι περιφέρειες όπου το τρέχον κατάστημα παραδίδει στο σπίτι (οι ζώνες αποστολής του)· false: μόνο οι υπόλοιπες. Στον host της πλατφόρμας, που δεν έχει κατάστημα, το true δεν επιστρέφει καμία."

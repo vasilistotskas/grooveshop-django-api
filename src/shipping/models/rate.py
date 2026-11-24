@@ -138,7 +138,9 @@ class ShippingRate(TimeStampMixinModel):
         indexes = [*TimeStampMixinModel.Meta.indexes]
 
     def __str__(self) -> str:
-        return f"{self.provider.code}/{self.zone}/{self.kind}"
+        # ``zone_id``: a rate the previous release writes during a rollout
+        # has none yet (``0025``), and ``self.zone`` would raise for it.
+        return f"{self.provider.code}/{self.zone_id}/{self.kind}"
 
     def clean(self) -> None:
         super().clean()

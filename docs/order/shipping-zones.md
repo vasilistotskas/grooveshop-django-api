@@ -62,12 +62,20 @@ does any other rate.
   `ShippingService.shippable_country_codes`) when any of its zones has an
   active rate with an active provider, pickup included.
 - **A region is served** when a home delivery reaches it: an active
-  home-delivery rate with an active provider in its resolved zone
-  (`HomeCoverage`, read in one pass). The region picker belongs to a home
+  home-delivery rate in its resolved zone whose carrier passes the gate a
+  quote puts on it (`carrier_offers`: an active provider with a registered
+  adapter, supporting home delivery, enabled by the adapter for the country,
+  so ACS without the store's credentials serves nothing), read in one pass
+  (`HomeCoverage`). The region picker belongs to a home
   address; a pickup order keeps no region ([§3.3](creation-address.md)).
   `?shippable=true` on `GET /region` and on
   `GET /region/<alpha2>/get_regions_by_country_alpha_2` keeps the served
   regions, `false` the others; on the platform host `true` lists none.
+- **A country a saved address may be in** is one some home delivery reaches
+  (`HomeCoverage.reached`): `GET /country?homeDelivery=true`, the address
+  book's country picker. `shippable` counts pickup points too (checkout's
+  picker), so a lockers-only country is shippable but takes no saved
+  address (`country_not_served`).
 
 ### Refusals (coded, [error contract](../error-contract.md))
 
@@ -111,7 +119,9 @@ before them. The form is the zone's name, country and regions
 M2M with its own through model), and a Rates inline. The provider page no
 longer has one. The form refuses (`zone_errors`, `rate_kind_errors`):
 
-1. a second base zone for a country;
+1. a second base zone for a country (with no column a constraint could hold,
+   the form takes a transaction-scoped advisory lock on the country's zones,
+   `_lock_country_zones`, so two concurrent saves cannot both pass);
 2. a region of another country;
 3. a region another zone holds (the database refuses it too);
 4. a pickup-point rate on a region zone.
@@ -120,7 +130,8 @@ longer has one. The form refuses (`zone_errors`, `rate_kind_errors`):
 
 `/shipping/*` and the region and country pickers read zones, so the
 `shipping` and `regions_countries` surfaces declare `ShippingZone` and
-`ShippingZoneRegion` in `invalidated_by`. A region set changes through
+`ShippingZoneRegion` in `invalidated_by`, and `regions_countries` also
+`ShippingProvider` (a carrier switched on or off changes what is shippable). A region set changes through
 `bulk_create`, which sends no `post_save`, so
 `shipping.signals.zone_regions_changed` marks both surfaces on
 `m2m_changed`. Django's response cache keys on the full URL, so
@@ -136,4 +147,6 @@ index (`SeparateDatabaseAndState`), `zone` required in the state and
 nullable in the database for the release still serving during the rollout.
 Release N+1 (contract, `contract_of` `0025`) puts any rate that release wrote
 into its country's base zone, sets `zone` NOT NULL and drops `country`, the
-old constraint and its index ([`docs/migrations.md`](../migrations.md)).
+old constraint and its index ([`docs/migrations.md`](../migrations.md)). The
+backfill's reverse refuses a store whose region zones hold rates: the old
+shape has one rate per `(provider, country, kind)`.

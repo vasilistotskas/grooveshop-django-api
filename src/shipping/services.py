@@ -39,7 +39,7 @@ from shipping.interfaces import (
     registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
-from shipping.zones import chargeable, destination_rates
+from shipping.zones import carrier_offers, chargeable, destination_rates
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -1215,27 +1215,11 @@ class ShippingService:
                 kind=kind or "",
                 country_code=country_code,
             )
-        if not is_registered(provider_code):
-            raise ShippingUnavailableError(
-                provider_code=provider_code,
-                kind=kind,
-                country_code=country_code,
-            )
-
         country_code = country_code.upper()
         provider = ShippingProvider.objects.filter(
             code=provider_code, is_active=True
         ).first()
-        if provider is None or not provider.supports(kind):
-            raise ShippingUnavailableError(
-                provider_code=provider_code,
-                kind=kind,
-                country_code=country_code,
-            )
-
-        adapter = get_provider(provider_code)
-        kind_enum = ShippingKind(kind)
-        if not adapter.is_kind_enabled(kind_enum, country_code=country_code):
+        if provider is None or not carrier_offers(provider, kind, country_code):
             raise ShippingUnavailableError(
                 provider_code=provider_code,
                 kind=kind,

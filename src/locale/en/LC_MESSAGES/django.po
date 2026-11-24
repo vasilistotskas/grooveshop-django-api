@@ -14945,8 +14945,8 @@ msgstr "The cost without VAT: this is what the profit report uses."
 msgid "The country it was priced for: the store's first shipping country, the one checkout preselects."
 msgstr "The country it was priced for: the store's first shipping country, the one checkout preselects."
 
-msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
-msgstr "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
+msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. The thresholds are those of its shipping zone covering the whole country: a region zone's own threshold applies once checkout prices an address in it. Null only when the store has no active shipping rate anywhere yet."
+msgstr "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. The thresholds are those of its shipping zone covering the whole country: a region zone's own threshold applies once checkout prices an address in it. Null only when the store has no active shipping rate anywhere yet."
 
 msgid "The coupon code can no longer be used."
 msgstr "The coupon code can no longer be used."
@@ -18427,6 +18427,9 @@ msgstr "to create and populate the index."
 #, python-format
 msgid "total %(qty)s, refunded %(refunded)s, net %(net)s"
 msgstr "total %(qty)s, refunded %(refunded)s, net %(net)s"
+
+msgid "true: only the countries the current store delivers to at home (its shipping zones), the countries a saved address may be in; false: only the others. shippable also counts pickup points. On the platform host true returns none."
+msgstr "true: only the countries the current store delivers to at home (its shipping zones), the countries a saved address may be in; false: only the others. shippable also counts pickup points. On the platform host true returns none."
 
 msgid "true: only the regions the current store delivers to at home (its shipping zones); false: only the others. On the platform host, which has no store, true returns none."
 msgstr "true: only the regions the current store delivers to at home (its shipping zones); false: only the others. On the platform host, which has no store, true returns none."

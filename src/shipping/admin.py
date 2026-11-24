@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from django.db import connection
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 from django.utils.translation import gettext_lazy as _
@@ -53,6 +54,8 @@ class ShippingZoneAdminForm(forms.ModelForm):
         cleaned = super().clean()
         country = cleaned.get("country")
         regions = list(cleaned.get("covered_regions") or [])
+        if country is not None:
+            _lock_country_zones(country.pk)
         errors = zone_errors(
             zone=self.instance,
             country_code=country.pk if country is not None else None,
@@ -65,6 +68,23 @@ class ShippingZoneAdminForm(forms.ModelForm):
                     message,
                 )
         return cleaned
+
+
+def _lock_country_zones(country_code: str) -> None:
+    """Serialise the saves of one country's zones until the admin's
+    transaction ends (``changeform_view`` runs in one).
+
+    "One whole-country zone per country" has no column a constraint could
+    hold (a zone is whole-country by having no regions), so two staff
+    saving one at the same moment would both pass ``zone_errors``. The
+    second now waits here for the first to commit, then sees its zone.
+    Advisory locks are per database, so the key names the store.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            [f"{connection.schema_name}:shipping-zones:{country_code}"],
+        )
 
 
 class ShippingRateInlineFormSet(BaseInlineFormSet):

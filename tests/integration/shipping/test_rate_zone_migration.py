@@ -99,3 +99,29 @@ class TestRatesMoveIntoZones(TestCase):
             set(Rate.objects.values_list("country_id", flat=True)), {"GR"}
         )
         self.assertEqual(Rate.objects.count(), 2)
+
+    def test_the_reverse_refuses_rates_a_region_zone_holds(self):
+        # The old shape has one rate per (provider, country, kind): a
+        # region's own price has nowhere to go.
+        self._rates_before("GR")
+        apps = migrate_to(AFTER)
+        Zone = apps.get_model("shipping", "ShippingZone")
+        ZoneRegion = apps.get_model("shipping", "ShippingZoneRegion")
+        Region = apps.get_model("region", "Region")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        region, _ = Region.objects.get_or_create(
+            alpha="GR-QZ", defaults={"country_id": "GR", "sort_order": 0}
+        )
+        crete = Zone.objects.create(name="Crete", country_id="GR")
+        ZoneRegion.objects.create(zone=crete, region=region)
+        Rate.objects.create(
+            provider=Provider.objects.get(code="flat_rate"),
+            zone=crete,
+            kind="home_delivery",
+            price=Decimal("6.00"),
+        )
+        _settle_deferred_constraints()
+
+        with self.assertRaisesMessage(RuntimeError, "Crete"):
+            migrate_to(BEFORE)

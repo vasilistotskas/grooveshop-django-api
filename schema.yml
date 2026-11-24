@@ -13654,6 +13654,21 @@ paths:
           - type: boolean
         description: Φίλτρο χωρών με/χωρίς κωδικό κλήσης
       - in: query
+        name: homeDelivery
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι χώρες όπου το τρέχον κατάστημα παραδίδει στο σπίτι
+          (οι ζώνες αποστολής του), οι χώρες όπου μπορεί να βρίσκεται μια αποθηκευμένη
+          διεύθυνση· false: μόνο οι υπόλοιπες. Το shippable μετρά και τα σημεία παραλαβής.
+          Στον host της πλατφόρμας το true δεν επιστρέφει καμία.'
+      - in: query
         name: isEu
         schema:
           oneOf:
@@ -14460,6 +14475,21 @@ paths:
             - '0'
           - type: boolean
         description: Φίλτρο χωρών με/χωρίς κωδικό κλήσης
+      - in: query
+        name: homeDelivery
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι χώρες όπου το τρέχον κατάστημα παραδίδει στο σπίτι
+          (οι ζώνες αποστολής του), οι χώρες όπου μπορεί να βρίσκεται μια αποθηκευμένη
+          διεύθυνση· false: μόνο οι υπόλοιπες. Το shippable μετρά και τα σημεία παραλαβής.
+          Στον host της πλατφόρμας το true δεν επιστρέφει καμία.'
       - in: query
         name: isEu
         schema:
@@ -39522,7 +39552,10 @@ components:
               type: string
               nullable: true
               description: 'The country the carriers'' thresholds were judged for:
-                the store''s first shipping country, the one checkout preselects'
+                the store''s first shipping country, the one checkout preselects,
+                at the rates of its shipping zone covering the whole country (a cart
+                knows no region; a region zone''s own threshold applies once checkout
+                prices the address)'
           required:
           - free
           - source
@@ -41979,10 +42012,12 @@ components:
         countryCode:
           type: string
           nullable: true
-          description: Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code``
+          description: 'Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code``
             του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική
-            χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη
-            καμία ενεργή τιμή αποστολής.
+            χώρα της ολοκλήρωσης αγοράς. Τα όρια είναι της ζώνης αποστολής που καλύπτει
+            ολόκληρη τη χώρα: το όριο μιας ζώνης περιοχών ισχύει μόλις η ολοκλήρωση
+            αγοράς τιμολογήσει διεύθυνση σε αυτήν. Null μόνο όταν το κατάστημα δεν
+            έχει ακόμη καμία ενεργή τιμή αποστολής.'
           maxLength: 2
       required:
       - countryCode

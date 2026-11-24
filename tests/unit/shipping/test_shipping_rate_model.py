@@ -32,7 +32,7 @@ def test_str_is_provider_zone_kind():
     provider = ShippingProviderFactory(code="rate_str_test")
     country = CountryFactory()
     rate = ShippingRateFactory(provider=provider, country=country)
-    assert str(rate) == f"rate_str_test/{rate.zone.name}/home_delivery"
+    assert str(rate) == f"rate_str_test/{rate.zone_id}/home_delivery"
 
 
 def test_unique_together_provider_zone_kind():

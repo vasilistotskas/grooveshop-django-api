@@ -66,9 +66,10 @@ fails without it.
 
 ## Reauthentication
 
-A call that needs a recent proof of identity (managing a second factor, and
-the storefront's account deletion in `user.views.account`) answers 401 with
-the ways this customer can give it, `data.flows`, from
+An allauth call that needs a recent proof of identity (managing a second
+factor) answers 401 with the ways this customer can give it, `data.flows`
+(the storefront's account deletion, `user.views.account`, answers 403
+`reauthentication_required` and no flows), from
 `allauth.account.internal.flows.reauthentication.get_reauthentication_flows`:
 
 * `reauthenticate`: a customer with a usable password.
@@ -78,9 +79,9 @@ the ways this customer can give it, `data.flows`, from
   customer has it, one without a password included. `POST
   .../auth/reauthenticate/code/request` (`email`), `.../confirm` (`code`) and
   `.../resend`; while a code is pending the flow carries `is_pending: true`.
-  The mail is the `account.login_code` type, so it is the store's own mail in
-  the customer's language. Its limits are allauth's per-address
-  `request_login_code` limit, `ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS` and
+  The mail is a type of its own, `account.reauthentication_code`
+  (`UserAccountAdapter.send_mail`), so it does not call itself a sign-in code.
+  Its limits are allauth's per-address `request_login_code` limit, `ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS` and
   `ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND`, and the per-IP rules in
   `core.middleware.allauth_ratelimit`.
 * `mfa_reauthenticate`: a customer with an authenticator.

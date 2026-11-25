@@ -805,6 +805,9 @@ msgstr "Η ανάλυση δείχνει μόνο τα προϊόντα, πρι�
 msgid "A charge that does not match its order: decide it"
 msgstr "Χρέωση που δεν ταιριάζει με την παραγγελία της: αποφασίστε"
 
+msgid "A click carries the impression id of its showing."
+msgstr "Ένα κλικ φέρει το αναγνωριστικό προβολής της εμφάνισής του."
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι πιστότητας ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
 
@@ -3593,6 +3596,9 @@ msgstr "Αποστολή επιβεβαίωσης"
 msgid "Confirmation Token"
 msgstr "Token επιβεβαίωσης"
 
+msgid "Confirmation code"
+msgstr "Κωδικός επιβεβαίωσης"
+
 msgid "Confirmation sent at"
 msgstr "Αποστολή επιβεβαίωσης"
 
@@ -4423,6 +4429,9 @@ msgstr "Επιστράφηκαν τα προϊόντα; Χρησιμοποιήσ
 msgid "Did you forget something? — {site_name}"
 msgstr "Ξεχάσατε κάτι; — {site_name}"
 
+msgid "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
+msgstr "Δεν τον ζητήσατε εσείς; Μη δώσετε τον κωδικό σε κανέναν και αλλάξτε τον κωδικό πρόσβασής σας: ίσως κάποιος άλλος είναι συνδεδεμένος στον λογαριασμό σας."
+
 msgid "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
 msgstr "Ψηφία με τα οποία γράφεται ένας τοπικός αριθμός αλλά δεν αποτελούν μέρος του αριθμού E.164 (π.χ. το αρχικό «0» της Γερμανίας). Null όταν η χώρα δεν έχει — οι περισσότερες δεν έχουν."
 
@@ -4671,9 +4680,6 @@ msgstr "Οι εμπορικοί όροι κάθε καταστήματος κα�
 
 msgid "Earn"
 msgstr "Κέρδος"
-
-msgid "Echo on click events so attach can be attributed."
-msgstr "Στείλτε το ξανά στα συμβάντα κλικ, ώστε να μπορεί να αποδοθεί η προσθήκη."
 
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Επεξεργαστείτε απευθείας το «Locker External ID» για να παρακάμψετε το locker σε δοκιμές stage (π.χ. ορίστε το σε «4» σύμφωνα με τις οδηγίες stage της BoxNow)."
@@ -5295,8 +5301,8 @@ msgstr "Λειτουργία feedback"
 msgid "Feedback received"
 msgstr "Ελήφθη feedback"
 
-msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
-msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Περάστε το impression_id από την απόκριση των προτάσεων. Τα συμβάντα προσθήκης καταγράφονται στον server όταν ολοκληρώνεται μια παραγγελία και δεν μπορούν να υποβληθούν εδώ."
+msgid "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
+msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Μη στέλνετε impression_id σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που δημιουργήθηκε για αυτή την εμφάνιση, και τα κλικ της το φέρουν. Τα συμβάντα προσθήκης καταγράφονται στον server όταν ολοκληρώνεται μια παραγγελία και δεν μπορούν να υποβληθούν εδώ."
 
 msgid "Fees"
 msgstr "Χρεώσεις"
@@ -11533,8 +11539,8 @@ msgstr "Τα προϊόντα αυτών των κατηγοριών (συμπε
 msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 msgstr "Υποσύνολο προϊόντων, μετά τις εκπτώσεις και χωρίς τα μεταφορικά, από το οποίο ο συνδυασμός αποστέλλεται δωρεάν. Null όταν δεν γίνεται ποτέ δωρεάν."
 
-msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
-msgstr "Προϊόντα προς εμφάνιση δίπλα στο προϊόν ή στα προϊόντα αναφοράς σε μια συγκεκριμένη επιφάνεια (σελίδα προϊόντος, καλάθι, εξαντλημένο προϊόν, άδειο καλάθι). Κάθε στοιχείο περιέχει τη στρατηγική που το παρήγαγε και, για συνδέσεις που επιμελήθηκε ο έμπορος, τον τύπο σχέσης. Μια κενή λίστα σημαίνει ότι το κατάστημα δεν έχει τίποτα αξιόλογο να δείξει εδώ — μην εμφανίσετε τίποτα. Αναφέρετε ένα συμβάν προβολής με το impression_id μόλις εμφανιστεί η λωρίδα και στείλτε το ξανά στα συμβάντα κλικ."
+msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
+msgstr "Προϊόντα προς εμφάνιση δίπλα στο προϊόν ή στα προϊόντα αναφοράς σε μια συγκεκριμένη επιφάνεια (σελίδα προϊόντος, καλάθι, εξαντλημένο προϊόν, άδειο καλάθι). Κάθε στοιχείο περιέχει τη στρατηγική που το παρήγαγε και, για συνδέσεις που επιμελήθηκε ο έμπορος, τον τύπο σχέσης. Μια κενή λίστα σημαίνει ότι το κατάστημα δεν έχει τίποτα αξιόλογο να δείξει εδώ — μην εμφανίσετε τίποτα. Αναφέρετε ένα συμβάν προβολής μόλις εμφανιστεί η λωρίδα, χωρίς impression_id: η απόκρισή του αναφέρει το αναγνωριστικό της εμφάνισης, που φέρουν τα συμβάντα κλικ της λωρίδας."
 
 msgid "Profile"
 msgstr "Προφίλ"
@@ -13290,6 +13296,9 @@ msgstr "Αποστέλλεται όταν ένας πελάτης ενεργοπ
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Αποστέλλεται όταν μια παραδομένη, εξοφλημένη παραγγελία ολοκληρώνεται."
 
+msgid "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+msgstr "Στέλνεται όταν ένας συνδεδεμένος πελάτης ζητά κωδικό για να επιβεβαιώσει ότι είναι ο ίδιος, πριν από μια ευαίσθητη αλλαγή όπως η διαγραφή του λογαριασμού."
+
 msgid "Sent when an order is canceled."
 msgstr "Αποστέλλεται όταν μια παραγγελία ακυρώνεται."
 
@@ -13478,6 +13487,9 @@ msgstr "Κοινοποιήθηκε από (προσωπικό)"
 
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Κοινό σε όλα τα μερίδια μιας επιστροφής ανά γραμμή, ώστε η επανάληψή της να τα βρίσκει μαζί."
+
+msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
 
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
@@ -14974,6 +14986,9 @@ msgstr "Το δώρο αυτού του κωδικού δεν είναι δια�
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρωσε ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά."
 
+msgid "The id of the showing the event was recorded under."
+msgstr "Το αναγνωριστικό της εμφάνισης με το οποίο καταγράφηκε το συμβάν."
+
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "Το αναγνωριστικό που επέστρεψε ο πάροχος. Κενό μέσω SMTP, που δεν επιστρέφει κάποιο."
 
@@ -15376,6 +15391,9 @@ msgstr "Η αποστολή της οποίας το αίτημα voucher επέ
 
 msgid "The shipping of this order was already refunded."
 msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
+
+msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgstr "Το αναγνωριστικό της εμφάνισης. Μην το στέλνετε σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που καταγράφηκε για αυτή την εμφάνιση, το οποίο φέρουν στη συνέχεια τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί. Ένα κλικ πρέπει να το φέρει."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
@@ -17576,6 +17594,9 @@ msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάπ
 msgid "You are signed in"
 msgstr "Έχετε συνδεθεί"
 
+msgid "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+msgstr "Είστε συνδεδεμένοι και ζητήσατε να επιβεβαιώσετε ότι είστε εσείς. Εισαγάγετε αυτόν τον κωδικό στο ανοιχτό παράθυρο του προγράμματος περιήγησης."
+
 msgid "You can only delete your own account."
 msgstr "Μπορείτε να διαγράψετε μόνο τον δικό σας λογαριασμό."
 
@@ -17721,6 +17742,9 @@ msgstr "Λείπουν νομικά στοιχεία της επιχείρησή
 
 msgid "Your cart has changed since its total was shown. Review your order and place it again."
 msgstr "Το καλάθι σας άλλαξε από τότε που εμφανίστηκε το σύνολό του. Ελέγξτε την παραγγελία σας και υποβάλετέ την ξανά."
+
+msgid "Your confirmation code"
+msgstr "Ο κωδικός επιβεβαίωσής σας"
 
 msgid "Your data and preferences are still safely stored"
 msgstr "Τα δεδομένα και οι προτιμήσεις σας διατηρούνται με ασφάλεια"
@@ -18848,6 +18872,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "Each CSP source must start with 'https://', 'http://localhost', or 'wss://'. Invalid entries: %(bad)s"
 #~ msgstr "Κάθε πηγή CSP πρέπει να ξεκινά με 'https://', 'http://localhost' ή 'wss://'. Μη έγκυρες καταχωρήσεις: %(bad)s"
+
+#~ msgid "Echo on click events so attach can be attributed."
+#~ msgstr "Στείλτε το ξανά στα συμβάντα κλικ, ώστε να μπορεί να αποδοθεί η προσθήκη."
 
 #~ msgid "Edge cache — Cloudflare"
 #~ msgstr "Cache στο Cloudflare"

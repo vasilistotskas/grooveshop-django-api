@@ -800,6 +800,9 @@ msgstr "A breakdown shows the goods only, before returns, biggest first. The pro
 msgid "A charge that does not match its order: decide it"
 msgstr "A charge that does not match its order: decide it"
 
+msgid "A click carries the impression id of its showing."
+msgstr "A click carries the impression id of its showing."
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
@@ -3589,6 +3592,9 @@ msgstr "Confirmation Sent At"
 msgid "Confirmation Token"
 msgstr "Confirmation Token"
 
+msgid "Confirmation code"
+msgstr "Confirmation code"
+
 msgid "Confirmation sent at"
 msgstr "Confirmation sent at"
 
@@ -4418,6 +4424,9 @@ msgstr "Did the goods come back? Use \"Restock returned items\" to put them back
 msgid "Did you forget something? — {site_name}"
 msgstr "Did you forget something? — {site_name}"
 
+msgid "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
+msgstr "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
+
 msgid "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
 msgstr "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
 
@@ -4666,9 +4675,6 @@ msgstr "Each store's commercial terms, and how the platform records and enforces
 
 msgid "Earn"
 msgstr "Earn"
-
-msgid "Echo on click events so attach can be attributed."
-msgstr "Echo on click events so attach can be attributed."
 
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
@@ -5290,8 +5296,8 @@ msgstr "Feedback feature"
 msgid "Feedback received"
 msgstr "Feedback received"
 
-msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
-msgstr "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
+msgid "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
+msgstr "Feeds the learning loop. Leave impression_id out of an impression: the response names the id minted for that showing, and its clicks carry it. Attach events are written server-side when an order completes and cannot be posted here."
 
 msgid "Fees"
 msgstr "Fees"
@@ -11526,8 +11532,8 @@ msgstr "Products in these categories (subcategories included) are never counted 
 msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 msgstr "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
 
-msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
-msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
+msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
+msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event once the strip is shown, with no impression_id: its response names the showing's id, which the strip's click events carry."
 
 msgid "Profile"
 msgstr "Profile"
@@ -13284,6 +13290,9 @@ msgstr "Sent when a customer turns on an authenticator app."
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Sent when a delivered, paid order is completed."
 
+msgid "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+msgstr "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+
 msgid "Sent when an order is canceled."
 msgstr "Sent when an order is canceled."
 
@@ -13472,6 +13481,9 @@ msgstr "Shared by (staff)"
 
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
+
+msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
 
 msgid "Shared text"
 msgstr "Shared text"
@@ -14972,6 +14984,9 @@ msgstr "The gift for this code is not available right now"
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 
+msgid "The id of the showing the event was recorded under."
+msgstr "The id of the showing the event was recorded under."
+
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
 
@@ -15374,6 +15389,9 @@ msgstr "The shipment whose voucher request returned this voucher after another o
 
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
+
+msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgstr "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
@@ -17574,6 +17592,9 @@ msgstr "You are receiving this email because you, or someone else, tried to sign
 msgid "You are signed in"
 msgstr "You are signed in"
 
+msgid "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+msgstr "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+
 msgid "You can only delete your own account."
 msgstr "You can only delete your own account."
 
@@ -17719,6 +17740,9 @@ msgstr "Your business's legal details are missing"
 
 msgid "Your cart has changed since its total was shown. Review your order and place it again."
 msgstr "Your cart has changed since its total was shown. Review your order and place it again."
+
+msgid "Your confirmation code"
+msgstr "Your confirmation code"
 
 msgid "Your data and preferences are still safely stored"
 msgstr "Your data and preferences are still safely stored"
@@ -18629,6 +18653,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Download the BoxNow parcel label PDF for an order"
 #~ msgstr "Download the BoxNow parcel label PDF for an order"
+
+#~ msgid "Echo on click events so attach can be attributed."
+#~ msgstr "Echo on click events so attach can be attributed."
 
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"

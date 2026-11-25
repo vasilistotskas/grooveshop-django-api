@@ -140,7 +140,7 @@ def test_the_login_code_is_sent_in_the_visitors_language(client):
     assert message.subject == "Ο κωδικός σύνδεσής σας"
 
 
-def test_the_reauthentication_code_is_the_stores_own_sign_in_code_mail(client):
+def test_the_reauthentication_code_is_a_mail_of_its_own(client):
     from allauth.account.models import EmailAddress
 
     user = UserAccountFactory(
@@ -168,5 +168,7 @@ def test_the_reauthentication_code_is_the_stores_own_sign_in_code_mail(client):
 
     assert response.status_code == status.HTTP_200_OK
     [message] = mail.outbox
-    assert_store_mail(message, to=user.email, list_label="account-login_code")
-    assert message.subject == "Ο κωδικός σύνδεσής σας"
+    assert_store_mail(
+        message, to=user.email, list_label="account-reauthentication_code"
+    )
+    assert message.subject == "Ο κωδικός επιβεβαίωσής σας"

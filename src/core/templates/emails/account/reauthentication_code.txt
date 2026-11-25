@@ -1,0 +1,8 @@
+{% extends "emails/base/account_message.txt" %}
+{% load i18n %}
+
+{% block content %}{% trans "You are signed in and asked to confirm it is you. Enter this code in your open browser window." %}
+
+{{ code }}
+
+{% trans "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account." %}{% endblock content %}

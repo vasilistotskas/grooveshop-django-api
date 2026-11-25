@@ -38,7 +38,9 @@ class UserAccountAdapter(DefaultAccountAdapter):
         template prefix (``account/email/login_code``); the prefix picks
         the type (``user.emails.ALLAUTH_TYPES``, a prefix it does not
         know raises ``KeyError``) and the pipeline renders, brands and
-        sends it like every other mail.
+        sends it like every other mail. A code asked for to reauthenticate
+        comes under the sign-in code's prefix, told apart by its context:
+        it is a type of its own, so it does not call itself a sign-in code.
 
         The language is the recipient's when allauth names one, and
         otherwise the visitor's who asked for the email (an unknown
@@ -59,10 +61,18 @@ class UserAccountAdapter(DefaultAccountAdapter):
         that has since snapped back to public.
         """
         from tenant.celery import dispatch_on_commit
-        from user.emails import ALLAUTH_TYPES, AllauthMail
+        from user.emails import (
+            ALLAUTH_TYPES,
+            REAUTHENTICATION_CODE,
+            AllauthMail,
+        )
         from user.tasks import send_allauth_email_task
 
-        type_key = ALLAUTH_TYPES[template_prefix]
+        type_key = (
+            REAUTHENTICATION_CODE
+            if context.get("reauthentication")
+            else ALLAUTH_TYPES[template_prefix]
+        )
         user = context.get("user")
         language = (
             get_user_language(user)

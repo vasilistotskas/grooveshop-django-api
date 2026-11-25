@@ -278,6 +278,10 @@ ALLAUTH_STOREFRONT_URL_KEYS = (
 #: coverage test fails for a prefix allauth sends that is not here.
 ALLAUTH_TYPES: dict[str, str] = {}
 
+#: The type of a sign-in code asked for to reauthenticate, which allauth
+#: sends under the sign-in code's prefix (``UserAccountAdapter.send_mail``).
+REAUTHENTICATION_CODE = "account.reauthentication_code"
+
 
 @dataclass(frozen=True, slots=True)
 class AllauthMail:
@@ -370,6 +374,25 @@ def _allauth_email(
     and sign-in mail is required: a store cannot switch it off, but a
     store without customer accounts has none to send."""
     ALLAUTH_TYPES[prefix] = key
+    _account_email(
+        key,
+        title=title,
+        description=description,
+        subject=subject,
+        sample=sample,
+        templates=templates,
+    )
+
+
+def _account_email(
+    key: str,
+    *,
+    title: StrOrPromise,
+    description: StrOrPromise,
+    subject: str,
+    sample: Callable[[RenderEnv], AllauthMail],
+    templates: str = "",
+) -> None:
     customer_email(
         key,
         title=title,
@@ -480,6 +503,16 @@ _allauth_email(
     title=_("Sign-in code"),
     description=_("Sent when a customer signs in with a code."),
     subject=gettext_noop("Your sign-in code"),
+    sample=_allauth_sample(code="123456"),
+)
+_account_email(
+    REAUTHENTICATION_CODE,
+    title=_("Confirmation code"),
+    description=_(
+        "Sent when a signed-in customer asks for a code to confirm it is "
+        "them, before a sensitive change such as deleting the account."
+    ),
+    subject=gettext_noop("Your confirmation code"),
     sample=_allauth_sample(code="123456"),
 )
 _allauth_email(

@@ -14,7 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from django.utils import translation
+from django.utils import timezone, translation
 from djmoney.money import Money
 from extra_settings.models import Setting
 
@@ -141,7 +141,7 @@ class TestTheStorefrontReservesBeforeEveryOrder:
         checkout.reserve()
         earlier = checkout.order()
 
-        assert checkout.reserve() == [], "the order already has the unit"
+        checkout.reserve()
         assert checkout.order().pk == earlier.pk
 
         assert checkout.stock() == STOCK - 1
@@ -159,7 +159,8 @@ class TestTheStorefrontReservesBeforeEveryOrder:
 
         assert checkout.order().pk == earlier.pk
 
-    def test_only_what_the_order_lacks_is_held(self):
+    def test_a_changed_checkout_is_held_in_full(self):
+        """Nobody takes what it needs before it is created."""
         checkout = _Checkout()
         checkout.order()
         CartItem.objects.filter(pk=checkout.item.pk).update(quantity=3)
@@ -167,7 +168,12 @@ class TestTheStorefrontReservesBeforeEveryOrder:
 
         [reservation] = checkout.reserve()
 
-        assert reservation.quantity == 2
+        assert reservation.quantity == 3
+        with pytest.raises(CartStockUnavailableError):
+            StockManager.reserve_cart_stock(
+                Cart.objects.create(user=None),
+                {checkout.product.pk: STOCK - 1 - 3 + 1},
+            )
 
     def test_a_hold_left_from_before_is_released(self):
         """A hold made while the order was not yet there (another tab)."""
@@ -386,6 +392,19 @@ class TestAnOrderThatCannotBePaidIsNotResumed:
         Order.objects.filter(pk=earlier.pk).update(**ended)
 
         assert checkout.order().pk != earlier.pk
+
+    def test_one_whose_open_link_outlives_the_window(self):
+        """Its link stays payable until the expiry the provider applied."""
+        checkout = _Checkout()
+        earlier = checkout.order()
+        Order.objects.filter(pk=earlier.pk).update(
+            created_at=earlier.created_at
+            - payment_hold.max_hold_window()
+            - timedelta(minutes=1),
+            payment_hold_expires_at=timezone.now() + timedelta(minutes=2),
+        )
+
+        assert checkout.order().pk == earlier.pk
 
     def test_one_whose_payment_window_closed(self):
         """No link fits before its hold limit: the shopper could not pay

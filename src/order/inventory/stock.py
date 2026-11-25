@@ -118,9 +118,14 @@ class StockManager:
         quantity: int,
         session_id: str,
         user_id: int | None = None,
+        own_units: int = 0,
     ) -> StockReservation:
         """
         Reserve stock for one product.
+
+        ``own_units`` are units the caller's own unpaid order already took
+        from the stock (``reserve_cart_stock``): available to it, since the
+        same checkout resumes that order and a changed one may take them.
 
         Counts EVERY active hold, the caller's own included. A cart reserves
         through ``reserve_cart_stock``, which replaces its holds first.
@@ -190,7 +195,7 @@ class StockManager:
         reserved_quantity = sum(r.quantity for r in active_reservations)
 
         # Calculate available stock
-        available_stock = product.stock - reserved_quantity
+        available_stock = product.stock - reserved_quantity + own_units
 
         # Validate sufficient stock
         if available_stock < quantity:
@@ -248,9 +253,12 @@ class StockManager:
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
 
-        Units the cart's own unpaid order already took are not held again
-        (``order.checkout.resume.units_held_for_cart``): the same checkout
-        made again resumes that order, which has them.
+        Units the cart's own unpaid order already took count as available
+        to it (``order.checkout.resume.units_held_for_cart``): the same
+        checkout made again resumes that order, which has them (and the
+        resume releases these holds), and a changed one is held in full, so
+        nobody takes what it needs before it is created. Creating it still
+        needs the units in stock: the earlier order keeps its own.
 
         The first statement locks the ``Cart`` row (``select_for_update``),
         the lock checkout takes first, so the order is cart, then products,
@@ -270,8 +278,7 @@ class StockManager:
             quantities: product id -> units wanted, every one positive
 
         Returns:
-            The new reservations, in ascending product id order; none for
-            a product whose every unit the cart's unpaid order holds.
+            The new reservations, in ascending product id order.
 
         Raises:
             Cart.DoesNotExist: The cart was deleted meanwhile
@@ -310,10 +317,7 @@ class StockManager:
         held = units_held_for_cart(locked_cart) if quantities else {}
         reservations: list[StockReservation] = []
         shortfalls: list[InsufficientStockError] = []
-        for product_id, wanted in sorted(quantities.items()):
-            quantity = wanted - held.get(product_id, 0)
-            if quantity <= 0:
-                continue
+        for product_id, quantity in sorted(quantities.items()):
             try:
                 reservations.append(
                     cls.reserve_stock(
@@ -321,6 +325,7 @@ class StockManager:
                         quantity=quantity,
                         session_id=session_id,
                         user_id=user_id,
+                        own_units=held.get(product_id, 0),
                     )
                 )
             except InsufficientStockError as exc:

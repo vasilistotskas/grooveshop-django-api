@@ -25,6 +25,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from django.db.models import Sum
+from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
 if TYPE_CHECKING:
@@ -120,8 +121,8 @@ def order_to_resume(
 ) -> Order | None:
     """The cart's unpaid order this same checkout made, locked; ``None``
     when there is none, its address was edited since, it was canceled, or
-    it can no longer be paid (no link of the pay way's provider fits in its
-    payment window).
+    it can no longer be paid (no link it has is payable, and no new link of
+    the pay way's provider fits in its payment window).
 
     One whose payment is being decided (processing, another amount taken,
     or paid while this waited for its lock) is returned whatever its
@@ -134,7 +135,6 @@ def order_to_resume(
     """
     from order.enum.status import OrderStatus
     from order.models.order import Order
-    from order.payments import payment_hold
     from order.payments.payment import get_payment_provider_class
 
     provider = get_payment_provider_class(pay_way.provider_code)
@@ -156,12 +156,23 @@ def order_to_resume(
             order
         ):
             continue
-        if payment_undecided(order) and payment_hold.window_closed(
-            order, provider.min_hosted_session
-        ):
+        if payment_undecided(order) and not _still_payable(order, provider):
             continue
         return order
     return None
+
+
+def _still_payable(order: Order, provider) -> bool:
+    """A link opened for the order is payable until the expiry its provider
+    applied, whatever is left of the hold; without one, a new link must
+    still fit (``payment_hold.window_closed``). Read from the order alone,
+    under its lock: asking for its link reads the provider."""
+    from order.payments import payment_hold
+
+    opened = order.payment_hold_expires_at
+    if opened is not None and opened > timezone.now():
+        return True
+    return not payment_hold.window_closed(order, provider.min_hosted_session)
 
 
 def payment_undecided(order: Order) -> bool:

@@ -236,8 +236,8 @@ class RecommendationEvent(models.Model):
     """The feedback loop: what was shown, what was clicked, what was
     bought. Follows ``search.SearchClick``.
 
-    ``impression_id`` ties the three together: the API mints one per
-    response, the client echoes it on impression and click, and order
+    ``impression_id`` ties the three together: the impression beacon mints
+    one per showing of a strip and the client sends it on click, and order
     creation writes ``attach`` for any line whose product appeared under
     an impression shown to the same cart or the same signed-in customer
     inside the attribution windows (``settings.RECOMMENDATION_ATTACH_*``,

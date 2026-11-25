@@ -3,6 +3,70 @@
 
 
 
+## v3.270.5 (2026-11-25)
+
+### Bug fixes
+
+* fix(tenant): refuse a blank tenant name; bump knox 6, gunicorn 27, facebook-business 27 and minors (#834) ([`1eec72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1eec72fa6919838f1974d62dbd617acb20601ac1))
+
+* fix(tenant): refuse a blank tenant name in the database and in tenant_create
+
+Tenant.name could be stored empty or whitespace-only: the admin form
+strips and requires it, but tenant_create and raw ORM writes skip the
+form, and the storefront prints the name as the schema.org Brand and
+seller and as the RSS title. A CheckConstraint (tenant_name_not_blank)
+now refuses it in the public schema, and tenant_create refuses a blank
+--name before any write. ([`1eec72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1eec72fa6919838f1974d62dbd617acb20601ac1))
+
+* fix(tenant): refuse every whitespace str.strip() removes in the blank-name constraint
+
+PostgreSQL's \s follows the database locale, and en_US.utf8 leaves out
+eight of the characters str.strip() removes (U+00A0, U+2007, U+202F,
+U+1680 and U+001C-U+001F), so a name made of them passed the
+constraint while tenant_create refused it. The constraint now names
+the whole str.isspace() set, and the test covers each character. ([`1eec72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1eec72fa6919838f1974d62dbd617acb20601ac1))
+
+### Chores
+
+* chore(deps): bump knox 6, gunicorn 27, facebook-business 27 and minors
+
+Bump babel, disposable-email-domains, django-mptt, django-rosetta,
+django-tenants, nh3, phonenumbers, psycopg, pypdf, standardwebhooks,
+django-rest-knox 6.0.0, gunicorn 27.0.1 and facebook-business 27.0.1,
+and in dev coverage, Faker, hypothesis, import-linter, pytest-asyncio,
+ruff and ty 0.0.109. django-allauth stays on 65.21.1: 65.22 adds a
+reauthentication flow to 401 responses that the live storefront's
+parsers reject, so it ships storefront first.
+
+ty 0.0.100-0.0.108 renamed and split rules: the config and ignore
+comments use the new names, and the ignores carry over to the rules
+split out of ignored ones (missing-union-attribute from
+unresolved-attribute, invalid-implicit-return from invalid-return-type). ([`1eec72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1eec72fa6919838f1974d62dbd617acb20601ac1))
+
+* chore(api-contract): drop the accepted breaks storefront v3.359.1 retired ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+### Documentation
+
+* docs(order): describe the order-first checkout in the comments the pay-first removal left
+
+The cart payment intent is gone: the quote and order creation are the
+checkout calls that price a cart, check the pay way, gift cards and
+loyalty, and order creation resolves the legal texts before the order
+or any payment exists. The comments, docstrings and docs that still
+named the payment intent now say so. ([`1eec72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1eec72fa6919838f1974d62dbd617acb20601ac1))
+
+* docs: correct and update the Markdown docs (#833) ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+* docs: correct and update the Markdown docs ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+* docs(order): describe current behaviour in the order pages ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+* docs(order): drop the payment-first removal history ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+* docs: address review findings on staff tokens, search and pricing ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
+* docs(search): format the narrowed CONTAINS example ([`c2a29e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2a29e0ad74c957d61750b6854f4e970ea5af3b9))
+
 ## v3.270.4 (2026-11-24)
 
 ### Refactoring

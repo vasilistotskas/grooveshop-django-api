@@ -288,8 +288,7 @@ class TenantAwareUserSessionsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        from allauth.usersessions import app_settings
-        from allauth.usersessions.models import UserSession
+        from allauth.usersessions.internal import usersessionkit
         from django_tenants.utils import (
             get_public_schema_name,
             schema_context,
@@ -297,18 +296,18 @@ class TenantAwareUserSessionsMiddleware:
 
         from tenant.auth_backends import is_platform_staff_session
 
-        if (
-            app_settings.TRACK_ACTIVITY
-            and hasattr(request, "session")
-            and request.session.session_key
-            and hasattr(request, "user")
-            and request.user.is_authenticated
-        ):
-            if is_platform_staff_session(request):
-                with schema_context(get_public_schema_name()):
-                    UserSession.objects.create_from_request(request)
-            else:
-                UserSession.objects.create_from_request(request)
+        def track() -> None:
+            usersessionkit.track_activity(
+                request,
+                user=getattr(request, "user", None),
+                session=getattr(request, "session", None),
+            )
+
+        if is_platform_staff_session(request):
+            with schema_context(get_public_schema_name()):
+                track()
+        else:
+            track()
         return self.get_response(request)
 
 

@@ -462,17 +462,27 @@ surface is never Nitro-cached; its seed set is the session's cart.
 On the storefront, `app/components/Product/Suggestions.vue` is the one
 strip for every surface. The product page and the out-of-stock slot
 fetch through `server/api/products/[id]/recommendations.get.ts`, a
-Nitro-cached tenant proxy (`name: 'productRecommendations'`, 5-minute
-SWR, keyed by seed · surface · limit · locale — the `recommendations`
-cache surface purges it); the cart fetches through
-`server/api/recommendations.get.ts` — `surface=cart` with the basket's
-product ids as `seeds`, or no seed for an empty cart — cached under the
-same handler name so the same purge reaches it. **The read endpoint
-writes no event.**
-`impressionId` is a correlation id; the strip posts the impression
-from its own `onMounted`, which under `hydrate-on-visible` fires when
-it scrolls into view — "shown", not "served" — and echoes the id on
-click through `server/api/analytics/recommendation-event.post.ts`,
+Nitro-cached tenant proxy (`name: 'productRecommendations'`, keyed by
+seed · surface · limit · exclude · locale, an hour fresh and a day stale
+while it revalidates — the `recommendations` cache surface purges it);
+the cart fetches through `server/api/recommendations.get.ts` —
+`surface=cart` with the basket's product ids as `seeds`, or no seed for
+an empty cart — cached for five minutes under the same handler name so
+the same purge reaches it. The strip is server-rendered into pages Nitro
+and the edge cache too (`/products/**`). **The read endpoint writes no
+event**, and while a body is cached every viewer gets the same one.
+
+**An impression is one showing, and its id is minted by the beacon.**
+The strip posts the impression from its own `onMounted`, which under
+`hydrate-on-visible` fires when it scrolls into view — "shown", not
+"served" — with no `impressionId`: `recommendation_event` mints one, records
+the impression with that request's own session, cart and customer, and
+answers with it. The `impressionId` in the suggestions body is shared by
+every viewer of a cached copy and is not the showing's. (Until the storefront
+that posts no `impressionId` is live, the beacon records an impression that
+names one under it.) The strip sends
+the minted id on its clicks through
+`server/api/analytics/recommendation-event.post.ts`,
 carrying the cart's identity headers so an `attach` can later be
 correlated against the same basket. The click also remembers the
 impression for that product (`useRecommendationAttribution`), and the

@@ -49,10 +49,12 @@ STRICT_NAMESPACE = "strict:"
 #: - ``allauth.mfa.totp.used?`` — TOTP replay protection
 #:   (``allauth/mfa/totp/internal/auth.py``): a miss reports a used code
 #:   as unused.
-#: - ``allauth.idp.oidc.authorization_code[`` / ``user_code[`` /
-#:   ``device_code[`` — the OAuth IdP's single-use codes
-#:   (``allauth/idp/oidc/internal/oauthlib/``): a lost ``delete`` leaves a
-#:   redeemed code redeemable until its TTL.
+#: - ``allauth.idp.oidc.user_code[`` / ``device_code[`` — the OAuth IdP's
+#:   device-flow codes (``allauth/idp/oidc/internal/oauthlib/device_codes.py``;
+#:   the flow is not served, ``core.views.device_flow_not_offered``): a lost
+#:   ``delete`` leaves a redeemed code redeemable until its TTL. The
+#:   authorization code is not here: since allauth 65.22 it is a row of
+#:   ``allauth_idp_oidc.Token``, claimed atomically in the database.
 #:
 #: The single-use tickets (``core.tickets``: the WebSocket's, the page
 #: builder editor's) live under ``strict:`` too, for the same reason: a lost
@@ -64,8 +66,8 @@ STRICT_NAMESPACE = "strict:"
 #: on the key, in this one place.
 #:
 #: **Every security control fails closed, and says so.** A control is a
-#: key whose loss lifts a bound or a guarantee: allauth's limits, TOTP
-#: replay protection and IdP codes, ``core.middleware.allauth_ratelimit``,
+#: key whose loss lifts a bound or a guarantee: allauth's limits (the IdP's
+#: included), TOTP replay protection, ``core.middleware.allauth_ratelimit``,
 #: the security scopes of the throttles (``fail_closed = True``),
 #: the single-use tickets, the staff sign-in counters
 #: (``tenant.staff_login_limits``, ``admin.staff_mfa``) and the staff
@@ -93,7 +95,6 @@ STRICT_KEY_PREFIXES: tuple[str, ...] = (
     f"global:{STRICT_NAMESPACE}",
     "allauth:rl:",
     "allauth.mfa.totp.used?",
-    "allauth.idp.oidc.authorization_code[",
     "allauth.idp.oidc.user_code[",
     "allauth.idp.oidc.device_code[",
 )

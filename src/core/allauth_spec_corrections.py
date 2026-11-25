@@ -17,6 +17,7 @@ import copy
 from collections.abc import Callable
 from typing import Any
 
+from allauth.account import app_settings as account_settings
 from allauth.headless.constants import Flow
 
 from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
@@ -24,6 +25,7 @@ from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
 Document = dict[str, Any]
 
 OUR_PATH_PREFIX = "/_allauth/app/v1"
+RENAMED_CODE_METHOD_TITLE = "(Re)authenticated by confirming a code sent by"
 
 
 def _schemas(document: Document) -> dict[str, Any]:
@@ -31,13 +33,41 @@ def _schemas(document: Document) -> dict[str, Any]:
 
 
 def declare_every_flow(document: Document) -> None:
-    """``Flow.id`` lists every ``allauth.headless.constants.Flow``.
+    """``Flow.id`` lists every ``allauth.headless.constants.Flow`` the
+    project serves.
 
     The enum omits ``mfa_login_webauthn``, ``mfa_signup_webauthn``,
-    ``mfa_trust`` and ``password_reset_by_code``, which responses carry.
+    ``mfa_trust`` and ``password_reset_by_code``, which responses carry,
+    and lists ``reauthenticate_by_code`` whether or not
+    ``ACCOUNT_REAUTHENTICATION_METHODS`` has ``code``, the one flow a
+    setting takes away (``account/internal/flows/reauthentication.py``,
+    ``get_reauthentication_flows``). The document says what is served, so
+    it leaves that value out while the setting does.
     """
     schema = _schemas(document)["Flow"]["properties"]["id"]
-    schema["enum"] = sorted({*schema["enum"], *(flow.value for flow in Flow)})
+    served = {*schema["enum"], *(flow.value for flow in Flow)}
+    if "code" not in account_settings.REAUTHENTICATION_METHODS:
+        served.discard(Flow.REAUTHENTICATE_BY_CODE.value)
+    schema["enum"] = sorted(served)
+
+
+def keep_the_code_methods_titles(document: Document) -> None:
+    """``AuthenticationMethod``: the two code entries keep the titles they
+    had before allauth 65.22 added reauthentication by code ("Authenticated
+    by confirming a code sent by ..."; 65.22 says "(Re)authenticated").
+
+    The title is only prose, but a consumer's contract check pairs the
+    entries of a ``oneOf`` by it: a renamed entry reads as one removed and
+    one added, ``response-property-one-of-added``, against every consumer
+    generated from the older text (``api-contract/README.md``). The entry's
+    shape is unchanged but for an optional ``reauthenticated``.
+    """
+    for entry in _schemas(document)["AuthenticationMethod"]["oneOf"]:
+        title = entry.get("title", "")
+        if title.startswith(RENAMED_CODE_METHOD_TITLE):
+            entry["title"] = title.replace(
+                "(Re)authenticated", "Authenticated", 1
+            )
 
 
 def declare_flow_providers(document: Document) -> None:
@@ -158,9 +188,9 @@ def declare_totp_svg(document: Document) -> None:
         },
         "required": ["status", "meta"],
     }
-    status = document["paths"][
+    totp_status = document["paths"][
         f"{OUR_PATH_PREFIX}/account/authenticators/totp"
-    ]["get"]["responses"]["200"]
+    ]["get"]
     document["paths"][f"{OUR_PATH_PREFIX}/account/authenticators/totp/svg"] = {
         "get": {
             "tags": ["Account: 2FA"],
@@ -170,9 +200,9 @@ def declare_totp_svg(document: Document) -> None:
                 "without an authenticator carries the secret, its otpauth "
                 "URL and the QR code."
             ),
-            "parameters": [{"$ref": "#/components/parameters/SessionToken"}],
+            "security": copy.deepcopy(totp_status["security"]),
             "responses": {
-                "200": copy.deepcopy(status),
+                "200": copy.deepcopy(totp_status["responses"]["200"]),
                 "404": {
                     "description": "No authenticator: the secret to enrol.",
                     "content": {
@@ -329,6 +359,7 @@ def allow_session_meta_on_every_answer(document: Document) -> None:
 
 CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_every_flow,
+    keep_the_code_methods_titles,
     declare_flow_providers,
     make_is_authenticated_nullable,
     make_optional_timestamp_nullable,

@@ -55,6 +55,7 @@ from shipping.interfaces import (
     providers_by_field_rank,
 )
 from shipping.services import ShippingService
+from shipping.zones import destination_errors
 from tenant.features import feature_on
 
 #: The tracking pages of the couriers staff record by hand, no carrier of
@@ -1097,9 +1098,12 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
 
     Every pay way creates the order before any payment, whatever its
     ``settlement``:
-    1. ``online``: the shopper pays the balance left after deductions
-       (gift cards, promotions, loyalty points) afterwards, on the
-       provider's hosted page (Viva Wallet, Stripe). Deductions that
+    1. ``online``: the balance left after deductions (gift cards,
+       promotions, loyalty points) is paid afterwards. In storefront
+       checkout the shopper pays it on the provider's hosted page (Viva
+       Wallet, Stripe); an agent order with delegated Stripe payments is
+       charged it through ``POST /api/v1/order/{id}/confirm_agent_payment``
+       (``confirmAgentPaymentForOrder``). Either way, deductions that
        cover the whole total settle the order at once, with no provider
        charge.
     2. Any other settlement (courier cash, carrier terminal, offline
@@ -1697,6 +1701,19 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
             attrs["country_id"], attrs.get("region_id")
         ):
             raise serializers.ValidationError(errors, code="region_invalid")
+        # A region the store's home deliveries skip, while they reach
+        # the rest of its country (its shipping zones), is refused on the
+        # region: no carrier would take it there. A country they do not
+        # reach at all is the delivery's refusal (``shipping_unavailable``).
+        errors = destination_errors(
+            attrs["country_id"],
+            attrs.get("region_id"),
+            region_field="region_id",
+        )
+        if "region_id" in errors:
+            raise serializers.ValidationError(
+                {"region_id": errors["region_id"]}, code="region_not_served"
+            )
         region = None
         if attrs.get("region_id"):
             region = Region.objects.filter(alpha=attrs["region_id"]).first()

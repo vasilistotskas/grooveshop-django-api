@@ -125,10 +125,14 @@ class TestTheStationSync:
                 return [row]
 
         monkeypatch.setattr(services, "AcsClient", _Client)
-        with mock.patch.object(services, "mark_surface_stale") as mark:
+        with mock.patch("core.cache.invalidation.mark_surface_stale") as mark:
             result = AcsService.sync_stations(
                 country="GR", kinds=(AcsShopKind.SMARTPOINT_LOCKER.value,)
             )
 
         assert result["deactivated"] == 1
-        mark.assert_called_once_with("shipping")
+        # The station list, and the countries a locker-only one lost.
+        assert {call.args[0] for call in mark.call_args_list} == {
+            "shipping",
+            "regions_countries",
+        }

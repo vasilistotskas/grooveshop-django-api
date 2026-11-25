@@ -14,9 +14,10 @@ and says which file holds each § number used here.
   share) and `branch` (with it, one station; empty matches the station
   without a branch). The agent gateway resolves a UCP pickup destination
   with the exact pair. The list is cached (`cache_methods`) under the
-  `shipping` cache surface, which every station write purges: a saved row
+  `shipping` cache surface (and `regions_countries`, whose `shippable`
+  counts ACS lockers), which every station write purges: a saved row
   through `invalidated_by`, a sync's deactivating `update` through
-  `mark_surface_stale`, the order-time resync included.
+  `mark_model_stale`, the order-time resync included.
 - **The recipient address** follows the manual's field meanings (p. 6-7):
   `Recipient_Address` is the street alone ("η οδός του παραλήπτη δίχως την
   περιοχή ή το τοπωνύμιο"), `Recipient_Address_Number` its number,

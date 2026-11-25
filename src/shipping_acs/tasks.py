@@ -413,7 +413,7 @@ def sync_acs_stations(self) -> dict[str, int]:
     countries = list(
         ShippingRate.objects.filter(provider__code="acs", is_active=True)
         .order_by()
-        .values_list("country_id", flat=True)
+        .values_list("zone__country_id", flat=True)
         .distinct()
     )
     totals = {"upserted": 0, "deactivated": 0}

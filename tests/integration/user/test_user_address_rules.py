@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.serializers.address import UserAddressWriteSerializer
@@ -27,6 +28,8 @@ def greece():
     country.postal_code_pattern = r"\d{3} ?\d{2}"
     country.postal_code_example = "151 24"
     country.save()
+    # Somewhere the store delivers to at home: a saved address must be.
+    enable_rate(country)
     return country
 
 
@@ -94,6 +97,7 @@ class TestWriteSerializer:
 
     def test_no_region_required_for_a_country_that_has_none(self):
         country = CountryFactory(num_regions=0)
+        enable_rate(country)
         payload = {
             "title": "Home",
             "first_name": "Jane",

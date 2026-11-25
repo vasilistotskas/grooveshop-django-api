@@ -63,7 +63,7 @@ def _webside_like_store(acs_and_boxnow_configured_tenant, acs_locker_station):
     )
     for code, price in (("boxnow", BOXNOW_PRICE), ("acs", ACS_PRICE)):
         ShippingRate.objects.filter(
-            provider__code=code, country_id="GR"
+            provider__code=code, zone__country_id="GR"
         ).update(price=price, free_shipping_threshold=THRESHOLD, is_active=True)
     with _store_settings():
         yield
@@ -142,7 +142,7 @@ def test_a_product_too_big_for_a_locker_is_priced_by_the_courier():
 
 def test_a_product_over_a_rates_weight_cap_skips_that_rate():
     ShippingRate.objects.filter(
-        provider__code="boxnow", country_id="GR"
+        provider__code="boxnow", zone__country_id="GR"
     ).update(max_weight_grams=1000)
 
     estimate = _get(_product(weight=Weight(g=1500)))
@@ -152,7 +152,7 @@ def test_a_product_over_a_rates_weight_cap_skips_that_rate():
 
 def test_the_threshold_is_the_lowest_of_the_carriers_that_take_it():
     ShippingRate.objects.filter(
-        provider__code="boxnow", country_id="GR"
+        provider__code="boxnow", zone__country_id="GR"
     ).update(free_shipping_threshold=Decimal("19.90"))
     product = _too_big_for_a_locker(_product())
 
@@ -233,7 +233,7 @@ def test_a_live_priced_carrier_is_priced_live():
     ShippingProvider.objects.filter(code="boxnow").update(is_active=False)
     ShippingRate.objects.filter(
         provider__code="acs",
-        country_id="GR",
+        zone__country_id="GR",
         kind=ShippingKind.PICKUP_POINT.value,
     ).update(is_active=False)
     product = _product(weight=Weight(g=1500))

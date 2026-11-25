@@ -16,9 +16,13 @@ from core.api.action_config import (
 )
 from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
+from core.api.views import LANGUAGE_PARAMETER, BaseModelViewSet
 from core.utils.views import cache_methods
-from region.filters import RegionFilter
+from region.filters import (
+    RegionFilter,
+    ShippableQuerySerializer,
+    filter_shippable,
+)
 from region.models import Region
 from region.serializers import (
     RegionDetailSerializer,
@@ -42,6 +46,7 @@ serializers_config: SerializersConfig = {
             "Get all regions for a specific country using its alpha-2 code."
         ),
         tags=["Geography"],
+        parameters=[LANGUAGE_PARAMETER, ShippableQuerySerializer],
     ),
 }
 
@@ -97,7 +102,12 @@ class RegionViewSet(BaseModelViewSet):
         filter_backends=[],
     )
     def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs):
-        regions = Region.objects.for_list().filter(country__alpha_2=pk)
+        query = ShippableQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        regions = filter_shippable(
+            Region.objects.for_list().filter(country__alpha_2=pk),
+            query.validated_data.get("shippable"),
+        )
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(regions, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)

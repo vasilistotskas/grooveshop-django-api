@@ -87,7 +87,10 @@ class FreeShippingInfoSerializer(serializers.Serializer):
             "The country these thresholds were resolved for — the "
             "caller's ``country_code`` when given, else the first "
             "shippable country, matching the rule checkout uses for "
-            "its initial country. Null only when the store has no "
-            "active shipping rate anywhere yet."
+            "its initial country. The thresholds are those of its "
+            "shipping zone covering the whole country: a region zone's "
+            "own threshold applies once checkout prices an address in "
+            "it. Null only when the store has no active shipping rate "
+            "anywhere yet."
         ),
     )

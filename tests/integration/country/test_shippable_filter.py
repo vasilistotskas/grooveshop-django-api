@@ -15,6 +15,8 @@ is the one test that wants the real default.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -23,8 +25,27 @@ from rest_framework.test import APIClient
 from country.factories import CountryFactory
 from shipping.enum import ShippingKind
 from shipping.factories import ShippingProviderFactory, ShippingRateFactory
+from tests.utils.shipping import registered_carrier
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _registered_carriers():
+    """The carriers these tests make up need an adapter: checkout's gate
+    offers none without one, and neither does a shippable country."""
+    with ExitStack() as stack:
+        for code in (
+            "shippable_test",
+            "shippable_rate_off",
+            "shippable_prov_off",
+            "shippable_false_test",
+            "shippable_omit_test",
+            "shippable_platform_test",
+            "shippable_two_kinds_test",
+        ):
+            stack.enter_context(registered_carrier(code))
+        yield
 
 
 @pytest.fixture

@@ -644,7 +644,7 @@ class TestALockerTheCatalogueDoesNotHoldYet:
         self, locker_checkout, resync
     ):
         ShippingRate.objects.filter(
-            country=locker_checkout.country, kind="pickup_point"
+            zone__country=locker_checkout.country, kind="pickup_point"
         ).update(is_active=False)
 
         response = _serializer(

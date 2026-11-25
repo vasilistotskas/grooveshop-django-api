@@ -17,8 +17,8 @@ present.
 
 Pricing is NOT this adapter's job any more. It used to read the global
 ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD`` Setting rows
-as a last-resort fallback; that fallback is gone, because a per-country
-``ShippingRate`` row is now the only source of "the store's shipping
+as a last-resort fallback; that fallback is gone, because a
+``ShippingRate`` row of a shipping zone is now the only source of "the store's shipping
 price" — for this carrier same as every other. This class is therefore
 lifecycle-only: it exists so ``ShippingService`` can dispatch to it
 unconditionally, and every hook below answers "there is nothing here"

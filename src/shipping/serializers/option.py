@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from core.validators import address as address_rules
 from shipping.enum import ShippingKind
 
 
@@ -13,8 +14,17 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
         max_length=2,
         help_text=_(
             "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — "
-            "a ``ShippingRate`` is per-country, so there is no "
-            "destination-agnostic matrix of options to return."
+            "a ``ShippingRate`` belongs to a zone of one country, so "
+            "there is no destination-agnostic matrix of options to return."
+        ),
+    )
+    region_id = serializers.CharField(
+        required=False,
+        max_length=10,
+        help_text=_(
+            "The delivery region's code, once the shopper has chosen it. "
+            "A home delivery is priced by the shipping zone of the "
+            "region; without one, by the zone covering the whole country."
         ),
     )
     order_value_amount = serializers.DecimalField(
@@ -46,6 +56,17 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
             "when omitted."
         ),
     )
+
+    def validate(self, attrs):
+        # A region that does not exist, or is another country's, is a
+        # field error, as on the quote and the order.
+        if errors := address_rules.region_errors(
+            attrs.get("country_code"), attrs.get("region_id")
+        ):
+            raise serializers.ValidationError(
+                {"region_id": errors["region_id"]}, code="region_invalid"
+            )
+        return attrs
 
 
 class ShippingOptionPayWaySerializer(serializers.Serializer):

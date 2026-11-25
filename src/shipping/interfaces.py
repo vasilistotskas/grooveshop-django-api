@@ -511,7 +511,7 @@ class ShippingCarrierInterface(ABC):
         when it holds no answer.
 
         ``rate`` is the resolved ``ShippingRate`` for this
-        (provider, country, kind) — the price, free-shipping threshold
+        (provider, zone, kind) — the price, free-shipping threshold
         and weight cap all live there now; this hook exists only for a
         carrier whose tariff varies by destination or weight bracket
         beyond what a single stored price can express (ACS's weight-
@@ -552,6 +552,22 @@ class ShippingCarrierInterface(ABC):
         stations for the country, independently of home delivery.
         """
         return True
+
+    def kind_enabled_countries(
+        self, kind: ShippingKind, country_codes: Iterable[str]
+    ) -> frozenset[str]:
+        """The upper-case ``country_codes`` where ``kind`` is enabled,
+        :meth:`is_kind_enabled` answered for a set at once (the store's
+        shippable countries, its home coverage).
+
+        Defaults to asking :meth:`is_kind_enabled` per country. Override
+        when the answer is a query, so a set costs one (ACS's stations).
+        """
+        return frozenset(
+            code
+            for code in {code.upper() for code in country_codes}
+            if self.is_kind_enabled(kind, country_code=code)
+        )
 
     def create_demo_shipment(
         self,

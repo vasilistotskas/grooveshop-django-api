@@ -22,7 +22,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from core.cache.invalidation import mark_surface_stale
+from core.cache.invalidation import mark_model_stale
 from core.net.safe_fetch import FetchError, safe_fetch
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.models import BoxNowLocker
@@ -240,7 +240,7 @@ def apply_catalogues(
                 extra={"boxnow_country": country_code},
             )
     if changed_any:
-        mark_surface_stale("shipping")
+        mark_model_stale(BoxNowLocker)
     if keep and accepted:
         remember_catalogues(accepted)
     logger.info(
@@ -260,7 +260,7 @@ def _forget_stage_sizes() -> dict[str, int]:
     )
     reset = stale.update(compartment_sizes=[], availability_probability=None)
     if reset:
-        mark_surface_stale("shipping")
+        mark_model_stale(BoxNowLocker)
         logger.warning(
             "BOX NOW store is not live: reset the sizes of %d lockers, the "
             "public catalogue describes the live network only",

@@ -268,7 +268,12 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "description": (
                         "The country the carriers' thresholds were "
                         "judged for: the store's first shipping country, "
-                        "the one checkout preselects"
+                        "the one checkout preselects, at the rates of its "
+                        "shipping zone covering the whole country, or of "
+                        "each region zone of a country served only in some "
+                        "regions (a cart knows no region; a region zone's "
+                        "own threshold applies once checkout prices the "
+                        "address)"
                     ),
                 },
             },
@@ -666,7 +671,11 @@ class CartQuoteRequestSerializer(PickupPointSerializer):
     both ``shipping_kind`` and ``country_id`` are given. Send what the
     order-create body will carry, the email and the pickup point
     included, so the quote is the total that order is created at and its
-    ``cartDigest`` the cart that order is made of.
+    ``cartDigest`` the cart that order is made of. Send that
+    ``cartDigest`` back as ``expectedCartDigest`` on ``POST /api/v1/order``:
+    only then is the order refused when the cart changed since the quote
+    (409 ``cart_changed``, nothing created), a change at the same total
+    included.
     """
 
     pay_way_id = serializers.IntegerField(

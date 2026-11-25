@@ -993,24 +993,14 @@ class OrderService:
                 ),
             }
 
-            # Shipping and the pay-way fee are the quote's: the parcel
-            # it weighed (gifts included) is the one the shipment is
-            # created for.
+            # Shipping, its carrier and the pay-way fee are the quote's:
+            # the parcel it weighed (gifts included) is the one the
+            # shipment is created for.
             parcel_items = list(quote.parcel_items)
-            cart_weight_grams = quote.weight_grams
             order_data["shipping_price"] = charges.shipping.price
             order_data["payment_method_fee"] = charges.payment_fee.amount
 
-            order_data.setdefault(
-                "shipping_provider_code",
-                shipping_address.get("shipping_provider_code"),
-            )
-            order_data.setdefault(
-                "shipping_kind", shipping_address.get("shipping_kind")
-            )
-            cls._resolve_shipping_provider(
-                order_data, weight_grams=cart_weight_grams
-            )
+            cls._assign_shipping_provider(order_data, quote)
             cls._seed_language_code(order_data)
             cls._seed_estimated_delivery(order_data)
 
@@ -1580,14 +1570,24 @@ class OrderService:
         if not errors.get("shipping_provider_code") and not errors.get(
             "country_id"
         ):
-            from shipping.exceptions import ShippingUnavailableError
+            from shipping.exceptions import (
+                ShippingRegionUnavailableError,
+                ShippingUnavailableError,
+            )
             from shipping.services import ShippingService
 
+            # A pickup point is judged by its country; a home delivery by
+            # the zone of its region too.
+            region_id = (
+                address.get("region_id")
+                if kind_value == "home_delivery"
+                else None
+            )
             resolved_provider_code = provider_code
             if not resolved_provider_code and kind_value == "home_delivery":
                 resolved_provider_code = (
                     ShippingService.resolve_home_delivery_provider(
-                        address.get("country_id")
+                        address.get("country_id"), region_id=region_id
                     )
                 )
             if resolved_provider_code and kind_value:
@@ -1596,7 +1596,15 @@ class OrderService:
                         provider_code=resolved_provider_code,
                         kind=kind_value,
                         country_code=address.get("country_id"),
+                        region_id=region_id,
                     )
+                except ShippingRegionUnavailableError:
+                    errors["shipping_provider_code"] = [
+                        _(
+                            "This shipping method does not deliver to "
+                            "the selected region."
+                        )
+                    ]
                 except ShippingUnavailableError:
                     errors["shipping_provider_code"] = [
                         _(
@@ -1823,42 +1831,24 @@ class OrderService:
         order.refresh_from_db()
         return order
 
-    @classmethod
-    def _resolve_shipping_provider(
-        cls, order_data: dict[str, Any], *, weight_grams: int
+    @staticmethod
+    def _assign_shipping_provider(
+        order_data: dict[str, Any], quote: CheckoutQuote
     ) -> None:
-        """Resolve ``shipping_provider_code`` → ``shipping_provider`` FK.
+        """Give the order the delivery its quote priced.
 
-        Mutates ``order_data`` in place: removes ``shipping_provider_code``
-        and replaces it with the resolved ``shipping_provider`` (a
-        ``ShippingProvider`` instance). Defaults ``shipping_kind`` to
-        ``home_delivery`` when not supplied
-        (``OrderQuoteService.delivery_kind``, which the price and the pay
-        ways offered read too).
-
-        Dispatch is registry-driven from the explicit
-        ``(shipping_provider_code, shipping_kind)`` pair only.
-        ``home_delivery`` orders without an explicit code auto-route
-        to whichever active provider has a rate for the order's
-        country — adding a new courier (ELTA, Speedex …) is then a
-        one-row admin change.
+        Sets ``shipping_kind`` and the ``shipping_provider`` row of the
+        carrier the quote resolved (``CheckoutQuote.shipping_choice``):
+        the one it charged for, a home delivery that named none included,
+        so the price and the carrier always agree.
         """
         from shipping.models import ShippingProvider
-        from shipping.services import ShippingService
 
-        code = order_data.pop("shipping_provider_code", None) or None
-        kind = OrderQuoteService.delivery_kind(order_data.get("shipping_kind"))
-
-        # Dynamic-routing fallback: a plain ``home_delivery`` request
-        # auto-routes to the active home-delivery carrier for the
-        # order's country. Shared with ``shipping_cost`` (via the same
-        # ``ShippingService.resolve_home_delivery_provider``) so the
-        # cost we charge and the carrier the order is assigned to
-        # always agree.
-        if not code and kind == "home_delivery":
-            code = ShippingService.resolve_home_delivery_provider(
-                order_data.get("country_id"), weight_grams
-            )
+        choice = quote.shipping_choice
+        if choice is None:
+            raise ValueError("a quote without a delivery has no carrier")
+        code = choice.provider_code
+        kind = choice.kind
 
         if code:
             provider = ShippingProvider.objects.filter(code=code).first()
@@ -1877,23 +1867,28 @@ class OrderService:
     def _seed_estimated_delivery(order_data: dict[str, Any]) -> None:
         """Fix ``Order.estimated_delivery`` from the chosen rate at create.
 
-        Runs after :meth:`_resolve_shipping_provider`. Left unset when no
+        Runs after :meth:`_assign_shipping_provider`. Left unset when no
         provider resolved, the rate advertises no estimate, or the
         stored ``DISPATCH_CUTOFF`` is unreadable.
         """
         from shipping.delivery import configured_cutoff, estimated_delivery
-        from shipping.models import ShippingRate
+        from shipping.zones import destination_rates
 
         provider = order_data.get("shipping_provider")
         country_id = order_data.get("country_id")
         if provider is None or not country_id:
             return
-        rate = ShippingRate.objects.filter(
-            provider=provider,
-            country_id=country_id,
-            kind=order_data["shipping_kind"],
-            is_active=True,
-        ).first()
+        # The rate of the zone the order's destination resolves to: the
+        # islands' own delivery days, where they have their own rate.
+        rate = (
+            destination_rates(country_id, order_data.get("region_id"))
+            .filter(
+                provider=provider,
+                kind=order_data["shipping_kind"],
+                is_active=True,
+            )
+            .first()
+        )
         try:
             cutoff = configured_cutoff()
         except ValueError:

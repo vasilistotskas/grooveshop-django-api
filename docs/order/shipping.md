@@ -104,21 +104,25 @@ Rules both carriers share:
 
 ### 5.0 Shipping pricing: `ShippingRate`
 
-`shipping.ShippingRate` (tenant schema, cross-schema FK to
-`country.Country` — the same shape `Order.country` uses) is the single
-source of a store's shipping price, availability and weight cap, one
-row per `(provider, country, kind)`. It replaced a global
+`shipping.ShippingRate` (tenant schema) is the single source of a
+store's shipping price, availability and weight cap, one row per
+`(provider, zone, kind)`: a rate belongs to a `ShippingZone`, a whole
+country or some of its regions, and which zone a destination is priced
+by is [§5.5](shipping-zones.md). It replaced a global
 `CHECKOUT_SHIPPING_PRICE` / `FREE_SHIPPING_THRESHOLD` /
 `BOXNOW_*` / `ACS_*` Setting sextet that priced every destination the
 same and had nothing to say about whether a store shipped there at
 all — the gap that blocked offering BoxNow-to-Cyprus without also
 accepting Cyprus orders at the Greek flat rate.
 
-- **`ShippingService.active_rate(provider_code, kind, country_code)`**
-  is the single gate: an active provider, a registered adapter, the
-  provider supporting `kind`, `is_kind_enabled(kind, country_code=...)` (ACS
-  lockers: active stations synced for that country), and an active rate row
-  for that country — or `ShippingUnavailableError`.
+- **`ShippingService.active_rate(provider_code, kind, country_code,
+  region_id)`** is the single gate: an active provider, a registered
+  adapter, the provider supporting `kind`, `is_kind_enabled(kind,
+  country_code=...)` (ACS lockers: active stations synced for that
+  country), and an active rate in the zone the destination resolves to
+  ([§5.5](shipping-zones.md)) — or `ShippingUnavailableError`, or its
+  subclass `ShippingRegionUnavailableError` when the carrier has that rate
+  elsewhere in the country but not in the region's zone.
   `assert_available(...)` adds the weight-cap check
   (`ShippingWeightExceededError`); both are used directly by a
   free-shipping promo, which must not let an unavailable or over-weight
@@ -166,12 +170,16 @@ accepting Cyprus orders at the Greek flat rate.
   transient failure returns `None`, never raises — the stored rate
   price is the safety net.
 - **`/shipping/options`** requires `country_code` (400 without) and
-  resolves the matrix from active rates for that country; each row
+  resolves the matrix from the active rates of the destination's zone:
+  the optional `regionId` picks a region zone, and without it the
+  country's whole-country zone answers ([§5.5](shipping-zones.md); a
+  `regionId` the country does not have is a 400 `region_invalid` or
+  `region_country_mismatch` on `regionId`); each row
   carries `country_code`, `max_weight_grams` and `exceeds_max_weight`
   — an over-cap option (a heavy Cyprus BoxNow cart) is still listed,
   flagged, so the storefront can disable it with a reason instead of
   the step silently having one fewer card. It prices on the caller's
-  `orderValueAmount`, with no region and no promotion waiver; the
+  `orderValueAmount`, with no promotion waiver; the
   `shippingOptions` of `POST /cart/quote` are the same rows
   (`available_options`) priced as an order would be, each with
   `waivedBy` ([§3.0](creation.md)).
@@ -284,9 +292,11 @@ accepting Cyprus orders at the Greek flat rate.
 - **`ShippingService.resolve_home_delivery_provider(country_code)`**
   picks the lowest-priority active home-delivery provider that has a
   rate for the country (or, with no country yet, the lowest-priority
-  active one regardless) — shared by `_resolve_shipping_provider` (the
-  order's FK) and `shipping_cost` (the price), so both always agree on
-  which carrier a plain `home_delivery` request routes to.
+  active one regardless), among the carriers checkout's gate takes
+  (`carrier_offers`). `OrderQuoteService.quote` resolves it once and
+  prices it, and order creation assigns that carrier
+  (`CheckoutQuote.shipping_choice`, `_assign_shipping_provider`), so the
+  price and the carrier always agree.
 - **Release N migration** (`shipping/0011_convert_legacy_pricing_to_
   rates.py`) copies each tenant's existing Setting values — or the
   frozen historical default when a row is missing — into GR-only rate
@@ -296,8 +306,9 @@ accepting Cyprus orders at the Greek flat rate.
   (`0014_drop_legacy_shipping_settings.py`, additive-only rule —
   `docs/migrations.md`).
 - **Adding a country to an existing carrier** is an admin action, not a
-  deploy: add a `ShippingRate` row (`ShippingProviderAdmin`'s Rates
-  inline) for `(provider, country, kind)`.
+  deploy: add a rate for `(provider, kind)` on the country's zone
+  (Settings → Shipping Zones, its Rates tab), creating the zone first
+  ([§5.5](shipping-zones.md)).
 
 ### 5.3 Adding a new carrier
 

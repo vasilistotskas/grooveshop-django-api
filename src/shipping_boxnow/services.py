@@ -15,7 +15,7 @@ from django.db.models import F
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from core.cache.invalidation import mark_surface_stale
+from core.cache.invalidation import mark_model_stale
 from shipping.exceptions import (
     ShipmentAwaitingPaymentError,
     ShipmentNotNeededError,
@@ -2948,9 +2948,9 @@ class BoxNowService:
                         )
                         continue
 
-                    # ShippingRate is now per-country: a locker we can't
-                    # place in a country can't be checked against the
-                    # destination's ``ShippingRate.country``, and
+                    # A rate belongs to a country's zone: a locker we
+                    # can't place in a country can't be checked against
+                    # the destination's rates, and
                     # defaulting to GR used to let a Cypriot locker with
                     # dropped country data mint as if it were Greek.
                     # Skipped rather than deactivated — added to
@@ -3026,7 +3026,7 @@ class BoxNowService:
             if deactivated_count:
                 # ``update`` sends no ``post_save``: the cached locker
                 # list would keep serving the withdrawn lockers.
-                mark_surface_stale("shipping")
+                mark_model_stale(BoxNowLocker)
             # Wholesale absence means this catalogue belongs to a
             # DIFFERENT partner than the rows we already had — the exact
             # shape of a credentials/data mismatch, and the reason every

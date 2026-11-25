@@ -13,7 +13,6 @@ cart is told the cheapest route that holds.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -35,57 +34,22 @@ from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
 from shipping.enum import FreeShippingSource, ShippingKind
-from shipping.interfaces import (
-    _REGISTRY,
-    ShippingCarrierInterface,
-    register_provider,
-)
 from shipping.models import ShippingProvider
-from tests.utils.shipping import enable_rate
+from tests.utils.shipping import enable_rate, registered_carrier
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
 
-class _SecondCarrier(ShippingCarrierInterface):
-    """A second carrier, so two thresholds can compete in one country."""
-
-    code: ClassVar[str] = "second_free_shipping_test"
-
-    def create_shipment(self, order, *, kind, payload=None):
-        return None
-
-    def cancel_shipment(self, shipment, *, reason="") -> None:
-        return None
-
-    def has_label(self, shipment) -> bool:
-        return False
-
-    def fetch_label_bytes(self, shipment) -> bytes:
-        return b""
-
-    def fetch_tracking_events(self, shipment) -> list[dict[str, Any]]:
-        return []
-
-    def shipment_for_order(self, order):
-        return None
-
-    def holds_the_parcel(self, shipment) -> bool:
-        return False
-
-    def serialize_shipment(self, shipment, *, context):
-        return None
-
-    def validate_order_payload(self, *, kind, payload) -> dict[str, list[str]]:
-        return {}
+SECOND_CARRIER = "second_free_shipping_test"
 
 
 @pytest.fixture
 def second_carrier():
-    register_provider(_SecondCarrier)
-    yield _SecondCarrier.code
-    _REGISTRY.pop(_SecondCarrier.code, None)
-    ShippingProvider.objects.filter(code=_SecondCarrier.code).delete()
+    """A second carrier, so two thresholds can compete in one country."""
+    with registered_carrier(SECOND_CARRIER):
+        yield SECOND_CARRIER
+    ShippingProvider.objects.filter(code=SECOND_CARRIER).delete()
 
 
 @pytest.fixture

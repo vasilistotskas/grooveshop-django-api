@@ -27,7 +27,7 @@ from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
-from core.cache.invalidation import mark_surface_stale
+from core.cache.invalidation import mark_model_stale
 from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
@@ -3425,8 +3425,9 @@ class AcsService:
             )
             if deactivated:
                 # ``update`` sends no ``post_save``: the cached station
-                # list would keep serving the withdrawn stations.
-                mark_surface_stale("shipping")
+                # list would keep serving the withdrawn stations, and the
+                # shippable countries a locker-only country lost.
+                mark_model_stale(AcsStation)
 
         return {"upserted": upserted, "deactivated": deactivated}
 

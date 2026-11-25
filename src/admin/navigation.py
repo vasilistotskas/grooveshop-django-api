@@ -476,6 +476,7 @@ def store_sidebar(request: Any) -> list[Item]:
                 _("Shipping Providers"),
                 "route",
             ),
+            page("shipping.ShippingZone", _("Shipping Zones"), "public"),
             page("vat.Vat", _("VAT Rates"), "percent"),
             # Which emails the store sends, with their preview, log and
             # suppression list; one page, not a model list.

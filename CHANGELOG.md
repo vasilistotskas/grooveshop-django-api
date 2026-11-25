@@ -3,6 +3,20 @@
 
 
 
+## v3.272.0 (2026-11-25)
+
+### Bug fixes
+
+* fix(auth): django-allauth 65.22.1, with reauthentication by code off until the storefront has it (#836)
+
+The bump, the limits of its new endpoints, a hook that keeps account deletion and second-factor setup open to a shopper with no way to reauthenticate while the code method is off, and a sweep of expired OAuth tokens and authorization codes. ([`059a65c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/059a65c42035191d9be939cedb0936cdbc224b73))
+
+### Features
+
+* feat(recommendation): the impression beacon mints the showing's id (#789)
+
+An impression event that names no id is given one, recorded with that request's own session, cart and customer, and its 202 names it. A click must name its showing. Transitional: an impression that names the body's id is recorded under it until #794. ([`3fd7ab8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fd7ab80bce383a8094d46fc4d334280faa96b3c))
+
 ## v3.271.0 (2026-11-25)
 
 ### Bug fixes

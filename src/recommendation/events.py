@@ -65,10 +65,12 @@ def record_events(
 
     Each row's ``event_key`` is the event itself: the kind, the showing
     (``impression_id``, minted by the beacon for each showing of a strip
-    and by the order confirmation for each email) and the item. A beacon
-    sent twice for one showing, and another copy of the task (a retry, a
-    message delivered again, the sweep's copy of a publish), make the same
-    keys, and the unique constraint on them leaves their rows out.
+    and by the order confirmation for each email) and the item. Another
+    copy of the task (a retry, a message delivered again, the sweep's copy
+    of a publish) and a click sent twice (it carries its showing's id) make
+    the same keys, and the unique constraint on them leaves their rows out.
+    An impression beacon is a showing of its own, with a new id each time:
+    the storefront sends one per showing.
     """
     if (
         kind not in _KINDS

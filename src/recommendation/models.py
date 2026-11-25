@@ -312,8 +312,8 @@ class RecommendationEvent(models.Model):
         default="",
     )
     # What makes two rows one event (``events.record_events``): the kind,
-    # the showing (``impression_id``) and the item, so a beacon sent twice
-    # for one showing and another copy of its task insert nothing. Empty for
+    # the showing (``impression_id``) and the item, so a click sent twice
+    # and another copy of a task insert nothing. Empty for
     # ``attach`` rows, whose own constraint below makes them once per order,
     # and for rows written before showings had ids of their own.
     event_key = models.UUIDField(

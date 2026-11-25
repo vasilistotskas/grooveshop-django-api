@@ -3,6 +3,145 @@
 
 
 
+## v3.271.0 (2026-11-25)
+
+### Bug fixes
+
+* fix(shipping): judge home coverage by the carrier gate, offer an address only countries home delivery reaches, and serialise zone saves per country
+
+HomeCoverage now counts a rate only when its carrier passes the gate a quote puts on it (carrier_offers, shared with active_rate), so no region is offered where checkout then finds no delivery. GET /country gains homeDelivery=true for the address book: a lockers-only country is shippable but takes no saved address. A carrier switched on or off marks the region and country pickers stale. The admin serialises one country's zone saves with a transaction-scoped advisory lock, the backfill's reverse refuses rates a region zone holds, a rate's str no longer reads a zone it may not have, and the free-shipping figures say they are the whole-country zone's. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): a country is shippable only where its carrier passes checkout's gate, answered per carrier in one query
+
+shippable_country_codes now keeps a country only when a rate's carrier passes the gate a quote puts on it (shipping.zones.offered): ACS without the store's credentials, or its lockers where it has no stations, ships nowhere. Carriers answer a set of countries at once (kind_enabled_countries; ACS with one station query), so the cart's free-shipping line costs the same however many countries the store ships to. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): a rate without a zone is not chargeable
+
+A rate the previous release inserts during the rollout carries a country
+and no zone. zones.chargeable() now excludes it explicitly instead of
+relying on the INNER JOIN a select_related happens to make, and tests pin
+that the store's countries, home coverage and the ACS station sync leave
+it out. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): the store's home carrier is one checkout would take, and carrier gates purge the pickers
+
+The automatic home-delivery pick (resolve_home_delivery_provider) now
+considers only carriers that pass carrier_offers in the country, the
+gate active_rate puts on every quote: a carrier ahead in priority that
+checkout refuses, such as ACS without the store's credentials, no longer
+fails a quote or an order to a country another carrier serves.
+
+The regions_countries surface declares AcsStation, whose synced lockers
+decide where ACS offers pickup. A write no signal reports marks every
+surface declaring its model through the new
+core.cache.invalidation.mark_model_stale, used by the zone region-set
+receiver and the station and locker syncs. A change to a carrier
+credential on Tenant queues shipping.tasks.purge_carrier_gate_surfaces
+in the store's schema, which marks what a carrier switch does.
+
+Also corrects wording that still described a per-country ShippingRate. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): keep writing a base zone rate's country for the release before, and make the zone backfill safe to run again
+
+The release before shipping zones prices by ShippingRate.country alone,
+and may still run during the rollout or come back in a rollback. The
+column stays in the state, nullable and not editable: ShippingRate.save
+writes the zone's country on a base zone's rate and leaves it empty on a
+region zone's (ShippingZone.rate_country_id), and a change of a zone's
+country or regions rewrites its rates. The old unique constraint stays
+in the database, so it refuses that release a duplicate of a base zone's
+rate. 0025 is renamed to what it now does.
+
+0024's backfill, which the contract release runs again, uses a country's
+oldest base zone, names a new one so no other zone's name collides,
+deletes and logs a zone-less rate its base zone already prices instead
+of failing on the unique (provider, zone, kind), and runs on the schema
+editor's database. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): an order takes the carrier its quote priced, and the zone backfill reconciles what the release before re-pointed
+
+OrderQuoteService.quote resolves a home delivery's carrier once and
+carries it on CheckoutQuote.shipping_choice; order creation assigns that
+carrier (_assign_shipping_provider) instead of resolving it again, so a
+zone or rate edit committing during the request cannot price one carrier
+and assign another.
+
+0024's backfill, which the contract release runs again, also moves a
+rate the release before re-pointed to another country into that
+country's base zone, and gives history rows their country's base zone.
+HomeCoverage ignores a zone deleted between its reads. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): a read that knows no region is judged at the country's standing destinations
+
+A country served only in some regions is shippable and may be the one
+checkout preselects, yet the policy, the free-shipping line, a
+product's estimate and the cart's free-shipping progress read its base
+zone only and found nothing. shipping.zones.standing_destinations names
+where such a read judges a country: its base zone when that has an
+active rate, else each of its region zones with one. The policy rows
+gain regionCodes, the regions a row applies to (empty for a base zone).
+
+Also fixes the estimated-delivery tests for the quote's carrier, and
+prose that still named the payment intent. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): write a zone's regions before its rates, and judge standing reads by offered rates per kind
+
+ShippingZone.set_regions is the one writer of a zone's regions: it syncs
+the rates' country once, for the set written, so a replacement no longer
+passes through an empty set that wrote the base zone's country into a
+region zone's rate. The admin writes the regions before the inline
+rates, which take their country from them. Both had failed on the
+release before's unique (provider, country, kind), still in the database.
+
+standing_destinations counts only offered rates, the gate the shippable
+countries use, per kind: the base zone stands for what it offers, and a
+home delivery it does not offer is judged at each region zone that does.
+It reads every country at once, so the policy costs two queries for it,
+not two per country. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* fix(shipping): refuse a region set that breaks the zones, and sync a region row written directly
+
+ShippingZone.set_regions refuses, with the zones' own rule
+(zone_errors), a set that would empty a zone beside its country's base
+zone, rather than reaching the old unique (provider, country, kind). A
+ShippingZoneRegion row created or deleted as a row now rewrites its
+zone's rates' country through post_save/post_delete, which
+set_regions holds back until its one sync. The zones doc says which
+rate wins when the contract release's backfill meets a duplicate. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+### Chores
+
+* chore(shipping): unfinished work on #222 shipping zones (Django expand)
+
+Saved before a pause; not reviewed or complete. Design: comment on #222. Resume from this branch. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+### Documentation
+
+* docs(api): tell clients to send the quote's cartDigest back, and name the agent payment path for online orders
+
+The cart quote request now says its cartDigest must be sent back as
+expectedCartDigest on POST /api/v1/order, the only way a cart changed at
+the same total is refused (409 cart_changed). The order-create request's
+online settlement limits the hosted-page wording to storefront checkout
+and names confirmAgentPaymentForOrder for an agent order with delegated
+Stripe payments; the zero-balance exception holds for both. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* docs(order): offered_pay_ways names the quote and order creation, not the removed payment intent ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+### Features
+
+* feat(shipping): per-store shipping zones, the expand release (#831) ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+* feat(shipping): back-fill rate zones in a migration of their own, and refuse a region no carrier reaches as the region's
+
+The zone column's index and foreign key are built when 0023 ends, so the backfill (0024) runs after them: a store provisioned in one transaction has rates written earlier in it, and their queued checks refused the index. The migration tests now settle each migration's checks the way migrate_schemas' command does, through one function.
+
+A home delivery that names no carrier, to a region no carrier's rate covers while one covers the rest of the country, is refused as shipping_region_unavailable. ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
+### Testing
+
+* test(shipping): pin the policy row's regionCodes, and that the options refuse a region that is not a stored code ([`70382b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70382b068a16ceeed1f5d2537ec3b0ec5ddfad68))
+
 ## v3.270.5 (2026-11-25)
 
 ### Bug fixes

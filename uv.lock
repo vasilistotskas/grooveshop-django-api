@@ -1257,7 +1257,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "3.270.4"
+version = "3.270.5"
 source = { virtual = "." }
 dependencies = [
     { name = "argon2-cffi" },

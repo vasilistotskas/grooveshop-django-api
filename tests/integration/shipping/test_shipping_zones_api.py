@@ -20,7 +20,7 @@ from shipping.factories import (
     ShippingRateFactory,
     ShippingZoneFactory,
 )
-from shipping.models import ShippingProvider, ShippingRate
+from shipping.models import ShippingProvider, ShippingRate, ShippingZone
 from tests.integration.order.test_checkout_quote import (
     _checkout,
     _choices,
@@ -216,17 +216,22 @@ class TestOptions:
         assert response.status_code == 400, response.content
         assert _codes(response, "regionId") == ["region_country_mismatch"]
 
-    def test_a_region_in_another_case_is_refused_as_the_quote_refuses_it(
-        self, store
+    @pytest.mark.parametrize(
+        "region_id", ["qz-m", "QZ-NOPE"], ids=["lower-case", "unknown"]
+    )
+    def test_a_region_that_is_not_a_stored_code_is_refused(
+        self, store, region_id
     ):
-        # A region is its stored code; the options never price it in
-        # another case as the whole country.
+        # Refused as the quote refuses it, never priced as the whole
+        # country: a region is its stored code, matched exactly.
+        islands_zone = ShippingZone.objects.get(regions=store.islands)
+        islands_zone.regions.add(
+            RegionFactory(country=store.country, alpha="QZ-M")
+        )
+
         response = APIClient().get(
             reverse("shipping-options"),
-            {
-                "country_code": store.country.alpha_2,
-                "region_id": store.islands.alpha.swapcase(),
-            },
+            {"country_code": store.country.alpha_2, "region_id": region_id},
         )
 
         assert response.status_code == 400, response.content

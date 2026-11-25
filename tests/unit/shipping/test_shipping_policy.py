@@ -75,6 +75,7 @@ def test_a_row_carries_exactly_what_the_rate_holds(_acs_only):
         "delivery_days_min": 1,
         "delivery_days_max": 3,
         "max_weight_grams": 20000,
+        "region_codes": [],
     }
 
 

@@ -28,6 +28,7 @@ ROW_KEYS = {
     "deliveryDaysMin",
     "deliveryDaysMax",
     "maxWeightGrams",
+    "regionCodes",
 }
 
 
@@ -52,6 +53,7 @@ def test_an_anonymous_visitor_gets_the_policy_shape(_acs_only):
     assert home["countryCode"] == "GR"
     assert home["providerCode"] == "acs"
     assert home["currency"] == "EUR"
+    assert home["regionCodes"] == []
 
 
 def test_a_store_that_ships_nowhere_returns_an_empty_list():

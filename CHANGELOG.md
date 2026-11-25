@@ -3,6 +3,14 @@
 
 
 
+## v3.272.1 (2026-11-25)
+
+### Refactoring
+
+* refactor(shipping): a rate's zone is required and its country leaves the code (#835)
+
+Release 2 of 3 of moving ShippingRate.country onto its zone (#222): 0026 zones what the release before zones wrote, 0027 sets zone NOT NULL, drops the old unique and index, empties the column and takes it out of the state. A base zone no address resolves to delivers home nowhere. migration_preflight refuses SQL that drops or renames what the serving state still holds. A shared row's edit (Country, Region) purges every store's own cached responses. ([`f127dd1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f127dd182185b9a7d0db48cc7cfed3ed65cc3545))
+
 ## v3.272.0 (2026-11-25)
 
 ### Bug fixes

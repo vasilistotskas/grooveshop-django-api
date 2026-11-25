@@ -29,8 +29,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
 - **Admin**: same `cancel_order` (`customer_initiated=False`) via the "Cancel
   selected orders and restore stock" action. The change form's `status` field
   is **read-only**: a form save wrote the column straight to the row, bypassing
-  both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08)
-  and the transition table in `update_order_status`. Every other transition is
+  both `cancel_order` (so no stock restore) and the transition table in `update_order_status`. Every other transition is
   an action too (`mark_as_processing` … `mark_as_returned`,
   `mark_as_refunded`), routed through `update_order_status`. RETURNED and
   REFUNDED deliberately leave stock alone ([§5.1](shipping-acs.md)).
@@ -69,17 +68,14 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   shipment CANCELED and leaves the order to the customer, staff or the sweep
   above ([§2.1](state-machines.md)). An open order behind it needs follow-up
   ([§2.3](state-machines.md)). So a customer cancel whose parcel event lands
-  before the order row is locked (§7.1.1, step 4) still cancels and refunds:
-  before #600 the event canceled the order first, without a refund, and the
-  customer's own cancel then failed its status check.
+  before the order row is locked (§7.1.1, step 4) still cancels and refunds.
+  If the event canceled the order, it would do so without a refund, and the
+  customer's own cancel would then fail its status check.
 
 There is no other path. `update_order_status` refuses CANCELED
 ([§2.1](state-machines.md)), the admin change form cannot write `status`, and
 the order write serializer keeps it read-only, so `cancel_order` is the only
-code that sets it on an existing order. The `order_canceled` receiver that used
-to backfill `metadata['cancellation']` and cancel the voucher for a status
-written some other way (`handle_order_canceled`) is gone with the last such
-path; `order_canceled` still fires on every cancel for the gift-card credit and
+code that sets it on an existing order. `order_canceled` fires on every cancel for the gift-card credit and
 the loyalty reversal.
 
 `customer_initiated` is a required decision for every caller that is not a
@@ -101,7 +97,7 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    commits here. It never calls the courier.
 4. Staff / system only, after the cancel has COMMITTED: cascades to the
    courier voucher via `cancel_attached_shipment` →
-   `ShippingService.cancel_shipment` (PR #2 H), with no transaction open and
+   `ShippingService.cancel_shipment`, with no transaction open and
    no row locked (§7.1.2). Records the dispatch outcome on metadata. A carrier
    rejection (e.g., voucher already in pickup list) does not undo the cancel:
    it is logged, kept in
@@ -117,15 +113,14 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    is paid or the ledger still holds refundable money, so an order a provider's
    dashboard already refunded in part gets the rest back, not nothing). The
    refund is its own claim, call and record ([§7.2](refund-execution.md)): no
-   transaction is open while the provider answers, which a cancel used to hold
-   open across the call. A refund refused before any provider is asked (a
+   transaction is open while the provider answers. A refund refused before any provider is asked (a
    dispute is open, nothing left, no credentials) is written to the order's
    history in plain words and reported as
    `refund_info = {"refunded": False, ...}`; for a dispute
    `refund_info["dispute_open"]` is true, the history says the refund waits
    until the dispute closes, and the admin cancel action says the same.
 
-**The receipt of an order canceled before its parcel left** (#747). Where the
+**The receipt of an order canceled before its parcel left.** Where the
 platform issues the store's receipts, a courier or locker order's receipt
 (with movement indication) is registered when its voucher or parcel is
 created and handed to the customer only when the parcel leaves. So every
@@ -185,8 +180,8 @@ locks stock.
     An expired session sends `checkout.session.expired`, and a customer opening
     it sees an expired message.
   - Stripe PaymentIntent the order holds (an agent's delegated card still
-    awaiting its confirmation, or an order placed before #818 removed the
-    client-confirmed intent): a PaymentIntent has no expiry, so the sweep
+    awaiting its confirmation, or an older order still holding a
+    client-confirmed intent, which checkout does not create): a PaymentIntent has no expiry, so the sweep
     cancels it (`StripePaymentProvider.close_payment`, reason `abandoned`)
     before it releases the stock. A succeeded intent is settled first (the
     sweep reads it before it cancels anything); one Stripe will not cancel
@@ -258,7 +253,7 @@ locks stock.
   recorded before the provider was read (`OpenPayment`): under the row lock it
   is refused when another link or intent was recorded meanwhile, and the next
   run reads that one.
-- **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
+- **What a client reads.** The order detail (`OrderDetailSerializer`:
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's
   `GET /agent/internal/order/{uuid}`) serves two instants, each null for
@@ -403,12 +398,11 @@ customer who retries after a cancel that stopped half way is not refused
 ### 7.1.2 A staff or system cancel asks the courier after it has committed
 
 `_cancel_order_locked` holds the order's row lock and the locks of every
-product it restocks. Until #713 it also called the courier before it
-returned: all those rows stayed locked across the carrier's HTTP calls
-(BoxNow's lookup and cancel, ACS's delete), the connection's
-`idle_in_transaction_session_timeout` could end the cancel half way, and
-the shipment was locked after the order while a tracking sync took the two
-the other way round (#613, a deadlock reproduced with two connections). Now:
+product it restocks. Calling the courier before it returns would keep all
+those rows locked across the carrier's HTTP calls (BoxNow's lookup and
+cancel, ACS's delete), the connection's `idle_in_transaction_session_timeout`
+could end the cancel half way, and a shipment locked after the order while a
+tracking sync takes the two the other way round deadlocks. So:
 
 1. **The cancel commits first.** Step 3 writes
    `metadata['shipment_cancel_pending'] = true`
@@ -488,8 +482,8 @@ What each failure does:
   included) takes every CANCELED order with the flag whose cancel is older
   than `ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS` (env, default 600) and
   runs the same `cancel_attached_shipment` (which also asks again for a
-  courier that gave no answer, above). Before #713 such a stop rolled
-  the whole cancel back; without the sweep it would leave a canceled,
+  courier that gave no answer, above). Without the sweep a worker that
+  stops between the commit and the courier call would leave a canceled,
   refunded order with a live voucher.
 - **The sweep and a slow first attempt overlap, or two runs of the
   sweep do.** The sweep takes no lock of its own, because every overlap

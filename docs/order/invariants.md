@@ -66,9 +66,8 @@ These invariants need more than a table row. Each ends with its anchor.
   - Anchor: commit `8041546ce` (2026-04-06)
 - `ShippingService.dispatch_create_shipment_task` wraps the carrier dispatch
   in `transaction.on_commit`. Queued inside the order-creation transaction,
-  the task looked the order up on another connection before the commit, did
-  not find it and gave up, so the order kept no voucher (prod order 47,
-  2026-04-30). Outside a transaction `on_commit` runs at once, so the admin
+  the task would look the order up on another connection before the commit,
+  not find it and give up, so the order would keep no voucher. Outside a transaction `on_commit` runs at once, so the admin
   buttons need no special case
   - Anchor: commit `59527a873` (2026-04-30),
     `tests/unit/shipping/test_dispatch_helpers.py`
@@ -169,10 +168,5 @@ These invariants need more than a table row. Each ends with its anchor.
   (`pricingBreakdown.remainingAmount`): `amount_due` until `payment_status` is
   settled, 0 after, and never derived from the ledger (a settled order can hold
   no ledger row). Whether an order is paid is `payment_status` alone
-  (`Order.is_paid`, the `is_paid` filter). It was called `paid_amount` until
-  `0070_order_amount_due` (the columns were dropped by
-  `0071_order_drop_paid_amount_columns`, and `paidAmount` is gone from the
-  API), and every reader that took it for collected money was wrong
-  (`remainingAmount` was 0 on every order, the filter matched every unpaid
-  online order)
+  (`Order.is_paid`, the `is_paid` filter)
   - Anchor: [§7.3](payment-ledger.md)

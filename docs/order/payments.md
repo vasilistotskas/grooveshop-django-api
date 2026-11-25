@@ -13,17 +13,15 @@ accounts:
   key via `tenant.credentials.stripe_credentials()` and passes it per
   call (`api_key=`, never the `stripe.api_key` module global). A tenant
   with no `stripe_secret_key` simply has Stripe unavailable — there is
-  no platform-account concept or fallback of any kind (the "platform"
-  account was always just webside's own account). Webhooks are
+  no platform-account concept or fallback of any kind. Webhooks are
   HOST-ROUTED per tenant:
   `https://api.<tenant-domain>/stripe/webhook/<uuid>/` — django-tenants
   selects the schema, then dj-stripe's UUID view verifies against the
   per-schema `WebhookEndpoint` row secret. Provisioning (APIKey row +
   Stripe endpoint incl. secret): `manage.py bootstrap_stripe
   --schema=<schema>` (idempotent; `--rotate-endpoint` to re-mint). Every
-  tenant, including webside, backfills its own `stripe_secret_key` +
-  `stripe_publishable_key` on the Tenant row before running
-  `bootstrap_stripe`.
+  tenant has its own `stripe_secret_key` + `stripe_publishable_key` on the
+  Tenant row before `bootstrap_stripe` runs.
 - **Viva Wallet** — all credentials incl. `source_code` and `live_mode`
   per-tenant (no settings fallback). The webhook route on the tenant's own
   API host resolves the tenant BEFORE the GET verification challenge,
@@ -37,7 +35,7 @@ accounts:
   hides credential-less providers from the shopper pay-way list AND
   refuses checkout-session/SPT creation for them.
 
-**One payable link per order (#643).** Asking for a payment link
+**One payable link per order.** Asking for a payment link
 (`OrderViewSet.create_checkout_session`, every caller: the storefront's
 payment view and "pay now", the agent gateway) is idempotent. The provider
 is asked first, with no row locked (`PaymentProvider.live_checkout_session`):
@@ -72,8 +70,7 @@ JSON object is "unreadable" too.
 (`VivaWalletPaymentProvider.TIME_ZONE`, Europe/Athens); the hour repeated
 when summer time ends is read as its later instant (`fold=1`), so a payable
 code is never taken for expired early. Viva forgets a code
-some time after it ends and answers 404 (codes from two months before
-answered 404 on demo, 2026-11-21); a 404 is "gone" only once the order's
+some time after it ends and answers 404 (a code two months old does); a 404 is "gone" only once the order's
 hold and the grace window have ended (`payment_hold.hold_ended`), else it is
 "unreadable". Stripe is read from the Checkout Session's `status`: `open` is
 returned, `expired` is gone, and `complete` is in progress only while its
@@ -108,7 +105,7 @@ on.
 Webhook handler:
 `src/order/signals/handlers.py::handle_stripe_payment_succeeded`.
 
-```
+```text
 payment_intent.succeeded → handle_stripe_payment_succeeded
                  │
                  ├── webhook_processed_{event_id} idempotency guard
@@ -117,7 +114,7 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  │   ├── select_for_update on Order row
                  │   ├── PaymentLedger.record_charge (CHARGE row, whatever state the order is in)
                  │   ├── mark_as_paid → payment_status=COMPLETED
-                 │   ├── suppress_customer_status_notifications(PROCESSING) ← PR #7
+                 │   ├── suppress_customer_status_notifications(PROCESSING)
                  │   ├── update_order_status(PROCESSING)
                  │   └── _dispatch_shipment_creation_task (on_commit)
                  │
@@ -130,7 +127,7 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                            payment-confirmed note (on_commit, emails-and-notifications.md)
 ```
 
-**A payment no order carries pages staff** (#818). When
+**A payment no order carries pages staff.** When
 `handle_payment_succeeded` finds no order for the intent (by `payment_id`,
 then by the order its server-set binding metadata names, `_bound_order_uuid`),
 it books nothing and calls `OrderService.report_payment_without_order`.
@@ -143,7 +140,7 @@ it books nothing and calls `OrderService.report_payment_without_order`.
   `payment_without_order_found` (the order services import no task), and its
   receiver queues `order.tasks.alert_payment_without_order_task` with
   `dispatch_on_commit`: a webhook that rolls back queues nothing, and the
-  mail no longer runs inside dj-stripe's `transaction.atomic`. Stripe has its
+  mail never runs inside dj-stripe's `transaction.atomic`. Stripe has its
   answer by then and redelivers nothing, so the task retries a transient mail
   error itself (`MAIL_TRANSIENT_ERRORS`). It re-checks that no order carries
   the intent, takes the claim on the intent id (`cache.add`,
@@ -158,8 +155,8 @@ it books nothing and calls `OrderService.report_payment_without_order`.
 - **At once.** Every intent of ours is opened for an order that already
   exists (`order`) or for a gift-card purchase (`giftcard`), so nothing is
   waited for: an intent bound to an order that does not exist alerts at
-  once. An intent bound with the retired `cart` purpose (the payment-first
-  path #818 removed) is not one of ours any more and is only logged.
+  once. An intent bound with any other purpose (an old `cart` binding) is not
+  one of ours and is only logged.
 
 **The collected amount must be the order's total.** `handle_payment_succeeded`
 (and the `checkout.session.completed` handler) compare what Stripe collected
@@ -192,27 +189,27 @@ the row. A polled COMPLETED settles through the same
 `announce_stripe_payment_applied`, shared with the webhook and reached by the
 `order_stripe_payment_polled` signal), only for a Stripe
 intent no gift-card purchase holds; any other provider's payment is settled by
-its webhook alone. `PayWayService.check_payment_status` (a second, caller-less
-polling writer) was removed.
+its webhook alone; nothing else polls and writes a payment.
 
 **A poll records only an open payment's state**
 (`_POLLED_STATUS_RECORDED` in `src/order/services.py`): PENDING, PROCESSING
 and FAILED as reported, and a provider's `canceled` (a Stripe intent closed by
 a hosted link opened in its place, a Viva `X`) as **FAILED**. The
 attempt is over, not the order: CANCELED is the payment state of a closed
-order (`Order.settle_unpaid_payment`), and on an open one it is settled, so
-neither bucket of `auto_cancel_stuck_pending_orders` selected the order, its
-stock stayed reserved, and a later success was ignored as stale (#697).
+order (`Order.settle_unpaid_payment`), and on an open one it would read as
+settled, so neither bucket of `auto_cancel_stuck_pending_orders` would select
+the order, its stock would stay reserved, and a later success would be
+ignored as stale.
 FAILED keeps the order payable (a new link, `create_checkout_session`) and is swept after
 `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`. A polled REFUNDED or
 PARTIALLY_REFUNDED is never written: the ledger derives those from the refunds
 it booked ([§7.3](payment-ledger.md)).
 
-**A provider that could not be asked is not a payment outcome** (#698). Each
+**A provider that could not be asked is not a payment outcome.** Each
 provider's `get_payment_status` raises `PaymentStatusUnavailableError` for a
 network error, a timeout, a rate limit, an outage or an answer it could not
-read; it used to answer FAILED, which the 30-minute sweep then acted on.
-Nothing is written. `GET /order/{id}/payment_status` answers 503
+read, never FAILED, which the 30-minute sweep would act on. Nothing is
+written. `GET /order/{id}/payment_status` answers 503
 `payment_provider_unavailable`, `PaymentLedger.ensure_charge`
 records no charge, and the Viva webhook's verification raises so Viva
 redelivers.
@@ -227,7 +224,7 @@ and tells no one: a card order is announced only when it is confirmed.
 The `suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an
 `order_payment_confirmed` email AND an `order_processing` email within ms
-(PR #7).
+([§6.3](emails-and-notifications.md)).
 
 **The charge is recorded on the payment ledger** ([§7.3](payment-ledger.md)):
 `captured` is the
@@ -391,7 +388,7 @@ order by the dispute's `payment_intent` and are guarded by the
   [§7.3](payment-ledger.md)). Unlike a refund or cancellation, it does **not**
   give back the points the customer redeemed on the order: the customer took
   the money back through their bank, so what they spent stays spent (owner
-  decision 2026-10-17; `LoyaltyService.reverse_order_points` skips the restore
+  decision; `LoyaltyService.reverse_order_points` skips the restore
   when the order has a CHARGEBACK row). Staff can re-grant by hand. A refund or
   a cancel takes back ALL the points the order earned even when the customer
   has spent them since, when `LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE` is on
@@ -471,7 +468,7 @@ refunds and disputes, the return page and a lost webhook.
 
 ### 4.4 COD / PAY_ON_DELIVERY (offline)
 
-```
+```text
 1. create_order_from_cart → status=PENDING, payment_status=PENDING
 2. _dispatch_shipment_creation_task (on_commit) → courier voucher mints
 3. AcsService._advance_pending_order_to_processing → status=PROCESSING

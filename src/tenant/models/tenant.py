@@ -77,6 +77,15 @@ class TenantQuerySet(models.QuerySet):
         return self.stores().exclude(self._ACTIVE)
 
 
+# A name made only of what ``str.strip()`` removes (every ``str.isspace()``
+# character). Spelled out because PostgreSQL's ``\s`` follows the database
+# locale, which leaves out U+00A0, U+2007, U+202F and others.
+BLANK_NAME_PATTERN = (
+    r"^[\s\x1c-\x1f\u0085\u00a0\u1680\u2000-\u200a"
+    r"\u2028\u2029\u202f\u205f\u3000]*$"
+)
+
+
 class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # Redeclares ``TenantMixin.schema_name`` (abstract base — safe to
     # override) to layer ``validate_reserved_schema_name`` on top of
@@ -1288,6 +1297,14 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                 fields=["is_platform_storefront"],
                 condition=models.Q(is_platform_storefront=True),
                 name="tenant_single_platform_storefront",
+            ),
+            # Every store has a name: the storefront prints it as the
+            # schema.org Brand and seller and as the RSS title. The admin
+            # form strips and requires it; this also refuses a raw ORM
+            # write or a command that skips the form.
+            models.CheckConstraint(
+                condition=~models.Q(name__regex=BLANK_NAME_PATTERN),
+                name="tenant_name_not_blank",
             ),
         ]
 

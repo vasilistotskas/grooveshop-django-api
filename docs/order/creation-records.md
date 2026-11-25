@@ -171,9 +171,8 @@ catalogue can no longer change.
   exact, no line pushed below what is left of it), and exposes the result
   as `AppliedPromotion.line_amounts` / `CartDiscountResult.line_discounts`
   (cart item pk -> amount). The cart preview (`Cart.vat_after_discount`),
-  the payment-intent amount and order creation all read the same
-  evaluation. Checkout (`OrderService._snapshot_line_discounts`, both
-  paths) freezes each line's share on `OrderItem.discount_allocation`
+  the quote and order creation all read the same
+  evaluation. Checkout (`OrderService._snapshot_line_discounts`) freezes each line's share on `OrderItem.discount_allocation`
   (the whole line, not per unit) exactly as it freezes `vat_rate`; the
   loyalty redemption is order-wide and is spread over the value left on
   every line. Its amount is rounded to the cent once, where it is priced

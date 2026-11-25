@@ -333,7 +333,7 @@ and says which file holds each § number used here.
   takes the larger of the derived size and that setting; with every item
   measured the derived size wins. The free gifts a cart is entitled to
   (`promotion.engine.benefits.gift_pairs`) are added to the cart's lines everywhere the
-  parcel is weighed or sized (payment intent, order verification and creation,
+  parcel is weighed or sized (the quote, order verification and creation,
   the shipment row, the options flag, the locker search), because they become
   physical order lines. A gift the engine leaves out (sold out) adds nothing;
   one lost to a later stock race only makes the booked size larger.
@@ -377,7 +377,7 @@ and says which file holds each § number used here.
   whose sizes are not known with `pickup_point_size_unknown`
   (`ShippingCarrierInterface.assert_pickup_point_fits` raising a
   `shipping.interfaces.PickupPointUnfit`, run in the locked quote; the
-  quote answers the same codes, the payment intent `invalid_order_data`).
+  quote answers the same codes).
   A locker is unknown only until the catalogue names it: each store keeps
   the last catalogue it applied for `BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS`
   (3 hours, `remember_catalogues`), and a partner sync that creates lockers

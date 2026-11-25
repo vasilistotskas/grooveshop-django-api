@@ -29,16 +29,6 @@ urlpatterns = [
         name="order-retrieve-by-uuid",
     ),
     path(
-        "order/<int:pk>/create_payment_intent",
-        OrderViewSet.as_view({"post": "create_payment_intent"}),
-        name="order-create-payment-intent",
-    ),
-    path(
-        "order/<int:pk>/retry-payment",
-        OrderViewSet.as_view({"post": "retry_payment"}),
-        name="order-retry-payment",
-    ),
-    path(
         "order/<int:pk>/create_checkout_session",
         OrderViewSet.as_view({"post": "create_checkout_session"}),
         name="order-create-checkout-session",

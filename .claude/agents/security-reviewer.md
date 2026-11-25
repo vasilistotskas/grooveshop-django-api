@@ -31,7 +31,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - `StockManager.reserve_stock()` / `release_reservation()` / `convert_reservation_to_sale()` / `decrement_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
 - `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `src/settings/store_settings.py`, validated by `order.inventory.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
-- Viva Wallet webhooks (`src/order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
+- Viva Wallet webhooks (`src/order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`viva_settlement.retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
 - Order status transitions: verify they follow the expected lifecycle (no skipping states)
 
 ### 4. Celery Task Security
@@ -70,7 +70,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Verify message content is not user-controlled HTML
 
 ### 10. Rate Limiting
-- Throttling is app-level DRF: `AnonRateThrottle`/`UserRateThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in each app's `throttles.py`, built on the bases in `src/core/api/throttling.py`, with rates in `DEFAULT_THROTTLE_RATES`
+- Throttling is app-level DRF: `core.api.throttling.AnonIpRateThrottle` and `UserBudgetThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in each app's `throttles.py`, built on the bases in `src/core/api/throttling.py`, with rates in `DEFAULT_THROTTLE_RATES`
 - Flag a throttle keyed on `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` read directly; the ident is `edge_client_ip(request) or self.get_ident(request)` (CLAUDE.md, "Client IP and throttle identity")
 - A new throttle uses `ResilientThrottleMixin` and sets `fail_closed` by the rule in that module's docstring (secret or existence oracle, money or stock, email to a caller-chosen address, uploads, third-party budgets deny while Redis is down)
 

@@ -87,8 +87,8 @@ class GiftCardCheckThrottle(UserOrIpRateThrottle):
         return True
 
 
-#: The body field a checkout names its gift cards in: the quote, the
-#: payment intent and order creation share it.
+#: The body field a checkout names its gift cards in: the quote and
+#: order creation share it.
 GIFT_CARD_CODES_FIELD = "gift_card_codes"
 
 
@@ -139,8 +139,8 @@ def _checkout_cart_ident(request) -> str | None:
 class GiftCardCodeThrottle(GatewayIdentMixin, GiftCardCheckThrottle):
     """Bound GUESSING a gift-card code through checkout, not using one.
 
-    The quote, the payment intent and order creation each say what a
-    card settles, or that a code is no card, so each is a balance oracle
+    The quote and order creation each say what a card settles, or that
+    a code is no card, so each is a balance oracle
     like ``/giftcard/check``. But a checkout re-prices the same card on
     every change, and that is use, not guessing. So:
 
@@ -217,8 +217,8 @@ def gift_card_code_throttles(
 ) -> list[GiftCardCodeThrottle]:
     """The extra budget of a checkout request that carries gift-card codes
     (``GiftCardCodeThrottle``). A view's ``get_throttles`` adds what this
-    returns, on every route that prices such codes: the quote, the
-    payment intent and order creation. ``serializer_class`` is the
+    returns, on every route that prices such codes: the quote and order
+    creation. ``serializer_class`` is the
     route's request serializer, whose ``gift_card_codes`` field reads the
     codes. A request without codes gets none.
     """

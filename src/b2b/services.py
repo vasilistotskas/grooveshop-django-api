@@ -7,9 +7,9 @@ stay retail; a resolved price map is bound onto the cart instance and
 ``CartItem`` money properties branch on it with a retail fallback.
 
 Binding happens at the model/context level (not in serializers) because
-``Cart.total_price`` feeds payment-intent verification, shipping
-thresholds and payment fees — a serializer-only override would desync
-what the customer is shown from what the provider charges.
+``Cart.total_price`` feeds the checkout quote, shipping thresholds and
+payment fees — a serializer-only override would desync what the
+customer is shown from what the order is created at.
 """
 
 from __future__ import annotations
@@ -598,10 +598,9 @@ class B2BPricingService:
         """The group's minimum order value when the BOUND cart is below
         it, else None.
 
-        One authority for all three consumers — the cart payload's
-        ``below_minimum`` flag, ``create_payment_intent`` (refusing to
-        mint an intent that order-create would reject after capture),
-        and both order-create paths.
+        One authority for both consumers — the cart payload's
+        ``below_minimum`` flag and order creation, which refuses the
+        order before any payment is opened for it.
         """
         context = getattr(cart, "_b2b_pricing", None)
         if context is None:

@@ -651,7 +651,7 @@ class TestRicherAccountDataset(TestCase):
             assert len(voucher) <= 20, "AcsShipment.voucher_no is 20 wide"
 
     def test_in_flight_parcels_are_the_newest_so_tracking_stays_fresh(self):
-        from devtools.demo_shipments import FINAL_STATES
+        from shipping.demo import FINAL_STATES
 
         newest_final = min(
             order.days_ago

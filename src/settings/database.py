@@ -24,8 +24,8 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 # probes. Without them a session gets the server's own (on the cluster, a
 # first probe after 900 s, then 9 more 100 s apart: about half an hour), and
 # a session that holds a lock across a call to another service holds it
-# that long: the delivery lock of an email (``core.db.locks``), and the store
-# lock a running task takes (``tenant.celery.holding_store``). Django
+# that long: every lock ``core.db.locks.held_across_calls`` takes, and the
+# store lock a running task takes (``tenant.celery.holding_store``). Django
 # connects to PostgreSQL directly (no pooler), so the server's probes reach
 # the worker's own socket. These GUCs are set per session, so they need no
 # change to the server.

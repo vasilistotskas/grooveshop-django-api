@@ -91,7 +91,7 @@ class TestTheLockerSync:
         written, so this sync's one write is the deactivating
         ``update``, which sends no signal."""
         codes, reset = purged
-        BoxNowLockerFactory(external_id="old-1")
+        BoxNowLockerFactory(external_id="old-1", consecutive_absent_syncs=2)
         reset()
 
         result = _sync_lockers([_destination("kept-1", country="")])
@@ -125,10 +125,14 @@ class TestTheStationSync:
                 return [row]
 
         monkeypatch.setattr(services, "AcsClient", _Client)
-        with mock.patch.object(services, "mark_surface_stale") as mark:
+        with mock.patch("core.cache.invalidation.mark_surface_stale") as mark:
             result = AcsService.sync_stations(
                 country="GR", kinds=(AcsShopKind.SMARTPOINT_LOCKER.value,)
             )
 
         assert result["deactivated"] == 1
-        mark.assert_called_once_with("shipping")
+        # The station list, and the countries a locker-only one lost.
+        assert {call.args[0] for call in mark.call_args_list} == {
+            "shipping",
+            "regions_countries",
+        }

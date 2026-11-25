@@ -109,11 +109,11 @@ class TestTheSplitIsFixedWhenClaimed:
             # A credit that took 60.00 of the receipt stands although the
             # provider reported the refund failed: the receipt, not the
             # ledger (which holds all 100.00 again), bounds the next credit.
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
             create_pending_credits(order.id)
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
             with pytest.raises(PaymentError, match="holds only"):
@@ -141,7 +141,7 @@ class TestOrderIndependence:
                 RefundService.refund_order(order, amount=_eur(amounts["A"]))
                 RefundService.refund_order(order, amount=_eur(amounts["B"]))
             for name in settled:
-                PaymentLedger.record_refund(
+                RefundService.book_refund(
                     order,
                     charge=charge,
                     amount=_eur(amounts[name]),
@@ -184,7 +184,7 @@ class TestAClaimBeforeTheReceiptBookedAfter:
                 Decimal("24.0"): Decimal("42.00"),
                 Decimal("13.0"): Decimal("28.00"),
             }
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
             create_pending_credits(order.id)
@@ -204,7 +204,7 @@ class TestAReversalFreesTheAllocation:
         )
         with mydata_enabled(auto_submit=auto_submit), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
             if auto_submit:
@@ -215,7 +215,7 @@ class TestAReversalFreesTheAllocation:
         order, charge = self._booked(auto_submit=False)
         assert credit_allocation.headroom_total(order) == Decimal("70.00")
 
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("10.00"), reference="re_1"
         )
 
@@ -225,7 +225,7 @@ class TestAReversalFreesTheAllocation:
     def test_a_refund_reversed_in_full_is_not_allocated_again(self):
         order, charge = self._booked(auto_submit=False)
 
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
         assert backfill_credit_allocations() == 0
@@ -236,7 +236,7 @@ class TestAReversalFreesTheAllocation:
         order, charge = self._booked(auto_submit=True)
         assert _credits(order).count() == 1
 
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
 
@@ -253,7 +253,7 @@ class TestUnclaimedMoneyIsAllocatedWhenBooked:
 
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("50.00"), reference="re_x"
             )
             create_pending_credits(order.id)
@@ -283,10 +283,10 @@ class TestTheBackfill:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            first, _ = PaymentLedger.record_refund(
+            first, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
-            second, _ = PaymentLedger.record_refund(
+            second, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("20.00"), reference="re_2"
             )
         booked = (_rows(refund=first), _rows(refund=second))
@@ -302,7 +302,7 @@ class TestTheBackfill:
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
         )
-        row, _ = PaymentLedger.record_refund(
+        row, _ = RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
         booked = _rows(refund=row)
@@ -373,10 +373,10 @@ class TestTheBackfill:
         )
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order, charge=charge, amount=_eur("10.00"), reference="re_1"
             )
         scaled = _rows(refund=row)
@@ -509,14 +509,14 @@ class TestCreditsAreIssuedNetOfReversals:
         )
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
         return order, charge
 
     def test_a_partial_reversal_before_the_credit_is_credited_net(self):
         order, charge = self._booked()
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("10.00"), reference="re_1"
         )
 
@@ -532,7 +532,7 @@ class TestCreditsAreIssuedNetOfReversals:
 
     def test_a_full_reversal_before_the_credit_issues_none(self):
         order, charge = self._booked()
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
 
@@ -544,7 +544,7 @@ class TestCreditsAreIssuedNetOfReversals:
             assert zero.amount.amount == 0
             assert credit_allocation.headroom_total(order) == Decimal("100.00")
             # The room is real: a later refund is credited in full.
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("100.00"), reference="re_2"
             )
             create_pending_credits(order.id)
@@ -558,7 +558,7 @@ class TestCreditsAreIssuedNetOfReversals:
             create_pending_credits(order.id)
         [credit] = _credits(order)
 
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
 
@@ -592,7 +592,7 @@ class TestEveryWritePathAllocatesFirst:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
             CreditAllocation.objects.all().delete()
@@ -610,7 +610,7 @@ class TestEveryWritePathAllocatesFirst:
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
         # What the previous release booked: the row, no allocation.
@@ -632,7 +632,7 @@ class TestEveryWritePathAllocatesFirst:
         )
         with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("60.00"), reference="re_old"
             )
             _duplicate_payment(order)
@@ -659,7 +659,7 @@ class TestTheHeadroomCountsTheCreditsThemselves:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
             create_pending_credits(order.id)
@@ -688,12 +688,12 @@ class TestALinkedBookedRefundKeepsOneAllocation:
             [attempt] = order.refund_attempts.all()
             # The provider's webhook books 29.00 (not the claimed 30.00):
             # it matches no attempt and is allocated as unclaimed money.
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("29.00"), reference="re_w"
             )
             assert credit_allocation.allocation_of(refund=row)
             # The answer to the call arrives: the same refund id.
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=_eur("29.00"),
@@ -728,7 +728,7 @@ class TestSmallCentsDoNotDependOnTheSettlementOrder:
                 RefundService.refund_order(order, amount=_eur(amounts["A"]))
                 RefundService.refund_order(order, amount=_eur(amounts["B"]))
             for name in settled:
-                PaymentLedger.record_refund(
+                RefundService.book_refund(
                     order,
                     charge=charge,
                     amount=_eur(amounts[name]),
@@ -794,7 +794,7 @@ class TestADuplicatePaymentOwesNoCredit:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             duplicate = _duplicate_payment(order)
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order,
                 charge=duplicate,
                 amount=_eur("100.00"),
@@ -832,7 +832,7 @@ class TestASettledAttemptWithoutItsRefundHoldsNothing:
         RefundService._allocate_claim(order, [first])
         RefundService._allocate_claim(order, [second])
         assert credit_allocation.headroom_total(order) == Decimal("40.00")
-        row, _ = PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=_eur("30.00"),
@@ -843,7 +843,13 @@ class TestASettledAttemptWithoutItsRefundHoldsNothing:
         # The second overlapped run finds the same refund (nothing in the
         # provider's answer ties it to an attempt): it is settled without
         # a link, and its room goes with it.
-        PaymentLedger.settle_attempt(second, row)
+        RefundService.book_refund(
+            order,
+            charge=charge,
+            amount=_eur("30.00"),
+            reference="re_1",
+            attempt=second,
+        )
 
         second.refresh_from_db()
         assert second.status == RefundAttemptStatus.SETTLED
@@ -884,7 +890,7 @@ class TestSourcesBookedByTheOldReleaseAreAllocatedAfterwards:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
             # What the old release booked: the row, no allocation, and a
@@ -916,12 +922,12 @@ class TestTheBackfillUsesTheLiveRules:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_a"
             )
             create_pending_credits(order.id)
             # The old release books another 65.00 with no allocation.
-            late, _ = PaymentLedger.record_refund(
+            late, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("65.00"), reference="re_b"
             )
             CreditAllocation.objects.filter(refund=late).delete()
@@ -939,7 +945,7 @@ class TestTheBackfillUsesTheLiveRules:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             duplicate = _duplicate_payment(order)
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order,
                 charge=duplicate,
                 amount=_eur("100.00"),
@@ -962,11 +968,11 @@ class TestASourceTheReceiptCannotHoldIsMarkedOnce:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("100.00"), reference="re_1"
             )
             # The receipt is full: this one finds no room.
-            late, _ = PaymentLedger.record_refund(
+            late, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("5.00"), reference="re_2"
             )
 
@@ -1007,7 +1013,7 @@ class TestRoomHeldByAClaimInFlightIsOnlyTemporary:
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
                 RefundService.refund_order(order, amount=_eur("100.00"))
             [claim] = order.refund_attempts.all()
-            late, _ = PaymentLedger.record_refund(
+            late, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
             )
 
@@ -1032,10 +1038,10 @@ class TestRoomHeldByAClaimInFlightIsOnlyTemporary:
         )
         with mydata_enabled(), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("100.00"), reference="re_1"
             )
-            late, _ = PaymentLedger.record_refund(
+            late, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("5.00"), reference="re_2"
             )
 
@@ -1053,13 +1059,13 @@ class TestTheExcessIsReadAtTheSourcesOwnMoment:
             _receipt(order)
             duplicate = _duplicate_payment(order)
             # The duplicate is paid back, then 50.00 of the sale.
-            first, _ = PaymentLedger.record_refund(
+            first, _ = RefundService.book_refund(
                 order,
                 charge=duplicate,
                 amount=_eur("100.00"),
                 reference="re_dup",
             )
-            second, _ = PaymentLedger.record_refund(
+            second, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("50.00"), reference="re_50"
             )
             CreditAllocation.objects.all().delete()
@@ -1103,7 +1109,7 @@ class TestAReceiptWaitsForUndecidedMoney:
         )
         with mydata_enabled(), FakeAade():
             claim = _pending_claim(order, "100.00")
-            late, _ = PaymentLedger.record_refund(
+            late, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
             )
             _mark_shipped(order)
@@ -1135,7 +1141,7 @@ class TestAReceiptWaitsForUndecidedMoney:
 
         order = _order(lines=(("24", "100.00"),))
         duplicate = _duplicate_payment(order)
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=duplicate, amount=_eur("100.00"), reference="re_dup"
         )
         _mark_shipped(order)
@@ -1156,7 +1162,7 @@ class TestOneRuleForUndecided:
             _receipt(order)
             _duplicate_payment(order)
             claim = _pending_claim(order, "100.00")
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("50.00"), reference="re_50"
             )
 
@@ -1180,10 +1186,10 @@ class TestOneRuleForUndecided:
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
             _pending_claim(order, "60.00")
-            older, _ = PaymentLedger.record_refund(
+            older, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("50.00"), reference="re_50"
             )
-            younger, _ = PaymentLedger.record_refund(
+            younger, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("40.00"), reference="re_40"
             )
 
@@ -1192,7 +1198,7 @@ class TestOneRuleForUndecided:
 
             # The claim settles: the 60.00 took its room, then the older
             # refund gets what is left, and the younger finds none.
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
 
@@ -1210,7 +1216,7 @@ class TestOneRuleForUndecided:
             _receipt(order)
             _duplicate_payment(order)
             _pending_claim(order, "60.00")
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("50.00"), reference="re_50"
             )
             assert not credit_allocation.is_allocated(refund=row)
@@ -1229,7 +1235,7 @@ class TestOneRuleForUndecided:
         with mydata_enabled(), FakeAade():
             _receipt(order)
             _pending_claim(order, "100.00")
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
             )
             Order.objects.filter(pk=order.pk).update(payment_status="REFUNDED")
@@ -1250,7 +1256,7 @@ class TestOneRuleForUndecided:
         staff = UserAccountFactory(is_staff=True, is_superuser=True)
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("90.00"), reference="re_90"
             )
             for i in range(2):
@@ -1286,7 +1292,7 @@ class TestMoneyBeyondTheReceiptIsAnAlert:
             charge = order.payment_transactions.get(
                 kind=PaymentTransactionKind.CHARGE
             )
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("150.00"), reference="re_150"
             )
 
@@ -1314,14 +1320,14 @@ class TestASettledClaimKeepsItsExcessWhereverItsRowFalls:
             # The claim takes the duplicate (a zero row), then a dashboard
             # refund of the sale is booked while it is still PENDING.
             claim = _pending_claim(order, "100.00")
-            row, _ = PaymentLedger.record_refund(
+            row, _ = RefundService.book_refund(
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
             assert not credit_allocation.is_allocated(refund=row)
 
             # The claim settles: its refund row is written AFTER the
             # dashboard refund, and the claim is no longer live.
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=claim.charge,
                 amount=_eur("100.00"),
@@ -1347,7 +1353,7 @@ class TestTheDeferredFlagFollowsTheReceipt:
         )
         with mydata_enabled(), FakeAade():
             claim = _pending_claim(order, "100.00")
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
             )
             _mark_shipped(order)
@@ -1358,7 +1364,7 @@ class TestTheDeferredFlagFollowsTheReceipt:
             # The claim ends up refunding 70: with the 30, the whole sale.
             # There is no sale left to document.
             _decline(claim)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("70.00"), reference="re_70"
             )
             allocate_credit_sources()
@@ -1379,13 +1385,13 @@ class TestUncoveredFollowsWhatStands:
         )
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("150.00"), reference="re_150"
             )
             [row] = credit_allocation.uncovered_orders()
             assert row.uncovered == Decimal("50.00")
 
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order,
                 charge=charge,
                 amount=_eur(reversed_),
@@ -1413,7 +1419,7 @@ class TestUncoveredFollowsWhatStands:
         )
         with mydata_enabled(auto_submit=False), FakeAade():
             _receipt(order)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("150.00"), reference="re_150"
             )
         staff = UserAccountFactory(is_staff=True, is_superuser=True)
@@ -1443,7 +1449,7 @@ class TestADeferredReceiptIsVisible:
             kind=PaymentTransactionKind.CHARGE
         )
         claim = _pending_claim(order, "100.00")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_30"
         )
         _mark_shipped(order)
@@ -1487,7 +1493,7 @@ class TestADeferredReceiptIsVisible:
                 kind=PaymentTransactionKind.CHARGE
             )
             _pending_claim(order, "100.00")
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_30"
             )
             from tests.integration.order.test_mydata_lifecycle import (
@@ -1553,7 +1559,7 @@ class TestOnlyTheClaimsThatBlockAreNamed:
             charge=None,
             amount=_eur("10.00"),
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("50.00"), reference="re_50"
         )
 
@@ -1634,7 +1640,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
         )
         with mydata_enabled(auto_submit=False), FakeAade():
             with FakeStripeRefunds() as api:
-                PaymentLedger.record_refund(
+                RefundService.book_refund(
                     order,
                     charge=charge,
                     amount=_eur("80.00"),
@@ -1650,10 +1656,10 @@ class TestASourceOwesTheSameWheneverItIsDecided:
                     provider="stripe",
                     reference="pi_d",
                 )
-                PaymentLedger.record_refund(
+                RefundService.book_refund(
                     order, charge=dup, amount=_eur("50.00"), reference="re_dup"
                 )
-                PaymentLedger.record_refund_reversal(
+                RefundService.book_refund_reversal(
                     order,
                     charge=charge,
                     amount=_eur("70.00"),
@@ -1697,7 +1703,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
                 provider="stripe",
                 reference="pi_d",
             )
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=dup, amount=_eur("100.00"), reference="re_dup"
             )
             decide_chargebacks(order.id, goods_returned=True, user=staff)
@@ -1732,7 +1738,7 @@ class TestASourceOwesTheSameWheneverItIsDecided:
                 provider="stripe",
                 reference="pi_d",
             )
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order, charge=dup, amount=_eur("100.00"), reference="re_dup"
             )
             decide_chargebacks(order.id, goods_returned=False, user=staff)
@@ -1814,7 +1820,7 @@ class TestEachKindOfDifferenceIsAcknowledgedOnItsOwn:
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
         )
-        refund, _ = PaymentLedger.record_refund(
+        refund, _ = RefundService.book_refund(
             order, charge=charge, amount=_eur("10.00"), reference="re_10"
         )
         stamp = timezone.now()
@@ -1948,7 +1954,7 @@ class TestTheDeferredFlagMeansWaitingForUndecidedSources:
             kind=PaymentTransactionKind.CHARGE
         )
         _pending_claim(order, "60.00")
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("50.00"), reference="re_50"
         )
         Order.objects.filter(pk=order.pk).update(

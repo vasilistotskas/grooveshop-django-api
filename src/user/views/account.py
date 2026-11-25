@@ -20,16 +20,16 @@ from blog.filters.post import BlogPostFilter
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from blog.views.post import BLOG_POST_ORDERING
-from core.api.permissions import IsOwnerOrAdmin
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.filters.camel_case_ordering import ActionOrdering
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import IsOwnerOrAdmin
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from notification.filters import NotificationUserFilter
 from notification.serializers.user import NotificationUserDetailSerializer
 from order.filters import OrderFilter

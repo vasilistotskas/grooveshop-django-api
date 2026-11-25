@@ -1,15 +1,14 @@
 """API-level binding regressions — the gap the first review round
 exposed: the service bound one cart instance while the views serialized
-freshly reloaded ones, so GET /cart showed retail and the Stripe intent
-was minted on the retail total (guaranteed
-``PaymentAmountMismatchError`` for every wholesale card checkout).
+freshly reloaded ones, so GET /cart showed retail while checkout charged
+the wholesale total.
 These tests pin the WIRE behavior, not the service layer.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -156,18 +155,12 @@ class TestCouponGateOnWire:
         assert not CartPromotionCode.objects.filter(cart__user=user).exists()
 
 
-@pytest.mark.usefixtures("checkout_legal_documents")
-class TestPaymentIntentBinding:
-    def _intent_payload(self, pay_way):
-        return {
-            "pay_way_id": pay_way.id,
-            "shipping_kind": "home_delivery",
-            "country_id": "GR",
-        }
-
-    def test_intent_amount_uses_wholesale_total(
+class TestQuoteBinding:
+    def test_the_quote_prices_the_wholesale_total(
         self, b2b_tenant, enable_wholesale
     ):
+        """What the order is created at, and so what the shopper pays
+        afterwards: never the retail base."""
         from country.models import Country
         from pay_way.factories import PayWayFactory
         from tests.utils.shipping import enable_rate
@@ -190,20 +183,10 @@ class TestPaymentIntentBinding:
             free_threshold=Money(Decimal(0), "EUR"),
         )
 
-        provider = MagicMock()
-        provider.process_payment.return_value = (
-            True,
-            {"payment_id": "pi_test", "client_secret": "cs_test"},
-        )
-
         def _get(key, default=None):
             return {"B2B_WHOLESALE_ENABLED": True}.get(key, default)
 
         with (
-            patch(
-                "pay_way.services.PayWayService.get_provider_for_pay_way",
-                return_value=provider,
-            ),
             # The store holds the provider's credentials: a pay way it
             # could not charge with is not offered.
             patch(
@@ -211,46 +194,21 @@ class TestPaymentIntentBinding:
                 return_value=True,
             ),
             patch("extra_settings.models.Setting.get", side_effect=_get),
-            patch("extra_settings.models.Setting.get", side_effect=_get),
         ):
             response = _client(user).post(
-                reverse("cart-create-payment-intent"),
-                self._intent_payload(pay_way),
+                reverse("cart-quote"),
+                {
+                    "pay_way_id": pay_way.id,
+                    "shipping_kind": "home_delivery",
+                    "country_id": "GR",
+                },
                 format="json",
             )
 
         assert response.status_code == status.HTTP_200_OK, response.data
-        charged = provider.process_payment.call_args.kwargs["amount"]
         # Wholesale items total, free shipping, no fee — NEVER the
-        # 100.00 retail base the pre-fix views were minting on.
-        assert charged.amount == Decimal("90.00")
-
-    def test_intent_refused_below_wholesale_minimum(
-        self, b2b_tenant, enable_wholesale
-    ):
-        from pay_way.factories import PayWayFactory
-
-        user, _group = _wholesale_buyer(
-            discount="10.00", min_order_value=Money("500.00", "EUR")
-        )
-        _cart_with_line(user, "100.00")
-        pay_way = PayWayFactory(
-            settlement=PaySettlement.ONLINE,
-            provider_code="stripe",
-            cost=Money(Decimal(0), "EUR"),
-            free_threshold=Money(Decimal(0), "EUR"),
-        )
-
-        response = _client(user).post(
-            reverse("cart-create-payment-intent"),
-            self._intent_payload(pay_way),
-            format="json",
-        )
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        # Match the amount, not the wording — the message is localized
-        # (Greek when the compiled .mo is present, English in CI).
-        assert "500" in str(response.data["detail"])
+        # 100.00 retail base the pre-fix views priced.
+        assert response.data["amount_due"] == Decimal("90.00")
 
 
 class TestCartTokenBindsToOwner:

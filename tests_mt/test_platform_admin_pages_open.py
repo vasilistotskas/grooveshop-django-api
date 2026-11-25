@@ -87,7 +87,8 @@ def test_every_platform_model_page_opens(platform_client, model, model_admin):
 
 def test_a_platform_identity_can_be_deleted(platform_client, mt_public_tenant):
     """Its store role goes with it; nothing reaches a store-only table."""
-    from tenant.models import TenantMembershipRole, UserTenantMembership
+    from tenant.enum import TenantMembershipRole
+    from tenant.models import UserTenantMembership
     from user.models import UserAccount
 
     with schema_context(get_public_schema_name()):

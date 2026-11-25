@@ -35,7 +35,6 @@ SECRET = "s3cret-edge-token"
 
 
 pytestmark = [
-    pytest.mark.usefixtures("trust_intent_binding"),
     pytest.mark.usefixtures("checkout_legal_documents"),
 ]
 

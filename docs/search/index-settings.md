@@ -20,7 +20,7 @@ change.
 `MeiliMeta.filterable_fields` names every field a query filters or facets on.
 `MeiliMeta.range_fields` names the subset that is also compared. The payload
 is the granular form of `filterableAttributes`
-([configure granular filters](https://www.meilisearch.com/docs/learn/filtering_and_sorting/configure_granular_filters)):
+([configure granular filters](https://www.meilisearch.com/docs/capabilities/filtering_sorting_faceting/how_to/configure_granular_filters)):
 one entry for the range fields (equality and comparison), one for the rest
 (equality only), each with `facetSearch` from `MeiliMeta.facet_search`.
 
@@ -37,12 +37,11 @@ minimums and maximums and the `facetStats` the sidebar reads as slider bounds.
 The blog search filters on `is_published` and the request language and uses
 no facets.
 
-Fields that used to be filterable and no query filters by (`name`,
-`category_name`, `stock`, `discount_percent`, `master_id`, `attributes`, and the
-blog's `title`, `likes_count`, `category`, `category_name`, `master_id`) are
-still in the documents, through their searchable, displayed or
-additional-field entry, and are read back in results. They are not indexed for
-filtering. A filter on one of them, `CONTAINS` included, is rejected by the
+Fields no query filters by (the product's `name`, `category_name`, `stock`,
+`discount_percent`, `master_id`, `attributes`, and the blog's `title`,
+`likes_count`, `category`, `category_name`, `master_id`) are in the documents,
+through their searchable, displayed or additional-field entry, and are read back
+in results. They are not indexed for filtering. A filter on one of them, `CONTAINS` included, is rejected by the
 engine until the field is added to `filterable_fields`.
 
 `range_fields` must be a subset of `filterable_fields`;
@@ -72,10 +71,9 @@ value reindexes its products: `product.signals._watch_search_text` queues
 queues one document each. Only a changed name or value queues it; deleting a translation, a brand or a
 category (with its child categories) queues the affected products too.
 
-After a deploy that changes these settings, `meilisearch_apply_settings
---all-tenants` runs as part of the release and adds the new fields to every
-store's index; the documents of existing products gain `sku`, `gtin`, `mpn`,
-`brand_name` and `category_name` on the next reindex (the nightly full sync, or
+A release that adds a searchable field applies it to every store's index through
+`meilisearch_apply_settings --all-tenants`; the documents of existing products
+gain the new document field on the next reindex (the nightly full sync, or
 `meilisearch_sync_index product.ProductTranslation` at once).
 
 ## Facet search
@@ -98,9 +96,9 @@ not sortable: `discount_percent` ranks through the custom ranking rule
 
 | Setting | Product | Blog | Why |
 |---|---|---|---|
-| `faceting.maxValuesPerFacet` | 500 | 100 | `attribute_values` holds the value ids of every attribute in one facet, returned in lexicographic order and cut at this cap. A cap below the number of distinct values drops ids silently (a cap of 20 did on the demo store; 95 distinct values already sat against 100). Do not lower it. The blog has no facets. |
-| `pagination.maxTotalHits` | 20000 | 20000 | The engine counts every hit up to this cap on each query, and past about 20000 a query can take seconds ([indexing best practices](https://www.meilisearch.com/docs/learn/indexing/indexing_best_practices)). No listing pages that deep. A product used to allow five million and the blog, in the code, 50000. |
-| `searchCutoffMs` | 1500 | 1500 | Unchanged. |
+| `faceting.maxValuesPerFacet` | 500 | 100 | `attribute_values` holds the value ids of every attribute in one facet, returned in lexicographic order and cut at this cap. A cap below the number of distinct values drops ids silently (a cap of 20 did; a store with about a hundred distinct values already sits against 100). Do not lower it. The blog has no facets. |
+| `pagination.maxTotalHits` | 20000 | 20000 | The engine counts every hit up to this cap on each query, and past about 20000 a query can take seconds ([paginating search results](https://www.meilisearch.com/docs/capabilities/full_text_search/how_to/paginate_search_results)). No listing pages that deep. |
+| `searchCutoffMs` | 1500 | 1500 | How long one query may run before the engine returns what it has found. |
 
 A total above `maxTotalHits` is reported as the cap, so `estimatedTotalHits`
 of a very large catalogue stops at 20000.
@@ -114,10 +112,9 @@ of a very large catalogue stops at 20000.
 
 `update_meili_settings` awaits each task for
 `MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]` (env `MEILI_SETTINGS_TASK_TIMEOUT_MS`,
-default 600000). The SDK's own default of five seconds made a reindex longer
-than that raise, after which the PreSync hook printed "DRIFTED" for a change
-the engine went on to apply. A task that outlasts the configured time still
-fails the command for that tenant (exit 1); the engine finishes it regardless.
+default 600000), because a reindex outlasts the SDK's own default of five
+seconds. A task that outlasts the configured time fails the command for that
+tenant (exit 1); the engine finishes it regardless.
 
 ## Inspecting an index
 

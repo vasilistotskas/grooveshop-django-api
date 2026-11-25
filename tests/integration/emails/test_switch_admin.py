@@ -21,7 +21,7 @@ from emails.registry import registry
 from emails.send import Status, send_email
 from emails.types import Owner
 from shipping.emails import WebhookFailed
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.texts.conftest import staff_client
 from tests.utils.staff import store_staff
 

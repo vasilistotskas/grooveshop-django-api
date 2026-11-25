@@ -1,11 +1,9 @@
 from datetime import timedelta
 
 import pytest
-from django.core import mail
 from django.utils import timezone
 
 from order.enum.status import (
-    CHARGED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
@@ -15,7 +13,6 @@ from order.models.order import Order
 from order.services import OrderService
 from order.tasks import (
     auto_cancel_stuck_pending_orders,
-    send_payment_failed_email,
 )
 from product.factories import ProductFactory
 
@@ -26,12 +23,11 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
     ``OrderService.handle_payment_failed`` only flips ``payment_status``
     to FAILED — it deliberately does NOT touch stock.
 
-    Stock is consumed at order-creation time (``_consume_stock_for_order``,
-    both the payment-first and offline paths), not on webhook receipt, so
-    by the time a ``payment_intent.payment_failed`` webhook arrives the
-    stock is already "sold". It must stay that way through a retry grace
-    window: Stripe allows retrying a failed PaymentIntent with a new
-    card, this storefront's back-to-form retry flow is live, and
+    Stock is consumed at order-creation time (``_consume_stock_for_order``),
+    not on webhook receipt, so by the time a ``payment_intent.payment_failed``
+    webhook arrives the stock is already "sold". It must stay that way
+    while the order can still be paid: the shopper may try another card on
+    the hosted page or open a new link (Pay now), and
     ``handle_payment_succeeded`` never re-consumes stock on a later
     success. Releasing stock the moment a payment fails would let a
     retried, successful payment ship an order against inventory that was
@@ -40,7 +36,7 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
     The terminal release path is ``order.tasks.auto_cancel_stuck_pending_
     orders``, which cancels PENDING orders whose payment has been FAILED
     for longer than ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` (default
-    30 minutes) via ``OrderService.cancel_order`` — see
+    30 minutes) via ``OrderLifecycleService.cancel_order`` — see
     ``TestAutoCancelReleasesStockAfterGracePeriod`` below.
     """
 
@@ -258,7 +254,7 @@ class TestAutoCancelReleasesStockAfterGracePeriod:
     failed-payment order's stock gets released. It cancels PENDING
     orders whose payment has been FAILED for longer than
     ``ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`` (default 30 minutes) via
-    ``OrderService.cancel_order``, which restores stock through
+    ``OrderLifecycleService.cancel_order``, which restores stock through
     ``StockManager.increment_stock`` on each order item and releases any
     reservation still linked via ``metadata['stock_reservation_ids']``.
     """
@@ -392,31 +388,3 @@ class TestAutoCancelReleasesStockAfterGracePeriod:
         )
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
-
-
-@pytest.mark.django_db
-class TestPaymentFailedEmailAfterACharge:
-    """The payment-failed email is queued when the payment fails and says
-    nothing was charged. A provider can charge the order before it runs
-    (a Viva retry that succeeds), and then it must not go out. A canceled
-    payment took nothing and can be retried, so the email still holds."""
-
-    @pytest.mark.parametrize("payment_status", sorted(CHARGED_PAYMENT_STATUSES))
-    def test_a_charged_order_gets_no_email(self, payment_status):
-        order = OrderFactory(num_order_items=0, payment_status=payment_status)
-        mail.outbox.clear()
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        assert mail.outbox == []
-
-    @pytest.mark.parametrize(
-        "payment_status", [PaymentStatus.FAILED, PaymentStatus.CANCELED]
-    )
-    def test_an_uncharged_order_gets_it(self, payment_status):
-        order = OrderFactory(num_order_items=0, payment_status=payment_status)
-        mail.outbox.clear()
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        assert [message.to for message in mail.outbox] == [[order.email]]

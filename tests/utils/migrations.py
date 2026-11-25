@@ -33,18 +33,31 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
 
+from core.db.migrate_command import settle_deferred_constraints
+
 type MigrationKey = tuple[str, str | None]
+
+
+def _settle(action: str, migration=None, fake: bool = False) -> None:
+    # A test migrates inside its ``TestCase`` transaction, as a store
+    # provisioned in one does: settle each migration's queued checks the
+    # way ``migrate_schemas``' command does.
+    settle_deferred_constraints(connection, action, fake=fake)
+
+
+def _executor() -> MigrationExecutor:
+    return MigrationExecutor(connection, progress_callback=_settle)
 
 
 def migrate(*targets: MigrationKey) -> MigrationLoader:
     """Migrate the default database to ``targets``; return a loader that
     reads the result (its ``applied_migrations`` are current)."""
-    executor = MigrationExecutor(connection)
+    executor = _executor()
     plan = executor.migration_plan(list(targets))
     if plan and all(backwards for _, backwards in plan):
         for step in _earlier_steps(executor, plan):
             executor.migrate(step)
-            executor = MigrationExecutor(connection)
+            executor = _executor()
     executor.migrate(list(targets))
     executor.loader.build_graph()
     return executor.loader

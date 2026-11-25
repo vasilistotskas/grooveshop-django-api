@@ -43,13 +43,14 @@ where the serializer nests:
 - The schema publishes the shapes as `ApiError`, `ApiValidationError` and
   `ApiFieldError`; plain-error response serializers carry an optional
   `code`.
-- A 400 is documented as `ApiValidationError` or a plain body (`anyOf`),
-  never as the plain body alone: a validation body has no `detail`.
-  `core.api.schema.publish_error_schemas` adds the validation variant to every
-  400 whose view declares a plain body (`PLAIN_400_BODIES`: `ErrorResponse`
-  becomes `ApiError`; `PaymentProviderError` is listed beside `ApiError`), so a view keeps
-  declaring `ErrorResponseSerializer` and a view with its own 400 body
-  (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
+- A 400 is documented as `ApiValidationError` or `ApiError` (`anyOf`), plus
+  the view's own body when it names one, never as one body alone: any view
+  can raise a validation error (a body with no `detail`) or a `ParseError`.
+  A 404 a view documents with its own body (`B2BErrorResponse`) gets
+  `ApiError` beside it, the body of a `NotFound` from `get_object` or a
+  feature gate. `core.api.schema.publish_error_schemas` writes both, so a
+  view keeps declaring `ErrorResponseSerializer` (a 400 of it becomes
+  `ApiValidationError` or `ApiError`) or its own body.
 - `ErrorResponse` is `{detail, code}` only. The one plain body that carries
   more is `PaymentProviderError` (`error`: the provider call's result), sent
   by the four order actions that call the payment provider.
@@ -105,15 +106,21 @@ from a missing one.
 calls it for raised exceptions), so those keep their own shape. Where a
 stable discriminator already existed, `code` now repeats it:
 
-- `{"detail", "reason"}` (cart coupons, quotes and payment intents, gift
+- `{"detail", "reason"}` (cart coupons, quotes, gift
   cards, business profile): `code` equals `reason`. `POST /cart/quote`
   answers a delivery it cannot price this way, with
-  `shipping_unavailable`, `shipping_parcel_too_large` or
-  `shipping_weight_exceeded` (`shipping.enum.ShippingRefusal`), so a
-  client can drop the selection and go on. A loyalty refusal there and on
-  the payment intent carries the loyalty program's code when it has one
-  (`loyalty_redemption_too_small`), else `loyalty_redemption_invalid`. The payment intent and order
-  creation keep `invalid_order_data` with the message under
+  `shipping_unavailable`, `shipping_region_unavailable` (the delivery
+  reaches the country but not the region's shipping zone),
+  `shipping_parcel_too_large` or `shipping_weight_exceeded`
+  (`shipping.enum.ShippingRefusal`), so a
+  client can drop the selection and go on, and a pickup point that cannot
+  be confirmed to take the cart with `pickup_point_too_small` or
+  `pickup_point_size_unknown` (`shipping.interfaces.PickupPointUnfit`;
+  order creation answers those two as field errors on the carrier's
+  location field). A loyalty refusal there carries the loyalty program's
+  code when it has one (`loyalty_redemption_too_small`), else
+  `loyalty_redemption_invalid`. Order creation keeps `invalid_order_data`
+  with the message under
   `fieldErrors.shippingProviderCode` for the same three.
 - `{"detail", "error": {"type"}}` (order create and cancel): `code` equals
   `error.type`. One exception, for now: an order refused because its total
@@ -184,10 +191,10 @@ line sees both, once each. In production it is one JSON object (the
 ```json
 {"level": "INFO", "logger": "core.middleware.access_log",
  "schema": "webside", "correlation_id": "…",
- "message": "POST api/v1/order/<int:pk>/create_payment_intent 400 812.4ms payment_intent_failed",
- "method": "POST", "route": "api/v1/order/<int:pk>/create_payment_intent",
+ "message": "POST api/v1/order/<int:pk>/create_checkout_session 400 812.4ms checkout_session_failed",
+ "method": "POST", "route": "api/v1/order/<int:pk>/create_checkout_session",
  "status": 400, "duration_ms": 812.4, "db_queries": 14, "db_ms": 233.1,
- "code": "payment_intent_failed"}
+ "code": "checkout_session_failed"}
 ```
 
 - `route` is the URL pattern, never the path; `schema` is the store. No

@@ -619,7 +619,16 @@ class TestAChargeThatWaitsForTheStoreIsToldApart:
     @pytest.mark.parametrize("read", ["_guest", "_gateway"])
     @pytest.mark.parametrize(
         "payment_status",
-        [PaymentStatus.PENDING, PaymentStatus.FAILED, PaymentStatus.PROCESSING],
+        [
+            PaymentStatus.PENDING,
+            PaymentStatus.FAILED,
+            PaymentStatus.PROCESSING,
+            # Refunded in full or in part while still PENDING: the store has
+            # not accepted the charge or closed the order, which still holds
+            # its stock.
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.REFUNDED,
+        ],
     )
     def test_a_flagged_undecided_order(self, hour, read, payment_status):
         order = _order(
@@ -643,9 +652,9 @@ class TestAChargeThatWaitsForTheStoreIsToldApart:
             (OrderStatus.PROCESSING, PaymentStatus.COMPLETED),
             # Canceled: ``Order.settle_unpaid_payment`` closes the payment.
             (OrderStatus.CANCELED, PaymentStatus.CANCELED),
-            # Refunded.
+            # Refunded, and the order closed.
             (OrderStatus.CANCELED, PaymentStatus.REFUNDED),
-            (OrderStatus.PENDING, PaymentStatus.REFUNDED),
+            (OrderStatus.CANCELED, PaymentStatus.PARTIALLY_REFUNDED),
             (OrderStatus.REFUNDED, PaymentStatus.REFUNDED),
         ],
     )

@@ -18,9 +18,8 @@ from typing import Any
 import requests
 from django.db import Error, InterfaceError, OperationalError, transaction
 from django.utils import timezone
-from psycopg.errors import LockNotAvailable, QueryCanceled
 
-from core.db.locks import held_across_calls
+from core.db.locks import LockWaitRanOut, held_across_calls
 from emails import optout
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
@@ -136,7 +135,10 @@ def delivering(
 
 def _claim(entry: EmailLog) -> EmailLog:
     try:
-        earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
+        # A savepoint: a failed read must not poison the transaction the
+        # send runs in (a webhook's atomic block), as ``_write`` does not.
+        with transaction.atomic():
+            earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
     except Error:
         earlier = None
     if earlier is None:
@@ -160,8 +162,9 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
     lock with it, and the copy that waits sends.
 
     A wait that runs out (``statement_timeout``, or ``lock_timeout`` where a
-    session sets one) raises ``OperationalError``, which every mail task
-    retries: the copy ahead is still sending. A database that cannot be
+    session sets one) raises ``core.db.locks.LockWaitRanOut``, an
+    ``OperationalError``, which every mail task retries: the copy ahead is
+    still sending. A database that cannot be
     reached (any other ``OperationalError`` or ``InterfaceError``) does not
     stop the send, as it does not for the row (``_write``): an alert about
     that database must go out. Any other database error is a bug and is
@@ -175,7 +178,7 @@ def _one_copy_at_a_time(delivery: uuid.UUID | None) -> Generator[None]:
         try:
             held.enter_context(held_across_calls(key))
         except (OperationalError, InterfaceError) as error:
-            if isinstance(error.__cause__, QueryCanceled | LockNotAvailable):
+            if isinstance(error, LockWaitRanOut):
                 raise
             logger.exception(
                 "Email delivery %s is sent without its lock",

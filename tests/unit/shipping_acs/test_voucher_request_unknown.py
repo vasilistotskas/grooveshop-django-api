@@ -171,7 +171,7 @@ class TestTheTracedSequence:
         first = _run_task_with_retries(order_id)
         again = _run_task_with_retries(order_id)
 
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )
@@ -781,7 +781,7 @@ class TestIssueVoucherNowFollowsTheRule:
 
         from shipping_acs.admin import AcsShipmentAdmin
 
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )
@@ -1620,7 +1620,7 @@ class TestAResetWhileAMintIsInFlight:
         AcsShipment.objects.filter(pk=shipment.pk).update(
             shipment_state=AcsShipmentState.CANCELED
         )
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )

@@ -21,11 +21,14 @@ from core.managers import OptimizedManager, OptimizedQuerySet
 from core.mixins import SoftDeleteManagerMixin, SoftDeleteQuerySetMixin
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
+    ORDER_STATUSES_SHIPPING_NOTHING,
+    PAYMENT_STATUSES_KEEPING_NOTHING,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
 from pay_way.enum.settlement import PaySettlement
+from shipping.interfaces import order_detail_prefetches, shipment_relations
 
 if TYPE_CHECKING:
     from typing import Self
@@ -36,12 +39,24 @@ def awaiting_online_payment_q(prefix: str = "") -> Q:
 
     ``prefix`` reaches the order from a related model (``"order__"``). The
     database form of "the shopper still owes money through a hosted flow",
-    deliberately NOT ``Order.awaits_online_payment``: that property is also
-    true for an online order that was refunded, partially refunded or
-    canceled, which is not waiting for anything.
+    and of ``Order.awaits_online_payment`` for one row.
     """
     return Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE}) & ~Q(
         **{f"{prefix}payment_status__in": SETTLED_PAYMENT_STATUSES}
+    )
+
+
+def ships_nothing_q(prefix: str = "") -> Q:
+    """Orders no parcel is to leave for: canceled, or refunded as an order
+    (``ORDER_STATUSES_SHIPPING_NOTHING``), or paid online and the store
+    keeps nothing of the payment (``PAYMENT_STATUSES_KEEPING_NOTHING``),
+    whatever their own status. Online only: a cash or terminal payment is
+    collected when the parcel arrives, so before it leaves it has nothing
+    to have gone back. ``prefix`` reaches the order from a related model
+    (``"order__"``). The database form of ``Order.ships_nothing``."""
+    return Q(**{f"{prefix}status__in": ORDER_STATUSES_SHIPPING_NOTHING}) | (
+        Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE})
+        & Q(**{f"{prefix}payment_status__in": PAYMENT_STATUSES_KEEPING_NOTHING})
     )
 
 
@@ -157,8 +172,11 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def with_shipments(self) -> Self:
         """Select related carrier shipment rows. Reverse one-to-ones, so an
         order without a row caches ``None`` instead of querying again —
-        what ``Order.can_be_canceled_by_customer`` reads per order."""
-        return self.select_related("acs_shipment", "boxnow_shipment")
+        what ``Order.can_be_canceled_by_customer`` reads per order. Every
+        carrier's (``shipment_relation``); none to join leaves the queryset
+        as it is, as ``select_related()`` with no names joins every FK."""
+        relations = shipment_relations()
+        return self.select_related(*relations) if relations else self
 
     def _enriched_items_prefetch(self) -> Prefetch:
         """Prefetch ``items`` with each item's product enriched for the
@@ -251,9 +269,9 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         Optimized queryset for detail views.
 
         Includes everything from for_list() plus full item details and
-        an eager-load of the linked shipping_provider row + provider
-        shipment objects so the Order detail serializer never N+1s on
-        ``boxnow_shipment`` / ``acs_shipment``.
+        an eager-load of the linked shipping_provider row + the rows every
+        carrier's detail reads (``order_detail_prefetches``), so the Order
+        detail serializer never N+1s on a carrier's shipment.
 
         ``with_total_amounts()`` matters as much here as on the list.
         ``Order.total_price_items`` is annotation-backed only when the
@@ -280,10 +298,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
                         "user"
                     ).order_by("created_at"),
                 ),
-                "boxnow_shipment",
-                "acs_shipment",
-                "acs_shipment__events",
-                "acs_shipment__station_destination",
+                *order_detail_prefetches(),
                 "invoice",
             )
         )

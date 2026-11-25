@@ -16,13 +16,15 @@ is `payment-ledger.md`. Read the file for what you are changing, then
 |---|---|---|
 | 1 | [`overview.md`](overview.md) | anything here: the three axes of an order (status, payment status, settlement), the two "payment method" columns, the carrier adapter |
 | 2 | [`state-machines.md`](state-machines.md) | an order status or payment status transition, who may make it, the follow-up flag |
-| 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the payment-first and order-first creation paths, locks and stock holds |
+| 3, 3.0 to 3.2 | [`creation.md`](creation.md) | checkout: the checkout quote (the one total) and the expected total, the one creation path (every pay way order first), repeats and agent checkouts, locks and stock holds |
 | 3.3 | [`creation-address.md`](creation-address.md) | delivery-address rules: the country's postcode and street rules, regions, pickup-point orders delivered to the point's address |
 | 3.4 to 3.7 | [`creation-records.md`](creation-records.md) | what an order stores when it is placed: acquisition source, VAT rate per line, legal acceptance, the line's name and SKU |
-| 4 | [`payments.md`](payments.md) | Stripe, Viva Wallet or cash on delivery: per-tenant credentials, webhooks, fees, provider refunds, disputes |
+| 4 | [`payments.md`](payments.md) | Stripe or cash on delivery, and what every provider shares: per-tenant credentials, webhooks, fees, provider refunds, disputes |
+| 4.3 | [`payments-viva.md`](payments-viva.md) | Viva Wallet: settlement and its checks, the webhook events (payment, refund, failure, fee), the return page, a lost webhook read back from Viva |
 | 5, 5.0, 5.3, 5.4 | [`shipping.md`](shipping.md) | the rules every carrier shares (the lock order included), shipping prices (`ShippingRate`), adding a carrier, operational alert emails |
 | 5.1 | [`shipping-acs.md`](shipping-acs.md) | `src/shipping_acs/`: vouchers, the voucher hold, pickup lists, tracking polls, COD payouts, the concurrency cap |
 | 5.2 | [`shipping-boxnow.md`](shipping-boxnow.md) | `src/shipping_boxnow/`: parcels, the webhook, the cancel rule, compartment sizes |
+| 5.5 | [`shipping-zones.md`](shipping-zones.md) | where a store delivers: `ShippingZone` (a whole country or some regions), which zone prices a destination, the served regions and the refusals, the admin rules |
 | 6 | [`emails-and-notifications.md`](emails-and-notifications.md) | an order email or a live toast: triggers, locale, suppression, marketing unsubscribe, account emails |
 | 7, 7.1, 7.1.0 to 7.1.2 | [`cancel.md`](cancel.md) | cancelling an order: every path, the payment hold and its sweep, asking the courier first (a customer) or after the commit (staff) |
 | 7.2, first half | [`refunds.md`](refunds.md) | what a refund returns: the paths, value-based refunds, refund by lines, restock, cash on delivery |
@@ -38,7 +40,13 @@ Keep each file well under 40,000 characters and its lines short: wrap
 prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
-Last refresh: 2026-11-21 (an order's address line 2, [§3.3](creation-address.md);
+Last refresh: 2026-11-24 (shipping zones: a rate belongs to a zone, a
+whole country or some of its regions, a home delivery is priced by its
+region's zone, an order or a saved address no home delivery reaches is
+refused, [§5.5](shipping-zones.md) / [§3.3](creation-address.md); every
+pay way creates the order first and pays it afterwards, [§3.1](creation.md);
+before
+that 2026-11-21: an order's address line 2, [§3.3](creation-address.md);
 an order has one payable payment link: a request for one returns the live
 one, [§4](payments.md); the cart digest leaves out the pay way and
 is returned once a delivery is chosen, [§3.0](creation.md); the quote's `cartDigest`: an order created
@@ -50,7 +58,7 @@ address and needs none of the buyer's, [§3.3](creation-address.md); before that
 2026-11-18: an agent checkout places one order, and a repeat
 of its creation is answered with that order, [§3.2](creation.md); one
 checkout total: `OrderQuoteService.quote`
-behind `POST /cart/quote`, the payment intent and both creation paths, and
+behind `POST /cart/quote` and order creation, and
 an order created with `expectedTotal` exists only at that total,
 [§3.0](creation.md); before that 2026-11-16: a staff or system cancel asks the courier after it
 has committed, with no row locked, and a sweep finishes a cancel whose worker

@@ -13,7 +13,7 @@ this page.
 
 ## The definition
 
-```
+```text
   net revenue                      order.reporting.turnover: sales less returns, net of VAT
 - cost of goods sold               units that shipped, less units restocked
 = gross profit
@@ -49,8 +49,8 @@ earned when the order leaves the store (`Order.shipped_at`).
 when the line is created (every creation path goes through it: checkout, a
 promotion's gift line, the admin, a script), exactly like `vat_rate`. Editing
 the product's cost later never restates a sale. A caller that states a cost
-keeps it. Lines sold before the field existed are null and are never backfilled:
-a cost copied onto a past sale would be a guess.
+keeps it. A line that has no recorded cost stays null and is never backfilled
+from the product: a cost copied onto a past sale would be a guess.
 
 **Cost coverage** is `goods_costed / (goods_costed + goods_uncosted)` over the
 net goods sold (the `GOODS` `OrderVatLine` rows, split by whether their item has
@@ -102,11 +102,12 @@ fee.
   7. After the next card payment, open the profit report: that payment shows
      a Viva fee instead of "fee not reported".
 
-  Only the documented payload was available when it was written
-  (developer.viva.com/webhooks-for-payments/transaction-price-calculated): check
-  the first real 1799 of a store (its `VivaWebhookEvent` row and the logged
-  `CurrencyCode`, `TotalCommission`, `Interchange`, `IsvFee`) and whether a
-  refund carries a commission event of its own.
+  The handler follows Viva's documented payload
+  (developer.viva.com/webhooks-for-payments/transaction-price-calculated). To
+  confirm a store's subscription, check its first real 1799 (its
+  `VivaWebhookEvent` row and the logged `CurrencyCode`, `TotalCommission`,
+  `Interchange`, `IsvFee`). Whether a refund carries a commission event of its
+  own is not verified.
 
 ### Delivery costs and other expenses
 
@@ -148,7 +149,7 @@ dict (`ProductAdmin.get_queryset`).
 ## Performance
 
 Five aggregate queries on top of turnover's, a constant number however many
-orders there are (`tests/unit/order/test_profit.py`).
+orders there are (`tests/unit/order/test_profit.py`: eight in all with turnover's three).
 
 ## Tests
 

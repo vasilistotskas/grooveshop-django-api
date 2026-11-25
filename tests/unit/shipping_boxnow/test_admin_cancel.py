@@ -29,7 +29,7 @@ CLIENT = "shipping_boxnow.services.BoxNowClient"
 
 
 def _request():
-    request = RequestFactory().post("/")
+    request = RequestFactory().post("/", {"_form_submitted": "on"})
     request.user = get_user_model()(id=1, username="staff", is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)

@@ -39,6 +39,7 @@ from django.utils.translation import gettext_lazy as _
 
 from order.enum.status import OrderStatus
 from order.managers.order import awaiting_online_payment_q
+from shipping.interfaces import registered_providers
 
 if TYPE_CHECKING:
     from django.utils.functional import _StrPromise
@@ -133,13 +134,12 @@ def follow_up_reason(order: Order) -> _StrPromise | None:
 
 
 def last_carrier_event_at(order: Order) -> datetime | None:
-    """When the carrier last reported on the parcel, ACS or BoxNow."""
-    events = [
-        shipment.last_event_at
-        for shipment in (
-            getattr(order, "acs_shipment", None),
-            getattr(order, "boxnow_shipment", None),
-        )
-        if shipment is not None and shipment.last_event_at is not None
+    """When a carrier last reported on the parcel
+    (``ShippingCarrierInterface.last_reported_at``)."""
+    reports = [
+        reported
+        for carrier in registered_providers()
+        if (shipment := carrier.shipment_for_order(order)) is not None
+        and (reported := carrier.last_reported_at(shipment)) is not None
     ]
-    return max(events, default=None)
+    return max(reports, default=None)

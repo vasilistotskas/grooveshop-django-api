@@ -28,7 +28,7 @@ from giftcard.models import (
     GiftCardTransactionKind,
 )
 from giftcard.services import GiftCardService
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,

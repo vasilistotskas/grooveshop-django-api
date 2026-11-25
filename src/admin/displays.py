@@ -56,8 +56,7 @@ from order.checkout.attribution import source_label
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from product.enum.review import ReviewStatus
-from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_boxnow.enum import BoxNowParcelState
+from shipping.interfaces import registered_providers
 from tenant.membership import bound_tenant
 
 # ── Shared variant maps (single source of truth) ──────────────────────
@@ -109,29 +108,51 @@ REVIEW_STATUS_VARIANT: dict[str, str] = {
     ReviewStatus.FALSE: "danger",
 }
 
-# One map covers both carriers: ACS and BoxNow state values are
-# distinct strings, and the semantics align (terminal-good → success,
-# terminal-bad → danger, in-flight → info, needs-attention → warning).
-SHIPMENT_STATE_VARIANT: dict[str, str] = {
-    # ACS
-    AcsShipmentState.PENDING_CREATION: "default",
-    AcsShipmentState.NEW: "info",
-    AcsShipmentState.IN_TRANSIT: "info",
-    AcsShipmentState.AT_DESTINATION: "info",
-    AcsShipmentState.OUT_FOR_DELIVERY: "info",
-    AcsShipmentState.DELIVERED: "success",
-    AcsShipmentState.ATTEMPTED: "warning",
-    AcsShipmentState.RETURNED: "warning",
-    AcsShipmentState.CANCELED: "danger",
-    AcsShipmentState.LOST: "danger",
-    # BoxNow (values that differ from ACS)
-    BoxNowParcelState.IN_DEPOT: "info",
-    BoxNowParcelState.FINAL_DESTINATION: "info",
-    BoxNowParcelState.EXPIRED: "warning",
-    BoxNowParcelState.ACCEPTED_FOR_RETURN: "warning",
-    BoxNowParcelState.ACCEPTED_TO_LOCKER: "info",
-    BoxNowParcelState.MISSING: "danger",
-}
+
+class _ShipmentStateVariants(dict[str, str]):
+    """The variant of every shipment state, as the registered carriers
+    declare them (``shipment_state_variants``).
+
+    Unfold only accepts a ``dict`` for ``label=``, and the admin classes
+    read it when they are defined, before the carrier apps have registered
+    their adapters; so the answer is gathered on each read instead. The
+    carriers' state values are distinct strings or agree on their
+    meaning (terminal-good: success, terminal-bad: danger, in-flight:
+    info, needs-attention: warning), so one map serves them all.
+    """
+
+    def _gather(self) -> dict[str, str]:
+        merged: dict[str, str] = {}
+        for carrier in registered_providers():
+            merged.update(carrier.shipment_state_variants())
+        return merged
+
+    def __getitem__(self, key: str) -> str:
+        return self._gather()[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._gather()
+
+    def __iter__(self):
+        return iter(self._gather())
+
+    def __len__(self) -> int:
+        return len(self._gather())
+
+    def get(self, key: object, default: Any = None, /) -> Any:
+        return self._gather().get(key, default)
+
+    def keys(self):
+        return self._gather().keys()
+
+    def values(self):
+        return self._gather().values()
+
+    def items(self):
+        return self._gather().items()
+
+
+SHIPMENT_STATE_VARIANT: dict[str, str] = _ShipmentStateVariants()
 
 
 def choice_label(

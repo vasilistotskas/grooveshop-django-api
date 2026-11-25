@@ -242,7 +242,7 @@ def _permissions_for_apps(
 
 def _permissions_for_role(role: str) -> set[str]:
     """The permission set a role grants inside its tenant."""
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
     from tenant.role_scopes import (
         OWNER_ONLY_PERMISSIONS,
         REFERENCE_DATA_APP_LABELS,

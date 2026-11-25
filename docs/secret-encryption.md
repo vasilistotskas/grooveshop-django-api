@@ -40,9 +40,8 @@ derived from `SECRET_KEY`, so rotating one does not touch the other.
   `backend-secrets` SealedSecret and in the operator's own secret store;
   a database backup is useless without it. Merchants can re-enter their
   credentials, but only after the operator tells them to.
-- The key must be present in every namespace and for the PreSync hook
-  **before** the release that adds the encrypted columns deploys: the
-  migration encrypts the existing plaintext and the app decrypts it.
+- The key must be present in every namespace and for the PreSync hook that
+  runs the migrations.
 
 ## Behaviour to know
 

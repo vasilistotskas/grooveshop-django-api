@@ -3,7 +3,7 @@
 Tells search engines that a product or a blog post of a store was created,
 changed or unpublished, instead of waiting for them to crawl it. Source:
 `src/indexnow/` (`models.py`, `signals.py`, `service.py`, `tasks.py`),
-`src/tenant/models.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
+`src/tenant/models/tenant.py` (`Tenant.indexnow_key`, `published_indexnow_key`),
 `src/tenant/validators.py` (`generate_indexnow_key`), `src/tenant/serializers.py`
 (`TenantConfigSerializer.indexnow_key`), `src/core/utils/tenant_urls.py` (the
 URLs). The code wins over this page.
@@ -32,7 +32,7 @@ URLs). The code wins over this page.
 | Part | Rule |
 |---|---|
 | Switch | The store setting `INDEXNOW_ENABLED`, **off by default**. A server-side switch (class (s) in `docs/store-features.md`): no client reads it, it is not in `features`. |
-| Key | `Tenant.indexnow_key`: a UUID's 32 hex characters, made when the store is created (the migration that added the column gave every existing store its own). Public by design. Platform staff can replace it on the tenant's Marketing tab (the regex of the protocol is its validator). |
+| Key | `Tenant.indexnow_key`: a UUID's 32 hex characters, made when the store is created, so every store has its own. Public by design. Platform staff can replace it on the tenant's Marketing tab (the regex of the protocol is its validator). |
 | Served | `GET /api/v1/tenant/resolve` carries `indexnowKey`: the key while `INDEXNOW_ENABLED` is on, `""` otherwise (and always for the control plane). The storefront serves `/<indexnowKey>.txt` with the key as the body when it is not empty. Switching the setting moves the resolve cache (`tenant.signals.bump_generation_on_agent_setting_change`). The field is optional in the schema. |
 | What is announced | A **published** product (`active` and not deleted) and a **live** blog post (`is_live`: `is_published`, and `published_at` empty or not in the future, the rule of `published()`): `/products/{id}/{slug}` and `/blog/post/{id}/{slug}` (`Product.storefront_path`, `BlogPost.storefront_path`; the pages of the storefront). |
 | When | `indexnow.signals`: a save of a published page; the save that unpublishes or soft-deletes it, or moves a live post's date into the future (the stored row said published before the save); a hard delete; a save of one of its translations. A draft, an inactive product, a post dated in the future and a save that touches only `view_count`/`updated_at` queue nothing, so an address never leaves the store before its page exists. |
@@ -63,9 +63,9 @@ stored like any other (`docs/celery-results.md`).
   language the product has no translation in is still sent.
 - A slug change announces the new address only; the old one is not known.
 - Environment: `INDEXNOW_ENDPOINT` and `INDEXNOW_TIMEOUT_SECONDS` (settings).
-  A staging copy of a production database carries the switch: the anonymiser
-  deletes the queue (`src/devtools/anonymise/rules.py`), and what staging sends
-  names the staging store's own domain.
+  The staging anonymiser (`src/devtools/anonymise/rules.py`) forces
+  `INDEXNOW_ENABLED` off (`FORCED_OFF_SETTINGS`) and deletes the queue, so a
+  staging copy announces nothing to the public endpoint.
 
 ## Tests
 

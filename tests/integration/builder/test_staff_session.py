@@ -15,12 +15,8 @@ from rest_framework.test import APIClient
 
 from builder import staff_session
 from core import tickets
-from tenant.models import (
-    PlatformStaffToken,
-    StaffTokenScope,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import StaffTokenScope, TenantMembershipRole
+from tenant.models import PlatformStaffToken, UserTenantMembership
 from tests.utils.staff import store_staff
 
 pytestmark = pytest.mark.django_db

@@ -25,7 +25,7 @@ import logging
 from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from django.db import transaction
 from django.db.models import (
@@ -41,13 +41,13 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.accounting import credit_allocation
 from order.enum.payment_transaction import (
     PaymentFeeSource,
     PaymentTransactionKind,
 )
 from order.enum.status import PaymentStatus
 from order.exceptions import PaymentStatusUnavailableError
+from order.models.credit_allocation import CreditAllocation
 from order.models.payment_transaction import PaymentTransaction
 from order.models.pending_payment_fee import PendingPaymentFee
 from order.models.refund_attempt import (
@@ -90,14 +90,6 @@ MANUAL_REFUND_PROVIDER = "manual"
 #: The longest "how was it paid back" reference accepted; the ledger prefixes
 #: it with the order and the collection it refunds.
 REPAYMENT_REFERENCE_MAX_LENGTH = 100
-
-#: What a provider can say about a payment that was captured. Viva reports
-#: ``R`` for a payment that was refunded afterwards, which is still a
-#: capture; Stripe keeps a refunded PaymentIntent ``succeeded``.
-_CAPTURED_STATUSES = frozenset(
-    {PaymentStatus.COMPLETED, PaymentStatus.REFUNDED}
-)
-
 
 #: Payment statuses of an order money is still held for, and so one whose
 #: capture a refund may have to read from the provider.
@@ -586,7 +578,7 @@ class PaymentLedger:
         single payment's remainder is split across payments, oldest first.
         A share against cash a courier collected (:func:`is_cash_collection`)
         has no provider to refund it: the merchant pays it back and says
-        how (:meth:`record_cod_refund`). The caller has already refused an
+        how (``RefundService.book_cod_refund``). The caller has already refused an
         amount above :meth:`refundable`.
         """
         plan: list[tuple[PaymentTransaction, Money]] = []
@@ -712,18 +704,79 @@ class PaymentLedger:
         what the provider still holds (captures less refunds and less every
         dispute). With *before*, the figure as it stood just
         before that ledger row, every input read at that one cut
-        (:meth:`held`, and :func:`credit_allocation.goods_returned`, which
-        ignores reversals booked at or after it)."""
+        (:meth:`held`, and :meth:`goods_returned`, which ignores
+        reversals booked at or after it)."""
         held = cls.held(order, before=before)
         excess = (
             held
             - order.calculate_order_total_amount().amount
-            + credit_allocation.goods_returned(order, before=before)
+            + cls.goods_returned(order, before=before)
         )
         # A money fact, not a rule: no refund can pay back more than the
         # provider still holds (what lost disputes took is gone).
         excess = min(excess, held - cls._charged_back_before(order, before))
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
+
+    @staticmethod
+    def goods_returned(
+        order: Order, *, before: PaymentTransaction | None = None
+    ) -> Decimal:
+        """The goods the provider's money has paid back, as it stood at a cut:
+        what every refund that moved before the ledger row *before* (``None``:
+        every one that moved) returned of goods (``goods_claimed``: what it
+        owed after the duplicate payment), less what the provider reported
+        failed of it by the same cut. A reversal booked at or after the cut is
+        not yet known there, however late the refund is decided. Gift card and
+        points returns are not the provider's money; a chargeback is no part of
+        it (:meth:`excess_held` takes off only what a lost dispute
+        took of the duplicate payment itself: a dispute on the sale is sale
+        money lost, whichever way staff decide its goods). A refund's
+        duplicate-payment part owes no credit and is no goods: the order is
+        still for what the ledger holds less this, so the excess is what is
+        above it (:meth:`excess_held`)."""
+        rows = (
+            CreditAllocation.objects.filter(
+                order=order,
+                moved_at__isnull=False,
+                goods_claimed__gt=0,
+                decision__isnull=True,
+            )
+            .exclude(refund_attempt__kind=RefundAttemptKind.STORED_VALUE)
+            .select_related("refund", "refund_attempt__refund")
+        )
+        if before is not None:
+            rows = rows.filter(moved_at__lt=before.created_at)
+        sources = [
+            (row, row.refund or row.refund_attempt.refund) for row in rows
+        ]
+        if not sources:
+            return _ZERO
+        reversals = PaymentTransaction.objects.filter(
+            kind=PaymentTransactionKind.REFUND_REVERSAL,
+            provider_reference__in={
+                refund.provider_reference for _row, refund in sources if refund
+            },
+        )
+        if before is not None:
+            reversals = reversals.filter(
+                Q(created_at__lt=before.created_at)
+                | Q(created_at=before.created_at, pk__lt=before.pk)
+            )
+        failed: dict[tuple[str, str], Decimal] = {}
+        for reversal in reversals:
+            key = (reversal.provider, reversal.provider_reference)
+            failed[key] = failed.get(key, _ZERO) + Decimal(
+                reversal.amount.amount
+            )
+        total = _ZERO
+        for row, refund in sources:
+            paid = Decimal((refund or row.refund_attempt).amount.amount)
+            if refund:
+                paid -= failed.get(
+                    (refund.provider, refund.provider_reference), _ZERO
+                )
+            total += max(min(row.goods_claimed, paid), _ZERO)
+        return total
 
     @staticmethod
     def _charged_back_before(
@@ -753,7 +806,7 @@ class PaymentLedger:
             cls.held(order)
             - cls.charged_back(order)
             - order.calculate_order_total_amount().amount
-            + credit_allocation.goods_returned(order)
+            + cls.goods_returned(order)
             + cls.chargebacks_returned(order)
         )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
@@ -1027,21 +1080,13 @@ class PaymentLedger:
         reference: str,
         description: str = "",
         provider: str | None = None,
-        attempt: RefundAttempt | None = None,
-        match_attempt: bool = True,
     ) -> tuple[PaymentTransaction, bool]:
         """Record that *charge* was refunded *amount* under *reference* (the
         provider's refund id), and bring ``order.payment_status`` in line.
         *provider* is who moved the money: the charge's own provider unless
-        the refund was made outside it.
-
-        *attempt* is the claim this refund fulfils. A refund booked without
-        one (a provider's webhook) settles the oldest PENDING attempt on the
-        charge for the same amount, whatever its age, so the attempt that
-        made it cannot book it a second time (:meth:`settle_attempt`). A
-        caller that knows the refund names an attempt which is not live
-        passes ``match_attempt=False``: the refund is then nobody's claim,
-        and no other attempt of the same amount may take it.
+        the refund was made outside it. The ledger row alone: a refund is
+        booked, with its attempt, allocation and overcharge flag, by
+        ``order.refunds.service.RefundService.book_refund``.
 
         The status is written here, from the ledger, whoever the writer is,
         so no path decides REFUNDED or PARTIALLY_REFUNDED for itself. A
@@ -1062,30 +1107,16 @@ class PaymentLedger:
         if created:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
-        if attempt is None and created and match_attempt:
-            attempt = (
-                RefundAttempt.objects.live()
-                .filter(charge=charge, amount=amount)
-                .order_by("created_at", "id")
-                .first()
-            )
-        if attempt is not None:
-            cls.settle_attempt(attempt, row)
-        if created:
-            # Whoever booked it, the order's unallocated sources are decided
-            # now, oldest first: a refund nobody claimed (a provider's
-            # webhook, a dashboard refund) over the headroom of this moment.
-            credit_allocation.allocate_order(order)
-            cls.sync_overcharge(order, row)
         return row, created
 
     @staticmethod
     def settle_attempt(
         attempt: RefundAttempt, refund: PaymentTransaction
-    ) -> None:
+    ) -> bool:
         """The ledger holds the refund *attempt* was claimed for. A refund
         row already answering another attempt is not linked twice: this one
-        is settled without a link, and without an allocation."""
+        is settled without a link. Returns whether it linked, which decides
+        the attempt's allocation (``RefundService.book_refund``)."""
         attempt.status = RefundAttemptStatus.SETTLED
         fields = ["status"]
         linked = (
@@ -1097,13 +1128,7 @@ class PaymentLedger:
             attempt.refund = refund
             fields.append("refund")
         attempt.save(update_fields=fields)
-        if linked:
-            credit_allocation.link_attempt(attempt, refund)
-        else:
-            # The refund is another attempt's and carries that attempt's
-            # allocation: this one's money did not move, so it holds no
-            # room and owes no credit.
-            credit_allocation.drop(refund_attempt=attempt)
+        return linked
 
     @classmethod
     def record_refund_reversal(
@@ -1120,7 +1145,9 @@ class PaymentLedger:
         was never paid back, so it counts as held again, and
         ``order.payment_status`` is re-derived. Nothing is written for a
         refund already reversed (providers redeliver) or when the ledger
-        holds no refund on *charge* to reverse."""
+        holds no refund on *charge* to reverse. The ledger row alone: the
+        allocation and the overcharge flag follow in
+        ``RefundService.book_refund_reversal``."""
         existing = PaymentTransaction.objects.filter(
             provider=charge.provider,
             provider_reference=reference,
@@ -1149,14 +1176,6 @@ class PaymentLedger:
         if created:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
-            refunded = PaymentTransaction.objects.filter(
-                provider=charge.provider,
-                provider_reference=reference,
-                kind=PaymentTransactionKind.REFUND,
-            ).first()
-            if refunded is not None:
-                credit_allocation.free_reversed(refunded)
-            cls.sync_overcharge(order, row)
         return row, created
 
     @staticmethod
@@ -1270,33 +1289,13 @@ class PaymentLedger:
         ).exists()
 
     @classmethod
-    def record_cod_refund(
+    def ensure_charge(
         cls,
         order: Order,
         *,
-        collection: PaymentTransaction,
-        amount: Money,
-        reference: str,
-        description: str = "",
-        attempt: RefundAttempt | None = None,
-    ) -> tuple[PaymentTransaction, bool]:
-        """Record that the merchant paid *amount* of the cash *collection*
-        back to the customer themselves, under *reference* (how: a bank
-        transfer id). The same status derivation as any refund
-        (:meth:`record_refund`)."""
-        return cls.record_refund(
-            order,
-            charge=collection,
-            amount=amount,
-            reference=cls.cod_refund_reference(order, collection, reference),
-            description=description,
-            provider=MANUAL_REFUND_PROVIDER,
-            attempt=attempt,
-        )
-
-    @classmethod
-    def ensure_charge(
-        cls, order: Order, *, provider_code: str, payment_id: str
+        provider_code: str,
+        payment_id: str,
+        reported: tuple[PaymentStatus, dict[str, Any]] | None = None,
     ) -> PaymentTransaction | None:
         """The ledger's CHARGE for *payment_id*, read from the provider and
         recorded when the ledger has none yet.
@@ -1307,11 +1306,17 @@ class PaymentLedger:
         order was created from an already-succeeded intent and its webhook
         never reached it. The first refund that needs the capture reads it
         from the provider once; from then on the ledger answers.
+        *reported* is the provider's ``get_payment_status`` answer when the
+        caller has read it already.
 
         ``None`` when the provider cannot confirm a capture (it has logged
         why): nothing is recorded and the caller refuses.
         """
-        from order.payments.payment import get_payment_provider
+        from order.payments.payment import (
+            get_payment_provider,
+            get_payment_provider_class,
+            provider_amount,
+        )
 
         existing = PaymentTransaction.objects.filter(
             order=order,
@@ -1322,15 +1327,24 @@ class PaymentLedger:
         if existing is not None:
             return existing
 
-        try:
-            status, data = get_payment_provider(
-                provider_code
-            ).get_payment_status(payment_id)
-        except PaymentStatusUnavailableError:
-            # The provider logged why; nothing is known about the capture.
-            return None
-        captured = data.get("amount")
-        if status not in _CAPTURED_STATUSES or captured is None:
+        if reported is None:
+            try:
+                reported = get_payment_provider(
+                    provider_code
+                ).get_payment_status(payment_id)
+            except PaymentStatusUnavailableError:
+                # The provider logged why; nothing is known about the
+                # capture.
+                return None
+        status, data = reported
+        captured = provider_amount(data.get("amount"))
+        # A capture is a positive amount: a refund (negative) named as the
+        # payment is none.
+        if (
+            not get_payment_provider_class(provider_code).captured(status, data)
+            or captured is None
+            or captured <= 0
+        ):
             logger.error(
                 "Payment %s %s cannot be recorded as captured for order %s: "
                 "provider says %s",
@@ -1343,8 +1357,7 @@ class PaymentLedger:
         row, _created = cls.record_charge(
             order,
             amount=Money(
-                Decimal(str(captured)),
-                data.get("currency") or order.amount_due.currency,
+                captured, data.get("currency") or order.amount_due.currency
             ),
             provider=provider_code,
             reference=payment_id,

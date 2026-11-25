@@ -684,7 +684,7 @@ def acs_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable ACS credentials.
 
     ACS credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
+    ``src/tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
     is_kind_enabled()``, the ACS fanout Celery tasks, and any test
     exercising ACS availability need an active tenant with
     ``Tenant.acs_*`` fields set. A ``SimpleNamespace`` is enough — the
@@ -733,13 +733,28 @@ def boxnow_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable BoxNow credentials.
 
     BoxNow credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
+    ``src/tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
     is_kind_enabled()``, the BoxNow fanout Celery tasks, and any test
     exercising BoxNow availability need an active tenant with
     ``Tenant.box_now_*`` fields set.
     """
     tenant = SimpleNamespace(
         schema_name="test-boxnow-tenant", **_BOXNOW_TENANT_FIELDS
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
+def boxnow_live_network(bind_tenant):
+    """Bind a fake tenant on BOX NOW's live network
+    (``Tenant.box_now_live_mode``): the only network whose lockers have
+    sizes (``shipping_boxnow.catalogue.sizes_exist``). A tenant without the
+    flag is on BOX NOW's stage network."""
+    tenant = SimpleNamespace(
+        schema_name="test-boxnow-live",
+        box_now_live_mode=True,
+        **_BOXNOW_TENANT_FIELDS,
     )
     bind_tenant(tenant)
     return tenant
@@ -906,30 +921,11 @@ def _retry_meili_connection_errors(attempts: int = 3) -> None:
 def checkout_legal_documents(db):
     """The store's terms of use and privacy policy, published in every
     language, as every store that takes orders has them. A checkout test
-    that creates a payment intent or an order needs them
+    that creates an order needs them
     (``tests/utils/legal.py``)."""
     from tests.utils.legal import publish_checkout_legal_documents
 
     return publish_checkout_legal_documents()
-
-
-@pytest.fixture
-def trust_intent_binding():
-    """Let a test whose mocked provider returns a bare intent create an order.
-
-    ``OrderService.create_order_from_cart`` refuses an intent whose
-    server-set metadata does not name the cart
-    (``order.payments.payment_binding``). Tests about something else (stock,
-    totals, attribution) mock the provider with no metadata; this accepts
-    their intent so they stay about that. The refusal itself is covered,
-    unpatched, in ``tests/integration/order/test_payment_binding.py``.
-    """
-    from unittest.mock import patch
-
-    from order.services import OrderService
-
-    with patch.object(OrderService, "_verify_intent_binding"):
-        yield
 
 
 @pytest.fixture

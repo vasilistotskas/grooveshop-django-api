@@ -8,6 +8,13 @@ from django.utils.translation import gettext_lazy as _
 from core.cache.registry import CacheSurface
 from core.cache.surfaces import nuxt_handlers
 
+#: ``GET /shipping/product/<id>``, the product page's "shipping from X":
+#: a rate moves it, and so do the product (price, weight, size) and the
+#: promotions, so the ``products`` and ``promotions`` surfaces purge it
+#: too.
+PRODUCT_SHIPPING_VIEW = "*ProductShippingView_*"
+PRODUCT_SHIPPING_HANDLER = "shipping.product"
+
 SURFACES = (
     CacheSurface(
         code="shipping",
@@ -21,6 +28,7 @@ SURFACES = (
             "*BoxNowLockerViewSet_*",
             "*AcsStationViewSet_*",
             "*ShippingPolicyView_*",
+            PRODUCT_SHIPPING_VIEW,
         ),
         nuxt_patterns=nuxt_handlers(
             "shipping.options",
@@ -29,10 +37,13 @@ SURFACES = (
             "shipping.acs.stations",
             "shipping.freeShippingInfo",
             "shipping.policy",
+            PRODUCT_SHIPPING_HANDLER,
         ),
         # A rate's price, threshold, weight cap or active flag
         # changes what ``/shipping/options`` and
-        # ``/shipping/free-shipping-info`` return; a provider's
+        # ``/shipping/free-shipping-info`` return, and so does the zone a
+        # rate belongs to (its regions, through an M2M that
+        # ``shipping.signals.zone_regions_changed`` reports); a provider's
         # active/capability flags do too. ``/shipping/policy`` is
         # cached here and also depends on the per-kind gate, which
         # for ACS lockers is the synced ``AcsStation`` rows.
@@ -41,6 +52,8 @@ SURFACES = (
         # ``update`` and marks the surface itself.
         invalidated_by=(
             "shipping.ShippingRate",
+            "shipping.ShippingZone",
+            "shipping.ShippingZoneRegion",
             "shipping.ShippingProvider",
             "shipping_acs.AcsStation",
             "shipping_boxnow.BoxNowLocker",

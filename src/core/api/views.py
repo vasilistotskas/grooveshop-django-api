@@ -15,10 +15,10 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from core.api.action_config import SerializersConfig
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
-from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -357,7 +357,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
 # Apply an extra action's ``@action(...)`` arguments when the view is
 # wired by hand, as DRF's router does.
 #
-# The URL confs call ``ViewSet.as_view({"post": "retry_payment"})``
+# The URL confs call ``ViewSet.as_view({"post": "create_checkout_session"})``
 # directly, and only the router merges the action's decorator
 # arguments (``throttle_classes``, ``permission_classes``,
 # ``pagination_class``, ``queryset``, ...) into the view it builds

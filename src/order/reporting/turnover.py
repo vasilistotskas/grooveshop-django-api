@@ -453,7 +453,7 @@ def _ledger_goods(rows: QuerySet) -> QuerySet:
     decided yet, or from before allocations) counts whole.
 
     A provider reversal takes the duplicate part back first, then the
-    goods, exactly as ``credit_allocation.goods_returned`` does: after
+    goods, exactly as ``PaymentLedger.goods_returned`` does: after
     reversals totalling ``c`` the refund stands for
     ``max(min(goods, paid - c), 0)`` of goods, and its one reversal (the
     ledger holds one per provider reference, ``unique_payment_transaction_

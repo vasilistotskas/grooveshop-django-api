@@ -19,11 +19,8 @@ from django.test import RequestFactory
 from core.cache.surfaces import SITEMAP_SEO_SURFACE, STORE_PAGES_SURFACE
 from core.tasks import purge_store_locales_task
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
-from tenant.models import (
-    Tenant,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 

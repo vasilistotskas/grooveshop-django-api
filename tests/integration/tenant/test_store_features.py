@@ -290,7 +290,6 @@ CART_ROUTES = [
     ("cart-detail", "get", False),
     ("cart-reserve-stock", "post", False),
     ("cart-release-reservations", "post", False),
-    ("cart-create-payment-intent", "post", False),
     ("cart-coupons", "get", False),
     ("cart-agent-token", "post", True),
     ("cart-item-list", "get", False),
@@ -312,20 +311,8 @@ def _call(route, method, signed_in):
 )
 @pytest.mark.parametrize("on", [True, False])
 def test_the_catalogue_switch_refuses_what_needs_the_catalogue(
-    request, route, method, signed_in, on
+    route, method, signed_in, on
 ):
-    if on and route == "giftcard:giftcard-check":
-        # Served, the empty check is a validation 400, which the operation
-        # documents as its own body only (#684).
-        request.applymarker(
-            pytest.mark.known_schema_drift(
-                "POST",
-                "/api/v1/giftcard/check",
-                400,
-                at=("$.code", "$.detail", "$.reason"),
-                issue=684,
-            )
-        )
     switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": on})
 
     response = _call(route, method, signed_in)
@@ -408,7 +395,7 @@ def test_the_trending_searches_of_the_blog_outlive_the_catalogue():
 
 @pytest.fixture
 def staff_api():
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
     from tests.utils.staff import (
         bind_store_tenant,
         store_staff,

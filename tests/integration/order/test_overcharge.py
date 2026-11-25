@@ -31,6 +31,8 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 from order.payments.payment_ledger import PaymentLedger
+from order.payments.viva_settlement import handle_payment_created
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
@@ -39,7 +41,6 @@ from order.signals.handlers import (
     handle_stripe_refund_failed,
     handle_stripe_refund_made,
 )
-from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
 from tests.utils.stripe_refunds import refund_event
 from tests.utils.viva import verified_payment
@@ -81,18 +82,18 @@ def _viva(order, transaction_id, order_code="OC1"):
     """Deliver a verified Viva payment-created event for *order*."""
     with (
         patch(
-            "order.views.viva_webhook._verify_transaction",
+            "order.payments.viva_settlement.verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
                 verified_payment(order, order_code),
             ),
         ),
-        patch("order.views.viva_webhook.dispatch_on_commit"),
+        patch("order.signals.handlers.dispatch_on_commit"),
         patch(
             "shipping.services.ShippingService.dispatch_create_shipment_task"
         ),
     ):
-        _handle_payment_created(order, {"StatusId": "F"}, transaction_id)
+        handle_payment_created(order, {"StatusId": "F"}, transaction_id)
     order.refresh_from_db()
 
 
@@ -258,7 +259,7 @@ class TestAnIntentTheOrderNoLongerNames:
         assert len(_alerts(send_email)) == 1
         assert order.payment_transactions.count() == 2
 
-    def test_an_older_intent_paid_after_a_retry_settles_the_order(
+    def test_an_older_intent_paid_after_another_settles_the_order(
         self, send_email
     ):
         order = _order(payment_id="pi_newer")
@@ -276,7 +277,8 @@ class TestAnIntentTheOrderNoLongerNames:
     @pytest.mark.parametrize(
         "forge",
         [
-            {"purpose": PaymentPurpose.CART.value},
+            # The retired payment-first purpose binds nothing.
+            {"purpose": "cart"},
             {"purpose": PaymentPurpose.GIFT_CARD.value},
             {"tenant_schema": "another_store"},
             {"subject": "not-a-uuid"},
@@ -297,18 +299,6 @@ class TestAnIntentTheOrderNoLongerNames:
         order.refresh_from_db()
         assert order.payment_transactions.count() == 0
         assert order.payment_status == PaymentStatus.PENDING
-        assert _alerts(send_email) == []
-
-    def test_a_payment_first_intent_with_no_order_yet_stays_as_today(
-        self, send_email
-    ):
-        cart_uuid = "5b1c1f06-6d6c-4a63-9c36-1e0a3f0b8a11"
-
-        _intent_succeeded(
-            "pi_early", binding_metadata(PaymentPurpose.CART, cart_uuid)
-        )
-
-        assert PaymentLedger.captured(_order()) == 0
         assert _alerts(send_email) == []
 
 
@@ -481,7 +471,7 @@ class TestTheFlagFollowsTheLedger:
             kind=PaymentTransactionKind.CHARGE, provider_reference=of
         )
         with patch("emails.send.send_email"):
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=Money(amount, "EUR"),
@@ -514,7 +504,7 @@ class TestTheFlagFollowsTheLedger:
 
         charge = order.payment_transactions.get(provider_reference="viva_txn_b")
         with patch("emails.send.send_email"):
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order,
                 charge=charge,
                 amount=Money(OWED, "EUR"),
@@ -532,7 +522,7 @@ class TestNormalOrdersAreNeverFlagged:
         _viva(order, "viva_txn_a", "OC1")
         charge = order.payment_transactions.get()
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=Money(Decimal(refunded), "EUR"),

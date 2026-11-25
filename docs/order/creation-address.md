@@ -113,7 +113,11 @@ address it cannot place (prod order #316: street "1", street number
   schema, logs its own failure and closes its own connection; the guard is
   taken before it starts, so a request arriving while a sync past its
   deadline still runs starts no other. Past the deadline the order is
-  refused while the sync goes on, so the next order finds the point. A point the resync does not hold either, a resync
+  refused while the sync goes on, so the next order finds the point. On a
+  store on BOX NOW's live network the locker the resync creates is sized
+  from the store's last catalogue; one the catalogue does not name yet is
+  refused as `pickup_point_size_unknown`
+  ([BOX NOW](shipping-boxnow.md)). A point the resync does not hold either, a resync
   that fails or passes its deadline (logged), is a 400
   `pickup_point_unknown` on the carrier's location field (`boxnowLockerId`,
   `acsStationExternalId`); no point at all is `pickup_point_required`. The
@@ -132,8 +136,14 @@ address it cannot place (prod order #316: street "1", street number
   country. A `region_id` with no such region is a 400 `region_invalid` and
   one of another country `region_country_mismatch`, both on `regionId`
   (`address_rules.region_errors`), from order creation and from the quote
-  and create-payment-intent bodies, which skip it for a pickup delivery;
+  body, which skips it for a pickup delivery;
   never a foreign key the database refuses.
+  A region the store's home deliveries skip while they reach the rest of
+  its country (its shipping zones, [§5.5](shipping-zones.md)) is a 400
+  `region_not_served` on `regionId` at order creation; a saved address
+  there is `region_not_served` on `region` (`country_not_served` on
+  `country` where no home delivery reaches the country), and one kept from
+  before reads `shippable: false`.
   `src/country/migrations/0012_seed_iso_countries.py` seeds the
   full ISO 3166-1 list, most of which have no seeded regions at all —
   a region could no longer be unconditionally required at the

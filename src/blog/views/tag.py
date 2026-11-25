@@ -11,14 +11,14 @@ from blog.serializers.tag import (
     BlogTagSerializer,
     BlogTagWriteSerializer,
 )
-from core.api.permissions import StoreStaffModelPermissions
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from core.utils.views import cache_methods
 from tenant.permissions import IsBlogEnabled
 

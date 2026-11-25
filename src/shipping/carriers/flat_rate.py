@@ -17,8 +17,8 @@ present.
 
 Pricing is NOT this adapter's job any more. It used to read the global
 ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD`` Setting rows
-as a last-resort fallback; that fallback is gone, because a per-country
-``ShippingRate`` row is now the only source of "the store's shipping
+as a last-resort fallback; that fallback is gone, because a
+``ShippingRate`` row of a shipping zone is now the only source of "the store's shipping
 price" — for this carrier same as every other. This class is therefore
 lifecycle-only: it exists so ``ShippingService`` can dispatch to it
 unconditionally, and every hook below answers "there is nothing here"
@@ -41,10 +41,6 @@ if TYPE_CHECKING:
 @register_provider
 class FlatRateCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "flat_rate"
-
-    #: Nothing to pick — no locker, no pickup point, no per-order
-    #: carrier data. The interface anticipates exactly this shape.
-    payload_keys: ClassVar[tuple[str, ...]] = ()
 
     # ------------------------------------------------------------------
     # Lifecycle — there is no carrier system to talk to
@@ -82,9 +78,6 @@ class FlatRateCarrier(ShippingCarrierInterface):
 
     def fetch_tracking_events(self, shipment: Any) -> list[dict[str, Any]]:
         return []
-
-    def shipment_for_order(self, order: Order) -> Any | None:
-        return None
 
     def holds_the_parcel(self, shipment: Any) -> bool:
         return False

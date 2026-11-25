@@ -22,7 +22,7 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.factories.payment_transaction import PaymentTransactionFactory
-from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -108,7 +108,7 @@ class TestARefundedOrder:
         order = _order(PaymentStatus.COMPLETED)
         charge = PaymentTransactionFactory(order=order, amount=_eur(DUE))
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("20.00"), reference="re_part"
         )
         order.refresh_from_db()
@@ -121,7 +121,7 @@ class TestARefundedOrder:
         order = _order(PaymentStatus.COMPLETED)
         charge = PaymentTransactionFactory(order=order, amount=_eur(DUE))
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur(DUE), reference="re_full"
         )
         order.refresh_from_db()

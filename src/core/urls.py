@@ -35,7 +35,6 @@ from core.views import (
 )
 from emails.webhooks import ResendWebhookView
 from order.views.viva_webhook import viva_wallet_webhook
-from shipping_boxnow.views.webhook import BoxNowWebhookView
 
 app_name = "core"
 
@@ -145,11 +144,7 @@ _root_shared_patterns = [
         viva_wallet_webhook,
         name="viva-wallet-webhook",
     ),
-    path(
-        "boxnow/webhook/",
-        BoxNowWebhookView.as_view(),
-        name="boxnow-webhook",
-    ),
+    path("", include("shipping.webhook_urls")),
     path(
         "resend/webhook/",
         ResendWebhookView.as_view(),
@@ -246,8 +241,6 @@ _storefront_i18n_patterns = [
     path("api/v1/", include("pay_way.urls")),
     path("api/v1/", include("recommendation.urls")),
     path("api/v1/", include("shipping.urls")),
-    path("api/v1/", include("shipping_boxnow.urls")),
-    path("api/v1/", include("shipping_acs.urls")),
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),

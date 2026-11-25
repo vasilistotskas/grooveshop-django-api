@@ -74,7 +74,7 @@ class _Checkout:
         }
 
     def order(self, *, pay_way=None, **address) -> Order:
-        return OrderService.create_order_from_cart_offline(
+        return OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=self.acceptance,
                 cart=self.cart,
@@ -156,7 +156,7 @@ class TestAnOrderThatCannotBePaidIsNotResumed:
         from order.checkout.attribution import AttributionInput
 
         checkout = _Checkout()
-        agents = OrderService.create_order_from_cart_offline(
+        agents = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout.acceptance,
                 cart=checkout.cart,

@@ -16,7 +16,7 @@ from django.utils import translation
 from admin import navigation
 from admin.navigation import ops_site_dropdown, store_sidebar
 from shipping.models import ShippingProvider
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
     bind_store_tenant,
     stamp_platform_identity,
@@ -240,6 +240,51 @@ class TestFeatures:
         assert "Pickup Points" not in entries
         assert "ACS Stations" in entries
         assert "items" not in entries["ACS Stations"]
+
+    def test_the_carrier_menus_keep_the_order_staff_know(
+        self, settings_values, carriers
+    ):
+        _tenant, previous = _bound()
+        try:
+            navigation = _sidebar(_superuser())
+        finally:
+            unbind_store_tenant(previous)
+
+        def menu(title):
+            found = []
+
+            def walk(items):
+                for item in items:
+                    if str(item["title"]) == title and item.get("items"):
+                        found.append([str(i["title"]) for i in item["items"]])
+                    walk(item.get("items", []))
+
+            for group in navigation:
+                walk(group["items"])
+            return found[0]
+
+        shipping = next(
+            group for group in navigation if str(group["title"]) == "Shipping"
+        )
+        assert [str(item["title"]) for item in shipping["items"]] == [
+            "ACS Shipments",
+            "ACS vouchers matching no order",
+            "ACS voucher holds",
+            "BoxNow Shipments",
+            "Pickup Points",
+        ]
+        assert menu("Pickup Points") == ["BoxNow Lockers", "ACS Stations"]
+        audit = menu("Audit & Logs")
+        assert [t for t in audit if "ACS" in t or "BoxNow" in t] == [
+            "BoxNow Events",
+            "ACS Tracking Events",
+            "ACS API Calls",
+        ]
+        assert [t for t in menu("Reconciliation") if "ACS" in t] == [
+            "ACS Pickup Lists",
+            "ACS Pickup List Runs",
+            "ACS COD Payouts",
+        ]
 
     def test_no_active_carrier_drops_the_shipping_group(
         self, settings_values, carriers

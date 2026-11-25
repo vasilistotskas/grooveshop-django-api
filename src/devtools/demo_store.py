@@ -1193,7 +1193,11 @@ def seed_products() -> dict[str, int]:
 
 
 def seed_tags() -> dict[str, int]:
-    """Create the tag vocabulary and attach it to products and posts.
+    """Create the tag vocabulary and attach it to products.
+
+    Only products: ``TaggedItem`` serves its object as a product
+    (``CONTENT_OBJECT_SERIALIZERS``), and a blog post has tags of its own
+    (``BlogPost.tags``).
 
     ``ContentType`` is looked up by ``app_label``/``model`` rather than
     through ``get_for_model``: contenttypes is in BOTH SHARED_APPS and
@@ -1202,7 +1206,6 @@ def seed_tags() -> dict[str, int]:
     """
     from django.contrib.contenttypes.models import ContentType
 
-    from blog.models import BlogPost
     from product.models import Product
     from tag.models import Tag, TaggedItem
 
@@ -1231,19 +1234,6 @@ def seed_tags() -> dict[str, int]:
                     tag=tag, content_type=product_ct, object_id=product_id
                 )
                 _bump(report, "product_links" if created else "links_unchanged")
-
-    # Blog posts get the two editorial tags, so the tag surface is not
-    # products-only.
-    post_ct = ContentType.objects.get(app_label="blog", model="blogpost")
-    post_ids = list(
-        BlogPost.objects.all().order_by("-id").values_list("id", flat=True)[:12]
-    )
-    for position, post_id in enumerate(post_ids):
-        tag = tags["Νέο"] if position % 2 == 0 else tags["Γραφείο"]
-        _, created = TaggedItem.objects.get_or_create(
-            tag=tag, content_type=post_ct, object_id=post_id
-        )
-        _bump(report, "post_links" if created else "links_unchanged")
     return report
 
 

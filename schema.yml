@@ -634,7 +634,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/B2BErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '500':
           content:
@@ -673,7 +675,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/B2BErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/B2BErrorResponse'
           description: ''
         '401':
           content:
@@ -10324,7 +10329,7 @@ paths:
         description: Language to resolve the content in; unknown or omitted means
           the store's default language.
       - in: path
-        name: pageKey
+        name: page_key
         schema:
           type: string
         required: true
@@ -10548,7 +10553,7 @@ paths:
         description: Language to resolve the content in; unknown or omitted means
           the store's default language.
       - in: path
-        name: pageKey
+        name: page_key
         schema:
           type: string
         required: true
@@ -11299,7 +11304,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CouponErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/CouponErrorResponse'
           description: ''
         '401':
           content:
@@ -11471,80 +11479,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CartCoupon'
-          description: ''
-  /api/v1/cart/create-payment-intent:
-    post:
-      operationId: createCartPaymentIntent
-      description: Δημιουργία Stripe payment intent βάσει του συνόλου του καλαθιού
-        πριν τη δημιουργία παραγγελίας. Απαιτείται για μεθόδους online πληρωμής (Stripe)
-        στη ροή πληρωμής πριν την παραγγελία. Επιστρέφει client_secret για επιβεβαίωση
-        πληρωμής στο frontend και payment_intent_id προς συμπερίληψη στο αίτημα δημιουργίας
-        παραγγελίας.
-      summary: Δημιουργία payment intent από καλάθι
-      parameters:
-      - in: header
-        name: X-Cart-Id
-        schema:
-          type: string
-          format: uuid
-        description: Cart UUID for guest users. Used to identify and maintain guest
-          cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel``.
-      tags:
-      - Cart
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CartCreatePaymentIntentRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CartCreatePaymentIntentRequestRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CartCreatePaymentIntentRequestRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      - {}
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CartPaymentIntentResponse'
           description: ''
   /api/v1/cart/item:
     get:
@@ -12747,15 +12681,14 @@ paths:
     post:
       operationId: quoteCart
       description: 'Τι χρεώνει το ταμείο για το καλάθι με τις επιλογές που έχουν γίνει
-        ως τώρα, υπολογισμένο από τη συνάρτηση που χρησιμοποιούν η δημιουργία παραγγελίας
-        και το payment intent: τα προϊόντα, οι προσφορές, η παράδοση, η επιβάρυνση
-        της μεθόδου πληρωμής, η έκπτωση πόντων και οι δωροκάρτες, και το οφειλόμενο
-        ποσό. Μια γραμμή που εξαρτάται από επιλογή που δεν έκανε το αίτημα είναι null.
-        Παραθέτει επίσης κάθε διαθέσιμο τρόπο παράδοσης και κάθε μέθοδο πληρωμής στην
-        τιμή που θα χρεωνόταν αυτό το καλάθι. Στείλτε πίσω το ``expectedTotal`` κατά
-        τη δημιουργία της παραγγελίας: τότε δημιουργείται μόνο σε αυτό το σύνολο.
-        Μια κοστολόγηση που ζητείται με ``X-Cart-Token`` είναι η τιμή του κατόχου
-        του καλαθιού.'
+        ως τώρα, υπολογισμένο από τη συνάρτηση που χρησιμοποιεί η δημιουργία παραγγελίας:
+        τα προϊόντα, οι προσφορές, η παράδοση, η επιβάρυνση της μεθόδου πληρωμής,
+        η έκπτωση πόντων και οι δωροκάρτες, και το οφειλόμενο ποσό. Μια γραμμή που
+        εξαρτάται από επιλογή που δεν έκανε το αίτημα είναι null. Παραθέτει επίσης
+        κάθε διαθέσιμο τρόπο παράδοσης και κάθε μέθοδο πληρωμής στην τιμή που θα χρεωνόταν
+        αυτό το καλάθι. Στείλτε πίσω το ``expectedTotal`` κατά τη δημιουργία της παραγγελίας:
+        τότε δημιουργείται μόνο σε αυτό το σύνολο. Μια κοστολόγηση που ζητείται με
+        ``X-Cart-Token`` είναι η τιμή του κατόχου του καλαθιού.'
       summary: Κοστολόγηση του συνόλου του καλαθιού στο ταμείο
       parameters:
       - in: header
@@ -13646,6 +13579,21 @@ paths:
           - type: boolean
         description: Φίλτρο χωρών με/χωρίς κωδικό κλήσης
       - in: query
+        name: homeDelivery
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι χώρες όπου το τρέχον κατάστημα παραδίδει στο σπίτι
+          (οι ζώνες αποστολής του), οι χώρες όπου μπορεί να βρίσκεται μια αποθηκευμένη
+          διεύθυνση· false: μόνο οι υπόλοιπες. Το shippable μετρά και τα σημεία παραλαβής.
+          Στον host της πλατφόρμας το true δεν επιστρέφει καμία.'
+      - in: query
         name: isEu
         schema:
           oneOf:
@@ -14045,7 +13993,7 @@ paths:
       summary: Ανάκτηση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14102,7 +14050,7 @@ paths:
       summary: Ενημέρωση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14178,7 +14126,7 @@ paths:
       summary: Μερική ενημέρωση Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14253,7 +14201,7 @@ paths:
       summary: Διαγραφή Χώρα
       parameters:
       - in: path
-        name: alpha2
+        name: alpha_2
         schema:
           type: string
           title: Κωδικός Χώρας (Alpha 2)
@@ -14283,6 +14231,479 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/country/all:
+    get:
+      operationId: listAllCountries
+      description: 'Ολόκληρη η λίστα χωρών σε έναν πίνακα, φιλτραρισμένη και ταξινομημένη
+        όπως η σελιδοποιημένη λίστα: για έναν επιλογέα που χρειάζεται κάθε γραμμή.'
+      summary: Όλες οι χώρες, σε μία λίστα
+      parameters:
+      - in: query
+        name: alpha2
+        schema:
+          type: string
+        description: Φίλτρο ανά ακριβή διψήφιο κωδικό χώρας
+      - in: query
+        name: alpha2_Icontains
+        schema:
+          type: string
+        description: Φίλτρο ανά διψήφιο κωδικό χώρας (μερική αντιστοίχιση)
+      - in: query
+        name: alpha2_Iexact
+        schema:
+          type: string
+      - in: query
+        name: alpha2_In
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: string
+        description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
+        explode: false
+        style: form
+      - in: query
+        name: alpha3
+        schema:
+          type: string
+        description: Φίλτρο ανά ακριβή τριψήφιο κωδικό χώρας
+      - in: query
+        name: alpha3_Icontains
+        schema:
+          type: string
+        description: Φίλτρο ανά τριψήφιο κωδικό χώρας (μερική αντιστοίχιση)
+      - in: query
+        name: alpha3_Iexact
+        schema:
+          type: string
+      - in: query
+        name: alpha3_In
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: string
+        description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
+        explode: false
+        style: form
+      - in: query
+        name: continent
+        schema:
+          type: string
+          enum:
+          - AF
+          - AN
+          - AS
+          - EU
+          - NA
+          - OC
+          - SA
+        description: |-
+          Φίλτρο ανά ήπειρο (βάσει κωδικών ISO)
+
+          * `AF` - Africa
+          * `AS` - Asia
+          * `EU` - Europe
+          * `NA` - North America
+          * `OC` - Oceania
+          * `SA` - South America
+          * `AN` - Antarctica
+      - in: query
+        name: createdAfter
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
+      - in: query
+        name: createdAt_Date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: createdAt_Gte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: createdAt_Lte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: createdBefore
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
+      - in: query
+        name: hasAllData
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών με πλήρη δεδομένα (ISO, κλήση, σημαία, όνομα)
+      - in: query
+        name: hasFlagImage
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών με/χωρίς εικόνα σημαίας
+      - in: query
+        name: hasIsoCc
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών με/χωρίς κωδικό ISO
+      - in: query
+        name: hasName
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών με/χωρίς μετάφραση ονόματος
+      - in: query
+        name: hasPhoneCode
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών με/χωρίς κωδικό κλήσης
+      - in: query
+        name: homeDelivery
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι χώρες όπου το τρέχον κατάστημα παραδίδει στο σπίτι
+          (οι ζώνες αποστολής του), οι χώρες όπου μπορεί να βρίσκεται μια αποθηκευμένη
+          διεύθυνση· false: μόνο οι υπόλοιπες. Το shippable μετρά και τα σημεία παραλαβής.
+          Στον host της πλατφόρμας το true δεν επιστρέφει καμία.'
+      - in: query
+        name: isEu
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο χωρών μελών ΕΕ
+      - in: query
+        name: isoCc
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο ανά ακριβή ISO κωδικό χώρας
+      - in: query
+        name: isoCc_Gte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: isoCc_In
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
+        explode: false
+        style: form
+      - in: query
+        name: isoCc_Lte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: isoCcMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο χωρών με κωδικό ISO μικρότερο ή ίσο με
+      - in: query
+        name: isoCcMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο χωρών με κωδικό ISO μεγαλύτερο ή ίσο με
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en)
+      - in: query
+        name: multipleCodes
+        schema:
+          type: string
+        description: Φίλτρο ανά πολλαπλούς κωδικούς χωρών (διαχωρισμένους με κόμμα,
+          alpha-2 ή alpha-3)
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Φίλτρο ανά όνομα χώρας (μερική αντιστοίχιση)
+      - in: query
+        name: name_Exact
+        schema:
+          type: string
+        description: Φίλτρο ανά ακριβές όνομα χώρας
+      - in: query
+        name: name_Startswith
+        schema:
+          type: string
+        description: Φίλτρο χωρών με όνομα που ξεκινά με
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field(s) to use when ordering the results. Multiple fields
+          can be combined with commas (e.g. ``-isMain,-createdAt``). Available fields:
+          alpha2, -alpha2, alpha3, -alpha3, isoCc, -isoCc, phoneCode, -phoneCode,
+          createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder, translations_Name,
+          -translations_Name'
+        schema:
+          type: string
+          pattern: ^(?:alpha2|\-alpha2|alpha3|\-alpha3|isoCc|\-isoCc|phoneCode|\-phoneCode|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|translations_Name|\-translations_Name)(?:,(?:alpha2|\-alpha2|alpha3|\-alpha3|isoCc|\-isoCc|phoneCode|\-phoneCode|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|translations_Name|\-translations_Name))*$
+      - in: query
+        name: phoneCode
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο ανά ακριβή κωδικό κλήσης
+      - in: query
+        name: phoneCode_Gte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: phoneCode_In
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
+        explode: false
+        style: form
+      - in: query
+        name: phoneCode_Lte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: phoneCodeMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο χωρών με κωδικό κλήσης μικρότερο ή ίσο με
+      - in: query
+        name: phoneCodeMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο χωρών με κωδικό κλήσης μεγαλύτερο ή ίσο με
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: shippable
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Φίλτρο για τις χώρες στις οποίες το τρέχον κατάστημα έχει ενεργή
+          τιμή αποστολής (ShippingRate). Στον host της πλατφόρμας — που δεν έχει κατάστημα,
+          άρα ούτε τιμές — δεν επιστρέφει ποτέ καμία.
+      - in: query
+        name: sortOrder
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
+      - in: query
+        name: sortOrder_Gte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: sortOrder_Lte
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
+        name: updatedAfter
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
+      - in: query
+        name: updatedAt_Date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: updatedAt_Gte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updatedAt_Lte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: updatedBefore
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: Φίλτρο ανά ακριβές UUID
+      tags:
+      - Countries
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Country'
           description: ''
   /api/v1/emails/unsubscribe/{token}:
     get:
@@ -14429,7 +14850,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GiftCardErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -14565,6 +14989,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedGiftCardList'
           description: ''
+  /api/v1/giftcard/mine/all:
+    get:
+      operationId: listAllMyGiftCards
+      description: Όλες οι δωροκάρτες που είναι συνδεδεμένες με τον λογαριασμό μου,
+        σε μία λίστα
+      summary: Όλες οι δωροκάρτες που είναι συνδεδεμένες με τον λογαριασμό μου, σε
+        μία λίστα
+      parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en)
+      tags:
+      - Gift Cards
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GiftCard'
+          description: ''
   /api/v1/giftcard/purchase:
     post:
       operationId: purchaseGiftCard
@@ -14592,7 +15078,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GiftCardErrorResponse'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/GiftCardErrorResponse'
           description: ''
         '401':
           content:
@@ -16824,7 +17313,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderCreateError'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/OrderCreateError'
           description: ''
         '401':
           content:
@@ -17986,7 +18478,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderCancelError'
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/OrderCancelError'
           description: ''
         '401':
           content:
@@ -18197,89 +18692,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-  /api/v1/order/{id}/create_payment_intent:
-    post:
-      operationId: createOrderPaymentIntent
-      description: Δημιουργία payment intent για πληρωμές Stripe σε υπάρχουσα παραγγελία
-      summary: Δημιουργία payment intent για παραγγελία
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      - in: query
-        name: uuid
-        schema:
-          type: string
-          format: uuid
-        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
-          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
-          και προσωπικό του καταστήματος.
-      tags:
-      - Orders
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/PaymentProviderError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreatePaymentIntentResponse'
-          description: ''
-        '409':
           content:
             application/json:
               schema:
@@ -18558,91 +18970,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReorderResponse'
-          description: ''
-  /api/v1/order/{id}/retry-payment:
-    post:
-      operationId: retryOrderPayment
-      description: Δημιουργία νέου Stripe PaymentIntent για παραγγελία της οποίας
-        η προηγούμενη πληρωμή απέτυχε ή δεν ολοκληρώθηκε ποτέ, ώστε ο πελάτης να μπορεί
-        να δοκιμάσει ξανά χωρίς να ξεκινήσει νέα παραγγελία.
-      summary: Επανάληψη πληρωμής για αποτυχημένη ή εκκρεμή παραγγελία
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      - in: query
-        name: uuid
-        schema:
-          type: string
-          format: uuid
-        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
-          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
-          και προσωπικό του καταστήματος.
-      tags:
-      - Orders
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/PaymentProviderError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreatePaymentIntentResponse'
-          description: ''
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/order/{id}/shipment_cancel:
     post:
@@ -27723,7 +28050,7 @@ paths:
           default: el
         description: Κωδικός γλώσσας για μεταφράσεις (el, en)
       - in: path
-        name: productId
+        name: product_id
         schema:
           oneOf:
           - type: string
@@ -27986,6 +28313,20 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: shippable
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι περιφέρειες όπου το τρέχον κατάστημα παραδίδει
+          στο σπίτι (οι ζώνες αποστολής του)· false: μόνο οι υπόλοιπες. Στον host
+          της πλατφόρμας, που δεν έχει κατάστημα, το true δεν επιστρέφει καμία.'
       - in: query
         name: sortOrder
         schema:
@@ -28424,6 +28765,20 @@ paths:
           - en
           default: el
         description: Κωδικός γλώσσας για μεταφράσεις (el, en)
+      - in: query
+        name: shippable
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: 'true: μόνο οι περιφέρειες όπου το τρέχον κατάστημα παραδίδει
+          στο σπίτι (οι ζώνες αποστολής του)· false: μόνο οι υπόλοιπες. Στον host
+          της πλατφόρμας, που δεν έχει κατάστημα, το true δεν επιστρέφει καμία.'
       tags:
       - Geography
       security:
@@ -28959,7 +29314,7 @@ paths:
       summary: Download ACS pickup-list manifest PDF
       parameters:
       - in: path
-        name: pickupListNo
+        name: pickup_list_no
         schema:
           type: string
         required: true
@@ -29006,7 +29361,7 @@ paths:
       summary: Cancel an ACS voucher
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -29036,7 +29391,7 @@ paths:
       summary: Download ACS voucher label PDF
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -29063,7 +29418,7 @@ paths:
       summary: Read ACS shipment tracking snapshot
       parameters:
       - in: path
-        name: voucherNo
+        name: voucher_no
         schema:
           type: string
         required: true
@@ -29238,6 +29593,18 @@ paths:
         cursor και limitOffset.'
       summary: Λίστα Lockers BoxNow
       parameters:
+      - in: query
+        name: compartmentSize
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Μόνο lockers που έχουν θυρίδα αυτού του μεγέθους (1 μικρό, 2
+          μεσαίο, 3 μεγάλο), με ακριβή αντιστοίχιση όπως κάνει ο δικός της επιλογέας
+          της BOX NOW. Ένα locker με άγνωστα μεγέθη δεν ταιριάζει ποτέ. Αγνοείται
+          σε κατάστημα που δεν είναι στο live δίκτυο της BOX NOW, όπου κανένα locker
+          δεν έχει μέγεθος.
       - in: query
         name: countryCode
         schema:
@@ -29500,7 +29867,7 @@ paths:
       summary: Cancel a BoxNow parcel
       parameters:
       - in: path
-        name: parcelId
+        name: parcel_id
         schema:
           type: string
         required: true
@@ -29530,7 +29897,7 @@ paths:
       summary: Download BoxNow parcel label PDF
       parameters:
       - in: path
-        name: parcelId
+        name: parcel_id
         schema:
           type: string
         required: true
@@ -29611,7 +29978,7 @@ paths:
         schema:
           type: string
         description: ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate``
-          is per-country.
+          belongs to a zone of one country.
         required: true
       - in: query
         name: currency
@@ -29627,6 +29994,13 @@ paths:
           - type: number
         description: Cart subtotal — included so providers can return free-shipping
           pricing when the threshold is hit.
+      - in: query
+        name: regionId
+        schema:
+          type: string
+        description: The delivery region's code, once chosen. A home delivery is priced
+          by the shipping zone of the region; without one, by the zone covering the
+          whole country.
       - in: query
         name: weightGrams
         schema:
@@ -29686,6 +30060,43 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ShippingPolicyEntry'
+          description: ''
+  /api/v1/shipping/product/{product_id}:
+    get:
+      operationId: getProductShipping
+      description: 'The cheapest delivery checkout would charge a cart holding this
+        product alone, to the store''s first shipping country: after the free-shipping
+        threshold and the automatic promotions such a cart gets, leaving out every
+        delivery that cannot carry the product (weight cap, parcel size). ``estimate``
+        is null when the store ships nowhere or no delivery can take the product.
+        Returns 404 when the product does not exist or is not active.'
+      summary: What shipping one product costs
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Shipping
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductShipping'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/shipping/providers:
     get:
@@ -30964,7 +31375,7 @@ paths:
         authenticates against that tenant's OWN user table — where the same
         id belongs to a different person. Filtering by that id would list
         stores the caller has nothing to do with. Customers hold no
-        memberships at all (see ``tenant/membership.py``), so an empty list
+        memberships at all (see ``src/tenant/membership.py``), so an empty list
         is the correct answer for every shopper.
       tags:
       - Tenant
@@ -31770,7 +32181,7 @@ paths:
       summary: Λήψη εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
-        name: exportId
+        name: export_id
         schema:
           oneOf:
           - type: string
@@ -36451,6 +36862,20 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
+        icon:
+          type: string
+          readOnly: true
+          title: Εικονίδιο
+          description: Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού
+            σελίδων.
         createdAt:
           type: string
           format: date-time
@@ -36464,9 +36889,12 @@ components:
       required:
       - createdAt
       - hasChildren
+      - icon
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - slug
       - sortOrder
@@ -36529,6 +36957,20 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
+        icon:
+          type: string
+          readOnly: true
+          title: Εικονίδιο
+          description: Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού
+            σελίδων.
         createdAt:
           type: string
           format: date-time
@@ -36575,9 +37017,12 @@ components:
       - createdAt
       - descendantsCount
       - hasChildren
+      - icon
       - id
       - level
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - postCount
       - recursivePostCount
       - siblingsCount
@@ -36656,6 +37101,12 @@ components:
           format: binary
           nullable: true
           title: Εικόνα
+        icon:
+          type: string
+          title: Εικονίδιο
+          description: Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού
+            σελίδων.
+          maxLength: 100
       required:
       - slug
       - translations
@@ -37042,6 +37493,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37056,7 +37515,9 @@ components:
       - createdAt
       - id
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -37168,6 +37629,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         readingTime:
           type: integer
           readOnly: true
@@ -37191,7 +37660,9 @@ components:
       - id
       - likes
       - likesCount
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - publishedAt
       - readingTime
       - slug
@@ -37660,6 +38131,20 @@ components:
           type: string
           readOnly: true
           title: Σημείωση
+        compartmentSizes:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+          description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
+        limitedAvailability:
+          type: boolean
+          readOnly: true
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true
@@ -37689,6 +38174,7 @@ components:
       required:
       - addressLine1
       - addressLine2
+      - compartmentSizes
       - countryCode
       - createdAt
       - externalId
@@ -37697,6 +38183,7 @@ components:
       - isActive
       - lastSyncedAt
       - lat
+      - limitedAvailability
       - lng
       - name
       - note
@@ -37779,6 +38266,20 @@ components:
           type: string
           readOnly: true
           title: Σημείωση
+        compartmentSizes:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+          description: 'Τα μεγέθη θυρίδων που έχει το locker (1 μικρό, 2 μεσαίο, 3
+            μεγάλο). Κενό όταν δεν είναι γνωστά: σε κατάστημα στο live δίκτυο της
+            BOX NOW το locker τότε δεν δέχεται καμία παραγγελία· ένα κατάστημα στο
+            δίκτυο stage της BOX NOW δεν έχει μεγέθη και δεν ελέγχει κανένα.'
+        limitedAvailability:
+          type: boolean
+          readOnly: true
+          description: True όταν η BOX NOW εκτιμά την πιθανότητα ελεύθερης θυρίδας
+            κάτω από το BOXNOW_LIMITED_AVAILABILITY_BELOW· false όταν δεν είναι γνωστή.
         isActive:
           type: boolean
           readOnly: true
@@ -37808,6 +38309,7 @@ components:
       required:
       - addressLine1
       - addressLine2
+      - compartmentSizes
       - countryCode
       - createdAt
       - externalId
@@ -37816,6 +38318,7 @@ components:
       - isActive
       - lastSyncedAt
       - lat
+      - limitedAvailability
       - lng
       - name
       - note
@@ -38806,7 +39309,11 @@ components:
               type: string
               nullable: true
               description: 'The country the carriers'' thresholds were judged for:
-                the store''s first shipping country, the one checkout preselects'
+                the store''s first shipping country, the one checkout preselects,
+                at the rates of its shipping zone covering the whole country, or of
+                each region zone of a country served only in some regions (a cart
+                knows no region; a region zone''s own threshold applies once checkout
+                prices the address)'
           required:
           - free
           - source
@@ -38845,7 +39352,7 @@ components:
                 description: This code waives shipping
               gift:
                 type: boolean
-                description: This code earns the gift listed in promotionGiftItems
+                description: This code earns a gift the order ships with
               rejection:
                 type: string
                 nullable: true
@@ -38860,8 +39367,8 @@ components:
                 - discount_code_not_applicable
                 - discount_code_gift_unavailable
                 - null
-                description: Why the engine refuses the attached code now; null while
-                  it applies
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
             required:
             - code
             - amount
@@ -39080,97 +39587,6 @@ components:
       - personal
       - promotion
       - reason
-    CartCreatePaymentIntentRequestRequest:
-      type: object
-      description: |-
-        Request body for ``POST /api/v1/cart/create-payment-intent``.
-
-        ``shipping_kind`` is required so the view's shipping calculation
-        follows the same code path the order-create verification runs.
-        ``shipping_provider_code`` is required for ``pickup_point`` (the
-        carrier identity drives the locker quote + per-carrier threshold)
-        but **omitted for ``home_delivery``** — home delivery is
-        provider-agnostic in checkout per the frontend's
-        ``shared/shipping/index.ts::carrierForMethod`` contract, and the
-        backend resolves the active home-delivery provider at order
-        creation. Sending whatever the frontend has guarantees both calc
-        paths agree.
-      properties:
-        payWayId:
-          type: integer
-          minimum: 1
-          description: ID της επιλεγμένης μεθόδου πληρωμής (πρέπει να είναι online
-            Stripe).
-        shippingKind:
-          allOf:
-          - $ref: '#/components/schemas/CartCreatePaymentIntentRequestShippingKindEnum'
-          description: |-
-            Τύπος εκπλήρωσης για τον μεταφορέα (home_delivery ή pickup_point). Απαιτείται ώστε να τηρούνται οι επιμέρους έλεγχοι διαθεσιμότητας (οι θυρίδες ACS χρειάζονται συγχρονισμένους σταθμούς) και ο έλεγχος PICKUP_POINT του BoxNow.
-
-            * `home_delivery` - home_delivery
-            * `pickup_point` - pickup_point
-        shippingProviderCode:
-          type: string
-          description: Κωδικός μεταφορέα που αντιστοιχεί σε καταχωρημένο προσαρμογέα
-            αποστολής (π.χ. 'acs', 'boxnow'). Απαιτείται για ``pickup_point``· παραλείψτε/αφήστε
-            κενό για ``home_delivery`` (το backend χρησιμοποιεί τη γενική πάγια χρέωση,
-            αντίστοιχη με αυτή που θα υπολογίσει η επαλήθευση δημιουργίας παραγγελίας
-            για το ίδιο αίτημα).
-          maxLength: 32
-        countryId:
-          type: string
-          minLength: 1
-          description: Κωδικός χώρας ISO 3166-1 alpha-2 — υποχρεωτικός, επειδή η τιμή
-            αποστολής (``ShippingRate``) ορίζεται ανά χώρα και χωρίς προορισμό δεν
-            τιμολογείται καμία επιλογή. Πρέπει να συμφωνεί με τη χώρα του αιτήματος
-            δημιουργίας παραγγελίας.
-          maxLength: 2
-        regionId:
-          type: string
-          description: Προαιρετικός κωδικός περιφέρειας — καθορίζει την προσαρμογή
-            αποστολής σε επίπεδο περιφέρειας.
-          maxLength: 16
-        email:
-          description: Email ολοκλήρωσης αγοράς. Επιτρέπει στους ελέγχους επιλεξιμότητας
-            προσφορών που εξαρτώνται από την ταυτότητα του πελάτη (μόνο για πρώτη
-            παραγγελία, όρια ανά πελάτη) να εκτελούνται με την ίδια ταυτότητα που
-            θα χρησιμοποιήσει η επαλήθευση κατά τη δημιουργία παραγγελίας, ώστε το
-            ποσό του PaymentIntent να παραμένει συγχρονισμένο.
-          oneOf:
-          - type: string
-            format: email
-          - type: string
-            maxLength: 0
-        giftCardCodes:
-          type: array
-          items:
-            type: string
-            minLength: 1
-            maxLength: 32
-          description: Κωδικοί δωροκαρτών που θέλει να εξαργυρώσει ο αγοραστής — το
-            intent δημιουργείται για το ΠΟΣΟ ΠΟΥ ΑΠΟΜΕΝΕΙ αφού αφαιρεθούν τα υπόλοιπά
-            τους. Στείλτε τους ίδιους κωδικούς στο σώμα της δημιουργίας παραγγελίας.
-          maxItems: 3
-        loyaltyPointsToRedeem:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: Πόντοι πιστότητας που θα εξαργυρώσει ο αγοραστής κατά τη δημιουργία
-            της παραγγελίας. Από το ποσό του intent αφαιρείται η έκπτωση που προκύπτει,
-            ώστε ο πάροχος να χρεώσει ό,τι εμφανίστηκε στον πελάτη. Στείλτε την ίδια
-            τιμή στο σώμα της δημιουργίας παραγγελίας. Απαιτεί πιστοποιημένο αίτημα.
-      required:
-      - countryId
-      - payWayId
-      - shippingKind
-    CartCreatePaymentIntentRequestShippingKindEnum:
-      enum:
-      - home_delivery
-      - pickup_point
-      type: string
-      description: |-
-        * `home_delivery` - home_delivery
-        * `pickup_point` - pickup_point
     CartItem:
       type: object
       properties:
@@ -39466,40 +39882,21 @@ components:
           format: uuid
           nullable: true
           title: Εμφάνιση σύστασης
-    CartPaymentIntentResponse:
-      type: object
-      description: Response body returned by the create-payment-intent cart action.
-      properties:
-        clientSecret:
-          type: string
-          description: Client secret του Stripe PaymentIntent για επιβεβαίωση στο
-            frontend
-        paymentIntentId:
-          type: string
-          description: ID του Stripe PaymentIntent προς αποθήκευση στην παραγγελία
-        amount:
-          type: number
-          format: double
-          maximum: 10000000000
-          minimum: -10000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          description: Συνολικό ποσό χρέωσης (καλάθι + αποστολή + έξοδα πληρωμής)
-        currency:
-          type: string
-          description: Κωδικός νομίσματος ISO 4217 (π.χ. EUR)
-          maxLength: 3
-      required:
-      - amount
-      - clientSecret
-      - currency
-      - paymentIntentId
     CartQuote:
       type: object
       description: |-
         The body of ``POST /cart/quote``: the quote, and what each
         delivery and pay way on offer would cost this cart.
       properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteLine'
+          readOnly: true
+          description: 'Οι γραμμές του καλαθιού που τιμολόγησε η προσφορά τιμής, από
+            την ίδια ανάγνωση με το itemsSubtotal και το cartDigest: ό,τι καλύπτει
+            το digest από την καθεμία (προϊόν, ποσότητα, τιμή μονάδας, χρήματα προωθήσεων),
+            με το όνομα και την εικόνα του προϊόντος.'
         itemsSubtotal:
           type: number
           format: double
@@ -39522,6 +39919,48 @@ components:
             $ref: '#/components/schemas/QuoteAppliedPromotion'
           description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
             στο discountTotal.
+        appliedCoupons:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              amount:
+                type: number
+                description: Money this code takes off; 0 when its benefit is not
+                  money, or it is refused
+              freeShipping:
+                type: boolean
+                description: This code waives shipping
+              gift:
+                type: boolean
+                description: This code earns a gift the order ships with
+              rejection:
+                type: string
+                nullable: true
+                enum:
+                - discount_code_invalid
+                - discount_code_expired
+                - discount_code_not_started
+                - discount_code_minimum_not_met
+                - discount_code_usage_limit_reached
+                - discount_code_combination_disallowed
+                - discount_code_user_ineligible
+                - discount_code_not_applicable
+                - discount_code_gift_unavailable
+                - null
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
+            required:
+            - code
+            - amount
+            - freeShipping
+            - gift
+            - rejection
+          readOnly: true
+          description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
+            το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
           allOf:
           - $ref: '#/components/schemas/QuoteBlockingCoupon'
@@ -39622,6 +40061,7 @@ components:
             μια παραγγελία.
       required:
       - amountDue
+      - appliedCoupons
       - appliedPromotions
       - blockingCoupon
       - cartDigest
@@ -39632,6 +40072,7 @@ components:
       - giftCardAmount
       - grandTotal
       - itemsSubtotal
+      - lines
       - loyaltyDiscount
       - payWays
       - paymentMethodFee
@@ -39642,13 +40083,17 @@ components:
       description: |-
         Request body for ``POST /api/v1/cart/quote``.
 
-        The choices of the payment-intent body, each optional: a quote may
-        be asked before the shopper has chosen a delivery or a pay way, and
-        the rows that depend on a missing choice come back null. A delivery
-        is priced once both ``shipping_kind`` and ``country_id`` are given.
-        Send what the order-create body will carry, the email and the pickup
-        point included, so the quote is the total that order is created at
-        and its ``cartDigest`` the cart that order is made of.
+        The checkout's choices, each optional: a quote may be asked before
+        the shopper has chosen a delivery or a pay way, and the rows that
+        depend on a missing choice come back null. A delivery is priced once
+        both ``shipping_kind`` and ``country_id`` are given. Send what the
+        order-create body will carry, the email and the pickup point
+        included, so the quote is the total that order is created at and its
+        ``cartDigest`` the cart that order is made of. Send that
+        ``cartDigest`` back as ``expectedCartDigest`` on ``POST /api/v1/order``:
+        only then is the order refused when the cart changed since the quote
+        (409 ``cart_changed``, nothing created), a change at the same total
+        included.
       properties:
         boxnowLockerId:
           type: string
@@ -39699,8 +40144,8 @@ components:
           description: Email ολοκλήρωσης αγοράς. Επιτρέπει στους ελέγχους επιλεξιμότητας
             προσφορών που εξαρτώνται από την ταυτότητα του πελάτη (μόνο για πρώτη
             παραγγελία, όρια ανά πελάτη) να εκτελούνται με την ίδια ταυτότητα που
-            θα χρησιμοποιήσει η επαλήθευση κατά τη δημιουργία παραγγελίας, ώστε το
-            ποσό του PaymentIntent να παραμένει συγχρονισμένο.
+            θα χρησιμοποιήσει η δημιουργία της παραγγελίας, ώστε η κοστολόγηση να
+            είναι το σύνολο στο οποίο δημιουργείται η παραγγελία.
           oneOf:
           - type: string
             format: email
@@ -39712,18 +40157,18 @@ components:
             type: string
             minLength: 1
             maxLength: 32
-          description: Κωδικοί δωροκαρτών που θέλει να εξαργυρώσει ο αγοραστής — το
-            intent δημιουργείται για το ΠΟΣΟ ΠΟΥ ΑΠΟΜΕΝΕΙ αφού αφαιρεθούν τα υπόλοιπά
-            τους. Στείλτε τους ίδιους κωδικούς στο σώμα της δημιουργίας παραγγελίας.
+          description: Κωδικοί δωροκαρτών που θέλει να εξαργυρώσει ο αγοραστής· το
+            οφειλόμενο ποσό είναι ό,τι απομένει αφού αφαιρεθούν τα υπόλοιπά τους.
+            Στείλτε τους ίδιους κωδικούς στο σώμα της δημιουργίας παραγγελίας.
           maxItems: 3
         loyaltyPointsToRedeem:
           type: integer
           minimum: 0
           nullable: true
           description: Πόντοι πιστότητας που θα εξαργυρώσει ο αγοραστής κατά τη δημιουργία
-            της παραγγελίας. Από το ποσό του intent αφαιρείται η έκπτωση που προκύπτει,
-            ώστε ο πάροχος να χρεώσει ό,τι εμφανίστηκε στον πελάτη. Στείλτε την ίδια
-            τιμή στο σώμα της δημιουργίας παραγγελίας. Απαιτεί πιστοποιημένο αίτημα.
+            της παραγγελίας· από το οφειλόμενο ποσό αφαιρείται η έκπτωση που προκύπτει.
+            Στείλτε την ίδια τιμή στο σώμα της δημιουργίας παραγγελίας. Απαιτεί πιστοποιημένο
+            αίτημα.
     CheckoutQuote:
       type: object
       description: |-
@@ -39734,6 +40179,15 @@ components:
         without a pay way, and ``giftCardAmount``, ``grandTotal``,
         ``amountDue`` and ``expectedTotal`` without both.
       properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteLine'
+          readOnly: true
+          description: 'Οι γραμμές του καλαθιού που τιμολόγησε η προσφορά τιμής, από
+            την ίδια ανάγνωση με το itemsSubtotal και το cartDigest: ό,τι καλύπτει
+            το digest από την καθεμία (προϊόν, ποσότητα, τιμή μονάδας, χρήματα προωθήσεων),
+            με το όνομα και την εικόνα του προϊόντος.'
         itemsSubtotal:
           type: number
           format: double
@@ -39756,6 +40210,48 @@ components:
             $ref: '#/components/schemas/QuoteAppliedPromotion'
           description: Μία εγγραφή ανά προσφορά που αφαίρεσε χρήματα· τα ποσά αθροίζουν
             στο discountTotal.
+        appliedCoupons:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              amount:
+                type: number
+                description: Money this code takes off; 0 when its benefit is not
+                  money, or it is refused
+              freeShipping:
+                type: boolean
+                description: This code waives shipping
+              gift:
+                type: boolean
+                description: This code earns a gift the order ships with
+              rejection:
+                type: string
+                nullable: true
+                enum:
+                - discount_code_invalid
+                - discount_code_expired
+                - discount_code_not_started
+                - discount_code_minimum_not_met
+                - discount_code_usage_limit_reached
+                - discount_code_combination_disallowed
+                - discount_code_user_ineligible
+                - discount_code_not_applicable
+                - discount_code_gift_unavailable
+                - null
+                description: Why the promotions refuse the attached code now; null
+                  while it applies
+            required:
+            - code
+            - amount
+            - freeShipping
+            - gift
+            - rejection
+          readOnly: true
+          description: Η κρίση για κάθε κωδικό κουπονιού που είναι συνδεδεμένος με
+            το καλάθι, όπως την αποφάσισαν οι προωθήσεις αυτής της προσφοράς τιμής.
         blockingCoupon:
           allOf:
           - $ref: '#/components/schemas/QuoteBlockingCoupon'
@@ -39840,6 +40336,7 @@ components:
             δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό.'
       required:
       - amountDue
+      - appliedCoupons
       - appliedPromotions
       - blockingCoupon
       - cartDigest
@@ -39850,6 +40347,7 @@ components:
       - giftCardAmount
       - grandTotal
       - itemsSubtotal
+      - lines
       - loyaltyDiscount
       - paymentMethodFee
       - shipping
@@ -40648,75 +41146,6 @@ components:
       - provider
       - sessionId
       - status
-    CreatePaymentIntentRequestRequest:
-      type: object
-      description: |-
-        Request body for ``create_payment_intent`` and ``retry_payment``.
-
-        The three named fields are declared because both views read them off
-        ``validated_data`` — undeclared, DRF dropped them and the branches
-        that copy them into ``payment_data`` could never fire.
-      properties:
-        paymentData:
-          type: object
-          additionalProperties:
-            type: string
-            minLength: 1
-            maxLength: 500
-          description: Επιπλέον δεδομένα πληρωμής που απαιτούνται από τον πάροχο πληρωμών
-        paymentMethodId:
-          type: string
-          description: ID μεθόδου πληρωμής του παρόχου προς χρέωση
-          maxLength: 255
-        customerId:
-          type: string
-          description: ID πελάτη του παρόχου στον οποίο θα συνδεθεί η πληρωμή
-          maxLength: 255
-        returnUrl:
-          description: Πού πρέπει ο πάροχος να επιστρέψει τον πελάτη
-          oneOf:
-          - type: string
-            format: uri
-            maxLength: 500
-          - type: string
-            maxLength: 0
-    CreatePaymentIntentResponse:
-      type: object
-      properties:
-        paymentId:
-          type: string
-          description: ID payment intent από τον πάροχο πληρωμών
-        status:
-          type: string
-          description: Κατάσταση πληρωμής
-        amount:
-          type: string
-          description: Ποσό πληρωμής
-        currency:
-          type: string
-          description: Νόμισμα πληρωμής
-        provider:
-          type: string
-          description: Όνομα παρόχου πληρωμών
-        clientSecret:
-          type: string
-          description: Client secret του Stripe PaymentIntent για επιβεβαίωση στο
-            frontend
-        requiresAction:
-          type: boolean
-          default: false
-          description: Αν η πληρωμή απαιτεί επιπλέον ενέργεια (3D Secure κ.λπ.)
-        nextAction:
-          type: object
-          additionalProperties: {}
-          nullable: true
-          description: Επόμενη ενέργεια που απαιτείται για την ολοκλήρωση της πληρωμής
-      required:
-      - amount
-      - currency
-      - paymentId
-      - provider
-      - status
     CurrencyEnum:
       enum:
       - EUR
@@ -41157,10 +41586,12 @@ components:
         countryCode:
           type: string
           nullable: true
-          description: Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code``
+          description: 'Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code``
             του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική
-            χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη
-            καμία ενεργή τιμή αποστολής.
+            χώρα της ολοκλήρωσης αγοράς. Τα όρια είναι της ζώνης αποστολής που καλύπτει
+            ολόκληρη τη χώρα: το όριο μιας ζώνης περιοχών ισχύει μόλις η ολοκλήρωση
+            αγοράς τιμολογήσει διεύθυνση σε αυτήν. Null μόνο όταν το κατάστημα δεν
+            έχει ακόμη καμία ενεργή τιμή αποστολής.'
           maxLength: 2
       required:
       - countryCode
@@ -41307,7 +41738,7 @@ components:
           type: string
           format: email
           readOnly: true
-          title: Email παραλήπτη
+          nullable: true
         recipientName:
           type: string
           readOnly: true
@@ -42865,10 +43296,6 @@ components:
             * `invalid_coupon` - Μη έγκυρο κουπόνι
             * `invalid_gift_card` - Μη έγκυρη δωροκάρτα
             * `legal_document_unavailable` - Νομικό έγγραφο μη διαθέσιμο
-            * `payment_not_found` - Δεν βρέθηκε πληρωμή
-            * `payment_verification` - Η επαλήθευση πληρωμής απέτυχε
-            * `payment_amount_mismatch` - Ασυμφωνία ποσού πληρωμής
-            * `payment_currency_mismatch` - Ασυμφωνία νομίσματος πληρωμής
         productId:
           type: integer
           description: Μόνο για ``insufficient_stock``.
@@ -42902,10 +43329,6 @@ components:
       - invalid_coupon
       - invalid_gift_card
       - legal_document_unavailable
-      - payment_not_found
-      - payment_verification
-      - payment_amount_mismatch
-      - payment_currency_mismatch
       type: string
       description: |-
         * `insufficient_stock` - Ανεπαρκές απόθεμα
@@ -42915,25 +43338,23 @@ components:
         * `invalid_coupon` - Μη έγκυρο κουπόνι
         * `invalid_gift_card` - Μη έγκυρη δωροκάρτα
         * `legal_document_unavailable` - Νομικό έγγραφο μη διαθέσιμο
-        * `payment_not_found` - Δεν βρέθηκε πληρωμή
-        * `payment_verification` - Η επαλήθευση πληρωμής απέτυχε
-        * `payment_amount_mismatch` - Ασυμφωνία ποσού πληρωμής
-        * `payment_currency_mismatch` - Ασυμφωνία νομίσματος πληρωμής
     OrderCreateFromCartRequest:
       type: object
       description: |-
-        Serializer for creating orders from cart (dual-flow payment architecture).
+        Serializer for creating orders from cart.
 
-        The flow follows the pay way's ``settlement``:
-        1. ``online``: the shopper pays at checkout. A client-confirmed
-           provider (Stripe) takes ``payment_intent_id`` for the balance
-           left after deductions (gift cards, promotions, loyalty points);
-           without one the order is created order-first, which succeeds only
-           when the deductions cover the whole total, so no provider charge
-           is made. A hosted-checkout provider (Viva) creates the order
-           first and redirects.
+        Every pay way creates the order before any payment, whatever its
+        ``settlement``:
+        1. ``online``: the balance left after deductions (gift cards,
+           promotions, loyalty points) is paid afterwards. In storefront
+           checkout the shopper pays it on the provider's hosted page (Viva
+           Wallet, Stripe); an agent order with delegated Stripe payments is
+           charged it through ``POST /api/v1/order/{id}/confirm_agent_payment``
+           (``confirmAgentPaymentForOrder``). Either way, deductions that
+           cover the whole total settle the order at once, with no provider
+           charge.
         2. Any other settlement (courier cash, carrier terminal, offline
-           transfer): money is collected later, no ``payment_intent_id``.
+           transfer): money is collected later.
 
         The order is created from an existing cart identified via X-Cart-Id header.
         Cart is NOT sent in request body - it's retrieved from the header using CartService.
@@ -42954,11 +43375,6 @@ components:
         payWayId:
           type: integer
           description: ID μεθόδου πληρωμής
-        paymentIntentId:
-          type: string
-          nullable: true
-          description: ID payment intent από τον πάροχο πληρωμών (υποχρεωτικό για
-            online πληρωμές)
         firstName:
           type: string
           minLength: 1
@@ -43104,8 +43520,8 @@ components:
             minLength: 1
             maxLength: 32
           description: Κωδικοί δωροκαρτών για εξαργύρωση σε αυτή την παραγγελία (έως
-            3). Όταν καλύπτουν ολόκληρο το σύνολο, παράλειψε το payment_intent_id
-            — δεν γίνεται καμία χρέωση από τον πάροχο.
+            3). Όταν καλύπτουν ολόκληρο το σύνολο, η παραγγελία εξοφλείται αμέσως
+            και δεν γίνεται καμία χρέωση από τον πάροχο.
           maxItems: 3
         shippingProviderCode:
           description: Κωδικός μεταφορέα από /api/v1/shipping/options (π.χ. 'acs').
@@ -45894,6 +46310,12 @@ components:
           format: binary
           nullable: true
           title: Εικόνα
+        icon:
+          type: string
+          title: Εικονίδιο
+          description: Το εικονίδιο της κατηγορίας, ένα από τα εικονίδια του δημιουργού
+            σελίδων.
+          maxLength: 100
     PatchedBlogCommentWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -47101,8 +47523,8 @@ components:
           type: string
         code:
           type: string
-          description: 'Σταθερός κωδικός σφάλματος: ``payment_intent_failed``, ``checkout_session_failed``
-            ή ``delegated_charge_failed``.'
+          description: 'Σταθερός κωδικός σφάλματος: ``checkout_session_failed`` ή
+            ``delegated_charge_failed``.'
         error:
           type: object
           additionalProperties: {}
@@ -47590,6 +48012,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -47651,7 +48081,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -47932,6 +48364,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         reviewAverage:
           type: number
           format: double
@@ -47965,7 +48405,9 @@ components:
       - finalPrice
       - id
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - potentialPoints
       - priorPrice
       - reviewAverage
@@ -48578,6 +49020,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -48647,7 +49097,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -48840,6 +49292,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -48909,7 +49369,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49228,6 +49690,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -49295,7 +49765,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -49365,6 +49837,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -49375,7 +49855,9 @@ components:
       - createdAt
       - id
       - image
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -49431,21 +49913,19 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
           readOnly: true
           title: Δημιουργήθηκε στις
-        imageDimensions:
-          type: object
-          properties:
-            width:
-              type: number
-            height:
-              type: number
-            aspectRatio:
-              type: number
-          readOnly: true
         imageFormat:
           type: string
           readOnly: true
@@ -49471,9 +49951,10 @@ components:
       - createdAt
       - id
       - image
-      - imageDimensions
       - imageFormat
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - product
       - sortOrder
       - translations
@@ -49574,6 +50055,12 @@ components:
           type: string
         mainImagePath:
           type: string
+        mainImageWidth:
+          type: integer
+          nullable: true
+        mainImageHeight:
+          type: integer
+          nullable: true
         matchesPosition: {}
         rankingScore:
           type: number
@@ -49649,7 +50136,9 @@ components:
       - languageCode
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - master
       - matchesPosition
       - name
@@ -50096,6 +50585,14 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
         imagePaths:
           type: array
           items:
@@ -50170,7 +50667,9 @@ components:
       - imagePaths
       - likesCount
       - lowStockThreshold
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - mpn
       - potentialPoints
       - price
@@ -50372,6 +50871,62 @@ components:
       - product
       - rate
       - translations
+    ProductShipping:
+      type: object
+      description: Response payload of the product shipping endpoint.
+      properties:
+        estimate:
+          allOf:
+          - $ref: '#/components/schemas/ProductShippingEstimate'
+          nullable: true
+          description: Null όταν το κατάστημα δεν αποστέλλει πουθενά ή όταν καμία
+            αποστολή που προσφέρει δεν μπορεί να πάρει αυτό το προϊόν.
+      required:
+      - estimate
+    ProductShippingEstimate:
+      type: object
+      description: The cheapest delivery of one product bought on its own.
+      properties:
+        countryCode:
+          type: string
+          description: 'Η χώρα για την οποία υπολογίστηκε η τιμή: η πρώτη χώρα αποστολής
+            του καταστήματος, αυτή που προεπιλέγει η ολοκλήρωση αγοράς.'
+          maxLength: 2
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Η φθηνότερη αποστολή που θα χρέωνε η ολοκλήρωση αγοράς σε ένα
+            καλάθι μόνο με αυτό το προϊόν, μετά το όριο δωρεάν αποστολής και τις προωθήσεις
+            δωρεάν αποστολής.
+        currency:
+          type: string
+          description: Νόμισμα των ``price`` και ``free_shipping_threshold``.
+          maxLength: 3
+        free:
+          type: boolean
+          description: 'Το προϊόν αποστέλλεται δωρεάν και μόνο του: το ``price`` είναι
+            0.'
+        freeShippingThreshold:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Το χαμηλότερο υποσύνολο προϊόντων, μετά τις εκπτώσεις, από
+            το οποίο μια μεταφορική που μπορεί να πάρει αυτό το προϊόν το αποστέλλει
+            δωρεάν. Null όταν καμία δεν το κάνει ποτέ.
+      required:
+      - countryCode
+      - currency
+      - free
+      - freeShippingThreshold
+      - price
     ProductVariant:
       type: object
       description: |-
@@ -51119,6 +51674,59 @@ components:
       required:
       - code
       - reason
+    QuoteLine:
+      type: object
+      description: One cart line as the quote priced it (``QuoteLine``).
+      properties:
+        id:
+          type: integer
+          description: Το στοιχείο του καλαθιού που είναι η γραμμή.
+        productId:
+          type: integer
+        productName:
+          type: string
+          readOnly: true
+          description: Το όνομα του προϊόντος στη γλώσσα του αιτήματος.
+        mainImagePath:
+          type: string
+          description: Η διαδρομή αποθήκευσης της κύριας εικόνας του προϊόντος· κενή
+            χωρίς εικόνα.
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Η τιμή ανά μονάδα που πληρώνει ο αγοραστής, πριν από τις προωθήσεις.
+        totalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: quantity μονάδες στην unitPrice, πριν από τις προωθήσεις.
+        promotionDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Το μέρος του discountTotal που φέρει αυτή η γραμμή· τα ποσά
+            των γραμμών αθροίζουν σε αυτό.
+      required:
+      - id
+      - mainImagePath
+      - productId
+      - productName
+      - promotionDiscount
+      - quantity
+      - totalPrice
+      - unitPrice
     QuotePayWayOption:
       type: object
       description: |-
@@ -51224,7 +51832,15 @@ components:
           type: boolean
           description: Αληθές όταν το καλάθι δεν χωρά στα δέματα αυτού του μεταφορέα·
             η επιλογή του απορρίπτεται.
+        compartmentSize:
+          type: integer
+          nullable: true
+          description: Το μέγεθος θυρίδας locker στο οποίο χωράει το καλάθι (1 μικρό,
+            2 μεσαίο, 3 μεγάλο) σε μια επιλογή παραλαβής BOX NOW· null αλλού και όταν
+            το καλάθι δεν χωράει σε κανένα. Στείλτε το ως ``compartmentSize`` για
+            να δείτε τα lockers που δέχονται αυτό το καλάθι.
       required:
+      - compartmentSize
       - exceedsMaxWeight
       - exceedsParcelSize
       - kind
@@ -52269,6 +52885,13 @@ components:
           type: string
           description: Χώρα προορισμού (ISO 3166-1 alpha-2).
           maxLength: 2
+        regionCodes:
+          type: array
+          items:
+            type: string
+          description: Οι περιοχές της χώρας στις οποίες ισχύει αυτή η γραμμή· κενό
+            όταν ισχύει για ολόκληρη τη χώρα. Ένα κατάστημα που παραδίδει μόνο σε
+            ορισμένες περιοχές μιας χώρας τις αναφέρει εδώ.
         kind:
           $ref: '#/components/schemas/ShippingKind'
         providerCode:
@@ -52282,7 +52905,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          description: Η ίδια η τιμή αποστολής για αυτόν τον συνδυασμό (πάροχος, χώρα,
+          description: Η ίδια η τιμή αποστολής για αυτόν τον συνδυασμό (πάροχος, ζώνη,
             τρόπος αποστολής), πριν το όριο δωρεάν αποστολής ή μια ζωντανή τιμή του
             courier αλλάξει όσα πληρώνει ένα συγκεκριμένο καλάθι.
         currency:
@@ -52326,6 +52949,7 @@ components:
       - price
       - providerCode
       - providerName
+      - regionCodes
     ShippingProvider:
       type: object
       properties:
@@ -53199,7 +53823,7 @@ components:
       type: object
       description: |-
         Each optional feature's effective state for the store: its plan
-        flag AND its store settings (``tenant/features.py``), so a client reads
+        flag AND its store settings (``src/tenant/features.py``), so a client reads
         one answer instead of combining the two tiers and copying defaults.
       properties:
         customerAccounts:
@@ -53340,7 +53964,7 @@ components:
     StorePreferences:
       type: object
       description: |-
-        Each store preference's state (``tenant/features.py``): a switch the
+        Each store preference's state (``src/tenant/features.py``): a switch the
         API does not refuse on, served here so a client learns it from the
         tenant payload instead of a settings read that can fail.
       properties:
@@ -53785,25 +54409,8 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          type: object
-          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
-          properties:
-            id:
-              type: integer
-              example: 1
-            name:
-              type: string
-              example: Sample Product
-            description:
-              type: string
-              example: Product description
-            price:
-              type: string
-              example: '29.99'
-            active:
-              type: boolean
-              example: true
-          additionalProperties: true
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         createdAt:
           type: string
@@ -53852,25 +54459,8 @@ components:
           minimum: 0
           title: ID αντικειμένου
         contentObject:
-          type: object
-          description: Σειριοποιημένη αναπαράσταση του σχετικού αντικειμένου περιεχομένου
-          properties:
-            id:
-              type: integer
-              example: 1
-            name:
-              type: string
-              example: Sample Product
-            description:
-              type: string
-              example: Product description
-            price:
-              type: string
-              example: '29.99'
-            active:
-              type: boolean
-              example: true
-          additionalProperties: true
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         createdAt:
           type: string
@@ -54109,9 +54699,6 @@ components:
         socialsYoutube:
           type: string
           readOnly: true
-        boxNowPartnerId:
-          type: string
-          readOnly: true
       required:
       - agentCommerceEnabled
       - agentHostedPaymentEnabled
@@ -54122,7 +54709,6 @@ components:
       - assetsDomain
       - b2bEnabled
       - blogEnabled
-      - boxNowPartnerId
       - defaultCurrency
       - defaultLocale
       - faviconUrl
@@ -54362,6 +54948,13 @@ components:
           type: string
           title: Κωδικός περιφέρειας
           nullable: true
+        shippable:
+          type: boolean
+          readOnly: true
+          description: Αν το κατάστημα παραδίδει σήμερα σε αυτή τη διεύθυνση στο σπίτι
+            (οι ζώνες αποστολής του). Μια διεύθυνση που αποθηκεύτηκε πριν το κατάστημα
+            σταματήσει να παραδίδει στην περιφέρειά της διατηρείται και έχει τιμή
+            false.
         createdAt:
           type: string
           format: date-time
@@ -54385,6 +54978,7 @@ components:
       - lastName
       - phone
       - region
+      - shippable
       - street
       - streetNumber
       - title
@@ -54460,6 +55054,13 @@ components:
           type: string
           title: Κωδικός περιφέρειας
           nullable: true
+        shippable:
+          type: boolean
+          readOnly: true
+          description: Αν το κατάστημα παραδίδει σήμερα σε αυτή τη διεύθυνση στο σπίτι
+            (οι ζώνες αποστολής του). Μια διεύθυνση που αποθηκεύτηκε πριν το κατάστημα
+            σταματήσει να παραδίδει στην περιφέρειά της διατηρείται και έχει τιμή
+            false.
         createdAt:
           type: string
           format: date-time
@@ -54483,6 +55084,7 @@ components:
       - lastName
       - phone
       - region
+      - shippable
       - street
       - streetNumber
       - title
@@ -54795,11 +55397,21 @@ components:
           type: string
           description: Διαδρομή avatar ή κενή συμβολοσειρά
           readOnly: true
+        mainImageWidth:
+          type: integer
+          readOnly: true
+          nullable: true
+        mainImageHeight:
+          type: integer
+          readOnly: true
+          nullable: true
       required:
       - firstName
       - id
       - lastName
+      - mainImageHeight
       - mainImagePath
+      - mainImageWidth
       - username
     UserSubscription:
       type: object
@@ -55412,12 +56024,16 @@ components:
     ApiValidationError:
       type: object
       description: 'A validation error: the field keys DRF always sent, plus ``code``
-        (the one code all errors share, else ``invalid``; absent when a field is itself
-        named ``code``) and ``fields``, each field''s messages with their codes. A
-        field of a nested serializer holds the nested object.'
+        (the one code all errors share, else ``invalid``; when a field is itself named
+        ``code``, that field''s messages instead) and ``fields``, each field''s messages
+        with their codes. A field of a nested serializer holds the nested object.'
       properties:
         code:
-          type: string
+          anyOf:
+          - type: string
+          - type: array
+            items:
+              type: string
         fields:
           type: object
           additionalProperties:

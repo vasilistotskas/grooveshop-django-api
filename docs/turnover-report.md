@@ -31,12 +31,11 @@ it.
 Why dispatch and not payment or placement. A Greek store keeps accrual books
 (ν.4308/2014): a sale is earned when the goods go, not on the day a courier
 pays a cash-on-delivery order out, nor on the day an online payment cleared
-before the parcel left. The earlier rule (placed, and collected)
-restated past months: on the production store 143 of 182 cash-on-delivery
-collections landed in a later month than the order, up to 27 days later. The
-rule was chosen by the owner on 2026-10-30; the statute's own wording of the tax
-point was not checked against the law text when it was written, so confirm it
-with the store's accountant before relying on the page for a filing.
+before the parcel left. Counting a sale by its collection would restate past
+months, since a cash-on-delivery payout can land weeks after the order. The
+statute's own wording of the tax point was not checked against the law text, so
+confirm the rule with the store's accountant before relying on the page for a
+filing.
 
 Why dispatch and not the receipt's date. Most receipts are issued when the
 parcel ships (`order.accounting.invoicing.receipt_issuable`), but a courier or
@@ -66,7 +65,7 @@ two months together to reconcile them.
   `payment_status` to `CANCELED` on `RETURNED` (`Order.settle_unpaid_payment`).
   The sale stands in the month it shipped and is reversed, whole, in the month of
   the closure (`status_updated_at`, which on such an order is the `RETURNED`
-  transition: verified against `OrderHistory` on production, 55 of 55).
+  transition).
 
 ### What a sale is worth
 
@@ -117,8 +116,8 @@ credit document and takes no room on the receipt (`order.accounting.credit_alloc
 `CreditAllocation.goods_claimed`, which is written once when the money is claimed
 or booked and never scaled afterwards, capped to what the refund really moved
 (`order.reporting.turnover._ledger_goods`). A refund with no allocation at all (not decided
-yet, or older than allocations) counts whole. A provider reversal takes the
-duplicate part back first and then the goods, as `credit_allocation.goods_returned`
+yet) counts whole. A provider reversal takes the
+duplicate part back first and then the goods, as `PaymentLedger.goods_returned`
 does: after reversing `c` the refund stands for `max(min(goods, paid - c), 0)`, and
 the reversal row counts the drop, in its own month. A reversal with no refund row
 counts whole.
@@ -131,14 +130,14 @@ rates per month. Known limit: a refund that is *undecided* when a month closes
 (booked while another claim is still PENDING) counts whole until it is decided,
 and then drops its duplicate part in the month it was booked.
 
-Gift-card `REFUND_CREDIT` is unchanged: a gift card is payment the receipt holds
+Gift-card `REFUND_CREDIT` counts whole: a gift card is payment the receipt holds
 and has no duplicate-payment part. A chargeback's decision allocation is capped to
-the receipt's headroom but the chargeback counts whole, as before.
+the receipt's headroom but the chargeback counts whole.
 
 A refund is gross money, not a list of lines. It is brought to net and VAT pro
 rata over the receipt, as a credit document does:
 
-```
+```text
 returned net   = round(goods * order net / receipt gross, 2)
 returned VAT   = goods - returned net
 receipt gross  = the order's OrderVatLine net + VAT
@@ -216,20 +215,19 @@ period. Revenue there is net turnover. The cached queries depend on
 `TURNOVER_MODELS` (the order, its VAT lines, the ledger, chargeback decisions and
 gift-card transactions), so a refund clears them.
 
-## Rolling it out
+## The snapshots
 
-`order` 0094 adds `OrderVatLine` and `Order.shipped_at` (add only); `order` 0095
-fills existing orders: VAT lines from the same `order_vat_lines` (on the
+`OrderVatLine` and `Order.shipped_at` were added by `order` 0094; `order` 0095
+filled existing orders: VAT lines from the same `order_vat_lines` (on the
 migration's historical models: `tests/integration/order/test_migration_turnover_snapshots.py`)
 and `shipped_at` from the order's history (the first status change into a
 dispatched status; an order with no such row takes its last status change, then
 its creation). An order whose receipt cannot be derived is named and skipped,
-never guessed. Orders the previous release creates or ships while it still
-serves the rollout are not covered, because the migration already ran: run
-`manage.py backfill_turnover_snapshots --all-tenants` after the rollout. It is
-idempotent. The seeded demo orders (`src/devtools/demo_orders.py`) write both
-snapshots, and a `REFUNDED` demo order gets its charge and refund ledger rows
-(`src/devtools/demo_account.py: _seed_refund`).
+never guessed. `manage.py backfill_turnover_snapshots --all-tenants` fills any
+order that still lacks a snapshot; it is idempotent. The seeded demo orders
+(`src/devtools/demo_orders.py`) write both snapshots, and a `REFUNDED` demo
+order gets its charge and refund ledger rows (`src/devtools/demo_account.py:
+_seed_refund`).
 
 ## Performance
 
@@ -237,8 +235,8 @@ Three queries for a range however many orders there are, one per breakdown: the
 sales over `OrderVatLine` joined to `Order` (filtered on `Order.shipped_at`,
 indexed `order_shipped_at_ix`, then the lines through their `order` foreign key),
 the orders and what is awaiting over `Order`, and one `UNION ALL` of the four
-return sources (`tests/unit/order/test_turnover.py::TestQueries`; the goods of each refund are correlated subqueries inside it). The figures are
-not cached on the page: it is opened rarely.
+return sources (`tests/unit/order/test_turnover.py::TestQueries`; the goods of each refund
+are correlated subqueries inside it). The figures are not cached on the page: it is opened rarely.
 
 ## Tests
 

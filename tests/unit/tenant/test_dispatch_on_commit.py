@@ -192,5 +192,5 @@ def test_helper_is_importable_without_touching_models():
         and node.module.endswith(".models")
     ]
     assert not offenders, (
-        f"tenant/celery.py imports models at module level: {offenders}"
+        f"src/tenant/celery.py imports models at module level: {offenders}"
     )

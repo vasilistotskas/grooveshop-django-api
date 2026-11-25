@@ -105,16 +105,17 @@ wrote, not how many orders were ever erased. The lookback is longer than any
 gap between two daily runs, so no write is missed. What arrives is cleared
 within a day.
 
-The same sweep clears the billing fields of an erased order that no longer
-needs them: an INVOICE order that was owed an invoice at erasure and was
+The same sweep clears the billing fields of an erased order that does not
+need them: an INVOICE order that was owed an invoice at erasure and was
 canceled since.
 
-## Orders erased before this
+## Half-erased orders
 
-The same daily sweep, as its last step, finishes the orders an earlier
-erasure left (`order.privacy.finish_earlier_erasures`): those with the old
-placeholder email (`deleted-<hex>@deleted.invalid`) and no stamp. It finds
-them through the email's trigram index (`order_email_search_ix`).
+The same daily sweep, as its last step, finishes the orders an erasure left
+half done (`order.privacy.finish_earlier_erasures`): those with the
+placeholder email `deleted-<hex>@deleted.invalid` and no
+`personal_data_erased_at` stamp. It finds them through the email's trigram
+index (`order_email_search_ix`).
 
 - It works in batches of 50, each one transaction: their carrier records are
   cleared, the cancel reason's copies and every email address in their
@@ -125,19 +126,18 @@ them through the email's trigram index (`order_email_search_ix`).
   next batch still runs (the batches page by id), and the rest of the sweep
   has already run.
 
-The step is idempotent, and it also covers an order erased the old way during
-a deploy's window. Run the sweep once by hand right after the deploy that
-ships this (the platform admin's schedule page, `erase-late-carrier-data`).
+The step is idempotent: a stamped order is never matched again. The sweep
+can also be run by hand from the platform admin's schedule page
+(`erase-late-carrier-data`).
 
-A soft-deleted order that the earlier erasure skipped was unlinked from its
-account with its data. It cannot be told apart from a guest's, so it cannot be
-found.
+A soft-deleted order that erasure skipped was unlinked from its account with
+its data. It cannot be told apart from a guest's, so it cannot be found.
 
 ## Tests
 
 `tests/integration/user/test_gdpr_erasure_completeness.py::test_no_value_of_the_subject_survives_on_what_erasure_keeps`
 puts the subject's data where the code puts it: two orders are canceled
-through `OrderService.cancel_order` with a typed reason (a restock, a refund,
+through `OrderLifecycleService.cancel_order` with a typed reason (a restock, a refund,
 both parcels canceled), the carriers' records are filled, and a third order is
 soft-deleted. After the erasure, the test searches every text and JSON column
 of every table in the schema for each value.

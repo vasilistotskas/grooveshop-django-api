@@ -501,7 +501,7 @@ class MetaDataModel(models.Model):
             )
         )
         # Keep the in-memory copy usable — callers go on to set more
-        # keys on it (see ``order/services.py`` right after
+        # keys on it (see ``src/order/services.py`` right after
         # ``redeem_points``). It reflects this write, not any concurrent
         # one; ``refresh_from_db`` if you need the row's full state.
         self.metadata.update(items)

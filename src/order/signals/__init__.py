@@ -1,6 +1,9 @@
 from django.dispatch import Signal
 
 order_created = Signal()
+# Sent once per order, by ``OrderLifecycleService.confirm``, when the order
+# is confirmed: at creation, or when its online payment settles.
+order_confirmed = Signal()
 order_status_changed = Signal()
 order_paid = Signal()
 order_canceled = Signal()
@@ -48,6 +51,11 @@ order_charged_back = Signal()
 # it as the webhook announces its own (``announce_stripe_payment_applied``).
 # A signal and not a call, because the receivers import the service.
 order_stripe_payment_polled = Signal()
+# Dispatched when a succeeded Stripe intent of the store's own has no order
+# (``OrderService.report_payment_without_order``). Keyword arguments:
+# ``payment_id`` and ``captured`` (``Money``). The receiver queues the
+# alert. A signal and not a call, because the order services import no task.
+payment_without_order_found = Signal()
 # Dispatched the first time an order gets a tracking number / carrier.
 # Kept distinct from ``order_shipped`` (which fires on status transition
 # to SHIPPED) because admins sometimes add tracking before flipping
@@ -56,6 +64,6 @@ order_stripe_payment_polled = Signal()
 # shipped" vs "here's how to track it").
 order_shipment_dispatched = Signal()
 # Dispatched once the courier's answer to the shipment cancel of a canceled
-# order is recorded (``OrderService._record_shipment_cancel``), after the
+# order is recorded (``OrderLifecycleService._record_shipment_cancel``), after the
 # write commits: what the order's receipt becomes depends on it.
 order_shipment_cancel_answered = Signal()

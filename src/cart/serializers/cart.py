@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.conf import settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
@@ -12,8 +10,12 @@ from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
 from core.validators import address as address_rules
-from order.serializers.quote import PickupPointSerializer
-from promotion.enum import BenefitType, CouponRejectionReason
+from order.serializers.quote import (
+    APPLIED_COUPONS_SCHEMA,
+    AppliedCouponSerializer,
+    PickupPointSerializer,
+)
+from promotion.enum import BenefitType
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
     PromotionProductRefSerializer,
@@ -266,7 +268,12 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "description": (
                         "The country the carriers' thresholds were "
                         "judged for: the store's first shipping country, "
-                        "the one checkout preselects"
+                        "the one checkout preselects, at the rates of its "
+                        "shipping zone covering the whole country, or of "
+                        "each region zone of a country served only in some "
+                        "regions (a cart knows no region; a region zone's "
+                        "own threshold applies once checkout prices the "
+                        "address)"
                     ),
                 },
             },
@@ -307,90 +314,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             return []
         return [row.code.code for row in obj.applied_codes.all()]
 
-    @extend_schema_field(
-        {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "string"},
-                    "amount": {
-                        "type": "number",
-                        "description": (
-                            "Money this code takes off; 0 when its "
-                            "benefit is not money, or it is refused"
-                        ),
-                    },
-                    "freeShipping": {
-                        "type": "boolean",
-                        "description": "This code waives shipping",
-                    },
-                    "gift": {
-                        "type": "boolean",
-                        "description": (
-                            "This code earns the gift listed in "
-                            "promotionGiftItems"
-                        ),
-                    },
-                    "rejection": {
-                        "type": "string",
-                        "nullable": True,
-                        "enum": [*CouponRejectionReason.values, None],
-                        "description": (
-                            "Why the engine refuses the attached code "
-                            "now; null while it applies"
-                        ),
-                    },
-                },
-                "required": [
-                    "code",
-                    "amount",
-                    "freeShipping",
-                    "gift",
-                    "rejection",
-                ],
-            },
-        }
-    )
-    def get_applied_coupons(self, obj: Cart) -> list[dict]:
-        # A coupon row that only knows its own money cannot tell "free
-        # shipping" from "a better offer applies" (demo store: SHIPFREE
-        # read "a better offer applies" while it was waiving shipping),
-        # nor say why a code that stopped applying is idle. The engine
-        # already decided all of it; this hands its verdict over.
+    @extend_schema_field(APPLIED_COUPONS_SCHEMA)
+    def get_applied_coupons(self, obj: Cart) -> list:
         if not self._codes_apply():
             return []
-        result = self._promotion_result(obj)
-        rejections: dict[str, str] = {}
-        for code, reason in result.rejected:
-            rejections.setdefault(code, reason)
-        benefits = {
-            code.code: promotion.benefit_type
-            for promotion, code in result.non_monetary
-            if code is not None
-        }
-        entries = []
-        for row in obj.applied_codes.all():
-            code = row.code.code
-            entries.append(
-                {
-                    "code": code,
-                    "amount": sum(
-                        (
-                            entry.amount.amount
-                            for entry in result.applied
-                            if entry.code is not None
-                            and entry.code.code == code
-                        ),
-                        Decimal(0),
-                    ),
-                    "freeShipping": benefits.get(code)
-                    == BenefitType.FREE_SHIPPING,
-                    "gift": benefits.get(code) == BenefitType.FREE_GIFT,
-                    "rejection": rejections.get(code),
-                }
-            )
-        return entries
+        verdicts = self._promotion_result(obj).coupon_verdicts(
+            row.code.code for row in obj.applied_codes.all()
+        )
+        return list(AppliedCouponSerializer(verdicts, many=True).data)
 
     @extend_schema_field(
         {
@@ -731,38 +662,32 @@ class CartAgentTokenResponseSerializer(serializers.Serializer):
     )
 
 
-class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
-    """Request body for ``POST /api/v1/cart/create-payment-intent``.
+class CartQuoteRequestSerializer(PickupPointSerializer):
+    """Request body for ``POST /api/v1/cart/quote``.
 
-    ``shipping_kind`` is required so the view's shipping calculation
-    follows the same code path the order-create verification runs.
-    ``shipping_provider_code`` is required for ``pickup_point`` (the
-    carrier identity drives the locker quote + per-carrier threshold)
-    but **omitted for ``home_delivery``** — home delivery is
-    provider-agnostic in checkout per the frontend's
-    ``shared/shipping/index.ts::carrierForMethod`` contract, and the
-    backend resolves the active home-delivery provider at order
-    creation. Sending whatever the frontend has guarantees both calc
-    paths agree.
+    The checkout's choices, each optional: a quote may be asked before
+    the shopper has chosen a delivery or a pay way, and the rows that
+    depend on a missing choice come back null. A delivery is priced once
+    both ``shipping_kind`` and ``country_id`` are given. Send what the
+    order-create body will carry, the email and the pickup point
+    included, so the quote is the total that order is created at and its
+    ``cartDigest`` the cart that order is made of. Send that
+    ``cartDigest`` back as ``expectedCartDigest`` on ``POST /api/v1/order``:
+    only then is the order refused when the cart changed since the quote
+    (409 ``cart_changed``, nothing created), a change at the same total
+    included.
     """
 
     pay_way_id = serializers.IntegerField(
         min_value=1,
-        help_text=_("ID of the selected PayWay (must be online Stripe)."),
+        required=False,
+        help_text=_("ID of the chosen PayWay; omit while none is chosen."),
     )
     shipping_kind = serializers.ChoiceField(
-        # Choices declared inline to avoid the circular import that
-        # would happen if ``shipping.enum`` were pulled in at module
-        # import time (cart -> shipping -> order -> cart).
-        choices=(
-            ("home_delivery", "home_delivery"),
-            ("pickup_point", "pickup_point"),
-        ),
+        choices=ShippingKind.choices,
+        required=False,
         help_text=_(
-            "Fulfilment kind for the carrier (home_delivery or "
-            "pickup_point). Required so the per-kind gates (ACS "
-            "lockers need synced stations) and BoxNow's PICKUP_POINT "
-            "gate are honoured."
+            "Fulfilment kind of the chosen delivery; omit while none is chosen."
         ),
     )
     shipping_provider_code = serializers.CharField(
@@ -779,11 +704,10 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
     )
     country_id = serializers.CharField(
         max_length=2,
+        required=False,
         help_text=_(
-            "ISO 3166-1 alpha-2 country code — required because a "
-            "``ShippingRate`` is per-country, so there is no priceable "
-            "shipping option without a destination. Match what the "
-            "order-create body will carry."
+            "ISO 3166-1 alpha-2 delivery country. Needed to price a "
+            "delivery and to list the shipping options."
         ),
     )
     region_id = serializers.CharField(
@@ -795,16 +719,15 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
             "adjustment."
         ),
     )
-
     email = serializers.EmailField(
         required=False,
         allow_blank=True,
         help_text=_(
             "Checkout email. Lets promotion eligibility checks that "
             "depend on customer identity (first-order-only, "
-            "per-customer limits) run against the same identity the "
-            "order-create verification will use, keeping the "
-            "PaymentIntent amount in lockstep."
+            "per-customer limits) run against the same identity order "
+            "creation will use, so the quote is the total the order is "
+            "created at."
         ),
     )
     gift_card_codes = serializers.ListField(
@@ -813,9 +736,9 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         allow_empty=True,
         max_length=3,
         help_text=_(
-            "Gift card codes the shopper wants to redeem — the intent "
-            "is created for the REMAINDER after their balances. Pass "
-            "the same codes in the order-create body."
+            "Gift card codes the shopper wants to redeem; the amount due "
+            "is what remains after their balances. Pass the same codes "
+            "in the order-create body."
         ),
     )
     loyalty_points_to_redeem = serializers.IntegerField(
@@ -823,9 +746,8 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         allow_null=True,
         min_value=0,
         help_text=_(
-            "Loyalty points the shopper will redeem at order creation. "
-            "The intent amount subtracts the resulting discount so the "
-            "provider captures what the customer was shown. Pass the "
+            "Loyalty points the shopper will redeem at order creation; "
+            "the amount due subtracts the resulting discount. Pass the "
             "same value in the order-create body. Requires an "
             "authenticated request."
         ),
@@ -841,7 +763,7 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         """
         kind = attrs.get("shipping_kind")
         code = (attrs.get("shipping_provider_code") or "").strip()
-        if kind == "pickup_point" and not code:
+        if kind == ShippingKind.PICKUP_POINT and not code:
             raise serializers.ValidationError(
                 {
                     "shipping_provider_code": _(
@@ -856,49 +778,13 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         # The region order creation would refuse is refused here too, as
         # a field error. A pickup delivery is priced without one
         # (``ShippingChoice.of``), so it is not read.
-        if kind != "pickup_point" and (
+        if kind != ShippingKind.PICKUP_POINT and (
             errors := address_rules.region_errors(
                 attrs.get("country_id"), attrs.get("region_id")
             )
         ):
             raise serializers.ValidationError(errors, code="region_invalid")
         return attrs
-
-
-class CartQuoteRequestSerializer(
-    PickupPointSerializer, CartCreatePaymentIntentRequestSerializer
-):
-    """Request body for ``POST /api/v1/cart/quote``.
-
-    The choices of the payment-intent body, each optional: a quote may
-    be asked before the shopper has chosen a delivery or a pay way, and
-    the rows that depend on a missing choice come back null. A delivery
-    is priced once both ``shipping_kind`` and ``country_id`` are given.
-    Send what the order-create body will carry, the email and the pickup
-    point included, so the quote is the total that order is created at
-    and its ``cartDigest`` the cart that order is made of.
-    """
-
-    pay_way_id = serializers.IntegerField(
-        min_value=1,
-        required=False,
-        help_text=_("ID of the chosen PayWay; omit while none is chosen."),
-    )
-    shipping_kind = serializers.ChoiceField(
-        choices=ShippingKind.choices,
-        required=False,
-        help_text=_(
-            "Fulfilment kind of the chosen delivery; omit while none is chosen."
-        ),
-    )
-    country_id = serializers.CharField(
-        max_length=2,
-        required=False,
-        help_text=_(
-            "ISO 3166-1 alpha-2 delivery country. Needed to price a "
-            "delivery and to list the shipping options."
-        ),
-    )
 
 
 class CouponApplyRequestSerializer(serializers.Serializer):
@@ -924,26 +810,4 @@ class CouponErrorResponseSerializer(serializers.Serializer):
     )
     code = serializers.CharField(
         required=False, help_text=_("The same value as ``reason``.")
-    )
-
-
-class CartPaymentIntentResponseSerializer(serializers.Serializer):
-    """Response body returned by the create-payment-intent cart action."""
-
-    client_secret = serializers.CharField(
-        help_text=_(
-            "Stripe PaymentIntent client secret for frontend confirmation"
-        ),
-    )
-    payment_intent_id = serializers.CharField(
-        help_text=_("Stripe PaymentIntent ID to be stored on the order"),
-    )
-    amount = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        help_text=_("Total charge amount (cart + shipping + payment fee)"),
-    )
-    currency = serializers.CharField(
-        max_length=3,
-        help_text=_("ISO 4217 currency code (e.g. EUR)"),
     )

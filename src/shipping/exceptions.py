@@ -45,6 +45,29 @@ class ShippingUnavailableError(ShippingError):
         )
 
 
+class ShippingRegionUnavailableError(ShippingUnavailableError):
+    """The carrier delivers this kind in the country, but not to the region.
+
+    The zone the region resolves to (``shipping.zones.zone_for``) has no
+    active rate for (provider, kind), while another zone of the same
+    country has one: the store does not deliver this way to that region
+    (an island, say), though it does elsewhere in the country.
+    """
+
+    def __init__(
+        self,
+        *,
+        provider_code: str | None,
+        kind: str,
+        country_code: str | None,
+        region_code: str,
+    ) -> None:
+        super().__init__(
+            provider_code=provider_code, kind=kind, country_code=country_code
+        )
+        self.region_code = region_code
+
+
 class ShippingWeightExceededError(ShippingError):
     """The cart's weight exceeds the resolved rate's ``max_weight_grams``.
 
@@ -112,6 +135,21 @@ class CarrierError(Exception):
     """
 
 
+class CarrierAPIError(CarrierError):
+    """The courier's API answered with an error (``AcsAPIError``,
+    ``BoxNowAPIError``): a refusal of the request, or, as a subclass that
+    is also a :class:`CarrierUnavailableError`, an answer to act on later.
+
+    :attr:`text` is the message the error carries, the one a view may
+    show: the courier's own words, or, for a :class:`CarrierBusyError`,
+    ours. Never ``str(exc)``, which holds the call's details for the log.
+    """
+
+    @property
+    def text(self) -> str:
+        raise NotImplementedError
+
+
 class CarrierUnavailableError(CarrierError):
     """The courier gave no answer to act on.
 
@@ -152,3 +190,22 @@ class PickupPointCheckUnavailableError(Exception):
     (``ShippingService.pickup_point_address``). Nothing is known about the
     point, so it is not refused as unknown; the same order may succeed
     once the cache is back."""
+
+
+class ShipmentNotNeededError(ShippingError):
+    """A courier shipment was requested for an order that ships nothing.
+
+    Raised by every carrier's mint choke point when ``Order.ships_nothing``
+    holds (canceled, refunded as an order, or its payment all went back)
+    or the carrier retired the shipment. A parcel for such an order would
+    hand over goods nobody keeps paying for. Like
+    :class:`ShipmentAwaitingPaymentError`, not a carrier API error: no
+    retry policy matches it and no "creation failed" alert fires.
+    """
+
+    def __init__(self, order_id: int) -> None:
+        self.order_id = order_id
+        super().__init__(
+            f"Order {order_id} ships nothing: it was canceled or refunded, "
+            "or its shipment was retired, so no courier shipment is created."
+        )

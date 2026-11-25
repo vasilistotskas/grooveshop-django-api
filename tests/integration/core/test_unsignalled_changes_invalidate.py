@@ -76,7 +76,7 @@ def purged():
 
 def _admin_call(admin_class, model, name, *args):
     admin = admin_class(model, AdminSite())
-    request = RequestFactory().post("/admin/")
+    request = RequestFactory().post("/admin/", {"_form_submitted": "on"})
     request.user = get_user_model()(is_superuser=True)
     with (
         mock.patch.object(admin_class, "message_user"),

@@ -21,10 +21,10 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.refunds.service import RefundService
-from order.services import OrderService
 from order.signals import order_refunded
 from pay_way.factories import PayWayFactory
 from tests.utils.viva import (
@@ -122,7 +122,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         order = _paid_viva_order()
 
         with FakeVivaApi(cancel=(200, CANCEL_REFUSED)):
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind"
             )
 
@@ -139,7 +139,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         order = _paid_viva_order()
 
         with FakeVivaApi(cancel=(200, CANCEL_REFUSED)):
-            OrderService.cancel_order(order, reason="changed mind")
+            OrderLifecycleService.cancel_order(order, reason="changed mind")
 
         assert _refund_failure_notes(order) == [
             (
@@ -152,7 +152,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         order = _paid_viva_order()
 
         with FakeVivaApi(cancel=(403, CANCEL_ALREADY_CANCELLED)):
-            _canceled, refund_info = OrderService.cancel_order(order)
+            _canceled, refund_info = OrderLifecycleService.cancel_order(order)
 
         assert refund_info == FAILED_REFUND
         [note] = _refund_failure_notes(order)
@@ -186,7 +186,7 @@ class TestARefundVivaAcceptsIsRecorded:
         fake = FakeVivaApi()
 
         with fake:
-            canceled, refund_info = OrderService.cancel_order(
+            canceled, refund_info = OrderLifecycleService.cancel_order(
                 order, reason="changed mind"
             )
 
@@ -223,7 +223,7 @@ class TestARefundVivaAcceptsIsRecorded:
         fake = FakeVivaApi()
 
         with fake:
-            OrderService.cancel_order(order, reason="changed mind")
+            OrderLifecycleService.cancel_order(order, reason="changed mind")
 
         [delete] = fake.deletes
         assert fake.query(delete) == {"amount": ["1000"]}

@@ -1,0 +1,13 @@
+{% load i18n %}{% blocktrans %}Payment {{ payment_id }} has no order{% endblocktrans %}
+
+{% blocktrans %}A confirmed {{ provider }} payment arrived and no order of the store carries it. The customer has been charged and nothing will ship.{% endblocktrans %}
+
+{% trans "Payment method" %}: {{ provider }}
+{% trans "Payment reference" %}: {{ payment_id }}
+{% trans "Amount" %}: {{ amount }}
+
+{% blocktrans %}Look the payment up in the {{ provider }} dashboard. Refund the customer, or find their order and attach the payment to it.{% endblocktrans %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

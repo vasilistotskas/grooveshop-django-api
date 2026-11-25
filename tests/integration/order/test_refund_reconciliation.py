@@ -140,7 +140,7 @@ class TestPendingHoldsUntilResolved:
         )
         _age(order, hours=24 * 30)
 
-        row, _ = PaymentLedger.record_refund(
+        row, _ = RefundService.book_refund(
             order, charge=charge, amount=_eur("40.00"), reference="re_late"
         )
 
@@ -254,7 +254,7 @@ class TestStripeLookup:
         )
         # The refund's webhook books it against the older attempt of the
         # same amount, as it cannot tell them apart.
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=charge,
             amount=_eur("40.00"),
@@ -484,7 +484,7 @@ class TestRecordRefundOutcomeAction:
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("5.00"), reference="re_1"
         )
         request = _post(
@@ -830,8 +830,8 @@ class TestASuspendedStore:
         from extra_settings.models import Setting
 
         from meta_capi.client import MetaCapiResponse
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
         from tests.utils.staff import store_tenant
 
         store = store_tenant(

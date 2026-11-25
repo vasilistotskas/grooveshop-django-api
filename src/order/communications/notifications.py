@@ -1,18 +1,19 @@
 """Live (in-app + WebSocket) notification dispatch tasks for orders.
 
-Kept in a dedicated module so the email tasks in ``order/tasks.py`` and
+Kept in a dedicated module so the email tasks in ``src/order/tasks.py`` and
 the live-notification tasks don't read as one concern. The two worlds
 share no code today — email tasks render templates and touch
 ``EmailMultiAlternatives``; live-notification tasks call
 ``notification.services.create_user_notification`` which transparently
 writes a Notification + NotificationUser row and the post_save signal
-in ``notification/signals.py`` fans out via ``send_notification_task``
+in ``src/notification/signals.py`` fans out via ``send_notification_task``
 to the per-user WebSocket group.
 
-Idempotency note: the underlying notification helper is not idempotent
-(two calls → two Notification rows). Signal receivers guard against
-double-dispatch at the event level (e.g. the ``_paid_signal_sent`` flag
-on ``order_paid``); at the Celery boundary these tasks rely on that.
+Idempotency: signal receivers guard against double-dispatch at the event
+level (e.g. the ``_paid_signal_sent`` flag on ``order_paid``), and every
+copy of one dispatch of these tasks (a retry, a message delivered again,
+the sweep's copy of a publish) gets back the notification the first copy
+wrote (``create_user_notification``, ``Notification.dispatch_key``).
 """
 
 from __future__ import annotations
@@ -42,9 +43,7 @@ logger = logging.getLogger(__name__)
 
 # Only transient database errors retry (``core.retry``). `IntegrityError`
 # is excluded — a unique-constraint or FK violation will not resolve on
-# retry, and a partially-completed task rerun would create a second
-# Notification row instead of fixing the conflict (the helper isn't
-# idempotent).
+# retry. A retry writes no second notification (``dispatch_key``).
 TASK_DEFAULTS = {
     "base": MonitoredTask,
     "bind": True,
@@ -265,29 +264,6 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
             gettext_noop("Payment confirmed for order #{order_id}"),
             gettext_noop(
                 "Your payment went through. We're preparing your order now."
-            ),
-            order_id=order.id,
-        ),
-    )
-
-
-@celery_app.task(name="notify_payment_failed_live", **TASK_DEFAULTS)
-def notify_payment_failed_live(self, order_id: int) -> dict:
-    """Fire when the payment provider rejects the charge."""
-    order = _load_order(order_id)
-    if order is None:
-        return {"status": "skipped"}
-
-    return _notify_order(
-        order,
-        kind=NotificationKindEnum.ERROR,
-        category=NotificationCategoryEnum.PAYMENT,
-        notification_type=NotificationTypeEnum.PAYMENT_FAILED,
-        translations=_render_translations(
-            gettext_noop("Payment failed for order #{order_id}"),
-            gettext_noop(
-                "We couldn't process your payment. Tap to retry with a "
-                "different method."
             ),
             order_id=order.id,
         ),

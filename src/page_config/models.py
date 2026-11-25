@@ -153,7 +153,7 @@ class ContentPage(
 # bases declare ``save_base`` with signatures that django-stubs types
 # differently, and ty reports the pair rather than a mismatch in the code
 # written here (same as ``product.ProductTranslation``).
-class ContentPageTranslation(  # ty: ignore[invalid-method-override]
+class ContentPageTranslation(  # ty: ignore[incompatible-method-override]
     TranslatedFieldsModel, SeoTranslationModel
 ):
     master = TranslationsForeignKey(

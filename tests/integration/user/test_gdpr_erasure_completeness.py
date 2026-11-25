@@ -306,15 +306,15 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
     erasure, so a copy under any key or in any table fails this test.
 
     The data gets there the way the code puts it: two orders are
-    canceled through ``OrderService.cancel_order`` with a typed reason
+    canceled through ``OrderLifecycleService.cancel_order`` with a typed reason
     (one restocks a line and refunds its payment, both cancel their
     parcel), and the carriers' records carry what each carrier writes.
     A third order is soft-deleted, as an admin delete leaves it."""
     from order.factories import OrderFactory, PaymentTransactionFactory
     from order.inventory.stock import StockManager
+    from order.lifecycle.service import OrderLifecycleService
     from order.models import OrderItem
     from order.models.order import Order
-    from order.services import OrderService
     from pay_way.factories import PayWayFactory
     from product.factories import ProductFactory
     from shipping.models import ShippingProvider
@@ -439,7 +439,7 @@ def test_no_value_of_the_subject_survives_on_what_erasure_keeps(
         django_capture_on_commit_callbacks(execute=True),
     ):
         for order in (by_acs, by_boxnow):
-            OrderService.cancel_order(
+            OrderLifecycleService.cancel_order(
                 order,
                 reason=reason,
                 refund_payment=True,

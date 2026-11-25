@@ -33,7 +33,6 @@ from order.accounting.invoicing import (
     generate_invoice,
 )
 from order.accounting.mydata.builder import build_receipt_xml
-from order.enum.status import PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.invoice import Invoice
 from order.models.item import OrderItem
@@ -50,10 +49,7 @@ from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 D = Decimal
 NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
@@ -100,7 +96,7 @@ def _address(country):
 def _offline_checkout(cart):
     country = CountryFactory()
     enable_rate(country)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,
@@ -116,24 +112,22 @@ def _offline_checkout(cart):
     )
 
 
-def _payment_first_checkout(cart, user):
+def _online_checkout(cart, user):
     country = CountryFactory()
     enable_rate(country)
-    with patch("order.payments.payment.get_payment_provider") as provider:
-        provider.return_value.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {"payment_id": "pi_test_123", "status": "succeeded"},
+    return OrderService.create_order_from_cart(
+        **priced(
+            legal_acceptance=checkout_acceptance(),
+            cart=cart,
+            shipping_address=_address(country),
+            pay_way=PayWayFactory(
+                provider_code="stripe",
+                settlement=PaySettlement.ONLINE,
+                active=True,
+            ),
+            user=user,
         )
-        return OrderService.create_order_from_cart(
-            **priced(
-                legal_acceptance=checkout_acceptance(),
-                cart=cart,
-                shipping_address=_address(country),
-                payment_intent_id="pi_test_123",
-                pay_way=PayWayFactory(provider_code="stripe"),
-                user=user,
-            )
-        )
+    )
 
 
 def _rates(order):
@@ -228,7 +222,7 @@ class TestCheckoutWritesTheRateTheCartUsed:
             zero.id: D("0"),
         }
 
-    def test_the_payment_first_path_snapshots_each_lines_rate(self):
+    def test_an_online_order_snapshots_each_lines_rate(self):
         user = UserAccountFactory()
         cart = CartFactory(user=user)
         cart.items.all().delete()
@@ -236,7 +230,7 @@ class TestCheckoutWritesTheRateTheCartUsed:
         for product in (standard, reduced):
             CartItemFactory(cart=cart, product=product, quantity=1)
 
-        order = _payment_first_checkout(cart, user)
+        order = _online_checkout(cart, user)
 
         assert _rates(order) == {standard.id: D("24"), reduced.id: D("13")}
 

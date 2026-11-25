@@ -5,34 +5,75 @@ and says which file holds each § number used here.
 
 ## 6. Email + WS notification graph
 
-### 6.1 Email triggers (final state, post PR #8)
+### 6.1 Email triggers
 
 | Event | Email task | Trigger | Idempotency flag |
 |---|---|---|---|
-| Order created (offline) | `send_order_confirmation_email` | `order_created` signal | `confirmation_email_sent` |
-| Order created (online, pending payment) | — | (deferred to payment success) | n/a |
-| Payment succeeded (online) | `send_order_confirmation_email` | webhook handler | `confirmation_email_sent` |
-| Payment failed | `send_payment_failed_email` | webhook handler | `payment_failed_email_sent` |
+| Order confirmed (see below) | `send_order_confirmation_email` and the staff `send_admin_new_order_email` | `order_confirmed` signal (`handle_order_confirmed`) | `Order.confirmed_at`, claimed once (and `confirmation_email_sent` in the task) |
+| Card order created, payment still due | — | nothing until the payment settles | n/a |
+| Card payment failed | — | nothing is sent: the failure is recorded (`FAILED`, a history row) | n/a |
 | Status changed → DELIVERED / CANCELED / COMPLETED / REFUNDED / RETURNED | `send_order_status_update_email` | `order_status_changed` signal | `status_update_email_sent_<status>` |
 | Status changed → PENDING / PROCESSING | — | (internal milestones — never a customer email) | n/a |
 | Order genuinely SHIPPED (status SHIPPED **and** tracking present) | `send_shipping_notification_email` | `order_status_changed`→SHIPPED **or** `order_shipment_dispatched`, whichever completes both conditions | `shipping_notification_email_sent` |
-| Refund (in-app, staff action or webhook): one per refund | `send_refund_confirmation_email(refund_id)` | `order_refunded` signal (PR #8), queued on commit once per REFUND ledger row | a `RefundNotification` row per refund, inserted to claim the email before it is sent ([§7.2](refunds.md), [§7.3](payment-ledger.md)) |
+| Refund (in-app, staff action or webhook): one per refund | `send_refund_confirmation_email(refund_id)` | `order_refunded` signal, queued on commit once per REFUND ledger row | a `RefundNotification` row per refund, inserted to claim the email before it is sent ([§7.2](refunds.md), [§7.3](payment-ledger.md)) |
 | Retail receipt registered with myDATA | `send_invoice_email` | from `send_invoice_to_mydata`, once the MARK is persisted ([§7.4](fiscal-mydata.md)) | `invoice_email_sent` |
 | Retail credit document registered with myDATA | `send_credit_email(credit_id)` | from `send_credit_to_mydata` ([§7.4](fiscal-mydata.md)) | `credit_email_sent_<credit id>` in `Order.metadata` |
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
 | Dispute lost (staff) | `send_dispute_notification_email(lost=True)` | `charge.dispute.closed` webhook, once per CHARGEBACK row ([§4.2.1](payments.md)) | the ledger row (a repeat records nothing) |
+
+**Confirmation.** An order is announced once, when it is confirmed
+(`OrderLifecycleService.confirm`, `src/order/lifecycle/confirmation.py`). An
+order with nothing left to pay online (cash or card on delivery, BOX NOW pay
+on the go, bank transfer, an online payment already taken) is confirmed as it
+is created (`handle_order_created`). A card order (Viva, Stripe) is confirmed
+when its payment settles, by every path that settles one: the Stripe
+`payment_intent.succeeded` (and a poll), the Stripe
+`checkout.session.completed`, the Viva 1796, the Viva return page, the sweep's
+read-back, and a payment taken at once (the agent SPT charge,
+`confirm_agent_payment`). `confirm` claims `Order.confirmed_at` with one
+`UPDATE ... WHERE confirmed_at IS NULL` that also requires the order to be due
+(`confirmation.due_for_confirmation`: nothing left to pay online, or the
+online payment COMPLETED) and not canceled, so however many of those report the
+same payment, one sends `order_confirmed`, and its receiver
+(`handle_order_confirmed`) queues the customer's confirmation email, the staff
+"New order" email and ONE in-app note: payment confirmed for an order paid
+online, order placed otherwise. The claim and the signal commit together
+(`confirm` runs them in one atomic block): when the announcement fails, the
+claim is rolled back, and the order heals itself, because every sight of a
+settled payment calls `confirm`, even one that applies nothing: a repeated or
+stale Stripe event (`announce_stripe_payment_applied`, the receivers'
+already-processed branches), a checkout session seen again
+(`settle_paid_checkout_session`), a Viva 1796 already applied
+(`viva_settlement.apply_event`), and a poll that finds the payment completed
+(`OrderService.get_payment_status`). A card order nobody paid is never confirmed:
+nobody is told about it, its failure sends nothing, and its cancel (customer,
+staff or the sweep) is silent to the customer (`_cancel_order_locked`
+suppresses the CANCELED email and toast when `confirmed_at` is empty), while
+its stock and reservations are released as for any cancel. The history note
+"Order created", the stock holds, Meta's InitiateCheckout and the agent
+outbox still follow creation. A payment that lands after the cancel still
+pages staff (`record_payment_after_cancel`), and `confirm` never announces a
+canceled order, whichever path reports the payment. Orders confirmed before the
+column existed carry `created_at` (migration `order` 0115).
+`manage.py backfill_confirmed_at` stamps the unconfirmed orders whose
+confirmation email went out (`metadata.confirmation_email_sent_at`): that key
+is written only after a committed confirmation, so any other order is still to
+be confirmed and the backfill never silences its announcement.
 
 Every customer email is sent through `emails.send.send_email` and carries
 the transactional `List-ID` and `List-Unsubscribe: mailto:` headers
 (`emails.headers.build_headers`); store-staff mail carries no list headers.
 
 **Each order email is an `EmailType`, declared in `src/order/emails.py`.**
-`order.received`, `order.payment_confirmed`, `order.payment_failed`,
+`order.received`, `order.payment_confirmed`,
 `order.shipped`, `order.delivered`, `order.completed`, `order.canceled`,
 `order.returned`, `order.status_refunded`, `order.refunded`,
-`order.receipt_issued`, `order.credit_issued`,
-`shipping.acs_out_for_delivery`, `shipping.boxnow_at_locker` and the
+`order.receipt_issued`, `order.credit_issued` and the
 store-facing `team.new_order`, `team.dispute_opened`, `team.dispute_lost`.
+The order emails about a carrier's shipment,
+`shipping.acs_out_for_delivery` and `shipping.boxnow_at_locker`, are
+declared in their carrier's app (`src/shipping_acs/emails.py`,
+`src/shipping_boxnow/emails.py`) through `order.emails.shipment_email`.
 A type holds the template pair, the subject (a msgid with plain named
 fields, e.g. `Order #{order_id} Status Update - {status_display}`), the
 `build_context(obj, env)` that reads the order for it, a `sample(env)` (an
@@ -41,12 +82,12 @@ gates and whether the store may switch it off (`delivered`, `completed` and
 `shipping.acs_out_for_delivery` can be; the rest are required). The task
 calls `send_email(type_key, obj)`; choosing *when* to send (the idempotency
 claims above) and the bookkeeping after a send stay in the task. A task
-that returned `True`/`False` still does: it maps the `Delivery` explicitly
+returns `True`/`False` by mapping the `Delivery` explicitly
 (`emails.send.was_sent`). A mail the pipeline did not send because the store
 switched it off or a gate is closed is a deliberate no-op: the task returns
 `True`, keeps its reservation and writes no "email sent" note, except the
-store-staff tasks, which return `False` as they did for a store without a
-contact address.
+store-staff tasks, which return `False` for a store with neither a contact
+nor an owner address.
 
 `order.delivered`, `order.completed` and `order.review_request` carry a
 `review_links` list: one "Write a review" link per distinct product still
@@ -138,9 +179,8 @@ the `shipping_notification_email_sent` flag; the second one sends. This
 also covers the admin who attaches tracking after flipping to SHIPPED
 (or vice-versa). PROCESSING is never a customer email/toast — the
 order-received (offline) / payment-confirmed (online) notification
-already says "we're preparing your order". This is why placing a COD
-order used to send three emails at once (received + "processing" +
-premature "shipped"); now it sends only the confirmation.
+already says "we're preparing your order". So placing a COD order sends
+only the confirmation, never "processing" or a premature "shipped".
 
 ### 6.2 Locale handling
 
@@ -169,9 +209,7 @@ premature "shipped"); now it sends only the confirmation.
 - There is no pending-order reminder email. An unpaid online order is
   cancelled by `auto_cancel_stuck_pending_orders` (every 15 minutes), so a
   "complete your order" mail a day later reached an order that was already
-  gone; `check_pending_orders`, its template and `PENDING_ORDER_REMINDER_*`
-  were removed (`Order.reminder_count` / `last_reminder_sent_at` leave the
-  model in `order` 0084 and the columns are dropped by `order` 0090).
+  gone.
 - A refused create answers 400 with a stable `error.type`
   (`src/order/enum/create_error.py: OrderCreateErrorType`); `detail` and
   `cart` are display text in the request's language, never a contract.
@@ -185,7 +223,7 @@ premature "shipped"); now it sends only the confirmation.
   `get_order_language`, `store_operators` the store's language); a task
   passes none.
 
-### 6.3 Customer-notification suppression on chained transitions (PR #7)
+### 6.3 Customer-notification suppression on chained transitions
 
 Three call paths chain `update_order_status` calls back-to-back.
 Without suppression the customer would see two near-identical
@@ -193,12 +231,12 @@ emails / toasts within ms:
 
 1. Carrier `_apply_order_status_transition` → DELIVERED →
    `maybe_advance_to_completed(silent_for_customer=True)` → COMPLETED.
-2. `handle_payment_succeeded` → PENDING → PROCESSING (then
-   `send_order_confirmation_email` covers the same ground).
+2. `handle_payment_succeeded` → PENDING → PROCESSING (then the
+   confirmation, `OrderLifecycleService.confirm`, covers the same ground).
 3. `OrderService.add_tracking_info` admin path → PENDING → PROCESSING →
    SHIPPED.
 
-`OrderService.suppress_customer_status_notifications(order, status)`
+`OrderLifecycleService.suppress_customer_status_notifications(order, status)`
 pre-stamps two metadata flags:
 - `status_update_email_sent_<status>` — short-circuits the email task's
   `_reserve_status_update_email`.
@@ -208,7 +246,7 @@ pre-stamps two metadata flags:
 Internal state still flows: signal fires, `OrderHistory` rows logged, post-save
 handler runs. Only user-visible dispatches are skipped.
 
-> Since `handle_order_status_changed` now categorically skips the
+> Since `handle_order_status_changed` categorically skips the
 > customer email/toast for PENDING and PROCESSING (they're internal
 > milestones), the PROCESSING suppression in paths 2 and 3 above is
 > belt-and-suspenders. The **COMPLETED** suppression in path 1 is still
@@ -218,9 +256,11 @@ handler runs. Only user-visible dispatches are skipped.
 
 ### 6.4 Live notifications (WebSocket toasts)
 
-- `notify_order_created_live` — every order create.
-- `notify_payment_confirmed_live` / `notify_payment_failed_live` — payment
-  webhooks.
+- `notify_order_created_live` / `notify_payment_confirmed_live` — one of
+  the two when the order is confirmed (`handle_order_confirmed`): payment
+  confirmed for an order paid online, order placed otherwise. A failed
+  payment has no toast; `NotificationTypeEnum.PAYMENT_FAILED` exists only
+  for rows already stored.
 - `notify_order_status_changed_live` — meaningful status transitions only.
   Policy lives in `_ORDER_STATUS_COPY` (`src/order/communications/notifications.py`): SHIPPED,
   DELIVERED, COMPLETED, CANCELED. **PENDING and PROCESSING are intentionally
@@ -228,14 +268,28 @@ handler runs. Only user-visible dispatches are skipped.
   so surfacing them again would be redundant.
 - `notify_order_refunded_live` — refund signal.
 
-There is no standalone "tracking available" toast: it fired at
-voucher-mint (the same premature moment as the old shipped email) and
-was redundant with the SHIPPED toast, so it was removed alongside the
-email fix.
+There is no standalone "tracking available" toast: at voucher-mint the
+parcel has not moved, and the SHIPPED toast covers the rest.
 
 All WS notifications go through `notification.consumers.NotificationConsumer`
 and require auth; **guest orders silently get no live notification** (the email
 IS sent for guests since it goes to `order.email`).
+
+**Once per dispatch.** Each of these tasks can run more than once (a retry, a
+message delivered again, the sweep's copy of a publish, see
+`docs/deferred-dispatch.md`). `create_user_notification` writes the
+notification with a `dispatch_key` made of the task id, the user, the type,
+the link and `distinct_by`, unique among `Notification` rows, so a second
+copy gets the first copy's row back (or nothing, when the user has removed
+it since) and writes nothing, even when it words the notification
+differently. One task can write several notifications of one type and link
+to one user when the caller tells them apart with `distinct_by` (the liker
+of a comment, `blog.tasks.notify_comment_liked_task`). The push that a new row
+queues (`notification.tasks.send_notification_task`) claims the row first
+(`NotificationUser.pushed_at`, a compare-and-set) and gives the claim back
+when the push fails, so the storefront gets one toast per row. A worker that
+dies between the claim and the push loses that toast; the notification stays
+in the list.
 
 ### 6.5 Marketing email and the unsubscribe link
 
@@ -245,9 +299,9 @@ and the abandoned-cart reminder
 (`order.tasks.send_checkout_abandonment_emails`). Neither belongs to a
 subscription topic, so there is no `UserSubscription` row for the
 unsubscribe link to end. The customer's refusal is therefore kept on the
-**account**: `UserAccount.marketing_opted_out_at` (nullable timestamp,
-additive migration; the moment is the proof of when they asked), beside the
-`EmailOptOut` row that is the gate.
+**account**: `UserAccount.marketing_opted_out_at` (nullable timestamp; the
+moment is the proof of when they asked), beside the `EmailOptOut` row that is
+the gate.
 
 - The unsubscribe link (`emails.optout`: the `List-Unsubscribe` URL of both
   emails is the endpoint, `POST /api/v1/emails/unsubscribe/<token>`, RFC 8058
@@ -266,8 +320,8 @@ additive migration; the moment is the proof of when they asked), beside the
   `send_email` skips a recipient with an `EmailOptOut` row for the type or
   for `*` (every marketing type). No task filters on
   `marketing_opted_out_at`; the field is account state only.
-  `emails/0002_import_marketing_opt_outs` gave every account that opted out
-  before #368 (flag, no row) its `*` row. The pipeline also gives the type
+  `emails/0002_import_marketing_opt_outs` gave every account that had the
+  flag but no row its `*` row. The pipeline also gives the type
   the RFC 8058 `List-Unsubscribe` headers (Gmail and Yahoo require
   one-click unsubscribe on marketing mail; the HTTPS URI carries a signed
   token, and the relay DKIM-signs both headers).
@@ -311,7 +365,7 @@ the mail only says they exist. A task returns `False` when nothing was sent
 ### 6.7 Account emails (allauth)
 
 `user.adapter.UserAccountAdapter.send_mail` replaces allauth's own
-`send_mail`: each of the 19 mails allauth can send (`account/email/*`,
+`send_mail`: each mail allauth can send (`account/email/*`,
 `mfa/email/*`, `socialaccount/email/*`) is an email type
 (`user.emails.ALLAUTH_TYPES`) sent by `send_email` from a task, so
 allauth's `current_site` is not in the context and must not be

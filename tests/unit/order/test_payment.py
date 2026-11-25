@@ -95,7 +95,9 @@ class PaymentModuleTestCase(TestCase):
             success, payment_data = provider.process_payment(
                 amount,
                 order_id,
-                purpose=PaymentPurpose.ORDER,
+                order_uuid="giftcard_order-uuid",
+                customer_email="customer@example.com",
+                purpose=PaymentPurpose.GIFT_CARD,
                 subject="order-uuid",
             )
 
@@ -244,9 +246,11 @@ class PaymentModuleTestCase(TestCase):
 
 
 class StripePaymentIntentMetadataTestCase(TestCase):
-    """
-    Test enhanced payment intent creation with metadata and idempotency.
-    """
+    """What a client-confirmed intent is created with: its metadata and
+    its idempotency key (``StripePaymentProvider.process_payment``, the
+    gift-card purchase's payment)."""
+
+    ORDER_UUID = "giftcard_550e8400-e29b-41d4-a716-446655440000"
 
     def setUp(self):
         # See PaymentModuleTestCase.setUp — these tests construct
@@ -262,22 +266,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_with_comprehensive_metadata(
-        self, mock_sync, mock_stripe_create
-    ):
-        """
-        Test payment intent creation with comprehensive metadata.
-
-        Validates:
-        - Metadata includes order_id
-        - Metadata includes cart_item_ids (comma-separated)
-        - Metadata includes customer_email
-        - All metadata fields are properly formatted
-        """
-        # Setup
-
+    def _create(self, mock_stripe_create, *, customer_email):
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
         mock_payment_intent.status = "requires_payment_method"
@@ -285,300 +274,61 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         mock_payment_intent.next_action = None
         mock_stripe_create.return_value = mock_payment_intent
 
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-
-        # Execute with comprehensive metadata
-        success, payment_data = provider.process_payment(
-            amount,
-            order_id,
-            cart_item_ids=[101, 102, 103],
-            customer_email="customer@example.com",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+        return StripePaymentProvider().process_payment(
+            Money(amount=Decimal("100.00"), currency="EUR"),
+            "12345",
+            order_uuid=self.ORDER_UUID,
+            customer_email=customer_email,
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject="purchase-uuid",
         )
 
-        # Verify success
+    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
+    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
+    def test_the_metadata_names_the_purchase_and_the_buyer(
+        self, mock_sync, mock_stripe_create
+    ):
+        success, payment_data = self._create(
+            mock_stripe_create, customer_email="customer@example.com"
+        )
+
         self.assertTrue(success)
         self.assertEqual(payment_data["payment_id"], "pi_test_123")
-
-        # Verify metadata was passed correctly
-        call_kwargs = mock_stripe_create.call_args[1]
-        metadata = call_kwargs["metadata"]
-
+        metadata = mock_stripe_create.call_args.kwargs["metadata"]
         self.assertEqual(metadata["order_id"], "12345")
-        self.assertEqual(metadata["cart_item_ids"], "101,102,103")
         self.assertEqual(metadata["customer_email"], "customer@example.com")
         self.assertEqual(metadata["source"], "django_app")
+        self.assertEqual(metadata["purpose"], PaymentPurpose.GIFT_CARD.value)
+        self.assertEqual(metadata["subject"], "purchase-uuid")
 
     @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_with_idempotency_key(
+    def test_the_intent_is_idempotent_on_the_purchase(
         self, mock_sync, mock_stripe_create
     ):
-        """
-        Test payment intent creation with idempotency key.
-
-        Validates:
-        - Idempotency key is generated from order_uuid
-        - Idempotency key format is "order_{uuid}"
-        - Idempotency key is passed to Stripe API
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-        order_uuid = "550e8400-e29b-41d4-a716-446655440000"
-
-        # Execute with order_uuid
-        success, _payment_data = provider.process_payment(
-            amount,
-            order_id,
-            order_uuid=order_uuid,
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+        success, _payment_data = self._create(
+            mock_stripe_create, customer_email="customer@example.com"
         )
 
-        # Verify success
         self.assertTrue(success)
-
-        # Verify idempotency key was passed
-        call_kwargs = mock_stripe_create.call_args[1]
         self.assertEqual(
-            call_kwargs["idempotency_key"],
-            f"order_{order_uuid}",
+            mock_stripe_create.call_args.kwargs["idempotency_key"],
+            f"order_{self.ORDER_UUID}",
         )
 
     @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_without_idempotency_key(
+    def test_an_empty_email_is_left_out_of_the_metadata(
         self, mock_sync, mock_stripe_create
     ):
-        """
-        Test payment intent creation without idempotency key.
-
-        Validates:
-        - Payment intent can be created without order_uuid
-        - No idempotency_key parameter is passed when order_uuid is absent
-        - Backward compatibility is maintained
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-
-        # Execute without order_uuid
-        success, _payment_data = provider.process_payment(
-            amount, order_id, purpose=PaymentPurpose.ORDER, subject="order-uuid"
+        success, _payment_data = self._create(
+            mock_stripe_create, customer_email=""
         )
 
-        # Verify success
         self.assertTrue(success)
-
-        # Verify idempotency_key was NOT passed
-        call_kwargs = mock_stripe_create.call_args[1]
-        self.assertNotIn("idempotency_key", call_kwargs)
-
-    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_with_cart_item_ids_as_string(
-        self, mock_sync, mock_stripe_create
-    ):
-        """
-        Test payment intent with cart_item_ids provided as string.
-
-        Validates:
-        - cart_item_ids can be provided as string
-        - String is stored directly in metadata
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-
-        # Execute with cart_item_ids as string
-        _success, _payment_data = provider.process_payment(
-            amount,
-            order_id,
-            cart_item_ids="101,102,103",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
-        )
-
-        # Verify metadata
-        call_kwargs = mock_stripe_create.call_args[1]
-        metadata = call_kwargs["metadata"]
-        self.assertEqual(metadata["cart_item_ids"], "101,102,103")
-
-    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_without_optional_metadata(
-        self, mock_sync, mock_stripe_create
-    ):
-        """
-        Test payment intent creation without optional metadata fields.
-
-        Validates:
-        - Payment intent can be created without cart_item_ids
-        - Payment intent can be created without customer_email
-        - Only required metadata (order_id, source) is included
-        - Backward compatibility is maintained
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-
-        # Execute without optional metadata
-        success, _payment_data = provider.process_payment(
-            amount, order_id, purpose=PaymentPurpose.ORDER, subject="order-uuid"
-        )
-
-        # Verify success
-        self.assertTrue(success)
-
-        # Verify only required metadata is present
-        call_kwargs = mock_stripe_create.call_args[1]
-        metadata = call_kwargs["metadata"]
-
-        self.assertEqual(metadata["order_id"], "12345")
-        self.assertEqual(metadata["source"], "django_app")
-        self.assertNotIn("cart_item_ids", metadata)
+        metadata = mock_stripe_create.call_args.kwargs["metadata"]
         self.assertNotIn("customer_email", metadata)
-
-    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_with_all_parameters(
-        self, mock_sync, mock_stripe_create
-    ):
-        """
-        Test payment intent creation with all possible parameters.
-
-        Validates:
-        - All metadata fields are included
-        - Idempotency key is set
-        - Customer ID is set
-        - All parameters work together correctly
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-        order_uuid = "550e8400-e29b-41d4-a716-446655440000"
-
-        # Execute with all parameters
-        success, _payment_data = provider.process_payment(
-            amount,
-            order_id,
-            order_uuid=order_uuid,
-            cart_item_ids=[101, 102, 103],
-            customer_email="customer@example.com",
-            customer_id="cus_test_123",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
-        )
-
-        # Verify success
-        self.assertTrue(success)
-
-        # Verify all parameters were passed correctly
-        call_kwargs = mock_stripe_create.call_args[1]
-
-        # Check metadata
-        metadata = call_kwargs["metadata"]
-        self.assertEqual(metadata["order_id"], "12345")
-        self.assertEqual(metadata["cart_item_ids"], "101,102,103")
-        self.assertEqual(metadata["customer_email"], "customer@example.com")
-        self.assertEqual(metadata["source"], "django_app")
-
-        # Check idempotency key
-        self.assertEqual(call_kwargs["idempotency_key"], f"order_{order_uuid}")
-
-        # Check customer ID
-        self.assertEqual(call_kwargs["customer"], "cus_test_123")
-
-    @mock.patch("order.payments.payment.stripe.PaymentIntent.create")
-    @mock.patch("order.payments.payment.PaymentIntent.sync_from_stripe_data")
-    def test_process_payment_with_empty_cart_item_ids_list(
-        self, mock_sync, mock_stripe_create
-    ):
-        """
-        Test payment intent with empty cart_item_ids list.
-
-        Validates:
-        - Empty list is converted to empty string
-        - Payment intent creation succeeds
-        """
-        # Setup
-
-        mock_payment_intent = mock.Mock()
-        mock_payment_intent.id = "pi_test_123"
-        mock_payment_intent.status = "requires_payment_method"
-        mock_payment_intent.client_secret = "pi_test_123_secret"
-        mock_payment_intent.next_action = None
-        mock_stripe_create.return_value = mock_payment_intent
-
-        provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="EUR")
-        order_id = "12345"
-
-        # Execute with empty cart_item_ids list
-        success, _payment_data = provider.process_payment(
-            amount,
-            order_id,
-            cart_item_ids=[],
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
-        )
-
-        # Verify success
-        self.assertTrue(success)
-
-        # Verify empty string in metadata
-        call_kwargs = mock_stripe_create.call_args[1]
-        metadata = call_kwargs["metadata"]
-        self.assertEqual(metadata["cart_item_ids"], "")
+        self.assertNotIn("customer", mock_stripe_create.call_args.kwargs)
 
 
 class StripeApiVersionConfigTestCase(TestCase):

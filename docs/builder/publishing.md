@@ -19,8 +19,8 @@ catalogue, then the write):
 ## What a release moves
 
 `BuilderRelease` is `invalidated_by` of the `builder` surface
-(`src/builder/cache_surfaces.py`: the storefront's `builderPage` handler, every
-cached route, `invalidates_tenant_config=True`, so the Cloudflare edge purge
+(`src/builder/cache_surfaces.py`: the storefront's `builderPage` and
+`builderChrome` handlers, its cached builder functions, every cached route, `invalidates_tenant_config=True`, so the Cloudflare edge purge
 follows) and `src/tenant/signals.py: bump_generation_on_builder_release` moves
 `Tenant.cache_generation` in the release's own transaction. A draft save or
 a checkpoint purges nothing: no public read touches a draft.
@@ -140,8 +140,7 @@ render a page without saving or publishing it.
   the read-only editor of a STAFF member previews too. A map of document keys
   is not camel-cased (`PreviewJSONParser`).
 - Cost: a fixed handful of queries (the release, its versions) plus the
-  validation; measured warm in the test client, about 8 ms for 5 sections,
-  17 ms for 20 and 27 ms for 40.
+  validation.
 
 ## The editor's link pickers
 
@@ -287,7 +286,7 @@ publish can wait for a time:
   inside it, so a retry, an overlapping sweep or a second worker finds it
   spent, and a cancel racing the sweep wins or loses cleanly.
 - At execution the references are checked again and the documents must still
-  exist. A schedule that can no longer be released (`reference_not_found`,
+  exist. A schedule that cannot be released (`reference_not_found`,
   `document_gone`, `nothing_to_publish`: something else already released
   those versions) is `failed` with the problems in `failure`, never half
   done. Otherwise it is the ordinary release (made by who scheduled it): the

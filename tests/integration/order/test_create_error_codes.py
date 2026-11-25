@@ -111,7 +111,7 @@ class TestOrderCreateErrorCodes(APITestCase):
         assert response.json()["code"] == OrderCreateErrorType.CART_INVALID
 
     @patch("order.services.OrderService.validate_shipping_address")
-    @patch("order.services.OrderService.create_order_from_cart_offline")
+    @patch("order.services.OrderService.create_order_from_cart")
     def test_a_lapsed_reservation_is_reservation_unavailable(
         self, mock_create, _mock_address
     ):

@@ -86,7 +86,7 @@ def awaiting_payment_order_id() -> Subquery:
 
     The cart is left standing while a hosted payment is open
     (``_clear_cart_for_order``), and the order names it in
-    ``metadata["cart_snapshot"]`` — both creation paths write that. One
+    ``metadata["cart_snapshot"]`` — order creation writes that. One
     correlated subquery in the changelist query, so neither the column
     nor the filter costs a query per row.
     """

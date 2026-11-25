@@ -33,7 +33,7 @@ from recommendation.strategies import get_strategy
 from recommendation.strategies.base import TenantContext
 from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 pytestmark = pytest.mark.django_db
 

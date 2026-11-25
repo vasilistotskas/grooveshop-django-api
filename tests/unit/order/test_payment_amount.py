@@ -48,7 +48,9 @@ class StripePaymentAmountTestCase(TestCase):
             provider.process_payment(
                 amount,
                 "order_1",
-                purpose=PaymentPurpose.ORDER,
+                order_uuid="giftcard_order-uuid",
+                customer_email="",
+                purpose=PaymentPurpose.GIFT_CARD,
                 subject="order-uuid",
             )
 
@@ -76,7 +78,9 @@ class StripePaymentAmountTestCase(TestCase):
             success, _data = provider.process_payment(
                 amount,
                 "order_1",
-                purpose=PaymentPurpose.ORDER,
+                order_uuid="giftcard_order-uuid",
+                customer_email="",
+                purpose=PaymentPurpose.GIFT_CARD,
                 subject="order-uuid",
             )
 
@@ -102,7 +106,9 @@ class StripePaymentAmountTestCase(TestCase):
         success, data = provider.process_payment(
             amount,
             "order_1",
-            purpose=PaymentPurpose.ORDER,
+            order_uuid="giftcard_order-uuid",
+            customer_email="",
+            purpose=PaymentPurpose.GIFT_CARD,
             subject="order-uuid",
         )
 

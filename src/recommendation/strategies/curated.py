@@ -17,7 +17,7 @@ from recommendation.strategies.base import (
     RecommendationStrategy,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 # The first curated relation scores 1.0; each later one a little less,
 # so the merchant's own ordering survives the ranker's sort — but never

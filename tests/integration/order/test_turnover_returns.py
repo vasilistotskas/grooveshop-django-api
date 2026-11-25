@@ -18,6 +18,7 @@ import pytest
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.models import PaymentTransaction
 from order.payments.payment_ledger import PaymentLedger
+from order.refunds.service import RefundService
 from order.reporting.turnover import Bucket, figures
 from tests.integration.order.test_mydata_lifecycle import _eur, _order
 from tests.utils.turnover import snapshot_sale
@@ -47,7 +48,7 @@ def _move(reference: str, kind: str, when: datetime) -> None:
 
 def _refund(order, charge, amount: str, reference: str, when: datetime):
     """Book a refund of *amount* on *charge*, dated *when*."""
-    PaymentLedger.record_refund(
+    RefundService.book_refund(
         order, charge=charge, amount=_eur(amount), reference=reference
     )
     _move(reference, PaymentTransactionKind.REFUND, when)
@@ -55,7 +56,7 @@ def _refund(order, charge, amount: str, reference: str, when: datetime):
 
 def _reverse(order, charge, amount: str, reference: str, when: datetime):
     """Book the provider's reversal of a refund, dated *when*."""
-    PaymentLedger.record_refund_reversal(
+    RefundService.book_refund_reversal(
         order, charge=charge, amount=_eur(amount), reference=reference
     )
     _move(reference, PaymentTransactionKind.REFUND_REVERSAL, when)

@@ -18,13 +18,33 @@ Rules both carriers share:
   `BoxNowService.create_shipment_for_order`) raise
   `shipping.exceptions.ShipmentAwaitingPaymentError` while
   `Order.awaits_online_payment` holds — checked on the order row loaded
-  under the shipment lock. An online-paid voucher carries no COD amount,
+  under the shipment lock. That is an online pay way whose payment is not
+  settled (`SETTLED_PAYMENT_STATUSES`): an order paid and then partly
+  refunded still gets its voucher (#649). An online-paid voucher carries no COD amount,
   so a voucher minted for an unpaid card order would hand the goods over
   for free (prod order 304 was one admin click away, 2026-09-24). The
   tasks return `{"status": "awaiting_payment"}` with no retry and no
   alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
   parcel now") refuse with a message, because the task's refusal never
   reaches the page.
+- **No shipment for an order that ships nothing.** `Order.ships_nothing`
+  (`order.managers.order.ships_nothing_q`): the order is CANCELED or
+  REFUNDED, or it was paid online and the store keeps nothing of the
+  payment (`PAYMENT_STATUSES_KEEPING_NOTHING`: a full refund leaves the
+  order PROCESSING). Both mint choke points raise
+  `shipping.exceptions.ShipmentNotNeededError` for it (ACS also for a
+  shipment it retired, `shipping_acs.attention.needs_no_voucher`; BOX NOW
+  first finishes a canceled order's cancel), the tasks return
+  `{"status": "not_needed"}` with no retry and no alert, and both admin
+  buttons refuse with a message. A retry that waited out a cancel in its
+  backoff therefore mints nothing. ACS asks for the store's credentials
+  only after that refusal, so an unconfigured store still answers
+  `not_needed`. Where BOX NOW may already hold a parcel (a creation of
+  uncertain outcome settled by the sweep, or one whose answer arrives
+  after the order stopped shipping), the parcel is cancelled at BoxNow and
+  the shipment recorded CANCELED, as for a canceled order
+  ([BOX NOW](shipping-boxnow.md)). No receipt with movement indication is
+  issued for such an order (`receipt_issuable`).
 - **The receipt follows the voucher, never the other way round.** Every
   path that makes a voucher or parcel live records it with
   `Order.add_tracking_info`, and recording it issues the receipt with
@@ -84,21 +104,25 @@ Rules both carriers share:
 
 ### 5.0 Shipping pricing: `ShippingRate`
 
-`shipping.ShippingRate` (tenant schema, cross-schema FK to
-`country.Country` — the same shape `Order.country` uses) is the single
-source of a store's shipping price, availability and weight cap, one
-row per `(provider, country, kind)`. It replaced a global
+`shipping.ShippingRate` (tenant schema) is the single source of a
+store's shipping price, availability and weight cap, one row per
+`(provider, zone, kind)`: a rate belongs to a `ShippingZone`, a whole
+country or some of its regions, and which zone a destination is priced
+by is [§5.5](shipping-zones.md). It replaced a global
 `CHECKOUT_SHIPPING_PRICE` / `FREE_SHIPPING_THRESHOLD` /
 `BOXNOW_*` / `ACS_*` Setting sextet that priced every destination the
 same and had nothing to say about whether a store shipped there at
 all — the gap that blocked offering BoxNow-to-Cyprus without also
 accepting Cyprus orders at the Greek flat rate.
 
-- **`ShippingService.active_rate(provider_code, kind, country_code)`**
-  is the single gate: an active provider, a registered adapter, the
-  provider supporting `kind`, `is_kind_enabled(kind, country_code=...)` (ACS
-  lockers: active stations synced for that country), and an active rate row
-  for that country — or `ShippingUnavailableError`.
+- **`ShippingService.active_rate(provider_code, kind, country_code,
+  region_id)`** is the single gate: an active provider, a registered
+  adapter, the provider supporting `kind`, `is_kind_enabled(kind,
+  country_code=...)` (ACS lockers: active stations synced for that
+  country), and an active rate in the zone the destination resolves to
+  ([§5.5](shipping-zones.md)) — or `ShippingUnavailableError`, or its
+  subclass `ShippingRegionUnavailableError` when the carrier has that rate
+  elsewhere in the country but not in the region's zone.
   `assert_available(...)` adds the weight-cap check
   (`ShippingWeightExceededError`); both are used directly by a
   free-shipping promo, which must not let an unavailable or over-weight
@@ -111,9 +135,8 @@ accepting Cyprus orders at the Greek flat rate.
   coupon discounts, excluding shipping and the pay-way fee (loyalty
   points and gift cards are payment, not discounts, and do not move it).
   `OrderQuoteService.quote` passes it to `shipping_cost` and
-  `calculate_payment_method_fee`, and both order-creation paths, the
-  cart's create-payment-intent and `POST /cart/quote` price through that
-  one function ([§3.0](creation.md)), so they agree for the same pricing
+  `calculate_payment_method_fee`, and order creation and
+  `POST /cart/quote` price through that one function ([§3.0](creation.md)), so they agree for the same pricing
   inputs. The inputs can change between two requests (a price, a
   promotion, a rate), and then the later total differs: every order is
   created with the quote's `expectedTotal`, and only at that total. The cart response
@@ -147,12 +170,16 @@ accepting Cyprus orders at the Greek flat rate.
   transient failure returns `None`, never raises — the stored rate
   price is the safety net.
 - **`/shipping/options`** requires `country_code` (400 without) and
-  resolves the matrix from active rates for that country; each row
+  resolves the matrix from the active rates of the destination's zone:
+  the optional `regionId` picks a region zone, and without it the
+  country's whole-country zone answers ([§5.5](shipping-zones.md); a
+  `regionId` the country does not have is a 400 `region_invalid` or
+  `region_country_mismatch` on `regionId`); each row
   carries `country_code`, `max_weight_grams` and `exceeds_max_weight`
   — an over-cap option (a heavy Cyprus BoxNow cart) is still listed,
   flagged, so the storefront can disable it with a reason instead of
   the step silently having one fewer card. It prices on the caller's
-  `orderValueAmount`, with no region and no promotion waiver; the
+  `orderValueAmount`, with no promotion waiver; the
   `shippingOptions` of `POST /cart/quote` are the same rows
   (`available_options`) priced as an order would be, each with
   `waivedBy` ([§3.0](creation.md)).
@@ -228,15 +255,48 @@ accepting Cyprus orders at the Greek flat rate.
   carrier's credentials live on the `Tenant` row, which no surface watches,
   so connecting or removing one shows after the TTL or a manual purge of
   the `shipping` surface.
+- **`GET /shipping/product/<product_id>`** is the product page's
+  "shipping from X": `ShippingService.product_shipping_from(product)`
+  prices a cart holding that one product and nothing else, as checkout
+  would, for a shopper not known yet:
+  - to `initial_country_code()`, the country checkout preselects;
+  - at `OrderQuoteService.threshold_value` of the product's
+    `final_price` after the automatic promotions such a cart gets
+    (`PromotionEngine.evaluate_single_unit`: the cart's own
+    classification, stacking and clamp over a one-line cart; no code,
+    and no `first_order_only` promotion, as for any anonymous cart), so a
+    free-shipping promotion covering the product waives every carrier and
+    a carrier's threshold is judged after the discount;
+  - through `available_options` with the parcel the cart would ship (the
+    product plus the promotions' gifts, `gift_pairs`): a row flagged
+    `exceeds_max_weight` or `exceeds_parcel_size` cannot carry it and does
+    not count, and a live-priced carrier (ACS) is asked for the parcel's
+    weight bracket as checkout asks it.
+
+  The response is `{estimate}`: the cheapest row's `price` and `currency`,
+  `free` (`price` is 0), `countryCode`, and `freeShippingThreshold`, the
+  lowest threshold of `free_threshold_rates(country, weight_grams, items)`
+  (the carriers that can take it). `estimate` is `null` when the store
+  ships nowhere or no delivery it offers can take the product; 404 for a
+  product that is missing or inactive. Retail only: a wholesale price
+  never reaches it (no shopper). Not on the product serializer, which
+  would tie the product cache to every rate. Anonymous, cached by
+  `@cache_methods` (`ProductShippingView`); the `shipping`, `products`
+  (the product's price, weight and size) and `promotions` surfaces all
+  purge it (`PRODUCT_SHIPPING_VIEW` / `PRODUCT_SHIPPING_HANDLER` in
+  `src/shipping/cache_surfaces.py`). A live ACS price can move within
+  the TTL.
 - **`?shippable=true` on `/country`** filters to
   `shippable_country_codes()`; always empty on the platform host,
   which has no tenant schema of its own to hold a rate.
 - **`ShippingService.resolve_home_delivery_provider(country_code)`**
   picks the lowest-priority active home-delivery provider that has a
   rate for the country (or, with no country yet, the lowest-priority
-  active one regardless) — shared by `_resolve_shipping_provider` (the
-  order's FK) and `shipping_cost` (the price), so both always agree on
-  which carrier a plain `home_delivery` request routes to.
+  active one regardless), among the carriers checkout's gate takes
+  (`carrier_offers`). `OrderQuoteService.quote` resolves it once and
+  prices it, and order creation assigns that carrier
+  (`CheckoutQuote.shipping_choice`, `_assign_shipping_provider`), so the
+  price and the carrier always agree.
 - **Release N migration** (`shipping/0011_convert_legacy_pricing_to_
   rates.py`) copies each tenant's existing Setting values — or the
   frozen historical default when a row is missing — into GR-only rate
@@ -246,8 +306,9 @@ accepting Cyprus orders at the Greek flat rate.
   (`0014_drop_legacy_shipping_settings.py`, additive-only rule —
   `docs/migrations.md`).
 - **Adding a country to an existing carrier** is an admin action, not a
-  deploy: add a `ShippingRate` row (`ShippingProviderAdmin`'s Rates
-  inline) for `(provider, country, kind)`.
+  deploy: add a rate for `(provider, kind)` on the country's zone
+  (Settings → Shipping Zones, its Rates tab), creating the zone first
+  ([§5.5](shipping-zones.md)).
 
 ### 5.3 Adding a new carrier
 
@@ -256,7 +317,6 @@ accepting Cyprus orders at the Greek flat rate.
    - The abstract methods: `create_shipment`, `cancel_shipment`, `has_label`,
      `fetch_label_bytes`,
      `fetch_tracking_events` (return `[]` when events arrive by webhook),
-     `shipment_for_order`,
      `serialize_shipment`, `validate_order_payload`.
    - `dispatch_create_shipment_task(self, order, *, schema_name: str | None = None)`
      — enqueues the
@@ -266,6 +326,60 @@ accepting Cyprus orders at the Greek flat rate.
      (`headers={"_schema_name": ...}`), or the
      worker runs under the wrong tenant. The default is a no-op for carriers
      with no async step.
+   - The admin hooks, so no admin module names the carrier (all default to
+     nothing). A carrier that is an app of its own sets `app_label` (the
+     sidebar and the ⌘K palette drop its pages while the store has no active
+     `ShippingProvider` row for it) and returns its pages from `admin_pages()`
+     (`AdminPages`: the Shipping group, the Pickup Points menu, the System
+     section's Audit and Reconciliation menus). `shipment_state_variants()`
+     colours its shipment states (`admin.displays.SHIPMENT_STATE_VARIANT`
+     merges every carrier's). `attention_counts(now)` and `attention_rows(counts)`
+     put the work it leaves waiting on the dashboard's "Needs attention" list
+     (the same rules as its alert emails, §5.4);
+     `attention_models` lists the models whose writes clear the cached counts.
+   - The order hooks, so no `order` module names the carrier (all default
+     to nothing). `shipment_relation` is the `related_name` of its shipment
+     row's one-to-one to `Order` (`acs_shipment`): `shipment_for_order`
+     reads it and the order lists join it (`OrderQuerySet.with_shipments`).
+     `order_detail_prefetches` lists what the order detail reads of it
+     (`for_detail`). `shipment_state(shipment)` is the state the order
+     changelist labels, `last_reported_at(shipment)` the last report the
+     follow-up rule reads (`order.lifecycle.follow_up`).
+     `admin_order_inline()` is the inline the order change page shows for
+     its orders; `admin_order_search_fields` and `admin_order_list_filters`
+     join the order changelist's. `order_shipment_field()` gives it a typed
+     field of its own on the order detail (`OrderShipmentField`: name and
+     detail serializer), before the generic `shipment`.
+   - The checkout hooks. `checkout_fields()` returns the request fields it
+     takes, by name. The ones named in `location_keys` are its pickup
+     point: they lead `PickupPointSerializer`, so the quote, the payment
+     intent and the order all take them, and the cart digest covers them.
+     The rest are options for the order alone and follow `shipping_kind`
+     on `OrderCreateFromCartSerializer`. The order view hands what the
+     body sent of them to the carrier as the payload. `field_rank` places
+     its fields among the carriers' in every API body, the order detail's
+     included (BOX NOW 0, ACS 1). `tracking_url_template` (`{number}`) is
+     its parcel's public tracking page, the order's `tracking_url` when
+     `shipping_carrier` is its `code`.
+   - Its API errors subclass `shipping.exceptions.CarrierAPIError` and
+     return the courier's message from `text`: the order's cancel view
+     answers a refusal with it.
+   - An email to the customer about its shipment is declared in its own
+     `emails.py` through `order.emails.shipment_email` (templates stay in
+     `emails/order/`; `shipping_acs.emails`, `shipping_boxnow.emails`).
+   - The routing and scheduling hooks, so no `core` or `tenant` module names
+     the carrier. `api_urlconf` is its storefront API's URL conf, mounted
+     under `api/v1/` after `shipping.urls` (which includes every carrier's).
+     `webhook_urlconf` is the URL conf of the endpoints the courier calls,
+     mounted at the root of both hosts by `shipping.webhook_urls`, with no
+     language prefix (BoxNow: `shipping_boxnow.webhook_urls`). Its beat
+     fan-outs (`run_for_all_tenants`) live in its own `tasks.py`; the ones
+     that moved there from `tenant.tasks` keep their `tenant.tasks.fanout_*`
+     names, which beat and queued messages address.
+   - `create_demo_shipment(order, row, ...)` writes the shipment a demo
+     account's order shipped under (`shipping.demo.ShipmentRow`, timed by
+     `shipping.demo.event_times`), from the carrier's own `demo.py`; the demo
+     seed (`devtools.demo_account`) asks the order's carrier for it.
    - Webhook-based carriers handle events in their own service (BoxNow:
      `BoxNowService.apply_webhook_event`); it is not part of the interface.
 3. Decorate the adapter with `@register_provider` and import it in the app's

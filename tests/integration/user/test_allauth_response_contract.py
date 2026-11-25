@@ -579,16 +579,30 @@ def test_a_customer_with_a_second_factor_is_offered_both(document, user, token):
     assert _flow_ids(body) == ["reauthenticate", "mfa_reauthenticate"]
 
 
-def test_a_customer_with_no_way_to_reauthenticate_is_given_none(
+def test_a_customer_with_no_way_to_reauthenticate_is_not_asked(
     document, user, passwordless_token
 ):
-    # No password, no second factor, and the code method is off: allauth
-    # 65.22 answers the 401 with no flow, where 65.21 let the call through.
+    # No password, no second factor, and the code method is off: refusing
+    # them would leave no way to add a second factor
+    # (``TenantAccountAdapter.is_reauthentication_required``).
+    response = _sensitive_action(passwordless_token, user)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert_documented(
+        document, "/account/authenticators/totp", "post", response
+    )
+
+
+def test_once_they_have_a_second_factor_they_are_asked_for_it(
+    document, user, passwordless_token
+):
+    _with_totp(user)
+
     response = _sensitive_action(passwordless_token, user)
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     body = assert_documented(document, *_sensitive_operation(user), response)
-    assert body["data"]["flows"] == []
+    assert _flow_ids(body) == ["mfa_reauthenticate"]
 
 
 @pytest.mark.parametrize(

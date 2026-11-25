@@ -88,10 +88,11 @@ the ways this customer can give it, `data.flows`, from
   value).
 
 A customer with none of the methods that are on (no password, no
-authenticator) is refused: allauth up to 65.21 counted such a customer as
-always freshly reauthenticated, 65.22 denies, so the storefront's account
-deletion answers 403 `reauthentication_required` and a second factor cannot be
-added until the code method is on.
+authenticator) is not asked while the code method is off
+(`TenantAccountAdapter.is_reauthentication_required`, deleted with the
+setting): allauth up to 65.21 counted such a customer as always freshly
+reauthenticated, and 65.22's refusal would leave them no way to delete their
+account or add a second factor until the code method is on.
 
 `AuthenticationMethod` keeps the titles its two code entries had before 65.22
 (`keep_the_code_methods_titles`): a consumer's contract check pairs the entries

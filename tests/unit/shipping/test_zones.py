@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -26,12 +27,14 @@ from shipping.factories import (
     whole_country_zone,
 )
 from shipping.interfaces import get_provider
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingRate
 from shipping.services import ShippingService
 from shipping.zones import (
     HomeCoverage,
+    chargeable,
     destination_errors,
     destination_rates,
+    offered,
     rate_kind_errors,
     zone_errors,
     zone_for,
@@ -427,3 +430,60 @@ def test_a_zone_save_serialises_the_countrys_zones():
             (held,) = cursor.fetchone()
 
     assert held >= 1
+
+
+class TestARateWithoutAZone:
+    """A rate the previous release inserts during the rollout: a country
+    and no zone (``0025`` keeps the column nullable for it until the
+    contract release backfills it). It applies nowhere, and nothing that
+    reads the store's rates fails on it."""
+
+    @pytest.fixture
+    def zoneless(self):
+        served = CountryFactory(num_regions=0)
+        enable_rate(served)
+        written_by_the_old_release = CountryFactory(num_regions=0)
+        rate = enable_rate(served, provider_code="acs")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE shipping_shippingrate "
+                "SET zone_id = NULL, country_id = %s WHERE id = %s",
+                [written_by_the_old_release.alpha_2, rate.pk],
+            )
+        return SimpleNamespace(
+            rate=rate,
+            served=served.alpha_2,
+            country=written_by_the_old_release.alpha_2,
+        )
+
+    def test_it_is_not_chargeable(self, zoneless):
+        rates = ShippingRate.objects.all()
+
+        assert zoneless.rate.pk not in chargeable(rates).values_list(
+            "pk", flat=True
+        )
+        assert zoneless.rate not in offered(rates)
+
+    def test_the_stores_countries_and_coverage_leave_it_out(self, zoneless):
+        shippable = ShippingService.shippable_country_codes()
+        coverage = HomeCoverage.load()
+
+        assert zoneless.served in shippable
+        assert zoneless.country not in shippable
+        assert zoneless.country not in coverage.reached
+
+    def test_the_acs_station_sync_never_syncs_a_null_country(
+        self, zoneless, acs_configured_tenant
+    ):
+        from shipping_acs.tasks import sync_acs_stations
+
+        with mock.patch(
+            "shipping_acs.services.AcsService.sync_stations",
+            return_value={"upserted": 0, "deactivated": 0},
+        ) as sync:
+            sync_acs_stations.run()
+
+        synced = {call.kwargs["country"] for call in sync.call_args_list}
+        assert synced, "the store's zoned ACS rates are synced"
+        assert None not in synced
+        assert zoneless.country not in synced

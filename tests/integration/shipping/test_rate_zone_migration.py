@@ -283,6 +283,7 @@ class TestTheContractRerun(TestCase):
 
         rate.refresh_from_db()
         self.assertEqual(rate.zone.country_id, "QZ")
+        self.assertEqual(rate.country_id, rate.zone.country_id)
         self.assertNotEqual(rate.zone_id, greece.pk)
 
     def test_a_history_row_gets_its_countrys_base_zone(self):

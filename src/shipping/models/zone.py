@@ -1,6 +1,9 @@
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -11,6 +14,26 @@ from tenant.staff_actors import history_user_getter, history_user_setter
 
 if TYPE_CHECKING:
     from region.models import Region
+
+#: The zones whose region set ``ShippingZone.set_regions`` is writing:
+#: the receivers in ``shipping.signals`` leave their rates to its one sync.
+_SETTING_REGIONS: ContextVar[frozenset[int]] = ContextVar(
+    "shipping_setting_regions", default=frozenset()
+)
+
+
+def setting_regions(zone_id: int | None) -> bool:
+    """Whether ``ShippingZone.set_regions`` is writing this zone's set."""
+    return zone_id in _SETTING_REGIONS.get()
+
+
+@contextmanager
+def _writing_regions(zone_id: int) -> Generator[None]:
+    token = _SETTING_REGIONS.set(_SETTING_REGIONS.get() | {zone_id})
+    try:
+        yield
+    finally:
+        _SETTING_REGIONS.reset(token)
 
 
 class ShippingZoneRegion(models.Model):
@@ -138,21 +161,28 @@ class ShippingZone(TimeStampMixinModel):
         a change of its country or its regions."""
         self.rates.update(country_id=self.rate_country_id())
 
-    def set_regions(self, regions: Iterable[Region | str]) -> None:
-        """Replace the zone's region set, the one writer of it.
+    def set_regions(self, regions: Iterable[Region]) -> None:
+        """Replace the zone's region set.
 
-        ``regions.set`` removes before it adds, so a replacement passes
-        through an empty set, a base zone for that moment: syncing the
-        rates' country there would write the base zone's country, which
-        the old unique ``(provider, country, kind)`` refuses next to the
-        real base zone's rate. The rates are synced once, for the set
-        written. ``ShippingZoneRegion`` rows are never written another way
-        (a region is ``PROTECT``ed, so none disappears under a zone).
+        Refused (``ValidationError``) where the store's zones would break
+        (``shipping.zones.zone_errors``): emptied, the zone would be a
+        second base zone of its country. ``regions.set`` removes before it
+        adds, so a replacement passes through an empty set, a base zone
+        for that moment: syncing the rates' country there would write the
+        base zone's country, which the old unique ``(provider, country,
+        kind)`` refuses next to the real base zone's rate. So the
+        receivers leave the rates alone while the set is written
+        (:func:`setting_regions`), and they are synced once, for the set
+        written. A ``ShippingZoneRegion`` row written another way is
+        synced by ``shipping.signals``.
         """
-        with transaction.atomic():
-            self._setting_regions = True
-            try:
-                self.regions.set(regions)
-            finally:
-                self._setting_regions = False
-            self.sync_rate_countries()
+        from shipping.zones import zone_errors
+
+        regions = list(regions)
+        if errors := zone_errors(
+            zone=self, country_code=self.country_id, regions=regions
+        ):
+            raise ValidationError(errors)
+        with transaction.atomic(), _writing_regions(self.pk):
+            self.regions.set(regions)
+        self.sync_rate_countries()

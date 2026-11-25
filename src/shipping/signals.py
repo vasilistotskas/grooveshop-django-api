@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from django.db.models.signals import m2m_changed
+from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
 from core.cache.invalidation import mark_model_stale
 from shipping.models import ShippingZone, ShippingZoneRegion
+from shipping.models.zone import setting_regions
 
 _CHANGES = frozenset({"post_add", "post_remove", "post_clear"})
 
@@ -31,6 +32,25 @@ def zone_regions_changed(sender, instance, action, **kwargs) -> None:
     if action not in _CHANGES:
         return
     # ``ShippingZone.set_regions`` syncs once, for the set it wrote.
-    if not getattr(instance, "_setting_regions", False):
+    if not setting_regions(instance.pk):
         instance.sync_rate_countries()
+    mark_model_stale(ShippingZoneRegion)
+
+
+@receiver(
+    [post_save, post_delete],
+    sender=ShippingZoneRegion,
+    dispatch_uid="shipping.zone_region_row_changed",
+)
+def zone_region_row_changed(sender, instance, **kwargs) -> None:
+    """A ``ShippingZoneRegion`` row written or deleted as a row, not
+    through ``zone.regions`` (a ``create``, a queryset ``delete``): the
+    zone may have become a region zone or the base zone, so its rates'
+    country is rewritten, as for a region-set change. A zone deleted with
+    its rows takes its rates with it."""
+    if setting_regions(instance.zone_id):
+        return
+    zone = ShippingZone.objects.filter(pk=instance.zone_id).first()
+    if zone is not None:
+        zone.sync_rate_countries()
     mark_model_stale(ShippingZoneRegion)

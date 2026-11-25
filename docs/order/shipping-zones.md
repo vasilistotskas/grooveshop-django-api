@@ -195,9 +195,16 @@ database the constraint still refuses that release a duplicate of a base
 zone's rate.
 
 Release N+1 (contract, `contract_of` `0025`), in this order: rerun `0024`'s
-`zone_every_rate` over the rates without a zone (a duplicate of a rate its
-base zone already has is deleted and logged), set `zone` NOT NULL, then drop
-`country`, the old constraint and its index
-([`docs/migrations.md`](../migrations.md)). The backfill's reverse refuses a
+`zone_every_rate`, set `zone` NOT NULL, then drop `country`, the old
+constraint and its index ([`docs/migrations.md`](../migrations.md)). The
+rerun puts in its country's base zone every rate the release before wrote
+during the rollout: one it inserted without a zone, and one whose `country`
+its admin changed. **Where the base zone already has a rate for the same
+carrier and kind, the zone's rate wins**: the other is deleted, and its id
+logged at WARNING with the schema and the zone. The zone's rate is the one
+this release has charged all along (a rate without a zone is not
+chargeable, and a re-pointed rate was still charged in its old zone), so
+what shoppers were quoted stays what they are charged; the old release's
+edit there is the price to set again by hand, from the logged ids. The backfill's reverse refuses a
 store whose region zones hold rates: the old shape has one rate per
 `(provider, country, kind)`.

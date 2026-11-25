@@ -8,7 +8,9 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.models import ProtectedError
 from django.test.utils import CaptureQueriesContext
 from djmoney.money import Money
 
@@ -29,7 +31,11 @@ from shipping.factories import (
     whole_country_zone,
 )
 from shipping.interfaces import get_provider
-from shipping.models import ShippingProvider, ShippingRate
+from shipping.models import (
+    ShippingProvider,
+    ShippingRate,
+    ShippingZoneRegion,
+)
 from shipping.services import ShippingService
 from shipping.zones import (
     HomeCoverage,
@@ -541,6 +547,40 @@ class TestTheCountryARateCarries:
             islands_zone.rates.get().country_id
             == greece_like["country"].alpha_2
         )
+
+    def test_a_zone_cannot_lose_its_regions_beside_a_base_zone(
+        self, greece_like
+    ):
+        # Emptied, it would be the country's second base zone, its rate
+        # the base zone's duplicate under the old unique (provider,
+        # country, kind): refused by the zones' rule, never an
+        # IntegrityError, and nothing is written.
+        islands_zone = greece_like["islands_zone"]
+
+        with pytest.raises(ValidationError) as refused:
+            islands_zone.set_regions([])
+
+        assert set(refused.value.message_dict) == {"regions"}
+
+        assert list(islands_zone.regions.all()) == [greece_like["islands"]]
+        assert islands_zone.rates.get().country_id is None
+
+    def test_a_region_row_written_directly_rewrites_it(self, greece_like):
+        base = greece_like["base"]
+        country = greece_like["country"].alpha_2
+
+        ShippingZoneRegion.objects.create(
+            zone=base, region=greece_like["mainland"]
+        )
+        assert base.rates.get().country_id is None
+
+        ShippingZoneRegion.objects.filter(zone=base).delete()
+        assert base.rates.get().country_id == country
+
+    def test_a_region_a_zone_holds_cannot_be_deleted(self, greece_like):
+        # So no cascade empties a zone's set under its rates.
+        with pytest.raises(ProtectedError):
+            greece_like["islands"].delete()
 
     def test_a_zone_moved_to_another_country_moves_it(self, greece_like):
         base = greece_like["base"]

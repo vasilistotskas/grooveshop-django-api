@@ -44,6 +44,7 @@ from shipping.zones import (
     chargeable,
     destination_rates,
     offered,
+    standing_destinations,
 )
 
 if TYPE_CHECKING:
@@ -707,7 +708,10 @@ class ShippingService:
         Priced as checkout prices a cart holding one unit of it and
         nothing else (:meth:`available_options`), for a shopper not known
         yet: to the store's first shipping country, the one checkout
-        preselects (:meth:`initial_country_code`); at the products value
+        preselects (:meth:`initial_country_code`), at its standing
+        destinations (``shipping.zones.standing_destinations``: the base
+        zone, or each region zone of a country served only in some
+        regions, the cheapest winning); at the products value
         every "free above X" rule is judged on, after the automatic
         promotions such a cart gets
         (``PromotionEngine.evaluate_single_unit``), whose free shipping
@@ -736,8 +740,10 @@ class ShippingService:
         )
         prices = [
             option["price"]
+            for destination in standing_destinations(country_code)
             for option in cls.available_options(
                 country_code=country_code,
+                region_id=destination.region_code,
                 order_value_amount=order_value.amount,
                 currency=str(order_value.currency),
                 weight_grams=weight_grams,
@@ -841,7 +847,11 @@ class ShippingService:
         """The store's standing shipping policy, one row per offer.
 
         One row per (provider, kind, country) the store actually offers
-        (:meth:`offered_rates`), over :meth:`shippable_country_codes`,
+        (:meth:`offered_rates`), over :meth:`shippable_country_codes`
+        and each country's standing destinations
+        (``shipping.zones.standing_destinations``): its base zone, whose
+        rows carry no ``region_codes``, or, in a country served only in
+        some regions, each region zone, whose rows name its regions;
         straight from the ``ShippingRate``: no cart, weight or order
         value is involved, so the price is the rate's own, before a
         live carrier quote or a free-shipping threshold. Powers
@@ -864,10 +874,12 @@ class ShippingService:
                 "delivery_days_min": rate.delivery_days_min,
                 "delivery_days_max": rate.delivery_days_max,
                 "max_weight_grams": rate.max_weight_grams,
+                "region_codes": list(destination.region_codes),
             }
             for country_code in cls.shippable_country_codes()
+            for destination in standing_destinations(country_code)
             for provider, kind, _adapter, rate in cls.offered_rates(
-                country_code
+                country_code, destination.region_code
             )
         ]
 
@@ -1012,7 +1024,9 @@ class ShippingService:
         """The rates to ``country_code`` that ship free above a threshold.
 
         Judged for the country with no region, as every caller here
-        knows none: its base zone (``shipping.zones``).
+        knows none: at its standing destinations
+        (``shipping.zones.standing_destinations``), the base zone, or
+        each region zone of a country served only in some regions.
 
         Each passes the gate :meth:`active_rate` puts on a quote (an
         active provider with a registered adapter, supporting the kind,
@@ -1026,8 +1040,16 @@ class ShippingService:
         """
         country_code = country_code.upper()
         items = None if items is None else list(items)
+        standing = reduce(
+            operator.or_,
+            (
+                destination_rates(country_code, destination.region_code)
+                for destination in standing_destinations(country_code)
+            ),
+            ShippingRate.objects.none(),
+        )
         rates = (
-            chargeable(destination_rates(country_code))
+            chargeable(standing)
             .filter(free_shipping_threshold__isnull=False)
             .select_related("provider")
         )

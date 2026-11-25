@@ -15308,6 +15308,9 @@ msgstr "The refund was not made"
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
 
+msgid "The regions of the country this row applies to; empty when it applies to the whole country. A store that delivers only to some regions of a country lists them here."
+msgstr "The regions of the country this row applies to; empty when it applies to the whole country. A store that delivers only to some regions of a country lists them here."
+
 msgid "The release whose versions this one restores."
 msgstr "The release whose versions this one restores."
 

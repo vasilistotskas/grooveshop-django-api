@@ -39310,7 +39310,8 @@ components:
               nullable: true
               description: 'The country the carriers'' thresholds were judged for:
                 the store''s first shipping country, the one checkout preselects,
-                at the rates of its shipping zone covering the whole country (a cart
+                at the rates of its shipping zone covering the whole country, or of
+                each region zone of a country served only in some regions (a cart
                 knows no region; a region zone''s own threshold applies once checkout
                 prices the address)'
           required:
@@ -52884,6 +52885,13 @@ components:
           type: string
           description: Χώρα προορισμού (ISO 3166-1 alpha-2).
           maxLength: 2
+        regionCodes:
+          type: array
+          items:
+            type: string
+          description: Οι περιοχές της χώρας στις οποίες ισχύει αυτή η γραμμή· κενό
+            όταν ισχύει για ολόκληρη τη χώρα. Ένα κατάστημα που παραδίδει μόνο σε
+            ορισμένες περιοχές μιας χώρας τις αναφέρει εδώ.
         kind:
           $ref: '#/components/schemas/ShippingKind'
         providerCode:
@@ -52941,6 +52949,7 @@ components:
       - price
       - providerCode
       - providerName
+      - regionCodes
     ShippingProvider:
       type: object
       properties:

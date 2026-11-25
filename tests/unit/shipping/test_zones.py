@@ -12,6 +12,7 @@ from django.db import connection, transaction
 from djmoney.money import Money
 
 from country.factories import CountryFactory
+from product.factories import ProductFactory
 from region.factories import RegionFactory
 from region.models import Region
 from shipping.admin import ShippingZoneAdminForm
@@ -31,15 +32,18 @@ from shipping.models import ShippingProvider, ShippingRate
 from shipping.services import ShippingService
 from shipping.zones import (
     HomeCoverage,
+    StandingDestination,
     chargeable,
     destination_errors,
     destination_rates,
     offered,
     rate_kind_errors,
+    standing_destinations,
     zone_errors,
     zone_for,
 )
 from tests.utils.shipping import enable_rate
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -545,3 +549,86 @@ class TestTheCountryARateCarries:
         base.save()
 
         assert base.rates.get().country_id == other.alpha_2
+
+
+class TestARegionOnlyCountry:
+    """A store that delivers to some regions of a country and has no base
+    zone there: the country is shippable (the country lists name it,
+    checkout may preselect it), so every read that knows no region judges
+    it at those region zones, and its policy rows name the regions."""
+
+    @pytest.fixture
+    def crete_only(self):
+        country = CountryFactory(num_regions=0)
+        crete, _elsewhere = (RegionFactory(country=country) for _ in "ab")
+        ShippingRateFactory(
+            provider=ShippingProvider.objects.get(code="flat_rate"),
+            zone=ShippingZoneFactory(country=country, regions=[crete]),
+            price=ISLANDS,
+            free_shipping_threshold=Decimal("60.00"),
+        )
+        ShippingProvider.objects.filter(code="flat_rate").update(is_active=True)
+        return SimpleNamespace(country=country.alpha_2, crete=crete.alpha)
+
+    def test_its_standing_destinations_are_its_region_zones(self, crete_only):
+        assert standing_destinations(crete_only.country) == [
+            StandingDestination(
+                region_code=crete_only.crete,
+                region_codes=(crete_only.crete,),
+            )
+        ]
+
+    def test_it_is_shippable(self, crete_only):
+        assert crete_only.country in ShippingService.shippable_country_codes()
+
+    def test_the_free_shipping_line_has_its_threshold(self, crete_only):
+        info = ShippingService.free_shipping_info(
+            country_code=crete_only.country
+        )
+
+        assert info["min_threshold"] == Decimal("60.00")
+
+    def test_the_policy_names_its_regions(self, crete_only):
+        rows = [
+            row
+            for row in ShippingService.shipping_policy()
+            if row["country_code"] == crete_only.country
+        ]
+
+        assert [(row["price"], row["region_codes"]) for row in rows] == [
+            (ISLANDS, [crete_only.crete])
+        ]
+
+    def test_a_products_estimate_is_its_regions_price(self, crete_only):
+        product = ProductFactory(
+            stock=10,
+            price=Money(Decimal("10.00"), "EUR"),
+            discount_percent=Decimal(0),
+            vat=VatFactory(value=0),
+            active=True,
+            num_images=0,
+            num_reviews=0,
+        )
+
+        with mock.patch.object(
+            ShippingService,
+            "initial_country_code",
+            return_value=crete_only.country,
+        ):
+            estimate = ShippingService.product_shipping_from(product)
+
+        assert estimate is not None
+        assert estimate.price.amount == ISLANDS
+
+    def test_a_country_with_a_base_zone_is_judged_there(self, greece_like):
+        assert standing_destinations(greece_like["country"].alpha_2) == [
+            StandingDestination(region_code=None)
+        ]
+        rows = [
+            row
+            for row in ShippingService.shipping_policy()
+            if row["country_code"] == greece_like["country"].alpha_2
+        ]
+        assert [(row["price"], row["region_codes"]) for row in rows] == [
+            (MAINLAND, [])
+        ]

@@ -54,9 +54,9 @@ def test_home_delivery_without_explicit_code_resolves_to_the_active_carrier():
     storefront sends no ``shipping_provider_code`` — both order creation
     and the quote receive None. ``OrderQuoteService.shipping_cost`` must
     auto-resolve to the active home-delivery provider for the
-    destination country (mirroring ``_resolve_shipping_provider``'s FK
-    resolution), so the cost matches the carrier the order will
-    actually be served by.
+    destination country, the carrier the quote hands the order
+    (``CheckoutQuote.shipping_choice``), so the cost matches the carrier
+    the order will actually be served by.
     """
     country = CountryFactory()
     enable_rate(

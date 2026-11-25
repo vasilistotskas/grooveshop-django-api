@@ -216,6 +216,22 @@ class TestOptions:
         assert response.status_code == 400, response.content
         assert _codes(response, "regionId") == ["region_country_mismatch"]
 
+    def test_a_region_in_another_case_is_refused_as_the_quote_refuses_it(
+        self, store
+    ):
+        # A region is its stored code; the options never price it in
+        # another case as the whole country.
+        response = APIClient().get(
+            reverse("shipping-options"),
+            {
+                "country_code": store.country.alpha_2,
+                "region_id": store.islands.alpha.swapcase(),
+            },
+        )
+
+        assert response.status_code == 400, response.content
+        assert _codes(response, "regionId") == ["region_invalid"]
+
 
 class TestCheckout:
     def test_the_quote_charges_the_islands_rate(self, store):

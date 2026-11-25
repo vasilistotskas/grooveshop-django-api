@@ -15310,6 +15310,9 @@ msgstr "Η επιστροφή δεν έγινε"
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
 
+msgid "The regions of the country this row applies to; empty when it applies to the whole country. A store that delivers only to some regions of a country lists them here."
+msgstr "Οι περιοχές της χώρας στις οποίες ισχύει αυτή η γραμμή· κενό όταν ισχύει για ολόκληρη τη χώρα. Ένα κατάστημα που παραδίδει μόνο σε ορισμένες περιοχές μιας χώρας τις αναφέρει εδώ."
+
 msgid "The release whose versions this one restores."
 msgstr "Η δημοσίευση της οποίας τις εκδόσεις επαναφέρει αυτή."
 

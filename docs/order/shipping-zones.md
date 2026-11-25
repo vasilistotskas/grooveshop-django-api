@@ -46,17 +46,23 @@ does any other rate.
   `quote` / `resolve_live_price`, `offered_rates` (the options and
   `/shipping/policy`), `free_threshold_rates`,
   `resolve_home_delivery_provider` and `Order.estimated_delivery`
-  (`OrderService._seed_estimated_delivery`). The quote, both order-creation
-  paths and the payment intent pass the order's region for a home delivery,
-  so the price charged and the carrier assigned come from the same zone.
+  (`OrderService._seed_estimated_delivery`). The quote and both
+  order-creation paths pass the order's region for a home delivery, and the
+  quote resolves the carrier once and hands it to the order
+  (`CheckoutQuote.shipping_choice`), so the price charged and the carrier
+  assigned come from the same zone.
 - The carrier's `live_quote()` (ACS) is asked with the rate the zone
   resolved and the region, as before.
-- **Without a region the base zone answers**: `/shipping/options` without
-  `regionId`, and every surface that knows no address (`/shipping/policy`,
+- **Without a region**, `/shipping/options` without `regionId` is priced
+  by the base zone. Every surface that knows no address (`/shipping/policy`,
   `/shipping/free-shipping-info`, `/shipping/product/<id>`, the cart's
-  `freeShippingProgress`), which judge the store's first shipping country.
-  A country served only by region zones advertises nothing there until a
-  region is known.
+  `freeShippingProgress`) is judged at the country's standing destinations
+  (`standing_destinations`): its base zone when that has an active rate,
+  else each of its region zones with one. So a country served only in some
+  regions, which is shippable and may be the one checkout preselects,
+  advertises those regions' prices: the product estimate takes the
+  cheapest, the free-shipping line their thresholds, and each policy row
+  names its regions (`regionCodes`, empty for a base zone).
 
 ### Served destinations
 
@@ -89,7 +95,7 @@ does any other rate.
 
 | Code | Where | Meaning |
 |---|---|---|
-| `shipping_region_unavailable` | `POST /cart/quote` and the payment intent (`ShippingRefusal.REGION_UNAVAILABLE`) | the chosen delivery reaches the country, but its rate is not in the region's zone |
+| `shipping_region_unavailable` | `POST /cart/quote` (`ShippingRefusal.REGION_UNAVAILABLE`) | the chosen delivery reaches the country, but its rate is not in the region's zone |
 | `region_not_served` | `regionId` on order creation; `region` on `/user/address` | the store delivers home elsewhere in the country, but not to this region |
 | `country_not_served` | `country` on `/user/address` | no home delivery of the store reaches the country |
 

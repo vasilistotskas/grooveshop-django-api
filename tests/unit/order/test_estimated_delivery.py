@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from extra_settings.models import Setting
 
 from country.factories import CountryFactory
+from order.checkout.quote import ShippingChoice
 from order.factories.order import OrderFactory
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
@@ -24,12 +26,15 @@ MONDAY_1530_ATHENS = datetime(2026, 10, 5, 12, 30, tzinfo=UTC)
 
 
 def _order_data(country, *, kind="home_delivery", code="flat_rate"):
-    data = {
-        "country_id": country.alpha_2,
-        "shipping_provider_code": code,
-        "shipping_kind": kind,
-    }
-    OrderService._resolve_shipping_provider(data, weight_grams=0)
+    data = {"country_id": country.alpha_2}
+    OrderService._assign_shipping_provider(
+        data,
+        SimpleNamespace(
+            shipping_choice=ShippingChoice(
+                kind=kind, provider_code=code, country_id=country.alpha_2
+            )
+        ),
+    )
     return data
 
 

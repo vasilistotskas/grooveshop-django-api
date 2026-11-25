@@ -10,6 +10,11 @@ that says where home delivery reaches:
   zone holding the region, else by the base zone; with no region (a
   country without regions, or a checkout before one is chosen) by the
   base zone;
+* a read that knows **no region at all** (the store's standing prices:
+  the policy, the free-shipping line, a product's "shipping from", a
+  cart before checkout) is judged for the country's
+  :func:`standing_destinations`: its base zone, or, in a country served
+  only in some regions, each of those region zones;
 * a **pickup point** is priced by the base zone of its country. Neither
   carrier's catalogue gives a point a ``Region``, so a point is judged by
   country, and a pickup rate on a region zone would never apply:
@@ -59,6 +64,48 @@ def zone_for(
         if zone is not None:
             return zone
     return zones.filter(regions__isnull=True).first()
+
+
+@dataclass(frozen=True, slots=True)
+class StandingDestination:
+    """A destination a read that knows no region is judged for.
+
+    ``region_code`` is what to price it as (``None`` for the base zone,
+    else one region of the region zone), and ``region_codes`` every
+    region it stands for (empty for the base zone, which covers the
+    country).
+    """
+
+    region_code: str | None
+    region_codes: tuple[str, ...] = ()
+
+
+def standing_destinations(country_code: str) -> list[StandingDestination]:
+    """Where a read that knows no region judges ``country_code``.
+
+    The base zone when it has an active rate: it prices the country, a
+    region zone only overriding it for some regions. Otherwise the store
+    delivers only to some regions, so each region zone with an active
+    rate stands for itself, priced by its own rates. Empty when the store
+    has neither.
+    """
+    country_code = country_code.upper()
+    zones = ShippingZone.objects.filter(
+        country_id=country_code, rates__is_active=True
+    ).distinct()
+    if zones.filter(regions__isnull=True).exists():
+        return [StandingDestination(region_code=None)]
+    regions: dict[int, list[str]] = {}
+    for zone_id, region_code in (
+        ShippingZoneRegion.objects.filter(zone__in=zones)
+        .order_by("zone_id", "region_id")
+        .values_list("zone_id", "region_id")
+    ):
+        regions.setdefault(zone_id, []).append(region_code)
+    return [
+        StandingDestination(region_code=codes[0], region_codes=tuple(codes))
+        for codes in regions.values()
+    ]
 
 
 def destination_rates(

@@ -22,6 +22,14 @@ class ShippingPolicyEntrySerializer(serializers.Serializer):
         max_length=2,
         help_text=_("ISO 3166-1 alpha-2 destination country."),
     )
+    region_codes = serializers.ListField(
+        child=serializers.CharField(),
+        help_text=_(
+            "The regions of the country this row applies to; empty when "
+            "it applies to the whole country. A store that delivers only "
+            "to some regions of a country lists them here."
+        ),
+    )
     kind = serializers.ChoiceField(choices=ShippingKind.choices)
     provider_code = serializers.CharField()
     provider_name = serializers.CharField()

@@ -317,9 +317,7 @@ Always combine CONTAINS with other filters to improve performance:
 
 ```python
 # Good: Narrow down by category first
-ProductTranslation.meilisearch.filter(
-    category=3, name__contains="pro"
-)
+ProductTranslation.meilisearch.filter(category=3, name__contains="pro")
 
 # Bad: CONTAINS on entire index
 ProductTranslation.meilisearch.filter(name__contains="pro")

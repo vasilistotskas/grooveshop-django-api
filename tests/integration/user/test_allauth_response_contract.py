@@ -12,6 +12,7 @@ wins and the disagreement is a failure to fix, not a schema to loosen.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -466,3 +467,148 @@ def test_resending_an_email_verification_carries_the_session_token(
 
     assert response.status_code == status.HTTP_200_OK
     assert_documented(document, "/auth/email/verify/resend", "post", response)
+
+
+def _sensitive_action(token, user):
+    """An action allauth guards with reauthentication
+    (``MFA_REAUTHENTICATION_REQUIRED`` is on by default): managing a
+    second factor. Its 401 lists the ways this customer can prove who they
+    are."""
+    from allauth.mfa.models import Authenticator
+    from allauth.mfa.totp.internal.auth import format_hotp_value, hotp_value
+
+    if Authenticator.objects.filter(
+        user=user, type=Authenticator.Type.TOTP
+    ).exists():
+        return _call(
+            Client(),
+            "delete",
+            "/account/authenticators/totp",
+            {},
+            token=token,
+        )
+    secret = _call(
+        Client(), "get", "/account/authenticators/totp", token=token
+    ).json()["meta"]["secret"]
+    code = format_hotp_value(hotp_value(secret, int(time.time()) // 30))
+    return _call(
+        Client(),
+        "post",
+        "/account/authenticators/totp",
+        {"code": code},
+        token=token,
+    )
+
+
+def _sensitive_operation(user) -> tuple[str, str]:
+    """The path and method ``_sensitive_action`` called."""
+    from allauth.mfa.models import Authenticator
+
+    if Authenticator.objects.filter(
+        user=user, type=Authenticator.Type.TOTP
+    ).exists():
+        return "/account/authenticators/totp", "delete"
+    return "/account/authenticators/totp", "post"
+
+
+def _code_in(message) -> str:
+    return next(
+        part
+        for part in message.body.split()
+        if part.isdigit() and len(part) == 6
+    )
+
+
+@pytest.fixture
+def passwordless_token(user) -> str:
+    """The session of a customer who has no password (a sign-up through a
+    provider, say) and signs in by the code mailed to them. Taking the
+    password away from a signed-in session would end that session."""
+    from django.core import mail
+
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    mail.outbox.clear()
+    pending = _call(
+        Client(), "post", "/auth/code/request", {"email": user.email}
+    )
+    token = pending.json()["meta"]["session_token"]
+    confirmed = _call(
+        Client(),
+        "post",
+        "/auth/code/confirm",
+        {"code": _code_in(mail.outbox[-1])},
+        token=token,
+    )
+    assert confirmed.status_code == status.HTTP_200_OK
+    assert not user.has_usable_password()
+    return confirmed.json()["meta"].get("session_token", token)
+
+
+def _with_totp(user) -> None:
+    from allauth.mfa.models import Authenticator
+    from allauth.mfa.totp.internal import auth as totp_auth
+
+    Authenticator.objects.create(
+        user=user,
+        type=Authenticator.Type.TOTP,
+        data={"secret": totp_auth.generate_totp_secret()},
+    )
+
+
+def _flow_ids(body: dict) -> list[str]:
+    return [flow["id"] for flow in body["data"]["flows"]]
+
+
+def test_a_password_customer_reauthenticates_by_password(document, user, token):
+    response = _sensitive_action(token, user)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    body = assert_documented(document, *_sensitive_operation(user), response)
+    # allauth 65.22 would add `reauthenticate_by_code`; the setting keeps it
+    # off until the storefront that completes it is live.
+    assert body["data"]["flows"] == [{"id": "reauthenticate"}]
+
+
+def test_a_customer_with_a_second_factor_is_offered_both(document, user, token):
+    _with_totp(user)
+
+    response = _sensitive_action(token, user)
+
+    body = assert_documented(document, *_sensitive_operation(user), response)
+    assert _flow_ids(body) == ["reauthenticate", "mfa_reauthenticate"]
+
+
+def test_a_customer_with_no_way_to_reauthenticate_is_given_none(
+    document, user, passwordless_token
+):
+    # No password, no second factor, and the code method is off: allauth
+    # 65.22 answers the 401 with no flow, where 65.21 let the call through.
+    response = _sensitive_action(passwordless_token, user)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    body = assert_documented(document, *_sensitive_operation(user), response)
+    assert body["data"]["flows"] == []
+
+
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [
+        ("/auth/reauthenticate/code/request", {"email": "a@example.com"}),
+        ("/auth/reauthenticate/code/confirm", {"code": "123456"}),
+        ("/auth/reauthenticate/code/resend", None),
+    ],
+)
+def test_the_code_method_is_refused_while_it_is_off(
+    document, token, path, body
+):
+    response = _call(Client(), "post", path, body, token=token)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert_documented(document, path, "post", response)
+
+
+def test_the_document_does_not_offer_the_flow_that_is_off(document):
+    flow_ids = document["components"]["schemas"]["Flow"]["properties"]["id"]
+
+    assert "reauthenticate_by_code" not in flow_ids["enum"]

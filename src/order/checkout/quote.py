@@ -1137,7 +1137,7 @@ class OrderQuoteService:
         through a provider the store can charge with, and not excluded
         for the chosen delivery (all of the first two while none is
         chosen). The one rule behind the list a quote returns and the
-        pay way a quote, a payment intent or order creation accepts, so
+        pay way a quote or order creation accepts, so
         a selection is accepted exactly when it is listed.
 
         A delivery without a kind is judged as what it is priced as, a

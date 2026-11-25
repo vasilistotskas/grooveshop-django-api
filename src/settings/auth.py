@@ -207,14 +207,6 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 ACCOUNT_REAUTHENTICATION_TIMEOUT = int(
     getenv("ACCOUNT_REAUTHENTICATION_TIMEOUT", "300")
 )
-# allauth 65.22 added reauthentication by a code mailed to a verified address
-# ("code") and turns it on by default. It adds the `reauthenticate_by_code`
-# flow to every reauthentication 401, a Flow.id the storefront live today
-# rejects. So it stays off until a storefront that completes the flow is in
-# production (`docs/allauth-schema.md`, "Reauthentication"); then this line
-# goes and the default (password, code, mfa) applies. The document follows it
-# (`core.allauth_spec_corrections.declare_every_flow`).
-ACCOUNT_REAUTHENTICATION_METHODS = ("password", "mfa")
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True

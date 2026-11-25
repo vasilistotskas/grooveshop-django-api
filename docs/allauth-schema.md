@@ -72,27 +72,25 @@ the ways this customer can give it, `data.flows`, from
 `allauth.account.internal.flows.reauthentication.get_reauthentication_flows`:
 
 * `reauthenticate`: a customer with a usable password.
-* `mfa_reauthenticate`: a customer with an authenticator.
 * `reauthenticate_by_code`: a code mailed to a verified address of the
-  customer (allauth 65.22; `POST .../auth/reauthenticate/code/request`,
-  `.../confirm`, `.../resend`). **Off for now**:
-  `ACCOUNT_REAUTHENTICATION_METHODS` in `src/settings/auth.py` leaves out
-  `code`, the three endpoints answer 403, and `declare_every_flow` keeps the
-  value out of `Flow.id`. The storefront live in production rejects a
-  `Flow.id` it does not know (422), so the flow is switched on only after a
-  storefront that completes it is live, in three releases, each one checked
-  with `api-contract/api-contract.sh compare`: this document (new paths, the
-  `SessionToken` security scheme, `recipients`, the enum without the value),
-  then the storefront generated from the document with the value, then the
-  release that deletes the setting (the document differs by that one enum
-  value).
+  customer, listed in the flow's `recipients`. `ACCOUNT_REAUTHENTICATION_METHODS`
+  is left at allauth's default (`password`, `code`, `mfa`), so every
+  customer has it, one without a password included. `POST
+  .../auth/reauthenticate/code/request` (`email`), `.../confirm` (`code`) and
+  `.../resend`; while a code is pending the flow carries `is_pending: true`.
+  The mail is the `account.login_code` type, so it is the store's own mail in
+  the customer's language. Its limits are allauth's per-address
+  `request_login_code` limit, `ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS` and
+  `ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND`, and the per-IP rules in
+  `core.middleware.allauth_ratelimit`.
+* `mfa_reauthenticate`: a customer with an authenticator.
 
-A customer with none of the methods that are on (no password, no
-authenticator) is refused: allauth up to 65.21 counted such a customer as
-always freshly reauthenticated, 65.22 denies, so the storefront's account
-deletion answers 403 `reauthentication_required` and a second factor cannot be
-added until the code method is on.
+A customer with none of them (no password, no authenticator, no verified
+address) is refused: allauth up to 65.21 counted such a customer as always
+freshly reauthenticated, 65.22 denies. A customer who is signed in always has
+a verified address (an account whose address is unverified cannot sign in),
+so the code is always a way.
 
 `AuthenticationMethod` keeps the titles its two code entries had before 65.22
 (`keep_the_code_methods_titles`): a consumer's contract check pairs the entries
-of a `oneOf` by title.
+of a `oneOf` by title, and a renamed one reads as removed and added.

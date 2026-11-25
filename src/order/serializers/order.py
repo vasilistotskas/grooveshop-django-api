@@ -1098,9 +1098,12 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
 
     Every pay way creates the order before any payment, whatever its
     ``settlement``:
-    1. ``online``: the shopper pays the balance left after deductions
-       (gift cards, promotions, loyalty points) afterwards, on the
-       provider's hosted page (Viva Wallet, Stripe). Deductions that
+    1. ``online``: the balance left after deductions (gift cards,
+       promotions, loyalty points) is paid afterwards. In storefront
+       checkout the shopper pays it on the provider's hosted page (Viva
+       Wallet, Stripe); an agent order with delegated Stripe payments is
+       charged it through ``POST /api/v1/order/{id}/confirm_agent_payment``
+       (``confirmAgentPaymentForOrder``). Either way, deductions that
        cover the whole total settle the order at once, with no provider
        charge.
     2. Any other settlement (courier cash, carrier terminal, offline

@@ -202,7 +202,7 @@ Django's response cache keys on the full URL, so `?shippable=` and
    along, so what shoppers were quoted stays what they are charged. `0027`
    sets `zone` NOT NULL (`contract_of` `0025`) and takes `country` out of the
    state: the code writes and reads the zone alone.
-3. **N+2 (contract, `contract_of` `0027`).** Drops the rate's `country_id`
+3. **N+2 (contract, `0028`, `contract_of` `0027`).** Drops the rate's `country_id`
    column, and with it the old unique `(provider, country, kind)` and its
    index. It cannot be part of N+1: release N names the column in every
    SELECT and INSERT, and serves until its last pod exits

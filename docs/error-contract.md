@@ -106,7 +106,7 @@ from a missing one.
 calls it for raised exceptions), so those keep their own shape. Where a
 stable discriminator already existed, `code` now repeats it:
 
-- `{"detail", "reason"}` (cart coupons, quotes and payment intents, gift
+- `{"detail", "reason"}` (cart coupons, quotes, gift
   cards, business profile): `code` equals `reason`. `POST /cart/quote`
   answers a delivery it cannot price this way, with
   `shipping_unavailable`, `shipping_region_unavailable` (the delivery
@@ -117,10 +117,10 @@ stable discriminator already existed, `code` now repeats it:
   be confirmed to take the cart with `pickup_point_too_small` or
   `pickup_point_size_unknown` (`shipping.interfaces.PickupPointUnfit`;
   order creation answers those two as field errors on the carrier's
-  location field, the payment intent as `invalid_order_data`). A loyalty refusal there and on
-  the payment intent carries the loyalty program's code when it has one
-  (`loyalty_redemption_too_small`), else `loyalty_redemption_invalid`. The payment intent and order
-  creation keep `invalid_order_data` with the message under
+  location field). A loyalty refusal there carries the loyalty program's
+  code when it has one (`loyalty_redemption_too_small`), else
+  `loyalty_redemption_invalid`. Order creation keeps `invalid_order_data`
+  with the message under
   `fieldErrors.shippingProviderCode` for the same three.
 - `{"detail", "error": {"type"}}` (order create and cancel): `code` equals
   `error.type`. One exception, for now: an order refused because its total

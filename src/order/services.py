@@ -197,8 +197,8 @@ LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
     "now, so the order cannot be placed. Please contact the store."
 )
 """Why a checkout is refused for ``LegalDocumentUnavailableError``: a
-store fault, not the buyer's, said the same before a payment is taken
-(the cart's payment intent) and at order creation."""
+store fault, not the buyer's, said at order creation, before the order
+or any payment exists."""
 
 
 class OrderLegalAcceptanceService:
@@ -213,8 +213,8 @@ class OrderLegalAcceptanceService:
 
         Raises ``LegalDocumentUnavailableError`` when one has no
         published text in that language: the buyer was shown a broken
-        link, so nothing can be accepted. Checked before any payment is
-        taken (the cart's payment intent) and before an order is created.
+        link, so nothing can be accepted. Checked at order creation,
+        before the order is created and so before any payment.
         """
         return tuple(
             LegalDocumentVersion.objects.in_force(slug, language_code)
@@ -503,8 +503,8 @@ class OrderService:
     def _require_quoted_total(order: Order, quoted: Money) -> None:
         """Refuse an order whose rows do not add up to its quote.
 
-        The quote is the total the buyer was shown, the payment intent
-        was verified against and ``expected_total`` was compared with;
+        The quote is the total the buyer was shown and
+        ``expected_total`` was compared with;
         ``Order.calculate_order_total_amount`` is what the order stores
         and is charged for. They are one figure because the order is
         built from the quote's rows. A charge added to one and not the

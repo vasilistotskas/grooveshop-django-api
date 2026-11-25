@@ -282,7 +282,7 @@ class LoyaltyRedemptionError(InvalidOrderDataError):
     is more than the products).
 
     The shopper was shown the discount, so it is never dropped: the
-    quote, the payment intent or the order is refused instead.
+    quote or the order is refused instead.
 
     A subclass of ``InvalidOrderDataError`` so order creation passes it
     on as it passes its other refusals, with the program's message under

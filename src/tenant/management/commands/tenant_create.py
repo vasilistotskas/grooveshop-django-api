@@ -94,6 +94,11 @@ class Command(BaseCommand):
                 f"{'; '.join(exc.messages)}"
             ) from exc
 
+        # The ``tenant_name_not_blank`` constraint refuses it too, but
+        # only after the schema has been built and rolled back.
+        if not options["name"].strip():
+            raise CommandError("A tenant needs a name: --name is blank.")
+
         if Tenant.objects.filter(schema_name=schema_name).exists():
             raise CommandError(
                 f"Tenant with schema '{schema_name}' already exists."
